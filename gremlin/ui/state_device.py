@@ -2302,7 +2302,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._update_ui()
 
     @QtCore.Slot(bool)
-    def _handle_autorelease_changed(self, checked):        
+    def _handle_autorelease_changed(self, checked : bool):        
         self.data.autorelease = checked
         self._update_ui()
 
@@ -2400,7 +2400,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.data.setDescription(description)
 
     @QtCore.Slot(bool)
-    def _is_expression_changed(self, checked):
+    def _is_expression_changed(self, checked : bool):
         self.data.isExpression = checked
         self._update_ui()
                  
@@ -2420,7 +2420,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         
 
     @QtCore.Slot(bool)
-    def _default_changed(self, checked):
+    def _default_changed(self, checked : bool):
         widget = self.sender()
         self.data.default_value = widget.data
 

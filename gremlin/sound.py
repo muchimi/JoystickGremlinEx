@@ -817,7 +817,7 @@ class TTSGeneratorDialog(QtWidgets.QDialog):
     def speaker(self, value):
         self._speaker = value
 
-    def _handle_overwrite_filename_changed(self, checked):
+    def _handle_overwrite_filename_changed(self, checked : bool):
         config = gremlin.config.Configuration()
         config.ai_tts_overwrite_filenames = checked        
 
@@ -934,15 +934,15 @@ class GenerateDialog(QtWidgets.QDialog):
         self.main_layout.addWidget(button_container)
 
 
-    def _handle_save_on_generate_changed(self, checked):
+    def _handle_save_on_generate_changed(self, checked : bool):
         config = gremlin.config.Configuration()
         config.ai_tts_save_on_generate = checked
 
-    def _handle_word_filename_changed(self, checked):
+    def _handle_word_filename_changed(self, checked : bool):
         config = gremlin.config.Configuration()
         config.ai_tts_use_word_filenames = checked
 
-    def _handle_overwrite_filename_changed(self, checked):
+    def _handle_overwrite_filename_changed(self, checked : bool):
         config = gremlin.config.Configuration()
         config.ai_tts_overwrite_filenames = checked
 

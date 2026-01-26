@@ -533,7 +533,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self._update_repeater()
 
     @QtCore.Slot(bool)
-    def _capture_mouse_changed(self, checked):
+    def _capture_mouse_changed(self, checked : bool):
         self._capture_mouse = checked
         self.config.keyboard_repeater_capture_mouse = checked
         if not checked:
@@ -553,7 +553,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         
     
     @QtCore.Slot(bool)
-    def _invert_display_changed(self, checked):
+    def _invert_display_changed(self, checked : bool):
         self._invert_display = checked
         self.config.keyboard_repeater_invert_display = checked
         self._repeater_list.reverse()
@@ -931,7 +931,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         return keys
                 
 
-    def _force_numlock_cb(self, checked):
+    def _force_numlock_cb(self, checked : bool):
         gremlin.shared_state.current_profile.set_force_numlock(checked)
 
     def _listen_cb(self):

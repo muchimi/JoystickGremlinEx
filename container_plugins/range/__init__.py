@@ -166,7 +166,7 @@ class RangeContainerWidget(AbstractContainerWidget):
         add_button_top_90.setToolTip("Configures the container for the top 90 percent range.  When used with the symmetry option, sets a trigger for bottom 10 percent or top 10 percent of the input range")
 
         action_label = QtWidgets.QLabel("Actions")
-        self.ui_action_dropdown = gremlin.ui.ui_common.QComboBox()
+        self.ui_action_dropdown = gremlin.ui.ui_common.QDataComboBox()
         # entries = list(gremlin.plugin_manager.ActionPlugins().repository.values())
         # for entry in entries:
         for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
@@ -300,7 +300,7 @@ class RangeContainerWidget(AbstractContainerWidget):
 
 
     @QtCore.Slot(bool)
-    def _change_direction(self, checked):
+    def _change_direction(self, checked : bool):
         if checked:
             rb = self.sender()
             delta = rb.data

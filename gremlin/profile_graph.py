@@ -262,7 +262,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
             syslog.error(f"Device copy: source [{device_guid}] device not found")
             self.close()
 
-        self.device_selector = gremlin.ui.ui_common.NoWheelComboBox()
+        self.device_selector = gremlin.ui.ui_common.QDataComboBox()
         devices = gremlin.joystick_handling.all_joystick_devices()
         devices = [dev for dev in devices if dev.device_guid != self.source_device.device_guid and dev.device_type == self.source_device.device_type]
 

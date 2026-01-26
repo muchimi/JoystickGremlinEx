@@ -247,7 +247,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
                                                              ])
         
 
-        self.comparison_dropdown = ui_common.QComboBox()
+        self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
         if self.condition.comparison:self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
@@ -375,7 +375,7 @@ class ModeConditionWidget(AbstractConditionWidget):
              
         self.mode_selector.modeChanged.connect(self._handle_mode_changed)
 
-        self.comparison_dropdown = gremlin.ui.ui_common.QComboBox()
+        self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.comparison_dropdown.addItem("Equal", "equal")
         self.comparison_dropdown.addItem("Not Equal", "not_equal")
         if self.condition.comparison:
@@ -415,7 +415,7 @@ class ModeConditionWidget(AbstractConditionWidget):
         self.condition.mode = mode
 
     @QtCore.Slot(bool)
-    def _ignore_release_cb(self, checked):
+    def _ignore_release_cb(self, checked : bool):
         self.condition.ignore_release = checked
         
     def setDescription(self, value):
@@ -441,7 +441,7 @@ class StateConditionWidget(AbstractConditionWidget):
         widget = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True, widget_only = True)
         self.main_layout.addWidget(widget)
 
-        self.state_selector = gremlin.ui.ui_common.QComboBox()
+        self.state_selector = gremlin.ui.ui_common.QDataComboBox()
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
         widget = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector], widget_only = True)
@@ -453,7 +453,7 @@ class StateConditionWidget(AbstractConditionWidget):
         widget = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget], widget_only = True)
         self.main_layout.addWidget(widget)
 
-        self.comparison_dropdown = ui_common.QComboBox()
+        self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
         if self.condition.comparison:self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
@@ -483,7 +483,7 @@ class StateConditionWidget(AbstractConditionWidget):
         self.populate_selector()
         
     @QtCore.Slot(bool)
-    def _ignore_release_cb(self, checked):
+    def _ignore_release_cb(self, checked : bool):
         self.condition.ignore_release = checked
         
     def setDescription(self, value):
@@ -771,7 +771,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.grab_high_widget.setToolTip("Grab axis value")
         
 
-        self.comparison_dropdown = ui_common.QComboBox()
+        self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.comparison_dropdown.addItem("Inside")
         self.comparison_dropdown.addItem("Outside")
         if not self.condition.comparison in ("inside","outside"):
@@ -820,7 +820,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
     def _button_ui(self):
         """Creates the UI needed to configure a button based condition."""
         gremlin.util.clear_layout(self.ui_container_layout)
-        self.comparison_dropdown = ui_common.QComboBox()
+        self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
         if not self.condition.comparison in ("pressed","released"):
@@ -965,7 +965,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.upper_widget.setValue(self._axis_value()) # also updates condition_data
 
     @QtCore.Slot(bool)
-    def _use_calibrated_input_changed(self, checked):
+    def _use_calibrated_input_changed(self, checked : bool):
         self.condition.use_calibrated_data = checked
         self._update_range_state(self._axis_value())
 
@@ -1020,7 +1020,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
 
     @QtCore.Slot(bool)
-    def _ignore_release_cb(self, checked):
+    def _ignore_release_cb(self, checked : bool):
         self.condition.ignore_release = checked
 
 class VJoyConditionWidget(AbstractConditionWidget):
@@ -1130,7 +1130,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
 
     @QtCore.Slot(bool)
-    def _ignore_release_cb(self, checked):
+    def _ignore_release_cb(self, checked : bool):
         self.condition.ignore_release = checked                
 
   		
@@ -1201,7 +1201,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         self.upper_widget.setValue(self.condition.range[1])
         self.upper_widget.valueChanged.connect(self._range_upper_changed_cb)
 
-        self.comparison_widget = ui_common.QComboBox()
+        self.comparison_widget = gremlin.ui.ui_common.QDataComboBox()
         self.comparison_widget.addItem("Inside")
         self.comparison_widget.addItem("Outside")
         if not self.condition.comparison in ("inside","outside"):
@@ -1230,7 +1230,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
     def _button_ui(self):
         """Creates the UI needed to configure a button based condition."""
-        self.comparison_widget = ui_common.QComboBox()
+        self.comparison_widget = gremlin.ui.ui_common.QDataComboBox()
         self.comparison_widget.addItem("Pressed")
         self.comparison_widget.addItem("Released")
         if not self.condition.comparison in ("pressed","released"):
@@ -1343,7 +1343,7 @@ class InputActionConditionWidget(AbstractConditionWidget):
         self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback = self._paste_condition)
    
 
-        self.state_dropdown = ui_common.QComboBox()
+        self.state_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.state_dropdown.addItem("Pressed")
         self.state_dropdown.addItem("Released")
         if self.condition.comparison:
@@ -1527,7 +1527,7 @@ class ConditionView(ui_common.AbstractView):
         self.main_layout.addLayout(self.conditions_layout)
 
         # Condition truth rules
-        self.rule_selector = ui_common.QComboBox()
+        self.rule_selector = gremlin.ui.ui_common.QDataComboBox()
         self.rule_selector.addItem("All")
         self.rule_selector.addItem("Any")
         self.rule_selector.currentTextChanged.connect(self._rule_changed_cb)
@@ -1541,7 +1541,7 @@ class ConditionView(ui_common.AbstractView):
 
 
         # Condition selector
-        self.condition_selector = ui_common.QComboBox()
+        self.condition_selector = gremlin.ui.ui_common.QDataComboBox()
         self.condition_selector.addItem("Keyboard Condition", )
         self.condition_selector.addItem("Joystick Condition")
         self.condition_selector.addItem("vJoy Condition")

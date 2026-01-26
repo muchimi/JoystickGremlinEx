@@ -64,7 +64,7 @@
         
 #     def _create_ui(self):
 #         """Creates the UI components."""
-#         self.action_widget = gremlin.ui.ui_common.NoWheelComboBox()
+#         self.action_widget = gremlin.ui.ui_common.QDataComboBox()
 #         index = 0
 #         set_index = None
 #         for index, action in enumerate(SystemAction):

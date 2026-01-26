@@ -77,8 +77,8 @@ class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.output_widget = QtWidgets.QWidget()
         self.output_layout = QtWidgets.QHBoxLayout(self.output_widget)
         
-        self.device_selector = gremlin.ui.ui_common.NoWheelComboBox()
-        self.output_selector = gremlin.ui.ui_common.NoWheelComboBox()
+        self.device_selector = gremlin.ui.ui_common.QDataComboBox()
+        self.output_selector = gremlin.ui.ui_common.QDataComboBox()
         
         self.output_layout.addWidget(QtWidgets.QLabel("Device:"))
         self.output_layout.addWidget(self.device_selector)

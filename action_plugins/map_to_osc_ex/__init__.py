@@ -904,17 +904,17 @@ class OscInputWidget(QtWidgets.QWidget):
             
 
     @QtCore.Slot(bool)
-    def _enabled_changed(self, checked):
+    def _enabled_changed(self, checked : bool):
         self._is_enabled = checked
         self._update()
         self.enabledChanged.emit(checked)
 
     @QtCore.Slot(bool)
-    def _enable_value_on_press_changed(self, checked):
+    def _enable_value_on_press_changed(self, checked : bool):
         self.enableValueOnPressChanged.emit(checked)
 
     @QtCore.Slot(bool)
-    def _enable_value_on_release_changed(self, checked):
+    def _enable_value_on_release_changed(self, checked : bool):
         self.enableValueOnReleaseChanged.emit(checked)
             
     @QtCore.Slot()

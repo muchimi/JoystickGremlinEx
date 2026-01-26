@@ -82,7 +82,7 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
             return
 
         # Device selection drop down
-        self.device_dropdown = gremlin.ui.ui_common.QComboBox()
+        self.device_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.device_dropdown.currentIndexChanged.connect(
             self._create_axes
         )
@@ -1201,7 +1201,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         # initial value
         self._update_ui()
     
-    def _auto_calibrate_changed(self, checked):
+    def _auto_calibrate_changed(self, checked : bool):
         config = gremlin.config.Configuration()
         config.auto_calibrate = checked
         self._auto_calibrate = checked
@@ -1410,7 +1410,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
 
     @QtCore.Slot(bool)
-    def _threshold_enabled_changed(self, checked):
+    def _threshold_enabled_changed(self, checked : bool):
         self.action_data.threshold_enabled = checked
         self._threshold_value_widget.setEnabled(checked)
 
@@ -1452,13 +1452,13 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
 
     @QtCore.Slot(bool)
-    def _centered_changed(self, checked):
+    def _centered_changed(self, checked : bool):
         self.action_data.centered = checked
         self._update_ui()
 
 
     @QtCore.Slot(bool)
-    def _inverted_changed(self, checked):
+    def _inverted_changed(self, checked : bool):
         self.action_data.inverted = checked
         self._update_ui()
 

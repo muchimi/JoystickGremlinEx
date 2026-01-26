@@ -518,18 +518,18 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self._update_warnings()
 
     @QtCore.Slot(bool)
-    def _chain_short_changed_cb(self, checked):
+    def _chain_short_changed_cb(self, checked : bool):
         ''' occurs when short chain checkbox is changed '''
         self.profile_data.chain_short = checked
 
 
     @QtCore.Slot(bool)
-    def _chain_long_changed_cb(self, checked):
+    def _chain_long_changed_cb(self, checked : bool):
         ''' occurs when short chain checkbox is changed '''
         self.profile_data.chain_long = checked
 
     @QtCore.Slot(bool)
-    def _chain_double_changed_cb(self, checked):
+    def _chain_double_changed_cb(self, checked : bool):
         ''' occurs when double chain checkbox is changed '''
         self.profile_data.chain_double = checked
 

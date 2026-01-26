@@ -2016,7 +2016,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
     @QtCore.Slot(bool)
-    def _handle_simconnect_enabled_changed(self, checked):
+    def _handle_simconnect_enabled_changed(self, checked : bool):
         self.config.simconnect_enabled = checked
         if checked:
             self._manager.activate()
@@ -2115,12 +2115,12 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         super().closeEvent(event)
 
     @QtCore.Slot(bool)
-    def _auto_mode_select_cb(self, checked):
+    def _auto_mode_select_cb(self, checked : bool):
         ''' auto mode changed'''
         self.options.auto_mode_select = checked
 
     @QtCore.Slot(bool)
-    def _auto_mode_lock_cb(self, checked):
+    def _auto_mode_lock_cb(self, checked : bool):
         ''' auto mode lock changed'''
         self.options.auto_mode_lock = checked
 
@@ -2740,7 +2740,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         
 
     @QtCore.Slot(bool)
-    def _global_selected_changed_cb(self, checked):
+    def _global_selected_changed_cb(self, checked : bool):
         for item in self._selected_cb_map.keys():
             self._selected_cb_map[item].setChecked(checked)
 
@@ -2751,7 +2751,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
     @QtCore.Slot(bool)
-    def _selected_changed_cb(self, state):
+    def _selected_changed_cb(self, state : bool):
         widget = self.sender()
         item, row_selector = widget.data
         checked = widget.isChecked() # param is an enum - ignore
@@ -2991,7 +2991,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._calculator_release_container_layout.setContentsMargins(0,0,0,0)
 
         # list of possible events to trigger
-        self._command_selector_widget = gremlin.ui.ui_common.QComboBox()
+        self._command_selector_widget = gremlin.ui.ui_common.QDataComboBox()
         self._command_list = self.action_data._manager.get_command_name_list()
         self._command_selector_widget.setEditable(True)
         self._command_selector_widget.addItems(self._command_list)
@@ -3031,7 +3031,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         # list of possible lvars to trigger
-        self._lvar_selector_widget = gremlin.ui.ui_common.QComboBox()
+        self._lvar_selector_widget = gremlin.ui.ui_common.QDataComboBox()
         self._lvar_selector_widget.setEditable(True)
         self._lvar_selector_widget.addItems(self.manager.get_lvar_name_list())
         self._lvar_selector_widget.currentIndexChanged.connect(self._command_changed_cb)
@@ -3452,11 +3452,11 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_ui()
 
     @QtCore.Slot(bool)
-    def _auto_repeat_state_changed(self, checked):
+    def _auto_repeat_state_changed(self, checked : bool):
         self.action_data.auto_repeat = checked
 
     @QtCore.Slot(bool)
-    def _is_release_command_changed(self, checked):
+    def _is_release_command_changed(self, checked : bool):
         self.action_data.is_release_command = checked
         self._update_visible()
 
@@ -3807,17 +3807,17 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._output_max_percent_range_widget.setValue(percent)
 
     @QtCore.Slot(bool)
-    def _output_invert_axis_cb(self, checked):
+    def _output_invert_axis_cb(self, checked : bool):
         self.action_data.inverted = checked
         self._axis_repeater_widget.setReverse(checked)
         # update the repeater
   
     @QtCore.Slot(bool)
-    def _trigger_on_release_cb(self, checked):
+    def _trigger_on_release_cb(self, checked : bool):
         self.action_data.trigger_on_release = checked
 
     @QtCore.Slot(bool)
-    def _trigger_on_press_cb(self, checked):
+    def _trigger_on_press_cb(self, checked : bool):
         self.action_data.trigger_on_press = checked
     
 
@@ -4107,36 +4107,36 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
     @QtCore.Slot(bool)
-    def _trigger_noop_changed_cb(self, checked):
+    def _trigger_noop_changed_cb(self, checked : bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.NoOp
             
 
     @QtCore.Slot(bool)
-    def _trigger_toggle_changed_cb(self, checked):
+    def _trigger_toggle_changed_cb(self, checked : bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.Toggle
             
 
     @QtCore.Slot(bool)
-    def _trigger_turnon_cb(self, checked):
+    def _trigger_turnon_cb(self, checked : bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.TurnOn
             
 
     @QtCore.Slot(bool)
-    def _trigger_turnoff_cb(self, checked):
+    def _trigger_turnoff_cb(self, checked : bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.TurnOff
 
     @QtCore.Slot(bool)
-    def _trigger_pulse_cb(self, checked):
+    def _trigger_pulse_cb(self, checked : bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.Pulse           
             
 
     @QtCore.Slot(bool)
-    def _trigger_input_value_cb(self, checked):
+    def _trigger_input_value_cb(self, checked : bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.InputValue
             

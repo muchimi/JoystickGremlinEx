@@ -396,6 +396,7 @@ class RepeatContainer(AbstractContainer):
         self.initial_pulse_delay = 0.75 # in seconds # initial repeat
         self.hold_delay = 0.25 # in seconds, repeat hold duration 
         self.pulse_interval_delay = 0.25 # in seconds, interval between repeats
+        self.actionsetCustomParseCallback = self._parse_action_set
 
 
     def _parse_xml(self, node, data = None, extra_data = None):
@@ -407,7 +408,21 @@ class RepeatContainer(AbstractContainer):
         self.initial_pulse_delay = safe_read(node, "delay", float, 0.75)
         self.hold_delay = safe_read(node,"interval", float, 0.25)
         self.pulse_interval_delay = safe_read(node,"pulse", float, 0.25)
-        
+
+        self.action_sets = []
+
+        actionset_nodes = node.xpath(".//action-set")   
+        for index, actionset_node in enumerate(actionset_nodes):
+            action_set = gremlin.base_profile.ActionSet()
+            self._parse_action_xml(actionset_node, action_set, data, extra_data)
+            self.action_sets.append(action_set)
+            break # only read the first set
+
+
+   
+    def _parse_action_set(elf, node, data = None, extra_data = None):
+        pass # do nothing
+                
 
 
     def _generate_xml(self):

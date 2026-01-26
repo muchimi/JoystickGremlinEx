@@ -1196,7 +1196,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_options_layout = QtWidgets.QHBoxLayout(self.container_options_widget)
 
         # Dropdown menu for the different curve types
-        self.curve_type_selection = gremlin.ui.ui_common.QComboBox()
+        self.curve_type_selection = gremlin.ui.ui_common.QDataComboBox()
         self.curve_type_selection.addItem("Cubic Spline")
         self.curve_type_selection.addItem("Cubic Bezier Spline")
         self.curve_type_selection.currentTextChanged.connect(
@@ -1366,7 +1366,7 @@ class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._configure_response_curve_view()
 
     @QtCore.Slot(bool)
-    def _curve_symmetry_cb(self, checked):
+    def _curve_symmetry_cb(self, checked : bool):
         if checked:
             self.action_data.symmetry_mode = SymmetryMode.Diagonal
             self.curve_model.set_symmetry_mode(SymmetryMode.Diagonal)

@@ -3039,4 +3039,13 @@ class Configuration(QtCore.QObject):
         return self._get_data("pause_action_default_pause_value", 0.250)
     @pause_action_default_pause_value.setter
     def pause_action_default_pause_value(self, value : float):
-        self._set_data("pause_action_default_pause_value", value)           
+        self._set_data("pause_action_default_pause_value", value)
+
+    @property
+    def dropdown_use_mouse_wheel(self) -> bool:
+        ''' true if UI combo boxes use the mouse wheel to change values '''
+        return self._get_data("dropdown_use_mouse_wheel", False)
+    @dropdown_use_mouse_wheel.setter
+    def dropdown_use_mouse_wheel(self, value : bool):
+        self._set_data("dropdown_use_mouse_wheel", value)
+        

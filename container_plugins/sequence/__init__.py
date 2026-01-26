@@ -610,17 +610,17 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.profile_data.exec_on_release = checked
 
     @QtCore.Slot(bool)
-    def _handle_wiggle_mode_change(self, checked):
+    def _handle_wiggle_mode_change(self, checked : bool):
         self.profile_data.wiggle_mode = checked
         self._update_widgets()
 
     @QtCore.Slot(bool)
-    def _handle_wiggle_random_change(self, checked):
+    def _handle_wiggle_random_change(self, checked : bool):
         self.profile_data.wiggle_random = checked
         self._update_widgets()
 
     @QtCore.Slot(bool)
-    def _handle_wiggle_random_steps_changed(self, checked):
+    def _handle_wiggle_random_steps_changed(self, checked : bool):
         self.profile_data.wiggle_randomize_steps = checked
 
 

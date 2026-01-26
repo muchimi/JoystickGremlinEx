@@ -821,12 +821,12 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         interface : MidiInterface = MidiInterface()
 
         # MIDI port selector
-        self._midi_port_selector_widget = gremlin.ui.ui_common.QComboBox()
+        self._midi_port_selector_widget = gremlin.ui.ui_common.QDataComboBox()
         ports = interface.ports
         self._midi_port_selector_widget.addItems(ports)
         self._midi_port_selector_widget.currentIndexChanged.connect(self._update_port)
 
-        self._midi_command_selector_widget = gremlin.ui.ui_common.QComboBox()
+        self._midi_command_selector_widget = gremlin.ui.ui_common.QDataComboBox()
         for name, it in MidiCommandType.to_pairs():
             self._midi_command_selector_widget.addItem(name, it)
         self._midi_command_selector_widget.currentIndexChanged.connect(self._update_command)

@@ -29,6 +29,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T164):
+New: UI: (feature request) Option to enable(disable) the mouse wheel in drop downs to change values. The new default is off.  This option is located in the UI page of the global GEX options.  This option can help with the inadvertent changes to drop downs values while scrolling UI elements that contain them vertically. The functionality also can be temporarily re-enabled if a shift key is down even with the option off.
+Change: UI : reworked the mapping top bar.
+Fix: Repeater Container: XML action sets not reading in correctly in the data structure.
+Fix: About box exception and about box rework to include correct links.
+Fix: XML: improved handling of failed input registrations (new API)
+
 ### (m76T163):
 Fix: Play Sound: resolve some parameter and object reference issues.
 Fix: Play Sound: resolve possible invalid bounds when using folder mode

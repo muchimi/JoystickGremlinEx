@@ -115,7 +115,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.upper_limit_widget = ui_common.DynamicDoubleSpinBox()
         self.upper_limit_widget.setRange(-1.0, 1.0)
         self.upper_limit_widget.setSingleStep(0.05)
-        self.direction_widget = ui_common.QComboBox()
+        self.direction_widget = gremlin.ui.ui_common.QDataComboBox()
         self.direction_widget.addItem("Anywhere")
         self.direction_widget.addItem("Above")
         self.direction_widget.addItem("Below")
@@ -152,7 +152,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.last_value = None
 
     @QtCore.Slot(bool)
-    def _enabled_changed(self, checked):
+    def _enabled_changed(self, checked : bool):
         self.condition_data.enabled = checked
 
     @QtCore.Slot()

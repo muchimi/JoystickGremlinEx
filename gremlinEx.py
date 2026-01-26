@@ -2065,7 +2065,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
     @QtCore.Slot()
-    def _toggle_button_highlight(self, checked):
+    def _toggle_button_highlight(self, checked : bool):
         eh = gremlin.event_handler.EventListener()
         
         status = self.config.highlight_input_buttons
@@ -2077,7 +2077,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         eh.toggle_highlight.emit(None, None, enabled)
 
     @QtCore.Slot()
-    def _toggle_highlight_enabled(self, checked):
+    def _toggle_highlight_enabled(self, checked : bool):
         self.config.highlight_enabled = not self.config.highlight_enabled
         el = gremlin.event_handler.EventListener()
         el.enable_highlight_changed.emit(checked)
@@ -3813,9 +3813,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         icon = load_icon(options_icon)
         self.ui.actionOptions.setIcon(icon)
 
-        about_icon = f"gfx/{prefix}about.svg"
-        icon = load_icon(about_icon)
-        self.ui.actionAbout.setIcon(icon)
+        # about_icon = f"gfx/{prefix}about.svg"
+        # icon = load_icon(about_icon)
+        # self.ui.actionAbout.setIcon(icon)
 
         # input actions
 

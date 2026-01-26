@@ -88,7 +88,7 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
 
 
     @QtCore.Slot(bool)
-    def _default_changed(self, checked):
+    def _default_changed(self, checked : bool):
         widget = self.sender()
         self.default_value = widget.data
 
@@ -144,7 +144,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
         
-        self.state_selector = gremlin.ui.ui_common.QComboBox()
+        self.state_selector = gremlin.ui.ui_common.QDataComboBox()
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
 
@@ -463,7 +463,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         row = 0
         for position in positions: # 9 positions - 8 cardinal and center push
-            cb = gremlin.ui.ui_common.NoWheelComboBox()
+            cb = gremlin.ui.ui_common.QDataComboBox()
             cb.data = position
             
             name = vjoy.vjoy.Hat.direction_to_name[position]

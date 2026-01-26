@@ -823,7 +823,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
             elif action.input_type == InputType.JoystickHat:
                 if not "hat_direction" in self.ui_elements.keys():
-                    self.ui_elements["hat_direction"] = gremlin.ui.ui_common.QComboBox()
+                    self.ui_elements["hat_direction"] = gremlin.ui.ui_common.QDataComboBox()
                     directions = [
                         "Center", "North", "North East", "East", "South East",
                         "South", "South West", "West", "North West"
@@ -846,7 +846,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
     def _remote_control_ui(self):
         self.ui_elements["remote_control_cb_label"] = QtWidgets.QLabel("Remote control command:") 
-        cb = gremlin.ui.ui_common.QComboBox()
+        cb = gremlin.ui.ui_common.QDataComboBox()
         self.ui_elements["remote_control_cb"] = cb
         self.ui_elements["remote_control_label"] = QtWidgets.QLabel()
         commands = [
@@ -895,7 +895,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         action.description = text
         
 
-    def _handle_description_log_changed(self, widget, checked):
+    def _handle_description_log_changed(self, widget, checked : bool):
         action = widget.data
         action.log = checked
 
@@ -903,7 +903,7 @@ class MacroActionEditor(QtWidgets.QWidget):
     def _state_ui(self):
         '''state interface'''
         action = self.model.get_entry(self.index.row())
-        self.state_selector = gremlin.ui.ui_common.QComboBox(width=None)
+        self.state_selector = gremlin.ui.ui_common.QDataComboBox(width=None)
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
         widget = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector], widget_only = True)

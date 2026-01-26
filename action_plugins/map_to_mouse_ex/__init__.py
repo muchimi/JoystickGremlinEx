@@ -65,7 +65,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.click_options_layout = QtWidgets.QHBoxLayout(self.click_widget)
 
 
-        self.mode_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.mode_widget = gremlin.ui.ui_common.QDataComboBox()
 
         input_type = self.action_data.get_input_type()
         if input_type == InputType.JoystickAxis:
@@ -244,7 +244,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.mouse_container_layout.addWidget(self.mouse_button)
 
 
-        self.mouse_button_widget = gremlin.ui.ui_common.QComboBox()
+        self.mouse_button_widget = gremlin.ui.ui_common.QDataComboBox()
         self.mouse_button_widget.addItem("Left (mouse 1)",gremlin.types.MouseButton.Left)
         self.mouse_button_widget.addItem("Middle (mouse 2)",gremlin.types.MouseButton.Middle)
         self.mouse_button_widget.addItem("Right (mouse 3)",gremlin.types.MouseButton.Right)
@@ -334,7 +334,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         )
 
     @QtCore.Slot(bool)
-    def _invert_cb(self, checked):
+    def _invert_cb(self, checked : bool):
         self.action_data.invert = checked
 
 
@@ -356,15 +356,15 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._change_mode()
 
     @QtCore.Slot(bool)
-    def _exec_on_release_changed(self, checked):
+    def _exec_on_release_changed(self, checked : bool):
         self.action_data.exec_on_release = checked
 
     @QtCore.Slot(bool)
-    def _force_remote_output_changed(self, checked):
+    def _force_remote_output_changed(self, checked : bool):
         self.action_data.force_remote_output = checked
         
     @QtCore.Slot(bool)
-    def _force_remote_output_only_changed(self, checked):
+    def _force_remote_output_only_changed(self, checked : bool):
         self.action_data.force_remote_output_only = checked
                         
 

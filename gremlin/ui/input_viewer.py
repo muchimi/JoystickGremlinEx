@@ -1066,7 +1066,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, checked)
 
     @QtCore.Slot(bool)
-    def _toggle_state_widget(self, checked):
+    def _toggle_state_widget(self, checked : bool):
         if checked:
             self.showState()
         else:
@@ -1080,7 +1080,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         syslog.info(f"state set to : {checked}")
 
     @QtCore.Slot(bool)
-    def _toggle_combine_button_hat(self, checked):
+    def _toggle_combine_button_hat(self, checked : bool):
         config = gremlin.config.Configuration()
         config.input_viewer_combine_buttonhats = checked
 
@@ -1095,7 +1095,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         
 
     @QtCore.Slot(bool)
-    def _toggle_flow_layout(self, checked):
+    def _toggle_flow_layout(self, checked : bool):
         config = gremlin.config.Configuration()
         config.input_viewer_flow_layout = checked
         self.views.updateLayout()

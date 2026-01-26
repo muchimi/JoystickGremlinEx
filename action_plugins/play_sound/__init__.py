@@ -395,7 +395,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.setPlayEnabled(play_enabled)
 
     @QtCore.Slot(bool)
-    def _handle_save_on_generate_changed(self, checked):
+    def _handle_save_on_generate_changed(self, checked : bool):
         self.action_data.save_on_generate = checked
 
 

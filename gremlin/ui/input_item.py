@@ -2087,7 +2087,7 @@ class InputItemWidget(QBoxFrame):
             self._close_button_widget.setEnabled(not input_item.locked)
         
     @QtCore.Slot(bool)
-    def _handle_lock_changed(self, checked):
+    def _handle_lock_changed(self, checked : bool):
         self.data.locked = checked
         if self.data.locked != checked:
             # input cannot be locked/unlocked - undo the check
@@ -2960,11 +2960,11 @@ class ContainerSelector(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.addWidget(QtWidgets.QLabel("Container"))
 
-        self.container_dropdown = ui_common.QComboBox()
+        self.container_dropdown = gremlin.ui.ui_common.QDataComboBox()
         
-        self.add_container_widget = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip = "Adds a container", callback = self._add_container)
+        self.add_container_widget = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip = "Adds the selected container", callback = self._add_container)
 
-        self.help_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._handle_help)
+        # self.help_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._handle_help)
 
         self.save_template_widget =  gremlin.ui.ui_common.Buttons.getSaveWidget(callback =self._save_container_to_template,
                                                                                   tooltip = "Save mappings to template")
@@ -2992,9 +2992,17 @@ class ContainerSelector(QtWidgets.QWidget):
         self.delete_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.delete_button.setToolTip("Delete container(s)")
 
-        self.main_layout.addWidget(self.container_dropdown)
-        self.main_layout.addWidget(self.help_widget)
-        self.main_layout.addWidget(self.add_container_widget)
+
+        widgets = [self.container_dropdown,
+                   self.add_container_widget,
+                  ]
+        
+        widget = gremlin.ui.ui_common.getHContainer(widgets,widget_only = True)
+        self.main_layout.addWidget(widget)
+
+        # self.main_layout.addWidget(self.container_dropdown)
+        # self.main_layout.addWidget(self.help_widget)
+        # self.main_layout.addWidget(self.add_container_widget)
 
         self.main_layout.addWidget(self.save_template_widget)
         self.main_layout.addWidget(self.load_template_widget)

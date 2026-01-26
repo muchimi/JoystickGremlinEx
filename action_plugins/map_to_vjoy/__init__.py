@@ -112,8 +112,8 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         self.container_merge_widget = QtWidgets.QWidget()
         self.container_merge_layout = QtWidgets.QVBoxLayout(self.container_merge_widget)
 
-        self.merge_selector_device_widget = gremlin.ui.ui_common.NoWheelComboBox()
-        self.merge_selector_input_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.merge_selector_device_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.merge_selector_input_widget = gremlin.ui.ui_common.QDataComboBox()
 
         merge_remove_widget = gremlin.ui.ui_common.Buttons.getRemoveWidget(callback = self._remove_cb)
 
@@ -406,13 +406,13 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
 
 
     @QtCore.Slot(bool)
-    def _merge_invert_changed_cb(self, checked):
+    def _merge_invert_changed_cb(self, checked : bool):
         self.data.invert = checked
         self.changed.emit(self.data)
 
 
     @QtCore.Slot(bool)
-    def _merge_mode_changed_cb(self, checked):
+    def _merge_mode_changed_cb(self, checked : bool):
         ''' merge mode selection change '''
         widget = self.sender()
         op = widget.data
@@ -532,7 +532,7 @@ class StepWidget(gremlin.ui.ui_common.QDataWidget):
 
 
     @QtCore.Slot(bool)
-    def _step_default_changed(self, checked):
+    def _step_default_changed(self, checked : bool):
         self.defaultChanged.emit(self.index, checked)
 
     @QtCore.Slot()
@@ -1215,7 +1215,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         row = 0
         for position in positions: # 9 positions - 8 cardinal and center push
-            cb = gremlin.ui.ui_common.NoWheelComboBox()
+            cb = gremlin.ui.ui_common.QDataComboBox()
             cb.data = position
             name = vjoy.vjoy.Hat.direction_to_name[position]
             icon = vjoy.vjoy.Hat.direction_to_icon[position]
@@ -1566,7 +1566,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.relative_value = value
 
     @QtCore.Slot(bool)
-    def _use_relative_value_changed(self, checked):
+    def _use_relative_value_changed(self, checked : bool):
         self.action_data.use_relative_value = checked
         self._update_ui()
 
@@ -2004,7 +2004,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
     @QtCore.Slot(bool)
-    def _merge_mode_changed_cb(self, checked):
+    def _merge_mode_changed_cb(self, checked : bool):
         ''' merge mode selection change '''
         widget = self.sender()
         self.merge_type = widget.data
@@ -2114,7 +2114,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._override_hat_widget.setChecked(input_type == InputType.JoystickHat)
 
     @QtCore.Slot(bool)
-    def _update_override_changed(self, checked):
+    def _update_override_changed(self, checked : bool):
         widget = self.sender()
         input_type = widget.data
         if self.action_data.override_input_type != input_type:
@@ -2215,7 +2215,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         # behavior combo box  - lets the user select the output behavior
-        self.cb_action_list = gremlin.ui.ui_common.NoWheelComboBox()
+        self.cb_action_list = gremlin.ui.ui_common.QDataComboBox()
         self.cb_action_list.currentIndexChanged.connect(self._action_mode_changed)
         lbl = QtWidgets.QLabel("Mode:")
 
@@ -2234,14 +2234,14 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         row += 1
         self.lbl_vjoy_device_selector = QtWidgets.QLabel("Device:")
         grid.addWidget(self.lbl_vjoy_device_selector,row,0)
-        self.cb_vjoy_device_selector = gremlin.ui.ui_common.NoWheelComboBox()
+        self.cb_vjoy_device_selector = gremlin.ui.ui_common.QDataComboBox()
         grid.addWidget(self.cb_vjoy_device_selector,row,1)
 
 
 
 
         row += 1
-        self.cb_vjoy_input_selector = gremlin.ui.ui_common.NoWheelComboBox()
+        self.cb_vjoy_input_selector = gremlin.ui.ui_common.QDataComboBox()
         self.lbl_vjoy_input_selector = QtWidgets.QLabel("Output:")
         grid.addWidget(self.lbl_vjoy_input_selector,row,0)
         grid.addWidget(self.cb_vjoy_input_selector,row,1)
@@ -2586,12 +2586,12 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.update_steps()
 
     @QtCore.Slot(bool)
-    def _step_direction_changed(self, checked):
+    def _step_direction_changed(self, checked : bool):
         self.action_data.target_step_direction = -1 if checked else 1
 
 
     @QtCore.Slot(bool)
-    def _step_latched_changed(self, checked):
+    def _step_latched_changed(self, checked : bool):
         self.action_data._stepped_latched = checked
         self.update_steps()
 
@@ -2768,8 +2768,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.step_widget_layout.addWidget(QtWidgets.QWidget(),0,6)
         self.step_widget_layout.setColumnStretch(6,2)
 
-        self.stepped_selector_device_widget = gremlin.ui.ui_common.NoWheelComboBox()
-        self.stepped_selector_input_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.stepped_selector_device_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.stepped_selector_input_widget = gremlin.ui.ui_common.QDataComboBox()
 
         listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._stepped_listen)
 
@@ -3211,11 +3211,11 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
     @QtCore.Slot(bool)
-    def _target_relative_changed(self, checked):
+    def _target_relative_changed(self, checked : bool):
         self.action_data.target_is_relative = checked
 
     @QtCore.Slot(bool)
-    def _handle_target_use_last_changed(self, checked):
+    def _handle_target_use_last_changed(self, checked : bool):
         self.action_data.target_use_last = checked
         self._update_ui()
 
@@ -3781,7 +3781,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             syslog.error(f"{err}\n{traceback.format_exc()}")
 
     @QtCore.Slot(bool)
-    def _axis_reverse_changed(self, checked):
+    def _axis_reverse_changed(self, checked : bool):
         self.action_data.reverse = checked
 
     @QtCore.Slot()
@@ -3799,7 +3799,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_range_text()
 
     @QtCore.Slot(bool)
-    def _axis_start_value_enabled(self, checked):
+    def _axis_start_value_enabled(self, checked : bool):
         self.action_data.axis_start_value_enabled = checked
         self._update_ui()
 
@@ -3873,15 +3873,15 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
     @QtCore.Slot(bool)
-    def _ignore_release_changed(self, checked):
+    def _ignore_release_changed(self, checked : bool):
         self.action_data.ignore_release = checked
 
     @QtCore.Slot(bool)
-    def _paired_changed(self, checked):
+    def _paired_changed(self, checked : bool):
         self.action_data.paired = checked # self.chkb_paired.isChecked()
 
     @QtCore.Slot(bool)
-    def _autorelease_changed(self, checked):
+    def _autorelease_changed(self, checked : bool):
         self.action_data.auto_release = checked
 
 

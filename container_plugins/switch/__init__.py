@@ -114,8 +114,8 @@ class SwitchWidget(QtWidgets.QWidget):
 
         device_layout.addWidget(QtWidgets.QLabel(f"<b>Switch position [{data.index+1}]</b>"))
 
-        self.selector_device_widget = gremlin.ui.ui_common.NoWheelComboBox()
-        self.selector_input_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.selector_device_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.selector_input_widget = gremlin.ui.ui_common.QDataComboBox()
 
         device_layout.addWidget(QtWidgets.QLabel("Device:"))
         device_layout.addWidget(self.selector_device_widget)

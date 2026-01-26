@@ -266,7 +266,7 @@ class DefaultModeSelector(QtWidgets.QGroupBox):
             return
         self.setTitle("Startup Mode")
 
-        self.dropdown = gremlin.ui.ui_common.QComboBox()
+        self.dropdown = gremlin.ui.ui_common.QDataComboBox()
         # self.dropdown.addItem("Use Heuristic")
         for mode in gremlin.profile.mode_list():
             self.dropdown.addItem(mode)
@@ -628,7 +628,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
 
 
     @QtCore.Slot(bool)
-    def _enabled_changed(self, checked):
+    def _enabled_changed(self, checked : bool):
         widget = self.sender()
         input_id = widget.data
         # self.settings.set_vjoy_axis_enabled(self.device.vjoy_id, input_id)

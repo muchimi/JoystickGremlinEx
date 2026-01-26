@@ -4406,7 +4406,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
 
             self.axis_widget = gremlin.ui.ui_common.QHookedProgressBar(orientation = QtCore.Qt.Orientation.Horizontal)
             
-            self.output_mode_widget = gremlin.ui.ui_common.QComboBox()
+            self.output_mode_widget = gremlin.ui.ui_common.QDataComboBox()
             self.output_container_widget = QtWidgets.QWidget()
             self.output_container_widget.setContentsMargins(0,0,0,0)
             self.output_container_layout = QtWidgets.QHBoxLayout(self.output_container_widget)
@@ -4785,7 +4785,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         self._update_tab_icons()
 
     @QtCore.Slot(bool)
-    def _autorelease_changed(self, checked):
+    def _autorelease_changed(self, checked : bool):
         ''' called when the autorelease checkbox is changed '''
         info, condition = self.sender().data
         info.autorelease_map[condition] = checked

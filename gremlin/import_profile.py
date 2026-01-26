@@ -571,7 +571,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.create_mode_widget = QtWidgets.QCheckBox("Import modes")
         self.target_mode_label_widget = QtWidgets.QLabel("Target Mode:")
 
-        self.target_mode_selector = ui_common.QComboBox()
+        self.target_mode_selector = gremlin.ui.ui_common.QDataComboBox()
         # populate the modes of the current device being imported into
         self.populate_mode_selector(self.target_mode_selector, self.target_profile)
 
@@ -579,7 +579,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.import_modes_widget.setToolTip("Import all modes from profile and add them to the existing profile if they don't exist")
         self.import_single_mode_widget = QtWidgets.QRadioButton("Import single mode")
         self.import_single_mode_widget.setToolTip("Import specific mode")
-        self.import_mode_selector = ui_common.QComboBox()
+        self.import_mode_selector = gremlin.ui.ui_common.QDataComboBox()
 
         self.import_mode_list_widget = QtWidgets.QListWidget()
 
@@ -2003,7 +2003,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
 
     @QtCore.Slot(bool)
-    def _select_import_item_cb(self, checked):
+    def _select_import_item_cb(self, checked : bool):
         widget = self.sender()
         data = widget.data
         data.selected = checked
@@ -2018,7 +2018,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         
 
     @QtCore.Slot(bool)
-    def _import_mode_selection_cb(self, checked):
+    def _import_mode_selection_cb(self, checked : bool):
         self._import_mode_selection_cb[self.sender().text()] = checked
 
 
@@ -2426,7 +2426,7 @@ class Mapper():
             
 
             self.lbl_vjoy_device_selector = QtWidgets.QLabel("Target VJoy Device:")
-            self.cb_vjoy_device_selector = gremlin.ui.ui_common.NoWheelComboBox()
+            self.cb_vjoy_device_selector = gremlin.ui.ui_common.QDataComboBox()
 
             
             self.container_selector_widget = QtWidgets.QWidget()
@@ -2519,12 +2519,12 @@ class Mapper():
             gremlin.config.Configuration().mapping_vjoy_id = value
             
         @QtCore.Slot(bool)
-        def _select_vjoy_remap(self, checked):
+        def _select_vjoy_remap(self, checked : bool):
             if checked:
                 self.button_mapper = "Vjoy Remap"
 
         @QtCore.Slot(bool)
-        def _select_remap(self, checked):
+        def _select_remap(self, checked : bool):
             if checked:
                 self.button_mapper = "Remap"
 

@@ -935,7 +935,8 @@ class Buttons():
     def getAddWidget(label = "Add", tooltip = "Add", callback = None, no_keyboard = True, data = None):
         button =  Buttons._template(label, "ri.add-line", tooltip, callback, no_keyboard, data)
         button.setMinimumHeight(24)
-        button.setStyleSheet(f" QPushButton {{margin-left: none;}}")
+        button.setMaximumWidth(24 + get_text_width(label))
+        # button.setStyleSheet(f" QPushButton {{margin-left: none;}}")
         return button
     
     @staticmethod
@@ -2553,7 +2554,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
         )
 
     def _create_device_dropdown(self):
-        self.device_dropdown = gremlin.ui.ui_common.QComboBox(self)
+        self.device_dropdown = gremlin.ui.ui_common.QDataComboBox(self)
         for device in self.device_list:
             self.device_dropdown.addItem(self._format_device_name(device))
             self._device_id_registry.append(self._device_identifier(device))
@@ -2577,7 +2578,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
         # Create input item selections for the devices. Each selection
         # will be invisible unless it is selected as the active device
         for device in self.device_list:
-            selection_widget = QComboBox(self)
+            selection_widget = QDataComboBox(self)
             # limit drop down size
             selection_widget.setMaxVisibleItems(20)
             selection_widget.setStyleSheet("QComboBox { combobox-popup: 0; }")
@@ -2761,6 +2762,7 @@ class ActionSelector(QtWidgets.QWidget):
         """
         super().__init__(parent)
         import gremlin.base_profile
+        import gremlin.ui.ui_common
 
         if not input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
             pass
@@ -2770,13 +2772,15 @@ class ActionSelector(QtWidgets.QWidget):
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
         self._input_type = input_type
 
-        self.action_dropdown = QComboBox()
+        self.action_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
         self.refresh(input_type)
         
-        self.add_button = Buttons.getAddWidget(callback = self._add_action)
+        self.add_button = Buttons.getAddWidget(callback = self._add_action, tooltip = "Adds the selected action")
+       
+        
 
-        self.help_widget = Buttons.getHelpWidget(callback = self._handle_help)
+        # self.help_widget = Buttons.getHelpWidget(callback = self._handle_help)
 
         # clipboard
         self.paste_button = gremlin.ui.ui_common.Buttons.getPasteWidget(callback=self._paste_action)
@@ -2789,8 +2793,8 @@ class ActionSelector(QtWidgets.QWidget):
 
         widget, _ = getHContainer([self.action_label, 
                                    self.action_dropdown,
-                                   self.help_widget,
                                    self.add_button,
+                                  # self.help_widget,
                                    self.paste_button,
                                    ])
 
@@ -2985,7 +2989,7 @@ class ModeSelectorWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
 
-        self._selector_widget = QComboBox()
+        self._selector_widget = QDataComboBox()
         self._selector_widget.currentIndexChanged.connect(self._handle_mode_changed)
 
         widgets = [self._selector_widget]
@@ -3230,7 +3234,7 @@ class ModeWidget(QtWidgets.QWidget):
         # Create mode selector and related widgets
         self.edit_label = QtWidgets.QLabel(self._label)
         self.edit_label.setSizePolicy(min_min_sp)
-        self.edit_mode_selector = QComboBox()
+        self.edit_mode_selector = QDataComboBox()
         self.edit_mode_selector.setSizePolicy(exp_min_sp)
         self.edit_mode_selector.setMinimumContentsLength(20)
         self.edit_mode_selector.setToolTip(self._tooltip)
@@ -3745,7 +3749,7 @@ def get_layout_widgets(layout) -> list:
 
 class QComboBox (QtWidgets.QComboBox):
     ''' a max limited combo box '''
-    def __init__(self, parent = None, width = None, maxItems = 20):
+    def __init__(self, parent = None, width = None, maxItems = 20,):
         ''' combo box with max count 
         
         :param parent: the parent widget of the combo box
@@ -4478,11 +4482,11 @@ class QDataIPLineEdit(QDataLineEdit):
 
 class QDataComboBox(QComboBox):
     ''' a combo box that has a data property to track an object associated with the checkbox '''
-    def __init__(self, data = None, callback = None, parent = None, wheel_enabled = True, auto_adjust = False, source = None, value = None, tooltip = None):
+    def __init__(self, data = None, callback = None, parent = None, wheel_enabled : bool = None, auto_adjust : bool = False, source = None, value = None, tooltip : str = None):
         ''' creates a combo box 
         
         :param data: data object the widget carries
-        :callback: callback handler when the index changes (optional)
+        :callback: callback handler when the index changes (optional) - callback(data) - returns the data for the selected row
         :wheel_enabled: true if mouse wheel is enabled on the combo box 
         :auto_adjust: true if the combo box autosizes to contents
         :source: optional, list of tuples (display, data) to populate the combo box with
@@ -4491,11 +4495,14 @@ class QDataComboBox(QComboBox):
         '''
         super().__init__(parent)
         self._data = data
-        self._wheel_enabled = wheel_enabled
+        self._wheel_enabled = gremlin.config.Configuration().dropdown_use_mouse_wheel if wheel_enabled is None else wheel_enabled
         self.installEventFilter(self)
         if auto_adjust:
             self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        # self.setStyleSheet("QComboBox { padding: 5px; margin: 10px; }") 
+        self.setStyleSheet("QComboBox { padding: 5px; }") 
         self._callback = callback
+
 
         if source:
             # source is expected to be a list of tuples of display/data
@@ -4524,7 +4531,9 @@ class QDataComboBox(QComboBox):
         if not self._wheel_enabled:
             t = event.type()
             if t == QtCore.QEvent.Type.Wheel:
-                return True # skip the event
+                # check for shift state
+                if not gremlin.event_handler.EventListener().get_shifted_state():
+                    return True # skip the event
         return super().eventFilter(widget, event)
         
     def setWheelEnabled(self, value : bool):
@@ -8134,7 +8143,7 @@ class QToggleText(QtWidgets.QWidget):
     def value(self):
         return self._button.isChecked()
     @value.setter
-    def value(self, checked):
+    def value(self, checked : bool):
         self._button.setChecked(checked)
 
 
@@ -10656,7 +10665,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
 
     @QtCore.Slot(bool)
-    def _inverted_changed(self, checked):
+    def _inverted_changed(self, checked : bool):
         self.inverted = checked
         self.invertChanged.emit()
 
@@ -11871,7 +11880,7 @@ class QInfoBox(QtWidgets.QFrame):
         if text:
             self.setText(text)
 
-    def _handle_hide_visual(self, checked):
+    def _handle_hide_visual(self, checked : bool):
         config = gremlin.config.Configuration()
         config.setVisualHidden(self._hide_key, True)
         self.setStyleSheet("")
@@ -12114,7 +12123,7 @@ class QModeSelector(QtWidgets.QWidget):
         import gremlin.shared_state
         super().__init__(parent)
         self.main_layout = QtWidgets.QHBoxLayout(self)
-        self.dropdown = QComboBox()
+        self.dropdown = QDataComboBox()
         if not profile:
             profile = gremlin.shared_state.current_profile
 
@@ -13009,13 +13018,13 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
 
         self.lbl_vjoy_device_selector = QtWidgets.QLabel("Device:")
         grid.addWidget(self.lbl_vjoy_device_selector,row,0)
-        self.device_selector_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.device_selector_widget = gremlin.ui.ui_common.QDataComboBox()
         grid.addWidget(self.device_selector_widget,row,1)
 
 
 
         row += 1
-        self.input_selector_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.input_selector_widget = gremlin.ui.ui_common.QDataComboBox()
         self.lbl_vjoy_input_selector = QtWidgets.QLabel("Input:")
         grid.addWidget(self.lbl_vjoy_input_selector,row,0)
         grid.addWidget(self.input_selector_widget,row,1)
@@ -13356,3 +13365,10 @@ class QTimedLabel(QtWidgets.QWidget):
         
         
 
+class QUrlLabel(QtWidgets.QLabel):
+    ''' URL label '''
+    def __init__(self, url : str, caption : str = None, parent = None):
+        super().__init__(parent = parent)
+        self.setText(f"<a href='{url}'>{caption if caption else url}</a>")
+        self.setOpenExternalLinks(True)
+        

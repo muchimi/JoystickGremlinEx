@@ -136,7 +136,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
         # Add widgets which allow modifying the mode list
-        self.mode_list_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.mode_list_widget = gremlin.ui.ui_common.QDataComboBox()
         self.button_add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(callback = self._add_cb)
         self.button_delete_widget =gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = self._remove_cb)
         

@@ -44,7 +44,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        self.voice_widget = gremlin.ui.ui_common.QComboBox()
+        self.voice_widget = gremlin.ui.ui_common.QDataComboBox()
         tts = gremlin.tts.TextToSpeech()
         for voice in tts.getVoices():
             self.voice_widget.addItem(voice.name, voice.id)
@@ -141,14 +141,14 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.exec_on_release = checked       
 
     @QtCore.Slot(bool)
-    def _handle_mode_change(self, checked):
+    def _handle_mode_change(self, checked : bool):
         widget = self.sender()
         if checked:
             self.action_data.abort = widget.data
             self._update_ui()
 
     @QtCore.Slot(bool)
-    def _handle_suppress_change(self, checked):
+    def _handle_suppress_change(self, checked : bool):
         self.action_data.override_suppress = checked
 
         
@@ -166,7 +166,7 @@ class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
         return False
     
     @QtCore.Slot(bool)
-    def _handle_clear_queue_changed(self, checked):
+    def _handle_clear_queue_changed(self, checked : bool):
         self.action_data.clearQueue = checked
     
     @QtCore.Slot()

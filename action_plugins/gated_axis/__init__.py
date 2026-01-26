@@ -379,8 +379,8 @@ making changes that impact the order of gates or ranges."""
         self._update_event_ui()
 
  
-
-    def _handle_display_event_changed(self, checked):
+    @QtCore.Slot(bool)
+    def _handle_display_event_changed(self, checked : bool):
         config = gremlin.config.Configuration()
         config.gated_axis_display_events = checked
 
@@ -1367,7 +1367,7 @@ making changes that impact the order of gates or ranges."""
         self._is_filtered = filtered
 
     @QtCore.Slot(bool)
-    def _filter_cb(self, widget, checked):
+    def _filter_cb(self, widget, checked : bool):
         trigger : TriggerMode = widget.data
         self._gate_data.filter_map[trigger] = checked
         self._update_filter()

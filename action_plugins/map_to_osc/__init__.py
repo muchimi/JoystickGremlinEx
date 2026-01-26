@@ -181,13 +181,13 @@ class OscValueWidget(QtWidgets.QWidget):
             self.typeChanged.emit()
 
     @QtCore.Slot(bool)
-    def _int_selected(self, checked):
+    def _int_selected(self, checked : bool):
         self._is_integer = True
         self._update()
         self.typeChanged.emit()
 
     @QtCore.Slot(bool)
-    def _float_selected(self, checked):
+    def _float_selected(self, checked : bool):
         self._is_integer = False
         self._update()
         self.typeChanged.emit()
@@ -401,17 +401,17 @@ class OscInputWidget(QtWidgets.QWidget):
             
 
     @QtCore.Slot(bool)
-    def _enabled_changed(self, checked):
+    def _enabled_changed(self, checked : bool):
         self._is_enabled = checked
         self._update()
         self.enabledChanged.emit(checked)
 
     @QtCore.Slot(bool)
-    def _enable_value_on_press_changed(self, checked):
+    def _enable_value_on_press_changed(self, checked : bool):
         self.enableValueOnPressChanged.emit(checked)
 
     @QtCore.Slot(bool)
-    def _enable_value_on_release_changed(self, checked):
+    def _enable_value_on_release_changed(self, checked : bool):
         self.enableValueOnReleaseChanged.emit(checked)
             
     @QtCore.Slot()
@@ -420,11 +420,11 @@ class OscInputWidget(QtWidgets.QWidget):
         self.valuePressChanged.emit()
 
     @QtCore.Slot(bool)
-    def _enable_press_changed(self, enabled):
+    def _enable_press_changed(self, enabled : bool):
         self.enableValueOnPressChanged.emit(enabled)
 
     @QtCore.Slot(bool)
-    def _enable_release_changed(self, enabled):
+    def _enable_release_changed(self, enabled : bool):
         self.enableValueOnReleaseChanged.emit(enabled)
 
     @QtCore.Slot()
@@ -663,7 +663,7 @@ class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.action_data.server_port = self._server_port_widget.value()
 
     # @QtCore.Slot(bool)
-    # def _trigger_on_release_cb(self, checked):
+    # def _trigger_on_release_cb(self, checked : bool):
     #     self.action_data.trigger_on_release = checked
 
     @QtCore.Slot(bool)        

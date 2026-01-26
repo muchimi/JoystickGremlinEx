@@ -1664,7 +1664,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.container_options_layout.setContentsMargins(0,0,0,0)
 
         # Dropdown menu for the different curve types
-        self.curve_type_selection = gremlin.ui.ui_common.QComboBox()
+        self.curve_type_selection = gremlin.ui.ui_common.QDataComboBox()
         self.curve_type_selection.addItem("Cubic Spline", CurveType.Cubic)
         self.curve_type_selection.addItem("Cubic Bezier Spline", CurveType.Bezier)
         self.curve_type_selection.setCurrentIndex(0)
@@ -1868,7 +1868,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
 
     @QtCore.Slot(bool)
-    def _centered_changed_cb(self, checked):
+    def _centered_changed_cb(self, checked : bool):
         self.curve_data.isCentered = checked
         self.deadzone_widget.isCentered = checked
 
@@ -2060,7 +2060,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.deadzone_widget.isCentered = is_centered
 
     @QtCore.Slot(bool)
-    def _curve_symmetry_cb(self, checked):
+    def _curve_symmetry_cb(self, checked : bool):
         if checked:
             self.curve_data.symmetry_mode = SymmetryMode.Diagonal
             self.curve_model.set_symmetry_mode(SymmetryMode.Diagonal)

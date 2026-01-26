@@ -129,14 +129,14 @@ class RunProcessWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_ui()
         
     @QtCore.Slot(bool)
-    def _args_per_line_changed(self, checked):
+    def _args_per_line_changed(self, checked : bool):
         self.action_data.args_per_line = checked
 
-    def _exec_on_release_changed(self, checked):
+    def _exec_on_release_changed(self, checked : bool):
         self.action_data.exec_on_release = checked
 
     @QtCore.Slot(object, str)
-    def _process_changed_cb(self, widget, text):
+    def _process_changed_cb(self, widget, text : str):
         self.action_data.process = text
         self._update_ui()
 

@@ -12,11 +12,12 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 class Ui_About(object):
     def setupUi(self, About):
-        import gremlinEx
         import gremlin.util
+        import gremlin.version
         About.setObjectName("About")
         About.setWindowModality(QtCore.Qt.WindowModal)
         About.resize(400, 300)
+
         self.horizontalLayout = QtWidgets.QHBoxLayout(About)
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.tabWidget = QtWidgets.QTabWidget(About)
@@ -25,20 +26,27 @@ class Ui_About(object):
         self.tab.setObjectName("tab")
         self.horizontalLayout_4 = QtWidgets.QHBoxLayout(self.tab)
         self.horizontalLayout_4.setObjectName("horizontalLayout_4")
-        self.about = QtWidgets.QTextBrowser(self.tab)
-        self.about.setObjectName("about")
+
 
         self.about_box_layout = QtWidgets.QVBoxLayout()
         self.about_box_widget = QtWidgets.QWidget()
         self.about_box_widget.setLayout(self.about_box_layout)
 
-        self.version_widget = QtWidgets.QLabel(f"Version: {gremlinEx.Version().version}")
-        self.about_box_layout.addWidget(self.version_widget)
-        self.about_box_layout.addWidget(QtWidgets.QLabel(f"Python: {gremlin.util.getPythonVersion()}"))
-        self.about_box_layout.addWidget(self.about)
-        self.horizontalLayout_4.addWidget(self.about_box_widget)
-
         
+
+
+        version_widget = QtWidgets.QLabel(f"Version: {gremlin.version.Version().version}")
+        self.about_box_layout.addWidget(version_widget)
+        self.about_box_layout.addWidget(QtWidgets.QLabel(f"Python: {gremlin.util.getPythonVersion()}"))
+        #self.about_box_layout.addWidget(self.about)
+
+        github_widget =  gremlin.ui.ui_common.QUrlLabel("https://github.com/muchimi/JoystickGremlinEx/","GremlinEx Project")
+        doc_widget = gremlin.ui.ui_common.QUrlLabel("https://muchimi.github.io/JoystickGremlinEx/","GremlinEx Documentation")
+        
+        self.about_box_layout.addWidget(github_widget)
+        self.about_box_layout.addWidget(doc_widget)
+
+        self.horizontalLayout_4.addWidget(self.about_box_widget)
         
         self.tabWidget.addTab(self.tab, "")
         self.tab_2 = QtWidgets.QWidget()
@@ -67,7 +75,7 @@ class Ui_About(object):
 
     def retranslateUi(self, About):
         _translate = QtCore.QCoreApplication.translate
-        About.setWindowTitle(_translate("About", "About JoystickGremlin Ex"))
+        About.setWindowTitle(_translate("About", "About Gremlin Ex"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), _translate("About", "About"))
         self.jg_license.setHtml(_translate("About", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"

@@ -816,11 +816,11 @@ class AbstractContainer(ProfileData, ConditionContainer):
         """
 
         if self.actionsetCustomParseCallback:
-            # handles the complete load if present
+            # handles the complete load via custom callback if the container implements it
             self.actionsetCustomParseCallback(node, data, extra_data)
             return
 
-
+        self.action_sets = []
         for child in node:
             if child.tag == "virtual-button":
                 continue
@@ -5918,7 +5918,7 @@ class Mode:
         registry = ProfileRegistry()
 
         self.inherit = node.get("inherit", None)
-
+        child: lxml.etree.Element
         for child in node:
             item = InputItem(mode_parent = self)
             item.from_xml(child, item, extra_data) # send owner item to sub components as the data member
@@ -5935,10 +5935,25 @@ class Mode:
             if not input_item:
                 # did not exist, create
                 input_item = registry.registerInputItem(item)
-                if not input_item.input_type in self.config:
-                    self.config[input_item.input_type] = {}
-                input_id_key = registry.getInputIdKey(item.input_id)
-                self.config[input_item.input_type][input_id_key] = input_item
+                if not input_item:
+                    input_item = registry.getInputItem(
+                        item.device_guid,
+                        item.device_type,
+                        mode_name,
+                        item.input_type,
+                        item.input_id,
+                        autocreate = True
+                        )
+                    
+                if input_item:
+                    if not input_item.input_type in self.config:
+                        self.config[input_item.input_type] = {}
+                    input_id_key = registry.getInputIdKey(item.input_id)
+                    self.config[input_item.input_type][input_id_key] = input_item
+                else:
+                    syslog.warning(f"XML: unable to register input item: offending line: {child.sourceline}")
+                    syslog.warning(f"\t{lxml.etree.tostring(child)}")
+
             else:
                 # existed, update containers only
                 input_item.setContainers(item.containers)

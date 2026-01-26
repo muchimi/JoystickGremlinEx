@@ -53,7 +53,7 @@ class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        self.mode_selector_widget = gremlin.ui.ui_common.QComboBox()
+        self.mode_selector_widget = gremlin.ui.ui_common.QDataComboBox()
         self.mode_selector_widget.currentIndexChanged.connect(self._mode_selected_changed)
 
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)

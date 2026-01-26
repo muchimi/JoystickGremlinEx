@@ -62,7 +62,7 @@ class MapToOctaviIfr1Widget(gremlin.ui.input_item.AbstractActionWidget):
 
         # LED selector 
 
-        widget = QtWidgets.QComboBox()
+        widget = QtWidgets.QDataComboBox()
         buttons = (OctaviButton.MODEAP, 
                    OctaviButton.MODEHDG,
                    OctaviButton.MODENAV,

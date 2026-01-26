@@ -122,7 +122,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
         self.delay_widget.setVisible(delay_visible)
             
     @QtCore.Slot(bool)
-    def _autorelease_changed(self, checked):
+    def _autorelease_changed(self, checked : bool):
         self.profile_data.autorelease = checked
         self._update_visible()
 
@@ -377,7 +377,7 @@ and another action on trigger release in a single container.'''
 
         self.action_sets = [[],[]]
 
-        actionset_nodes = node.xpath("action-set")   
+        actionset_nodes = node.xpath(".//action-set")   
         for index, actionset_node in enumerate(actionset_nodes):
             action_set = gremlin.base_profile.ActionSet()
             self._parse_action_xml(actionset_node, action_set, data, extra_data)

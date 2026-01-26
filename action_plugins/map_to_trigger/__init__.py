@@ -137,7 +137,7 @@ class MapToTriggerWidget(gremlin.ui.input_item.AbstractActionWidget):
         pass
 
     @QtCore.Slot(bool)
-    def _handle_use_actual_changed(self, checked):
+    def _handle_use_actual_changed(self, checked : bool):
         self.action_data.use_actual = checked
         self._update_ui()
 

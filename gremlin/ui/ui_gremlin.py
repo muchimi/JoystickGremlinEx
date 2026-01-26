@@ -408,7 +408,7 @@ class Ui_Gremlin(object):
         self.actionGenerate.setText(_translate("GremlinEx", "Generate"))
         self.actionProfileDevices.setText(_translate("GremlinEx", "Change Visible Devices..."))
         self.actionDeviceInformation.setText(_translate("GremlinEx", "Device Information"))
-        self.actionAbout.setText(_translate("GremlinEx", "&About"))
+        self.actionAbout.setText(_translate("GremlinEx", "&About..."))
         self.actionManageCustomModules.setText(_translate("GremlinEx", "&Manage Custom Modules"))
         self.actionInputRepeater.setText(_translate("GremlinEx", "Input Repeater"))
         self.actionReloadDevices.setText(_translate("GremlinEx","Reload Devices"))

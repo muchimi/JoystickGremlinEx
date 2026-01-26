@@ -57,7 +57,7 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
-        self.action_widget = gremlin.ui.ui_common.NoWheelComboBox()
+        self.action_widget = gremlin.ui.ui_common.QDataComboBox()
 
         index = 0
         set_index = None

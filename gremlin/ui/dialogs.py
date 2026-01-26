@@ -103,7 +103,7 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self.start_label = QtWidgets.QLabel("Start Mode")
         self.start_label.setSizePolicy(min_min_sp)
-        self.start_mode_selector = gremlin.ui.ui_common.QComboBox()
+        self.start_mode_selector = gremlin.ui.ui_common.QDataComboBox()
         self.start_mode_selector.setSizePolicy(exp_min_sp)
         self.start_mode_selector.setMinimumContentsLength(20)
         self.start_mode_selector.setToolTip("Selects the startup mode when the profile is activated and the restore last mode option is not set")
@@ -171,12 +171,12 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.start_mode_selector.currentIndexChanged.connect(self._start_mode_changed_cb)
 
     @QtCore.Slot(bool)
-    def _numlock_force_cb(self, checked):
+    def _numlock_force_cb(self, checked : bool):
         self.profile.set_force_numlock(checked)
         self._update_ui()
 
     @QtCore.Slot(bool)
-    def _numlock_force_on_cb(self, checked):
+    def _numlock_force_on_cb(self, checked : bool):
         self.profile.set_force_numlock_on(checked)
         
 
@@ -185,7 +185,7 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.numlock_on_widget.setEnabled(enabled)
 
     @QtCore.Slot(bool)
-    def _restore_mode_cb(self, checked):
+    def _restore_mode_cb(self, checked : bool):
         self.profile.set_restore_mode(checked)
 
     def _close_cb(self):
@@ -223,7 +223,7 @@ class HostIpDialog(ui_common.BaseDialogUi):
 
         grid_layout = QtWidgets.QGridLayout()
 
-        self._ip_list_widget = QtWidgets.QComboBox()
+        self._ip_list_widget = gremlin.ui.ui_common.QDataComboBox()
         w = gremlin.ui.ui_common.get_text_width("888.888.888.888 ")
         self._ip_list_widget.setMinimumWidth(w)
         self._ip_list_widget.currentIndexChanged.connect(self._ip_selection_changed)
@@ -1079,6 +1079,15 @@ class OptionsUi(ui_common.BaseDialogUi):
         
 
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Options", transparent = True)
+
+        widget = gremlin.ui.ui_common.QDataCheckbox("Enable mouse wheel in dropdowns",
+                                                    value = self.config.dropdown_use_mouse_wheel,
+                                                    callback= self._handle_dropdown_wheel_changed,
+                                                    tooltip = "When set, dropdown selection can be changed using the mouse wheel.  This option may sometimes interfere with vertical scrolling if the mouse is hovering above a drop down.")
+        
+        box.addWidget(widget)
+
+
         hide_default_mode_widget = QtWidgets.QCheckBox("Hide default mode")
         hide_default_mode_widget.setToolTip("When set, the default mode won't be displayed if another root mode exists and no assignments to the default mode exist.")
         hide_default_mode_widget.setChecked(self.config.hide_default_mode)
@@ -1405,10 +1414,10 @@ There should only be one GremlinEx master server on the subnet.
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Runtime")
 
-    def _handle_macro_mode_affinity_changed(self, checked):
+    def _handle_macro_mode_affinity_changed(self, checked : bool):
         self.config.macro_mode_affinity = checked
 
-    def _handle_macro_abort_changed(self, checked):
+    def _handle_macro_abort_changed(self, checked : bool):
         self.config.mode_change_aborts_sequence = checked
             
     def _handle_macro_concurrent_count_changed(self, value):
@@ -1476,7 +1485,7 @@ There should only be one GremlinEx master server on the subnet.
 
         tts = gremlin.tts.TextToSpeech()
 
-        self.voice_widget = gremlin.ui.ui_common.QComboBox()
+        self.voice_widget = gremlin.ui.ui_common.QDataComboBox()
         tts = gremlin.tts.TextToSpeech()
         for voice in tts.getVoices():
             self.voice_widget.addItem(voice.name, voice.id)
@@ -1837,11 +1846,15 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
 
 
     @QtCore.Slot(bool)
-    def _show_id_changed(self, checked):
+    def _show_id_changed(self, checked : bool):
         self.config.show_container_id = checked
 
     @QtCore.Slot(bool)
-    def _hide_default_mode_changed(self, checked):
+    def _handle_dropdown_wheel_changed(self, checked : bool):
+        self.config.dropdown_use_mouse_wheel = checked
+
+    @QtCore.Slot(bool)
+    def _hide_default_mode_changed(self, checked : bool):
         self.config.hide_default_mode = checked
 
     def _create_osc_page(self):
@@ -2050,7 +2063,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         self.config.mouse_wheel_autorelease_delay = value
 
     @QtCore.Slot(bool)
-    def _osc_pad_args(self, checked):
+    def _osc_pad_args(self, checked : bool):
         self.config.osc_pad_args = checked
 
     @QtCore.Slot()
@@ -2137,27 +2150,27 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
 
     @QtCore.Slot(bool)
-    def _handle_simconnect_enabled_changed(self, checked):
+    def _handle_simconnect_enabled_changed(self, checked : bool):
         gremlin.config.Configuration().simconnect_enabled = checked
 
     @QtCore.Slot(bool)
-    def _auto_mode_select_cb(self, checked):
+    def _auto_mode_select_cb(self, checked : bool):
         ''' auto mode changed'''
         self.config.simconnect_auto_mode_select = checked
 
     @QtCore.Slot(bool)
-    def _auto_mode_lock_cb(self, checked):
+    def _auto_mode_lock_cb(self, checked : bool):
         ''' auto mode lock changed'''
         self.config.simconnect_auto_mode_lock = checked
 
     @QtCore.Slot(bool)
-    def _stop_profile_on_sim_stop_cb(self, checked):
+    def _stop_profile_on_sim_stop_cb(self, checked : bool):
         ''' auto mode lock changed'''
         self.config.simconnect_stop_profile_on_sim_stop = checked
 
 
     @QtCore.Slot(bool)
-    def _show_simconnect_options_on_toolbar(self, checked):
+    def _show_simconnect_options_on_toolbar(self, checked : bool):
         self.config.show_simconnect_options_on_toolbar = checked
         el = gremlin.event_handler.EventListener()
         el.toolbar_changed.emit() # tell the Ui to change the toolbar 
@@ -2243,7 +2256,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
 
     @QtCore.Slot(bool)
-    def _highlight_enabled_cb(self, checked):
+    def _highlight_enabled_cb(self, checked : bool):
         self.config.highlight_enabled = checked
         self._update_highlight_options()
 
@@ -2268,7 +2281,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
 
     @QtCore.Slot(bool)
-    def _autoload_mapped_profile(self, checked):
+    def _autoload_mapped_profile(self, checked : bool):
         """Stores profile autoloading preference.
 
         :param clicked whether or not the checkbox is ticked
@@ -2287,80 +2300,80 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
 
     @QtCore.Slot(bool)
-    def _keep_focus(self, checked):
+    def _keep_focus(self, checked : bool):
         self.config.keep_profile_active_on_focus_loss = checked
 
     @QtCore.Slot(bool)
-    def _activate_on_launch(self, checked):
+    def _activate_on_launch(self, checked : bool):
         self.config.activate_on_launch = checked
 
     @QtCore.Slot(bool)
-    def _activate_on_process_focus(self, checked):
+    def _activate_on_process_focus(self, checked : bool):
         self.config.activate_on_process_focus = checked
 
     @QtCore.Slot(bool)
-    def _runtime_ui_update(self, checked):
+    def _runtime_ui_update(self, checked : bool):
         self.config.runtime_ui_update = checked
 
     @QtCore.Slot(bool)
-    def _restore_profile_mode(self, checked):
+    def _restore_profile_mode(self, checked : bool):
         self.config.restore_profile_mode_on_start = checked
 
     @QtCore.Slot(bool)
-    def _convert_vjoy_remap(self, checked):
+    def _convert_vjoy_remap(self, checked : bool):
         self.config.convert_vjoy_remap = checked
 
     @QtCore.Slot(bool)
-    def _convert_response_curve(self, checked):
+    def _convert_response_curve(self, checked : bool):
         self.config.convert_response_curve = checked
 
     @QtCore.Slot(bool)
-    def _tts_suppress_changed(self, checked):
+    def _tts_suppress_changed(self, checked : bool):
         self.config.tts_suppress_duplicate = checked
 
     @QtCore.Slot(bool)
-    def _tts_initial_load_mode_changed(self, checked):
+    def _tts_initial_load_mode_changed(self, checked : bool):
         self.config.initial_load_mode_tts = checked
 
     @QtCore.Slot(bool)
-    def _reset_mode_on_process_activate(self, checked):
+    def _reset_mode_on_process_activate(self, checked : bool):
         self.config.reset_mode_on_process_activate = checked
 
     @QtCore.Slot(bool)
-    def _close_to_systray(self, checked):
+    def _close_to_systray(self, checked : bool):
         self.config.close_to_tray = checked
 
     @QtCore.Slot(bool)
-    def _import_prompt(self, checked):
+    def _import_prompt(self, checked : bool):
         self.config.import_prompt_enabled = checked
 
     @QtCore.Slot(bool)
-    def _debug_ui(self, checked):
+    def _debug_ui(self, checked : bool):
         self.config.debug_ui = checked
 
     @QtCore.Slot(bool)
-    def _runtime_ui_active(self, checked):
+    def _runtime_ui_active(self, checked : bool):
         self.config.runtime_ui_active = checked
 
     @QtCore.Slot(bool)
-    def _sync_last_selection(self, checked):
+    def _sync_last_selection(self, checked : bool):
         self.config.sync_last_selection = checked
 
     @QtCore.Slot(bool)
-    def _runtime_ignore_device_change(self, checked):
+    def _runtime_ignore_device_change(self, checked : bool):
         self.config.runtime_ignore_device_change = checked
 
     @QtCore.Slot(bool)
-    def _show_input_enable(self, checked):
+    def _show_input_enable(self, checked : bool):
         self.config.show_input_enable = checked
 
     @QtCore.Slot(bool)
-    def _start_on_f5(self, checked):
+    def _start_on_f5(self, checked : bool):
         self.config.start_on_f5 = checked
 
 
     @QtCore.Slot(bool)
-    def _start_minimized(self, checked):
+    def _start_minimized(self, checked : bool):
         """Stores start minimized preference.
 
         :param clicked whether or not the checkbox is ticked
@@ -2368,7 +2381,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         self.config.start_minimized = checked
 
     @QtCore.Slot(bool)
-    def _persist_clipboard(self, checked):
+    def _persist_clipboard(self, checked : bool):
         self.config.persist_clipboard = checked
 
     @QtCore.Slot(bool)
@@ -2376,31 +2389,31 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         return self.config.persist_clipboard
 
     @QtCore.Slot(bool)
-    def _show_scancodes_cb(self, checked):
+    def _show_scancodes_cb(self, checked : bool):
         self.config.show_scancodes = checked
 
     @QtCore.Slot(bool)
-    def _show_joystick_input_cb(self, checked):
+    def _show_joystick_input_cb(self, checked : bool):
         self.config.show_input_axis = checked
 
     @QtCore.Slot(bool)
-    def _disable_joystick_input_cb(self, checked):
+    def _disable_joystick_input_cb(self, checked : bool):
         self.config.input_viewer_disables_repeaters = checked
 
 
     @QtCore.Slot(bool)
-    def _show_button_grid_cb(self, checked):
+    def _show_button_grid_cb(self, checked : bool):
         self.config.button_grid_visible = checked
 
     @QtCore.Slot(bool)
-    def _split_joystick_repeater_cb(self, checked):
+    def _split_joystick_repeater_cb(self, checked : bool):
         self.config.splitJoystickRepeater = checked
         # tell UI options changed
         el = gremlin.event_handler.EventListener()
         el.calibration_options_changed.emit()
 
     @QtCore.Slot(bool)
-    def _show_joystick_repeater_tooltip_cb(self, checked):
+    def _show_joystick_repeater_tooltip_cb(self, checked : bool):
         self.config.showJoystickRepeaterTooltip = checked
         # tell UI options changed
         el = gremlin.event_handler.EventListener()
@@ -2408,17 +2421,17 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         
 
     @QtCore.Slot(bool)
-    def _show_parent_mode_widget_cb(self, checked):
+    def _show_parent_mode_widget_cb(self, checked : bool):
         self.config.show_parent_mode = checked
         el = gremlin.event_handler.EventListener()
         el.mode_list_update.emit() # request mode list update
 
     @QtCore.Slot(bool)
-    def _allow_invalid_container_build(self, checked):
+    def _allow_invalid_container_build(self, checked : bool):
         self.config.allow_invalid_container_build = checked
 
     @QtCore.Slot(bool)
-    def _partial_plugin_save(self, checked):
+    def _partial_plugin_save(self, checked : bool):
         self.config.partial_plugin_save = checked
 
     @QtCore.Slot()
@@ -2426,11 +2439,11 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         self.config.range_comparison_decimals = self.range_precision_widget.value()
 
     @QtCore.Slot(bool)
-    def _enable_version_log_changed(self, checked):
+    def _enable_version_log_changed(self, checked : bool):
         self.config.enable_log_version = checked
 
     @QtCore.Slot(bool)
-    def _verbose_cb(self, checked):
+    def _verbose_cb(self, checked : bool):
         ''' stores verbose setting '''
         self.config.verbose = checked
         for widget in self._verbose_mode_widgets.values():
@@ -2444,16 +2457,16 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         self.config.verbose_set_mode(mode, is_checked)
 
     @QtCore.Slot(bool)
-    def _numlock_off(self, checked):
+    def _numlock_off(self, checked : bool):
         self.config.numlock_off = checked
 
     @QtCore.Slot(bool)
-    def _midi_enabled(self, checked):
+    def _midi_enabled(self, checked : bool):
         self.config.midi_enabled = checked
         self._reload_needed = True
 
     @QtCore.Slot(bool)
-    def _osc_enabled(self, checked):
+    def _osc_enabled(self, checked : bool):
         self.config.osc_enabled = checked
         self.osc_input_port.setEnabled(checked)
         self._reload_needed = True
@@ -2555,7 +2568,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
 
     @QtCore.Slot(bool)
-    def _start_windows(self, checked):
+    def _start_windows(self, checked : bool):
         """Set registry entry to launch Joystick Gremlin on login.
         Hive location: Computer\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
         :param clicked True if launch should happen on login, False otherwise
@@ -2971,13 +2984,13 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         item.default_mode = widget.currentText()
 
 
-    def _restore_profile_last_mode_on_change(self, checked):
+    def _restore_profile_last_mode_on_change(self, checked : bool):
         widget = self.sender()
         item : gremlin.base_profile.ProfileMapItem = widget.data
         item.restore_last_mode_on_auto_activate = checked
 
 
-    def _force_numlock_cb(self, checked):
+    def _force_numlock_cb(self, checked : bool):
         widget = self.sender()
         item : gremlin.base_profile.ProfileMapItem = widget.data
         item.numlock_force = checked
@@ -3328,9 +3341,7 @@ class AboutUi(ui_common.BaseDialogUi):
         self.ui = ui_about.Ui_About()
         self.ui.setupUi(self)
 
-        self.ui.about.setHtml(
-            open(gremlin.util.resource_path("about/about.html")).read()
-        )
+ 
 
         self.ui.jg_license.setHtml(
             open(gremlin.util.resource_path("about/joystick_gremlin.html")).read()
@@ -3368,7 +3379,7 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
         self.main_layout.addWidget(widget)
         widgets.append(widget)
 
-        self._parent_widget = gremlin.ui.ui_common.QComboBox()
+        self._parent_widget = gremlin.ui.ui_common.QDataComboBox()
         self._parent_widget.setToolTip("Select the parent mode of the new mode.\nLeave blank if the new mode is a top level mode.")
 
         widget, layout = ui_common.getGridContainer(["Parent mode:", self._parent_widget])
@@ -3530,7 +3541,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         close_button_widget = QtWidgets.QPushButton("Close")
         close_button_widget.clicked.connect(self._close_cb)
 
-        self.mode_default_selector = gremlin.ui.ui_common.QComboBox()
+        self.mode_default_selector = gremlin.ui.ui_common.QDataComboBox()
         self.mode_default_selector.setToolTip("Specifies the default startup mode for this profile when it is loaded. This setting can be overriden if the restore last active mode option is set.")
 
         self.mode_restore_flag = QtWidgets.QCheckBox("Restore last mode on activation")
@@ -3631,7 +3642,7 @@ The setting can be overriden by the global mode reload option set in Options for
             mode_widget = gremlin.ui.ui_common.QDataLineEdit(mode,data = mode)
             mode_widget.setReadOnly(True)
             self.mode_layout.addWidget(mode_widget, row, 0)
-            self.mode_dropdowns[mode] = gremlin.ui.ui_common.QComboBox()
+            self.mode_dropdowns[mode] = gremlin.ui.ui_common.QDataComboBox()
             self.mode_dropdowns[mode].addItem("None")
             self.mode_dropdowns[mode].setMinimumContentsLength(20)
             self.mode_default_selector.addItem(mode)
@@ -3691,7 +3702,7 @@ The setting can be overriden by the global mode reload option set in Options for
 
 
     @QtCore.Slot(bool)
-    def _profile_restore_flag_cb(self, checked):
+    def _profile_restore_flag_cb(self, checked : bool):
         ''' called when the restore last mode checked state is changed '''
         self._profile.set_restore_mode(checked)
 
@@ -3939,7 +3950,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
         self._update_data()
 
     @QtCore.Slot(bool)
-    def _handle_disconnected_changed(self, checked):
+    def _handle_disconnected_changed(self, checked : bool):
          config = gremlin.config.Configuration()
          config.show_disconnected = checked
          self._update_data()
@@ -4285,8 +4296,8 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
         profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
 
 
-        self.profile_device_widget = gremlin.ui.ui_common.QComboBox()
-        self.hardware_device_widget = gremlin.ui.ui_common.QComboBox()
+        self.profile_device_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.hardware_device_widget = gremlin.ui.ui_common.QDataComboBox()
 
         self.replace_button_widget = QtWidgets.QPushButton("Replace")
         self.replace_button_widget.clicked.connect(self._replace_cb)
@@ -4507,20 +4518,20 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
         self.main_layout.addWidget(widget)
 
     @QtCore.Slot(bool)
-    def _handle_pdf_changed(self, checked):
+    def _handle_pdf_changed(self, checked : bool):
          self.config.ReportPdfEnabled = checked
         
     @QtCore.Slot(bool)
-    def _handle_svg_changed(self, checked):
+    def _handle_svg_changed(self, checked : bool):
          self.config.ReportSvgEnabled = checked
 
     @QtCore.Slot(bool)
-    def _handle_open_files_changed(self, checked):
+    def _handle_open_files_changed(self, checked : bool):
          self.config.ReportOpenFilesEnabled = checked
 
     
     @QtCore.Slot(bool)
-    def _handle_show_folder_changed(self, checked):
+    def _handle_show_folder_changed(self, checked : bool):
          self.config.ReportShowFolder = checked
     
 
