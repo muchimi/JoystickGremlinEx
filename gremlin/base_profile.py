@@ -988,6 +988,7 @@ class Device:
     def device_id(self) -> str:
         ''' device ID a a string '''
         return str(self.device_guid)
+    
 
     @property
     def device_type(self) -> DeviceType:
@@ -2363,7 +2364,6 @@ class ProfileRegistry():
             # create a device
             device = Device(profile)
             device.device_guid = device_guid
-            device.device_id = str(device_guid)
             device.device_type = device_type
             profile.devices[device_guid] = device
 
