@@ -2258,6 +2258,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
         client = InputOscClient()
         client.registerInput(self)
 
+
+
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
         from gremlin.reporting import ReportTable, ReportRow, ReportCell
@@ -2363,6 +2365,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
     def message(self, value):
         self._message = value
         self._update()
+
+        
 
     @property
     def input_id(self):
@@ -2683,8 +2687,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
         
 
     def __hash__(self):
-        # if self._message_key:
-        #     return str(self._message_key).__hash__()
+        if self._message_key:
+            return str(self._message_key).__hash__()
         return str(self.id).__hash__()
     
     def __lt__(self, other):
@@ -4295,21 +4299,22 @@ class InputOscClient(QtCore.QObject):
     
     def registerInput(self, input_item):
         ''' registers an OSC input item '''
-       
-        if isinstance(input_item, OscInputItem):
+
+        input_id = input_item.input_id
+        if isinstance(input_id, OscInputItem):
             if not self._started:
                 # ensure OSC is listening
                 self._start()
 
-            message_key = input_item.message_key
+            message_key = input_id.message_key
             if not message_key in self._osc_map.keys():
                 self._osc_map[message_key] = []
         
-            if not input_item in self._osc_map[message_key]:
-                self._osc_map[message_key].append(input_item)
+            if not input_id in self._osc_map[message_key]:
+                self._osc_map[message_key].append(input_id)
             verbose = gremlin.config.Configuration().verbose_mode_osc
             if  verbose:
-                syslog.info(f"OSC: register trigger on: {input_item.display_name} source index: {input_item.source_index} mode: {input_item.mode_string} key: {message_key}")
+                syslog.info(f"OSC: register trigger on: {input_id.display_name} source index: {input_id.source_index} mode: {input_id.mode_string} key: {message_key}")
                 
         
 
@@ -4368,8 +4373,8 @@ class InputOscClient(QtCore.QObject):
             for device in profile.devices.values():
                 if device.name.casefold() == "osc":
                     for mode in device.modes.values():
-                        for input_items in mode.config.values():
-                            for input_item in input_items:
+                        if InputType.OpenSoundControl in mode.config:
+                            for input_item in mode.config[InputType.OpenSoundControl].values():
                                 self.registerInput(input_item)
 
 

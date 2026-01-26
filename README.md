@@ -29,6 +29,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T163):
+Fix: Play Sound: resolve some parameter and object reference issues.
+Fix: Play Sound: resolve possible invalid bounds when using folder mode
+Fix: Press/Release Container: exception when loading a saved container without actions.
+Fix: Press/Release Container: may not load correct visuals
+Fix: Press/Release Container: impacts subsequent processing
+Fix: XML: fixed an issue with container serialization with input registry
+Fix: XML: incorrect xpath expression for multiple child containers
+Fix: UI: incomplete available container list for non-joystick inputs
+
 
 ### (m76T162A):
 New: Macro Pause and Pause Action: pause function will remember their respective last values for subsequent entries.

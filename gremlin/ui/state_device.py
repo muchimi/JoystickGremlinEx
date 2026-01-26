@@ -583,6 +583,8 @@ class StateInputItem(gremlin.base_profile.InputItem):
             syslog.warning(f"State setter: state: [{self.key}] id: [{self.id}] attempt to set unrecognized value [{data}] - defaulting state to default value: [{self.default_value}]")
             data = self.default_value
             
+        # verbose = gremlin.config.Configuration().verbose_mode_state
+        # if verbose: syslog.info(f"STATE: set state: [{self.key}] -> [{data}]")
         if self._autorelease_timer:
             self._autorelease_timer.cancel()
             self._autorelease_timer = None
@@ -930,12 +932,8 @@ class StateInputItem(gremlin.base_profile.InputItem):
     def _fire_changed(self, value: bool):
         ''' called when a state changes '''
         verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose: syslog.info(f"STATE CHANGE EMIT: [{self.key}] value: {self.value}")
+        if verbose: syslog.info(f"STATE CHANGE: [{self.key}] current value: [{self.value}] -> new value: [{value}]")
         self.changed.emit(self)
-
-        # if not gremlin.shared_state.is_running:
-        #     return
-        
         
         event = gremlin.event_handler.Event(
             event_type= InputType.State,
@@ -956,8 +954,9 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
         # handle state changes directly at design or runtime
         eh = gremlin.event_handler.EventHandler()
+        # if verbose: syslog.info(f"STATE CHANGE: [{self.key}] begin execution: {value}")
         eh.execute_event(event)
-
+        # if verbose: syslog.info(f"STATE CHANGE: [{self.key}] end execution: {value}")
 
 
     def _valid_states(self):

@@ -106,14 +106,14 @@ class TimedRandomInt:
         
         # Determine the pool of available numbers
         available_numbers = [
-            num for num in range(self.min_val, self.max_val + 1)
+            num for num in range(self.min_val, self.max_val+1) # range is inclusive left, exclusive right
             if num not in self.used_numbers
         ]
 
         if not available_numbers:
             # Handle the case where all numbers are in cooldown
             # return a random number
-            new_number = random.randint(self.min_val, self.max_val)
+            new_number = random.randint(self.min_val, self.max_val) # randint is inclusive of both bounds
 
         else:
             # Select a random number from the available pool
@@ -133,6 +133,9 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
         assert isinstance(action_data, PlaySound)
+
+    def _create(self, action_data):
+        self.action_data : PlaySound = action_data
 
     def _create_ui(self):
         
@@ -533,7 +536,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
                 
         
     @QtCore.Slot()
-    def _handle_select_default(self, is_control : bool, is_shift : bool, is_alt : bool, is_right : bool):
+    def _handle_select_default(self, widget, is_control : bool, is_shift : bool, is_alt : bool, is_right : bool):
         ''' selects the default playback device '''
 
         default_index = self.action_data.getDefaultAudioDeviceIndex()
@@ -715,7 +718,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.text = None # text to speech for AI mode
         self.speaker = None # text to speech AI speaker 
         self.sound_file = None # the sound file to play in audio mode
-        self.sound_files = [] # list of sound files to pick from if in folder mode
+        self._sound_files = [] # list of sound files to pick from if in folder mode
         self._tts_file = None # sound file for TTS 
         self.tts_speed = 1.0 # for AI generation, speed factor, 1.0 = normal rate
         self.volume = 100 # default volume as a percentage 0 to 100
@@ -807,16 +810,16 @@ class PlaySound(gremlin.base_profile.AbstractAction):
     
     def scanFolder(self):
         ''' scans the file folder for valid audio files '''
-        sound_files = []
+        self._sound_files.clear()
         if self.sound_file and os.path.isfile(self.sound_file):
             folder_path = os.path.dirname(self.sound_file)
             entries = os.listdir(folder_path)
             for entry in entries:
                 ext = gremlin.util.get_ext(entry)
                 if ext in (".wav", ".mp3"):
-                    sound_files.append(os.path.join(folder_path, entry))
-        self._sound_files = sound_files
-        self._timed_random.setMax(len(self._sound_files))
+                    self._sound_files.append(os.path.join(folder_path, entry))
+         
+        self._timed_random.setMax(len(self._sound_files)-1)
 
 
     def generate(self) -> bool:
@@ -925,7 +928,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                         # pick a file at random
                         if not self._sound_files:
                             # update file list - there is at least one file
-                            self.scanFolder() 
+                            self.scanFolder()
+
                         index = self._timed_random.getValue()
                         sound_file = self._sound_files[index]
                     else:
@@ -1042,7 +1046,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.tts_file = safe_read(node,"tts_file", str, '')
         self.sound_file = node.get("file")
         self.randomize_sound_file = safe_read(node, "randomize", bool, False)
-        self._sound_files = []
+        self._sound_files.clear()
         self.tts_speed = safe_read(node,"tts_speed", float, 1.0)
         self.volume = int(node.get("volume", 50))
         self.exec_on_press = safe_read(node,"exec_on_press",bool, True)

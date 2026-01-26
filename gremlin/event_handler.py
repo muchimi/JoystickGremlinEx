@@ -160,6 +160,12 @@ class Event:
 		self.extra_data = extra_data
 
 
+	# @property
+	# def is_pressed(self):
+	# 	return self._is_pressed
+	# @is_pressed.setter
+	# def is_pressed(self, value):
+	# 	self._is_pressed = value
 
 	@property
 	def curve_value(self) -> float:
@@ -3110,6 +3116,8 @@ class EventHandler(QtCore.QObject):
 	def _trigger_callbacks(self, callbacks, event):
 		''' trigger regular callbacks '''
 		#verbose = gremlin.config.Configuration().verbose'
+		if event.event_type == InputType.State and event.is_pressed == False:
+			pass
 		for cb in callbacks:
 			try:
 				# if verbose:

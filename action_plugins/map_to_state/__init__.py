@@ -934,8 +934,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                             state = not self.sd.value(key)
                             if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] TOGGLE -> {'ON' if state else 'OFF'}")
                             self.sd.setValue(key, state)
-                            if not state:
-                                pass
+                 
                             
                         case "pulse":
                             if is_pressed:

@@ -304,7 +304,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 input_id = ModeInputModeType.ModeEnter,
                 mode_name = mode_object.name,
                 override_input_type = InputType.JoystickButton,
-                custom_name_handler = self._custom_name_handler
+                custom_name_handler = self._custom_name_handler,
+                autocreate = True
                 )
             # modeEnter = gremlin.base_profile.InputItem(self._custom_name_handler, mode_parent = mode_object)
             # modeEnter.input_type = InputType.ModeControl
@@ -326,7 +327,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 input_id = ModeInputModeType.ModeExit,
                 mode_name = mode_object.name,
                 override_input_type = InputType.JoystickButton,
-                custom_name_handler = self._custom_name_handler
+                custom_name_handler = self._custom_name_handler,
+                autocreate = True,
                 )
             # modeExit.input_type = InputType.ModeControl
             # modeExit.setOverrideInputType(InputType.JoystickButton)
@@ -346,7 +348,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 input_id = ModeInputModeType.ModeProfileStart,
                 mode_name = master_mode_object.name,
                 override_input_type = InputType.JoystickButton,
-                custom_name_handler = self._custom_name_handler
+                custom_name_handler = self._custom_name_handler,
+                autocreate = True,
                 )     
 
 
@@ -370,7 +373,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 input_id = ModeInputModeType.ModeProfileStop,
                 mode_name = master_mode_object.name,
                 override_input_type = InputType.JoystickButton,
-                custom_name_handler = self._custom_name_handler
+                custom_name_handler = self._custom_name_handler,
+                autocreate = True,
                 )     
             # modeProfileStop = gremlin.base_profile.InputItem(self._custom_name_handler, mode_parent = master_mode_object)
             # modeProfileStop.input_type = InputType.ModeControl

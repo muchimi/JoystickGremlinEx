@@ -4902,9 +4902,6 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             is_paired = remote_state.paired
             force_remote = event.force_remote or is_paired
 
-
-
-
             # determine if event should be fired based on release mode
             is_pressed = event.is_pressed
             trigger = False

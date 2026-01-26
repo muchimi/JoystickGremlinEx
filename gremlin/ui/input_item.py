@@ -3002,7 +3002,7 @@ class ContainerSelector(QtWidgets.QWidget):
         self.main_layout.addWidget(self.paste_button_widget)
         self.main_layout.addWidget(self.delete_button)
 
-        self.refresh(input_type)
+        self.refresh(data)
 
         self._handle_lock_changed_ui(self.data)
 
@@ -3022,12 +3022,12 @@ class ContainerSelector(QtWidgets.QWidget):
 
 
 
-    def refresh(self, input_type):
+    def refresh(self, input_item):
         ''' reloads the selector based on the input '''
-        self.input_type = input_type
+        self.input_type = input_item.input_type
         with QtCore.QSignalBlocker(self.container_dropdown):
             self.container_dropdown.clear()
-            for name in self._valid_container_list(input_type):
+            for name in input_item.get_valid_container_list():
                 self.container_dropdown.addItem(name )
             config = gremlin.config.Configuration()
             self.container_dropdown.setCurrentText(config.last_container)
@@ -3062,6 +3062,7 @@ class ContainerSelector(QtWidgets.QWidget):
         :return list of valid action names
         """
         container_list = []
+        
         for entry in gremlin.plugin_manager.ContainerPlugins().repository.values():
             if not entry.input_types or input_type in entry.input_types:
                 if entry.axis_only:
@@ -3760,6 +3761,12 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
     def _container_remove(self):
         """Emits the closed event when this widget is being closed."""
         self.closed.emit(self)
+
+    def redrawActionSets(self):
+        ''' redraws the action set widgets '''
+        for widget in self.action_widgets:
+            if Shiboken.isValid(widget):
+                widget.redraw()
 
     def _copy_container(self, _):
         """Emits the copy clipboard when the widget is being copied """

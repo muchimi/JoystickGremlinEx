@@ -32,8 +32,10 @@ import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.util import safe_read, safe_format
+import gremlin.util
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
+import gremlin.base_profile
 
 syslog = logging.getLogger("system")
 
@@ -74,6 +76,17 @@ class ButtonContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addWidget(widget)
 
+        # actions
+        self._update_actions()
+
+        self._update_visible()
+
+
+            
+
+    def _update_actions(self):
+        
+
         if self.profile_data.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),
@@ -102,8 +115,8 @@ class ButtonContainerWidget(AbstractContainerWidget):
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
 
-        self._update_visible()
 
+ 
     def _update_visible(self):
         delay_visible = self.profile_data.autorelease
         self.delay_widget.setVisible(delay_visible)
@@ -136,6 +149,9 @@ class ButtonContainerWidget(AbstractContainerWidget):
                     gremlin.ui.ui_common.ContainerViewTypes.Conditions
                 )
 
+
+
+
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
         """Adds an action selection UI widget.
 
@@ -144,7 +160,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
         """
         action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type(),
-            self.profile_data,
+            self.profile_data.get_input_item()
         )
         action_selector.inputItem = self.profile_data
         action_selector.action_added.connect(add_action_cb)
@@ -179,7 +195,12 @@ class ButtonContainerWidget(AbstractContainerWidget):
         )
         layout.addWidget(widget)
         widget.redraw()
-        widget.model.data_changed.connect(self.container_modified.emit)
+        widget.model.data_changed.connect()
+
+
+    def _handle_container_changed(self):
+        self.container_modified.emit()
+        self.redrawActionSets()
 
     def _add_action(self, index, action_name):
         """Adds a new action to the container.
@@ -196,6 +217,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
             self.profile_data.action_sets[index].append(action_item)
             self.profile_data.create_or_delete_virtual_button()
             self.container_modified.emit()
+            self._update_actions()
         finally:
             gremlin.util.popCursor()
 
@@ -210,6 +232,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
                 self.profile_data.action_sets[index] = []
             self.profile_data.action_sets[index].append(action_item)
             self.profile_data.create_or_delete_virtual_button()
+            self._update_actions()
         finally:
             gremlin.util.popCursor()
 
@@ -227,6 +250,8 @@ class ButtonContainerWidget(AbstractContainerWidget):
                 index = 1
             self.profile_data.action_sets[index] = None
             self.container_modified.emit()
+            self._update_actions()
+            self._update_container_ui()
 
     def _get_window_title(self):
         """Returns the title to use for this container.
@@ -246,7 +271,7 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
         self.profile_data = container
         self.last_trigger = None
         self.autorelease = container.autorelease
-        self.verbose = gremlin.config.Configuration().verbose
+        self.verbose = gremlin.config.Configuration().verbose_mode_container
         self.release_timer = None
 
     def profile_stop(self):
@@ -255,6 +280,7 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
 
     def process_event(self, event, value, extra_data = None):
 
+        event = event.clone()
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0,0)
         else:
@@ -293,7 +319,7 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
 
             #self.release_set.process_event(event, value)
 
-        return False # stop execution as the logic is internal to trigger the other nodes
+        return True 
 
 
 class ButtonContainer(AbstractContainer):
@@ -311,12 +337,7 @@ class ButtonContainer(AbstractContainer):
 and another action on trigger release in a single container.'''
     functor = ButtonContainerFunctor
     widget = ButtonContainerWidget
-    # override default allowed inputs here
-    # input_types = [
-    #     InputType.JoystickButton,
-    #     InputType.JoystickHat,
-    #     InputType.Keyboard
-    # ]
+
     input_types = [
          InputType.JoystickButton,
          InputType.JoystickHat,
@@ -331,23 +352,44 @@ and another action on trigger release in a single container.'''
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.action_sets = [[], []]
+        self.resetActionSets()
         self.delay = 0.5
         self.activate_on = "release"
         self.autorelease = True
         self.autorelease_delay = 250 # delay for autorelease trigger if in autorelease mode
+        self.actionsetCustomParseCallback = self._parse_action_set
+        self.resetActionSets()
+
+    def resetActionSets(self):
+        ''' resets actions sets - override in derived class if the action set default should be different '''
+        self.action_sets = [[],[]]
 
     def _parse_xml(self, node, data = None, extra_data = None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
-        self.action_sets = []
         super()._parse_xml(node, data)
         if "autorelease" in node.attrib:
             self.autorelease = safe_read(node,"autorelease",bool, True)
         if "delay" in node.attrib:
             self.autorelease_delay = safe_read(node,"delay",int, 250)
+
+        self.action_sets = [[],[]]
+
+        actionset_nodes = node.xpath("action-set")   
+        for index, actionset_node in enumerate(actionset_nodes):
+            action_set = gremlin.base_profile.ActionSet()
+            self._parse_action_xml(actionset_node, action_set, data, extra_data)
+            self.action_sets[index] = action_set
+
+
+   
+    def _parse_action_set(elf, node, data = None, extra_data = None):
+        pass # do nothing
+        
+        
+        
 
 
     def _generate_xml(self):

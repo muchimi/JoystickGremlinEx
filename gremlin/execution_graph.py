@@ -1845,28 +1845,13 @@ class ExecutionContext():
         verbose_exec = self._verbose_exec
         verbose_detailed = self._verbose_detailed
         verbose_condition = self._verbose_condition
+
         result = False # assume fails
         node.data = event # last event
         try:
             gremlin.shared_state.pushLog()
             logTabs = gremlin.shared_state.logTabs()
-
-            # #if not node.nodeType in (ExecutionGraphNodeType.ActionSet, ExecutionGraphNodeType.Group):
-            # if node.id in visited:
-            #     if  event.callbackKey in visited[node.id]:
-            #         syslog.error(f"{logTabs}EXEC: LOOP DETECTED [{node.id}] [{node.nodeType.name}] {node.description}) - this node has already been executed as part of this sequence indicating a logical loop")
-            #         ntabs = " "
-            #         syslog.error(f"{logTabs}{ntabs}Execution history:")
-            #         for id in visited:
-            #             n : ExecutionGraphNode = self.getNode(id)
-            #             syslog.error(f"{logTabs}{ntabs}{n.to_string()} EVENT: {str(event)}")
-            #             ntabs += " "
-            #         return False
-            # else:
-            #     visited[node.id] = []
-
-            # visited[node.id].append(event.callbackKey)
-                
+        
             # abort if the mode changed and the event was fired in a different mode
             if event.mode and event.mode != gremlin.shared_state.runtime_mode:
                 if verbose_exec: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description} - ignoring event due to wrong mode {event.mode} current runtime: {gremlin.shared_state.runtime_mode} ")    
@@ -2023,7 +2008,8 @@ class ExecutionContext():
             return result
 
         finally:
-            if verbose_condition: syslog.info(f"{logTabs}>Overall Result: {'PASS' if result else 'FAIL'}")
+            if verbose_exec:
+                syslog.info(f"{logTabs}>Overall Result: {'PASS' if result else 'FAIL'}")
             gremlin.shared_state.popLog()
 
 
