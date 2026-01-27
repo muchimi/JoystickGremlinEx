@@ -60,10 +60,30 @@ class RepeatContainerWidget(AbstractContainerWidget):
             return
         self.profile_data.create_or_delete_virtual_button()
 
-
         self.action_layout.addWidget(QtWidgets.QLabel("Repeat Options:"))
 
+        widget = gremlin.ui.ui_common.QDataCheckbox("Trigger on initial press",
+                                                    value = self.action_data.trigger_on_start,
+                                                    tooltip = "If set, the repeated action will trigger immediately, wait for the initial delay, and start repeating the actions if the input is pressed.\nIf not set, there is no intitial trigger, and repeated action will only trigger if the input is still held after the initial delay has lapsed.\nHas no effect if the initial delay is disabled (0).",
+                                                    callback = self._handle_start_trigger_changed)
+        
+        self.action_layout.addWidget(widget)
+
+
         widgets = []
+
+        widget = gremlin.ui.ui_common.QIntLineEdit(value = self.action_data.repeat_count,
+                                                   callback = self._handle_repeat_count_changed,
+                                                   tooltip = "Number of times to repeat the actions.  Set to 0 to disable (unlimited).")
+
+
+
+
+        widget = gremlin.ui.ui_common.getHContainer([widget,"(0 for unlimited)"], widget_only=True)
+        
+        widgets.append(("Repeat Count:", widget))
+
+      
 
         # activation delay
         widget = gremlin.ui.ui_common.QDelayWidget(
@@ -128,6 +148,12 @@ class RepeatContainerWidget(AbstractContainerWidget):
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
             self.action_layout.addWidget(action_selector)
+
+    def _handle_start_trigger_changed(self, checked : bool):
+        self.action_data.trigger_on_start = checked
+
+    def _handle_repeat_count_changed(self, value : int):
+        self.action_data.repeat_count = value
 
     def _handle_delay_changed(self, value : int):
         self.action_data.initial_pulse_delay = value / 1000
@@ -229,6 +255,8 @@ class RepeatContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
         self._lock = threading.Lock()
         self._is_running = False
         self._thread = None
+        self._repeat_count = None # number of times to repeat, None = disabled
+
 
     def profile_start(self):
         self.verbose = gremlin.config.Configuration().verbose_mode_container
@@ -244,6 +272,7 @@ class RepeatContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
         ''' called when pulse is off '''
         self._execute(self._release_event, self._value, self._extra_data) 
 
+
     def pulse_start(self, args, duration : float, interval : float):
         ''' pulse setup '''
         if self.verbose: syslog.info(f"Pulse START repeat container [{self.id}] duration: {duration:0.3f} interval: {interval:0.3f}")
@@ -256,7 +285,8 @@ class RepeatContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
                 if self.verbose: syslog.info(f"\talready pulsing - ignored")
                 return
         else:
-            worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data = args)
+            count = self._repeat_count
+            worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data = args, count = count)
             self.pulse_worker_map[key] = worker
 
         if self.verbose: syslog.info(f"\tactivate")
@@ -310,6 +340,7 @@ class RepeatContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
         while self._is_running and time.time() < pulse_end:
             time.sleep(0.001)
         self._execute(self._release_event, self._value, self._extra_data) # execute the first actions
+
         if self._is_running:
             # initial pulse completed ok, chain the rest 
             wait_time = self.action_data.initial_pulse_delay # wait interval before pulsing the next one
@@ -342,15 +373,23 @@ class RepeatContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
             self._release_event = self._press_event.invert()
             self._value = value
             self._extra_data = extra_data
-            
-            
+            self._repeat_count = self.action_data.repeat_count if self.action_data.repeat_count > 0 else None
 
-
+ 
             if delay == 0:
                 # go straight to pulsing if we're not delaying the pulse start
                 self._handle_repeat_start()
+
             else:
-                self._initial_pulse() # run a separate initial abortable pulse
+                if self.action_data.trigger_on_start:
+                    self._initial_pulse() # run a separate initial abortable pulse
+                else:
+                    # start after the timer has lapsed
+                    wait_time = self.action_data.initial_pulse_delay # wait interval before pulsing the next one
+                    self._timer = threading.Timer(wait_time, self._handle_repeat_start)
+                    self._timer.start()
+
+
 
         else:
             # input is released
@@ -397,6 +436,8 @@ class RepeatContainer(AbstractContainer):
         self.hold_delay = 0.25 # in seconds, repeat hold duration 
         self.pulse_interval_delay = 0.25 # in seconds, interval between repeats
         self.actionsetCustomParseCallback = self._parse_action_set
+        self.trigger_on_start = True # true if the the repeat action is triggered on start.  If false, the trigger will only occur after the input has been held for the initial repeat delay.
+        self.repeat_count = 0 # number of times to repeat, 0 to disable (unlimited)
 
 
     def _parse_xml(self, node, data = None, extra_data = None):
@@ -408,6 +449,8 @@ class RepeatContainer(AbstractContainer):
         self.initial_pulse_delay = safe_read(node, "delay", float, 0.75)
         self.hold_delay = safe_read(node,"interval", float, 0.25)
         self.pulse_interval_delay = safe_read(node,"pulse", float, 0.25)
+        self.trigger_on_start = safe_read(node,"trigger-start", bool, True)
+        self.repeat_count = safe_read(node, "repeat-count", int, 0)
 
         self.action_sets = []
 
@@ -435,6 +478,8 @@ class RepeatContainer(AbstractContainer):
         node.set("delay",safe_format(self.initial_pulse_delay, float))
         node.set("interval", safe_format(self.hold_delay, float))
         node.set("pulse", safe_format(self.pulse_interval_delay, float))
+        node.set("trigger-start", safe_format(self.trigger_on_start, bool))
+        node.set("repeat-count", safe_format(self.repeat_count, int))
 
         as_node = ElementTree.Element("action-set")
         for action in self.action_sets[0]:

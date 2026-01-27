@@ -29,22 +29,31 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T165):
+- New: Repeat Container: Added option to suppress the initial trigger of the repeated actions on input trigger.  If disabled, the repeated actions will only start if the input has been held for the initial delay.  If enabled (default), the repeated actions will run once on input trigger, then repeat after the initial delay has lapsed.  This option has no effect if the initial delay is disabled (0).
+
+- New: Repeat Container: Added repeat count option. Set to 0 to disable (repeat indefinitely while the input is pressed).  If the count is positive, the actions will repeat up to the count.  The initial trigger is not included in this count, so a repeat count of 5 will trigger 6 times if the initial trigger is enabled, and 5 times if the initial trigger is disabled.  If the repeat count is 0, the actions will continue repeating until the input is released.
+
+- Documentation updates
+
+- Fix: macro UI exception on refactored wheel behavior for drop downs from T164.
+
 ### (m76T164A):
-New: UI: (feature request) Option to enable(disable) the mouse wheel in drop downs to change values. The new default is off.  This option is located in the UI page of the global GEX options.  This option can help with the inadvertent changes to drop downs values while scrolling UI elements that contain them vertically. The functionality also can be temporarily re-enabled if a shift key is down even with the option off.
-Change: UI : reworked the mapping top bar.
-Fix: Repeater Container: XML action sets not reading in correctly in the data structure.
-Fix: About box exception and about box rework to include correct links.
-Fix: XML: improved handling of failed input registrations (new API)
+- New: UI: (feature request) Option to enable(disable) the mouse wheel in drop downs to change values. The new default is off.  This option is located in the UI page of the global GEX options.  This option can help with the inadvertent changes to drop downs values while scrolling UI elements that contain them vertically. The functionality also can be temporarily re-enabled if a shift key is down even with the option off.
+- Change: UI : reworked the mapping top bar.
+- Fix: Repeater Container: XML action sets not reading in correctly in the data structure.
+- Fix: About box exception and about box rework to include correct links.
+- Fix: XML: improved handling of failed input registrations (new API)
 
 ### (m76T163):
-Fix: Play Sound: resolve some parameter and object reference issues.
-Fix: Play Sound: resolve possible invalid bounds when using folder mode
-Fix: Press/Release Container: exception when loading a saved container without actions.
-Fix: Press/Release Container: may not load correct visuals
-Fix: Press/Release Container: impacts subsequent processing
-Fix: XML: fixed an issue with container serialization with input registry
-Fix: XML: incorrect xpath expression for multiple child containers
-Fix: UI: incomplete available container list for non-joystick inputs
+- Fix: Play Sound: resolve some parameter and object reference issues.
+- Fix: Play Sound: resolve possible invalid bounds when using folder mode
+- Fix: Press/Release Container: exception when loading a saved container without actions.
+- Fix: Press/Release Container: may not load correct visuals
+- Fix: Press/Release Container: impacts subsequent processing
+- Fix: XML: fixed an issue with container serialization with input registry
+- Fix: XML: incorrect xpath expression for multiple child containers
+- Fix: UI: incomplete available container list for non-joystick inputs
 
 
 ### (m76T162A):
@@ -52,20 +61,20 @@ New: Macro Pause and Pause Action: pause function will remember their respective
 
 
 ### (m76T162):
-New: Repeat container: This container triggers included momentary actions once, and repeats them thereafter if the input is still held after an initial delay.  Options include specifying how long the pulse duration is, and the interval between pulses.  
+- New: Repeat container: This container triggers included momentary actions once, and repeats them thereafter if the input is still held after an initial delay.  Options include specifying how long the pulse duration is, and the interval between pulses.  
 Use case: This container duplicates keyboard firmware autorepeat functions.
 
 ### (m76T161A):
-New: Gated Axis: Range Hold condition.  This condition that applies to ranges makes the range behave like a button, pressed when the axis is in range, released when not.
-New: Gated Axis: Remember last selected condition for gates/ranges.
-New: Keyboard Ex: release held pressed keys on profile stop (hold mode).
-Fix: Keyboard Ex: may not always trigger in hold mode.
+- New: Gated Axis: Range Hold condition.  This condition that applies to ranges makes the range behave like a button, pressed when the axis is in range, released when not.
+- New: Gated Axis: Remember last selected condition for gates/ranges.
+- New: Keyboard Ex: release held pressed keys on profile stop (hold mode).
+- Fix: Keyboard Ex: may not always trigger in hold mode.
 
 
 
 ### (m76T161):
-Fix: Play Sound: possible no default for randomize folder option as UI initializes.
-Fix: Gated Axis: drag gate does not update the corresponding display repeater.
+- Fix: Play Sound: possible no default for randomize folder option as UI initializes.
+- Fix: Gated Axis: drag gate does not update the corresponding display repeater.
 
 ### (m76T160):
 - New: Play Sound: randomize folder option: when enabled, the play action will pick a random file (wav or mp3, wav recommended) from the folder to play.  The folder is specified by selecting an existing audio file.

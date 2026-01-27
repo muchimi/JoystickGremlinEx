@@ -903,7 +903,7 @@ class MacroActionEditor(QtWidgets.QWidget):
     def _state_ui(self):
         '''state interface'''
         action = self.model.get_entry(self.index.row())
-        self.state_selector = gremlin.ui.ui_common.QDataComboBox(width=None)
+        self.state_selector = gremlin.ui.ui_common.QDataComboBox()
         self.state_selector.currentIndexChanged.connect(self._state_changed)
         self.state_description_widget = QtWidgets.QLabel()
         widget = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector], widget_only = True)

@@ -2361,9 +2361,9 @@ The range mapper is not designed to work with the default keyboard mapper as tha
 
 The latching feature (awareness of other range containers) may introduce some strange behaviors and applies to all ranges attached to a single axis, so it's not aware of nesting for example.  The latching applies to all ranges in the mapping tree regardless of their level.
 
-## Button Container
+## Press/Release Container
 
-This experimental container simplifies the mapping of actions when an input button is pressed or released.  While this can be done with conditions, this is a simpler and easier way to map a button to a set of actions when a button is pressed or released.
+This container simplifies the mapping of actions when an input button is pressed or released.  While this can be done with conditions, this is a simpler and easier way to map a button to a set of actions when a button is pressed or released.
 
 ### Usage tips
 
@@ -2376,6 +2376,38 @@ In this section, add the container or actions you want to execute on button pres
 ### Release block
 
 In this section, add the container of actions you want to execute on button release.  Leave blank for no action.
+
+## Repeat Container
+
+This container mimics keyboard auto-repeat.  It allows for actions to be defined that will auto-repeat while the input is triggered (pressed/on).   The behavior of the auto-repeat changes with the options selected.
+
+### Trigger on Initial Press
+
+This option determines if the actions are triggered immediately when the input is pressed.  The default is enabled.  When enabled, an input press will trigger the repeated actions once, then start the auto-repeat if the input is still pressed after the initial delay lapses.  If not enabled, there is no initial trigger of the actions, and the auto-repeat will start only after the initial delay has lapsed.  This option has no effect if the initial delay is disabled (set to 0).
+
+### Repeat count
+
+This is the number of times the actions should repeat while the input is pressed.  If set to zero (0), the actions will repeat while the input is pressed indefinitely.  If positive, the repeats will stop after the number of repetitions has been reached.
+This value resets at every input press.  The initial trigger is not included in this count.  A repeat count of 5 will trigger 6 times if trigger on initial press is enabled, and 5 times if trigger on initial press is disabled.
+
+### Initial delay
+
+This delay, in milliseconds, is the time between the input is pressed and the time the auto-repeat starts.  If this value is disabled (set to 0), the auto-repeat starts immediately on input press.
+
+### Repeat hold time
+
+This delay, in milliseconds, specifies how long actions are "held", or the time between actions being repeated get a "press" and a "release".
+
+### Repeat Interval
+
+This delay, in milliseconds, specifies the time between repeats.
+
+### Use cases
+
+The repeat container can be used to auto-repeat one or more actions when an input is held or while a state is enabled.
+
+The container can also be used to trigger a future action, which only gets executed if the input is still pressed.
+
 
 ## TempoEx Container (tempo with chain)
 

@@ -210,13 +210,14 @@ class Repeater(QtCore.QObject):
 class PulseWorker():
     ''' helper object to schedule repeated triggers (callback) at a given interval until the object is stopped. '''
 
-    def __init__(self, pulse_duration : float, repeat_interval : float, on_callback, off_callback = None, data = None):
+    def __init__(self, pulse_duration : float, repeat_interval : float, on_callback, off_callback = None, data = None, count : int = None):
         """Creates a new instance.
 
         :param pulse_duration: duration in seconds of the pulse
         :param repeat_interval: duration in seconds of the interval between pulses - send a negative value to disable - value of 0 means no delay (not recommended)
         :param on_callback: function to call when the pulse is on - if data is provided, that will be passed as an argument
         :param off_callback: function to call when the pusle if off (optional) - if data is provided, that will be passed as an argument
+        :param count: number of pulses, set to 0 to disable
         """
         #QtCore.QObject.__init__(self)
         self.is_running = False
@@ -227,6 +228,7 @@ class PulseWorker():
         self._is_pulse = False # true when the signal is active
         self._thread = None # holds the running thread
         self._data = data # any data 
+        self._repeat_count = count
 
         el = gremlin.event_handler.EventListener()
         el.profile_stop.connect(self.stop) # stop processing on profile stop
@@ -283,9 +285,6 @@ class PulseWorker():
             self._is_pulse = True # indicate pulsing phase
             self._is_interval = False
 
-            # fire the pulse on callback
-            #if verbose: syslog.info("Start pulse")
-
             #if verbose: syslog.info("Fire on callback")
             if self._on_callback:
                 if self.data:
@@ -311,6 +310,11 @@ class PulseWorker():
                     self._off_callback(self.data)
                 else:
                     self._off_callback()
+
+
+            if self._repeat_count is not None:
+                self._repeat_count -= 1
+                self._keep_running = self._repeat_count > 0
 
             if not self._keep_running or self._repeat_interval < 0:
                 if verbose: syslog.info("End pulse worker")
