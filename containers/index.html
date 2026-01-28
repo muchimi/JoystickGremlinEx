@@ -514,39 +514,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Conditions
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Conditions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#types-of-conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Types of conditions
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#condition-results" class="md-nav__link">
-    <span class="md-ellipsis">
-      Condition results
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#available-containers" class="md-nav__link">
     <span class="md-ellipsis">
       Available containers
@@ -561,6 +528,48 @@
       Implementation
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequence-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sequence Container
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sequence Container">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-once-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run once mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-loop-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Toggle (loop) mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wiggle-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wiggle mode
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -718,39 +727,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Conditions
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Conditions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#types-of-conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Types of conditions
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#condition-results" class="md-nav__link">
-    <span class="md-ellipsis">
-      Condition results
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#available-containers" class="md-nav__link">
     <span class="md-ellipsis">
       Available containers
@@ -765,6 +741,48 @@
       Implementation
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequence-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sequence Container
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sequence Container">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-once-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run once mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-loop-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Toggle (loop) mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wiggle-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wiggle mode
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -790,89 +808,6 @@
 <p>Containers do not produce output.  </p>
 <p>Containers must have at least one <a href="../actions/#actions">action</a>.</p>
 <p>When you add an action to a mapping, it will be placed in a container, and the default container is the basic container.</p>
-<h2 id="conditions">Conditions<a class="headerlink" href="#conditions" title="Permanent link">&para;</a></h2>
-<p>Logical conditions that check for certain input states, values or ranges can be applied to all container actions as a group (container level), or individual actions contained within the container.  This allows you to further manage when and if actions are executed.</p>
-<p>Conditions are set via the condition tab of the container (right side of the UI).</p>
-<p>Each container has a top level condition that applies to the entire container.  If this condition fails, the others will not be evaluated.</p>
-<p>Each action in the container can have a condition as well, and these conditions only apply the action.  If that condition fails, only that action will not be executed.</p>
-<h3 id="types-of-conditions">Types of conditions<a class="headerlink" href="#types-of-conditions" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Container</th>
-<th>Description</th>
-<th>Typical Use-Case</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Joystick condition - Axis</td>
-<td>The condition looks for a physical input axis to be in a specific range</td>
-<td></td>
-</tr>
-<tr>
-<td>Joystick condition - Button</td>
-<td>The condition looks for a physical button to be pressed, released, or changed.</td>
-<td></td>
-</tr>
-<tr>
-<td>VJoy condition - Axis</td>
-<td>The condition looks for a vjoy input axis to be in a specific range</td>
-<td></td>
-</tr>
-<tr>
-<td>VJoy condition - Button</td>
-<td>The condition looks for a vjoy button to be pressed, released, or changed.</td>
-<td></td>
-</tr>
-<tr>
-<td>Action condition</td>
-<td>The condition looks at the state of the input trigger</td>
-<td></td>
-</tr>
-<tr>
-<td>State condition</td>
-<td>The condition looks for a state value.</td>
-<td>This is extremely powerful because a state can itself derive from other states, making complex boolean compound conditions possible.</td>
-</tr>
-<tr>
-<td>Keyboard condition</td>
-<td>The condition looks for a specific key press</td>
-<td></td>
-</tr>
-<tr>
-<td>Mode condition</td>
-<td>Thje condition looks for the profile to be in a specific mode</td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="condition-results">Condition results<a class="headerlink" href="#condition-results" title="Permanent link">&para;</a></h3>
-<p>All conditions have a ruleset applied to them.</p>
-<table>
-<thead>
-<tr>
-<th>Ruleset</th>
-<th>Description</th>
-<th>Typical Use-Case</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Any</td>
-<td>Any condition passing results in a PASS.</td>
-<td>Used for multiple choice conditions when one out of many is needed to succeed.</td>
-</tr>
-<tr>
-<td>All</td>
-<td>All conditions must pass to result in a PASS.</td>
-<td>Used when all conditions need to be met.</td>
-</tr>
-</tbody>
-</table>
-<p>If a condition fails, the mapping fails and no output is generated.</p>
-<p>Conditions are evaluated top down.</p>
-<p>Conditions use a shortcut evaluation, meaning that the first one to fail the output fails the entire operation and no downstream conditions will be evaluated.</p>
 <h2 id="available-containers">Available containers<a class="headerlink" href="#available-containers" title="Permanent link">&para;</a></h2>
 <p>GremlinEx includes several containers that can be used to solve various mapping challenges.</p>
 <table>
@@ -943,6 +878,27 @@
 </table>
 <h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
 <p>Each container in GremlinEx is a Python plugin.</p>
+<h2 id="sequence-container">Sequence Container<a class="headerlink" href="#sequence-container" title="Permanent link">&para;</a></h2>
+<p>This container executes all contained actions in a sequence, and as such is very similar to a macro.  Unlike a macro, the sequence container executes one or more full action per step, which can itself contain a macro for example.  The difference between this container and others is the order of execution is guaranteed in step order, and each action runs in sequence rather than in parallel.</p>
+<p>This container allows the sequencing of actions contained in the sequence steps, and has several features not available in the simpler macro action:</p>
+<ul>
+<li>all action types suitable for momentary input can be used, such as OSC.  The sequence container has more action types than the macro action.</li>
+<li>the steps can contain multiple actions.</li>
+<li>steps can themselves contain macros if needed.</li>
+<li>the container supports several "wiggle" modes to randomize the execution of the steps, including a random pick mode where a count of steps can be selected at random, thus using steps as a menu of possible choices to execute on trigger.</li>
+<li>steps can be re-ordered</li>
+</ul>
+<h3 id="run-once-mode">Run once mode<a class="headerlink" href="#run-once-mode" title="Permanent link">&para;</a></h3>
+<p>In this mode, the sequence is executed once when the input is triggered as determined by the "exec on release" or "exec on press" options.  The sequence will run in the order of the steps.  The sequence cannot be stopped in this mode.  If a retrigger occurs while the sequence is still running, the trigger is ignored.</p>
+<h3 id="toggle-loop-mode">Toggle (loop) mode<a class="headerlink" href="#toggle-loop-mode" title="Permanent link">&para;</a></h3>
+<p>In this mode, the sequence runs as a loop.  The first trigger, as determined by the "exec on release" or "exec on press" options, enables the loop.  The second trigger stops the loop.  If the "resume at last step" option is enabled, the sequence will start the next loop where it was last stopped.  By default the loop starts at the first step.</p>
+<h3 id="wiggle-mode">Wiggle mode<a class="headerlink" href="#wiggle-mode" title="Permanent link">&para;</a></h3>
+<p>When Wiggle mode is enabled, this container can randomize the execution of actions it contains. </p>
+<p>In wiggle mode, the container will continue executing actions while the input is pressed, and stop when the input is released.  This makes it particularly suitable to usage by a state, or when mapped to a physical toggle switch on a hardware input.</p>
+<p>The pause between steps can be randomized between a minimum delay, and a maximum delay.</p>
+<p>If step randomization is enabled, the next step to execute will also be randomized.  If disabled, the step sequence is observed.</p>
+<p>Actions execute in the order they are listed and they can be re-ordered if needed.</p>
+<p>The purpose of this container is to add macro-like functionality using mappings instead of the macro action itself.</p>
 
 
 
