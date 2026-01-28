@@ -520,6 +520,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Conditions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#types-of-conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Types of conditions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#condition-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      Condition results
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -537,84 +561,6 @@
       Implementation
     </span>
   </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#containers_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      Containers
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Containers">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#basic" class="md-nav__link">
-    <span class="md-ellipsis">
-      Basic
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tempoex" class="md-nav__link">
-    <span class="md-ellipsis">
-      TempoEx
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#chain" class="md-nav__link">
-    <span class="md-ellipsis">
-      Chain
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#sequence" class="md-nav__link">
-    <span class="md-ellipsis">
-      Sequence
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#smart-toggle" class="md-nav__link">
-    <span class="md-ellipsis">
-      Smart Toggle
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#button" class="md-nav__link">
-    <span class="md-ellipsis">
-      Button
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#range" class="md-nav__link">
-    <span class="md-ellipsis">
-      Range
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -778,6 +724,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Conditions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#types-of-conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Types of conditions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#condition-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      Condition results
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -795,84 +765,6 @@
       Implementation
     </span>
   </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#containers_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      Containers
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Containers">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#basic" class="md-nav__link">
-    <span class="md-ellipsis">
-      Basic
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tempoex" class="md-nav__link">
-    <span class="md-ellipsis">
-      TempoEx
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#chain" class="md-nav__link">
-    <span class="md-ellipsis">
-      Chain
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#sequence" class="md-nav__link">
-    <span class="md-ellipsis">
-      Sequence
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#smart-toggle" class="md-nav__link">
-    <span class="md-ellipsis">
-      Smart Toggle
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#button" class="md-nav__link">
-    <span class="md-ellipsis">
-      Button
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#range" class="md-nav__link">
-    <span class="md-ellipsis">
-      Range
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -900,6 +792,87 @@
 <p>When you add an action to a mapping, it will be placed in a container, and the default container is the basic container.</p>
 <h2 id="conditions">Conditions<a class="headerlink" href="#conditions" title="Permanent link">&para;</a></h2>
 <p>Logical conditions that check for certain input states, values or ranges can be applied to all container actions as a group (container level), or individual actions contained within the container.  This allows you to further manage when and if actions are executed.</p>
+<p>Conditions are set via the condition tab of the container (right side of the UI).</p>
+<p>Each container has a top level condition that applies to the entire container.  If this condition fails, the others will not be evaluated.</p>
+<p>Each action in the container can have a condition as well, and these conditions only apply the action.  If that condition fails, only that action will not be executed.</p>
+<h3 id="types-of-conditions">Types of conditions<a class="headerlink" href="#types-of-conditions" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Container</th>
+<th>Description</th>
+<th>Typical Use-Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Joystick condition - Axis</td>
+<td>The condition looks for a physical input axis to be in a specific range</td>
+<td></td>
+</tr>
+<tr>
+<td>Joystick condition - Button</td>
+<td>The condition looks for a physical button to be pressed, released, or changed.</td>
+<td></td>
+</tr>
+<tr>
+<td>VJoy condition - Axis</td>
+<td>The condition looks for a vjoy input axis to be in a specific range</td>
+<td></td>
+</tr>
+<tr>
+<td>VJoy condition - Button</td>
+<td>The condition looks for a vjoy button to be pressed, released, or changed.</td>
+<td></td>
+</tr>
+<tr>
+<td>Action condition</td>
+<td>The condition looks at the state of the input trigger</td>
+<td></td>
+</tr>
+<tr>
+<td>State condition</td>
+<td>The condition looks for a state value.</td>
+<td>This is extremely powerful because a state can itself derive from other states, making complex boolean compound conditions possible.</td>
+</tr>
+<tr>
+<td>Keyboard condition</td>
+<td>The condition looks for a specific key press</td>
+<td></td>
+</tr>
+<tr>
+<td>Mode condition</td>
+<td>Thje condition looks for the profile to be in a specific mode</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="condition-results">Condition results<a class="headerlink" href="#condition-results" title="Permanent link">&para;</a></h3>
+<p>All conditions have a ruleset applied to them.</p>
+<table>
+<thead>
+<tr>
+<th>Ruleset</th>
+<th>Description</th>
+<th>Typical Use-Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Any</td>
+<td>Any condition passing results in a PASS.</td>
+<td>Used for multiple choice conditions when one out of many is needed to succeed.</td>
+</tr>
+<tr>
+<td>All</td>
+<td>All conditions must pass to result in a PASS.</td>
+<td>Used when all conditions need to be met.</td>
+</tr>
+</tbody>
+</table>
+<p>If a condition fails, the mapping fails and no output is generated.</p>
+<p>Conditions are evaluated top down.</p>
+<p>Conditions use a shortcut evaluation, meaning that the first one to fail the output fails the entire operation and no downstream conditions will be evaluated.</p>
 <h2 id="available-containers">Available containers<a class="headerlink" href="#available-containers" title="Permanent link">&para;</a></h2>
 <p>GremlinEx includes several containers that can be used to solve various mapping challenges.</p>
 <table>
@@ -970,22 +943,6 @@
 </table>
 <h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
 <p>Each container in GremlinEx is a Python plugin.</p>
-<h2 id="containers_1">Containers<a class="headerlink" href="#containers_1" title="Permanent link">&para;</a></h2>
-<p>The container holds one or more actions.  There are multiple container types available.  All actions in a container are executed when an input trigger occurs, subject to the options and the capabilities of the container and the action that modify the behavior.</p>
-<h3 id="basic">Basic<a class="headerlink" href="#basic" title="Permanent link">&para;</a></h3>
-<p>The basic container is the most used and the default container.  It is a simple container with one or more actions in it.</p>
-<h3 id="tempoex">TempoEx<a class="headerlink" href="#tempoex" title="Permanent link">&para;</a></h3>
-<p>This container has two content areas.  One for short press actions, one for long press actions.</p>
-<h3 id="chain">Chain<a class="headerlink" href="#chain" title="Permanent link">&para;</a></h3>
-<p>This container lets you chain actions.  Whenever the input is triggered, the chain will increment the index and move to the next block of actions index, and loop around when it runs out of blocks to execute.  This is used for round-robin type mappings when you need a sequence of things to happen for each trigger.</p>
-<h3 id="sequence">Sequence<a class="headerlink" href="#sequence" title="Permanent link">&para;</a></h3>
-<p>This container is a bit like a high level macro, and runs all the actions in the sequence they appear.</p>
-<h3 id="smart-toggle">Smart Toggle<a class="headerlink" href="#smart-toggle" title="Permanent link">&para;</a></h3>
-<p>This container is used to toggle outputs based on short of long presses.  Used to toggle "hold"/"sticky" outputs.</p>
-<h3 id="button">Button<a class="headerlink" href="#button" title="Permanent link">&para;</a></h3>
-<p>This container has a set of actions that execute on input press, and another set on input release, in the same container.</p>
-<h3 id="range">Range<a class="headerlink" href="#range" title="Permanent link">&para;</a></h3>
-<p>THis container performs certain actions when the input value is in a certain range</p>
 
 
 
