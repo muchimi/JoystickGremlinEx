@@ -111,38 +111,14 @@ A mapping contains one or more containers.
 
 ### Containers
 
-Once an input is defined (manually or automatically depending on the type of device it is), you can select that input and add a container to it.  A container is an entity that contains one or more actions.  There are multiple container types, each with unique capabilities and options that control how the mapping happens.
+Once an input is defined (manually or automatically depending on the type of device it is), you can select that input and add a [container](containers.md#containers) to it.  A [container](containers.md#containers) is an entity that contains one or more [actions](actions.md#actions).  There are multiple [container](containers.md#available-containers) types, each with unique capabilities and options that control how the mapping happens.  
 
-Containers by themselves do not produce output.  Containers contain actions.  Containers have options and conditions that determine at runtime what actions execute and how.
-
-Containers must have at least one action.  Nearly all containers can contain multiple actions.
-
-Each container in GremlinEx is a plugin, so it is possible to add custom containers.
-
-The simplest container is called the basic container, which is the default.  Container types also include things like tempoEx that let you map actions based on short press, long press or double-clicks.  There is a sequence container which lets you execute actions either in sequence, or randomly and with variable delays, like a macro.  Containers can also simplify mappings of axis (linear input) to a series of actions by range (Range container), etc...  
-
-Some containers (like range) have similar, but not identical functionality to some actions.
-
-
-| Container | Description | Typical Use-Case |
-| ----------- | ----------- | ----------- |
-| Basic | The basic container is a container for one or more actions.  This is the simplest container.  All actions in GEX have to be in a container, and this is the simplest container that can be used. | This is the default container when adding a new action to an input and the most common.  Note that adding an action to an input automatically puts it in the basic container if no container exists. |
-| Button | This container has two sets of actions, one for when a button is pressed, the other for when a button is released. | This container is best used with input that behave like buttons if a different action has to be executed on button press or release. |
-| Chain | This container executes actions in the order the appear in stepped mode.  Every input trigger advances one step.  When the last action is executed, it wraps around. This container should not contain a mode change action. | This container is used for example to trigger state changes in sequence.   |
-| Delay Trigger | This container executes one or more actions in the future.  The action will execute even on mode change.  Conditions applied to the container are evaluated at the scheduled time.  If the container is retriggered, the clock is reset and the delay starts again. |  This container is best used when combined with conditions, so execute this after several seconds have lapsed unless the condition changed. |
-| Double Tap | Similar to the Button container, this adds the ability to detect a rapid double press of the input. | Similar to a mouse double click, this applies to a keyboard or button double pressed quickly. |
-| Sequence | This container lets GEX actions to be used as a macro.  All actions will be executed, one after the other in the order they appear.  The container can also randomize these actions and randomize the delay between action executions. This container should not contain a mode change action. | This is the container equivalent of macros, and because actions have more functionality than the action macro, can be used to create very complex macros superseding the capabilities of the macro action. |
-| Smart Toggle | This container is used to toggle an output based on the short or long press of the input.  A short press pulses the output.  A long press causes the output to be toggled on. | Used for "sticky" output for keyboard or joystick buttons based on a quick toggle, or a hold function.  This container should not contain a mode change action. |
-| Switch | This container is designed to support two way and three way hardware switches. | This container simplifies the mapping of actions to hardware buttons that only trigger in specific positions such as on, but not off.  The container makes it easy to do these mapping without having to use conditions, or to detect input state changes. |
-| State | This container is similar to the basic container however only executes the contained actions after checking a profile state (on or off). | This container eliminates the need to apply a state condition to a container and can be used to run differnt groups of actions based on a state, and without using performance intensive mode context switches.  Use one container for each group of actions.  Expression states can be used to combine multiple states if needed if multiple states are involved (for example A and B, A and B and C, A or B, B and not D, etc.).  Referencing an expression state for this container makes this a very powerful way to group actions that should only execute based on multiple states and increases the readability of the profile while making it simpler to create. |
-| Tempo | This is a container that performs actions on short press, or long press. | This is a legacy container for compatibiliy with older profiles. |
-| TempoEx | This is a container that defines separate actions for short press, long press our double click of the input.  This container does not work for actions that require a release trigger at the onset. | Use this container instead of Tempo although both work pretty much the same. |
 
 
 
 ### Actions
 
-Actions are specific entities that actually produce output.  Actions are contained by containers.
+Actions are specific entities that actually produce output.  [Actions](actions.md#actions) are contained by [containers](containers.md#containers).
 
 GremlinEx actions typically fall in two categories:
 
@@ -150,7 +126,6 @@ GremlinEx actions typically fall in two categories:
 - actions that work on a momentary input (like a button or hat)
 
 If you select an input, and you do not see an available action, it's likely because that action does not work with the selected input type.
-
 
 Actions are self contained, meaning that each action functions independently of other actions, which makes it possible for the same action to be added multiple times to the same container for example.
 
@@ -170,13 +145,60 @@ Conditions apply to containers and actions.  A condition is a pass/fail logic ga
 
 Conditions can check for a key press, a button press, an input axis being in a specific range.  Conditions can also check for a state.
 
-Conditions are either cumulative or "all", so requires all conditions to pass.  In this mode, all conditions have to pass for the mapping to trigger.   The other mode is "any", meaning, one of many. In thi smode, the mapping executes if one condition passes out of all conditions.
-
 Conditions are evaluated as blocks.   If a mapping has nested conditions, they will all be evaluated based on the mapping hierarchy.   Container conditions are evaluated before action conditions.
 
 If a condition fails, the processing of the mapping is aborted.
 
 It can be difficult to diagnose why a mapping does not execute when it is expected to, GremlinEx has three verbose modes dedicated to showing this information at runtime in the log file.  These are turned off by default because they generate a large amount of log data.  The Exec and Extra verbose mode will show the execution tree, and the Condition verbose mode will add to the tree the pass/fail status for each condition and the sequence followed.
+
+Logical conditions that check for certain input states, values or ranges can be applied to all container actions as a group (container level), or individual actions contained within the container.  This allows you to further manage when and if actions are executed.
+
+Conditions are set via the condition tab of the container (right side of the UI).
+
+Each container has a top level condition that applies to the entire container.  If this condition fails, the others will not be evaluated.
+
+Each action in the container can have a condition as well, and these conditions only apply the action.  If that condition fails, only that action will not be executed.
+
+### Types of conditions
+
+| Container | Description | Typical Use-Case |
+| ----------- | ----------- | ----------- |
+| Joystick condition - Axis | The condition looks for a physical input axis to be in a specific range |
+| Joystick condition - Button | The condition looks for a physical button to be pressed, released, or changed. |
+| VJoy condition - Axis | The condition looks for a vjoy input axis to be in a specific range |
+| VJoy condition - Button | The condition looks for a vjoy button to be pressed, released, or changed. |
+| Action condition | The condition looks at the state of the input trigger |
+| State condition | The condition looks for a state value.  | This is extremely powerful because a state can itself derive from other states, making complex boolean compound conditions possible. |
+| Keyboard condition | The condition looks for a specific key press |
+| Mode condition | Thje condition looks for the profile to be in a specific mode |
+
+### Condition results
+
+All conditions have a ruleset applied to them.
+
+| Ruleset | Description | Typical Use-Case |
+| ----------- | ----------- | ----------- |
+| Any | Any condition passing results in a PASS.  | Used for multiple choice conditions when one out of many is needed to succeed. |
+| All | All conditions must pass to result in a PASS. | Used when all conditions need to be met. |
+
+If a condition fails, the mapping fails and no output is generated.
+
+Conditions are evaluated top down.
+
+Conditions use a shortcut evaluation, meaning that the first one to fail the output fails the entire operation and no downstream conditions will be evaluated.
+
+### Usage considerations
+
+Conditions are often necessary and a natural part of any complex mapping scenario, and are a core feature of GremlinEx.
+
+Conditions are time consuming to setup, and they are expensive to process at runtime (expensive in relative terms as GremlinEx is heavily focused on eliminating any latency in processing mappings).  Conditions are available and should be used, with the additional design consideration that there are (usually) multiple ways to filter output in GremlinEx, and the overall goal is to minimize the need for conditions if the same goal can be achieved in other ways.
+
+GremlinEx at runtime uses a quick branching execution graph to determine what needs to be executed, and as such, it's best to place conditions at the highest level possible: container conditions are preferrable to action level conditions.
+
+It is also recommended to use states where possible as a condition, because the state system is very efficient compared to conditions.  Expression states can often replace multiple conditions using boolean logic which simplifies the number of conditions that need to be evaluated.   The State Container includes a built-in test for a state eliminating the need for a separate condition.
+
+As part of the profile design, also consider reversing conditions if it means using fewer conditions overall.
+
 
 ### Startup state
 
@@ -526,229 +548,6 @@ It it not advised to have the axis or device modes enabled if you have a noisy i
 
 
 
-## Containers
-
-The container holds one or more actions.  There are multiple container types available.  All actions in a container are executed when an input trigger occurs, subject to the options and the capabilities of the container and the action that modify the behavior.
-
-### Basic
-
-The basic container is the most used and the default container.  It is a simple container with one or more actions in it.
-
-### TempoEx
-
-This container has two content areas.  One for short press actions, one for long press actions.
-
-### Chain
-
-This container lets you chain actions.  Whenever the input is triggered, the chain will increment the index and move to the next block of actions index, and loop around when it runs out of blocks to execute.  This is used for round-robin type mappings when you need a sequence of things to happen for each trigger.
-
-### Sequence
-
-This container is a bit like a high level macro, and runs all the actions in the sequence they appear.
-
-### Smart Toggle
-
-This container is used to toggle outputs based on short of long presses.  Used to toggle "hold"/"sticky" outputs.
-
-### Button
-
-This container has a set of actions that execute on input press, and another set on input release, in the same container.
-
-### Range
-
-THis container performs certain actions when the input value is in a certain range
-
-## Actions
-
-Actions are added to a container.  They perform the actual mapping of the input.  
-
-
-
-### Action priority
-
-Certain actions execute last (such as a mode change).  Actions have an internal priority that determines when an action runs.  In most cases, actions are executed top down (in the order they appear), however some actions like a mode change are executed last, and actions that change the input value like applying a curve will execute first.
-
-### Vjoy Remap
-
-![vjoy remap action](assets/action_vjoy_remap.png)
-
-This is the most common action in GremlinEx and lets you map an input (linear or momentary) to a VJOY device.
-
-This action replaces the legacy remap option.  In GremlinEx, this action is the main way to send output to a VJOY device. 
-
-Some of the features of vjoy remap:
-- map an input axis to a vjoy axis
-- apply an output curve to the vjoy axis based on input
-- scale or apply a range to the vjoy axis based on input
-- merge the output axis value with one or more input axes using add, substract, multiply, average.
-- map an input button to a vjoy button
-- map an input hat to a button or a hat
-- synchonize the input value to the output on profile start or pick a default value.
-- force a button pressed
-- force a button release
-- toggle a button
-- convert an axis value to a button
-- view which buttons are in-use profile wise
-
-
-### Gated Axis
-
-![gated axis](assets/action_gated_axis.png)
-
-This action lets you split an input axis and define what should happen when
-
-- a range is entered or exited
-- a specific point on the axis is crossed
-
-Up to 20 gates or crossing points can be defined (19 ranges). It is possible for ranges to send a fixed value or rescale/change the value of the output.
-This container was specifically created for output needs that have "gates", such as throttles used in some simulators.
-
-### Mode Switch
-
-![switch to mode](assets/action_switch_to_mode.png)
-
-This action lets you change a profile mode at runtime based on an input trigger.
-
-### Temporary Mode Switch
-
-![temporary mode switch](assets//action_map_to_temporary_mode_switch.png)
-
-This action lets you change the profile mode temporarily while the input is pressed.
-
-### Cycle Modes
-
-This action lets you cycle modes with each press.
-
-![cycle modes](assets/action_cycle_mode.png)
-
-### Map to Keyboard Ex
-
-![map to keyboard](assets/action_map_to_keyboard_ex.png)
-
-This action lets you send a keyboard or mouse button/wheel click to the output.
-
-
-### Map to Mouse Ex
-
-![map to mouse ex](assets/action_mouse_ex.png)
-
-This action lets you send a mouse button/wheel or mouse position change to the output.
-
-### Map to Gamepad
-
-![map to gamepad](assets/action_map_to_gamepad.png)
-
-This action maps to a Gamepad (VIGEM) output.
-
-### Map to SimConnect
-
-![map to simconnect action](assets/action_map_to_simconnect.png)
-
-
-This action lets you send a SimConnect command to Microsoft Flight Simulator via the SimConnect SDK.   This bypasses the need to map any controls inside Microsoft Flight Simulator, and sends the data direct to the simulator to control aircrafts.  This way you completely bypass the MSFS control mapper and send control data directly to the sim, and the add-on.
-
-This includes sending calculation and expressions via the GremlinEX WASM module to read or modify internal simulator parameters defined by addons that are not exposed by the SimConnect API.  In this example, execute the "(>K:AP_MASTER)" internal command.
-
-![map to simconnect calculator action](assets/action_map_to_simconnect_calculator.png)
-
-
-Using the SimConnect mapper from sim variables to calculator expressions requires knowledge of the [Microsoft Flight Simulator SDK](https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/SimConnect_SDK.htm).  
-
-The recommended setup is to have a single profile for Microsoft Flight Simulator, and have a mode for each aircraft type, and under that if needed, a mode for each subtype/variant.  Recommendations including having a setup for Boeing, Airbus, single prop, dual prop, single turboprop and dual turboprop, and quad engine as the base.  The Simconnect options page in GremlinEx while the sim is running will pull the current aircraft and let you associate a mode with that aircraft.  If you find the aircraft uses the default mode, it means it's being reported as a new type and likely needs to be associated with a profile mode for that type.
-
-For aircraft with detents, such as for spoiler or throttles, use the Gated Axis as it was designed precisely for this complicated need and in conjunction with other mapping features make mapping complex throttle assignments relatively easy.
-
-It is also recommended to use calculator expressions as much as a possible due to the capabilities to access add-on variables that are not in SimConnect.  A [guide to calculator expressions can be found here](https://hubhop.mobiflight.com/presets/) with examples for commond add-ons.  All these work as-is in GremlinEx and allow you to access variables defined by each add-on.  
-
-SimConnect itself is a bit of an arcane art due to the historically poor documentation, lack of examples and errors / ommissions which combined with bugs make controlling MSFS via SimConnect an interesting challenge, however one miles better than using the built-in MSFS control mapper.  A number of add-ons also define variables that are not part of the base simulator, so are not exposed by the SimConnect SDK.  The only way to set them is to use calculator expressions, and consult the add-on manual and the MSFS user commmunity for what the variables are.
-
-I often use the built-in debug tools in MSFS to determine what variable to set or what the values should be, including the SimConnect inspector and the example Simvars explorer that comes as a sample project to compile with the Simconnect SDK.
-
-Another avanced used of Simconnect is to have a user plugin capture sim state, for example parking brakes, and update a glass surface widget with the state. This can be done via a custom plugin in GremlinEx using the existing event model and API fro Simconnect via Simconnect Manager, an internal control class in GremlinEx.
-
-
-### Map to OSC
-
-![map to osc action](assets/action_map_to_osc.png)
-
-This action lets you send an OSC message to the network.
-
-### Text to Speech
-
-![tts action](assets/action_tts.png)
-
-This action lets you send an audio prompt via TTS (text to speech).
-
-### Map to State
-
-This action lets you set or clear a state defined in the profile.  States are defined in the state device tab.
-
-If a state's value is changed and that state is used in an expression in another state, that state is also updated.
-
-### Map to Octavi IFR1
-
-This action sends output to the Octavie IFR 1 to control LEDs and modes.
-
-### Macro
-
-![macro action](assets/action_macro.png)
-
-This action lets you send complex sequences of outputs (joystick, keyboard, mouse) complete with timing and delay controls and separate make/break actions for buttons.
-
-### Play Sound
-
-
-
-This action lets you play a sound file located on disk.  As of m76T110, the playback device can be selected.  Clicking the default button will select the default Windows device.
-
-As of m76T111, the action includes a number of additional features:
-
-- Ability to playback multiple sounds concurrently
-- Ability to trigger the same sound multiple times via repeated triggers
-- Playback is non-blocking (the profile continues to run)
-- Ability to change timing on how the sample is played back
-- Ability to loop the sample multiple times (default count is one)
-- Ability to randomize playback by selecting a sound to play from a list of files in a folder.
-
-![warning](assets/warning.png) The play sound action also has the ability to use AI if CoquiTTS if available.  This feature is not available with the packaged distribution as the AI model cannot be packaged.
-
-It is recommended to use an online text to speech model to create an audio file from text, as this will likely provide the best experience.  The desired output format is a WAV file, although MP3 can also be used.  MP3 playback is not recommended as it introduces latency and takes longer to process over the WAV file format, which is why WAV is recommended for game output use-cases.
-
-![play sound](assets/action_play_sound.png)
-
-If control-click is used on the default button, the default device is set for all instances of Play Sound in the profile.
-
-The default playback device is the Windows default playback device at the time the action is created.
-
-Volume can be adjusted from 0 to 100 percent.  The play button will play the audio with the currently selected options.
-
-The action supports .WAV files, and .MP3 files.  Note that playback of .MP3 may not work on all systems due to the need for CODECs to be installed.  .WAV format is recommended.
-
-### Trigger (Joystick)
-
-(requires m76T103 or later)
-
-![trigger map](assets/trigger_map.png)
-
-
-This action is a loopback action that allows one device input (axis, button or hat) to trigger an input on the same or another device called the target device, as if the target had generated that trigger.  The action lets you select the target joystick like device.
-
-Based on the selection, the action will present the ability to set an axis value if the output is an axis.  For buttons, the ability to press or release a button are available.  For hats, the position of the hat can be selected.
-
-A special mode, called actual, will use the actual input value (axis, button or hat) and use that value to trigger the output.  If the input is an axis, it will send the input axis value to the output.  If the input is a button, it will send both press and release triggers to the output based on the state of the input button.  For hats, it will synchronize the input hat with the output hat position.
-
-Additionally, if a button is mapped to a hat output, an input press will set the hat value to the position listed in the action, and the release will set the hat to the center position.
-
-It is not possible to map an axis input to a button or a hat and a warning will be displayed for this particular combination.
-
-Examples of how this action can be used:
-
-- to use an axis on one device and duplicate this axis on another axis on a different device.
-- to press a button on one device and duplicate this button state on another button on another device.
-- at runtime, to trigger mappings on one device from another device.
-- to set the value of an axis on another device by pressing a button.
-
-![trigger map button](assets/trigger_map_button.png)
 
 ## Conditions
 
@@ -1957,206 +1756,7 @@ However the status bar (bottom left) will always reflect the active run modes of
 
 GremlinEx has a dialog visualizer to show, in text form, the current mappings and modes for the profile.  This text can be copied to the clipboard and pasted as plain text.
 
-## VJoyRemap action 
 
-This mapper is an enhancement to the default remap action. The main enhancements are to show a visual representation of all buttons used, support remote control, eliminate the need to setup many conditions, and to support one-click typical mapping needs directly from the UI.
-
-
-The VjoyRemap commands are:
-
-| Command      | Description |
-| ----------- | ----------- |
-| Set Remote Control Only      | Enables broadcast mode and disables local output mode.  In this mode, GremlinEx only sends output to network clients.       |
-| Set Local Control Only  | Enables local mode and disables broadcast mode.  In this mode, GremlinEx only sends output to the local machine.         |
-| Enable Remote Control      | Enables broadcast mode. This activates broadcast mode regardless of the local output setting. |
-| Disable Remote Control      | Disables broadcast mode. This disables broadcast mode regardless of the local output setting. |
-| Enable Local Control      | Enables local mode. This activates local output mode regardless of the broadcast output setting. |
-| Disable Local Control      | Disables local mode. This disables local output mode regardless of the broadcast output setting. |
-| Enable Concurrent Local + Remote Control      | Enables both local and broadcast modes. GremlinEx output goes to both local and remote machines at the same time. |
-| Toggle Control      | Inverts current output settings for both local and broadcast controls, whatever they are. |
-
-
-The commands are only available to button bindings at this time.
-
-### VJoyRemap button press actions
-
-
-| Command      | Description |
-| ----------- | ----------- |
-| Button Press     | Outputs a single button to the given VJOY device.  The exec on release option sends the output when the physical button is released.  Start mode sets the output status on profile start.   |
-| Button Release | Releases a single button on the given VJOY device.  This is the opposite of press.  This is usually not required but is helpful in some scenarios such as using the tempo container or toggle behaviors.  |
-| Pulse     | Outputs a single button to the given VJOY device momentarily.  The default pulse duration is 250 milliseconds, which can be adjusted.  The exec on release option sends the output when the physical button is released.  Start mode sets the output status on profile start.   |
-| Toggle     | Toggles (flips) the button output on the given VJOY device. If it was on, it's off, if it was off, it toggles on.  Useful for on/off type activites.    |
-| Invert Axis     |  Inverts the specified output axis on the VJOY device.  This flips the direction of output of the axis on the fly by mapping it to a button.  This is specific to games that map the same axis but they are inverted (example in Star Citizen is ship throttle vs vehicle throttle).  When mapped to a physical switch on the throttle, converts from ship mode to vehicle mode for the throttle.  |
-| Set Axis Value     | Sets the axis value on the given VJOY axis to a specific value between -1 (min) and +1 (max).  This is useful for detent programming.  |
-| Set Axis Range     | Modifies the output range of an axis in VJOY.  The output will be calibrated to the new min/max and has convenience buttons to set half ranges. Use-case: increase sensitivity of physical axis, such as, for landing or roll. |
-| Enable remote pairing | When set, the button output locally will also be output remotely regardless of the control mode |
-| Disable remote pairing | Turns off remote pairing mode
-
-### VJoyRemap axis mapping actions
-
-| Command      | Description | |
-| ----------- | ----------- | ----------- |
-| Axis     | Maps source axis to a VJOY output axis. Options:    | |
-| | Reverse | Inverts the output of the axis |
-| | Absolute | The value of the output matches the raw input value  |
-| | Relative | The value of the output is relative to the raw input value |
-| | Start Value | The default axis position on profile start |
-| | Scale | Scaling factor applied to the raw input.  Use case: increase sensitivity. |
-| | Min/Max Range | Sets the default output min/max range.  The raw input is calibrated to only output between the two values (scale is computed automatically) |
-
-### VJoyRemap relative mode
-
-In relative mode when the input is also an axis, the value of the offset depends on the deviation of the input.  An input of 0 (center) means no deviation.
-The offset applied is scaled based on the deviation, so maximum deviation of the input is the full offset value.
-
-### Merge operations
-
-When the input is an axis, Vjoy Remap has a merge axis mode that enables merging of two or more axes into an output value.
-
-A merge operation always has at least one merged axis.  It is possible to add more merge axes as needed for more complicated merge scenarios and a cumulative effect.  The merge is applied top to bottom, so the prior merge step output becomes the input to the next merge operation in sequence.
-
-Each merge axis can be selected by selecting the axis from the drop downs, or you can click the listen button to have GremlinEx select the axis that moved.
-
-The merged axis cannot be the same as the input axis.
-
-A merge operation should only be applied to one of the components of the merge.
-
-
-| Merge operation      | Description |
-| ----------- | ----------- |
-| Add | The axis is added to the prior value. |
-| Average | The value of the merged axis is averaged with the prior value. |
-| Center | The value of the merged axis represents half of the output value, and the prior value is the other half.  This is used to combined two axes into a single centered axis such as for toe-brakes. |
-| Minimum | The smallest value of the merged axis and the prior value is the output value |
-| Maximum | The largest value of the merged axis and the prior value is the output value |
-| Scale | The merged axis value acts is a scale multiplier on the other axis.  The scale applied is 0 to 100%.  Output range -1 to +1.  |
-| Scale Half | The merged axis value acts is a scale multiplier on the other axis however only uses half the range.  If the merged axis is centered, the scale is 0%.  Output range -1 to +1. |
-| Scale (centered)| The merged axis value acts is a scale multiplier on the other axis.  The scale applied is 0 to 100%. |
-| Scale Half (centered)| The merged axis value acts is a scale multiplier on the other axis however only uses half the range.  If the merged axis is centered, the scale is 0%.  Moving the merged axis up or down sales +- 100%. |
-| Trim | The merged axis adds a positive or negative trim, using a full axis range of the merge axis. |
-| Trim (centered) | The merged axis adds a positive or negative trim, using the half axis range of the merge axis. |
-
-Each merge step can be inverted.
-
-Each merge step can have its own curve applied to the merge axis.  The curve is applied to the merge axis first, then used in the computation of the merge.  This can be used for interesting effects such as reducing the range of the merged axis, which is helpful to control min and max scaling, and also to control sensitivity.
-
-
-
-### Axis to Buttons
-
-In this mode, the input axis can be split up into ranges each triggering a button when the range is entered.  For more complicated scenarios and sophisticated axis range slicing, use ![gated axis](#gated-axis).
-
-&nbsp;
-
-| Command      | Description |
-| ----------- | ----------- |
-| Axis To Button     | Maps a raw input range to a specific button.  While the raw input is in that range, the button will be output.  Combine multiples of those to create more than one trigger.  Use-case: detent programming based on axis position.  | |
-
-## Gated axis action
-
-This plugin is an experimental axis input filtering plugin.  It splits an input axis into ranges.  A range is separated by two gates, and the number of gates that are defined determines how many ranges are created.
-
-The inspiration for this action comes from the need to more easily map complex gated axis inputs to outputs, and very specifically to tackle space sims, commercial airliner, turboprop and helicopter throttle mappings in simulators. 
-
-The default action is configured with two gates at min/max and a single range in the middle.
-
-The gated axis allows you to map one or more actions when the input value crosses a gate - a specific point on the axis.  The gates axis also allows you to map one or more actions when the input enters, exits or is within a range.
-
-The gated axis action can only be associated with an axis hardware input and cannot be associated with buttons or hats.  It expects a linear input.
-
-![gated axis](assets/gated_axis.png)
-
-![axis gate](assets/gate_axis_gate_widget.png)
-
-![axis range](assets/gate_axis_range_widget.png)
-
-
-### Gates
-
-A gate is a point along the input axis with a specific floating point value in the range -1 to +1.  
-
-Up to 20 gates can be defined.
-
-A gate can be added to the action by right clicking anywhere on a range, or adding a gate manually.
-
-Gates can be moved by the mouse, or by clicking the record button which will move the gate to the live input position (the black marker on the display), or the value can be manually input.  The mouse wheel over the gate position number will also increment or decrement the gate's position.
-
-### Gate mappings
-
-The gate mapping configuration window is access by clicking on the gate's configure button, or right clicking a gate.
-
-![gate mapping](assets/gate_axis_gate_mapping.png)
-
-
-Each gate condition has its own set of mappings.   Mappings will see the gate as a momentary (button) input so only actions suitable for a button will be available for selection.
-
-| Condition      | Description |
-| ----------- | ----------- |
-| Cross | The gate will trigger whenever the input crosses the gate |
-| Cross (inc) | The gate will trigger if the gate is crossed from left to right, or in increasing value |
-| Cross (dec) | The gate will trigger if the gate is crossed from right to left, or decreasing value |
-
-### Gate Delay
-
-The delay is a value in milliseconds that determines how much time elapses between a press and release action.  Internally a gate will mimic a button press, so will send two specific events to sub-actions on a gate, a press action, followed by a release action.  Setting this to zero means the two are instant.  The default value is 250 milliseconds (1/4 second) which is enough time for most games to capture the input, either a keyboard press or a button press.
-
-### Ranges
-
-A range is defined by two gates.  The number of available ranges depends on the number of gates, and the size of each range depends on the position of the two gates representing the lower and upper end of the range.   Ranges are automatically computed based on gates, and adjust whenever a gate is moved.
-
-Ranges cannot overlap.
-
-### Default range
-
-If individual range mappings are not needed, a default range corresponding to the entire input axis is defined.  A checkbox toggles this mode on/off.
-
-### Range mapping
-
-![range actions](assets/gated_axis_range_action.png)
-
-A range lets you map actions whenever the input enters a range, exits a range, or is within a range.  Each as its own set of mappings.
-
-Actions mapped to a range will see it as a joystick axis input.
-
-
-| Condition      | Description |
-| ----------- | ----------- |
-| Enter Range | This will trigger whenever the input value enters the range.  This triggers once every time the input enters the range.  |
-| Exit Range | This will trigger whenever the input value exits the range. If the range is a boundary range (at minimum or maximum of the input range), it will still trigger.  This triggers once every time the input exits the range. |
-| In Range | This will trigger whenever the input changes within the range.  This is useful to send axis data out based on the position inside a range.  This triggers on any input change. |
-| Outsie of Range | This will trigger whenever the input changes and is not in this range. This triggers on any input change. |
-
-
-### Range output mode
-
-Ranges have multiple output modes that affect the output value sent to mappings.
-
-| Mode      | Description |
-| ----------- | ----------- |
-| Normal | The value is output as is (this is the default) - this is also known as the pass-through mode.  |
-| Output Fixed Value | Mappings get a fixed value whenever the range condition is triggered. This is helpful to freeze the output to a fixed value.  |
-| Ranged | The value is scaled to the range's defined minimum and maximum. By default the minimum and maximum match the bounding gate positions, but this can be changed to any valid value to scale the output.  |
-| Filtered (no output) | No value is output in this mode. Use this to suppress output when the input is in a given range. |
-| Rebased | This is similar to ranged mode, and the bounds are set to -1 to +1 so each range acts as a full output axis. |
-
-Whenever you add or remove gates, ranges are added or removed as well.  It is recommended you don't configure ranges until you have the number of gates finalized to avoid inadvertently loosing configured actions because a range was deleted as you removed a gate.  GremlinEx will confirm deletions.
-
-### Default range
-
-The default range is a special range that is used for how the gated output should behave when the input is not in configured range.   A configured range is a range that has actions and modes defined. The default range is used when a range exists, but is not configured to do something special.
-
-You can use the default range to your advantage by only configuring special ranges in the input axis - and let the default range handle what happens when the input is not in the special ranges you've defined.
-
-### Use-cases and scenarios
-
-The gated axis plugin can be useful for a number of scenarios where more sophistication is needed on input axis data.
-
-The plugin can be used for complex axis to button mapping, for establishing complex setups for latched output, for scaling purposes, to suppress output for some input values, allows for stepped throttle settings, and allow for different scale and sensitivity (curves) based on input positions.
-
-Examples for ranges include mapping beta-range for turbo props simulations, trigger fuel cutoff at the bottom of a range, thrust reverser toggle, introduce dead zones along the axis, or split a single axis into multiple axes.
-
-Examples for gates include triggering a mode or setting up a state based on how a gate is crossed (directional) as well as bi-directional.
 
 ## Map to mouse EX action
 
@@ -2175,44 +1775,6 @@ The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off
 
 
 Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.
-
-## Map to keyboard/Mouse EX action
-
-This is identical to the base keyboard mapper but adds a few functions I thought would be handy.
-
-The updated keyboard mapper adds separate press (make), release (break) functionality so keys can stay pressed, or just released separately.
-
-It also adds a delay (pulse) function to hold a key down for a preset period of time (default is 250 milliseconds or 1/4 of a second which is the typical game "detect" range as some games cannot detect key presses under 250ms in my experience.
-
-The make/break/pulse behavior applies to all keys in the action, and the keys are released in the reverse order they were pressed.
-
-![keyboard mapper](assets/keyboard_mapper_ex.png)
-
-
-
-
-### Action modes
-
-| Mode     | Description |
-| ----------- | ----------- |
-| Hold | Keys will be pressed while the input is active, and released when the input is not.  The meaning of active depends on the input type.  For example, keys will be pressed while a joystick button is held down and will release when the button is released.  The input does not auto-repeat in this mode - only one make/break is sent for each latched key. |
-| Pulse | This mode triggers a press action, waits the pulse delay, and releases the keys.  This happens regardless of the input state.  If the input is pressed again while the pulse delay has not elapsed, the pulse is restarted.  In this mode, the keys are always released after the pulse delay.   Keep the pulse delay at or above 200ms as most game loops will fail to capture key presses under 200ms. |
-| Auto Repeat | This mode is similar to pulse mode, except the pulse will repeat while the input is held.  The interval specifies the time between pulses.  Set to 0 for no delay, keeping again in mind that most game loops will not detect key presses if they occur within 200ms of each other.|
-| Press | This mode triggers a press only (a "make" in keyboard hardware parlance).  This mode does not release the keys so it's expected at some point, the profile will release the keys.  Dragons: when used to send mouse clicks - it will keep the mouse pressed until the release which can cause behavior issues in the operating system.  Use with caution and only paired with a release mapping somewhere in the profile. Usually you can manually press the keys or the mouse to "undo" a press, provided that input is available (example F13 would not be).|
-| Release | Ths mode triggers a release only (a "break" in keyboard hardware parlance).  This is the companion action to the press mode. |
-| Toggle | Ths mode toggles the key or mouse button. If a key is released, the key is pressed.  If it is pressed, it is released.|
-
-### Sync mode
-
-As of m76T117, the action can synchronize with the mapped input.  If the input the action is mapped to is triggered at profile start (for example, a hardware switch is in the on position), the mapped keys / mouse buttons will be set to match the state of the input when the profile starts.  This mode is designed to keep the profile in synchronized with hardware input panels in simpits.
-
-### Latching
-
-This action can send very complex and unusual keys and mouse buttons, including keys that are not typically available on a regular keyboard like the F13 to F24 function keys.   The action can also combine unusual "latched" sequences such as pressing more than multiple keys and mouse buttons at once.
-
-### Numlock behavior
-
-The keyboard behavior is hard-coded in the hardware to send duplicative scan codes depending on the state of the numlock key.  To avoid issues, GremlinEx automatically turns off numlock (if it was on) while the profile is running to ensure that the keyboard sends the correct and predictable scan codes.  This can be a challenge in some situations but was necessary to ensure the keyboard mapper sends consistent keystrokes and mouse buttons when the hardware, depending on the state of numlock, sends duplicate scan codes based on its mode.   This ensures that numeric keypad keystrokes all show up as numeric keypad.
 
 ### Dragons
 
@@ -2408,7 +1970,6 @@ The repeat container can be used to auto-repeat one or more actions when an inpu
 
 The container can also be used to trigger a future action, which only gets executed if the input is still pressed.
 
-
 ## TempoEx Container (tempo with chain)
 
 This experimental container combines the Tempo and Chain containers together.  The container has two main sections, a short press action set, and a long press action set.  The delay box indicates how long the (real) button has to be held before selecting either a short or long set.
@@ -2425,62 +1986,6 @@ The chain delay is included although it will conflict with long press.  I may re
 
 Within each action set, the chain group entries can be re-ordered, or can be removed.
 
-## Sequence Container
-
-This container executes all contained actions in sequence, similar to a macro.  The difference between this container and others is the order of execution is guaranteed in step order, and each action runs in sequence rather than in parallel.
-
-This container has several features not found in a macro:
-
-- all action types suitable for momentary input can be used, such as OSC.
-- steps can themselves contain macros if needed.
-- wiggle mode can be used to randomize the execution of the container
-- each step can contain more than one action.
-
-### Run once mode
-
-In this mode, the sequence is executed once when the input is triggered as determined by the "exec on release" or "exec on press" options.  The sequence will run in the order of the steps.  The sequence cannot be stopped in this mode.  If a retrigger occurs while the sequence is still running, the trigger is ignored.
-
-### Toggle (loop) mode
-
-In this mode, the sequence runs as a loop.  The first trigger, as determined by the "exec on release" or "exec on press" options, enables the loop.  The second trigger stops the loop.  If the "resume at last step" option is enabled, the sequence will start the next loop where it was last stopped.  By default the loop starts at the first step.
-
-### Wiggle mode
-
-When Wiggle mode is enabled, this container can randomize the execution of actions it contains. 
-
-In wiggle mode, the container will continue executing actions while the input is pressed, and stop when the input is released.  This makes it particularly suitable to usage by a state, or when mapped to a physical toggle switch on a hardware input.
-
-The pause between steps can be randomized between a minimum delay, and a maximum delay.
-
-If step randomization is enabled, the next step to execute will also be randomized.  If disabled, the step sequence is observed.
-
-
-
-
-
-Actions execute in the order they are listed and they can be re-ordered if needed.
-
-The purpose of this container is to add macro-like functionality using mappings instead of the macro action itself.
-
-## Map to State
-
-This feature is only available in 1.0ex m74 and above.  For more information on states, consult the [state device section](#states) of the documentation.
-
-The map to state action manipulates a state when it's triggered.  This action lets you select the state to act on, and what should happen to the state value:
-
-![action state](assets/action_state.png)
-
-
-| Operation      | Description |
-| ----------- | ----------- |
-| Press (On) | Turns the state on |
-| Release (Off) | Turns the state off |
-| Pulse | Inverts the state, waits delay milliseconds, and restores the previous state |
-| Toggle | Toggles the state.  If it was off, turns it on, if it was on, turns it off |
-
-A new state can be created directly from the action by pressing the add button.
-
-![action state add](assets/action_state_add.png)
 
 ## State Device
 
@@ -2538,6 +2043,8 @@ Called when the mode is changed (use def mode_change(mode) - mode will be a stri
 
 Called when the state information is changed (local, remote or broadcast mode). The event properties is_local, is_remote and is_broadcast are flags that contain the current state of GremlinEx.
 
+
+
 ## Recipes
 
 ### One way or two way switch to two way switch / three way switch
@@ -2569,12 +2076,10 @@ In this scenario, both outputs will be active if the input button is held long e
 
 The vjoyremap action in the short action block should be set to *button press*.  The vjoyremap action in the long action block should also be set to *button press*.  The resulting behavior is the short and long buttons will both be pressed if the input button is held long enough, and both will release when the input is released.
 
-
 | Mapping     | Description |
 | ----------- | ----------- |
 | Short action block   | VjoyRemap set to *button press* and/or MaptoKeyboardEx set to "press" for the output on short hold      |
 | Long action block   | VjoyRemap set to *button press* and/or MaptoKeyboardEx set to "press" for the output on long hold |
-
 
 #### To setup a latched short, then long button press with only one button active
 
@@ -2584,13 +2089,13 @@ Add a vjoyremap in the short action block set to *button press*.
 
 Add two vjoyremaps in the long action block.  The first will map to the long press output button and the mode is set to *button press*.
 
-The second vjoyremap will be set to *button release* and map to the same output button in the short action block. 
+The second vjoyremap will be set to *button release* and map to the same output button in the short action block.
 
-| Mapping     | Description |
+| Mapping | Description |
 | ----------- | ----------- |
-| Short action block   | VjoyRemap set to *button press* and/or MaptoKeyboardEx set to "press" for the output on short hold      |
-| Long action block   | VjoyRemap #1 set to *button press* and/or MaptoKeyboardEx set to "press" for the output on long hold |
-| Long action block   | VjoyRemap #2 set to *button release* and/or MaptoKeyboardEx set to *release* to release the short press action |
+| Short action block | VjoyRemap set to *button press* and/or MaptoKeyboardEx set to "press" for the output on short hold |
+| Long action block | VjoyRemap #1 set to *button press* and/or MaptoKeyboardEx set to "press" for the output on long hold |
+| Long action block | VjoyRemap #2 set to *button release* and/or MaptoKeyboardEx set to *release* to release the short press action |
 
 ## Scripting logic
 

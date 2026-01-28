@@ -1,0 +1,2365 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/actions/">
+      
+      
+        <link rel="prev" href="../containers/">
+      
+      
+        <link rel="next" href="../resources/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.12">
+    
+    
+      
+        <title>Actions - GremlinEx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.2afb09e1.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+   <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+    html.glightbox-open { overflow: initial; height: 100%; }
+    .gslide-title { margin-top: 0px; user-select: text; }
+    .gslide-desc { color: #666; user-select: text; }
+    .gslide-image img { background: white; }
+    .gscrollbar-fixer { padding-right: 15px; }
+    .gdesc-inner { font-size: 0.75rem; }
+    body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+    body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+    body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}</style> <script src="../assets/javascripts/glightbox.min.js"></script></head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#actions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GremlinEx" class="md-header__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GremlinEx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Actions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../usage/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Usage
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../containers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Containers
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Actions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../resources/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../scripting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Scripting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../ktts/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  AI and DevOps
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../credits/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Credits
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GremlinEx" class="md-nav__button md-logo" aria-label="GremlinEx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    GremlinEx
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Usage
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Containers
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Actions
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Actions
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-an-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      What is an action?
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available actions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Implementation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vjoy-remap-map-to-vjoy-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      VJoy Remap (map to vjoy) Action
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VJoy Remap (map to vjoy) Action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-remap-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vjoy Remap modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ouput-curve" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ouput Curve
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#axis-merging" class="md-nav__link">
+    <span class="md-ellipsis">
+      Axis merging
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inversion-reverse" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inversion / Reverse
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#relative-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Relative mode
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gated-axis-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gated Axis Action
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Gated Axis Action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      What is a gate?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-range" class="md-nav__link">
+    <span class="md-ellipsis">
+      What is a range?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#available-triggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available triggers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gates
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gate-mappings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gate mappings
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gate-delay" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gate Delay
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ranges" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ranges
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-range" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default range
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      Range mapping
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-output-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Range output mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-range_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default range
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-cases-and-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      Use-cases and scenarios
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#action-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      Action priority
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-remap" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vjoy Remap
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gated-axis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gated Axis
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-switch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode Switch
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#temporary-mode-switch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Temporary Mode Switch
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cycle-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cycle Modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-keyboard-ex" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to Keyboard Ex
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-mouse-ex" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to Mouse Ex
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-gamepad" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to Gamepad
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-simconnect" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to SimConnect
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-osc" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to OSC
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#text-to-speech" class="md-nav__link">
+    <span class="md-ellipsis">
+      Text to Speech
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to State
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-octavi-ifr1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to Octavi IFR1
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#macro" class="md-nav__link">
+    <span class="md-ellipsis">
+      Macro
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#play-sound" class="md-nav__link">
+    <span class="md-ellipsis">
+      Play Sound
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trigger-joystick" class="md-nav__link">
+    <span class="md-ellipsis">
+      Trigger (Joystick)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-to-keyboardmouse-ex-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to keyboard/Mouse EX action
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Map to keyboard/Mouse EX action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#virtual-keyboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      Virtual keyboard
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#action-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Action modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sync-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sync mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#latching" class="md-nav__link">
+    <span class="md-ellipsis">
+      Latching
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numlock-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      Numlock behavior
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-to-state-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to State Action
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Map to State Action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operation-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Operation modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      New state
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#input-synchronization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Input synchronization
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Resources
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scripting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ktts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    AI and DevOps
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../credits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Credits
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-an-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      What is an action?
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available actions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Implementation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vjoy-remap-map-to-vjoy-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      VJoy Remap (map to vjoy) Action
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VJoy Remap (map to vjoy) Action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-remap-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vjoy Remap modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ouput-curve" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ouput Curve
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#axis-merging" class="md-nav__link">
+    <span class="md-ellipsis">
+      Axis merging
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inversion-reverse" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inversion / Reverse
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#relative-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Relative mode
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gated-axis-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gated Axis Action
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Gated Axis Action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      What is a gate?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-range" class="md-nav__link">
+    <span class="md-ellipsis">
+      What is a range?
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#available-triggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available triggers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gates
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gate-mappings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gate mappings
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gate-delay" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gate Delay
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ranges" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ranges
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-range" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default range
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      Range mapping
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-output-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Range output mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-range_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default range
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-cases-and-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      Use-cases and scenarios
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#action-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      Action priority
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vjoy-remap" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vjoy Remap
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gated-axis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gated Axis
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-switch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode Switch
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#temporary-mode-switch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Temporary Mode Switch
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cycle-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cycle Modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-keyboard-ex" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to Keyboard Ex
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-mouse-ex" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to Mouse Ex
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-gamepad" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to Gamepad
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-simconnect" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to SimConnect
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-osc" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to OSC
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#text-to-speech" class="md-nav__link">
+    <span class="md-ellipsis">
+      Text to Speech
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to State
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#map-to-octavi-ifr1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to Octavi IFR1
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#macro" class="md-nav__link">
+    <span class="md-ellipsis">
+      Macro
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#play-sound" class="md-nav__link">
+    <span class="md-ellipsis">
+      Play Sound
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trigger-joystick" class="md-nav__link">
+    <span class="md-ellipsis">
+      Trigger (Joystick)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-to-keyboardmouse-ex-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to keyboard/Mouse EX action
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Map to keyboard/Mouse EX action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#virtual-keyboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      Virtual keyboard
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#action-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Action modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sync-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sync mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#latching" class="md-nav__link">
+    <span class="md-ellipsis">
+      Latching
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numlock-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      Numlock behavior
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-to-state-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to State Action
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Map to State Action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operation-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Operation modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      New state
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#input-synchronization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Input synchronization
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="actions">Actions<a class="headerlink" href="#actions" title="Permanent link">&para;</a></h1>
+<h2 id="what-is-an-action">What is an action?<a class="headerlink" href="#what-is-an-action" title="Permanent link">&para;</a></h2>
+<p>An action in GremlinEx is the actual mapping mechanism to take input data, such as an axis movement, a button press, a state value change or OSC input, and convert this into an output, VJoy, Keyboard, or mouse.  Some actions also can send commands, like for Microsoft Simconnect for Flight Simulator, and can send OSC messages as well to update panels.</p>
+<p>Actions are contained in <a href="../containers/#containers">containers</a>.</p>
+<h2 id="available-actions">Available actions<a class="headerlink" href="#available-actions" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Description</th>
+<th>Typical Use-Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Control</td>
+<td>Modifies GremlinEx runtime options</td>
+<td>Enable or disable remote control, pause a profile, etc...</td>
+</tr>
+<tr>
+<td>Cycle Modes</td>
+<td>Changes profile modes as a sequence</td>
+<td>Each trigger of the input advances to the next mode in the list</td>
+</tr>
+<tr>
+<td>Description</td>
+<td>Adds a descriptive note to actions in a container, optionally placing an output to the log file</td>
+<td>Used in sequence or chain containers to document/add a comment to profile logic</td>
+</tr>
+<tr>
+<td>Gated Axis</td>
+<td>This action is an advanced linear axis mapper and executes actions based on axis movement, such as crossing a particular point on an axis, entering or exiting a range between two points.</td>
+<td>Use for advanced axis mapping if you need something to happen at specific points on an axis, or specific ranges.  The action can also scale, remap or split up an axis into multiple outputs</td>
+</tr>
+<tr>
+<td>Macro</td>
+<td>This action defines simple steps to execute such as pressing or releasing a key, setting an axis value or a state</td>
+<td>Use this for simple macro situations.  For more advanced features, look at the sequence container</td>
+</tr>
+<tr>
+<td>Map to Gamepad</td>
+<td>This action lets you map to a console game controller output via VIGEM</td>
+<td>Use this if your target application only understands game controllers</td>
+</tr>
+<tr>
+<td>Map to Keyboard</td>
+<td>This action is a legacy action to create keyboard output, included here to be compatible with original Joystick Gremlin profiles</td>
+<td></td>
+</tr>
+<tr>
+<td>Map to Keyboard/Mouse Ex</td>
+<td>This action lets you output keyboard, and mouse button or mouse wheel to the output.  Supports advanced options for auto-repeat, hold, latching and various other controls.  Support multimedia key output such as volume control.</td>
+<td>Use this when you need to send keyboard / mouse output to the target application</td>
+</tr>
+<tr>
+<td>Map to Mouse</td>
+<td>This action is a legacy action to create mouse output.  Supports button and axis (mouse movement) actions.</td>
+<td>Use this to send mouse movement to the target application.  For mouse button, look at Map to Keyboard/Mouse Ex instead as it has more features.</td>
+</tr>
+<tr>
+<td>Map to Mouse Ex</td>
+<td>More advanced version of the legacy action to create mouse output.</td>
+<td>Use this to send mouse movement to the target application.  For mouse button, look at Map to Keyboard/Mouse Ex instead as it has more features.</td>
+</tr>
+<tr>
+<td>Map to Octavi IFR1</td>
+<td>Allows you to change/set LEDs on the IFR1 device</td>
+<td>Use this to manage modes and LEDs on the Octavi IFR1 hardware panel</td>
+</tr>
+<tr>
+<td>Map to OSC</td>
+<td>Send OSC messages to send data to hardware panels or glass surfaces to modify their appearance/modes.</td>
+<td>This is the original GremlinEx OSC mapper</td>
+</tr>
+<tr>
+<td>Map to OSC Ex</td>
+<td>Send OSC messages to send data to hardware panels or glass surfaces to modify their appearance/modes.</td>
+<td>This is a more advanced version of the GremlinEx OSC mapper.  This is often used to change states on Bitfocus controlled devices such as the ELgato Streamdeck, LoupeDeck or OSC glass surfaces like Open Stage Control or TouchOSC - this enables two way communication between GremlinEx and these hardware panels or control surfaces via the OSC protocol over the network.</td>
+</tr>
+<tr>
+<td>Map to Simconnect</td>
+<td>Sends commands and inputs to Microsoft Flight Simulator using the Simconnect SDK.  Works with the GremlinEx WASM module for MSFS to process internal calculator code, which mostly lets you control add-on software for MSFS not exposed via the usual SDK.  This lets you use GremlinEx to completely bypass the MSFS internal mapper.</td>
+<td></td>
+</tr>
+<tr>
+<td>Map to State</td>
+<td>This action modifies states at runtime.  This action lets you toggle a state on/off, pulse, repeat or set a state and otherwise modify the state based on the input.</td>
+<td>Use this to set states used as a condition or a mode replacement, to track input status such as mechanical switch positions. This can also be used to enable or disable containers via the State Container, and perform sophisticated profile logic actions when used on conjunction with expression based states (states that are based on other states using boolean logic).</td>
+</tr>
+<tr>
+<td>Map to trigger</td>
+<td>This action sends a virtual trigger to the profile as if the input hardware was triggered.  This can send any joystick event such as a button, hat or axis change, and looks to the profile as if the actual hardware was touched.</td>
+<td>Use this to trigger other parts of the profile that are already mapped. This enables one input to trigger other inputs.</td>
+</tr>
+<tr>
+<td>Map to Vjoy (Vjoy Remap)</td>
+<td>This action lets you do advanced mapping to VJOY devices, including applying curves or merging axes.</td>
+<td>Use this when you need to map to a vjoy device.</td>
+</tr>
+<tr>
+<td>Noop</td>
+<td>This action is a placeholder action if a container requires an action and you want nothing to happen yet while using the other functionality from the container.</td>
+<td>Use this to fill required action slots you want ignored.</td>
+</tr>
+<tr>
+<td>Pause</td>
+<td>This action adds a delay or pauses profile execution.</td>
+<td>Use this as a pause/delay in sequence or chained containers.  See the Resume action to re-enable a suspended profile if used in that mode.</td>
+</tr>
+<tr>
+<td>Play Sound</td>
+<td>This action plays an audio file.  Optionally let you play a random audio file from a folder at every trigger for variety.  Supports audio output to multiple concurrent audio devices, and supports concurrent audio on the same device.  Supports faders to manage clip duration, ramp up and ramp down, volume, and pitch corrected playback rate.</td>
+<td>Use this to play WAV or MP3 audio (WAV recommended for low latency).</td>
+</tr>
+<tr>
+<td>Previous Mode</td>
+<td>Returns the profile to the last mode before the most recent mode switch.</td>
+<td>Use this to revert to a prior mode.</td>
+</tr>
+<tr>
+<td>Remap</td>
+<td>This is the legacy remap for VJOY from the original Joystick Gremlin (with minor modifications) to maintain compatibility with older profiles</td>
+<td>Use the Map to VJoy action instead.</td>
+</tr>
+<tr>
+<td>Response Curve</td>
+<td>This is a legacy action to add a curve to an input to maintain compatibility with older profiles.</td>
+<td>Use the curve mapper on the input device directly, or use the Map to VJOY action to curve the output to VJOY instead.</td>
+</tr>
+<tr>
+<td>Response Curve Ex</td>
+<td>This is a more advanced legacy action added early on to GremlinEx.</td>
+<td>Use the curve mapper on the input device directly, or use the Map to VJOY action to curve the output to VJOY instead.</td>
+</tr>
+<tr>
+<td>Resume</td>
+<td>Resumes profile execution paused with the Pause action</td>
+<td>Use this to resume a profile after it has been paused</td>
+</tr>
+<tr>
+<td>Run Process</td>
+<td>This action will execute a command line.</td>
+<td>Use this to launch another process from within a profile.  Be aware that UAC may prevent on some systems the execution if the account used to run GremlinEx has insufficient rights.</td>
+</tr>
+<tr>
+<td>Split Axis</td>
+<td>This is a legacy action to split up an axis into multiple ranges. This action is to be compatible with older profiles.</td>
+<td>Use the Gated Axis action instead.</td>
+</tr>
+<tr>
+<td>Switch Mode</td>
+<td>This action lets you change the profile mode at runtime.</td>
+<td>Use this to change modes.</td>
+</tr>
+<tr>
+<td>Temporary Mode Switch</td>
+<td>This action temporarily changes the mode while the input is pressed, and changes back to the previous mode when released.</td>
+<td>Use to temporarily switch modes.</td>
+</tr>
+<tr>
+<td>Text to Speech (TTS)</td>
+<td>This action converts text to speech using the internal operating system TTS synthesis.  Voices available depend on what voice packs are installed on the system.  The output is limited to the default audio device.</td>
+<td>While you can use this for TTS, the recommendation is to use an online AI TTS converter that lets you save a WAV file (or MP3 you can convert to WAV via Audacity for example), and use the Play Sound action instead as it is both faster and less resource intensive, and allows multiple sounds at the same time unlike TTS.</td>
+</tr>
+<tr>
+<td>Toggle Pause</td>
+<td>Toggles the profile on/off at runtime</td>
+<td>Use this to suspend profile execution temporarily</td>
+</tr>
+<tr>
+<td>Vjoy Remap</td>
+<td>see Map to Vjoy</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
+<p>All actions in GremlinEx are plugins written in Python.</p>
+<h2 id="vjoy-remap-map-to-vjoy-action">VJoy Remap (map to vjoy) Action<a class="headerlink" href="#vjoy-remap-map-to-vjoy-action" title="Permanent link">&para;</a></h2>
+<p>This action is takes a linear or momentary input and maps it to a VJOY virtual joystick device.  It replaces the legacy "remap" action from the original Joystick Gremlin.</p>
+<h3 id="vjoy-remap-modes">Vjoy Remap modes<a class="headerlink" href="#vjoy-remap-modes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Description</th>
+<th>Typical Use-Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Button</td>
+<td>Maps to a VJoy button.  The button's state matches the input state, so pressed if the input is pressed, released if the input is released.</td>
+<td>This is the most commmon mapping of a button input to a VJoy button.</td>
+</tr>
+<tr>
+<td>Button (inverted)</td>
+<td>Maps to a VJoy button.  The button's state inverts the input state, so the output button is released when the button is pressed, and pressed when the input is released.</td>
+<td>This is used to invert the output button and used typically in physical three way hardware switch scenarios.</td>
+</tr>
+<tr>
+<td>Button Press</td>
+<td>Maps to a VJoy button.  The button is pressed when the input is triggered.</td>
+<td>This is used to set a vjoy button to on, and to stay on.</td>
+</tr>
+<tr>
+<td>Button Release</td>
+<td>Maps to a VJoy button.  The button is released when the input is triggered.</td>
+<td>This is used to set a vjoy button to off, and to stay off.</td>
+</tr>
+<tr>
+<td>Pulse Button</td>
+<td>Maps to a VJoy button.  The button is pulsed (so on/off) with optional repeat.</td>
+<td>This is used to pulse a button on/off either once, or at regular intervals while the input is held pressed.</td>
+</tr>
+<tr>
+<td>Toggle Button</td>
+<td>Maps to a VJoy button.  This button is toggled, so if it was off, will be on, and if it was on, it will be be off.</td>
+<td>This is used in toggle scenarios.</td>
+</tr>
+<tr>
+<td>Invert Axis</td>
+<td>Maps to a VJoy axis.  This will invert the input axis.</td>
+<td>This is used to easily invert an input axis and map it to the output VJoy axis.</td>
+</tr>
+<tr>
+<td>Set Axis Value</td>
+<td>Maps to a VJoy axis.  This mode sets the output VJoy axis to a fixed floating point value.</td>
+<td>Use this to set a specific value on an output axis.</td>
+</tr>
+<tr>
+<td>Set Axis Range</td>
+<td>Maps to a VJoy axis.  This changes the output scale of a Vjoy axis and impacts subsequent output.</td>
+<td></td>
+</tr>
+<tr>
+<td>Merge Axis</td>
+<td>Maps to a VJoy axis.  Combines the input with one ore more other axis inputs (could be from different devices), applying a numberic transformation to the prior step.  Each merge step is cummulative to the prior step, and the merge is applied to the prior merge value.  The output can be curved if needed.</td>
+<td>This replaced the legacy Joystick Gremlin merge feature.  Use this to combine multiple axes into one.  There are two primary uses for this:  The first is to merge toe-brakes on rudder pedals to a single linear axis.  The second is to scale one axis with another, thus increasing or decreasing precision/sensitivity.</td>
+</tr>
+<tr>
+<td>Control modes (multiple)</td>
+<td>This is a legacy feature of an earlier version of GremlinEx, and is used to manage GremlineEx various remote control modes.</td>
+<td></td>
+</tr>
+<tr>
+<td>Axis to Button</td>
+<td>Maps an input axis range to output buttons.</td>
+<td>This is used to set an output button based on the position on an axis. This is largely replaced by the more capable Gated Axis Action but is simpler to setup/use for simple range setups.</td>
+</tr>
+<tr>
+<td>Axis</td>
+<td>Maps to a VJoy axis.</td>
+<td>This is the basic map to axis functionality.  The output can be curved as an option.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ouput-curve">Ouput Curve<a class="headerlink" href="#ouput-curve" title="Permanent link">&para;</a></h3>
+<p>Vjoy Remap can apply an output curve to the output axis.  This allows GremlinEx to be able to, via multiple Vjoy Remaps and modes/conditions, to output multiple curves easily to a given output axis.  This is the preferred method over using a curve action.</p>
+<p>There is only one curve per Vjoy Remap, however multiple remap actions can be added and enabled/disabled using conditions or modes (or both).</p>
+<h3 id="axis-merging">Axis merging<a class="headerlink" href="#axis-merging" title="Permanent link">&para;</a></h3>
+<p>Vjoy Remap can merge multiple axes from different inputs together to form a single output axis.  The first axis is the axis being mapped.  Additional merge steps can be added each with its own calculation.</p>
+<p>For all computations, all axis data is normalized to a floating point value of -1 to +1.</p>
+<table>
+<thead>
+<tr>
+<th>Merge computation</th>
+<th>Description</th>
+<th>Typical Use-Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Add</td>
+<td>A + B.  The value of the merge axis B is added to the prior step A.</td>
+<td></td>
+</tr>
+<tr>
+<td>Average</td>
+<td>(A + B) / 2.  The value of the merge axis B is averaged with the prior step A.</td>
+<td></td>
+</tr>
+<tr>
+<td>Center</td>
+<td>(A - B) / 2.  The value of the merge axis B is substracted, then averaged with the prior step A.</td>
+<td>This mode is usually used to merge toe-brakes on hardware rudders.</td>
+</tr>
+<tr>
+<td>Minimum</td>
+<td>min(A, B).  The smallest value of the merge axis B and prior step A is the output.</td>
+<td></td>
+</tr>
+<tr>
+<td>Maximum</td>
+<td>max(A, B).  The largest value of the merge axis B and prior step A is the output.</td>
+<td></td>
+</tr>
+<tr>
+<td>Scale</td>
+<td>A * B.  The merge axis B is multiplied with the prior step A.</td>
+<td>Use this to scale throttles and other non-centered axis data</td>
+</tr>
+<tr>
+<td>Scale (centered)</td>
+<td>A * B.  The merge axis B is multiplied with the prior step A.</td>
+<td>Use this to scale centered axis data (the scaling is offset from the middle value 0).  Use case: scaled straffe axis.</td>
+</tr>
+<tr>
+<td>Scale (half)</td>
+<td>A * B.  The scale is applied to the half input only.</td>
+<td></td>
+</tr>
+<tr>
+<td>Trim</td>
+<td>A * B.  The scaling axis B is normalized 0 to 1 and applies a trim offset to the prior step.</td>
+<td>Use to modify a centered axis with trim values.  Use case: very precise trim on aircraft rudder, ailerons and pitch.</td>
+</tr>
+<tr>
+<td>Trim (centered)</td>
+<td>A * B.  The scaling axis B is normalized 0 to 1 and applies a trim offset to the prior step offset to the center.</td>
+<td>Use to modify a centered axis with trim values.  Use case: very precise trim on aircraft rudder, ailerons and pitch.</td>
+</tr>
+</tbody>
+</table>
+<p>Each merge step can be inverted if needed.</p>
+<p>There is no limit to the number of steps that can be added, so "combo" effects can be applied.  Note that not all combinations necessarily yield a useful result.</p>
+<p>GremlinEx will show the computed value on the UI as a preview.</p>
+<h3 id="inversion-reverse">Inversion / Reverse<a class="headerlink" href="#inversion-reverse" title="Permanent link">&para;</a></h3>
+<p>The output axis can be inverted by checking this box.</p>
+<h3 id="relative-mode">Relative mode<a class="headerlink" href="#relative-mode" title="Permanent link">&para;</a></h3>
+<p>In relative mode when the input is also an axis, the value of the offset depends on the deviation of the input.  An input of 0 (center) means no deviation.
+The offset applied is scaled based on the deviation, so maximum deviation of the input is the full offset value.</p>
+<h2 id="gated-axis-action">Gated Axis Action<a class="headerlink" href="#gated-axis-action" title="Permanent link">&para;</a></h2>
+<p>This action is an advanced joystick axis mapper/filter.   The premise of Gated Axis is to solve common axis splitting or triggering mapping challenges and consolidates into a single action various advanced mapping features, including scaling or re-ranging of an axis. The inspiration for this action comes from the need to more easily map an axis to an output for what has been usually complex from a mapping perspective gated axis inputs to outputs.  Very specifically, gated axis can easily tackle space sims, commercial airliner, turboprop and helicopter throttle mappings in simulators, creating internal deadzones, triggers, and split one axis into several.</p>
+<h3 id="what-is-a-gate">What is a gate?<a class="headerlink" href="#what-is-a-gate" title="Permanent link">&para;</a></h3>
+<p>A gate is a fixed point along the axis, with a normalized floating point value between -1 and +1.  Two gates are always defined, representing the extremities of an axis.  </p>
+<h3 id="what-is-a-range">What is a range?<a class="headerlink" href="#what-is-a-range" title="Permanent link">&para;</a></h3>
+<p>The space between two gates is called a range.  It is a linear space between two specific points on an axis.  There is always at least one range defined, because there is a minimum of two gates.</p>
+<p>Unlike gates, ranges have two conditions that output linear values with optional scaling/rebasing or even output supression to create deadzones on a given axis.  </p>
+<h3 id="available-triggers">Available triggers<a class="headerlink" href="#available-triggers" title="Permanent link">&para;</a></h3>
+<p>At runtime, when the input axis is moved, Gated Axis will trigger different actions depending on gate crossings and range movement and what is mapped.  These can be used in any combination and are all cummulative.</p>
+<table>
+<thead>
+<tr>
+<th>Trigger</th>
+<th>Description</th>
+<th>Typical Use-Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gate crossed</td>
+<td>Triggers when the axis movement passes the gate value on the axis.  This trigger is momentary and looks to actions as a button press and release.</td>
+<td>Use to trigger a set of actions whenever a specific point is crossed.</td>
+</tr>
+<tr>
+<td>Gate crossed (increasing)</td>
+<td>Triggers when the input axis passes gate as it travels "up".  This trigger is momentary and looks to actions as a button press and release.</td>
+<td>Use to trigger a set of actions whenever a specific point is crossed in the up direction</td>
+</tr>
+<tr>
+<td>Gate crossed (decreasing)</td>
+<td>Triggers when the input axis passes gate as it travels "down".  This trigger is momentary and looks to actions as a button press and release.</td>
+<td>Use to trigger a set of actions whenever a specific point is crossed in the down direction</td>
+</tr>
+<tr>
+<td>Range entered</td>
+<td>Triggers when the input enters a range.  This trigger is momentary and looks to actions as a button press and release.</td>
+<td>Use this to detect the input has entered a specific range on the input axis.</td>
+</tr>
+<tr>
+<td>Range exit</td>
+<td>Triggers when the input exits a range.  This trigger is momentary and looks to actions as a button press and release.</td>
+<td>Use this to detect the input has entered a specific range on the input axis.</td>
+</tr>
+<tr>
+<td>In range</td>
+<td>Triggers when the input enters a range.  This trigger is linear and looks to actions as an axis input, which can be rebased and scaled (min/max values changed).</td>
+<td>Use this to create a sub-axis or change the output value, or suppress the output value altogether to create a deadzone.</td>
+</tr>
+<tr>
+<td>Out of range</td>
+<td>Triggers when the input is outside the range range.  This trigger is linear and looks to actions as an axis input, which can be rebased and scaled (min/max values changed).</td>
+<td>This is not usually used as the mapping is usually more meaningful in-range.</td>
+</tr>
+<tr>
+<td>Range Hold</td>
+<td>Triggers a press when the input enters the range and a release when the input exits the range. This trigger is momentary and looks to actions as a button press and release.</td>
+<td>This is used to mimic a key/button/state press while the axis is in a given range, and avoids having to set triggers on range entry / exit separately.  Particularly useful to set a state whenever an axis is in a given range, which can be used in turn for conditions.  Also useful to hold a button or key down while the input is in a given range.</td>
+</tr>
+</tbody>
+</table>
+<p>Some of the triggers are duplicative: a range exit could be also triggered via a gate crossing.  The option is provided for flexibility and there is no right or wrong way.</p>
+<p><a class="glightbox" href="../assets/gated_axis.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="gated axis" src="../assets/gated_axis.png" /></a></p>
+<p><a class="glightbox" href="../assets/gate_axis_gate_widget.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="axis gate" src="../assets/gate_axis_gate_widget.png" /></a></p>
+<p><a class="glightbox" href="../assets/gate_axis_range_widget.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="axis range" src="../assets/gate_axis_range_widget.png" /></a></p>
+<h3 id="gates">Gates<a class="headerlink" href="#gates" title="Permanent link">&para;</a></h3>
+<p>A gate is a point along the input axis with a specific floating point value in the range -1 to +1.  </p>
+<p>Up to 20 gates can be defined.</p>
+<p>A gate can be added to the action by right clicking anywhere on a range, or adding a gate manually.</p>
+<p>Gates can be moved by the mouse, or by clicking the record button which will move the gate to the live input position (the black marker on the display), or the value can be manually input.  The mouse wheel over the gate position number will also increment or decrement the gate's position.</p>
+<h3 id="gate-mappings">Gate mappings<a class="headerlink" href="#gate-mappings" title="Permanent link">&para;</a></h3>
+<p>The gate mapping configuration window is access by clicking on the gate's configure button, or right clicking a gate.</p>
+<p><a class="glightbox" href="../assets/gated_axis_gate_condition.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="gate mapping" src="../assets/gated_axis_gate_condition.png" /></a></p>
+<p>Each gate condition has its own set of mappings.   Mappings will see the gate as a momentary (button) input so only actions suitable for a button will be available for selection.</p>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cross</td>
+<td>The gate will trigger whenever the input crosses the gate</td>
+</tr>
+<tr>
+<td>Cross (inc)</td>
+<td>The gate will trigger if the gate is crossed from left to right, or in increasing value</td>
+</tr>
+<tr>
+<td>Cross (dec)</td>
+<td>The gate will trigger if the gate is crossed from right to left, or decreasing value</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gate-delay">Gate Delay<a class="headerlink" href="#gate-delay" title="Permanent link">&para;</a></h3>
+<p>The delay is a value in milliseconds that determines how much time elapses between a press and release action.  Internally a gate will mimic a button press, so will send two specific events to sub-actions on a gate, a press action, followed by a release action.  Setting this to zero means the two are instant.  The default value is 250 milliseconds (1/4 second) which is enough time for most games to capture the input, either a keyboard press or a button press.</p>
+<h3 id="ranges">Ranges<a class="headerlink" href="#ranges" title="Permanent link">&para;</a></h3>
+<p>A range is defined by two gates.  The number of available ranges depends on the number of gates, and the size of each range depends on the position of the two gates representing the lower and upper end of the range.   Ranges are automatically computed based on gates, and adjust whenever a gate is moved.</p>
+<p>Ranges cannot overlap.</p>
+<h3 id="default-range">Default range<a class="headerlink" href="#default-range" title="Permanent link">&para;</a></h3>
+<p>If individual range mappings are not needed, a default range corresponding to the entire input axis is defined.  A checkbox toggles this mode on/off.</p>
+<h3 id="range-mapping">Range mapping<a class="headerlink" href="#range-mapping" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/gated_axis_range_condition.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="range actions" src="../assets/gated_axis_range_condition.png" /></a></p>
+<p>A range lets you map actions whenever the input enters a range, exits a range, or is within a range.  Each as its own set of mappings.</p>
+<p>Actions mapped to a range will see it as a joystick axis input.</p>
+<table>
+<thead>
+<tr>
+<th>Range Trigger</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Enter Range</td>
+<td>This will trigger whenever the input value enters the range.  This triggers once every time the input enters the range.</td>
+</tr>
+<tr>
+<td>Exit Range</td>
+<td>This will trigger whenever the input value exits the range. If the range is a boundary range (at minimum or maximum of the input range), it will still trigger.  This triggers once every time the input exits the range.</td>
+</tr>
+<tr>
+<td>In Range</td>
+<td>This will trigger whenever the input changes within the range.  This is useful to send axis data out based on the position inside a range.  This triggers on any input change.</td>
+</tr>
+<tr>
+<td>Outside of Range</td>
+<td>This will trigger whenever the input changes and is not in this range. This triggers on any input change.</td>
+</tr>
+<tr>
+<td>Range Hold</td>
+<td>Sends a press to mapped actions when the input enters the range, sends a release when the input exits the range.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="range-output-mode">Range output mode<a class="headerlink" href="#range-output-mode" title="Permanent link">&para;</a></h3>
+<p>Ranges have multiple output modes that affect the output value sent to mappings.</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Normal</td>
+<td>The value is output as is (this is the default) - this is also known as the pass-through mode.</td>
+</tr>
+<tr>
+<td>Output Fixed Value</td>
+<td>Mappings get a fixed value whenever the range condition is triggered. This is helpful to freeze the output to a fixed value.</td>
+</tr>
+<tr>
+<td>Ranged</td>
+<td>The value is scaled to the range's defined minimum and maximum. By default the minimum and maximum match the bounding gate positions, but this can be changed to any valid value to scale the output.</td>
+</tr>
+<tr>
+<td>Filtered (no output)</td>
+<td>No value is output in this mode. Use this to suppress output when the input is in a given range.</td>
+</tr>
+<tr>
+<td>Rebased</td>
+<td>This is similar to ranged mode, and the bounds are set to -1 to +1 so each range acts as a full output axis.</td>
+</tr>
+</tbody>
+</table>
+<p>Whenever you add or remove gates, ranges are added or removed as well.  It is recommended you don't configure ranges until you have the number of gates finalized to avoid inadvertently loosing configured actions because a range was deleted as you removed a gate.  GremlinEx will confirm deletions.</p>
+<h3 id="default-range_1">Default range<a class="headerlink" href="#default-range_1" title="Permanent link">&para;</a></h3>
+<p>The default range is a special range that is used for how the gated output should behave when the input is not in configured range.   A configured range is a range that has actions and modes defined. The default range is used when a range exists, but is not configured to do something special.</p>
+<p>You can use the default range to your advantage by only configuring special ranges in the input axis - and let the default range handle what happens when the input is not in the special ranges you've defined.</p>
+<h3 id="use-cases-and-scenarios">Use-cases and scenarios<a class="headerlink" href="#use-cases-and-scenarios" title="Permanent link">&para;</a></h3>
+<p>The gated axis plugin can be useful for a number of scenarios where more sophistication is needed on input axis data.</p>
+<p>The plugin can be used for complex axis to button mapping, for establishing complex setups for latched output, for scaling purposes, to suppress output for some input values, allows for stepped throttle settings, and allow for different scale and sensitivity (curves) based on input positions.</p>
+<p>Examples for ranges include mapping beta-range for turbo props simulations, trigger fuel cutoff at the bottom of a range, thrust reverser toggle, introduce dead zones along the axis, or split a single axis into multiple axes.</p>
+<p>Examples for gates include triggering a mode or setting up a state based on how a gate is crossed (directional) as well as bi-directional.</p>
+<h3 id="action-priority">Action priority<a class="headerlink" href="#action-priority" title="Permanent link">&para;</a></h3>
+<p>Certain actions execute last (such as a mode change).  Actions have an internal priority that determines when an action runs.  In most cases, actions are executed top down (in the order they appear), however some actions like a mode change are executed last, and actions that change the input value like applying a curve will execute first.</p>
+<h3 id="vjoy-remap">Vjoy Remap<a class="headerlink" href="#vjoy-remap" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_vjoy_remap.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="vjoy remap action" src="../assets/action_vjoy_remap.png" /></a></p>
+<p>This is the most common action in GremlinEx and lets you map an input (linear or momentary) to a VJOY device.</p>
+<p>This action replaces the legacy remap option.  In GremlinEx, this action is the main way to send output to a VJOY device. </p>
+<p>Some of the features of vjoy remap:
+- map an input axis to a vjoy axis
+- apply an output curve to the vjoy axis based on input
+- scale or apply a range to the vjoy axis based on input
+- merge the output axis value with one or more input axes using add, substract, multiply, average.
+- map an input button to a vjoy button
+- map an input hat to a button or a hat
+- synchonize the input value to the output on profile start or pick a default value.
+- force a button pressed
+- force a button release
+- toggle a button
+- convert an axis value to a button
+- view which buttons are in-use profile wise</p>
+<h3 id="gated-axis">Gated Axis<a class="headerlink" href="#gated-axis" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_gated_axis.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="gated axis" src="../assets/action_gated_axis.png" /></a></p>
+<p>This action lets you split an input axis and define what should happen when</p>
+<ul>
+<li>a range is entered or exited</li>
+<li>a specific point on the axis is crossed</li>
+</ul>
+<p>Up to 20 gates or crossing points can be defined (19 ranges). It is possible for ranges to send a fixed value or rescale/change the value of the output.
+This container was specifically created for output needs that have "gates", such as throttles used in some simulators.</p>
+<h3 id="mode-switch">Mode Switch<a class="headerlink" href="#mode-switch" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_switch_to_mode.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="switch to mode" src="../assets/action_switch_to_mode.png" /></a></p>
+<p>This action lets you change a profile mode at runtime based on an input trigger.</p>
+<h3 id="temporary-mode-switch">Temporary Mode Switch<a class="headerlink" href="#temporary-mode-switch" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_map_to_temporary_mode_switch.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="temporary mode switch" src="../assets/action_map_to_temporary_mode_switch.png" /></a></p>
+<p>This action lets you change the profile mode temporarily while the input is pressed.</p>
+<h3 id="cycle-modes">Cycle Modes<a class="headerlink" href="#cycle-modes" title="Permanent link">&para;</a></h3>
+<p>This action lets you cycle modes with each press.</p>
+<p><a class="glightbox" href="../assets/action_cycle_mode.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="cycle modes" src="../assets/action_cycle_mode.png" /></a></p>
+<h3 id="map-to-keyboard-ex">Map to Keyboard Ex<a class="headerlink" href="#map-to-keyboard-ex" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_map_to_keyboard_ex.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to keyboard" src="../assets/action_map_to_keyboard_ex.png" /></a></p>
+<p>This action lets you send a keyboard or mouse button/wheel click to the output.</p>
+<h3 id="map-to-mouse-ex">Map to Mouse Ex<a class="headerlink" href="#map-to-mouse-ex" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_mouse_ex.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to mouse ex" src="../assets/action_mouse_ex.png" /></a></p>
+<p>This action lets you send a mouse button/wheel or mouse position change to the output.</p>
+<h3 id="map-to-gamepad">Map to Gamepad<a class="headerlink" href="#map-to-gamepad" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_map_to_gamepad.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to gamepad" src="../assets/action_map_to_gamepad.png" /></a></p>
+<p>This action maps to a Gamepad (VIGEM) output.</p>
+<h3 id="map-to-simconnect">Map to SimConnect<a class="headerlink" href="#map-to-simconnect" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_map_to_simconnect.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to simconnect action" src="../assets/action_map_to_simconnect.png" /></a></p>
+<p>This action lets you send a SimConnect command to Microsoft Flight Simulator via the SimConnect SDK.   This bypasses the need to map any controls inside Microsoft Flight Simulator, and sends the data direct to the simulator to control aircrafts.  This way you completely bypass the MSFS control mapper and send control data directly to the sim, and the add-on.</p>
+<p>This includes sending calculation and expressions via the GremlinEX WASM module to read or modify internal simulator parameters defined by addons that are not exposed by the SimConnect API.  In this example, execute the "(&gt;K:AP_MASTER)" internal command.</p>
+<p><a class="glightbox" href="../assets/action_map_to_simconnect_calculator.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to simconnect calculator action" src="../assets/action_map_to_simconnect_calculator.png" /></a></p>
+<p>Using the SimConnect mapper from sim variables to calculator expressions requires knowledge of the <a href="https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/SimConnect_SDK.htm">Microsoft Flight Simulator SDK</a>.  </p>
+<p>The recommended setup is to have a single profile for Microsoft Flight Simulator, and have a mode for each aircraft type, and under that if needed, a mode for each subtype/variant.  Recommendations including having a setup for Boeing, Airbus, single prop, dual prop, single turboprop and dual turboprop, and quad engine as the base.  The Simconnect options page in GremlinEx while the sim is running will pull the current aircraft and let you associate a mode with that aircraft.  If you find the aircraft uses the default mode, it means it's being reported as a new type and likely needs to be associated with a profile mode for that type.</p>
+<p>For aircraft with detents, such as for spoiler or throttles, use the Gated Axis as it was designed precisely for this complicated need and in conjunction with other mapping features make mapping complex throttle assignments relatively easy.</p>
+<p>It is also recommended to use calculator expressions as much as a possible due to the capabilities to access add-on variables that are not in SimConnect.  A <a href="https://hubhop.mobiflight.com/presets/">guide to calculator expressions can be found here</a> with examples for commond add-ons.  All these work as-is in GremlinEx and allow you to access variables defined by each add-on.  </p>
+<p>SimConnect itself is a bit of an arcane art due to the historically poor documentation, lack of examples and errors / ommissions which combined with bugs make controlling MSFS via SimConnect an interesting challenge, however one miles better than using the built-in MSFS control mapper.  A number of add-ons also define variables that are not part of the base simulator, so are not exposed by the SimConnect SDK.  The only way to set them is to use calculator expressions, and consult the add-on manual and the MSFS user commmunity for what the variables are.</p>
+<p>I often use the built-in debug tools in MSFS to determine what variable to set or what the values should be, including the SimConnect inspector and the example Simvars explorer that comes as a sample project to compile with the Simconnect SDK.</p>
+<p>Another avanced used of Simconnect is to have a user plugin capture sim state, for example parking brakes, and update a glass surface widget with the state. This can be done via a custom plugin in GremlinEx using the existing event model and API fro Simconnect via Simconnect Manager, an internal control class in GremlinEx.</p>
+<h3 id="map-to-osc">Map to OSC<a class="headerlink" href="#map-to-osc" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_map_to_osc.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to osc action" src="../assets/action_map_to_osc.png" /></a></p>
+<p>This action lets you send an OSC message to the network.</p>
+<h3 id="text-to-speech">Text to Speech<a class="headerlink" href="#text-to-speech" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_tts.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="tts action" src="../assets/action_tts.png" /></a></p>
+<p>This action lets you send an audio prompt via TTS (text to speech).</p>
+<h3 id="map-to-state">Map to State<a class="headerlink" href="#map-to-state" title="Permanent link">&para;</a></h3>
+<p>This action lets you set or clear a state defined in the profile.  States are defined in the state device tab.</p>
+<p>If a state's value is changed and that state is used in an expression in another state, that state is also updated.</p>
+<h3 id="map-to-octavi-ifr1">Map to Octavi IFR1<a class="headerlink" href="#map-to-octavi-ifr1" title="Permanent link">&para;</a></h3>
+<p>This action sends output to the Octavie IFR 1 to control LEDs and modes.</p>
+<h3 id="macro">Macro<a class="headerlink" href="#macro" title="Permanent link">&para;</a></h3>
+<p><a class="glightbox" href="../assets/action_macro.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="macro action" src="../assets/action_macro.png" /></a></p>
+<p>This action lets you send complex sequences of outputs (joystick, keyboard, mouse) complete with timing and delay controls and separate make/break actions for buttons.</p>
+<h3 id="play-sound">Play Sound<a class="headerlink" href="#play-sound" title="Permanent link">&para;</a></h3>
+<p>This action lets you play a sound file located on disk.  As of m76T110, the playback device can be selected.  Clicking the default button will select the default Windows device.</p>
+<p>As of m76T111, the action includes a number of additional features:</p>
+<ul>
+<li>Ability to playback multiple sounds concurrently</li>
+<li>Ability to trigger the same sound multiple times via repeated triggers</li>
+<li>Playback is non-blocking (the profile continues to run)</li>
+<li>Ability to change timing on how the sample is played back</li>
+<li>Ability to loop the sample multiple times (default count is one)</li>
+<li>Ability to randomize playback by selecting a sound to play from a list of files in a folder.</li>
+</ul>
+<p><a class="glightbox" href="../assets/warning.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png" /></a> The play sound action also has the ability to use AI if CoquiTTS if available.  This feature is not available with the packaged distribution as the AI model cannot be packaged.</p>
+<p>It is recommended to use an online text to speech model to create an audio file from text, as this will likely provide the best experience.  The desired output format is a WAV file, although MP3 can also be used.  MP3 playback is not recommended as it introduces latency and takes longer to process over the WAV file format, which is why WAV is recommended for game output use-cases.</p>
+<p><a class="glightbox" href="../assets/action_play_sound.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="play sound" src="../assets/action_play_sound.png" /></a></p>
+<p>If control-click is used on the default button, the default device is set for all instances of Play Sound in the profile.</p>
+<p>The default playback device is the Windows default playback device at the time the action is created.</p>
+<p>Volume can be adjusted from 0 to 100 percent.  The play button will play the audio with the currently selected options.</p>
+<p>The action supports .WAV files, and .MP3 files.  Note that playback of .MP3 may not work on all systems due to the need for CODECs to be installed.  .WAV format is recommended.</p>
+<h3 id="trigger-joystick">Trigger (Joystick)<a class="headerlink" href="#trigger-joystick" title="Permanent link">&para;</a></h3>
+<p>(requires m76T103 or later)</p>
+<p><a class="glightbox" href="../assets/trigger_map.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="trigger map" src="../assets/trigger_map.png" /></a></p>
+<p>This action is a loopback action that allows one device input (axis, button or hat) to trigger an input on the same or another device called the target device, as if the target had generated that trigger.  The action lets you select the target joystick like device.</p>
+<p>Based on the selection, the action will present the ability to set an axis value if the output is an axis.  For buttons, the ability to press or release a button are available.  For hats, the position of the hat can be selected.</p>
+<p>A special mode, called actual, will use the actual input value (axis, button or hat) and use that value to trigger the output.  If the input is an axis, it will send the input axis value to the output.  If the input is a button, it will send both press and release triggers to the output based on the state of the input button.  For hats, it will synchronize the input hat with the output hat position.</p>
+<p>Additionally, if a button is mapped to a hat output, an input press will set the hat value to the position listed in the action, and the release will set the hat to the center position.</p>
+<p>It is not possible to map an axis input to a button or a hat and a warning will be displayed for this particular combination.</p>
+<p>Examples of how this action can be used:</p>
+<ul>
+<li>to use an axis on one device and duplicate this axis on another axis on a different device.</li>
+<li>to press a button on one device and duplicate this button state on another button on another device.</li>
+<li>at runtime, to trigger mappings on one device from another device.</li>
+<li>to set the value of an axis on another device by pressing a button.</li>
+</ul>
+<p><a class="glightbox" href="../assets/trigger_map_button.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="trigger map button" src="../assets/trigger_map_button.png" /></a></p>
+<h2 id="map-to-keyboardmouse-ex-action">Map to keyboard/Mouse EX action<a class="headerlink" href="#map-to-keyboardmouse-ex-action" title="Permanent link">&para;</a></h2>
+<p>This is identical to the base keyboard mapper but adds a few functions I thought would be handy.</p>
+<p>The updated keyboard mapper adds separate press (make), release (break) functionality so keys can stay pressed, or just released separately.</p>
+<p>It also adds a delay (pulse) function to hold a key down for a preset period of time (default is 250 milliseconds or 1/4 of a second which is the typical game "detect" range as some games cannot detect key presses under 250ms in my experience.</p>
+<p>The make/break/pulse behavior applies to all keys in the action, and the keys are released in the reverse order they were pressed.</p>
+<p><a class="glightbox" href="../assets/keyboard_mapper_ex.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="keyboard mapper" src="../assets/keyboard_mapper_ex.png" /></a></p>
+<h3 id="virtual-keyboard">Virtual keyboard<a class="headerlink" href="#virtual-keyboard" title="Permanent link">&para;</a></h3>
+<p>This action provides a visual keyboard to select one or more keys from. </p>
+<p>The virtual keyboard is sometimes the only way to specify extended keys such as F13 to F24, audio keys.</p>
+<p>The virtual keyboard in GremlinEx also provides easy mappings for mouse buttons including buttons one to five, and the four wheel events, and the media keys.</p>
+<p><a class="glightbox" href="../assets/virtual_keyboard.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="virtual keyboard" src="../assets/virtual_keyboard.png" /></a></p>
+<h3 id="action-modes">Action modes<a class="headerlink" href="#action-modes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hold</td>
+<td>Keys will be pressed while the input is active, and released when the input is not.  The meaning of active depends on the input type.  For example, keys will be pressed while a joystick button is held down and will release when the button is released.  The input does not auto-repeat in this mode - only one make/break is sent for each latched key.</td>
+</tr>
+<tr>
+<td>Pulse</td>
+<td>This mode triggers a press action, waits the pulse delay, and releases the keys.  This happens regardless of the input state.  If the input is pressed again while the pulse delay has not elapsed, the pulse is restarted.  In this mode, the keys are always released after the pulse delay.   Keep the pulse delay at or above 200ms as most game loops will fail to capture key presses under 200ms.</td>
+</tr>
+<tr>
+<td>Auto Repeat</td>
+<td>This mode is similar to pulse mode, except the pulse will repeat while the input is held.  The interval specifies the time between pulses.  Set to 0 for no delay, keeping again in mind that most game loops will not detect key presses if they occur within 200ms of each other.</td>
+</tr>
+<tr>
+<td>Press</td>
+<td>This mode triggers a press only (a "make" in keyboard hardware parlance).  This mode does not release the keys so it's expected at some point, the profile will release the keys.  Dragons: when used to send mouse clicks - it will keep the mouse pressed until the release which can cause behavior issues in the operating system.  Use with caution and only paired with a release mapping somewhere in the profile. Usually you can manually press the keys or the mouse to "undo" a press, provided that input is available (example F13 would not be).</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>Ths mode triggers a release only (a "break" in keyboard hardware parlance).  This is the companion action to the press mode.</td>
+</tr>
+<tr>
+<td>Toggle</td>
+<td>Ths mode toggles the key or mouse button. If a key is released, the key is pressed.  If it is pressed, it is released.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sync-mode">Sync mode<a class="headerlink" href="#sync-mode" title="Permanent link">&para;</a></h3>
+<p>As of m76T117, the action can synchronize with the mapped input.  If the input the action is mapped to is triggered at profile start (for example, a hardware switch is in the on position), the mapped keys / mouse buttons will be set to match the state of the input when the profile starts.  This mode is designed to keep the profile in synchronized with hardware input panels in simpits.</p>
+<h3 id="latching">Latching<a class="headerlink" href="#latching" title="Permanent link">&para;</a></h3>
+<p>This action can send very complex and unusual keys and mouse buttons, including keys that are not typically available on a regular keyboard like the F13 to F24 function keys.   The action can also combine unusual "latched" sequences such as pressing more than multiple keys and mouse buttons at once.</p>
+<h3 id="numlock-behavior">Numlock behavior<a class="headerlink" href="#numlock-behavior" title="Permanent link">&para;</a></h3>
+<p>The keyboard behavior is hard-coded in the hardware to send duplicative scan codes depending on the state of the numlock key.  To avoid issues, GremlinEx automatically turns off numlock (if it was on) while the profile is running to ensure that the keyboard sends the correct and predictable scan codes.  This can be a challenge in some situations but was necessary to ensure the keyboard mapper sends consistent keystrokes and mouse buttons when the hardware, depending on the state of numlock, sends duplicate scan codes based on its mode.   This ensures that numeric keypad keystrokes all show up as numeric keypad.</p>
+<h2 id="map-to-state-action">Map to State Action<a class="headerlink" href="#map-to-state-action" title="Permanent link">&para;</a></h2>
+<p>This feature is only available in 1.0ex m74 and above.  For more information on states, consult the <a href="#states">state device section</a> of the documentation.</p>
+<p>The map to state action manipulates a state when it's triggered.  This action lets you select the state to act on, and what should happen to the state value:</p>
+<p><a class="glightbox" href="../assets/action_state.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="action state" src="../assets/action_state.png" /></a></p>
+<h3 id="operation-modes">Operation modes<a class="headerlink" href="#operation-modes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hold</td>
+<td>The state turns on while the input is pressed and held pressed, and turns off when the input is released</td>
+</tr>
+<tr>
+<td>Press (On)</td>
+<td>Turns the state on</td>
+</tr>
+<tr>
+<td>Release (Off)</td>
+<td>Turns the state off</td>
+</tr>
+<tr>
+<td>Pulse</td>
+<td>Toggles the state, waits delay milliseconds, and restores the previous state.  Can optionally repeat the pulse while the input is held.</td>
+</tr>
+<tr>
+<td>Toggle</td>
+<td>Toggles the state.  If it was off, turns it on, if it was on, turns it off</td>
+</tr>
+<tr>
+<td>Invert</td>
+<td>Turns the state on if the input is released, and off if the input is pressed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="new-state">New state<a class="headerlink" href="#new-state" title="Permanent link">&para;</a></h3>
+<p>A new state can be created directly from the action by pressing the add button.</p>
+<p><a class="glightbox" href="../assets/action_state_add.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="action state add" src="../assets/action_state_add.png" /></a></p>
+<h3 id="input-synchronization">Input synchronization<a class="headerlink" href="#input-synchronization" title="Permanent link">&para;</a></h3>
+<p>The action can synchronize the state value on profile start with the input.  This ensures the state value is set to the value matching the input's state on start.  This is helpful to match hardware panel switch positions for example.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky"], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c8b220af.min.js"></script>
+      
+    
+  <script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(() => { lightbox.reload() });
+</script></body>
+</html>

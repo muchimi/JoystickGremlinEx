@@ -34,12 +34,11 @@ GremlinEx takes inputs from multiple sources, local and network, performs the tr
 
 There should be no expectation that a single input always results in a single output. A single input can produce multiple outputs, and multiple inputs can provide a single output.  It's also possible that no output is produced if the input(s) should be ignored based on the particular context.
 
-
 ## Differences with Joystick Gremlin
 
 GremlinEx is not Joystick Gremlin or a new version of Joystick Gremlin.  They may have a lot in common, however they are significantly different in how they work and function in many respects, including runtime.  GremlinEx started as a fork, however in the last several years is mostly a gut/replace.
 
-GremlinEx is far more event driven and threaded, has networking and support for non-joystick devices, and has many actions, functions and options that do not exist in the original because they evolved differently.
+GremlinEx is heavily event driven, uses multi-threading, has networking and support for non-joystick devices, and has many actions, functions and options that do not exist in the original because they evolved differently.  Available [containers are listed here](containers.md#containers) and available mapping [actions are found here](actions.md#actions).
 
 The internal wiring is significantly different along with a completely new execution graph logic so any expectation that GremlinEx works like Joystick Gremlin may be misplaced and not applicable.  GremlinEx is the essence of the original it's based on, has a general shared pedigree, however it does things differently.
 
@@ -49,7 +48,7 @@ Also note that once a profile has been touched by GremlinEx, it may not work at 
 
 ## Installation
 
-GremlinEx comes as a zip file in the [release section of GitHub](https://github.com/muchimi/JoystickGremlinEx/releases) that contains all you need.
+GremlinEx comes as a compressed zip file in the [release section of GitHub](https://github.com/muchimi/JoystickGremlinEx/releases) that contains all you need including required libraries.
 
 The contents of the zip file should be extracted to a folder that is not a protected system folder such as "Program Files" or "Windows".
 
@@ -58,7 +57,6 @@ The recommendation is to install GremlinEx in its own folder, like "GremlinEx" a
 The master repository can be found here on GitHub: [https://github.com/muchimi/JoystickGremlinEx
 ](https://github.com/muchimi/JoystickGremlinEx).
 
-
 ### Test versions
 
 GremlinEx uses an open development philosphy.  As such, test releases are frequently available that introduce not only fixes but desired features as well.  Some of the versions are more robust than others, however test versions are more likely to have issues, especially with new features.
@@ -66,9 +64,6 @@ GremlinEx uses an open development philosphy.  As such, test releases are freque
 To this end, GremlinEx offers in the configuration an option to "Version" profile folders so that configurations and profiles are safe from mishaps, such as a new profile version making it incompatible with a prior version of GremlinEx.
 
 It is a best practice regardless ot make a copy of the data folder (default is %USERPROFILE%\Joystick Gremlin Ex) to safeguard any files and configurations, just in case.
-
-
-
 
 ### Required additional tools
 

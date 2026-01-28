@@ -137,6 +137,10 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         :param parent the parent of this widget
         """
         super().__init__(action_data, QtWidgets.QVBoxLayout, parent=parent)
+
+
+    def _create(self, action_data):
+        self.action_data : MapToState = action_data
         
 
     def _create_ui(self):
@@ -215,6 +219,12 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
             rb.setChecked(True)
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
+        rb = gremlin.ui.ui_common.QDataRadioButton("Invert", data = "invert")
+        rb.setToolTip("Set the state to the reversed input (off if pressed, on if released)")
+        if mode == "invert":
+            rb.setChecked(True)
+        rb.clicked.connect(self._mode_changed)
+        widgets.append(rb)
 
         self.mode_widget, self.mode_layout = gremlin.ui.ui_common.getHContainer(widgets,"Action:")
     
@@ -250,7 +260,8 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_hat_widget = None
         self._create_hat_mapping()
 
-        gremlin.util.singleShot(self._update_ui)
+        #gremlin.util.singleShot(self._update_ui)
+        self._update_ui()
 
     def _sync_changed(self, mode):
         self.action_data.sync_mode = mode
@@ -762,6 +773,10 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             syslog.info (f"\tsync mode: [{self.action_data.sync_mode.name}]")
 
 
+        # input inversion
+        if self.action_data.mode == "invert":
+            is_pressed = not is_pressed
+
         # determine the startup state 
         
         match self.action_data.sync_mode:
@@ -907,7 +922,8 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         
         trigger = (is_pressed and self.action_data.exec_on_press) or \
                 (not is_pressed and self.action_data.exec_on_release) or \
-                mode in ("actual","pulse")        
+                mode in ("actual","pulse") or \
+                (not is_pressed and mode == "invert")
 
         if verbose: syslog.info(f"STATE FUNCTOR: got event: [{key}] pressed: [{is_pressed}] trigger: [{trigger}] input type: [{input_type.name}] mode: [{mode}] exec on press: [{self.action_data.exec_on_press}]  exec on release: [{self.action_data.exec_on_release}]")
 
@@ -934,7 +950,6 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                             state = not self.sd.value(key)
                             if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] TOGGLE -> {'ON' if state else 'OFF'}")
                             self.sd.setValue(key, state)
-                 
                             
                         case "pulse":
                             if is_pressed:
@@ -943,6 +958,11 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                                 self.pulse_start(key, self.action_data.pulse_delay/1000, repeat_interval)
                             else:
                                 self.pulse_stop(key)
+
+                        case "invert":
+                            state = not is_pressed
+                            if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] INVERT ->  {'ON' if state else 'OFF'}")
+                            self.sd.setValue(key, state)
 
 
                 case InputType.JoystickHat:
@@ -1065,7 +1085,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         
         self.state : gremlin.ui.state_device.StateInputItem = None # mapped state for non-hat mappings
         self.description = None # state description (used to recreate the state if needed)
-        self.mode = "toggle" # valid modes are "pressed", "released", "toggle", "pulse"
+        self.mode = "toggle" # valid modes are "pressed", "released", "toggle", "pulse", "invert"
         self.pulse_delay = 250 # delay for pulse mode in milliseconds
         self.pulse_repeat = False # true if the pulse repeats while down
         self.pulse_repeat_delay  = 250 # repeat delay for pulse mode in milliseconds

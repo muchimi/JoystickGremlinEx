@@ -29,6 +29,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T166):
+- New: Map to State: Added invert mode.  This will set the state to off if the input is pressed, and on if the input is released.
+- Fix: Map to State: hide pulse options when not in pulse mode.
+- Fix: UI : optimized handling of missing graphics/resource search.
+- Documentation updates
+
 ### (m76T165):
 - New: Repeat Container: Added option to suppress the initial trigger of the repeated actions on input trigger.  If disabled, the repeated actions will only start if the input has been held for the initial delay.  If enabled (default), the repeated actions will run once on input trigger, then repeat after the initial delay has lapsed.  This option has no effect if the initial delay is disabled (0).
 

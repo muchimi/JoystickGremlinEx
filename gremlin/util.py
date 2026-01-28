@@ -861,7 +861,7 @@ def get_icon_path(path):
         if not "/" in the_path and not os.sep in the_path:
             # raw find fine
             icon_file = _find_file(the_path, root_path)
-            if os.path.isfile(icon_file):
+            if icon_file and os.path.isfile(icon_file):
                 gremlin.shared_state._icon_path_cache[the_path] = icon_file
                 return icon_file
 
@@ -900,6 +900,9 @@ def get_icon_path(path):
                     return brute_force
         
         syslog.error(f"Icon file not found: {icon_file}")
+
+        # cache it to avoid the search next time
+        gremlin.shared_state._icon_path_cache[the_path] = None
     
         return None
 

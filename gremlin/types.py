@@ -1222,10 +1222,10 @@ class ActivationRule(Enum):
 
 class ButtonOutputMode (IntEnum):
     ''' modes for input hats '''
-    Hold = 0
-    Pulse = 1
-    Press = 2
-    Release = 3
+    Hold = 0 # hold while pressed
+    Pulse = 1 # pulse once
+    Press = 2 # press / on
+    Release = 3 # release / off
     NoOp = 4 # do nothing
 
 

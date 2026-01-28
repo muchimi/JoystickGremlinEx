@@ -18,6 +18,8 @@ nav:
   - Home: index.md
   - Overview: overview.md
   - Usage: usage.md
+  - Containers : containers.md
+  - Actions : actions.md
   - Resources: resources.md
   - Scripting: scripting.md
   - AI and DevOps: ktts.md

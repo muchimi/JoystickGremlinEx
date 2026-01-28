@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/ktts/">
+        <link rel="canonical" href="https://github.com/muchimi/JoystickGremlinEx/containers/">
       
       
-        <link rel="prev" href="../scripting/">
+        <link rel="prev" href="../usage/">
       
       
-        <link rel="next" href="../credits/">
+        <link rel="next" href="../actions/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>AI and DevOps - GremlinEx</title>
+        <title>Containers - GremlinEx</title>
       
     
     
@@ -73,7 +73,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#using-ai-voice-generation" class="md-skip">
+        <a href="#containers" class="md-skip">
           Skip to content
         </a>
       
@@ -109,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              AI and DevOps
+              Containers
             
           </span>
         </div>
@@ -231,9 +231,11 @@
   
   
   
+    
   
-    <li class="md-tabs__item">
-      <a href="../containers/" class="md-tabs__link">
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
         
   
   
@@ -307,11 +309,9 @@
   
   
   
-    
   
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="./" class="md-tabs__link">
+    <li class="md-tabs__item">
+      <a href="../ktts/" class="md-tabs__link">
         
   
   
@@ -452,10 +452,32 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../containers/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Containers
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -466,6 +488,95 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      What is a container?
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available containers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Implementation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequence-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sequence Container
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sequence Container">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-once-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run once mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-loop-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Toggle (loop) mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wiggle-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wiggle mode
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -540,32 +651,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    AI and DevOps
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../ktts/" class="md-nav__link">
         
   
   
@@ -576,53 +665,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#how-does-it-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      How does it work?
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installation-of-the-ai-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installation of the AI model
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#installation-of-gex-scripting-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      Installation of GEX scripting environment
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -676,29 +718,71 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#how-does-it-work" class="md-nav__link">
+  <a href="#what-is-a-container" class="md-nav__link">
     <span class="md-ellipsis">
-      How does it work?
+      What is a container?
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#installation-of-the-ai-model" class="md-nav__link">
+  <a href="#available-containers" class="md-nav__link">
     <span class="md-ellipsis">
-      Installation of the AI model
+      Available containers
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#installation-of-gex-scripting-environment" class="md-nav__link">
+  <a href="#implementation" class="md-nav__link">
     <span class="md-ellipsis">
-      Installation of GEX scripting environment
+      Implementation
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequence-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sequence Container
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sequence Container">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-once-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run once mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#toggle-loop-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Toggle (loop) mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wiggle-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wiggle mode
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -718,119 +802,103 @@
 
 
 
-<h1 id="using-ai-voice-generation">Using AI voice generation<a class="headerlink" href="#using-ai-voice-generation" title="Permanent link">&para;</a></h1>
-<p>GEX as of m76T130 supports AI text to speech generation using a local LLM model via the Coqui-AI open source local model AI tool.</p>
-<p>GEX adds this functionality through the Play Sound action.</p>
-<p>The complete set of files needed for this is some 3.5 to 4Gb of dependencies and data files, so this is not included (packaged) with the standard GEX installation.  It is also extremely difficult to package the AI model because some files are system dependent.  Some of the required tools, such as the Nvidia CUDA toolkit that allows the model to generate audio files extremely quickly over the CPU model, have licensing and terms that you must agree to that is different from the GEX licensing as well.  It is thus not possible to deliver the AI model functionality with GEX.</p>
-<p>Consequently, the functionality is available, but GEX must run as a script from VSCode.</p>
-<p>Running GEX as a script in VSCode is only needed to generate (or convert) TTS actions to Sound and generate audio from text using the AI model.   Once the files are generated and the profile saved, you do not need to run GEX in VSCode and it is not recommended.  You should use the regular .EXE as once the files are created, the AI model does not need to run.  This will also ensure that dependencies only used to generate audio files are not loaded, which will reduced the memory footprint used by GEX.</p>
-<h2 id="how-does-it-work">How does it work?<a class="headerlink" href="#how-does-it-work" title="Permanent link">&para;</a></h2>
-<p>The core TTS support in GremlinEx is based on the windows API built-in text to speech API which is a legacy system.  It has the advantage of generating sound in real time, however the sound quality is limited, as is the choice of voices.</p>
-<p>The new AI model supported by GEX via the Open Source Coqui TTS (called here KTTS) runs locally.  KTTS supports different accent and languages and a more natural sounding voice generated from text.  It does not require a license for non-commercial use and importantly compared to other LLM models out there, does not require an account or a subscription nor the purchase of tokens. </p>
-<p>The caveat is this model is not real time, which is not a problem if text doesn't change, which in most cases it does not. GEX will cache the generated audio files, will facilitate the creation of these files, and manage the cache.  </p>
-<p>The conversion is performed once, but will require some manual management as for example.</p>
-<h2 id="installation-of-the-ai-model">Installation of the AI model<a class="headerlink" href="#installation-of-the-ai-model" title="Permanent link">&para;</a></h2>
-<p>These instructions will get the LLM model installed locally on your system.  You will need approximately 4Gb of available disk space.</p>
-<p>Some of these steps can be quite lengthy to execute as there are a significant number of downloads involved.</p>
-<ol>
-<li>
-<p>Install 64 bit Python 3.13.x.  The recommended folder is C:\Python\Python313 for easy access (the default folder is usually difficult to get to). The version should match the Python version used by GEX version (first line of the log file).</p>
-</li>
-<li>
-<p>Install pytorch with CUDA enabled if you have an Nvidia GPU (note that this is recommended for speed of processing).  If you do not have an NVidia GPU, the CPU model will be used.  Follow the instructions on the Pytorch website:</p>
-</li>
-</ol>
-<pre><code>https://pytorch.org/
-</code></pre>
-<p>The easiest is to open a command line:</p>
-<pre><code>Windows Key + R to open a run window
-type cmd and press the enter key to open the command line
-</code></pre>
-<p>At the command prompt, change to the python folder:</p>
-<pre><code>cd c:\python\python313
-</code></pre>
-<p>Run pip to install the correct version of torch - the link will be listed on the web site based on the version you have selected.  The example below we're installing Torch for CUDA 13.0.</p>
-<pre><code>python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
-</code></pre>
-<p>Keep the command window open.</p>
-<ol>
-<li>Install the NVidia CUDA toolkit matching the exact version you selected in the PyTorch (in the example above, 13.0).  This has to match exactly or CUDA will not function in Torch. It is very likely that the Nvidia CUDA toolkit download page will have a more recent version than that supported by PyTorch.  However the installed version must match what PyTorch was compiled against. </li>
-</ol>
-<pre><code> https://developer.nvidia.com/cuda-downloads
-</code></pre>
-<ol>
-<li>Install coqui-tts.  Note the TTS below is case sensitive.</li>
-</ol>
-<pre><code>python -m pip install TTS
-</code></pre>
-<ol>
-<li>If you intend to change the rate of playback from the AI generated voice, you also need to install the rubberband command line interface (CLI).  Download the "Rubber Band Library v4.0.0 command-line utility" from:</li>
-</ol>
-<pre><code>https://breakfastquay.com/rubberband/.
-</code></pre>
-<p>Add the contents of the zip archive to a folder (example C:\Rubberband).
-Add that path to the PATH environment variable in Windows.  This is needed or the next step will not find the Rubberband CLI at runtime from Python.</p>
-<ol>
-<li>Install pyrubberband.</li>
-</ol>
-<pre><code>python -m pip install pyrubberband
-</code></pre>
-<p><a class="glightbox" href="../assets/warning.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png" /></a> Generating AI audio files from text requires steps 1 to 4.</p>
-<p><a class="glightbox" href="../assets/warning.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png" /></a> Resampling (changing the playback speed from default) requires rubberband steps 5 and 6.</p>
-<ol>
-<li>Install additional dependencies</li>
-</ol>
-<pre><code>python -m pip install pydub
-python -m pip install soundfile
-
-</code></pre>
-<ol>
-<li>The following dependencies should be installed by the items above:  scipy, numba and a few others.</li>
-</ol>
-<h2 id="installation-of-gex-scripting-environment">Installation of GEX scripting environment<a class="headerlink" href="#installation-of-gex-scripting-environment" title="Permanent link">&para;</a></h2>
-<p>These instructions are to setup Visual Studio Code to run GEX as a script.  This is needed for the AI version to function.
-Note: this is not a guide on how to use VSCode, is it only listing the steps needed.</p>
-<p><a class="glightbox" href="../assets/warning.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png" /></a> It is assumed you already have VJOY and other tools installed as part as running GEX on your system.</p>
-<ol>
-<li>Install the current version of 64 bit Visual Studio Code.  Recommend using the installer version. </li>
-</ol>
-<pre><code>https://code.visualstudio.com/download
-</code></pre>
-<ol>
-<li>Add the Python development extensions to Visual Studio Code.</li>
-</ol>
-<pre><code>Python (by Microsoft)
-Pylance (by Microsoft)
-Python Debugger (by Microsoft)
-Python Environments (by Microsoft)
-Python Indent (by Kevin Rose)
-</code></pre>
-<ol>
-<li>
-<p>Clone the GEX repository (recommend using Github desktop or Git command line tools).  <a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository">See instructions on GitHub</a>.  Recommend the cloning location to be C:\GEX-develop or something along those lines, not in a protected folder and not in a folder that is six levels deep as Windows often likes to find.  The reason is that path length does matter and you want GEX at a top level folder to eliminate long path issues in some compilation steps.</p>
-</li>
-<li>
-<p>Open a command line window</p>
-</li>
-</ol>
-<pre><code>Windows Key + R to open a run window
-type cmd and press the enter key to open the command line
-</code></pre>
-<ol>
-<li>Install GEX Python dependencies.  The easiest is to use the requirements.txt file located where you cloned GEX to in the root folder.</li>
-</ol>
-<pre><code>python -m pip install -r c:\gex-develop\requirements.txt
-</code></pre>
-<ol>
-<li>In VSCode, open a folder, in our example:</li>
-</ol>
-<pre><code>C:\gex-development
-</code></pre>
-<p>Trust the folder contents to avoid being prompted all the time.</p>
-<ol>
-<li>Run GEX by using the F5 key with debugging (helpful the first time in case some dependency or other issue exists) or Ctrl-F5 to run without the debugger.</li>
-</ol>
-<p>This by no means is a guide on how to use VSCode.</p>
+<h1 id="containers">Containers<a class="headerlink" href="#containers" title="Permanent link">&para;</a></h1>
+<h2 id="what-is-a-container">What is a container?<a class="headerlink" href="#what-is-a-container" title="Permanent link">&para;</a></h2>
+<p>A container in GremlinEx is a grouping mechanism that contains one or more actions to execute in a mapping. The container can also apply logic to how the contained actions are executed, and let you define conditions of execution.</p>
+<p>Containers do not produce output.  </p>
+<p>Containers must have at least one <a href="../actions/#actions">action</a>.</p>
+<p>When you add an action to a mapping, it will be placed in a container, and the default container is the basic container.</p>
+<h2 id="available-containers">Available containers<a class="headerlink" href="#available-containers" title="Permanent link">&para;</a></h2>
+<p>GremlinEx includes several containers that can be used to solve various mapping challenges.</p>
+<table>
+<thead>
+<tr>
+<th>Container</th>
+<th>Description</th>
+<th>Typical Use-Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Basic</td>
+<td>The basic container is a container for one or more actions.  This is the simplest container.  All actions in GEX have to be in a container, and this is the simplest container that can be used.</td>
+<td>This is the default container when adding a new action to an input and the most common.  Note that adding an action to an input automatically puts it in the basic container if no container exists.</td>
+</tr>
+<tr>
+<td>Button</td>
+<td>This container has two sets of actions, one for when a button is pressed, the other for when a button is released.</td>
+<td>This container is best used with input that behave like buttons if a different action has to be executed on button press or release.</td>
+</tr>
+<tr>
+<td>Chain</td>
+<td>This container executes actions in the order the appear in stepped mode.  Every input trigger advances one step.  When the last action is executed, it wraps around. This container should not contain a mode change action.</td>
+<td>This container is used for example to trigger state changes in sequence.</td>
+</tr>
+<tr>
+<td>Delay Trigger</td>
+<td>This container executes one or more actions in the future.  The action will execute even on mode change.  Conditions applied to the container are evaluated at the scheduled time.  If the container is retriggered, the clock is reset and the delay starts again.</td>
+<td>This container is best used when combined with conditions, so execute this after several seconds have lapsed unless the condition changed.</td>
+</tr>
+<tr>
+<td>Double Tap</td>
+<td>Similar to the Button container, this adds the ability to detect a rapid double press of the input.</td>
+<td>Similar to a mouse double click, this applies to a keyboard or button double pressed quickly.</td>
+</tr>
+<tr>
+<td>Sequence</td>
+<td>This container lets GEX actions to be used as a macro.  All actions will be executed, one after the other in the order they appear.  The container can also randomize these actions and randomize the delay between action executions. This container should not contain a mode change action.</td>
+<td>This is the container equivalent of macros, and because actions have more functionality than the action macro, can be used to create very complex macros superseding the capabilities of the macro action.</td>
+</tr>
+<tr>
+<td>Smart Toggle</td>
+<td>This container is used to toggle an output based on the short or long press of the input.  A short press pulses the output.  A long press causes the output to be toggled on.</td>
+<td>Used for "sticky" output for keyboard or joystick buttons based on a quick toggle, or a hold function.  This container should not contain a mode change action.</td>
+</tr>
+<tr>
+<td>Switch</td>
+<td>This container is designed to support two way and three way hardware switches.</td>
+<td>This container simplifies the mapping of actions to hardware buttons that only trigger in specific positions such as on, but not off.  The container makes it easy to do these mapping without having to use conditions, or to detect input state changes.</td>
+</tr>
+<tr>
+<td>State</td>
+<td>This container is similar to the basic container however only executes the contained actions after checking a profile state (on or off).</td>
+<td>This container eliminates the need to apply a state condition to a container and can be used to run differnt groups of actions based on a state, and without using performance intensive mode context switches.  Use one container for each group of actions.  Expression states can be used to combine multiple states if needed if multiple states are involved (for example A and B, A and B and C, A or B, B and not D, etc.).  Referencing an expression state for this container makes this a very powerful way to group actions that should only execute based on multiple states and increases the readability of the profile while making it simpler to create.</td>
+</tr>
+<tr>
+<td>Tempo</td>
+<td>This is a container that performs actions on short press, or long press.</td>
+<td>This is a legacy container for compatibiliy with older profiles.</td>
+</tr>
+<tr>
+<td>TempoEx</td>
+<td>This is a container that defines separate actions for short press, long press our double click of the input.  This container does not work for actions that require a release trigger at the onset.</td>
+<td>Use this container instead of Tempo although both work pretty much the same.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
+<p>Each container in GremlinEx is a Python plugin.</p>
+<h2 id="sequence-container">Sequence Container<a class="headerlink" href="#sequence-container" title="Permanent link">&para;</a></h2>
+<p>This container executes all contained actions in a sequence, and as such is very similar to a macro.  Unlike a macro, the sequence container executes one or more full action per step, which can itself contain a macro for example.  The difference between this container and others is the order of execution is guaranteed in step order, and each action runs in sequence rather than in parallel.</p>
+<p>This container allows the sequencing of actions contained in the sequence steps, and has several features not available in the simpler macro action:</p>
+<ul>
+<li>all action types suitable for momentary input can be used, such as OSC.  The sequence container has more action types than the macro action.</li>
+<li>the steps can contain multiple actions.</li>
+<li>steps can themselves contain macros if needed.</li>
+<li>the container supports several "wiggle" modes to randomize the execution of the steps, including a random pick mode where a count of steps can be selected at random, thus using steps as a menu of possible choices to execute on trigger.</li>
+<li>steps can be re-ordered</li>
+</ul>
+<h3 id="run-once-mode">Run once mode<a class="headerlink" href="#run-once-mode" title="Permanent link">&para;</a></h3>
+<p>In this mode, the sequence is executed once when the input is triggered as determined by the "exec on release" or "exec on press" options.  The sequence will run in the order of the steps.  The sequence cannot be stopped in this mode.  If a retrigger occurs while the sequence is still running, the trigger is ignored.</p>
+<h3 id="toggle-loop-mode">Toggle (loop) mode<a class="headerlink" href="#toggle-loop-mode" title="Permanent link">&para;</a></h3>
+<p>In this mode, the sequence runs as a loop.  The first trigger, as determined by the "exec on release" or "exec on press" options, enables the loop.  The second trigger stops the loop.  If the "resume at last step" option is enabled, the sequence will start the next loop where it was last stopped.  By default the loop starts at the first step.</p>
+<h3 id="wiggle-mode">Wiggle mode<a class="headerlink" href="#wiggle-mode" title="Permanent link">&para;</a></h3>
+<p>When Wiggle mode is enabled, this container can randomize the execution of actions it contains. </p>
+<p>In wiggle mode, the container will continue executing actions while the input is pressed, and stop when the input is released.  This makes it particularly suitable to usage by a state, or when mapped to a physical toggle switch on a hardware input.</p>
+<p>The pause between steps can be randomized between a minimum delay, and a maximum delay.</p>
+<p>If step randomization is enabled, the next step to execute will also be randomized.  If disabled, the step sequence is observed.</p>
+<p>Actions execute in the order they are listed and they can be re-ordered if needed.</p>
+<p>The purpose of this container is to add macro-like functionality using mappings instead of the macro action itself.</p>
 
 
 
