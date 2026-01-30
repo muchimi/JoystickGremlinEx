@@ -42,6 +42,7 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
         self._id = gremlin.util.get_guid()
         self._comparison = ""
         self._activation_condition = None # owning container
+        self.delay = 0.0 # delay in seconds
 
     def setOwner(self, owner):
         self._activation_condition = owner
@@ -76,15 +77,8 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
         import_data = gremlin.base_profile.ProfileImportData()
         if "condition_id" in node.attrib:
             self._id = node.get("condition_id")
-        
-        # if self._id in import_data.used_ids:
-        #     new_id = gremlin.util.get_guid()
-        #     verbose = gremlin.config.Configuration().verbose
-        #     if verbose: syslog.warning(f"PROFILE: duplicate ID found - Condition: [{id}] - assigning new id: [{new_id}]")
-        #     self._id = new_id
-        
-        # import_data.used_ids[self._id] = self
-
+        self.delay = safe_read(node,"delay", float, 0.0)
+      
     
     def to_xml(self):
         """Returns an XML node containing the objects data.
@@ -93,6 +87,7 @@ class AbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
         """
         node = ElementTree.Element("condition")
         node.set("condition_id", self._id)
+        node.set("delay", safe_format(self.delay, float))
         return node
         
 

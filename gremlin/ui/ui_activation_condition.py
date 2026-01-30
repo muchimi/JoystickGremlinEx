@@ -558,6 +558,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label = "Listen", callback = self._request_user_input)
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
 
+
         widgets,layout = gremlin.ui.ui_common.getHContainer([self.copy_widget,
                                                              self.paste_widget,
                                                              self.record_button_widget,
@@ -566,7 +567,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
 
 
-        
+        self.delay_widget = None
 
         self.main_layout.addWidget(QtWidgets.QLabel("Activate if:"))
 
@@ -635,7 +636,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.condition.input_id =  input_id
         self.condition.device_name = device.name
         
-        self._update_ui()
+        self._init_ui()
 
 
     def _populate_device_selector(self):
@@ -710,16 +711,13 @@ class JoystickConditionWidget(AbstractConditionWidget):
             self.condition.input_id = input_id
 
             # update the other UI based on input type
-            self._update_ui()
+            self._init_ui()
             
         
 
-    def _update_ui(self):
-        ''' updates UI based on input type'''
+    def _init_ui(self):
         input_type = self.condition.input_type
-        visible = False
-
-
+        self.axis_repeater_widget.hookDevice(self.condition.id, self.condition.device_guid, self.condition.input_type, self.condition.input_id)
 
         match input_type:
             case InputType.JoystickAxis:
@@ -731,12 +729,25 @@ class JoystickConditionWidget(AbstractConditionWidget):
         
             case InputType.JoystickHat:
                 self._hat_ui()
+
+        self._update_ui()
             
-        self.axis_repeater_widget.hookDevice(self.condition.id, self.condition.device_guid, self.condition.input_type, self.condition.input_id)
-                
+
+
+    def _update_ui(self):
+        ''' updates UI based on input type'''
+        gremlin.util.assert_ui_thread()
+        visible = False
+      
+        
         self.axis_repeater_widget.setVisible(visible)
 
-    
+        if self.delay_widget:
+            input_type = self.condition.input_type
+            visible = input_type == InputType.JoystickButton and self.condition.comparison in ("notchangedin", "changedin")
+            self.delay_widget.setVisible(visible)
+
+
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
         
@@ -778,7 +789,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
             self.condition.comparison = "inside"
             
         self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
-        self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
+        self.comparison_dropdown.setCallback(self._comparison_changed_cb)
 
         self.range_status_widget = ui_common.QIconLabel()
         self.range_status_widget.setIcon("mdi.checkbox-marked-outline", color = gremlin.ui.ui_common.Color.activeColor())
@@ -821,12 +832,19 @@ class JoystickConditionWidget(AbstractConditionWidget):
         """Creates the UI needed to configure a button based condition."""
         gremlin.util.clear_layout(self.ui_container_layout)
         self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
-        self.comparison_dropdown.addItem("Pressed")
-        self.comparison_dropdown.addItem("Released")
-        if not self.condition.comparison in ("pressed","released"):
-            self.condition.comparison = "pressed"
-        self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
-        self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
+        self.comparison_dropdown.addItem("Pressed","pressed")
+        self.comparison_dropdown.addItem("Released","released")
+        self.comparison_dropdown.addItem("Changed In","changedin")
+        self.comparison_dropdown.addItem("Not Changed In","notchangedin")
+        if not self.condition.comparison in ("pressed","released", "notchangedin","changedin"):
+             self.condition.comparison = "pressed"
+        index = self.comparison_dropdown.findData(self.condition.comparison)
+        if index != -1:
+            self.comparison_dropdown.setCurrentIndex(index)
+
+        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(self.condition.delay, is_seconds = True, show_shortcuts=False,label="Delay (s):", callback=self._handle_delay_changed)
+
+        self.comparison_dropdown.setCallback(self._comparison_changed_cb)
 
         self.ui_container_layout.addWidget(
             QtWidgets.QLabel(
@@ -836,7 +854,11 @@ class JoystickConditionWidget(AbstractConditionWidget):
             1
         )
         self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        self.ui_container_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
+
+        widgets = [self.comparison_dropdown, self.delay_widget]
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
+        self.ui_container_layout.addWidget(widget, 0, 3, alignment=QtCore.Qt.AlignLeft)
+
         self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
 
         self.ignore_release_widget = QtWidgets.QCheckBox("Apply condition on press only")
@@ -850,6 +872,15 @@ class JoystickConditionWidget(AbstractConditionWidget):
         if not self.condition.comparison:
             # update the comparison
             self.condition.comparison = self.comparison_dropdown.currentText()
+
+        self._update_ui()
+
+
+    def _handle_delay_changed(self, value : float):
+        gremlin.util.InvokeUiMethod(self._handle_delay_changed_ui, value)
+
+    def _handle_delay_changed_ui(self, value : float):
+        self.condition.delay = value
 
     def _hat_ui(self):
         """Creates the UI needed to configure a hat based condition."""
@@ -1005,19 +1036,21 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
         :param text the new comparison operation name
         """
-        if self.condition.input_type == InputType.JoystickButton:
-            self.condition.comparison = data.casefold()
-        elif self.condition.input_type == InputType.JoystickHat:
-            self.condition.comparison = gremlin.types.HatDirection.to_string(data)
-        elif self.condition.input_type == InputType.JoystickAxis:
-            self.condition.comparison = data.casefold()
-        else:
-            syslog.warning(
-                f"Invalid input type encountered: {self.condition.input_type}"
-            )
-        
-        self._update_range_state(self._axis_value())
+        if data:
+            if self.condition.input_type == InputType.JoystickButton:
+                self.condition.comparison = data
+            elif self.condition.input_type == InputType.JoystickHat:
+                self.condition.comparison = gremlin.types.HatDirection.to_string(data)
+            elif self.condition.input_type == InputType.JoystickAxis:
+                self.condition.comparison = data
+                self._update_range_state(self._axis_value())
+            else:
+                syslog.warning(
+                    f"Invalid input type encountered: {self.condition.input_type}"
+                )
+            
 
+            self._update_ui()
 
     @QtCore.Slot(bool)
     def _ignore_release_cb(self, checked : bool):

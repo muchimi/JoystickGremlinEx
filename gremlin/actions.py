@@ -33,6 +33,7 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.util
 import gremlin.fsm
+import time
 
 import math
 
@@ -211,6 +212,7 @@ class AbstractCondition(metaclass=ABCMeta):
         self.comparison = comparison
         self.id = gremlin.util.get_guid()
         self.manual_callback = False
+        self.delay = 0.0 # delay in seconds
 
     @abstractmethod
     def __call__(self, event, value, extra_data = None):
@@ -437,6 +439,7 @@ class JoystickCondition(AbstractCondition):
         self.input_index = condition.input_index if hasattr(condition,"input_index") else 0
         self.condition = condition
         self.ignore_release = condition.ignore_release
+        self.delay = condition.delay # delay in seconds
 
 
     def __call__(self, event, value, extra_data = None):
@@ -450,7 +453,7 @@ class JoystickCondition(AbstractCondition):
         :param value the possibly modified value
         :return True if the condition is satisfied, False otherwise
         """
-
+        import gremlin.event_handler
         
 
         verbose = gremlin.config.Configuration().verbose_mode_condition
@@ -503,13 +506,32 @@ class JoystickCondition(AbstractCondition):
 
             retval = False
             
-            if self.comparison == "pressed":
-                retval = is_pressed
-            elif self.comparison == "released":
-                retval = not is_pressed
-            else:
-                syslog.error(f"Don't know how to handle joystick condition: {self.comparison}")
-                return False
+            match self.comparison:
+                case "pressed":
+                    retval = is_pressed
+                case "released":
+                    retval = not is_pressed
+                case "notchangedin":
+                    reg = gremlin.event_handler.EventRegistry()
+                    last_timestamp = reg.getLastEvent(self.device_guid, self.input_type, self.input_id)
+                    if last_timestamp:
+                        now = time.time()
+                        retval = now - last_timestamp > self.delay
+                    else:
+                        retval = True # pass
+                case "changedin":
+                    reg = gremlin.event_handler.EventRegistry()
+                    last_timestamp = reg.getLastEvent(self.device_guid, self.input_type, self.input_id)
+                    if last_timestamp:
+                        now = time.time()
+                        retval = now - last_timestamp <= self.delay
+                    else:
+                        retval = False # fail
+
+
+                case _:
+                    syslog.error(f"Don't know how to handle joystick condition: {self.comparison}")
+                    return False
             if verbose: syslog.info(f"{logtabs}JoystickCondition: Button {self.comparison}: device {info.name} input: {self.input_id} pressed: {is_pressed} return: {"PASS" if retval else "FAIL"}")
             return retval
             

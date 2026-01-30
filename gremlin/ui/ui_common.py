@@ -4521,7 +4521,8 @@ class QDataComboBox(QComboBox):
 
     def _handle_callback(self):
         if self._callback:
-            self._callback(self.currentData())
+            with QtCore.QSignalBlocker(self):
+                self._callback(self.currentData())
 
     def setCallback(self, callback):
         self._callback = callback

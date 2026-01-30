@@ -103,6 +103,7 @@ class Event:
 		"is_repeater",
 		"override_input_type",
 		"extra_data",
+		"timestamp"
 
 
 	]
@@ -158,6 +159,7 @@ class Event:
 		self.is_repeater = False # True if the event is a repeater generated event
 		self.override_input_type = override_input_type # override input type - used as the input type for actions 
 		self.extra_data = extra_data
+		self.timestamp = time.time()
 
 
 	# @property
@@ -2053,6 +2055,8 @@ class EventHandler(QtCore.QObject):
 		el.profile_stop.connect(self._profile_stop)
 		el.profile_started.connect(self._profile_started)
 
+		self.registry = EventRegistry()
+
 		
 
 		self._lock = threading.Lock()
@@ -2957,6 +2961,8 @@ class EventHandler(QtCore.QObject):
 		config =  gremlin.config.Configuration()
 		verbose = config.verbose_mode_inputs
 		verbose_detailed = verbose and config.verbose_mode_extra
+
+		self.registry.update(event) # record the event
 		
 		try:
 			
@@ -4469,4 +4475,56 @@ class JoystickEventProcessor():
 		else:
 			gremlin.util.InvokeUiMethod(cb.callback, event, values)
 
+
+@gremlin.singleton_decorator.SingletonDecorator
+class EventRegistry():
+	''' tracks events '''
+	def __init__(self):
+		self._registry = {}  # holds [event_type][device_guid][input_id] = event
+		el = EventListener()
+		el.profile_start.connect(self._reset)
+		el.profile_stop.connect(self._reset)
+		self._lock = threading.Lock()
+
+	def _reset(self):
+		with self._lock:
+			self._registry.clear()
+
+	def getInputIdKey(self, input_id):
+		if input_id is not None and hasattr(input_id,"message_key"):
+			return input_id.message_key
+		return input_id
+
+	def update(self, event : Event):
+		input_type = event.event_type
+		device_guid = event.device_guid
+		input_id = event.identifier
+
+		with self._lock:
+			if not input_type in self._registry:
+				self._registry[input_type] = {}
+			if not device_guid in self._registry[input_type]:
+				self._registry[input_type][device_guid] = {}
+			input_item_key = self.getInputIdKey(input_id)
+			
+			self._registry[input_type][device_guid][input_item_key] = event.timestamp
+
+	def lastEvent(self, event : Event) -> Event | None:
+		''' gets the last event  '''
+		input_type = event.event_type
+		device_guid = event.device_guid
+		input_id = event.identifier
+		return self.getLastEvent(device_guid, input_type, input_id)
+
+	def getLastEvent(self, device_guid, input_type, input_id) -> Event | None:
+		with self._lock:
+			if not input_type in self._registry:
+				return None
+			if not device_guid in self._registry[input_type]:
+				return None
+			input_item_key = self.getInputIdKey(input_id)
+			if not input_item_key in self._registry[input_type][device_guid]:
+				return None
+			return self._registry[input_type][device_guid][input_item_key]
+	
 

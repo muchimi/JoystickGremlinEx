@@ -60,15 +60,16 @@ This action is takes a linear or momentary input and maps it to a VJOY virtual j
 | Button (inverted) | Maps to a VJoy button.  The button's state inverts the input state, so the output button is released when the button is pressed, and pressed when the input is released.  | This is used to invert the output button and used typically in physical three way hardware switch scenarios. |
 | Button Press | Maps to a VJoy button.  The button is pressed when the input is triggered. | This is used to set a vjoy button to on, and to stay on. |
 | Button Release | Maps to a VJoy button.  The button is released when the input is triggered. | This is used to set a vjoy button to off, and to stay off. |
-| Pulse Button | Maps to a VJoy button.  The button is pulsed (so on/off) with optional repeat. | This is used to pulse a button on/off either once, or at regular intervals while the input is held pressed. |
+| Pulse Button | Maps to a VJoy button.  The button is pulsed on/off with an optional repeat function. | This is used to pulse a button on/off either once, or at regular intervals while the input is held pressed. |
 | Toggle Button | Maps to a VJoy button.  This button is toggled, so if it was off, will be on, and if it was on, it will be be off. | This is used in toggle scenarios. |
 | Invert Axis | Maps to a VJoy axis.  This will invert the input axis. | This is used to easily invert an input axis and map it to the output VJoy axis. |
 | Set Axis Value | Maps to a VJoy axis.  This mode sets the output VJoy axis to a fixed floating point value. | Use this to set a specific value on an output axis. |
 | Set Axis Range | Maps to a VJoy axis.  This changes the output scale of a Vjoy axis and impacts subsequent output. |
-| Merge Axis | Maps to a VJoy axis.  Combines the input with one ore more other axis inputs (could be from different devices), applying a numberic transformation to the prior step.  Each merge step is cummulative to the prior step, and the merge is applied to the prior merge value.  The output can be curved if needed. | This replaced the legacy Joystick Gremlin merge feature.  Use this to combine multiple axes into one.  There are two primary uses for this:  The first is to merge toe-brakes on rudder pedals to a single linear axis.  The second is to scale one axis with another, thus increasing or decreasing precision/sensitivity. |
+| Merge Axis | Maps to a VJoy axis.  Combines the input with one ore more other axis inputs (could be from different devices), applying a numberic transformation to the prior step.  Each merge step is cummulative to the prior step, and the merge is applied to the prior merge value.  The output can be curved if needed. | This replaces the legacy Joystick Gremlin merge feature.  Use this to combine multiple axes into one.  This mode can be used to merge toe-brakes on rudder pedals to a single linear axis, to scale one axis with another, or to use an axis to trim another axis in a flight simulation setting. |
 | Control modes (multiple) | This is a legacy feature of an earlier version of GremlinEx, and is used to manage GremlineEx various remote control modes.|
 | Axis to Button | Maps an input axis range to output buttons. | This is used to set an output button based on the position on an axis. This is largely replaced by the more capable Gated Axis Action but is simpler to setup/use for simple range setups. |
 | Axis | Maps to a VJoy axis. | This is the basic map to axis functionality.  The output can be curved as an option. |
+| Stepped Axis Value | Maps a VJoy axis to at least one, optionally two, inputs to increase or decrease (step/bump) the VJoy axis value.  The stepping is based on a user entered value table called "ticks".  The table can be prepopulated using shortcut buttons to set the number of ticks, normalize spacing, use a geometric progression, or manual enter step data. | This mode is typically attached to the increase input button, and latches the optional decrease button so stepping can occur up and down.  This is used with a momentary input for stepped increases/decreases of an output axis based on a value table, also known as a bump table. |
 
 
 ### Ouput Curve
@@ -263,6 +264,7 @@ Some of the features of vjoy remap:
 - force a button pressed
 - force a button release
 - toggle a button
+- increase and decrease an output vjoy axis using two momentary inputs using a table of values
 - convert an axis value to a button
 - view which buttons are in-use profile wise
 

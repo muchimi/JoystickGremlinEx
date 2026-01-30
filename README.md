@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T167):
+- New: Button Condition: (experimental) Added a pair of new button conditions to test if an input was changed within a particular time limit.  There are two new condition, "changed in" and "not changed in".  The condition logic will check against the last processed input change.
+
 ### (m76T166):
 - New: Map to State: Added invert mode.  This will set the state to off if the input is pressed, and on if the input is released.
 - Fix: Map to State: hide pulse options when not in pulse mode.

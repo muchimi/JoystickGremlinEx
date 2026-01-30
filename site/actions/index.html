@@ -1806,7 +1806,7 @@
 </tr>
 <tr>
 <td>Pulse Button</td>
-<td>Maps to a VJoy button.  The button is pulsed (so on/off) with optional repeat.</td>
+<td>Maps to a VJoy button.  The button is pulsed on/off with an optional repeat function.</td>
 <td>This is used to pulse a button on/off either once, or at regular intervals while the input is held pressed.</td>
 </tr>
 <tr>
@@ -1832,7 +1832,7 @@
 <tr>
 <td>Merge Axis</td>
 <td>Maps to a VJoy axis.  Combines the input with one ore more other axis inputs (could be from different devices), applying a numberic transformation to the prior step.  Each merge step is cummulative to the prior step, and the merge is applied to the prior merge value.  The output can be curved if needed.</td>
-<td>This replaced the legacy Joystick Gremlin merge feature.  Use this to combine multiple axes into one.  There are two primary uses for this:  The first is to merge toe-brakes on rudder pedals to a single linear axis.  The second is to scale one axis with another, thus increasing or decreasing precision/sensitivity.</td>
+<td>This replaces the legacy Joystick Gremlin merge feature.  Use this to combine multiple axes into one.  This mode can be used to merge toe-brakes on rudder pedals to a single linear axis, to scale one axis with another, or to use an axis to trim another axis in a flight simulation setting.</td>
 </tr>
 <tr>
 <td>Control modes (multiple)</td>
@@ -1848,6 +1848,11 @@
 <td>Axis</td>
 <td>Maps to a VJoy axis.</td>
 <td>This is the basic map to axis functionality.  The output can be curved as an option.</td>
+</tr>
+<tr>
+<td>Stepped Axis Value</td>
+<td>Maps a VJoy axis to at least one, optionally two, inputs to increase or decrease (step/bump) the VJoy axis value.  The stepping is based on a user entered value table called "ticks".  The table can be prepopulated using shortcut buttons to set the number of ticks, normalize spacing, use a geometric progression, or manual enter step data.</td>
+<td>This mode is typically attached to the increase input button, and latches the optional decrease button so stepping can occur up and down.  This is used with a momentary input for stepped increases/decreases of an output axis based on a value table, also known as a bump table.</td>
 </tr>
 </tbody>
 </table>
@@ -2120,6 +2125,7 @@ The offset applied is scaled based on the deviation, so maximum deviation of the
 - force a button pressed
 - force a button release
 - toggle a button
+- increase and decrease an output vjoy axis using two momentary inputs using a table of values
 - convert an axis value to a button
 - view which buttons are in-use profile wise</p>
 <h3 id="gated-axis">Gated Axis<a class="headerlink" href="#gated-axis" title="Permanent link">&para;</a></h3>

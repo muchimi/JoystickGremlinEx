@@ -5583,6 +5583,9 @@ if __name__ == "__main__":
     # sound engine
     sound = gremlin.sound.Sound() 
 
+    # event regsitry
+    event_registry = gremlin.event_handler.EventRegistry() 
+
 
     # Run UI
 
