@@ -362,7 +362,7 @@ and another action on trigger release in a single container.'''
 
     def resetActionSets(self):
         ''' resets actions sets - override in derived class if the action set default should be different '''
-        self.action_sets = [[],[]]
+        self.setActionSets([[],[]])
 
     def _parse_xml(self, node, data = None, extra_data = None):
         """Populates the container with the XML node's contents.
@@ -375,7 +375,7 @@ and another action on trigger release in a single container.'''
         if "delay" in node.attrib:
             self.autorelease_delay = safe_read(node,"delay",int, 250)
 
-        self.action_sets = [[],[]]
+        self.setActionSets([[],[]])
 
         actionset_nodes = node.xpath(".//action-set")   
         for index, actionset_node in enumerate(actionset_nodes):

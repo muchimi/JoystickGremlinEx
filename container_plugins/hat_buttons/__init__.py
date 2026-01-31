@@ -366,9 +366,6 @@ class HatButtonsContainerFunctor(AbstractTriggerFunctor):
         
 
         ec = gremlin.execution_graph.ExecutionContext()
-        
-        # self.button_count = 4
-        # #self.action_sets = [[], [], [], []]
 
         direction = value.current
         sticky = self.container.sticky

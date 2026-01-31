@@ -85,32 +85,40 @@ class TempoContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addLayout(self.options_layout)
         self.action_layout.addLayout(self.options2_layout)
-        if not self.profile_data.action_sets:
-            self.profile_data.action_sets = [None, None]
+
+        icon = gremlin.ui.ui_common.Icons.chevronIcon()
+        
+        self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Short Press Action Sets</b>", icon = icon))
+
         if self.profile_data.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),
-                "Short Press",
+                None,
                 lambda x: self._paste_action(0, x),
             )
         else:
             self._create_action_widget(
                 0,
-                "Short Press",
+                None,
                 self.action_layout,
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
 
+
+        
+        self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Long Press Action Sets</b>", icon = icon))
+
+        
         if self.profile_data.action_sets[1] is None:
             self._add_action_selector(
                 lambda x: self._add_action(1, x),
-                "Long Press",
+                None,
                 lambda x: self._paste_action(1, x),
             )
         else:
             self._create_action_widget(
                 1,
-                "Long Press",
+                None,
                 self.action_layout,
                 gremlin.ui.ui_common.ContainerViewTypes.Action
             )
@@ -139,21 +147,23 @@ class TempoContainerWidget(AbstractContainerWidget):
         :param add_action_cb function to call when an action is added
         :param label the description of the action selector
         """
+        input_item = self.profile_data.input_item
         action_selector = gremlin.ui.ui_common.ActionSelector(
             self.profile_data.get_input_type(),
-            self.profile_data.input_item,
+            input_item,
         )
-        action_selector.inputItem = self.profile_data.input_item
+        action_selector.inputItem = self.profile_data
         action_selector.action_added.connect(add_action_cb)
         action_selector.action_paste.connect(paste_action_cb)
 
         group_layout = QtWidgets.QVBoxLayout()
         group_layout.addWidget(action_selector)
         group_layout.addStretch(1)
-        group_box = QtWidgets.QGroupBox(label)
+        group_box = QtWidgets.QGroupBox(label or '')
         group_box.setLayout(group_layout)
 
-        self.action_layout.addWidget(group_box)
+        self.action_layout.addWidget(group_box)        
+        
 
     def _create_action_widget(self, index, label, layout, view_type):
         """Creates a new action widget.
@@ -169,6 +179,7 @@ class TempoContainerWidget(AbstractContainerWidget):
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self.container_modified.emit)
+        # self.redrawActionSets()
 
     def _add_action(self, index, action_name):
         """Adds a new action to the container.
@@ -443,13 +454,13 @@ Look at Tempo Ex for a container that allows more than one action per short or l
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.action_sets = []
+       
         self.delay = 0.5 # delay for long press
         self.autorelease_delay = 0.250 # delay between press and autorelease 
         self.activate_on = "release"
-        self.short_action_sets = []
+        self.short_action_sets = [] 
         self.long_action_sets = []
-
+        self.setActionSets([self.short_action_sets,self.long_action_sets])
     
 
     def _parse_xml(self, node, data = None, extra_data = None):
@@ -459,21 +470,6 @@ Look at Tempo Ex for a container that allows more than one action per short or l
         """
         
         super()._parse_xml(node, data)
-        
-        for index, as_node in enumerate(node):
-            if as_node.tag == "action-set":
-                if index == 0:
-                    action_set = gremlin.base_profile.ActionSet("short")
-                    self.short_action_sets.append(action_set)
-                else:
-                    action_set = gremlin.base_profile.ActionSet("long")
-                    self.long_action_sets.append(action_set)
-                self._parse_action_xml(as_node, action_set, data)
-
-        
-                
-          
-
         self.delay = float(node.get("delay", 0.5))
         self.autorelease_delay = float(node.get("autorelease-delay", 0.25))
         self.activate_on = node.get("activate-on", "release")
@@ -490,11 +486,12 @@ Look at Tempo Ex for a container that allows more than one action per short or l
         node.set("autorelease-delay", safe_format(self.autorelease_delay, float))
 
         node.set("activate-on", self.activate_on)
-        for actions in self.action_sets:
-            as_node = ElementTree.Element("action-set")
-            for action in actions:
-                as_node.append(action.to_xml())
-            node.append(as_node)
+        for action_set in self.action_sets:
+            if action_set:
+                as_node = ElementTree.Element("action-set")
+                for action in action_set:
+                    as_node.append(action.to_xml())
+                node.append(as_node)
         return node
 
     def _is_container_valid(self):

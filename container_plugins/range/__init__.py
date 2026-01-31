@@ -491,11 +491,7 @@ class RangeContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
         action_data: RangeContainer
         super().__init__(action_data, parent)
         
-        # self.action_sets = []
-        # for action_set in action_data.action_sets:
-        #     self.action_sets.append(
-        #         gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
-        #     )
+
 
         self.action_data = action_data
         self.any_change_mode = action_data.any_change_mode

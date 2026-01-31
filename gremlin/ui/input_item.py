@@ -3439,6 +3439,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         self._update_container_ui(self.container)
 
+
+
+
+
     @QtCore.Slot()
     def _handle_toggled(self):
         self.container.collapsed = self.collapsible_widget.isCollapsed()

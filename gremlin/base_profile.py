@@ -422,6 +422,7 @@ class AbstractContainer(ProfileData, ConditionContainer):
         super().__init__(parent)
 
         self.parent = parent
+
         self._action_sets = []
         self.action_model = None # set at creation by the parent of this container
         self.custom_action_sets = False # true if the container uses custom action sets (need a converter to produce action_sets)
@@ -467,6 +468,16 @@ class AbstractContainer(ProfileData, ConditionContainer):
         self.device = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
 
 
+    @property
+    def action_sets(self):
+        return self._action_sets
+    @action_sets.setter
+    def action_sets(self, value):
+        pass
+    
+    
+    def setActionSets(self, data):
+        self._action_sets = data
 
     def dumpActionSets(self, action_sets : list, label = None):
         ''' dumps the container's action sets to the output '''
@@ -806,7 +817,10 @@ class AbstractContainer(ProfileData, ConditionContainer):
 
     def resetActionSets(self):
         ''' resets actions sets - override in derived class if the action set default should be different '''
-        self.action_sets = []
+        if self.action_sets:
+            for action_set in self.action_sets:
+                action_set.clear()
+        
 
 
     def _parse_action_set_xml(self, node, data = None, extra_data = None):
@@ -820,20 +834,23 @@ class AbstractContainer(ProfileData, ConditionContainer):
             self.actionsetCustomParseCallback(node, data, extra_data)
             return
 
-        self.action_sets = []
-        for child in node:
-            if child.tag == "virtual-button":
-                continue
-            elif child.tag == "action-set":
-                action_set = None
-                if self.actionsetParseCallback:
-                    # container needs special handling of action set nodes
-                    action_set = self.actionsetParseCallback(child)
-                if action_set is None:
-                    action_set = ActionSet()
-                self._parse_action_xml(child, action_set, data, extra_data)
-                if action_set:
-                    self.action_sets.append(action_set)
+        
+        as_nodes = node.xpath(".//action-set")
+        index = 0
+        for child in as_nodes:
+            action_set = None
+            if self.actionsetParseCallback:
+                # container needs special handling of action set nodes
+                action_set = self.actionsetParseCallback(child)
+            if action_set is None:
+                action_set = ActionSet()
+            self._parse_action_xml(child, action_set, data, extra_data)
+            if action_set:
+                if index == len(self.action_sets):
+                    self.action_sets.append([])
+                self.action_sets[index] = action_set
+            index += 1
+
 
 
     def _parse_action_xml(self, node, action_set, input_item = None, extra_data = None, data = None):

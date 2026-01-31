@@ -4482,7 +4482,7 @@ class QDataIPLineEdit(QDataLineEdit):
 
 class QDataComboBox(QComboBox):
     ''' a combo box that has a data property to track an object associated with the checkbox '''
-    def __init__(self, data = None, callback = None, parent = None, wheel_enabled : bool = None, auto_adjust : bool = False, source = None, value = None, tooltip : str = None):
+    def __init__(self, data = None, callback = None, parent = None, wheel_enabled : bool = None, auto_adjust : bool = False, source = None, value = None, tooltip : str = None, max_items = 20):
         ''' creates a combo box 
         
         :param data: data object the widget carries
@@ -4502,6 +4502,9 @@ class QDataComboBox(QComboBox):
         # self.setStyleSheet("QComboBox { padding: 5px; margin: 10px; }") 
         self.setStyleSheet("QComboBox { padding: 5px; }") 
         self._callback = callback
+
+        self.setMaxVisibleItems(max_items)
+        self.setStyleSheet("QComboBox { combobox-popup: 0; }")
 
 
         if source:

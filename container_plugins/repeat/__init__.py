@@ -431,7 +431,7 @@ class RepeatContainer(AbstractContainer):
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.action_sets = [[]]
+        self.setActionSets([[]])
         self.initial_pulse_delay = 0.75 # in seconds # initial repeat
         self.hold_delay = 0.25 # in seconds, repeat hold duration 
         self.pulse_interval_delay = 0.25 # in seconds, interval between repeats
@@ -452,7 +452,7 @@ class RepeatContainer(AbstractContainer):
         self.trigger_on_start = safe_read(node,"trigger-start", bool, True)
         self.repeat_count = safe_read(node, "repeat-count", int, 0)
 
-        self.action_sets = []
+        self.setActionSets([])
 
         actionset_nodes = node.xpath(".//action-set")   
         for index, actionset_node in enumerate(actionset_nodes):

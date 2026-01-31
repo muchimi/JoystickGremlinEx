@@ -347,7 +347,7 @@ On long press the action receives a press input when the input is pressed, and a
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.action_sets = [[]]
+        self.setActionSets([[]])
         self.delay = 0.5 # in seconds
         self.shortPressMode = True # false to toggle on long press
 

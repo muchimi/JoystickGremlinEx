@@ -388,7 +388,7 @@ and another action on input double-click (tap)'''
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.action_sets = [[], []]
+        self.setActionSets([[], []])
         self.delay = 0.5
         self.activate_on = "exclusive"
 

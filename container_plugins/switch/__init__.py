@@ -489,12 +489,6 @@ class SwitchContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
     def __init__(self, container, parent = None):
         super().__init__(container, parent)
         self.profile_data :  SwitchContainer = container
-        # self.action_sets = []
-        # for action_set in container.action_sets:
-        #     self.action_sets.append(
-        #         gremlin.execution_graph.ActionSetExecutionGraph(action_set, parent)
-        #     )
-        # self.timeout = container.timeout
 
         self.index = 0
         self.last_execution = 0.0

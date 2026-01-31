@@ -439,7 +439,7 @@ For a more advanced way to split an axis and trigger actions at specific points,
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.action_sets = [[], []]
+        self.setActionSets([[],[]])
         self.delay = 0.5
         self.activate_on = "release"
         self.interval = 0.2 # interval between ticks
@@ -453,7 +453,7 @@ For a more advanced way to split an axis and trigger actions at specific points,
 
         :param node the XML node with which to populate the container
         """
-        self.action_sets = []
+        self.setActionSets([])
         self.interval  = safe_read(node,"interval",float,0.2)
         super()._parse_xml(node, data)
 
