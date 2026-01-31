@@ -2757,24 +2757,24 @@ class ActionSelector(QtWidgets.QWidget):
         """Creates a new selector instance.
 
         :param input_type the input type for which the action selector is being created
-        :param container: the owner container
+        :param input_item: the mapped input type
         :param parent the parent of this widget
         """
         super().__init__(parent)
         import gremlin.base_profile
         import gremlin.ui.ui_common
 
-        if not input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
-            pass
+        # if not input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
+        #     pass
 
         assert isinstance(input_item, gremlin.base_profile.InputItem), "expected an input item, wrong type passed"
         self._input_item = input_item
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
-        self._input_type = input_type
+        self._input_type = input_type if input_type else self._input_item.getInputType()
 
         self.action_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
-        self.refresh(input_type)
+        self.refresh()
         
         self.add_button = Buttons.getAddWidget(callback = self._add_action, tooltip = "Adds the selected action")
        
@@ -2815,14 +2815,11 @@ class ActionSelector(QtWidgets.QWidget):
             self.add_button.setEnabled(unlocked)
             self.paste_button.setEnabled(unlocked)
         
-    def refresh(self, input_type):
+    def refresh(self):
         ''' reloads the selector based on the input '''
-        self.input_type = input_type if self._input_type is None else self._input_type
         with QtCore.QSignalBlocker(self.action_dropdown):
             self.action_dropdown.clear()
-            action_list = self._valid_action_list(input_type)
-            if not action_list:
-                pass
+            action_list = self._valid_action_list(self._input_type)
             for name in action_list:
                 self.action_dropdown.addItem(name)
             config = gremlin.config.Configuration()

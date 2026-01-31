@@ -28,7 +28,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
-### (m76T169):
+### (m76T169A):
+- New: Sequence Container: The sequence container gains a new wiggle mode optional delay interval between steps.  This interval specifies the delay in milliseconds between sequence step executions.
 - Fix: Tempo Container: unable to save with new API
 - Fix: XML: action set parsing may add an extra nested list to the data
 

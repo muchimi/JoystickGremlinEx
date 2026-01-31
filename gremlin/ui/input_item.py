@@ -5044,7 +5044,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
 
         self.sync_widget = gremlin.ui.ui_common.Buttons.getListSyncWidget(callback = self._sync_list)
 
-        self.action_selector = ui_common.ActionSelector(input_type, self.item_data)
+        self.action_selector = ui_common.ActionSelector(None, self.item_data)
         self.action_selector.inputItem = self.item_data
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)

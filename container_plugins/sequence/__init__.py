@@ -459,6 +459,12 @@ class SequenceContainerWidget(AbstractContainerWidget):
                                                                            callback=self._handle_wiggle_exec_delay_change
         )
 
+        self._wiggle_step_delay_widget = gremlin.ui.ui_common.QDelayWidget(value = self.profile_data.wiggle_step_delay,
+                                                                           label = "Step Interval Delay (ms):",
+                                                                           tooltip="Time (ms) between wiggle steps. Set to 0 to disable.\nIf randomize delay is enabled, the interval will use the delay min/max values instead.",
+                                                                           callback=self._handle_wiggle_step_delay_change
+        )
+
         self._wiggle_count_min_widget = gremlin.ui.ui_common.QIntLineEdit(min_range=1,
                                                                       max_range=1000,
                                                                       tooltip="Minimum number of steps to execute in wiggle mode. 0 to disable.<br>If set to 5, up to 5 wiggle steps will run and wiggle will stop after 5.",
@@ -483,7 +489,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(self.container_wiggle_count_widget)
 
         self.action_layout.addWidget(self._wiggle_exec_delay_widget)
-        self.action_layout.addWidget(self._wiggle_exec_delay_widget)
+        self.action_layout.addWidget(self._wiggle_step_delay_widget)
         self.action_layout.addWidget(self._wiggle_min_delay_widget)
         self.action_layout.addWidget(self._wiggle_max_delay_widget)
 
@@ -691,6 +697,12 @@ class SequenceContainerWidget(AbstractContainerWidget):
     @QtCore.Slot(int)
     def _handle_wiggle_exec_delay_change(self, value):
         self.profile_data.wiggle_exec_delay = value        
+
+    @QtCore.Slot(int)
+    def _handle_wiggle_step_delay_change(self, value):
+        self.profile_data.wiggle_step_delay = value        
+
+        
 
     @QtCore.Slot(int)
     def _handle_normal_exec_delay_change(self, value):
@@ -1244,6 +1256,8 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
         wiggle_steps = self.container.wiggle_randomize_steps
         exec_delay_ms = self.container.wiggle_exec_delay 
         exec_delay_s = exec_delay_ms / 1000
+        step_delay_ms = self.container.wiggle_step_delay
+        step_delay_s = step_delay_ms / 1000
         if verbose: 
             syslog.info(f"SEQUENCE RUNNER: (wiggle) starting wiggle with  min delay: [{min_delay}] max delay: [{max_delay}] random mode: [{wiggle_random}]")
             if max_count:
@@ -1291,9 +1305,10 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
             if not self.action_data._is_running: break
 
             # handle delay between steps
-            delay = exec_delay_s
+            delay = random.randrange(min_delay, max_delay) / 1000 if wiggle_random else step_delay_s
+
             if delay > 0:
-                if verbose_extra: syslog.info(f"step repeat interval delay [{delay}]")
+                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) step interval delay (s) [{delay:0.3f}]")
                 self._wait(delay)
                 if not self.action_data._is_running: break
 
@@ -1307,7 +1322,7 @@ class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFuncto
                 if index == count:
                     # loop
                     index = 0
-                    if verbose: syslog.info("SEQUENCE RUNNER: (wiggle) looping sequence")
+                if verbose: syslog.info(f"SEQUENCE RUNNER: (wiggle) - next step [{index}]")
             self.action_data.last_step = index
 
             if max_count:
@@ -1379,6 +1394,7 @@ Unlike a macro, any action suitable for the input can be used.'''
         self.wiggle_max_delay = 5000 # maximum delay for wiggle mode, if in random mode
         self.wiggle_random = True # wiggle random mode
         self.wiggle_exec_delay = 250 # delay between a press trigger and a release trigger for each action executing in wiggle mode
+        self.wiggle_step_delay = 250 # delay between steps
         self.wiggle_randomize_steps = False # if set, randomizes the execution steps
         self.resume_mode = False # if set, the sequence resumes where it was last stopped
         self.last_step = None # stores the last step
@@ -1422,6 +1438,7 @@ Unlike a macro, any action suitable for the input can be used.'''
         self.wiggle_min_delay = safe_read(node,"wiggle-min", int, 250)
         self.wiggle_max_delay = safe_read(node,"wiggle-max", int, 5000)
         self.wiggle_exec_delay = safe_read(node,"wiggle-exec", int, 5000)
+        self.wiggle_step_delay = safe_read(node,"wiggle-step", int, 5000)
         self.wiggle_random = safe_read(node,"wiggle-random", bool, True)
         self.wiggle_randomize_steps = safe_read(node,"wiggle-random-steps", bool, False)
         value = safe_read(node,"wiggle-count-min", int, 1)
@@ -1473,6 +1490,7 @@ Unlike a macro, any action suitable for the input can be used.'''
         node.set("wiggle-min", safe_format(self.wiggle_min_delay, int))
         node.set("wiggle-max", safe_format(self.wiggle_max_delay, int))
         node.set("wiggle-exec", safe_format(self.wiggle_exec_delay, int))
+        node.set("wiggle-step", safe_format(self.wiggle_step_delay, int))
         node.set("wiggle-random", safe_format(self.wiggle_random, bool))
         node.set("wiggle-random-steps", safe_format(self.wiggle_randomize_steps, bool))
         node.set("wiggle-count-min", safe_format(self.wiggle_count_min, int))
