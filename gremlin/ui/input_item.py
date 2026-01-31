@@ -545,6 +545,7 @@ class InputItemListModel(ui_common.AbstractModel):
 
     def removeRow(self, index):
         ''' removes the item at the specified index '''
+        import gremlin.base_profile
 
         try:
             if self._custom_remove_handler:
@@ -559,9 +560,14 @@ class InputItemListModel(ui_common.AbstractModel):
                     # cannot remove other types
                     return False
 
-                input_id = data.input_id
+                input_item = data.input_id
+                registry = gremlin.base_profile.ProfileRegistry()
+                input_id_key = registry.getInputIdKey(input_item)
+
                 input_items = self._device_data.modes[self._mode]
-                del input_items.config[input_type][input_id]
+                del input_items.config[input_type][input_id_key]
+                registry.removeInputItem(input_item)
+                
 
 
             return True

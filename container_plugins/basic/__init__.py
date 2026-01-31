@@ -213,6 +213,7 @@ class BasicContainer(AbstractContainer):
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
+        
     
     def add_action(self, action, index=-1):
         assert isinstance(action, gremlin.base_profile.AbstractAction)
@@ -259,6 +260,7 @@ class BasicContainer(AbstractContainer):
 
         :param node the XML node with which to populate the container
         """
+        pass
         
 
     def _generate_xml(self):
@@ -268,10 +270,11 @@ class BasicContainer(AbstractContainer):
         """
         node = ElementTree.Element("container")
         node.set("type", "basic")
-        as_node = ElementTree.Element("action-set")
-        for action in self.action_sets[0]:
-            as_node.append(action.to_xml())
-        node.append(as_node)
+        if self.action_sets:
+            as_node = ElementTree.Element("action-set")
+            for action in self.action_sets[0]:
+                as_node.append(action.to_xml())
+            node.append(as_node)
         return node
 
     def _is_container_valid(self):

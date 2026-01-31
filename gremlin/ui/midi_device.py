@@ -167,7 +167,7 @@ _string_to_midi_lookup = {
 }
 
 
-class MidiInputItem(AbstractInputItem):
+class MidiInputItem(gremlin.base_profile.InputItem):
     ''' holds the data for a MIDI device '''
 
     message_key_changed = Signal(str, str) # fires when message key changes 
@@ -202,9 +202,9 @@ class MidiInputItem(AbstractInputItem):
             case _:
                 return InputType.JoystickButton
 
-    def __init__(self):
-        super().__init__()
-        
+    def __init__(self, parent = None):
+        super().__init__(mode_parent=parent) # parent is the mode object this input belongs to
+       
         self._port_name = None
         self._message = None # the midi message
         self._title_name =  "MIDI (not configured)"

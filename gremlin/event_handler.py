@@ -882,12 +882,12 @@ class EventListener:
 
 		# calibration data access
 		self._calibrationManager = None
-		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
+		self._verbose_dinput = config.verbose_mode_dinput
 		self._verbose_perf = False
 		self._verbose_dinput_extra = False
 		self._verbose_vjoy = config.verbose_mode_vjoy
 		self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
-		self._verbose_queue = self._verbose_vjoy or self._verbose_dinput
+		self._verbose_queue = self._verbose_dinput
 		self._verbose_inputs = config.verbose_mode_inputs
 		self._verbose_extra = config.verbose_mode_extra
 
@@ -1086,7 +1086,7 @@ class EventListener:
 		self._verbose_dinput_extra = self._verbose_dinput and config.verbose_mode_extra
 		self._verbose_vjoy = config.verbose_mode_vjoy
 		self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
-		self._verbose_queue = self._verbose_vjoy or self._verbose_dinput
+		self._verbose_queue =  self._verbose_dinput
 		self._verbose_inputs = config.verbose_mode_inputs
 		self._verbose_extra = config.verbose_mode_extra
 

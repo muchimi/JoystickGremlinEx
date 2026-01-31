@@ -29,6 +29,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T168):
+- New: Vjoy Remap: Stepped renamed to Stepped/Linear.  This mode of Vjoy Remap gains a new linear mode in addition to discrete steps to facilitate increasing or decreasing an axis via an input button without specific target values in mind.  The linear mode has two parameters: velocity (change over time) and acceleration (change of velocity over time).  These two values determine how much and how fast an axis changes when the input is pressed and the mapper is in linear stepped mode.  As with the discrete "tick" mode, the latched input, if defined, controls the opposite direction, so a single mapping can increase/decrease the output value of a vjoy axis.
+- Updated documentation.
+- Fix: Remove input fails for devices that support input deletion in new API.
+- Fix: Basic container: can fail if no action set present in profile in new API.
+
 ### (m76T167):
 - New: Button Condition: (experimental) Added a pair of new button conditions to test if an input was changed within a particular time limit.  There are two new condition, "changed in" and "not changed in".  The condition logic will check against the last processed input change.
 

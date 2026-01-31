@@ -55,7 +55,7 @@ from psygnal import Signal
 from gremlin.types import SyncMode
 import vjoy.vjoy
 import time
-
+# import gremlin.pid
 
 IdMapToButton = -2 # map to button special ID
 import gremlin.ui.input_item
@@ -2659,6 +2659,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_stepped_widget = QtWidgets.QWidget()
         self.container_stepped_layout = QtWidgets.QVBoxLayout(self.container_stepped_widget)
 
+        
+
         self.step_value_container_widget = QtWidgets.QWidget()
         self.step_value_container_layout = QtWidgets.QHBoxLayout(self.step_value_container_widget)
 
@@ -2674,10 +2676,48 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         value = self.action_data.target_step_list[self.action_data.target_step_start_index]
         self.step_start_value_widget.setValue(value)
 
-        # self.step_direction_widget = QtWidgets.QCheckBox("Invert direction")
-        # self.step_direction_widget.setToolTip("When set, inverts the direction of the stepping so up becomes down, and down becomes up.")
-        # self.step_direction_widget.setChecked(self.action_data.target_step_direction == -1)
-        # self.step_direction_widget.clicked.connect(self._step_direction_changed)
+        self.step_velocity_mode_widget = gremlin.ui.ui_common.QDataCheckbox("Use velocity/acceleration mode",
+                                                                     value = self.action_data._target_step_linear_mode,
+                                                                     callback = self._handle_step_linear_changed,
+                                                                     tooltip = "When set, the stepping does not use ticks and the up/down functions increase/decrease the axis while the input is triggered.)")
+        
+        widgets = []
+
+        widget = gremlin.ui.ui_common.QDelayWidget(
+            value = self.action_data.pulse_delay,
+            label = "Update Interval (ms):",
+            tooltip =  "Pulse interval in milliseconds",
+            callback = self._pulse_value_changed)
+
+        widgets.append(widget)
+
+        widget = gremlin.ui.ui_common.QFloatLineEdit(value = self.action_data._target_step_velocity,
+                                                                      callback=self._handle_step_velocity_changed)
+                                                                      
+     
+        widget = gremlin.ui.ui_common.getHContainer(widget,"Rate of change:", widget_only=True, tooltip="Rate of change (velocity) per second, determines the rate of change while the input is pressed")
+
+        widgets.append(widget)
+
+        widget = gremlin.ui.ui_common.QFloatLineEdit(value = self.action_data._target_step_acceleration,
+                                                                      callback=self._handle_step_acceleration_changed)
+                                                                      
+     
+        widget = gremlin.ui.ui_common.getHContainer(widget,"Acceleration:", widget_only=True, tooltip="Velocity rate of change (acceleration) per second, set to 0 for linear")
+
+        widgets.append(widget)
+
+
+
+        self.container_linear_timings = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
+        
+
+        self.container_stepped_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self.container_stepped_layout.addWidget(QtWidgets.QLabel("Stepping Configuration:"))
+        self.container_stepped_layout.addWidget(self.step_velocity_mode_widget)
+        self.container_stepped_layout.addWidget(self.container_linear_timings)
+        
+
 
         self.step_latched_enabled_widget = QtWidgets.QCheckBox("Latch secondary input for reverse action")
         self.step_latched_enabled_widget.setToolTip("If enabled, allows binding of another input to trigger a down step")
@@ -2717,10 +2757,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.slider_widget.setMinimumWidth(200)
         self.slider_widget.setMarkerVisible(False)
 
-        self.container_stepped_layout.addWidget(self.slider_widget)
 
-        # self.step_value_container_layout.addWidget(QtWidgets.QLabel("Steps (CSV):"))
-        # self.step_value_container_layout.addWidget(self.step_list_widget)
+
 
         self.normalize_widget = QtWidgets.QPushButton("Normalize")
         self.normalize_widget.setToolTip("Normalizes steps to be evenly spaced")
@@ -2768,8 +2806,22 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.step_widget_layout.addWidget(QtWidgets.QWidget(),0,6)
         self.step_widget_layout.setColumnStretch(6,2)
 
+
+        widgets = [
+            self.slider_widget,
+            self.step_value_container_widget,
+            self.progression_container_widget
+        ]
+        self.container_ticks_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+
+
+        self.container_stepped_layout.addWidget(self.container_ticks_widget)
+
         self.stepped_selector_device_widget = gremlin.ui.ui_common.QDataComboBox()
         self.stepped_selector_input_widget = gremlin.ui.ui_common.QDataComboBox()
+
+
+        
 
         listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._stepped_listen)
 
@@ -2788,14 +2840,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         device_layout.setColumnStretch(4,2)
 
 
+        self.container_stepped_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
         self.container_stepped_layout.addWidget(self.step_latched_enabled_widget)
         self.container_stepped_layout.addWidget(self.latched_device_widget)
-        self.container_stepped_layout.addWidget(self.step_value_container_widget)
-        self.container_stepped_layout.addWidget(self.progression_container_widget)
-        self.container_stepped_layout.addWidget(self.step_widget_container)
-
-        #self.container_stepped_layout.addWidget(self.container_stepped_widget)
-
 
         self.stepped_selector_device_widget.currentIndexChanged.connect(self._stepped_device_changed_cb)
         self.stepped_selector_input_widget.currentIndexChanged.connect(self._stepped_input_changed_cb)
@@ -2836,13 +2883,24 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.update_steps()
 
 
+    def _handle_step_linear_changed(self, checked : bool):
+        self.action_data._target_step_linear_mode = checked
+        self._update_ui()
+
+    def _handle_step_velocity_changed(self, value: float):
+        self.action_data._target_step_velocity = value
+    
+    def _handle_step_acceleration_changed(self, value: float):
+        self.action_data._target_step_acceleration = value
+        
+
     def get_axis_value(self, channels = False):
         ''' gets the current axis value - if channels enabled, returns a list of the transforms '''
         #value = gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
-        if channels:
-            raw_value = self.action_data.get_raw_axis_value()
-            curve_value = self.action_data.get_curved_axis_value(raw_value)
-            data = gremlin.event_handler.AxisValues()
+        # if channels:
+        #     raw_value = self.action_data.get_raw_axis_value()
+        #     curve_value = self.action_data.get_curved_axis_value(raw_value)
+        #     data = gremlin.event_handler.AxisValues()
 
 
         value = self.action_data.get_filtered_axis_value()
@@ -3235,6 +3293,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         axis_visible = False
         pulse_visible = False
         repeat_visible = self.action_data.pulse_repeat
+        step_repeat_visible = self.action_data._target_step_linear_mode
+
 
         sync_on_start_visible = False
         grid_visible = False
@@ -3257,6 +3317,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         merge_visible =  False
 
         stepped_visible = False
+        ticks_visible = False
         reverse_visible = False
 
         set_target_visible = False
@@ -3339,7 +3400,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             case VjoyAction.VJoySetAxisStepped:
                 output_range_visible
                 grid_visible = False
-                stepped_visible = True
+                stepped_visible = True 
+                ticks_visible = not self.action_data._target_step_linear_mode # hide steps if in linear mode
             case VjoyAction.VJoyAxisToButton:
                 output_range_visible = False
 
@@ -3421,6 +3483,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_pulse_widget.setVisible(pulse_visible)
         self.button_pulse_repeat_widget.setVisible(repeat_visible)
 
+        self.container_linear_timings.setVisible(step_repeat_visible)
+        self.container_ticks_widget.setVisible(ticks_visible)
+
         self.container_options_widget.setVisible(options_visible)
         self.container_target_widget.setVisible(relative_target_visible)
         self.container_relative_widget.setVisible(default_target_visible)
@@ -3449,8 +3514,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(int)
     def _pulse_value_changed(self, value):
         ''' called when the pulse value changes '''
-        if value >= 0:
-            self.action_data.pulse_delay = value
+        self.action_data.pulse_delay = value
 
     @QtCore.Slot(int)
     def _pulse_repeat_value_changed(self, value):
@@ -3943,13 +4007,22 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.pulse_delay = action_data.pulse_delay
         self.start_pressed = action_data.button_start_value
         self.target_value = action_data.target_value
+        self.last_value = 0 # axis value
         self.target_is_relative = action_data.target_is_relative
         self.target_value_valid = action_data.target_value_valid
         self.step_index = action_data.target_step_start_index
+        self.step_direction = 1.0 # assume going up for linear step mode
+
         v1 = action_data.button_range_min
         v2 = action_data.button_range_max
         self._latched_container_condition_node = None
         self._latched_action_condition_node = None
+        self._pid = None
+        self._velocity = 0.01
+        self._acceleration = 2.0
+        self._start_time = None
+
+        self.repeat_interval = 0 # computed repeat interval
         
   
         self.usage_data = gremlin.joystick_handling.VJoyUsageState()
@@ -4389,11 +4462,18 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if self.action_mode == VjoyAction.VJoySetAxisStepped:
             # initial stepped axis value
 
-            if start_mode == mode:
-                self.step_index = self.action_data.target_step_start_index
-                value = self.action_data.target_step_list[self.step_index]
-                vs.setStartValue(self.vjoy_id, self.vjoy_input_id, value)
-                self.action_data.axis_last_value = value
+            if self.action_data._target_step_linear_mode:
+                # linear mode - read the intial output axis value
+                self.last_value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
+                
+            else:
+                if start_mode == mode:
+                    self.step_index = self.action_data.target_step_start_index
+                    value = self.action_data.target_step_list[self.step_index]
+                    vs.setStartValue(self.vjoy_id, self.vjoy_input_id, value)
+                    self.action_data.axis_last_value = value
+
+
 
 
     def profile_stop(self):
@@ -4407,22 +4487,85 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         if self._relative_pulse_worker:
             self._relative_pulse_worker.stop()
 
+    def _compute_value(self, value : float, direction : int) -> float:
+        now = time.time()
+        if self._start_time is None:
+            t = 0
+            self._start_time = now
+            self._start_value = value
+        else:
+            t = now - self._start_time
+            
+   
+        
+        # equation of accelerated motion:
+        # s = v*t + (a*t^2)/2
+        v = self._velocity 
+        a = self._acceleration
+        delta = (v * t) + (0.5 * a * (t**2))
+        new_value = self._start_value + delta * direction
+        return gremlin.util.clamp(new_value)
+
+
     def _pulse_on(self, data):
         ''' called when pulse is on '''
         device_id, input_id, is_local, is_remote, force_remote = data
-        if self.verbose: syslog.info(f"Pulse ON {device_id} button {input_id}")
-        if is_local:
-            if gremlin.joystick_handling.is_vjoy_connected(device_id):
-                joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = True
-        if is_remote:
-            self.remote_client.send_button(device_id, input_id, True, force_remote = force_remote)
+        if self.verbose_extra: syslog.info(f"Pulse ON {device_id} button {input_id}")
+
+        if self.action_data.action_mode == VjoyAction.VJoySetAxisStepped:
+            # compute the next value
+
+          
+            last_value = self._get_axis(device_id, input_id)
+
+            if self.action_data._target_step_linear_mode:
+                # # PID mode
+                # sp = 1.0 if self.step_direction > 0 else -1.0 # target set point
+                # if not self._pid:
+                #     # setup a pid that returns values between 0 and 2 for the full axis range
+                #     kp = 0.1
+                #     ki = 0.2
+                #     kd = 0
+                #     self._pid = gremlin.pid.PID(kp, ki, kd,
+                #                                 setpointRamp=5.0,
+                #                                 proportionnalOnMeasurement=True,
+                #                                 outputLimits = (-1, 1))
+                    
+                #     if self.verbose: syslog.info(f"STEPPED AXIS: linear PID setup: starting value: [{last_value:0.3f}]") 
+             
+                # value = self._pid(sp, last_value)
+                value = self._compute_value(last_value, self.step_direction)
+                if self.verbose: syslog.info(f"STEPPED AXIS: linear: direction: [{self.step_direction}] new value: [{value:0.3f}]") 
+            else:
+                # normal pulsed stepping
+                delta = self.action_data._target_step_delta
+                value = max(
+                        -1.0,
+                        min(1.0, last_value + delta * self.step_direction)
+                    )
+            
+                if self.verbose: syslog.info(f"STEPPED AXIS: linear pulse: direction: [{self.step_direction}] delta: [{delta:0.3f}] new value: [{value:0.3f}]")
+            if is_local:
+                self._set_axis(device_id, input_id, value)
+            if is_remote:
+                self.remote_client.send_axis(device_id, input_id, value, force_remote = force_remote)
+
+        else:
+
+            if is_local:
+                if gremlin.joystick_handling.is_vjoy_connected(device_id):
+                    joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = True
+            if is_remote:
+                self.remote_client.send_button(device_id, input_id, True, force_remote = force_remote)
 
 
     def _pulse_off(self, data):
         ''' called when pulse is off '''
-
+        if self.action_data._target_step_linear_mode:
+            return # nothing to do if in PID mode
+       
         device_id, input_id, is_local, is_remote, force_remote = data
-        if self.verbose: syslog.info(f"Pulse OFF {device_id} button {input_id}")
+        if self.verbose_extra: syslog.info(f"Pulse OFF {device_id} button {input_id}")
         if is_local:
             if gremlin.joystick_handling.is_vjoy_connected(device_id):
                 joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = False
@@ -5039,57 +5182,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 # set the value on the specified axis
                 if fire_event:
                     return self._set_axis_value()
-                    # if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-
-                    #     if self.action_data.target_use_last:
-                    #         # set the output to the current value, but wiggle it so the target app detects a change
-                    #         # this is to "reset" an axis to a known value if the target environment changed the input outside of the control data being setn
-                    #         # the wiggle value is a small offet to trigger the target game to cause it to retrigger - there has to be a change of the game would not pick it up
-                    #         offset = 0.01
-                    #         # read the current output value
-                    #         value = self.action_data.axis_last_value
-                    #         if value is None:
-                    #             # read the last value
-                    #             value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
-                    #             if verbose: syslog.info(f"reading axis value: {value:0.3f}")
-                    #         else:
-                    #             if verbose: syslog.info(f"using last axis value: {value:0.3f}")
-
-                    #         wiggle_value = value - offset
-                    #         if wiggle_value < -1.0:
-                    #             wiggle_value = value + offset
-
-                    #         self.target_value = value # value to restore after wiggle
-
-                    #         if verbose: syslog.info(f"VJOY: set last value [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f} wiggle value: {wiggle_value:0.3f}")
-                    #         self._set_axis(self.vjoy_id, self.vjoy_input_id, wiggle_value)
-                    #         timer = threading.Timer(0.25, self._handle_set_axis_wiggle)
-                    #         timer.start()
-
-                    #         return True
-
-
-                    #     target_value_valid = self.target_value_valid or self.action_data.use_relative_value
-
-
-                    #     if target_value_valid and fire_event:
-                    #         target_value = self.target_value
-
-                    #         if self.action_data.use_relative_value:
-                    #             # read the current output axis value
-                    #             value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
-                    #             # apply the offset
-                    #             value += target_value
-                    #         else:
-                    #             value = target_value
-
-                    #         value = gremlin.util.clamp(value)
-                    #         if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
-                    #         self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
-
-                    #         # remember the last value
-                    #         syslog.info(f"set setaxis last value: {value:0.3f}")
-                    #         self.action_data.axis_last_value = value
+                   
 
             elif self.action_mode == VjoyAction.VJoyRangeAxis:
                 # changes the output range on the target device / axis
@@ -5106,92 +5199,85 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if fire_event:
                     latched = self.action_data._stepped_latched and event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id
                     primary = event.device_guid == self.hardware_device_guid and event.identifier == self.hardware_input_id
-
                   
                     if primary or latched:
                         trigger = False
                         trigger = (event.is_pressed and not self.action_data.exec_on_release) or (not event.is_pressed and self.action_data.exec_on_release)
                         if trigger:
-                            trigger = False
-                            key = ("stepped-axis",self.vjoy_input_id)
-                            device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(self.vjoy_id)
-                            if not key in device.data:
-                                device.data[key] = self.action_data.target_step_start_index
-
-                            start_index = device.data[key]
-                            count = len(self.action_data.target_step_list)
-                            index = start_index
-
-                            value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
-                            if self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput) and value is not None:
-                                # sync the current index with the current axis value
-                                v1 = v2 = None
-                                # syslog.info(f"Sync mode: {value:0.3f}")
-                                for i in range(count):
-                                    v2 = self.action_data.target_step_list[i]
-                                    if v1 is not None:
-                                        if value >= v1 and value <= v2:
-                                            index = i
-                                            # syslog.info(f"[{i}] {v1:0.3f} {v2:0.3f} match value: {value:0.3f}")
-                                            break
-
-                                        # syslog.info(f"[{i}] {v1:0.3f} {v2:0.3f}")
-                                    v1 = v2
 
 
-
-
+                            # determine direction we're going
                             direction = self.action_data.target_step_direction
+                            
 
-                            if primary:
-                                # up direction
-                                if verbose: syslog.info(f"STEPPED AXIS: Step {'up' if direction == 1 else 'down'}")
-                                index += direction
-                                trigger = True
-                            elif latched:
-                                # down direction
-                                if verbose: syslog.info(f"STEPPED AXIS: Step {'down' if direction == 1 else 'up'}")
-                                index -= direction
-                                trigger = True
+                            
+                            if self.action_data._target_step_linear_mode:
+                                # linear mode = start pulsing while pressed
+                                self.repeat_interval =  self.action_data.pulse_delay/1000
+                                self.step_direction = direction if primary else -direction
+                                self._start_time = None
+                                self._start_value = None
+                                if verbose: syslog.info(f"STEPPED AXIS: start linear update - interval [{self.repeat_interval:0.3f}] Linear velocity mode: [{self.action_data._target_step_linear_mode}]  direction: [{self.step_direction}]")    
+                                self.pulse_start(self.vjoy_id, self.vjoy_input_id, 0, self.repeat_interval, is_local, is_remote, force_remote)
+                            else:
+                                # non linear step mode
+                                # trigger = False
+                                key = ("stepped-axis",self.vjoy_input_id)
+                                device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(self.vjoy_id)
+                                if not key in device.data:
+                                    device.data[key] = self.action_data.target_step_start_index
 
-                            if trigger:
-                                index = gremlin.util.clamp(index, 0, count-1)
+                                start_index = device.data[key]
+                                count = len(self.action_data.target_step_list)
+                                index = start_index
+
+                                value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
+                                if self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput) and value is not None:
+                                    # sync the current index with the current axis value
+                                    v1 = v2 = None
+                                    
+                                    # syslog.info(f"Sync mode: {value:0.3f}")
+                                    for i in range(count):
+                                        v2 = self.action_data.target_step_list[i]
+                                        if v1 is not None:
+                                            if value >= v1 and value <= v2:
+                                                index = i
+                                                # syslog.info(f"[{i}] {v1:0.3f} {v2:0.3f} match value: {value:0.3f}")
+                                                break
+
+                                            # syslog.info(f"[{i}] {v1:0.3f} {v2:0.3f}")
+                                        v1 = v2
+                                else:
+                                    # get the next or prior index
+                                    
+                                    if primary:
+                                        index += direction
+                                    elif latched:
+                                        index -= direction
+                                    if index < 0: index = 0
+                                    elif index == count:
+                                        index = count - 1
+                                    index = gremlin.util.clamp(index, 0, count-1)
+                                    
                                 value = self.action_data.target_step_list[index]
                                 if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis {self.vjoy_input_id} value: {value:0.3f}")
 
-                                # if self.step_linear:
-                                #     # smooth changes between values
-                                #     self._step_is_running = False
-                                #     if self.step_thread.is_alive():
-                                #         self._step_thread.join()
-
-                                #     self.action_data.target_value = value
-                                #     current = self.action_data.axis_last_value
-                                #     if not current:
-                                #         current = self._get_axis(self.vjoy_id, self.vjoy_input_id)
-                                #     if self.step_timer:
-                                #         self.step_timer.cancel()
-                                #     time = 2.0
-                                #     tick = 0.25
-                                #     delta = current - value
-                                #     offset = delta * time / tick
-
-                                #     self.step_thread = threading.Thread(target = self._step_runner, args=(tick, current, value, offset,))
-                                #     self.step_thread.name = "step_runner"
-                                #     self._step_is_running = True
-                                #     self.step_thread.start()
-                                # else:
-                                # one shot value
+        
                                 self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
 
-                                device.data[key] = index
+                                device.data[key] = index # remember the last step index used
                                 if verbose: syslog.info(f"STEPPED AXIS: start index: {start_index} new index: {index} step value: {value:0.3f}")
 
                                 # remember the last value
                                 syslog.info(f"set step last value: {value:0.3f}")
                                 self.action_data.axis_last_value = value
                 else:
-                    # wrong input
+                    # release
+                    if self.action_data._target_step_linear_mode:
+                        # stop the updates
+                        if verbose: syslog.info(f"STEPPED AXIS: stop linear update")
+                        self.pulse_stop(self.vjoy_id, self.vjoy_input_id)
+                    
                     result = False
 
 
@@ -5561,7 +5647,14 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._current_step_index = 0 # index of last value sent
         self._target_step_start_index = 0 # start index when profile is loaded (initial step)
         self._target_step_direction = 1 # direction of stepping, +1 or -1
+        
+        self._target_step_interval = 0.1 # interval for linear stepping
+        self._target_step_delta = 0.01 # delta when in manual pulse mode
+        self._target_step_linear_mode = True # true if using velocity/acceleration mode controller for simple up/down
+        self._target_step_velocity = 0.01 # rate of change per second for accelerated mode
+        self._target_step_acceleration = 2.0 # acceleration for the rate of change
         self._stepped_latched = True # true if the step down latching is enabled
+        
         self.target_value_valid = True
         self.target_is_relative = False # true if the set value axis is a relative value (+ or -)
         self.target_use_last = False # true if the last sent axis value is sent again
@@ -6491,6 +6584,17 @@ Supports axis merging, curved output, command, hat and button mappings.
             if "stepped-input-id" in node.attrib:
                 self.stepped_input_id = safe_read(node,"stepped-input-id", int, 0)
 
+        
+            self._target_step_linear_mode = safe_read(node, "linear",bool, False)
+            self._target_step_delta = safe_read(node,"delta", float, 0.01)
+            self._target_step_velocity = safe_read(node, "velocity", float, 0.01)
+            if self._target_step_velocity < 0:
+                self._target_step_velocity = 0.0
+            self._target_step_acceleration = safe_read(node, "acceleration", float, 2.0)
+            if self._target_step_acceleration < 0:
+                self._target_step_acceleration = 0.0
+
+
             if "override-input-type" in node.attrib:
                 input_type = safe_read(node, "override-input-type", str, '')
                 self.override_input_type = gremlin.input_types.InputType.to_enum(input_type)
@@ -6501,6 +6605,8 @@ Supports axis merging, curved output, command, hat and button mappings.
                 self.pulse_repeat = safe_read(node,"repeat",bool, False)
             if "repeat-delay" in node.attrib:
                 self.pulse_repeat_delay = safe_read(node, "repeat-delay", int, 250)
+
+            
 
 
             # curve data
@@ -6669,6 +6775,14 @@ Supports axis merging, curved output, command, hat and button mappings.
                     node.set("stepped-device-id", self.stepped_device_id)
                 if self.stepped_input_id:
                     node.set("stepped-input-id", str(self.stepped_input_id))
+                node.set("linear", safe_format(self._target_step_linear_mode, bool))
+                node.set("velocity", safe_format(self._target_step_velocity, float))
+                node.set("acceleration", safe_format(self._target_step_acceleration, float))
+                node.set("delta", safe_format(self._target_step_delta, float))
+                node.set("pulse_delay", safe_format(self.pulse_delay, int))
+
+
+        
 
         node.set("auto_release", safe_format(self.auto_release,bool))
         node.set("ignore-release",safe_format(self.ignore_release,bool))

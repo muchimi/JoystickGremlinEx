@@ -213,7 +213,7 @@ class VjoyAction(enum.Enum):
             case  VjoyAction.VJoyPulse:
                 return "Pulse Button"
             case  VjoyAction.VJoySetAxis:
-                return "Set Axis Value"
+                return "Set Fixed Axis Value"
             case  VjoyAction.VJoyToggle:
                 return "Toggle Button"
             case VjoyAction.VJoyRangeAxis:
@@ -247,7 +247,7 @@ class VjoyAction(enum.Enum):
             case  VjoyAction.VJoyMergeAxis:
                 return "Merge Axis"
             case VjoyAction.VJoySetAxisStepped:
-                return "Stepped Axis Value"
+                return "Stepped/Linear Axis Value"
             case VjoyAction.VJoyButton:
                 return "Button"
             case VjoyAction.VJoyButtonInverted:

@@ -2396,6 +2396,20 @@ class ProfileRegistry():
         self._input_item_registry[key] = input_item
 
         return input_item
+    
+        
+    def removeInputItem(self, input_item : InputItem):
+        ''' removes a given input item from the registry '''
+        device_guid = input_item.device_guid
+        input_type = input_item.input_type
+        input_id = input_item.input_id
+        input_id_key = self.getInputIdKey(input_item)
+        input_mode = input_item.profile_mode
+        key = (device_guid, input_mode, input_type, input_id_key)
+        if key in self._input_item_registry:
+            del self._input_item_registry[key]
+
+
 
 
     def registerInputItem(self, input_item : InputItem, overwrite = False):
@@ -2453,6 +2467,7 @@ class ProfileRegistry():
             return [item for key,item in self._input_item_registry.items() if key[0] == device_guid and key[1] == mode_name and key[2] == input_type]
 
         return [item for key,item in self._input_item_registry.items() if key[0] == device_guid and key[1] == mode_name]
+
 
     def sync(self, profile : Profile):
         ''' synchronizes the input items in this registry with the profile devices '''
