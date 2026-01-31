@@ -4012,6 +4012,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.target_value_valid = action_data.target_value_valid
         self.step_index = action_data.target_step_start_index
         self.step_direction = 1.0 # assume going up for linear step mode
+        self.synced = False # true if synchronized, resets on profile start
 
         v1 = action_data.button_range_min
         v2 = action_data.button_range_max
@@ -4226,6 +4227,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         input_id = self.action_data.hardware_input_id
         raw_input_type = self.action_data.hardware_raw_input_type
         self.pressed_hat_buttons = {}
+        self.synced = False # indicate not synchronized
 
         # get the current mode
         mode = gremlin.shared_state.runtime_mode
@@ -5232,21 +5234,21 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                 index = start_index
 
                                 value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
-                                if self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput) and value is not None:
-                                    # sync the current index with the current axis value
-                                    v1 = v2 = None
-                                    
-                                    # syslog.info(f"Sync mode: {value:0.3f}")
-                                    for i in range(count):
-                                        v2 = self.action_data.target_step_list[i]
-                                        if v1 is not None:
-                                            if value >= v1 and value <= v2:
-                                                index = i
-                                                # syslog.info(f"[{i}] {v1:0.3f} {v2:0.3f} match value: {value:0.3f}")
-                                                break
-
-                                            # syslog.info(f"[{i}] {v1:0.3f} {v2:0.3f}")
-                                        v1 = v2
+                                if not self.synced:
+                                    # synchronize index if needed
+                                    if self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput) and value is not None:
+                                        # sync the current index with the current axis value
+                                        v1 = v2 = None
+                                        
+                                        # syslog.info(f"Sync mode: {value:0.3f}")
+                                        for i in range(count):
+                                            v2 = self.action_data.target_step_list[i]
+                                            if v1 is not None:
+                                                if value >= v1 and value <= v2:
+                                                    index = i
+                                                    break
+                                                v1 = v2
+                                    self.synced = True
                                 else:
                                     # get the next or prior index
                                     
@@ -5258,15 +5260,12 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                                     elif index == count:
                                         index = count - 1
                                     index = gremlin.util.clamp(index, 0, count-1)
-                                    
                                 value = self.action_data.target_step_list[index]
-                                if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] axis {self.vjoy_input_id} value: {value:0.3f}")
-
         
                                 self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
 
                                 device.data[key] = index # remember the last step index used
-                                if verbose: syslog.info(f"STEPPED AXIS: start index: {start_index} new index: {index} step value: {value:0.3f}")
+                                if verbose: syslog.info(f"STEPPED AXIS: previous index: [{start_index}] new index: [{index}] new value: {value:0.3f}")
 
                                 # remember the last value
                                 syslog.info(f"set step last value: {value:0.3f}")
