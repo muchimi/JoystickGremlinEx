@@ -379,7 +379,7 @@ class ActionPlugins:
                 root = etree.fromstring(xml)
                 if root.tag == "multi_containers":
                     # encoded as a multi container
-                    container_nodes = root.xpath("//container")
+                    container_nodes = root.xpath("//container[not(ancestor::container)]")
                 elif root.tag == "container":
                     # encoded as a single container
                     container_nodes = [root]

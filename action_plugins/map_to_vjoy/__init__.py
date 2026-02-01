@@ -6271,19 +6271,8 @@ Supports axis merging, curved output, command, hat and button mappings.
         :return icon representing the remap action
         """
         import gremlin.shared_state
-        is_dark = gremlin.shared_state.is_dark_theme
-        prefix = "dark_" if is_dark else ""
 
-        fallback = f"{prefix}joystick.png"
-        if self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis, VjoyAction.VJoyMergeAxis, VjoyAction.VJoySetAxisStepped):
-            input_string = "axis"
-        elif self.action_mode == VjoyAction.VJoyHat:
-            input_string = "hat"
-            fallback = "mdi.axis-arrow"
-        elif self.action_mode in (VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease,  VjoyAction.VJoyButton, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton):
-            input_string = "button"
-            fallback = "mdi.gesture-tap-button"
-        elif self.action_mode in ( VjoyAction.VJoyToggleRemote,
+        if self.action_mode in ( VjoyAction.VJoyToggleRemote,
                                     VjoyAction.VJoyEnableRemoteOnly,
                                     VjoyAction.VJoyEnableLocalOnly,
                                     VjoyAction.VJoyDisableRemote,
@@ -6294,9 +6283,42 @@ Supports axis merging, curved output, command, hat and button mappings.
                                     VjoyAction.VJoyEnablePairedRemote,
                                     VjoyAction.VJoyDisablePairedRemote):
             return "fa6s.gear"
+        
+        is_dark = gremlin.shared_state.is_dark_theme
+        prefix = "dark_" if is_dark else ""
+        input_type = self.get_input_type()
+        fallback = f"{prefix}joystick.png"
+
+        if self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis, VjoyAction.VJoyMergeAxis, VjoyAction.VJoySetAxisStepped):
+            input_type = InputType.JoystickAxis
+        elif self.action_mode == VjoyAction.VJoyHat:
+            input_type = InputType.JoystickHat
+        elif self.action_mode in (VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease,  VjoyAction.VJoyButton, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton):
+            input_type = InputType.JoystickButton
         else:
-            input_string = None
-            #log_sys_warn(f"VjoyRemap: don't know how to handle action mode: {self.action_mode}")
+            input_type = None
+            syslog.warning(f"VJOYREMAP ICON: don't know how to handle action mode: {self.action_mode}")        
+
+        match input_type:
+            case InputType.JoystickAxis:
+                if self._vjoy_input_id > 8:
+                    input_string = "button"
+                else:
+                    input_string = "axis"
+            case InputType.JoystickButton:
+                input_string = "button"
+                fallback = "mdi.gesture-tap-button"
+            case InputType.JoystickHat:
+                if self._vjoy_input_id > 4:
+                    input_string = "button"
+                else:
+                    input_string = "hat"
+                    fallback = "mdi.axis-arrow"    
+            case _:
+                input_string = None
+
+        
+
 
         if input_string:
             icon_path = f"{prefix}icon_{input_string}_{self.vjoy_input_id:03d}.png" if input_string else fallback

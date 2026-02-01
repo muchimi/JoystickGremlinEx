@@ -363,7 +363,7 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
         else:
             self._perform_mouse_button(event, value)
 
-    def _perform_mouse_button(self, event, value):
+    def _perform_mouse_button(self, event, value, wheel_factor = 1):
         assert self.config.motion_input is False
         (is_local, is_remote) = input_devices.remote_state.state
         if self.config.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
@@ -377,9 +377,9 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
                     input_devices.remote_client.send_mouse_wheel(direction)
         elif self.config.button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
             if value.current:
-                direction = -16
+                direction = -wheel_factor
                 if self.config.button_id == MouseButton.WheelRight:
-                    direction = 16
+                    direction = wheel_factor
                 if is_local:
                     gremlin.sendinput.mouse_h_wheel(direction)
                 if is_remote:

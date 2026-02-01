@@ -1468,7 +1468,7 @@ Unlike a macro, any action suitable for the input can be used.'''
 
         # load step options
         self.step_options.clear()
-        option_nodes = node.xpath(".//step-option")
+        option_nodes = node.xpath("./step-option")
         for o_node in option_nodes:
             option = StepOptions()
             option.from_xml(o_node)

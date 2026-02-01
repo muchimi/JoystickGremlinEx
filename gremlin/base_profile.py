@@ -835,7 +835,7 @@ class AbstractContainer(ProfileData, ConditionContainer):
             return
 
         
-        as_nodes = node.xpath(".//action-set")
+        as_nodes = node.xpath("./action-set")
         index = 0
         for child in as_nodes:
             action_set = None
@@ -850,6 +850,8 @@ class AbstractContainer(ProfileData, ConditionContainer):
                     self.action_sets.append([])
                 self.action_sets[index] = action_set
             index += 1
+
+        
 
 
 
@@ -1870,13 +1872,13 @@ class Settings:
 
         self.input_filter = {}
         # read the device list as it will tell GEX that the device was previously viewed
-        for device_node in node.xpath(".//input-filter/device"):
+        for device_node in node.xpath("./input-filter/device"):
             device_id = safe_read(device_node,"id", str, "")
             device_guid = gremlin.util.parse_guid(device_id)
             self.input_filter[device_guid] = {}
 
 
-        for filter_node in node.xpath(".//input-filter/filter"):
+        for filter_node in node.xpath("./input-filter/filter"):
 
             device_id = safe_read(filter_node,"device", str, "")
             device_guid = gremlin.util.parse_guid(device_id)
@@ -3253,7 +3255,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
 
         # read containers for this input item
-        container_nodes = node.xpath(".//container")
+        container_nodes = node.xpath("./container")
         for child in container_nodes:
             if child.tag in ("latched", "input", "keylatched") or gremlin.base_profile._is_curve_tag(child.tag):
                 # ignore extra data
@@ -5274,7 +5276,7 @@ class Profile():
         vjoy_devices = etree.Element("vjoy-devices")
         for device in self.vjoy_devices.values():
             node = device.to_xml()
-            has_container = node.xpath(".//container")
+            has_container = node.xpath("./container")
             if has_container:
                 vjoy_devices.append(node)
                 add_vjoy = True

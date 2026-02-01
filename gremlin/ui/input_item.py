@@ -1161,7 +1161,7 @@ class InputItemListView(ui_common.AbstractView):
         pass
 
 
-    def select_item(self, index, emit=True, force_update = True, user_selected = False):
+    def select_item(self, index, emit=True, force_update = False, user_selected = False):
         """Handles selecting a specific item.  this is called whenever an input item is selected
 
         :param index the index of the item being selected

@@ -377,7 +377,7 @@ and another action on trigger release in a single container.'''
 
         self.setActionSets([[],[]])
 
-        actionset_nodes = node.xpath(".//action-set")   
+        actionset_nodes = node.xpath("./action-set")   
         for index, actionset_node in enumerate(actionset_nodes):
             action_set = gremlin.base_profile.ActionSet()
             self._parse_action_xml(actionset_node, action_set, data, extra_data)

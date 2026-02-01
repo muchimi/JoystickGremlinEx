@@ -1426,7 +1426,7 @@ class ProfileConverter:
                 converted = True
                 keyboard_count += 1
                 node.tag = "map-to-keyboard-ex"
-                key_nodes = node.xpath(".//key")
+                key_nodes = node.xpath("./key")
                 for key_node in key_nodes:
                     scan_code = safe_read(key_node,"scan-code", int, 0)
                     is_extended = safe_read(key_node,"extended", bool, False)

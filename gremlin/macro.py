@@ -224,7 +224,7 @@ def _unicode_to_key(character):
     return gremlin.keyboard.Key(character, scan_code, is_extended, virtual_code)
 
 
-def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False, force_remote = False, dbl_click = False):
+def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False, force_remote = False, dbl_click = False, wheel_factor = 1):
         from gremlin.types import MouseButton
         import gremlin.sendinput
         import gremlin.input_devices
@@ -233,18 +233,18 @@ def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False
             is_remote = True
         if button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
             if is_pressed:
-                direction = -16
+                direction = -wheel_factor
                 if button_id == MouseButton.WheelDown:
-                    direction = 16
+                    direction = wheel_factor
                 if is_local:
                     gremlin.sendinput.mouse_wheel(direction)
                 if is_remote:
                     gremlin.input_devices.remote_client.send_mouse_wheel(direction)
         elif button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
             if is_pressed:
-                direction = -16
+                direction = -wheel_factor
                 if button_id == MouseButton.WheelRight:
-                    direction = 16
+                    direction = wheel_factor
                 if is_local:
                     gremlin.sendinput.mouse_h_wheel(direction)
                 if is_remote:

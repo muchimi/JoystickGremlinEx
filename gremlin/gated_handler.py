@@ -313,7 +313,7 @@ class GateInfo():
     
 
 
-    def __init__(self, slider_index = -1, id = None, value = None, parent = None, delay = 250, used = False):
+    def __init__(self, slider_index = -1, id = None, value = None, parent = None, delay : int = 250, used : bool = False):
         ''' holds gate information data 
         :param index: gate index
         :param id: id (str) guid of this gate - unique
@@ -387,51 +387,10 @@ class GateInfo():
         return self._delay
     @delay.setter
     def delay(self, value : int):
-        if value >= 0:
+        if value >= 0 and self._delay != value:
             self._delay = value
 
-    def to_xml(self):
-        ''' generates an xml node from the gate data '''
-        node = ElementTree.Element("gate-info")
-        node.set("id", self._id)
-        node.set("index", str(self.index))
-        node.set("value", safe_format(self._value, float))
-        node.set("used", str(self._used))
-        node.set("delay", safe_format(self.delay, int))
-        if self.description:
-            node.set("description", self.description)
-
-        for condition, item in self.item_data_map.items():
-            condition_node = ElementTree.Element("gate-condition")
-            condition_node.set("condition", GateConditionType.to_string(condition))
-            item_node = item.to_xml()
-            condition_node.append(item_node)
-            node.append(condition_node)
-
-        return node
-
-    def from_xml(self, node, extra_data = None):
-        self.id = node.get("id")
-        self.setIndex(safe_read(node,"index",int,0))
-        self.value = safe_read(node,"value",float,0)
-        self.used = safe_read(node,"used",bool,False)
-        self.delay = safe_read(node,"delay",int,250)
-        description = safe_read(node,"description", str, "")
-        if description:
-            self.description = description
-        else:
-            self.description = None
-
-        for condition_node in node:
-            condition = GateConditionType.to_enum(condition_node.get("condition"))
-            item_node = condition[0]
-            item = self.parent._new_item_data()
-            item.from_xml(item_node)
-            self.item_data[condition] = item
-            
-
-
-
+    
     @property
     def slider_index(self) -> int:
         return self._slider_index
@@ -507,6 +466,7 @@ class GateInfo():
         gi.item_data_map = other.item_data_map
         gi.slider_index = other.slider_index
         gi._last_condition = other._last_condition
+        
         return gi
 
 
@@ -672,6 +632,7 @@ class RangeInfo():
                  max_gate,
                  mode = GateRangeOutputMode.Normal,
                  parent = None,
+                 delay : int = 250,
                  used = False):
 
         assert parent is not None, "Ranges must be parented to a GateData object " # = must provide this parameter
@@ -685,7 +646,7 @@ class RangeInfo():
         self._condition = GateConditionType.InRange # last set condition
         self._description = None
         self.item_data_map = {}
-        self.delay = 250 # default delay
+        self._delay = delay 
         self.g1 = min_gate
         self.g2 = max_gate
 
@@ -718,6 +679,16 @@ class RangeInfo():
         self.mode = mode # output mode determines what we do with the input data
         self._fixed_value = None # fixed value to output for this range if the condition is Fixed
         self._swap_gates() # flip the gates so the values are always increasing 
+
+
+    @property
+    def delay(self) -> int:
+        return self._delay
+    @delay.setter
+    def delay(self, value : int):
+        if value >= 0 and self._delay != value:
+            self._delay = value
+
 
     def __deepcopy__(self, memo):
         import copy
@@ -806,9 +777,8 @@ class RangeInfo():
         self.item_data_map = other.item_data_map
         self.description = other.description
         self._last_condition = other._last_condition
-
-        # print (f"Range: copyfrom: {self.range_display()}")
-        
+        self.delay = other.delay
+ 
 
     @property
     def containerCount(self) -> int:
@@ -1266,7 +1236,7 @@ class GateData():
         self.display_range_max = range_max
         self.macro : gremlin.macro.Macro = None  # macro steps
         self.id = gremlin.util.get_guid()
-        
+          
         self.display_mode = DisplayMode.Normal
         self.filter_map = {} # map of conditions to flag - if true, the item is not filtered, if false, filtered - this is for display purposes
         self.range_filter_map = {} # map of range filter
@@ -2624,6 +2594,7 @@ class GateData():
                 rng.output_range_max = current.output_range_max
                 rng.fixed_value = current.fixed_value
                 rng.description = current.description
+                rng.delay = current.delay
             
 
             range_list.append(rng)
@@ -3150,8 +3121,7 @@ class GateData():
                         continue
                     if verbose_extra: syslog.info(f"GATE CROSSED: processing range {r.range_display()}")
                     in_range = r.valueInRange(last_value)
-                    if in_range is None:
-                        pass
+
                     if in_range:
                         # range exited and previously entered
                         if not tt.getTrigger(r,TriggerMode.RangeExit):
@@ -3360,8 +3330,6 @@ class GateData():
         
         node.set("show_mode", DisplayMode.to_string(self.display_mode))
 
-        #node.set("mode", self.profile_mode)
-
        
         # save gate data
         gate_info : GateInfo
@@ -3373,9 +3341,9 @@ class GateData():
             child = ElementTree.SubElement(node, "gate")
             child.set("condition", _gate_condition_to_name[gate_info.condition]) # last condition selected
             child.set("value", f"{gate_info.value:0.{_decimals}f}")
-            child.set("delay", str(gate_info.delay))
             child.set("id", gate_info.id)
-            child.set("index", str(gate_info.slider_index))
+            child.set("index", safe_format(gate_info.slider_index, int))
+            child.set("delay", safe_format(gate_info.delay, int))
 
             
             # description
@@ -3496,7 +3464,7 @@ class GateData():
         
 
         # read gate configurations
-        node_gates = node.xpath(".//gate")
+        node_gates = node.xpath("./gate")
 
         guid_map = {} # map of OLD guid to NEW guid
 
@@ -3509,18 +3477,18 @@ class GateData():
         self._gates = [] # remove all gates
         self._ranges = [] # remove all ranges
             
-        for child in node_gates:
+        for node_range in node_gates:
             
-            gate_id = safe_read(child, "id", str,"")
+            gate_id = safe_read(node_range, "id", str,"")
             if not gate_id:
                 gate_id = get_guid()
             
             if verbose: 
                 syslog.info(f"GATE XML: loading gate {gate_id}:")
 
-            gate_value = safe_read(child, "value", float, 0.0)
+            gate_value = safe_read(node_range, "value", float, 0.0)
             
-            gate_delay = safe_read(child, "delay", int, 250)
+            gate_delay = safe_read(node_range, "delay", int, 250)
             
             
       
@@ -3537,8 +3505,8 @@ class GateData():
 
             gate_info.setUsed(True) # indicate the gate is used
             gate_info.value = gate_value
-            if "index" in child.attrib:
-                gate_index = safe_read(child,"index",int, 0)
+            if "index" in node_range.attrib:
+                gate_index = safe_read(node_range,"index",int, 0)
                 gate_info.slider_index = gate_index
 
             
@@ -3546,7 +3514,7 @@ class GateData():
             
             # gate_info = self.registerGate(gate_value, gate_default)
             # last condition
-            gate_condition = safe_read(child, "condition", str, "")
+            gate_condition = safe_read(node_range, "condition", str, "")
             if gate_condition in _gate_condition_to_enum.keys():
                 gate_condition = GateConditionType.to_enum(gate_condition)
                 gate_info.setLastCondition(gate_condition)
@@ -3556,13 +3524,13 @@ class GateData():
             
 
             description = None
-            if "description" in child.attrib:
-                description = child.get("description")
+            if "description" in node_range.attrib:
+                description = node_range.get("description")
                 if description:
                     gate_info.description = description
 
             # read action containers for the gate
-            item_nodes = gremlin.util.get_xml_child(child, "action_containers", multiple=True)
+            item_nodes = gremlin.util.get_xml_child(node_range, "action_containers", multiple=True)
             gate_info.item_data_map = {}
             for item_node in item_nodes:
                 if item_node is not None:
@@ -3600,11 +3568,11 @@ class GateData():
         # read range configuration
         range_pairs = {}            
 
-        node_ranged = node.xpath(".//range")
-        for child in node_ranged:
+        node_ranged = node.xpath("./range")
+        for node_range in node_ranged:
 
             
-            range_id = safe_read(child, "id", str, "")
+            range_id = safe_read(node_range, "id", str, "")
             if paste_mode:
                 new_guid = gremlin.util.get_guid()
                 guid_map[range_id] = new_guid
@@ -3614,11 +3582,11 @@ class GateData():
                 range_id = get_guid()
 
             description = None
-            if "description" in child.attrib:
-                description = child.get("description")
+            if "description" in node_range.attrib:
+                description = node_range.get("description")
 
-            min_id = safe_read(child, "min_id", str, "")
-            max_id = safe_read(child, "max_id", str, "")
+            min_id = safe_read(node_range, "min_id", str, "")
+            max_id = safe_read(node_range, "max_id", str, "")
             g1 : GateInfo = next((g for g in gate_list if g.id == min_id), None)
             g2 : GateInfo = next((g for g in gate_list if g.id == max_id), None)
 
@@ -3649,27 +3617,28 @@ class GateData():
             range_info = RangeInfo(g1, g2, used = True, parent = self)
             range_info.id = range_id
             range_pairs[key] = range_info
+            range_info.delay = safe_read(node_range, "delay", int, 250)
 
-            description = safe_read(child, "description", str, "")
+            description = safe_read(node_range, "description", str, "")
             range_info.description = description
 
-            range_condition = safe_read(child, "condition", str, "")
+            range_condition = safe_read(node_range, "condition", str, "")
             if range_condition in _gate_condition_to_enum.keys():
                 range_condition = _gate_condition_to_enum[range_condition] 
                 range_info.setLastCondition(range_condition)
             
 
-            range_mode = safe_read(child, "mode", str, "")
+            range_mode = safe_read(node_range, "mode", str, "")
             if not range_mode in _gate_range_to_enum.keys():
                 syslog.error(f"GateData: Invalid mode {range_mode} range: {range_id}")
                 return
             range_mode = _gate_range_to_enum[range_mode]
     
-            range_min = safe_read(child,"range_min", float, -1.0)
-            range_max = safe_read(child,"range_max", float, 1.0)
+            range_min = safe_read(node_range,"range_min", float, -1.0)
+            range_max = safe_read(node_range,"range_max", float, 1.0)
 
 
-            range_info.delay = safe_read(child,"delay",int,250)
+            range_info.delay = safe_read(node_range,"delay",int,250)
             range_info.id = range_id
             range_info.setLastCondition(range_condition)
             range_info.mode = range_mode
@@ -3682,14 +3651,14 @@ class GateData():
                 range_info.output_range_min = range_min
                 range_info.output_range_max = range_max
             elif range_mode == GateRangeOutputMode.Fixed:
-                fixed_value = safe_read(child,"fixed_value", float, 0)
+                fixed_value = safe_read(node_range,"fixed_value", float, 0)
                 range_info.fixed_value = fixed_value
 
 
             self._range_item_map[range_id] = range_info
 
             # read range mapping data 
-            item_nodes = gremlin.util.get_xml_child(child, "range_containers", multiple=True)
+            item_nodes = gremlin.util.get_xml_child(node_range, "range_containers", multiple=True)
             range_info.item_data_map = {}
             for item_node in item_nodes:
                 if item_node is not None:
@@ -3834,7 +3803,7 @@ class TriggerData():
        
         
 
-class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
+class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
     ''' holds the data for a single gate '''
 
     valueChanged = QtCore.Signal(object) # fires when a gate value is changed - sends the gate
@@ -4033,6 +4002,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         self.clear_widget.setEnabled(delete_enabled)
         self.clear_widget.data = gate
 
+        
         main_layout.addWidget(self.label_warning)
         main_layout.addWidget(self.label_widget)
         main_layout.addWidget(self.value_widget)
@@ -4040,6 +4010,8 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         main_layout.addWidget(self.setup_widget)
         main_layout.addWidget(self.clear_widget)
         main_layout.addStretch()
+
+
 
     def _handle_configure_request(self, widget):
         ''' show the configuration dialog for gate and range conditions '''
@@ -4104,7 +4076,7 @@ class GateWidgetInfo(gremlin.ui.ui_common.QDataWidget):
         return "n/a"
 
         
-class RangeWidgetInfo(QtWidgets.QWidget):
+class RangeInfoWidget(QtWidgets.QWidget):
     ''' range widget '''
     # requestConfigure = QtCore.Signal(object) # fires when the user clicks on the configuration icon - sends the range 
 
@@ -4137,9 +4109,12 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         self.setup_widget.clicked.connect(self._handle_configure)
         self.setup_widget.setToolTip(f"Setup actions for range [{self.display_name()}]")
 
+
+
         main_layout = QtWidgets.QHBoxLayout(self)
         main_layout.setContentsMargins(0,0,0,0)
 
+        
         main_layout.addWidget(self.label_warning)
         main_layout.addWidget(self.label_widget)
         main_layout.addWidget(self.range_widget)
@@ -4157,6 +4132,9 @@ class RangeWidgetInfo(QtWidgets.QWidget):
         # display default value
         self.update_value()
         self.update_icon()
+
+
+     
 
     @QtCore.Slot()
     def _handle_configure(self):
@@ -4496,24 +4474,26 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
 
             
         # delay
-        if self._gate_info:
-            value = self._gate_info.delay
+        if is_range:
+            delay = self._range_info.delay
         else:
-            value = self._range_info.delay
+           delay = self._gate_info.delay
 
         self.delay_widget = gremlin.ui.ui_common.QDelayWidget(
-            value = value,
-            tooltip = "Delay in milliseconds between a press and release event for gate crossings or range enter/exit triggers",
-            callback = self._delay_changed_cb,
+            value = delay,
+            tooltip = "Delay in milliseconds between a press and release event for autorelease triggers",
+            callback = self._handle_delay_changed,
             label = "Trigger Delay:",
             show_shortcuts=False
+            
         )
+
     
         self.trigger_condition_layout.addStretch()
         self.trigger_condition_layout.addWidget(self.delay_widget, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
         
 
-            
+        
 
         
         self.main_layout.addWidget(self.trigger_container_widget)
@@ -4525,6 +4505,13 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self._hooked = False
         self.hook()
+
+    def _handle_delay_changed(self, value : int):
+        if self._is_range:
+            self._range_info.delay = value
+        else:
+            self._gate_info.delay = value
+        
 
     def hook(self):
         if not self._hooked:
@@ -4608,12 +4595,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         if value is not None:
             self.axis_widget.setValue(value)
 
-    def _delay_changed_cb(self, delay):
-        ''' delay value changed for gates or ranges '''
-        if self._gate_info:
-            self._gate_info.delay = delay
-        elif self._range_info:
-            self._range_info.delay = delay
+
 
     QtCore.Slot()
     def _delete_gate_confirm_cb(self):

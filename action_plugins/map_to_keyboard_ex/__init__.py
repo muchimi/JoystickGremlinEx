@@ -125,9 +125,10 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.container_options_widget = gremlin.ui.ui_common.getHContainer(widgets, "Mode:", widget_only = True)
 
+
         widgets = [
             self.delay_box,
-            self.autorepeat_delay_box
+            self.autorepeat_delay_box,
         ]
         
         self.container_delay_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
@@ -155,11 +156,24 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         sync_container = gremlin.ui.ui_common.getHContainer(widgets, left_margin =12, widget_only = True)
         
 
+        widget = gremlin.ui.ui_common.QIntLineEdit(value = self.action_data.wheel_factor,
+                                                   min_range = 1,
+                                                   max_range = 100,
+                                                callback=self._handle_wheel_factor_changed)
+        wheel_factor_container = gremlin.ui.ui_common.getHContainer(
+            widget,
+            "Mouse Wheel Factor:",
+            widget_only=True,
+            tooltip = "Mouse wheel motion factor, determines how much the wheel moves per trigger. The default is 1 for 1x.")
+
+
+
         self.main_layout.addWidget(self.key_combination)
         self.main_layout.addWidget(self.display_container_widget)
         self.main_layout.addWidget(self.container_action_widget)
         self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addWidget(self.container_delay_widget)
+        self.main_layout.addWidget(wheel_factor_container)
         self.main_layout.addWidget(sync_container)
         self.main_layout.addWidget(self.description_widget)
 
@@ -171,6 +185,9 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.main_layout.addStretch()
         self._update_ui() # update UI based on mode
+
+    def _handle_wheel_factor_changed(self, value : int):
+        self.action_data.wheel_factor = value
 
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked : bool):
@@ -658,7 +675,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         for key in self._release_keys:
             if key.is_mouse:
                 (is_local, is_remote) = input_devices.remote_state.state
-                gremlin.macro._send_mouse_button(key.mouse_button, False, is_local, is_remote)
+                gremlin.macro._send_mouse_button(key.mouse_button, False, is_local, is_remote, wheel_factor=self.action_data.wheel_factor)
             else:
                 gremlin.keyboard.send_key_up(key)
 
@@ -782,7 +799,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                                 for key in self._press_keys:
                                     if verbose: syslog.info(f"HOLD: send key press: {key}")
                                     if key.is_mouse:
-                                        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote)
+                                        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote, wheel_factor=self.action_data.wheel_factor)
                                     else:
                                         gremlin.keyboard.send_key_down(key)
 
@@ -800,7 +817,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                                 for key in self._press_keys:
                                     if verbose: syslog.info(f"send key press (autorelease): {key}")
                                     if key.is_mouse:
-                                        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote)
+                                        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote, wheel_factor=self.action_data.wheel_factor)
                                     else:
                                         gremlin.keyboard.send_key_down(key)
 
@@ -826,7 +843,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                                 el = gremlin.event_handler.EventListener()
                                 state = el.get_key_state(key)
                                 if key.is_mouse:
-                                    gremlin.macro._send_mouse_button(key.mouse_button, not state, is_local, is_remote)
+                                    gremlin.macro._send_mouse_button(key.mouse_button, not state, is_local, is_remote, wheel_factor=self.action_data.wheel_factor)
                                 else:
                                     if state:
                                         # key is down, send up
@@ -931,6 +948,7 @@ Can also send mouse buttons, mouse wheel events.'''
         self.sync_mode = SyncMode.Ignore # ignore by default
         self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
+        self.wheel_factor = 1 # factor for wheel motion
      
 
     @property
@@ -1091,7 +1109,9 @@ Can also send mouse buttons, mouse wheel events.'''
         if "exec_on_press" in node.attrib:
             self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
         if "exec_on_release" in node.attrib:
-            self.exec_on_release = safe_read(node,"exec_on_release",bool, False)            
+            self.exec_on_release = safe_read(node,"exec_on_release",bool, False)       
+
+        self.wheel_factor = safe_read(node,"wheel-factor",int, 1)     
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
@@ -1141,6 +1161,7 @@ Can also send mouse buttons, mouse wheel events.'''
         node.set("sync-mode", safe_format(self.sync_mode, int))     
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))                   
+        node.set("wheel-factor", safe_format(self.wheel_factor, int))
 
         return node
 
@@ -1168,12 +1189,14 @@ Can also send mouse buttons, mouse wheel events.'''
 
         table.addField("Key", html.escape(key_stub))
         table.addField("Mode", self.mode.name)
+        table.addField("Wheel Factor", str(self.wheel_factor))
         match self.mode:
             case KeyboardOutputMode.Pulse:
                 table.addField("Delay", f"{self.delay} ms")
             case KeyboardOutputMode.AutoRepeat:
                 table.addField("Delay", f"{self.delay }ms")
                 table.addField("Repeat Delay", f"{self._autorepeat_delay} ms")
+
 
         return table.to_html()    
 

@@ -31,7 +31,7 @@ import gremlin.gated_handler
 import gremlin.shared_state
 import logging
 from shiboken6 import Shiboken
-from gremlin.gated_handler import GateInfo, RangeInfo, DisplayMode, GateData, GateEventHandler, GateWidgetInfo, RangeWidgetInfo, GateConditionType,TriggerData, TriggerMode, GateRangeOutputMode
+from gremlin.gated_handler import GateInfo, RangeInfo, DisplayMode, GateData, GateEventHandler, GateInfoWidget, RangeInfoWidget, GateConditionType,TriggerData, TriggerMode, GateRangeOutputMode
 import gremlin.ui.qsliderwidget
 import gremlin.ui.ui_common
 import gremlin.util
@@ -745,7 +745,7 @@ making changes that impact the order of gates or ranges."""
             # create a widget for this gate
             assert isinstance(gate,GateInfo)
             gate.setIndex(index, False)
-            widget = GateWidgetInfo(gate,
+            widget = GateInfoWidget(gate,
                                     None,
                                     self.create_delete_callback(gate),
                                     is_container=gate.hasAnyContainers(),
@@ -829,7 +829,7 @@ making changes that impact the order of gates or ranges."""
         if verbose_extra: syslog.info("Range table:")
         for index, rng in enumerate(range_list):
             
-            widget = RangeWidgetInfo(index + 1, 
+            widget = RangeInfoWidget(index + 1, 
                                 rng,
                                 decimals,
                                 self._configure_range_cb_ui,
@@ -856,7 +856,7 @@ making changes that impact the order of gates or ranges."""
         if not self._option_display_events:
             return
         widgets = [self.get_range_widget(rwi) for rwi in self._rwi_map.keys()]
-        widget : RangeWidgetInfo
+        widget : RangeInfoWidget
         range_count = len(widgets)
         # disable single range mode on the slider
         self._slider_widget.singleRange = False
@@ -940,7 +940,7 @@ making changes that impact the order of gates or ranges."""
         
 
 
-    def get_gate_gwi(self, gate : GateInfo) -> GateWidgetInfo:
+    def get_gate_gwi(self, gate : GateInfo) -> GateInfoWidget:
         ''' gets the gate widget info for a given gate '''
         if gate in self._gwi_map.keys():
             widget = self._gwi_map[gate]  # contains (row, col), widget
@@ -948,7 +948,7 @@ making changes that impact the order of gates or ranges."""
                 return widget
         return None
     
-    def get_gate_widget(self, gate : GateInfo) -> GateWidgetInfo:
+    def get_gate_widget(self, gate : GateInfo) -> GateInfoWidget:
         ''' returns the widget for the corresponding gate '''
         return self.get_gate_gwi(gate)
     
@@ -1646,7 +1646,7 @@ making changes that impact the order of gates or ranges."""
 
         # find the widgets for the gate
         if gate in self._gwi_map:
-            widget : GateWidgetInfo = self.get_gate_widget(gate)
+            widget : GateInfoWidget = self.get_gate_widget(gate)
             if widget:
                 widget.update_icon()
 

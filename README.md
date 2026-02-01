@@ -28,6 +28,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T170):
+- New: Map to keyboard ex: mouse wheel motion parameter. This is a positive value >= 1 used to adjust how much motion is sent for a wheel event (left, up, down, right).  The default is 1 which is the smallest motion than can be sent.
+- Fix: XML: another pass at action-set processing due to API changes related causing issues with gated axis and other complex containers.
+- Fix: Gated Axis: autorelease delay for gates and ranges not persisted properly
+- Fix: removed legacy input viewer menu that was deprecated and replaced by the profile graphical viewer.
+
 ### (m76T169A):
 - New: Sequence Container: The sequence container gains a new wiggle mode optional delay interval between steps.  This interval specifies the delay in milliseconds between sequence step executions.
 - Fix: Tempo Container: unable to save with new API

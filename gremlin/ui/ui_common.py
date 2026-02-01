@@ -2179,7 +2179,10 @@ class QIntLineEdit(QtWidgets.QLineEdit):
 
     def setSuppressed(self, value : bool):
         self._supressed = value
-    
+
+    def unhook(self):
+        ''' called on widget delete '''
+        self._supressed = True
 
     @property
     def chars(self) -> int:
@@ -2206,6 +2209,8 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self._data = value
 
     def eventFilter(self, widget, event):
+        if self._supressed:
+            return True
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change
@@ -8225,6 +8230,8 @@ class QDelayWidget(QtWidgets.QWidget):
         ''' supresses events when on '''
         self._supressed = value
             
+    def unhook(self):
+        self._supressed = True
 
     def isValid(self) -> bool:
         ''' true if the delay value is valid '''

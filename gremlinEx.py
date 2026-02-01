@@ -1798,7 +1798,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionReloadDevices.triggered.connect(self._reload_devices)
 
         self.ui.actionCheatsheet.triggered.connect(lambda: self._create_cheatsheet())
-        self.ui.actionViewInput.triggered.connect(lambda: self._view_input_map())
+        # self.ui.actionViewInput.triggered.connect(lambda: self._view_input_map())
         self.ui.actionOptions.triggered.connect(self.options_dialog)
         self.ui.actionLogDisplay.triggered.connect(self.log_window)
         self.ui.actionLogEdit.triggered.connect(self.log_edit)
