@@ -4671,7 +4671,7 @@ class QPathLineItem(QtWidgets.QWidget):
 
     IconSize = QtCore.QSize(16, 16)
 
-    def __init__(self, header = None, text = None, data = None, dir_mode = False, parent = None, open_tooltip_text = "Browse"):
+    def __init__(self, header = None, text = None, data = None, dir_mode = False, parent = None, open_tooltip_text = "Browse", callback = None, callback_open = None):
         '''
         displays the path to a file or a folder
         :param: header - the header text
@@ -4711,20 +4711,33 @@ class QPathLineItem(QtWidgets.QWidget):
         self._layout.setContentsMargins(0,0,0,0)
 
         self._data = data
+        self._callback = callback
+        self._callback_open = callback_open
+        self.pathChanged.connect(self._handle_path_changed)
+        self.open.connect(self._handle_open)
+        
 
         self._file_changed()
         
-
+        
         self.setLayout(self._layout)
 
     @property
     def header_width(self):
         return self._header_widget.frameGeometry().width()
-
+    
     @header_width.setter
     def header_width(self, value):
         self._header_widget.setMaximumWidth(value)
         self._header_widget.setMinimumWidth(value)
+
+    def _handle_path_changed(self, value : str):
+        if self._callback:
+            self._callback(self, self.text())
+
+    def _handle_open(self):
+        if self._callback_open:
+            self._callback_open(self)
 
     def _open_button_cb(self):
         self.open.emit(self)

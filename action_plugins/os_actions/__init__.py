@@ -279,51 +279,44 @@ class OsActionWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _create_ui(self):
         if not Shiboken.isValid(self):
             return
-        self.mode_container_widget = QtWidgets.QWidget()
-        self.mode_container_layout = QtWidgets.QHBoxLayout(self.mode_container_widget)
-
+       
         items = [
             ("Set Window Focus", OsActionMode.SetFocus)
         ]
+
+        grid_widgets = []
 
         self.action_selector = gremlin.ui.ui_common.QDataComboBox(
             value = self.action_data.action,
             source = items,
             callback = self._handle_action_changed,
-            tooltip="Selected Action"
+            tooltip="Selected Action",
+            auto_adjust=True,
         )
 
-        grid_widgets = []
-        self.process_path_widget = gremlin.ui.ui_common.QLineEdit(text = self.action_data.process_name,
-                                                callback = self._handle_process_path_changed)
+        widget = gremlin.ui.ui_common.getHContainer(self.action_selector, "Mode:", widget_only=True)
+        self.action_selector.setMaximumWidth(300)
+        self.main_layout.addWidget(widget)
 
         
-        find_button = gremlin.ui.ui_common.QDataPushButton("...",
-                                                           callback = self._handle_find_window,
-                                                           tooltip = "Select Process Window")
+        self.process_path_widget = gremlin.ui.ui_common.QPathLineItem(text = self.action_data.process_name,
+                                                callback = self._handle_process_path_changed,
+                                                callback_open= self._handle_find_window)
+        self.process_path_widget.setMaximumWidth(300)
         widgets = [
             "Process Window:",
             self.process_path_widget,
-            find_button,
-            " ",
         ]
 
-        widget = gremlin.ui.ui_common.getGridContainer(widgets, widget_only=True)
-        grid_widgets.append(widget)
 
-        # self.window_title_widget = gremlin.ui.ui_common.QLineEdit(text = self.action_data.window_title,
-        #                                         callback = self._handle_window_title_changed)
-
-        # widget = gremlin.ui.ui_common.getGridContainer(self.window_title_widget, "Window Title:", widget_only=True)
-        # grid_widgets.append(widget)
-
-        self.container_setfocus = gremlin.ui.ui_common.getVContainer(grid_widgets, widget_only = True)
+        self.container_setfocus = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
         
 
-        self.main_layout.addWidget(self.action_selector)
+        
+        self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
         self.main_layout.addWidget(self.container_setfocus)
 
-        # gremlin.ui.ui_common.synchronize_grids(grid_widgets)
+        
 
 
         self._update_ui()
@@ -355,7 +348,7 @@ class OsActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._update_ui()
 
     @QtCore.Slot(str)
-    def _handle_process_path_changed(self, value : str):
+    def _handle_process_path_changed(self, widget, value : str):
         self.action_data.process_name = value
 
     @QtCore.Slot(str)

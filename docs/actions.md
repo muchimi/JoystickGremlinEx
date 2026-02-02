@@ -42,7 +42,8 @@ Actions are contained in [containers](containers.md#containers).
 | Temporary Mode Switch | This action temporarily changes the mode while the input is pressed, and changes back to the previous mode when released. | Use to temporarily switch modes. |
 | Text to Speech (TTS) | This action converts text to speech using the internal operating system TTS synthesis.  Voices available depend on what voice packs are installed on the system.  The output is limited to the default audio device. | While you can use this for TTS, the recommendation is to use an online AI TTS converter that lets you save a WAV file (or MP3 you can convert to WAV via Audacity for example), and use the Play Sound action instead as it is both faster and less resource intensive, and allows multiple sounds at the same time unlike TTS. |
 | Toggle Pause | Toggles the profile on/off at runtime | Use this to suspend profile execution temporarily |
-| Vjoy Remap | see Map to Vjoy |
+| Vjoy Remap | see Map to Vjoy | |
+| OS Action | Operating system actions. Currently only one option is available, change process focus to a new window. | |
 
 ## Implementation
 
