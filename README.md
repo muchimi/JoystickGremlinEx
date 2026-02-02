@@ -28,8 +28,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+
+### (m76T171):
+- New: Map to State: (feature request) Added a weighted randomized skip feature that only acts on press, release, toggle and invert modes.  If the random function is enabled, the action has a chance of not executing.  The percent value determines the chance of the action not executing with 100% meaning all the time (blocked), and 50 meaning a 50/50 chance of not executing.  This feature is meant to be used in conjunction with the sequence container wiggle mode, and can of course be used in other use-cases as well.
+- New: OS Action: (feature request) For now, this new bare bones action gives GremlinEx the ability to set the focus on a new process window.  The process must be running, and it will shift the focus on the process window.  The full path to the process should be entered (not case sensitive).  The best way to do this is to have the GremlinEx do the data entry by running the program that will eventually get the focus by the profile.  Select that entry from the list presented in the action "find window" button as that will populate the correct process path. Important: This action may fail if GremlinEx is run under an account with insufficient privileges as this is a UAC gated function.
+- Fix: Map to keyboard Ex: autorepeat does not always terminate on input release due to shortcut logic evaluation that was a bit overzealous.
+
 ### (m76T170):
-- New: Map to keyboard ex: mouse wheel motion parameter. This is a positive value >= 1 used to adjust how much motion is sent for a wheel event (left, up, down, right).  The default is 1 which is the smallest motion than can be sent.
+- New: Map to keyboard Ex: mouse wheel motion parameter. This is a positive value >= 1 used to adjust how much motion is sent for a wheel event (left, up, down, right).  The default is 1 which is the smallest motion than can be sent.
 - Fix: XML: another pass at action-set processing due to API changes related causing issues with gated axis and other complex containers.
 - Fix: Gated Axis: autorelease delay for gates and ranges not persisted properly
 - Fix: removed legacy input viewer menu that was deprecated and replaced by the profile graphical viewer.

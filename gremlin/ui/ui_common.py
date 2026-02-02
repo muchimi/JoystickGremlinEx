@@ -1630,8 +1630,14 @@ class QLineEdit(QtWidgets.QLineEdit):
 
     focusOut = QtCore.Signal()
 
-    def __init__(self, text = None, parent = None):
+    def __init__(self, text = None, callback = None, parent = None):
         super().__init__(text = text, parent = parent)
+        self._callback = callback
+        self.focusOut.connect(self._handle_text_changed)
+
+    def _handle_text_changed(self, value : str):
+        if self._callback:
+            self._callback(value)
 
     def focusOutEvent(self, event):
         self.focusOut.emit()

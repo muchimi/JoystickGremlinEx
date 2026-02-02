@@ -750,13 +750,15 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 is_pressed = True
                 auto_release = True
 
-        if not trigger:
-            # nothing to process
-            return True 
+
         
         if is_pressed:
             # joystick values or virtual button
             # verbose = True
+            if not trigger:
+                # nothing to process
+                return True 
+
             match mode:
                 case KeyboardOutputMode.Release:
                     if verbose:
@@ -877,7 +879,9 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                             self._hold_keys.clear()
 
                     case KeyboardOutputMode.AutoRepeat:
+                        if verbose: syslog.info(f"AUTOREPEAT: stop")
                         self.pulse_stop()
+                        self._autorepeat_clear()
                     
 
         

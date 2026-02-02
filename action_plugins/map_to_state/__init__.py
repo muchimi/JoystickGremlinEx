@@ -226,12 +226,37 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
 
+        
+
+        
+
         self.mode_widget, self.mode_layout = gremlin.ui.ui_common.getHContainer(widgets,"Action:")
     
         self.main_layout.addWidget(self.mode_widget)
 
-        self.main_layout.addWidget(self.container_pulse_widget)
+        widgets = []
+        widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Randomize",
+            value = self.action_data.randomize_mode,
+            callback = self._handle_randomize_mode_changed,
+            tooltip = "Enables randomize mode for press, release, toggle, invert modes which is the chance of the action being performed when triggered."
+        )
+        widgets.append(widget)
 
+        self.randomize_weight_widget = gremlin.ui.ui_common.QIntLineEdit(min_range = 0, max_range = 100,
+                                                   value = int(self.action_data.randomize_weight*100),
+                                                   callback = self._handle_randomize_weight_changed)
+        widgets.append("|")
+        widgets.append("Skip Chance %:")
+        widgets.append(self.randomize_weight_widget)
+
+        self.container_randomize_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, left_margin=8,
+                                                                             tooltip = "If enabled, the state change is randomized.  The skip chance percentage of 0 means never skipped, 100 always skipped, 50 is a 50/50 chance of skipping.\nThis mode is meant to be used in a wiggle scenario when radomized state changes are required.")
+
+
+       
+        self.main_layout.addWidget(self.container_pulse_widget)
+        self.main_layout.addWidget(self.container_randomize_widget)
 
 
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
@@ -265,6 +290,17 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _sync_changed(self, mode):
         self.action_data.sync_mode = mode
+
+    @QtCore.Slot(bool)
+    def _handle_randomize_mode_changed(self, checked : bool):
+        self.action_data.randomize_mode = checked
+        self._update_ui()
+
+    @QtCore.Slot(int)
+    def _handle_randomize_weight_changed(self, value : int):
+        self.action_data.randomize_weight = value / 100
+
+
 
     @QtCore.Slot(bool)
     def _handle_reset_default_changed(self, checked : bool):
@@ -391,6 +427,11 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_pulse_widget.setVisible(pulse_visible)
 
         self.button_pulse_repeat_widget.setVisible(repeat_visible)
+
+        randomize_enabled = self.action_data.mode != "pulse" # in ("toggle","press","release","toggle","invert")
+        self.container_randomize_widget.setEnabled(randomize_enabled)
+        self.randomize_weight_widget.setEnabled(self.action_data.randomize_mode)
+
 
 
     @QtCore.Slot()
@@ -929,6 +970,18 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
         if trigger:
             # trigger mode (act as press)
+
+            # randomizer
+            if self.action_data.randomize_mode and mode != "pulse" and input_type in (InputType.JoystickButton, InputType.JoystickHat):
+                value = random.randrange(0, 100)
+                threshhold = int(self.action_data.randomize_weight*100)
+                execute = value <= threshhold
+                if verbose: syslog.info(f"MAP TO STATE: random mode: [{value}] threshhold: [{threshhold}] execute: [{execute}]")
+                if not execute:
+                    # skip the action
+                    return True
+
+
             match input_type:
                 case InputType.JoystickButton: #| InputType.Keyboard | InputType.KeyboardLatched:
                     # button
@@ -1096,6 +1149,8 @@ class MapToState(gremlin.base_profile.AbstractAction):
         self.hat_map = {} # map of button id keyed by hat position tuple
         self.hat_positions = list(vjoy.vjoy.Hat.to_continuous_direction.keys())
         self.hat_mode_map = {} # bool table keyed by hat position
+        self.randomize_mode = False # true if the action mode is randomized for toggle, press, release or invert.
+        self.randomize_weight = 0.5 # chance of randomizing if in randomize mode.  The value 0 to 1 indicates the chance of randomization with 1 = 100%, 0 = no chance.
 
         for position in self.hat_positions:
             self.hat_map[position] = "" # not mapped by default
@@ -1181,6 +1236,9 @@ class MapToState(gremlin.base_profile.AbstractAction):
             self.sync_mode = SyncMode(safe_read(node,"sync-mode", int, 0))
 
         self.reset_default_on_stop = safe_read(node,"default-reset", bool, True)
+        self.randomize_mode = safe_read(node,"randomize-mode", bool, False)
+        self.randomize_weight = safe_read(node,"randomize-weight", float, 0.5)
+
 
 
         input_type = self.get_input_type()
@@ -1233,6 +1291,9 @@ class MapToState(gremlin.base_profile.AbstractAction):
                 node.set("repeat-delay", safe_format(self.pulse_repeat_delay, int))
 
             node.set("default-reset", safe_format(self.reset_default_on_stop, bool))
+
+            node.set("randomize-mode", safe_format(self.randomize_mode, bool))
+            node.set("randomize-weight", safe_format(self.randomize_weight, float))
 
             input_type = self.get_input_type()
             if input_type == InputType.JoystickHat:
