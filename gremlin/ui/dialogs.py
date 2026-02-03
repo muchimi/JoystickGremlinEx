@@ -3107,7 +3107,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
     # Signal emitted when the user selects a process
     process_selected = Signal(object, str) # (widget, filename)
 
-    def __init__(self, text = None, parent=None):
+    def __init__(self, text = None, data = None, parent=None):
         """Creates a new instance.
 
         :param text: the process exe to select by default (if one is provided, and the item is not in the list, the file open will executed at that folder location)
@@ -3118,6 +3118,8 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self.setWindowTitle("Process List")
         self.setMinimumWidth(400)
         self.setMinimumHeight(600)
+
+        self.data = data
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.list_model = QtCore.QStringListModel()

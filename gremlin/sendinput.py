@@ -530,8 +530,6 @@ def _mouse_input(flags, dx=0, dy=0, data=0):
     )
 
 
-
-
 def send_key(virtual_code, scan_code, flags):
     ''' sends a key message via send input '''
     _send_input(_keyboard_input(virtual_code, scan_code, flags))

@@ -301,37 +301,89 @@ class OsActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self.process_path_widget = gremlin.ui.ui_common.QPathLineItem(text = self.action_data.process_name,
                                                 callback = self._handle_process_path_changed,
-                                                callback_open= self._handle_find_window)
+                                                callback_open= self._handle_find_window,
+                                                button_label = "Select Window...")
         self.process_path_widget.setMaximumWidth(300)
+
+        select_process = gremlin.ui.ui_common.QDataPushButton("Select Executable...", callback=self._handle_select_executable)
+
+        container_process = gremlin.ui.ui_common.getHContainer([self.process_path_widget, select_process], widget_only = True)
+
+        start_widget = gremlin.ui.ui_common.QDataCheckbox("Auto-start process if not running",
+                                                    value = self.action_data.start_process,
+                                                    callback = self._handle_autostart_changed,
+                                                    tooltip = "Attemps to start the process if not running.")
+        
+        self.timeout_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self.action_data.start_timeout,
+                                                           min_range=1,
+                                                           max_range = 1000,
+                                                           step = 1.0,
+                                                           callback = self._handle_timeout_changed
+                                                           )
+        
+        self.args_widget = gremlin.ui.ui_common.QLineEdit(self.action_data.process_args,
+                                                    callback = self._handle_args_changed,
+                                                    tooltip = "Command line arguments to pass to the process (optional)")
+        
+        margin = 12
+        self.container_timeout = gremlin.ui.ui_common.getHContainer(self.timeout_widget,"Process start timeout (s):", widget_only = True, left_margin = margin)
+        self.container_args = gremlin.ui.ui_common.getHContainer(self.args_widget,"Process command line arguments:", widget_only = True, left_margin = margin)
+        
+        
         widgets = [
             "Process Window:",
-            self.process_path_widget,
+            container_process,
+            start_widget,
+            self.container_timeout,
+            self.container_args
         ]
 
 
         self.container_setfocus = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
-        
-
-        
         self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
         self.main_layout.addWidget(self.container_setfocus)
-
-        
-
 
         self._update_ui()
 
     def _populate_ui(self):
         pass
 
+    def _handle_timeout_changed(self, value : float):
+        self.action_data.start_timeout = value
+
+    def _handle_select_executable(self, widget):
+        ''' opens the process executable '''
+        import gremlin.ui.dialogs
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+            None,
+            "Process",
+            self.action_data.process_name,
+            "Executable files (*.exe)"
+        )
+        if fname and os.path.isfile(fname):
+            self.action_data.process_name = fname
+            with QtCore.QSignalBlocker(self.process_path_widget):
+                self.process_path_widget.setText(fname)
+            self._update_ui()
+
+
+    @QtCore.Slot(bool)
+    def _handle_autostart_changed(self, checked : bool):
+        self.action_data.start_process = checked
+        self._update_ui()
+
+    @QtCore.Slot(str)
+    def _handle_args_changed(self, value : str):
+        self.action_data.process_args = value if value else None
         
+    @QtCore.Slot(object)
     def _handle_find_window(self, widget):
         ''' show find window dialog '''
         self.dialog = FindWindowDialog()
         self.dialog.closed.connect(self._handle_dialog_closed)
         self.dialog.exec()
 
-        
+    @QtCore.Slot()
     def _handle_dialog_closed(self):
         selected = self.dialog.selected
         if selected:
@@ -365,6 +417,10 @@ class OsActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         setfocus_visible = self.action_data.action == OsActionMode.SetFocus
         self.container_setfocus.setVisible(setfocus_visible)
 
+        enabled = self.action_data.start_process
+        self.container_args.setEnabled(enabled)
+        self.container_timeout.setEnabled(enabled)
+
 
 
 
@@ -373,6 +429,16 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
     def __init__(self, action_data, parent = None):
         super().__init__(action_data, parent)
         self.action_data : OsAction = action_data
+        self._is_running = False
+        self._lock = threading.Lock()
+        self._thread = None
+
+    def profile_stop(self):
+        with self._lock:
+            self._is_running = False
+        if self._thread and self._thread.is_alive():
+            self._thread.join()
+            self._thread = None
         
 
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
@@ -388,25 +454,97 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
                         pm = ProcessHelper()
                         data = pm.getWindows()
                         info = next((item for item in data if item["process_path"].casefold() == self.action_data.process_name.casefold()), None)
+
+                        if not info and self.action_data.start_process:
+                            ''' attempt to autostart the process '''
+                            if not self._is_running:
+                                self._thread = threading.Thread(target = self._exec_runner)
+                                self._thread.name = "os action exec"
+
+                                
+                                # wait for the process to load
+                                with self._lock:
+                                    self._is_running = True
+                                self._thread.start()
+                                return True
+
                         if info:
                             hwnd = info["hwnd"]
                             if verbose: syslog.info(f"OSACTION: set focus: handle: [{hwnd}] process: [{info["process_name"]}]")
-
-                            if win32gui.IsIconic(hwnd):
-                                # restore the window if minimized
-                                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-                            # enable setforeground if the process is not the current foreground exploiting a windows hack to send the alt key first, then setting the focus
-                            # in case gremlinEx is not the current foreground application (which it most invariably isn't at runtime)
-                            win32api.keybd_event(win32con.VK_MENU, 0, 0, 0) # Alt key down
-                            win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0) # Alt key up
-                            win32gui.SetForegroundWindow(hwnd)
-
+                            self._set_focus(hwnd)
+                        
 
                     except:
                         if verbose: syslog.info(f"OSACTION: set focus: unable to find process window for [{self.action_data.process_name}]")
 
                 
         return True
+    
+    def _exec_runner(self):
+        ''' runs the process and waits to set the focus '''
+        verbose = gremlin.config.Configuration().verbose_mode_process
+        # execute the process
+        self._execute(self.action_data.process_name, self.action_data.process_args)
+                              
+        pm = ProcessHelper()
+        delay = self.action_data.start_timeout
+        timeout = time.time() + delay
+        info = None
+        if verbose: syslog.info("OSACTION: waiting for process to start...")
+        while self._is_running and time.time() < timeout:
+            data = pm.getWindows()
+            info = next((item for item in data if item["process_path"].casefold() == self.action_data.process_name.casefold()), None)
+            if info:
+                if verbose: syslog.info("OSACTION: process started")
+                break
+            
+            # wait for the process to start
+            time.sleep(0.5)
+
+        if info:
+            hwnd = info["hwnd"]
+            if verbose: syslog.info(f"OSACTION: set focus: handle: [{hwnd}] process: [{info["process_name"]}]")
+            self._set_focus(hwnd)
+
+        elif not self._is_running:
+            # only issue warning if not aborted
+            syslog.warning("OSACTION: set focus: unable to find process window (timeout)")
+
+        self._is_running = False
+
+    
+    def _set_focus(self, hwnd):
+        ''' sets the focus to the given window handle '''
+        if win32gui.IsIconic(hwnd):
+            # restore the window if minimized
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        # enable setforeground if the process is not the current foreground exploiting a windows hack to send the alt key first, then setting the focus
+        # in case gremlinEx is not the current foreground application (which it most invariably isn't at runtime)
+        win32api.keybd_event(win32con.VK_MENU, 0, 0, 0) # Alt key down
+        win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0) # Alt key up
+        win32gui.SetForegroundWindow(hwnd)
+
+    def _execute(self, path, args = None, args_per_line : bool = False):
+        ''' executes the process '''
+        import subprocess
+
+        if os.path.isfile(path):
+            try:
+                cmd_list = [path]
+                if args:
+                    if args_per_line:
+                        args = args.splitlines()
+                    if isinstance(args,list) or isinstance(args,tuple):
+                        cmd_list.extend(arg for arg in args)
+                    else:
+                        cmd_list.append(args)
+                # attemp start (no wait)
+                subprocess.Popen(cmd_list)
+            except:
+                pass
+        else:
+            syslog.error(f"OSACTION: unable to find process: [{path}]")
+
 
 
 class OsAction(gremlin.base_profile.AbstractAction):
@@ -431,9 +569,12 @@ class OsAction(gremlin.base_profile.AbstractAction):
         super().__init__(parent)
         self.parent = parent
         self.action = OsActionMode.SetFocus
-        self.process_name = None # process name
-        self.window_class = None # window class
-        self.window_title = None # window title
+        self.process_name : str = None # process name
+        self.window_class : str = None # window class
+        self.window_title : str = None # window title
+        self.start_process = False # if true, starts the process if it's not running
+        self.process_args : str = None # process start args (optional)
+        self.start_timeout : float = 5 # number of seconds to wait for the process to start
 
 
     def icon(self):
@@ -458,6 +599,12 @@ class OsAction(gremlin.base_profile.AbstractAction):
             self.window_title = node.get("window-title")
         if "process-name" in node.attrib:
             self.process_name = node.get("process-name")
+        self.start_process = safe_read(node,"auto-start", bool, False)
+        if "args" in node.attrib:
+            args = node.get("args")
+            if args:
+                self.process_args = args
+        self.start_timeout = safe_read(node,"timeout", float, 5.0)
 
     def _generate_xml(self):
         node = ElementTree.Element(self.tag)
@@ -468,6 +615,10 @@ class OsAction(gremlin.base_profile.AbstractAction):
             node.set("window-class", self.window_class)
         if self.window_title:
             node.set("window-title", self.window_title)
+        node.set("auto-start",safe_format(self.start_process, bool))
+        if self.process_args:
+            node.set("args", self.process_args)
+        node.set("timeout", safe_format(self.start_timeout, float))
 
             
         return node

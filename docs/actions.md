@@ -20,7 +20,7 @@ Actions are contained in [containers](containers.md#containers).
 | Map to Keyboard | This action is a legacy action to create keyboard output, included here to be compatible with original Joystick Gremlin profiles |
 | Map to Keyboard/Mouse Ex | This action lets you output keyboard, and mouse button or mouse wheel to the output.  Supports advanced options for auto-repeat, hold, latching and various other controls.  Support multimedia key output such as volume control. | Use this when you need to send keyboard / mouse output to the target application |
 | Map to Mouse | This action is a legacy action to create mouse output.  Supports button and axis (mouse movement) actions.  | Use this to send mouse movement to the target application.  For mouse button, look at Map to Keyboard/Mouse Ex instead as it has more features. |
-| Map to Mouse Ex | More advanced version of the legacy action to create mouse output. |Use this to send mouse movement to the target application.  For mouse button, look at Map to Keyboard/Mouse Ex instead as it has more features. |
+| Map to Mouse Ex | More advanced version of the legacy action to create mouse output. Ability to trigger a mouse button, mouse motion, or set the mouse to a set position. |Use this to send mouse movement to the target application.  For mouse button, look at Map to Keyboard/Mouse Ex instead as it has more features. |
 | Map to Octavi IFR1 | Allows you to change/set LEDs on the IFR1 device | Use this to manage modes and LEDs on the Octavi IFR1 hardware panel |
 | Map to OSC | Send OSC messages to send data to hardware panels or glass surfaces to modify their appearance/modes. | This is the original GremlinEx OSC mapper |
 | Map to OSC Ex | Send OSC messages to send data to hardware panels or glass surfaces to modify their appearance/modes. | This is a more advanced version of the GremlinEx OSC mapper.  This is often used to change states on Bitfocus controlled devices such as the ELgato Streamdeck, LoupeDeck or OSC glass surfaces like Open Stage Control or TouchOSC - this enables two way communication between GremlinEx and these hardware panels or control surfaces via the OSC protocol over the network. |
@@ -43,7 +43,7 @@ Actions are contained in [containers](containers.md#containers).
 | Text to Speech (TTS) | This action converts text to speech using the internal operating system TTS synthesis.  Voices available depend on what voice packs are installed on the system.  The output is limited to the default audio device. | While you can use this for TTS, the recommendation is to use an online AI TTS converter that lets you save a WAV file (or MP3 you can convert to WAV via Audacity for example), and use the Play Sound action instead as it is both faster and less resource intensive, and allows multiple sounds at the same time unlike TTS. |
 | Toggle Pause | Toggles the profile on/off at runtime | Use this to suspend profile execution temporarily |
 | Vjoy Remap | see Map to Vjoy | |
-| OS Action | Operating system actions. Currently only one option is available, change process focus to a new window. | |
+| OS Action | Operating system actions. Currently only one option is available, change process focus to a new window.  Optionally starts the process if it's not running. | |
 
 ## Implementation
 

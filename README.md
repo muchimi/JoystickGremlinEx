@@ -29,8 +29,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T172):
+- New: Map to Mouse Ex: gains mouse set position feature.  The position can be recorded while in record mode by moving the mouse, and clicking a button when the mouse is in the proper position. Press esc to cancel the recording. Supports multiple monitors. Note: if the monitor configuration changes, the saved mouse coordinates may be invalid.
+- New: OS Action: Option to start a process if not running when setting the focus. Command line parameters can be provided.
+- New: OS Action: Option to select an executable from the file system.
+- Change: Map to Mouse Ex: adopts execute on press/release modes like other newer actions.
+
 ### (m76T171A):
 - Changed: OS Action : improved UI
+- Updated documentation
 
 ### (m76T171):
 - New: Map to State: (feature request) Added a weighted randomized skip feature that only acts on press, release, toggle and invert modes.  If the random function is enabled, the action has a chance of not executing.  The percent value determines the chance of the action not executing with 100% meaning all the time (blocked), and 50 meaning a 50/50 chance of not executing.  This feature is meant to be used in conjunction with the sequence container wiggle mode, and can of course be used in other use-cases as well.

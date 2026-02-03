@@ -808,6 +808,8 @@ class MouseClickMode(Enum):
 class MouseAction(Enum):
     MouseButton = 0 # output a mouse button
     MouseMotion = 1 # output a mouse motion
+    MousePosition = 2 # set the exact mouse position
+
     # MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
     # MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
     # MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
@@ -843,39 +845,52 @@ class MouseAction(Enum):
     @staticmethod
     def to_description(action):
         ''' returns a descriptive string for the action '''
-        if action == MouseAction.MouseButton:
-            return "Maps a mouse button"
-        elif action == MouseAction.MouseMotion:
-            return "Maps to a mouse motion axis"
-        elif action == MouseAction.MouseWiggleOffLocal:
-            return "Turns wiggle mode off (local only)"
-        elif action == MouseAction.MouseWiggleOnLocal:
-            return "Turns wiggle mode on (local only)"
-        elif action == MouseAction.MouseWiggleOffRemote:
-            return "Turns wiggle mode off (remote only)"
-        elif action == MouseAction.MouseWiggleOnRemote:
-            return "Turns wiggle mode on (remote only)"
+        match action:
+            case MouseAction.MouseButton:
+                return "Maps a mouse button"
+            case MouseAction.MouseMotion:
+                return "Maps to a mouse motion axis"
+            case MouseAction.MousePosition:
+                return "Sets the mouse position"
+        
+        # elif action == MouseAction.MouseWiggleOffLocal:
+        #     return "Turns wiggle mode off (local only)"
+        # elif action == MouseAction.MouseWiggleOnLocal:
+        #     return "Turns wiggle mode on (local only)"
+        # elif action == MouseAction.MouseWiggleOffRemote:
+        #     return "Turns wiggle mode off (remote only)"
+        # elif action == MouseAction.MouseWiggleOnRemote:
+        #     return "Turns wiggle mode on (remote only)"
 
-        return f"Unknown {action}"
+        return f"Unknown [{action}]"
     
     @staticmethod
     def to_name(action):
         ''' returns the name from the action '''
-        if action == MouseAction.MouseButton:
-            return "Mouse button"
-        elif action == MouseAction.MouseMotion:
-            return "Mouse axis"
-        elif action == MouseAction.MouseWiggleOffLocal:
-            return "Wiggle Disable (local)"
-        elif action == MouseAction.MouseWiggleOnLocal:
-            return "Wiggle Enable (local)"
-        elif action == MouseAction.MouseWiggleOffRemote:
-            return "Wiggle Disable (remote)"
-        elif action == MouseAction.MouseWiggleOnRemote:
-            return "Wiggle Enable (remote)"
+        match action:
+            case MouseAction.MouseButton:
+                return "Mouse button"
+            case MouseAction.MouseMotion:
+                return "Mouse axis"
+            case MouseAction.MousePosition:
+                return "Mouse position"
+            
+
+        # if action == MouseAction.MouseButton:
+        #     return "Mouse button"
+        # elif action == MouseAction.MouseMotion:
+        #     return "Mouse axis"
+        # elif action == MouseAction.MouseWiggleOffLocal:
+        #     return "Wiggle Disable (local)"
+        # elif action == MouseAction.MouseWiggleOnLocal:
+        #     return "Wiggle Enable (local)"
+        # elif action == MouseAction.MouseWiggleOffRemote:
+        #     return "Wiggle Disable (remote)"
+        # elif action == MouseAction.MouseWiggleOnRemote:
+        #     return "Wiggle Enable (remote)"
 
                 
-        return f"Unknown {action}"
+        return f"Unknown [{action}]"
     
 class MouseButton(IntEnum):
 

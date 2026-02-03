@@ -27,7 +27,8 @@ import gremlin.singleton_decorator
 user32 = ctypes.WinDLL("user32")
 
 g_keyboard_callbacks = []
-g_mouse_callbacks = []
+g_mouse_callbacks = [] # holds callbacks specific to non mouse movement 
+g_mouse_move_callbacks = [] # holds callbacks specific to mouse movement 
 import win32api
 import logging
 syslog = logging.getLogger("system")
@@ -262,6 +263,11 @@ def setRunning(value : bool):
     global _is_runtime
     _is_runtime = value
 
+def getMousePosition(self):
+    ''' gets the mouse position '''
+    global _mouse_x, _mouse_y
+    return (_mouse_x, _mouse_y)
+
 
 @HOOKPROC
 def process_mouse_event(n_code, w_param, l_param):
@@ -273,6 +279,7 @@ def process_mouse_event(n_code, w_param, l_param):
     """
     import gremlin.types
     global g_mouse_callbacks, _is_runtime, _mouse_x, _mouse_y
+    global g_mouse_move_callbacks
     verbose = False
     if n_code == HC_ACTION: # and w_param != WM_MOUSEMOVE:
         msg = ctypes.cast(l_param, LPMSLLHOOKSTRUCT)[0]
@@ -327,6 +334,9 @@ def process_mouse_event(n_code, w_param, l_param):
             # mouse movement
             _mouse_x = msg.pt.x
             _mouse_y = msg.pt.y
+            # fire the callbacks for mouse movement
+            for callback in g_mouse_move_callbacks:
+                callback(_mouse_x, _mouse_y)
 
         if is_wheel and button_id:
             # mouse wheel event processing
@@ -501,15 +511,30 @@ class MouseHook:
             g_mouse_callbacks.append(callback)
             self.start() # start listen if needed
 
+    def registerMouseMove(self, callback):
+        ''' registers a mouse move callback '''
+        global g_mouse_move_callbacks
+        if callback and not callback in g_mouse_move_callbacks:
+            g_mouse_move_callbacks.append(callback)
+            self.start()
+
     def unregister(self, callback):
         ''' removes a mouse callback '''
         global g_mouse_callbacks
         if callback in g_mouse_callbacks:
             g_mouse_callbacks.remove(callback)
 
-        if not callback:
+        if not g_mouse_callbacks:
             # no more callbacks, stop the hook
             self.stop() 
+
+    def unregisterMouseMove(self, callback):
+        ''' unregisters a mouse move callback '''
+        global g_mouse_move_callbacks
+        if callback in g_mouse_move_callbacks:
+            g_mouse_move_callbacks.remove(callback)
+
+        
 
     def start(self):
         """Starts the hook if it is not yet running."""

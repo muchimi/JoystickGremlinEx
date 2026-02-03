@@ -1045,6 +1045,9 @@ class Buttons():
     def getExpandAllWidget(tooltip = "Collapse All", callback = None, width = 24, height = 24):
         return Buttons._template(None, Icons.expandAllIcon(), tooltip, callback, width=width, height=height)
     
+    @staticmethod
+    def getRecordWidget(tooltip = "Record", callback = None, width = 24, height = 24):
+        return Buttons._template(None, Icons.recordIcon(), tooltip, callback, width=width, height=height)
     
     
     
@@ -1630,10 +1633,12 @@ class QLineEdit(QtWidgets.QLineEdit):
 
     focusOut = QtCore.Signal()
 
-    def __init__(self, text = None, callback = None, parent = None):
+    def __init__(self, text = None, callback = None, parent = None, tooltip = None):
         super().__init__(text = text, parent = parent)
         self._callback = callback
         self.focusOut.connect(self._handle_text_changed)
+        if tooltip:
+            self.setToolTip(tooltip)
 
     def _handle_text_changed(self, value : str):
         if self._callback:
@@ -2126,17 +2131,11 @@ class IntValidator(QtGui.QValidator):
             return (QtGui.QValidator.Invalid, input_str, pos)
         
         # convert
+
         try:
             value = int(input_str)
         except:
             return (QtGui.QValidator.Invalid, input_str, pos)
-        
-        # range check
-        # if self._min_range is not None and value < self._min_range:
-        #     return (QtGui.QValidator.Invalid, input_str, pos)
-        
-        # if self._max_range is not None and value > self._max_range:
-        #     return (QtGui.QValidator.Invalid, input_str, pos)
         
         return (QtGui.QValidator.Acceptable, input_str, pos)
 
@@ -2164,6 +2163,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         self._supressed = False # true if events are suppressed
 
         # self._validator = QtGui.QIntValidator(min_range, max_range) 
+    
         self._validator = IntValidator(min_range, max_range) 
         self._validator.setLocale(self.locale()) # handle correct floating point separator
         #self.textChanged.connect(self._validate)
@@ -2240,6 +2240,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         elif t == QtCore.QEvent.Type.FocusAboutToChange:
             # check the range
             value = self.value()
+            
             if self._min_range is not None and value < self._min_range:
                 self.setValue(self._min_range)
             if self._max_range is not None and value > self._max_range:
@@ -3443,6 +3444,8 @@ class InputListenerWidget(QBoxFrame):
         self._accepted = False # true if the input is accepted
         self._virtual_only = virtual_only # only listen to virtual devices if set
         self.selection = None # holds whatever was selecteed
+        self._mouse_x = None # mouse x coord for mouse move
+        self._mouse_y = None # mouse y coord for mouse move
         
         self._listen_mouse = InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types or InputType.Mouse in event_types
 
@@ -3495,13 +3498,23 @@ class InputListenerWidget(QBoxFrame):
         if self._listen_mouse:
             # hook the mouse
             mh = gremlin.windows_event_hook.MouseHook()
-            mh.register(self._mouse_event_cb)
+            mh.registerMouseMove(self._mouse_move_cb)
+            mh.register(self._mouse_event_cb) # trap clicks
+
+
 
     def unhook(self):
         ''' called on widget destruction '''
         el = gremlin.event_handler.EventListener()
         el.keyboard_event.disconnect(self._kb_event_cb)
         el.joystick_event_ui.disconnect(self._joy_event_cb)
+
+        if self._listen_mouse:
+            # unhook mouse callbacks
+            mh = gremlin.windows_event_hook.MouseHook()
+            mh.unregisterMouseMove(self._mouse_move_cb)
+            mh.unregister(self._mouse_event_cb)
+            
             
 
     @property
@@ -3679,6 +3692,13 @@ class InputListenerWidget(QBoxFrame):
     def _mouse_event_cb(self, event):            
         gremlin.util.InvokeUiMethod(self._mouse_event_ui, event)
 
+    def _mouse_move_cb(self, x, y):
+        self._mouse_x = x
+        self._mouse_y = y
+
+    def getMousePosition(self):
+        ''' gets the recorded mouse position '''
+        return (self._mouse_x, self._mouse_y)
   
 
     def _abort_request(self):
@@ -3707,7 +3727,9 @@ class InputListenerWidget(QBoxFrame):
         gremlin.shared_state.pop_suspend_highlighting()
         gremlin.shared_state.pop_suspend_ui_keyinput()
 
+        self.unhook()
         self.closed.emit(self._accepted)
+        
 
         # print ("input widget close")
         super().closeEvent(evt)
@@ -4671,7 +4693,7 @@ class QPathLineItem(QtWidgets.QWidget):
 
     IconSize = QtCore.QSize(16, 16)
 
-    def __init__(self, header = None, text = None, data = None, dir_mode = False, parent = None, open_tooltip_text = "Browse", callback = None, callback_open = None):
+    def __init__(self, header = None, text = None, data = None, dir_mode = False, parent = None, open_tooltip_text = "Browse", callback = None, callback_open = None, button_label = "..."):
         '''
         displays the path to a file or a folder
         :param: header - the header text
@@ -4692,11 +4714,15 @@ class QPathLineItem(QtWidgets.QWidget):
         self._file_widget.returnPressed.connect(self._open_button_cb) # open the dialog on enter
         self._file_widget.setText(text)
         self._file_widget.textChanged.connect(self._file_changed)
-        self._open_button = QtWidgets.QPushButton("...")
-        self._open_button.setMaximumWidth(20)
-        self._open_button.clicked.connect(self._open_button_cb)
-        if open_tooltip_text:
-            self._open_button.setToolTip(open_tooltip_text)
+        self._open_button = None
+        if button_label:
+            self._open_button = QtWidgets.QPushButton(button_label)
+            if button_label == "...":
+                self._open_button.setMaximumWidth(20)
+            self._open_button.clicked.connect(self._open_button_cb)
+            if open_tooltip_text:
+                self._open_button.setToolTip(open_tooltip_text)
+        
         self._icon_widget = QtWidgets.QLabel()
         self._icon_widget.setMaximumWidth(20)
         self._layout = QtWidgets.QHBoxLayout()
@@ -4707,7 +4733,8 @@ class QPathLineItem(QtWidgets.QWidget):
 
         self._layout.addWidget(self._icon_widget)
         self._layout.addWidget(self._file_widget)
-        self._layout.addWidget(self._open_button)
+        if self._open_button:
+            self._layout.addWidget(self._open_button)
         self._layout.setContentsMargins(0,0,0,0)
 
         self._data = data
@@ -4968,6 +4995,7 @@ class QProgressBar(QtWidgets.QWidget):
                 else:
                     # down
                     v -= self._step * factor
+                
                 v = gremlin.util.clamp(v, self._min_range, self._max_range)
                 self.setValue(v)
                 self.valueChanged.emit()
@@ -8180,6 +8208,7 @@ class QDelayWidget(QtWidgets.QWidget):
 
     def __init__(self, 
                  value = 250, 
+                 min_value_seconds = 0,
                  max_value_seconds = 60,
                  is_seconds = False, 
                  callback = None, 
@@ -8203,6 +8232,7 @@ class QDelayWidget(QtWidgets.QWidget):
 
         self._is_seconds = is_seconds
         self._max_value = max_value_seconds * 1000 # max value possible
+        self._min_value = min_value_seconds * 1000 # min value
 
         width = gremlin.ui.ui_common.get_char_width(8)
         self.delay_label = QtWidgets.QLabel(label) if label else None
@@ -8210,7 +8240,8 @@ class QDelayWidget(QtWidgets.QWidget):
         self._delay_widget.invalid.connect(self._handle_invalid_input)
         # self._delay_widget.setRange(0, self._max_value) 
         self._delay_widget.setMaximumWidth(width)
-        self._delay_widget.setMinimum(0)
+        self._delay_widget.setMinimum(self._min_value)
+        self._delay_widget.setMaximum(self._max_value)
         self._delay_widget.setValue(value) # default
         self._delay_widget.valueChanged.connect(self._value_changed)
 
