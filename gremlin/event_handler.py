@@ -2502,7 +2502,7 @@ class EventHandler(QtCore.QObject):
 			mouse_button = event.identifier
 			# convert the mouse button to the virtual scan code we use for mouse events
 			index = ((mouse_button.value + 0x1000, False), 0)
-			verbose = config.verbose_mode_mouse and config.verbose_mode_inputs
+			verbose = config.verbose_mode_mouse_input and config.verbose_mode_inputs
 			if verbose:
 				syslog.info(f"matching mouse event {event.identifier} to {gremlin.keyboard.KeyMap.keyid_tostring(index)}")
 		else:

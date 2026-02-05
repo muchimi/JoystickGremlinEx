@@ -20,8 +20,6 @@ from __future__ import annotations
 import win32gui
 import win32con
 import win32api
-import win32process
-import psutil
 
 import os
 from PySide6 import QtWidgets, QtCore
@@ -42,6 +40,7 @@ import logging
 import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
+import gremlin.process
 
 syslog = logging.getLogger("system")
 
@@ -56,208 +55,8 @@ class OsActionMode (IntEnum):
                 return "Sets the focus to a window"
             case _:
                 return f"Don't know how to handle: [{value}]"
-            
-class ProcessHelper:
-    def getWindows(self):
-        """
-        Enumerates all visible top-level windows and returns a list of 
-        (hwnd, title) tuples.
-        """
-        windows = []
+  
 
-        def callback(hwnd, extra):
-            if win32gui.IsWindowVisible(hwnd):
-                window_title = win32gui.GetWindowText(hwnd)
-                window_class = win32gui.GetClassName(hwnd)
-                process_data = self.getProcessFromHwnd(hwnd)
-                process_name = process_data["process_path"] if process_data else None
-                process_path = process_data["process_path"] if process_data else None
-                hwnd = process_data["hwnd"] if process_data else None
-                
-                if window_title:  # Only include windows with a non-empty title
-                    data = {
-                        "hwnd" : hwnd,
-                        "process_path": process_path,
-                        "process_name" : process_name,
-                        "window_title": window_title,
-                        "window_class": window_class
-                    }
-                    windows.append(data)
-            return True # Continue enumeration
-
-        win32gui.EnumWindows(callback, None)
-        return windows
-    
-    def getProcessFromHwnd(self, hwnd):
-        """
-        Retrieves the process ID and a process handle from a window handle.
-
-        Args:
-            hwnd (int): The window handle (HWND).
-
-        Returns:
-            dict: A dictionary containing the thread ID, process ID, process handle,
-                and process name. Returns None if the process cannot be opened.
-        """
-        try:
-            # 1. Get the Thread ID and Process ID from the window handle
-            # The function returns the thread ID, and the second argument (pid) 
-            # is filled with the process ID.
-            thread_id, process_id = win32process.GetWindowThreadProcessId(hwnd)
-            
-            # 2. Open the process to get a process handle
-            # PROCESS_QUERY_LIMITED_INFORMATION (0x1000) is a required access right
-            # False means inherit handle is not set.
-            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-            process_handle = win32api.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, process_id)
-            process_path = None
-            process_name = None
-            
-            
-            # 3. Use psutil to get the process name (optional but helpful)
-            try:
-                process_name = psutil.Process(process_id).name()
-
-                process = psutil.Process(process_id)
-                process_name = process.name()
-                process_path = process.exe()
-
-
-
-            except psutil.NoSuchProcess:
-                process_name = "N/A (Process not found)"
-                
-
-            return {
-                "hwnd": hwnd,
-                "thread_id": thread_id,
-                "process_id": process_id,
-                "process_handle": process_handle,
-                "process_name": process_name,
-                "process_path": process_path
-            }
-
-        except Exception as e:
-            print(f"Error getting process info for HWND {hwnd}: {e}")
-            return None
-
-class FindWindowDialog(gremlin.ui.ui_common.BaseDialogUi):
-    def __init__(self, parent = None):
-        super().__init__(self.__class__.__name__, parent)
-        self.setWindowTitle("Find Process Window")
-        self.setModal(True)
-
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.data = [] # tuples of (class : str, title : str)
-        self.selected_index = None # nothing selected
-        
-        refresh_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget("Refresh", callback = self._update_data)
-
-        self.scroll_area = QtWidgets.QScrollArea()
-        self.scroll_widget = QtWidgets.QWidget()
-        self.scroll_layout = QtWidgets.QVBoxLayout()
-        self.table = QtWidgets.QTableWidget()
-        self.table.setSortingEnabled(True)
-
-        self.scroll_widget.setLayout(self.scroll_layout)
-        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-
-        # Configure the scroll area
-        self.scroll_area.setMinimumWidth(400)
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setWidget(self.scroll_widget)
-
-        self.scroll_layout.addWidget(self.table)
-
-        self.main_layout.addWidget(self.scroll_area)
-
-        headers = [
-                "Process",
-                "Window Title",
-                "Process Path",
-        ]
-
-        self.table.setColumnCount(len(headers))
-        self.table.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
-        self.table.setHorizontalHeaderLabels(headers)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows) # select the entire row
-        self.table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection) # select a single row at a time
-        self.table.currentItemChanged.connect(self._handle_row_changed)
-        
-        # self.table.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
-        # self.table.customContextMenuRequested.connect(self._context_menu_cb)
-        # self.table.viewport().installEventFilter(self)
-
-
-        self.ok_button = QtWidgets.QPushButton("Ok")
-        self.ok_button.clicked.connect(self._handle_ok)
-
-        close_button = QtWidgets.QPushButton("Cancel")
-        close_button.clicked.connect(self._handle_cancel)
-
-        widgets = [
-            refresh_widget,
-            "||",
-            self.ok_button,
-            close_button
-            ]
-        
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
-        self.main_layout.addWidget(widget)
-
-
-        self._update_data()
-
-    def _handle_row_changed(self, current, previous):
-        if current is not None:
-            self.selected_index = current.row()
-        self.ok_button.setEnabled(self.selected_index is not None)
-
-    def getSelectedRow(table_widget):
-        row = table_widget.currentRow()
-        if row > -1:  # Check if a row is actually selected
-            row_data = []
-            for column in range(table_widget.columnCount()):
-                item = table_widget.item(row, column)
-                if item is not None:
-                    row_data.append(item.text())
-                else:
-                    row_data.append("") # Handle empty cells
-            return row_data
-        return None        
-
-
-   
-
-    def _update_data(self):
-        ''' updates the list of windows '''
-        pm = ProcessHelper()
-        self.data = pm.getWindows()
-        self.selected_index = None
-
-        self.table.clearContents()
-        self.table.setRowCount(len(self.data))
-        for i, item in enumerate(self.data):
-            self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(item["process_name"]))
-            self.table.setItem(i, 1, QtWidgets.QTableWidgetItem(item["window_title"]))
-            self.table.setItem(i, 2, QtWidgets.QTableWidgetItem(item["process_path"]))
-                               
-
-        # resize
-        self.table.resizeColumnsToContents()
-
-        # ok button
-        self.ok_button.setEnabled(self.selected_index is not None)
-
-    def _handle_ok(self):
-        self.selected = self.data[self.selected_index]
-        self.close()
-
-    def _handle_cancel(self):
-        self.selected = None
-        self.close()
 
 
 class OsActionWidget(gremlin.ui.input_item.AbstractActionWidget):
@@ -284,8 +83,7 @@ class OsActionWidget(gremlin.ui.input_item.AbstractActionWidget):
             ("Set Window Focus", OsActionMode.SetFocus)
         ]
 
-        grid_widgets = []
-
+  
         self.action_selector = gremlin.ui.ui_common.QDataComboBox(
             value = self.action_data.action,
             source = items,
@@ -379,7 +177,7 @@ class OsActionWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(object)
     def _handle_find_window(self, widget):
         ''' show find window dialog '''
-        self.dialog = FindWindowDialog()
+        self.dialog = gremlin.ui.ui_common.FindWindowDialog()
         self.dialog.closed.connect(self._handle_dialog_closed)
         self.dialog.exec()
 
@@ -451,7 +249,7 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
                 case OsActionMode.SetFocus:
                     # set focus to a window 
                     try:
-                        pm = ProcessHelper()
+                        pm = gremlin.process.ProcessHelper()
                         data = pm.getWindows()
                         info = next((item for item in data if item["process_path"].casefold() == self.action_data.process_name.casefold()), None)
 
@@ -486,7 +284,7 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
         # execute the process
         self._execute(self.action_data.process_name, self.action_data.process_args)
                               
-        pm = ProcessHelper()
+        pm = gremlin.process.ProcessHelper()
         delay = self.action_data.start_timeout
         timeout = time.time() + delay
         info = None
@@ -530,18 +328,26 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
 
         if os.path.isfile(path):
             try:
-                cmd_list = [path]
                 if args:
-                    if args_per_line:
-                        args = args.splitlines()
-                    if isinstance(args,list) or isinstance(args,tuple):
-                        cmd_list.extend(arg for arg in args)
-                    else:
-                        cmd_list.append(args)
-                # attemp start (no wait)
-                subprocess.Popen(cmd_list)
-            except:
-                pass
+                    os.startfile(path, arguments = args)
+                else:
+                    os.startfile(path)
+                os.startfile(path, arguments = args)
+                # cmd_list = [path]
+                # if args:
+                #     if args_per_line:
+                #         args = args.splitlines()
+                #     if isinstance(args,list) or isinstance(args,tuple):
+                #         cmd_list.extend(arg for arg in args)
+                #     else:
+                #         cmd_list.append(args)
+                # # attemp start (no wait)
+                # # attemp start (no wait) as a detached process with separate file descriptors
+                # creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+                # subprocess.Popen(cmd_list, creationflags = creationflags, close_fds = True)
+                
+            except Exception as e:
+                syslog.error(f"OSACTION: process start error: {e}")
         else:
             syslog.error(f"OSACTION: unable to find process: [{path}]")
 

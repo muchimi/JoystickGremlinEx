@@ -24,7 +24,8 @@ from psygnal import Signal
 import gremlin.config
 import gremlin.repeater
 import gremlin.event_handler
-import win32api, win32com, ctypes
+import win32api, win32com, ctypes, win32gui
+import gremlin.process
 
 
 import enum, threading,time, random
@@ -163,7 +164,33 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         record_widget = gremlin.ui.ui_common.Buttons.getRecordWidget(callback = self._handle_mouse_position_record)
 
         center_widget = gremlin.ui.ui_common.QDataPushButton("Center", callback = self._handle_mouse_position_center)
+
+        relative_widget = gremlin.ui.ui_common.QDataCheckbox("Position is relative to processs", 
+                                                             value = self.action_data.process_position_relative,
+                                                             callback = self._handle_process_relative_changed)
+        self.focus_widget = gremlin.ui.ui_common.QDataCheckbox("Set focus to window", 
+                                                        value = self.action_data.process_focus,
+                                                        callback = self._handle_process_focus_changed)
+      
+
+        self.process_path_widget = gremlin.ui.ui_common.QProcessSelectorWidget(
+                                                path = self.action_data.process_path,
+                                                autostart=self.action_data.process_autostart,
+                                                timeout = self.action_data.process_timeout,
+                                                args = self.action_data.process_args,
+                                                callback_path = self._handle_process_path_changed,
+                                                callback_args = self._handle_process_args_changed,
+                                                callback_autostart = self._handle_process_autostart_changed,
+                                                callback_timeout = self._handle_process_timeout_changed,
+                                                enable_autostart = True
+                                                )
         
+
+        widgets = [
+            self.process_path_widget 
+        ]
+
+        self.container_process  = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
         
         self.container_monitor = gremlin.ui.ui_common.getHContainer(self._monitor_selector_widget,"Monitor:", widget_only=True)
 
@@ -175,12 +202,20 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             record_widget,
             center_widget
         ]
-        self.container_position = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
-        monitor_widget = gremlin.ui.ui_common.QIntLineEdit()
-        
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
+        widgets = [
+            relative_widget,
+            self.focus_widget,
+            self.container_process,
+            widget,
+            
+        ]
 
+        self.container_position = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
+
+     
         self.main_layout.addLayout(self.mode_layout)
         self.main_layout.addWidget(self._execute_widget)
         self.main_layout.addWidget(self.release_widget)
@@ -191,6 +226,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.main_layout.addWidget(self.container_monitor)
         self.main_layout.addWidget(self.container_position)
+        self.main_layout.addWidget(self.container_process)
         
 
 
@@ -204,7 +240,28 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._populate_monitor_selector()
         self._update_ui()
 
+    @QtCore.Slot(bool)
+    def _handle_process_relative_changed(self, checked : bool):
+        self.action_data.process_position_relative = checked
+        self._update_ui()
 
+    @QtCore.Slot(bool)
+    def _handle_process_focus_changed(self, checked : bool):
+        self.action_data.process_focus = checked
+
+    def _handle_process_path_changed(self, value : str):
+        self.action_data.process_path = value
+    
+    def _handle_process_args_changed(self, value : str):
+        self.action_data.process_args = value
+
+    def _handle_process_autostart_changed(self, value : bool):
+        self.action_data.process_autostart = value
+
+    def _handle_process_timeout_changed(self, value : float):
+        self.action_data.process_timeout = value
+
+ 
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked : bool):
         self.action_data.execute_on_press = checked
@@ -233,17 +290,44 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _update_ui(self):
         visible = self.action_data.action_mode == MouseAction.MousePosition
-        self.container_monitor.setVisible(visible)
+        self.container_monitor.setVisible(False) # disable monitor selection for now as it's not used
         self.container_position.setVisible(visible)
+
+        visible = self.action_data.process_position_relative
+        self.container_process.setVisible(visible)
+        self.focus_widget.setEnabled(visible)
 
 
     def _handle_mouse_position_record(self, widget):
         ''' records the mouse position '''
-        self.dialog = gremlin.ui.ui_common.InputListenerWidget(
-                event_types= [InputType.Mouse],
-            )
-        self.dialog.closed.connect(self._handle_listen_selection)
-        self.dialog.show()
+
+        if self.action_data.process_position_relative:
+            # verify the process is valid
+            hwnd = self.action_data.getProcessWindowHwnd()
+            if not hwnd and self.action_data.process_autostart:
+                # attempt to autostart the process
+                self.action_data.startProcess(self._handle_process_started)
+                return 
+            self._handle_process_started(True)
+
+
+    def _handle_process_started(self, started : bool):        
+        gremlin.util.InvokeUiMethod(self._handle_process_started_ui, started)
+
+    def _handle_process_started_ui(self, started : bool):
+        verbose = gremlin.config.Configuration().verbose_mode_mouse
+        if verbose: syslog.info(f"MOUSE: profile start [{'OK' if started else 'FAIL'}]")
+        if started:
+            hwnd = self.action_data.getProcessWindowHwnd()
+            if hwnd:
+                self.dialog = gremlin.ui.ui_common.InputListenerWidget(
+                        event_types= [InputType.Mouse],
+                    )
+                self.dialog.closed.connect(self._handle_listen_selection)
+                self.dialog.show()
+                return
+            
+        gremlin.ui.ui_common.MessageBoxWarning(prompt = "Process window was not found.  Ensure the window is available.")
 
         
     def _handle_listen_selection(self, accepted):
@@ -252,7 +336,18 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _handle_listen_selection_ui(self):        
         # input was not canceled
+        verbose = gremlin.config.Configuration().verbose_mode_mouse
         x,y = self.dialog.getMousePosition()
+        if self.action_data.process_position_relative:
+            # convert the mouse position to a position relative to the dialog
+            hwnd = self.action_data.getProcessWindowHwnd()
+            if hwnd:
+                rx,ry = win32gui.ScreenToClient(hwnd, (x,y))
+                if verbose: syslog.info(f"MOUSE: position: {x} {y}, relative to window: {rx} {ry}")
+                x,y = rx, ry
+        else:
+            if verbose: syslog.info(f"MOUSE: position: {x} {y}")
+        
         self.x_widget.setValue(x)
         self.y_widget.setValue(y)
         
@@ -277,15 +372,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot(int)
     def _handle_monitor_changed(self, value : int):
         self.action_data.monitor_index = value
-        # update mouse position ranges
-        # info = self._monitors[value]
-        # x,y,w,h = info["Work"]
-        # self.x_widget.setRange(x, w)
-        # self.y_widget.setRange(y, h)
-        # if not x <= self.x_widget.value() <= w:
-        #     self.x_widget.setValue(x)
-        # if not y <= self.x_widget.value() <= h:
-        #     self.x_widget.setValue(y)
+
         
         
 
@@ -676,7 +763,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         """
         super().__init__(action, parent)
 
-        self.action : MapToMouseEx = action
+        self.action_data : MapToMouseEx = action
         self.input_type = action.get_input_type()
         
         self.action_mode = action.action_mode
@@ -745,12 +832,14 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _perform_mouse_button(self, event, value, wheel_factor = 1):
         assert self.action.motion_input is False
+        verbose = gremlin.config.Configuration().verbose_mode_mouse
         (is_local, is_remote) = self.get_state()
         if self.action.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
             if value.current:
                 direction = -wheel_factor
                 if self.action.button_id == MouseButton.WheelDown:
                     direction = wheel_factor
+                if verbose: syslog.info(f"MOUSE: send wheel up/dn [{direction}]")
                 if is_local:
                     gremlin.sendinput.mouse_wheel(direction)
                 if is_remote:
@@ -760,6 +849,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 direction = -wheel_factor
                 if self.action.button_id == MouseButton.WheelRight:
                     direction = wheel_factor
+                if verbose: syslog.info(f"MOUSE: send wheel l/r [{direction}]")
                 if is_local:
                     gremlin.sendinput.mouse_h_wheel(direction)
                 if is_remote:
@@ -767,32 +857,38 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         else:
             if self.action.click_mode == MouseClickMode.Normal:
                 if value.current:
+                    if verbose: syslog.info(f"MOUSE: press button [{self.action.button_id}]")
                     if is_local:
                         gremlin.sendinput.mouse_press(self.action.button_id)
                     if is_remote:
                         input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
                 else:
+                    if verbose: syslog.info(f"MOUSE: release button [{self.action.button_id}]")
                     if is_local:
                         gremlin.sendinput.mouse_release(self.action.button_id)
                     if is_remote:
                         input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
             elif self.action.click_mode == MouseClickMode.DoubleClick:
                 if value.current:
+                    if verbose: syslog.info(f"MOUSE: press dclick button [{self.action.button_id}]")
                     if is_local:
                         gremlin.sendinput.mouse_press_double_click(self.action.button_id)    
                     if is_remote:
                         input_devices.remote_client.send_mouse_button_double_click(self.action.button_id.value, True)
                 else:
+                    if verbose: syslog.info(f"MOUSE: release dclick button [{self.action.button_id}]")
                     if is_local:
                         gremlin.sendinput.mouse_release(self.action.button_id)
                     if is_remote:
                         input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)                        
             elif self.action.click_mode == MouseClickMode.Press:
+                if verbose: syslog.info(f"MOUSE: press button [{self.action.button_id}]")
                 if is_local:
                     gremlin.sendinput.mouse_press(self.action.button_id)
                 if is_remote:
                     input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
             elif self.action.click_mode == MouseClickMode.Release:
+                if verbose: syslog.info(f"MOUSE: release button [{self.action.button_id}]")
                 if is_local:
                     gremlin.sendinput.mouse_release(self.action.button_id)
                 if is_remote:
@@ -801,7 +897,46 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _perform_mouse_position(self, x :int, y : int):
         ''' sets the mouse position '''
+        verbose = gremlin.config.Configuration().verbose_mode_mouse
+        if self.action_data.process_position_relative:
+            # relative to process
+            hwnd = self.action_data.getProcessWindowHwnd() # get process window
+            if not hwnd:
+                # window not found
+                if self.action_data.process_autostart:
+                    # attemp to start the process
+                    self.target_point = (x, y)
+                    self.action_data.startProcess(self._handle_process_started)
+                    # further action handled by the callback
+                    return 
+            
+                syslog.warning("MOUSE: set position failed - process/window not found.")       
+                return
+            
+            # convert local coords to global coords
+            x, y = win32gui.ClientToScreen(hwnd, (x,y))
+            if self.action_data.process_focus:
+                if verbose: syslog.info(f"MOUSE: set focus to [{hwnd}]")
+                gremlin.process.ProcessHelper().setFocus(hwnd)
+        
+        if verbose: syslog.info(f"MOUSE: set position: {x} {y}")
         win32api.SetCursorPos((x, y))
+
+    def _handle_process_started(self, started : bool):
+        ''' callback on process start request '''
+        verbose = gremlin.config.Configuration().verbose_mode_mouse
+        if verbose: syslog.info(f"MOUSE: profile start [{'OK' if started else 'FAIL'}]")
+        if started:
+            # convert local coords to global coords
+            hwnd = self.action_data.getProcessWindowHwnd()
+            x, y = win32gui.ClientToScreen(hwnd, self.target_point)
+            if self.action_data.process_focus:
+                if verbose: syslog.info(f"MOUSE: set focus to [{hwnd}]")
+                gremlin.process.ProcessHelper().setFocus(hwnd)
+                
+            if verbose: syslog.info(f"MOUSE: set position: {x} {y}")
+            win32api.SetCursorPos((x, y))
+
      
 
     def _perform_axis_motion(self, event, value):
@@ -810,7 +945,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         :param event the event triggering the code execution
         :param value the current value of the event chain
         """
-
+        verbose = gremlin.config.Configuration().verbose_mode_mouse
         raw_value = event.curve_value
         value = abs(raw_value)
         is_x = self.action_data.direction == 90
@@ -824,8 +959,6 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 mc.set_absolute_motion(0,None)
             else:
                 mc.set_absolute_motion(None, 0)
-            #if self.verbose: syslog.info(f"MOUSE MOTION: stop - centered")
-            
             return
 
         if self.action.invert:
@@ -844,8 +977,10 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         delta_motion = math.copysign(delta_motion, raw_value)
 
         if is_x:
+            if verbose: syslog.info(f"MOUSE: x motion [{delta_motion}]")
             mc.set_absolute_motion(delta_motion, None)
         else:
+            if verbose: syslog.info(f"MOUSE: y motion [{delta_motion}]")
             mc.set_absolute_motion(None, delta_motion)
 
 
@@ -964,10 +1099,13 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         self.monitor_index = 1 # monitor index for exact mouse position set
         self.mouse_x = 0
         self.mouse_y = 0
+        self.process_path = None # if specified, the mouse position will be relative to the window of the given process if found
+        self.process_args = None # args for autostart process
+        self.process_autostart = False # true if process should autostart if not running (no window)
+        self.process_timeout = 5.0 # timeout to wait for a process to autostart and get a window
+        self.process_focus = True # true if the focus should be set to the target window
 
-     
-        
-
+        self.process_position_relative : bool = False # true if the position is relative to a specific process window
 
         if self.get_input_type() == InputType.JoystickAxis:
             self.action_mode = MouseAction.MouseMotion
@@ -976,14 +1114,21 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
 
         self.execute_on_press = True # true if macro executes on input press/change
         self.execute_on_release = False # true if macro executs on input release
-       
         
         self.force_remote_output = False
         self.force_remote_output_only = False
 
-
         self.click_mode = MouseClickMode.Normal
 
+        
+    def startProcess(self, callback):
+        '''
+        Docstring for startProcess
+        :param callback: callback(bool) called when the process has started, true means ok, false means not started
+        '''
+
+        pm = gremlin.process.ProcessHelper()
+        pm.executeProcess(self.process_path, callback = callback, args = self.process_args)
 
 
     def display_name(self):
@@ -1072,7 +1217,21 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
             self.execute_on_release = safe_read(node,"exec_on_release",bool,True)            
             
         if "execute-on-release" in node.attrib:
-            self.execute_on_release = safe_read(node,"execute-on-release",bool,True)            
+            self.execute_on_release = safe_read(node,"execute-on-release",bool,True)     
+
+        if "target-process" in node.attrib:
+            self.process_path = node.get("target-process")
+        
+        self.process_autostart = safe_read(node,"process-autostart",bool, False)
+
+        if "process-args" in node.attrib:
+            args = node.get("process-args")
+            if args:
+                self.process_args = args
+
+        self.profile_timeout = safe_read(node,"process-timeout", float, 5.0)
+        self.process_position_relative = safe_read(node,"position-relative", bool, False)
+        self.process_focus = safe_read(node,"process-focus", bool, True)
 
 
 
@@ -1098,6 +1257,15 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         node.set("wheel-factor", safe_format(self.wheel_factor, int))
         node.set("x", safe_format(self.mouse_x, int))
         node.set("y", safe_format(self.mouse_y, int))
+        if self.process_path:
+            node.set("target-process", self.process_path)
+        if self.process_args:
+            node.set("process-args", self.process_args)
+        node.set("process-autostart", safe_format(self.process_autostart, bool))
+        node.set("process-timeout", safe_format(self.process_timeout, float))
+        node.set("position-relative", safe_format(self.process_position_relative, bool))
+        node.set("process-focus", safe_format(self.process_focus, bool))
+
 
         node.set("execute-on-press",safe_format(self.execute_on_press, bool))
         node.set("execute-on-release",safe_format(self.execute_on_release, bool))
@@ -1118,6 +1286,13 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
             #monitors = [win32api.GetMonitorInfo(hmonitor) for hmonitor in win32api.EnumDisplayMonitors()]
             monitors[index+1] = info
         return monitors
+    
+    def getProcessWindowHwnd(self):
+        ''' gets the window handle for the given process '''
+        pm = gremlin.process.ProcessHelper()
+        return pm.getProcessWindowHwnd(self.process_path)
+
+        
 
 
     def _is_valid(self):

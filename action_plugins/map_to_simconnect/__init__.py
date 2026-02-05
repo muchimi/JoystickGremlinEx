@@ -29,7 +29,7 @@ import gremlin.gated_handler
 from gremlin.input_types import InputType
 from gremlin.input_devices import CallbackActions
 import gremlin.macro
-import gremlin.process_monitor
+import gremlin.process
 import gremlin.shared_state
 import traceback
 import gremlin.shared_state
@@ -1117,9 +1117,7 @@ class SimConnectMonitor():
 
         self._options_visible = False # true if the options UI is visible
 
-        # self._pm = gremlin.process_monitor.ProcessMonitor()
-        # self._pm.process_changed.connect(self._process_list_changed)
-
+     
 
         self._started = False
         self._startup_mode = {}

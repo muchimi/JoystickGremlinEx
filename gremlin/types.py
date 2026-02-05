@@ -1048,7 +1048,8 @@ class VerboseMode(IntFlag):
     Keyboard = auto() # keyboard input only
     Joystick = auto() # joystick input
     Inputs = auto() # list inputs
-    Mouse = auto() # mouse input
+    Mouse = auto() # mouse output
+    MouseInput = auto() # mouse input
     SimConnect = auto() # simconnect interface
     Details = auto() # user interface details
     Condition = auto() # conditions diagnostics / execution graph
@@ -1081,7 +1082,7 @@ class VerboseMode(IntFlag):
     Sequence = auto()
     Mode = auto()
     InputItems = auto()
-    All = Keyboard | Joystick | Inputs | Mouse | Details | \
+    All = Keyboard | Joystick | Inputs | Mouse | MouseInput | Details | \
           SimConnect | Condition | Process | Exec | Midi | \
           Device | Macro | Gate | Outputs | UI | ExecDetails |\
           VJoy | State | Extra | Remote | Container | Octavi |\

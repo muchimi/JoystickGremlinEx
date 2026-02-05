@@ -1350,6 +1350,12 @@ class Configuration(QtCore.QObject):
         ''' true if verbose mode is in mouse mode '''
         return self.verbose and VerboseMode.Mouse in self.verbose_mode
     
+
+    @property
+    def verbose_mode_mouse_input(self):
+        ''' true if verbose mode is in mouse mode '''
+        return self.verbose and VerboseMode.MouseInput in self.verbose_mode    
+    
     @property
     def verbose_mode_details(self):
         ''' true if verbose mode is in detail mode '''
@@ -3049,3 +3055,14 @@ class Configuration(QtCore.QObject):
     def dropdown_use_mouse_wheel(self, value : bool):
         self._set_data("dropdown_use_mouse_wheel", value)
         
+
+    @property
+    def hid_list_enabled(self) -> bool:
+        ''' true if GEX should enumerate HID devices '''
+        return self._get_data("hid_list_enabled", False)
+    @hid_list_enabled.setter
+    def hid_list_enabled(self, value : bool):
+        self._set_data("hid_list_enabled", value)
+        
+
+    

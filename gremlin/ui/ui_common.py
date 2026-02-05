@@ -27,7 +27,7 @@ import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 from typing import NamedTuple
 
-import gremlin.base_classes
+
 import gremlin.config
 import gremlin.error
 import qtawesome as qta
@@ -3627,7 +3627,8 @@ class InputListenerWidget(QBoxFrame):
 
     def _mouse_event_ui(self, event):
         ''' process mouse events on UI thread '''
-        syslog.info(f"mouse event ui: {event}")
+        verbose = gremlin.config.Configuration().verbose_mode_mouse_input
+        if verbose: syslog.info(f"mouse event ui: {event}")
         if event.is_pressed:
             # only handle press events
             key = gremlin.keyboard.key_from_mousebutton(event.button_id)
@@ -13430,3 +13431,314 @@ class QUrlLabel(QtWidgets.QLabel):
         self.setText(f"<a href='{url}'>{caption if caption else url}</a>")
         self.setOpenExternalLinks(True)
         
+
+
+class FindWindowDialog(BaseDialogUi):
+    def __init__(self, parent = None):
+        super().__init__(self.__class__.__name__, parent)
+        self.setWindowTitle("Find Process Window")
+        self.setModal(True)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.data = [] # tuples of (class : str, title : str)
+        self.selected_index = None # nothing selected
+        
+        refresh_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget("Refresh", callback = self._update_data)
+
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_widget = QtWidgets.QWidget()
+        self.scroll_layout = QtWidgets.QVBoxLayout()
+        self.table = QtWidgets.QTableWidget()
+        self.table.setSortingEnabled(True)
+
+        self.scroll_widget.setLayout(self.scroll_layout)
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+
+        # Configure the scroll area
+        self.scroll_area.setMinimumWidth(400)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.scroll_widget)
+
+        self.scroll_layout.addWidget(self.table)
+
+        self.main_layout.addWidget(self.scroll_area)
+
+        headers = [
+                "Process",
+                "Window Title",
+                "Process Path",
+        ]
+
+        self.table.setColumnCount(len(headers))
+        self.table.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
+        self.table.setHorizontalHeaderLabels(headers)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows) # select the entire row
+        self.table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection) # select a single row at a time
+        self.table.currentItemChanged.connect(self._handle_row_changed)
+        
+        # self.table.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        # self.table.customContextMenuRequested.connect(self._context_menu_cb)
+        # self.table.viewport().installEventFilter(self)
+
+
+        self.ok_button = QtWidgets.QPushButton("Ok")
+        self.ok_button.clicked.connect(self._handle_ok)
+
+        close_button = QtWidgets.QPushButton("Cancel")
+        close_button.clicked.connect(self._handle_cancel)
+
+        widgets = [
+            refresh_widget,
+            "||",
+            self.ok_button,
+            close_button
+            ]
+        
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
+        self.main_layout.addWidget(widget)
+
+
+        self._update_data()
+
+    def _handle_row_changed(self, current, previous):
+        if current is not None:
+            self.selected_index = current.row()
+        self.ok_button.setEnabled(self.selected_index is not None)
+
+    def getSelectedRow(table_widget):
+        row = table_widget.currentRow()
+        if row > -1:  # Check if a row is actually selected
+            row_data = []
+            for column in range(table_widget.columnCount()):
+                item = table_widget.item(row, column)
+                if item is not None:
+                    row_data.append(item.text())
+                else:
+                    row_data.append("") # Handle empty cells
+            return row_data
+        return None        
+
+
+   
+
+    def _update_data(self):
+        ''' updates the list of windows '''
+        import gremlin.process
+        pm = gremlin.process.ProcessHelper()
+        self.data = pm.getWindows()
+        self.selected_index = None
+
+        self.table.clearContents()
+        self.table.setRowCount(len(self.data))
+        for i, item in enumerate(self.data):
+            self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(item["process_name"]))
+            self.table.setItem(i, 1, QtWidgets.QTableWidgetItem(item["window_title"]))
+            self.table.setItem(i, 2, QtWidgets.QTableWidgetItem(item["process_path"]))
+                               
+
+        # resize
+        self.table.resizeColumnsToContents()
+
+        # ok button
+        self.ok_button.setEnabled(self.selected_index is not None)
+
+    def _handle_ok(self):
+        self.selected = self.data[self.selected_index]
+        self.close()
+
+    def _handle_cancel(self):
+        self.selected = None
+        self.close()
+
+class QProcessSelectorWidget(QtWidgets.QWidget):
+    ''' process selection widget by window or by exe file '''
+    process_changed = QtCore.Signal(str)
+    args_changed = QtCore.Signal(str)
+    autostart_changed = QtCore.Signal(bool)
+    timeout_changed = QtCore.Signal(float)
+
+    def __init__(self, path : str,
+                 args : str = None,
+                 enable_autostart : bool = False, 
+                 autostart : bool = False,
+                 timeout : float = 5,
+                 label : str = "Target Process:",
+                 callback_path = None,
+                 callback_args = None,
+                 callback_autostart = None,
+                 callback_timeout = None,
+                parent = None):
+        '''
+        Docstring for __init__
+        
+        
+        :param path: path to the exe, can be None
+        :param args: process start arguments, optional
+        :param enable_autostart: true if autostart checkbox and timeout can be used
+        :param autostart: start process flag, optional
+        :param timeout: start timeout flag, time in second to wait for a process to autostart
+        :param label: widget caption, optional
+        :param parent: parent widget, optional
+        '''
+        super().__init__(parent = parent)
+
+        self._path = path
+        self._args = args
+        self._autostart = autostart
+        self._timeout = timeout
+        self._callback_path = callback_path
+        self._callback_args = callback_args
+        self._callback_timeout = callback_timeout
+        self._callback_autostart = callback_autostart
+        self._autostart_enabled = enable_autostart
+        
+    
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.process_path_widget = QPathLineItem(text = self._path,
+                                                callback = self._handle_process_path_changed,
+                                                callback_open= self._handle_find_window,
+                                                button_label = "Select Window...")
+        self.process_path_widget.setMaximumWidth(300)
+
+        select_process = QDataPushButton("Select Executable...", callback=self._handle_select_executable)
+
+        container_process = getHContainer([self.process_path_widget, select_process], widget_only = True)
+
+        if enable_autostart:
+
+            start_widget = gremlin.ui.ui_common.QDataCheckbox("Auto-start process if not running",
+                                                        value = self._autostart,
+                                                        callback = self._handle_autostart_changed,
+                                                        tooltip = "Attemps to start the process if not running.")
+            
+            self.timeout_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self._timeout,
+                                                            min_range=1,
+                                                            max_range = 1000,
+                                                            step = 1.0,
+                                                            callback = self._handle_timeout_changed
+                                                            )
+                
+   
+        self.args_widget = QLineEdit(self._args,
+                                                    callback = self._handle_args_changed,
+                                                    tooltip = "Command line arguments to pass to the process (optional)")
+        
+        margin = 12
+        self.container_timeout = getHContainer(self.timeout_widget,"Process start timeout (s):", widget_only = True, left_margin = margin)
+        self.container_args = getHContainer(self.args_widget,"Process command line arguments:", widget_only = True, left_margin = margin)
+        widgets = []
+        
+        if label:
+            widgets.append(label)
+        
+        widgets.append(container_process)
+        if enable_autostart:
+            widgets.append(start_widget)
+            widgets.append(self.container_timeout)
+
+        widgets.append(self.container_args)
+        
+        self.container = getVContainer(widgets, widget_only = True)
+        self.main_layout.addWidget(self.container)
+
+
+    @property
+    def process(self) -> str:
+        return self._path
+    def setProcess(self, path:str):
+        import gremlin.util
+        gremlin.util.InvokeUiMethod(self._set_process_ui, path)
+
+    @property
+    def args(self) -> str:
+        return self._args
+    
+    def setArgs(self, args : str):
+        import gremlin.util
+        gremlin.util.InvokeUiMethod(self._set_args, args)
+
+    def _set_process_ui(self, path: str):
+        self.process_path_widget.setText(path)
+
+    def _set_args_ui(self, args : str):
+        self.args_widget.setText(args)
+
+    def _handle_process_path_changed(self, widget, path : str):
+        if path != self._path:
+            self._path = path
+            self.process_changed.emit(path)
+            if self._callback_path:
+                self._callback_path(path)
+   
+    def _handle_select_executable(self, widget):
+        ''' opens the process executable '''
+        import gremlin.ui.dialogs
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+            None,
+            "Process",
+            self.action_data.process_name,
+            "Executable files (*.exe)"
+        )
+        if fname and os.path.isfile(fname):
+            self.process_name = fname
+            with QtCore.QSignalBlocker(self.process_path_widget):
+                self.process_path_widget.setText(fname)
+            self._update_ui()
+
+
+    @QtCore.Slot(bool)
+    def _handle_autostart_changed(self, checked : bool):
+        if checked != self._autostart:
+            self._autostart = checked
+            self._update_ui()
+            self.autostart_changed.emit(checked)
+            if self._callback_autostart:
+                self._callback_autostart(checked)
+
+    @QtCore.Slot(float)
+    def _handle_timeout_changed(self, value : float):
+        if value != self._timeout:
+            self._timeout = value
+            self.timeout_changed.emit(value)
+            if self._callback_timeout:
+                self._callback_timeout(value)
+
+    @QtCore.Slot(str)
+    def _handle_args_changed(self, value : str):
+        if self._args != value:
+            self._args = value if value else None
+            self.args_changed.emit(self._args)
+            if self._callback_args:
+                self._callback_args(self._args)
+        
+    @QtCore.Slot(object)
+    def _handle_find_window(self, widget):
+        ''' show find window dialog '''
+        self.dialog = FindWindowDialog()
+        self.dialog.closed.connect(self._handle_dialog_closed)
+        self.dialog.exec()
+
+    @QtCore.Slot()
+    def _handle_dialog_closed(self):
+        selected = self.dialog.selected
+        if selected:
+            path = selected["process_path"]
+            if path != self._path:
+                with QtCore.QSignalBlocker(self.process_path_widget):
+                    self.process_path_widget.setText(path)
+                    self._path = path
+                    self.process_changed.emit(path)
+                    if self._callback_path:
+                        self._callback_path(path)
+
+        
+
+    def _update_ui(self):
+        enabled = self._autostart
+        self.container_args.setEnabled(enabled)
+        if self._autostart_enabled:
+            self.container_timeout.setEnabled(enabled)

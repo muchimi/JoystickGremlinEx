@@ -328,7 +328,7 @@ class SimConnect():
 		:param handler: SimConnectEventHandler - the handler to signals
 		
 		'''
-		import gremlin.process_monitor
+		import gremlin.process
 		super().__init__()
 
 		self.Requests = {}
@@ -840,7 +840,7 @@ class SimConnect():
 	def connect(self):
 		from pathlib import Path
 		from gremlin.util import display_error, get_dll_version
-		import gremlin.process_monitor
+		import gremlin.process
 
 		if self._is_connected:
 			# already connected
@@ -851,13 +851,7 @@ class SimConnect():
 			if verbose: syslog.info("\tconnecting...")
 			return True
 		
-		# # check for process running
-		# pm = gremlin.process_monitor.ProcessMonitor()
-		# if not pm.process_running(self.process_list):
-		# 	# process not running
-		# 	syslog.warning("Simconnect: connect failed - MSFS process not running")
-		# 	return False
-
+		
 
 		# syslog = logging.getLogger("system")
 		verbose = gremlin.config.Configuration().verbose_mode_simconnect

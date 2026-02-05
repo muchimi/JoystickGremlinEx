@@ -27,7 +27,6 @@ import hashlib
 import logging
 import os
 import gc
-import weakref
 import sys
 import time
 import traceback
@@ -68,6 +67,7 @@ import gremlin.joystick_handling
 import gremlin.input_devices
 
 import gremlin.hid
+import gremlin.process
 import gremlin.shared_state
 import gremlin.types
 import gremlin.profile_graph
@@ -80,7 +80,7 @@ import gremlin.ui.state_device
 import gremlin.ui.theme
 
 import gremlin.plugin_manager
-import gremlin.process_monitor
+import gremlin.process
 import gremlin.execution_graph
 import gremlin.gamepad_handling
 import gremlin.import_profile
@@ -90,6 +90,7 @@ import gremlin.ui.octavi_device
 import gremlin.ui.virpil_device
 import gremlin.sound
 import gremlin.ktts
+
 
 
 # Import QtMultimedia so pyinstaller doesn't miss it
@@ -110,7 +111,7 @@ import gremlin.config
 import gremlin.code_runner
 
 import gremlin.keyboard
-import gremlin.process_monitor
+import gremlin.process
 import gremlin.code_runner
 import gremlin.repeater
 import gremlin.base_profile
@@ -272,7 +273,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.request_profile_stop.connect(lambda x: self.abort(x))
 
         # Process monitor
-        self.process_monitor = gremlin.process_monitor.ProcessMonitor()
+        self.process_monitor = gremlin.process.ProcessMonitor()
         self.process_monitor.process_changed.connect(self._process_changed_cb)
         self.current_process_path = None # current process
         self._last_tts_notify_time = None # last autoload process change TTS time
@@ -5362,11 +5363,7 @@ if __name__ == "__main__":
     # log file configuration
     app_path = gremlin.shared_state.data_path
     
-    # # TODO: see if gremlinex is already running
-    # pm = gremlin.process_monitor.ProcessMonitor()
-    # if pm.process_running("gremlinex.exe"):
-    #     sys.exit(-1)
-        
+    
     # faster context switching (default is 5ms)
     sys.setswitchinterval(0.001)
     
@@ -5568,7 +5565,7 @@ if __name__ == "__main__":
 
     # automatic process monitoring check
         
-    pmgr = gremlin.process_monitor.ProcessMonitor()
+    pmgr = gremlin.process.ProcessMonitor()
     el = gremlin.event_handler.EventListener()
     el.process_monitor_changed.emit()
 

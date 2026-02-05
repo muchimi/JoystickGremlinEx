@@ -29,6 +29,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T173):
+- Change: Added an option to disable HID device enumeration at app load to optimize start speed.  HID data is of limited value unless troubleshooting DINPUT devices and problematic drivers.  The HID enumeration can be time consuming (2 to 30 seconds depending on the system and number of devices) and a known issue with the HIDAPI layer.  Turning this off for now has limited impact on GremlinEx and it should improve initial load time.  The caveat is it will not list discovered HID devices.
+- Change: OctaviIFR1 detection will query HID directly rather than use an enumeration.
+- Change: Map to Mouse Ex: (feature request).  Ability to set mouse position relative to a specific window, and optionally start the process, and set the focus to that window directly from the action.  The mouse position record action can be relative to the process UI if the option is selected, which will account at runtime for process dialog position changes. This feature comes with several caveats: (1) the action only relays the position information to the operating system and gives it the target window as reported by the operating system. (2) GremlinEx has no idea of how many dialogs/windows the target process has. (3) Success depends on several factors including UAC permissions, group policy settings, and the target process. (3) As with several Gremlinx EX features for mouse and keyboard output, the feature touches on cross-process API security barriers and may be blocked or trigger anti-cheat or security software. These caveats are outside of the scope of GremlinEx. The mouse verbose mode will output to the log file the results of the action and what was sent to the OS.
+- Fix: if remote control socket is not available for whatever reason, remote control will be disabled for the session without causing an exception.
+- Fix: processes started by GremlinEx are now independent.  The prior execution method could have the spawned process tied to the GremlinEx process and would close when GremlinEx is closed.  Note: this only applies to the packaged version of GremlinEx.
+
+
+
 ### (m76T172):
 - New: Map to Mouse Ex: gains mouse set position feature.  The position can be recorded while in record mode by moving the mouse, and clicking a button when the mouse is in the proper position. Press esc to cancel the recording. Supports multiple monitors. Note: if the monitor configuration changes, the saved mouse coordinates may be invalid.
 - New: OS Action: Option to start a process if not running when setting the focus. Command line parameters can be provided.

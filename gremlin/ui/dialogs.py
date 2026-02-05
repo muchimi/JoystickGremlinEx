@@ -32,7 +32,7 @@ from gremlin.clipboard import Clipboard
 import gremlin.config
 import gremlin.event_handler
 import gremlin.joystick_handling
-import gremlin.process_monitor
+import gremlin.process
 import gremlin.shared_state
 import gremlin.types
 import gremlin.ui
@@ -1826,7 +1826,16 @@ This setting is also available on a profile by profile basis on the profile tab,
         box.addWidget(widget)
         page_layout.addWidget(box)
 
+        widget = gremlin.ui.ui_common.QDataCheckbox("Enable HID enumerations",
+                                                    value=self.config.hid_list_enabled,
+                                                    callback = self._handle_hid_list_enabled_changed,
+                                                    tooltip = "Enables HID list enumeration on GremlinEx start (this can increase application load time as checks are performed)."
+                                                    )
         
+        page_layout.addWidget(widget)
+
+
+        # info box        
 
         text = '''Warning: these options can significantly degrade performance due to the amount of log data generated.
 Log file size can grow quickly in the megabyte range. Please only use these modes to diagnose a specific subsystem.
@@ -1838,6 +1847,8 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         
         page_layout.addWidget(box)
 
+   
+
         page_layout.addStretch()
        
        
@@ -1848,6 +1859,10 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
     @QtCore.Slot(bool)
     def _show_id_changed(self, checked : bool):
         self.config.show_container_id = checked
+
+    @QtCore.Slot(bool)
+    def _handle_hid_list_enabled_changed(self, checked : bool):
+        self.config.hid_list_enabled = checked
 
     @QtCore.Slot(bool)
     def _handle_dropdown_wheel_changed(self, checked : bool):
@@ -3124,7 +3139,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.list_model = QtCore.QStringListModel()
 
-        process_list = gremlin.process_monitor.list_current_processes()
+        process_list = gremlin.process.list_current_processes()
         self.list_model.setStringList(process_list)
 
         self.filter_widget = QtWidgets.QLineEdit()
@@ -3191,7 +3206,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
 
     def _refresh(self):
         self.list_model.setStringList(
-            gremlin.process_monitor.list_current_processes()
+            gremlin.process.list_current_processes()
         )
 
     def _cancel(self):

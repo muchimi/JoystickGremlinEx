@@ -46,44 +46,51 @@ class HidDevice():
 @SingletonDecorator
 class Hid():
     def __init__(self):
-
+        import gremlin.config
+        enabled = gremlin.config.Configuration().hid_list_enabled
         self._devices = []
         self._all_devices = []
         index = 0
-        for device_map in hid.enumerate():
-            keys = list(device_map.keys())
-            keys.sort()
-            device = HidDevice()
-            for key in keys:
-                data = device_map[key]
-                match key:
-                    case "bus_type":
-                        device.BusType = data
-                    case "interface_number":
-                        device.InterfaceNumber = data
-                    case "path":
-                        device.Path = data
-                    case "vendor_id":
-                        device.VendorId = data
-                    case "product_id":
-                        device.ProductId = data
-                    case "release_number":
-                        device.ReleaseNumber = data
-                    case "manufacturer_string":
-                        device.Manufacturer = data
-                    case "serial_number":
-                        device.Serial = data
-                    case "usage":
-                        device.Usage = data
-                    case "usage_page":
-                        device.UsagePage = data
-                        
-            if device.Usage in (4, 5) and device.UsagePage == 1:
-                # devices 4,5 are controllers, require usage page 1
-                syslog.info(f"HID device: [{index}] Manufacturer: {device.Manufacturer} Product: {device.ProductString} VendorID: 0x{device.VendorId:X}({device.VendorId}) ProductID: 0x{device.ProductId:X}({device.ProductId}) Usage: {device.Usage} Page: {device.UsagePage} Interface: {device.InterfaceNumber}")
-                index +=1
-                self._devices.append(device)
-            self._all_devices.append(device)
+        if enabled:
+            syslog.info("HID: locate HID devices...")
+            hid_devices = hid.enumerate()
+            syslog.info("HID: done locating HID devices")
+            for device_map in hid_devices:
+                keys = list(device_map.keys())
+                keys.sort()
+                device = HidDevice()
+                for key in keys:
+                    data = device_map[key]
+                    match key:
+                        case "bus_type":
+                            device.BusType = data
+                        case "interface_number":
+                            device.InterfaceNumber = data
+                        case "path":
+                            device.Path = data
+                        case "vendor_id":
+                            device.VendorId = data
+                        case "product_id":
+                            device.ProductId = data
+                        case "release_number":
+                            device.ReleaseNumber = data
+                        case "manufacturer_string":
+                            device.Manufacturer = data
+                        case "serial_number":
+                            device.Serial = data
+                        case "usage":
+                            device.Usage = data
+                        case "usage_page":
+                            device.UsagePage = data
+                            
+                if device.Usage in (4, 5) and device.UsagePage == 1:
+                    # devices 4,5 are controllers, require usage page 1
+                    syslog.info(f"HID device: [{index}] Manufacturer: {device.Manufacturer} Product: {device.ProductString} VendorID: 0x{device.VendorId:X}({device.VendorId}) ProductID: 0x{device.ProductId:X}({device.ProductId}) Usage: {device.Usage} Page: {device.UsagePage} Interface: {device.InterfaceNumber}")
+                    index +=1
+                    self._devices.append(device)
+                self._all_devices.append(device)
+        else:
+            syslog.info("HID: device check disabled.")
 
     def get_controller_count(self):
         ''' returns the number of visible controllers (HID device type 4) '''

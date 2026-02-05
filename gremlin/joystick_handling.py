@@ -900,30 +900,45 @@ def joystick_devices_initialization():
 
         dinput.DILL.init()
         _hid = gremlin.hid.Hid()
-        controller_count = _hid.get_controller_count()
-        syslog.info(f"INIT: {controller_count} HID devices detected:")
-        
-        # # give it some time to load data
-        # time.sleep(0.25)
+        hid_enabled = gremlin.config.Configuration().hid_list_enabled
+        if hid_enabled:
+            controller_count = _hid.get_controller_count()
+            syslog.info(f"INIT: {controller_count} HID devices detected:")
+            
+            # # give it some time to load data
+            # time.sleep(0.25)
 
-        device_count = 0 # 
-        
-        max_retries = 5
-        attempt = 1
-        while device_count != controller_count and attempt <= max_retries:
-            time.sleep(0.05)
-            device_count = dinput.DILL.get_device_count()
-            attempt += 1
+            device_count = 0 # 
+            
+            max_retries = 5
+            attempt = 1
+            while device_count != controller_count and attempt <= max_retries:
+                time.sleep(0.05)
+                device_count = dinput.DILL.get_device_count()
+                attempt += 1
 
-        if device_count:
-            syslog.info(f"INIT: {device_count} hardware devices detected:")
-            dinput.DILL.dumpDevices()
+            if device_count:
+                syslog.info(f"INIT: {device_count} hardware devices detected:")
+                dinput.DILL.dumpDevices()
 
-        if device_count != controller_count:
-            syslog.warning(f"INIT: HID device count is {controller_count}, does not match DirectX controller count: {device_count}")
-        
-        if device_count == 0:
-            syslog.warning(f"INIT: DirectX reports no hardware devices detected")
+            if device_count != controller_count:
+                syslog.warning(f"INIT: HID device count is {controller_count}, does not match DirectX controller count: {device_count}")
+            
+            if device_count == 0:
+                syslog.warning(f"INIT: DirectX reports no hardware devices detected")
+
+        else:
+            max_retries = 10
+            attempt = 1
+            last_count = 0
+            while attempt <= max_retries:
+                device_count = dinput.DILL.get_device_count()
+                if last_count != device_count:
+                    attempt += 1
+                    last_count = device_count
+                    time.sleep(0.5)
+                else:
+                    break
             
 
         # Process all connected devices in order to properly initialize the device registry

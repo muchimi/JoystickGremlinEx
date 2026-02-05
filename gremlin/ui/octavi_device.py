@@ -590,18 +590,29 @@ class OctaviInterface():
         ''' scans the HID devices to see if the device is found '''
         if self._device_found:
             return True
-        device_VID = 0x4d8 # vendor ID
-        device_PID = 0xe6d6 # product ID
-        for data in hid.enumerate():
-            vid = data['vendor_id']
-            if vid == device_VID:
-                pid = data['product_id']
-                if pid == device_PID:
-                    self._device_found = True
-                    self._device = hid.Device(vid, pid)
-                    self._device.nonblocking = 1
-                    syslog.info("IFR1: detected")
-                    return True
+        vid = 0x4d8 # vendor ID
+        pid = 0xe6d6 # product ID
+        try:
+            device = hid.Device(vid, pid)
+            if device:
+                self._device_found = True
+                self._device = hid.Device(vid, pid)
+                self._device.nonblocking = 1
+                syslog.info("IFR1: detected")    
+                return True
+        except:
+            pass
+
+        # hid_devices = list(hid.enumerate())
+        # data = next((hid for hid in hid_devices if hid["vendor_id"] == vid and data["product_id"] == pid), None)
+        # if data:
+        #     vid = data['vendor_id']
+        #     pid = data['product_id']
+        #     self._device_found = True
+        #     self._device = hid.Device(vid, pid)
+        #     self._device.nonblocking = 1
+        #     syslog.info("IFR1: detected")
+        #     return True
                 
         self._device_found = False
         self._device = None

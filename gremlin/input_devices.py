@@ -1112,30 +1112,37 @@ class RemoteClient():
     def start(self):
         ''' creates a multicast client send socket on profile start '''
         if not self._started:
-            self._started = True
-            self.ensure_socket()
-            el = gremlin.event_handler.EventListener()
-            el.heartbeat.connect(self._alive_ticker)
+            if  self.ensure_socket():
+                el = gremlin.event_handler.EventListener()
+                el.heartbeat.connect(self._alive_ticker)
+                self._started = True
             
 
 
     def ensure_socket(self):
         # makes sure the socket exists
         import struct
-        if not self._sock:
-            config = gremlin.config.Configuration()
-            broadcast_host = config.broadcast_host_ip
-            bind_all = config.broadcast_bind_all_ips
-            port = config.broadcast_port
-            self._address = (RPCGremlin.MULTICAST_GROUP, port)
-            self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            ttl = struct.pack('b', RPCGremlin.MULTICAST_TTL)
-            self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-            if bind_all and broadcast_host:
-                self._sock.bind((broadcast_host, port))
-                syslog.debug(f"Gremlin RPC client started... IP: {broadcast_host} port: {port}")
-            else:
-                syslog.debug(f"Gremlin RPC client started... ALL IP - port: {port}")
+        try:
+            if not self._sock:
+                config = gremlin.config.Configuration()
+                broadcast_host = config.broadcast_host_ip
+                bind_all = config.broadcast_bind_all_ips
+                port = config.broadcast_port
+                self._address = (RPCGremlin.MULTICAST_GROUP, port)
+                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                ttl = struct.pack('b', RPCGremlin.MULTICAST_TTL)
+                self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+                if bind_all and broadcast_host:
+                    self._sock.bind((broadcast_host, port))
+                    syslog.debug(f"Gremlin RPC client started... IP: {broadcast_host} port: {port}")
+                else:
+                    syslog.debug(f"Gremlin RPC client started... ALL IP - port: {port}")
+            return self._sock is not None
+        except Exception as e:
+            syslog.error("SOCKET: unable to open remote control socket. Feature will be disabled.")
+            self._sock = None
+            return False
+
 
     def stop(self):
         ''' closes the client socket'''
@@ -1176,8 +1183,14 @@ class RemoteClient():
     def _send(self, data = None):
         ''' sends data to the socket'''
         if data:
-            self.ensure_socket()
-            self._sock.sendto(data, self._address)
+            if self._sock:
+                self._sock.sendto(data, self._address)
+            else:
+                # retry connection
+                self.ensure_socket()
+                if self._sock:
+                    self._sock.sendto(data, self._address)
+
 
     def send_button(self, device_id, button_id, is_pressed, force_remote = False):
         ''' handles a remote joystick event '''
