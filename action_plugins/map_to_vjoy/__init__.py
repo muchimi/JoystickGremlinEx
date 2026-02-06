@@ -4066,7 +4066,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
         self.axis_start_value = action_data.axis_start_value
         self.curve_actions = None # list of curve actions that apply to our input
 
-        self.remote_client = gremlin.remote.remote_client
+        self.remote_client : gremlin.remote.RemoteClient = gremlin.remote.remote_client
         self.hat_position = (0,0)
         self.pressed_hat_buttons = {}
         self.in_range = False # true when in axis to button mode and the axis was in range
@@ -4644,7 +4644,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
                 if is_local:
                     joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
                 if is_remote:
-                    self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, None, value)
+                    self.remote_client.send_relative_axis(self.vjoy_id, self.vjoy_input_id, value)
                 # remember the last value
                 self.action_data.axis_last_value = value
             

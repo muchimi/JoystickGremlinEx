@@ -536,12 +536,13 @@ class RemoteClient():
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event toggle button: {device_id} {button_id}")
 
-    def send_axis(self, device_id, axis_id, value, relative_value = None, force_remote = False):
+    def send_axis(self, device_id, axis_id, value, force_remote = False):
         ''' handles a remote joystick event '''
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: send axis: VJoyId: {device_id} axis: {axis_id} value: {value:0.3f}")
+                stub = f"{value:0.3f}" if value is not None else 'None'
+                syslog.info(f"REMOTE OUTPUT: send axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
             data = {}
             data["sender"] = self._id
             data["action"] = "axis"
@@ -558,7 +559,8 @@ class RemoteClient():
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: relative axis: VJoyId: {device_id} axis: {axis_id} value: {value:0.3f}")
+                stub = f"{value:0.3f}" if value is not None else 'None'
+                syslog.info(f"REMOTE OUTPUT: send relative axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
             data = {}
             data["sender"] = self._id
             data["action"] = "relative_axis"
