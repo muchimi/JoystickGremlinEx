@@ -10291,7 +10291,16 @@ def getFlowContainer(widget_or_list = None, label = None, widget_only = False):
     return (widget, layout)
 
 
-def getGridContainer(widget_or_list = None, label = None, alignment = QtCore.Qt.AlignmentFlag.AlignLeft, start_col = 0, start_row = None, stretch_col = None, add_to_widget = None, widget_only = False, left_margin = 0):
+def getGridContainer(widget_or_list = None,
+                     label = None,
+                     alignment = QtCore.Qt.AlignmentFlag.AlignLeft,
+                     start_col = 0,
+                     start_row = None,
+                     stretch_col = None,
+                     add_to_widget = None,
+                     widget_only = False,
+                     left_margin = 0,
+                     bottom_margin = 0):
     ''' gets a qt grid container widget
      
     :param widget_or_list: the widget or widgets to add to the next row - if the item is a string, it's converted to a label, use "|" for a separator
@@ -10311,7 +10320,7 @@ def getGridContainer(widget_or_list = None, label = None, alignment = QtCore.Qt.
     else:
         widget = QtWidgets.QWidget()
         layout = QtWidgets.QGridLayout(widget)
-        widget.setContentsMargins(left_margin,0,0,0)
+        widget.setContentsMargins(left_margin,0,0,bottom_margin)
         layout.setContentsMargins(0,0,0,0)
         row = 0 if start_row is None else start_row
         stretch = True

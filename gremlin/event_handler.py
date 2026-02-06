@@ -3254,7 +3254,7 @@ class EventHandler(QtCore.QObject):
 
 
 
-	def _matching_callbacks(self, event):
+	def _matching_callbacks(self, event : Event):
 		"""Returns the list of callbacks to execute in response to
 		the provided event.
 
@@ -3271,7 +3271,7 @@ class EventHandler(QtCore.QObject):
 			# look for options
 			if 'mode' in event.extra_data:
 				mode = event.extra_data['mode']
-		
+
 
 		# Obtain callbacks matching the event
 		callback_list = []

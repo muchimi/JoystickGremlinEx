@@ -29,6 +29,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T174):
+- Change: VJoy Remap: UI rework (still needs improvements).
+- Change: Internal code reorg to move remote control related code to its own package for ease of maintenance and clarity.
+- Change: If the host IP is not configured in settings (defaults to localhost), a warning will be issued and GremlinEx will default to the first available IP address on the system to avoid further errors.  This works fine on most systems with a single NIC, but if you have dual homed setups (multiple IPs), this may fail.  The correct procedure is to set the IP address you wish to use in the broadcast options.
+- Fix: Remote axis data was sending as relative axis data due to a parameter swap.
+
 ### (m76T173):
 - Change: Added an option to disable HID device enumeration at app load to optimize start speed.  HID data is of limited value unless troubleshooting DINPUT devices and problematic drivers.  The HID enumeration can be time consuming (2 to 30 seconds depending on the system and number of devices) and a known issue with the HIDAPI layer.  Turning this off for now has limited impact on GremlinEx and it should improve initial load time.  The caveat is it will not list discovered HID devices.
 - Change: OctaviIFR1 detection will query HID directly rather than use an enumeration.

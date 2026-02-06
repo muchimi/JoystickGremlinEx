@@ -5,6 +5,7 @@ import atexit
 from gremlin.spline import CubicSpline
 from gremlin.input_devices import keyboard
 from gremlin.macro import Macro, MacroManager
+import gremlin.remote
 from vjoy.vjoy import AxisName
 from configuration import * # load constants defining the devices connected to this PC
 from util import *
@@ -169,19 +170,19 @@ def cruise_toggle(event, vjoy):
 def speed_limit_increase(event, vjoy):
 	
     if event.is_pressed:
-        (is_local, is_remote) = gremlin.input_devices.remote_state.state
+        (is_local, is_remote) = gremlin.remote.remote_state.state
         global bump_a_table, bump_a_index
         current = vjoy[1].axis(6).value
         new_value = get_value(+1, current)
         #gremlin.util.log(f"increase speed: Current: {current} New {new_value}")
         vjoy[1].axis(6).value = new_value
         if is_remote:
-            gremlin.input_devices.remote_client.send_axis(1, 6, new_value)
+            gremlin.remote.remote_client.send_axis(1, 6, new_value)
     
 
 def speed_limit_decrease(event, vjoy):
     if event.is_pressed:
-        (is_local, is_remote) = gremlin.input_devices.remote_state.state
+        (is_local, is_remote) = gremlin.remote.remote_state.state
         global bump_a_table, bump_a_index
         current = vjoy[1].axis(6).value
         new_value = get_value(-1, current)
@@ -189,14 +190,14 @@ def speed_limit_decrease(event, vjoy):
 
         vjoy[1].axis(6).value = new_value
         if is_remote:
-            gremlin.input_devices.remote_client.send_axis(1, 6, new_value)
+            gremlin.remote.remote_client.send_axis(1, 6, new_value)
 
 def init_speed_limiter(vjoy):
-    (is_local, is_remote) = gremlin.input_devices.remote_state.state
+    (is_local, is_remote) = gremlin.remote.remote_state.state
     global bump_a_table, bump_a_index
     current = bump_a_table[bump_a_index]
     vjoy[1].axis(6).value = current
-    gremlin.input_devices.remote_client.send_axis(1, 6, current)
+    gremlin.remote.remote_client.send_axis(1, 6, current)
 
 @left_vpc.button(24)
 def speed_inc_a(event, vjoy):
@@ -219,7 +220,7 @@ def speed_dec_a(event, vjoy):
 
 def acc_limit_increase(event, vjoy):
     if event.is_pressed:
-        (is_local, is_remote) = gremlin.input_devices.remote_state.state
+        (is_local, is_remote) = gremlin.remote.remote_state.state
         global bump_a_table, bump_a_index
         current = vjoy[1].axis(7).value
         new_value = get_value(+1, current)
@@ -227,14 +228,14 @@ def acc_limit_increase(event, vjoy):
 
         vjoy[1].axis(7).value = new_value
         if is_remote:
-            gremlin.input_devices.remote_client.send_axis(1, 7, new_value)
+            gremlin.remote.remote_client.send_axis(1, 7, new_value)
         
         
     
 
 def acc_limit_decrease(event, vjoy):
     if event.is_pressed:
-        (is_local, is_remote) = gremlin.input_devices.remote_state.state
+        (is_local, is_remote) = gremlin.remote.remote_state.state
         global bump_a_table, bump_a_index
         current = vjoy[1].axis(7).value
         new_value = get_value(-1, current)
@@ -242,7 +243,7 @@ def acc_limit_decrease(event, vjoy):
 
         vjoy[1].axis(7).value = new_value
         if is_remote:
-            gremlin.input_devices.remote_client.send_axis(1, 7, new_value)
+            gremlin.remote.remote_client.send_axis(1, 7, new_value)
 
 
 
@@ -797,7 +798,7 @@ class Wiggle():
 
 
         msg = "local wiggle mode on"
-        gremlin.input_devices.remote_state.say(msg)
+        gremlin.remote.remote_state.say(msg)
 
         if self._step_count > 0:
             while not self._wiggle_local_stop_requested.is_set():
@@ -814,7 +815,7 @@ class Wiggle():
                 time.sleep(0.1)
             
         syslog.debug("Wiggle local stop...")
-        gremlin.input_devices.remote_state.say("local wiggle mode off")
+        gremlin.remote.remote_state.say("local wiggle mode off")
 
 
     def _wiggle_remote(self):
@@ -822,7 +823,7 @@ class Wiggle():
         syslog.debug("Wiggle remote start...")
 
         msg = "remote wiggle mode on"
-        gremlin.input_devices.remote_state.say(msg)
+        gremlin.remote.remote_state.say(msg)
 
         if self._step_count > 0:
             while not self._wiggle_remote_stop_requested.is_set():
@@ -839,7 +840,7 @@ class Wiggle():
             time.sleep(0.1)
             
         syslog.debug("Wiggle remote stop...")
-        gremlin.input_devices.remote_state.say("remote wiggle mode off")
+        gremlin.remote.remote_state.say("remote wiggle mode off")
 
 
 wiggle = Wiggle()

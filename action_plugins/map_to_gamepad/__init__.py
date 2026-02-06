@@ -186,7 +186,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
         if verbose: syslog.error(f"VIGEM: event: {str(event)}")
 
         
-        (is_local, is_remote) = input_devices.remote_state.state
+        (is_local, is_remote) = gremlin.remote.remote_state.state
         if event.force_remote:
             # force remote mode on if specified in the event
             is_remote = True

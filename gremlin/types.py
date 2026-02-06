@@ -25,6 +25,7 @@ from typing import Tuple, Union
 import gremlin.error
 
 import logging
+import enum
 
 
 syslog = logging.getLogger("system")
@@ -1265,3 +1266,217 @@ _syncmode_to_description = {
     SyncMode.LastOrDefault : "Use the last value at profile stop or the default value",
     SyncMode.LastOrInput : "Use the Last value at profile stop or the current input value "
 }
+
+
+
+
+class VjoyAction(enum.Enum):
+    ''' defines available vjoy actions supported by the vjoy mapper plugins'''
+    VJoyButton = 0 # hold state
+    VJoyToggle = 1 # toggle function on/off
+    VJoyPulse = 2 # pulse function (pulses a button),
+    VJoyInvertAxis = 3 # invert axis function
+    VJoySetAxis = 4 # set axis value
+    VJoyAxis = 5 # normal map to axis
+    VJoyHat = 6 #  normal map to hat
+    VJoyRangeAxis = 7 # scale axis
+    VJoyAxisToButton = 8 # axis to button mapping
+    VJoyToggleRemote = 9 # toggle remote control
+    VJoyEnableRemoteOnly = 10 # enables remote control, disables local control
+    VJoyEnableLocalOnly = 11 # enables local control, disables remote control
+    VJoyDisableRemote = 12 # turns remote control off
+    VJoyDisableLocal = 13 # turns local control off
+    VJoyEnableRemote = 14 # enables remote control (does not impact local control)
+    VJoyEnableLocal = 15 # enables local control (does not impact remote control)
+    VJoyEnableLocalAndRemote = 16 # enables concurrent local/remote control
+    VJoyEnablePairedRemote = 17 # enables primary fire one and two on remote client
+    VJoyDisablePairedRemote = 18 # disable primary fire one and two on remote client
+    VJoyButtonRelease = 19 # action button release (clear a button if set)
+    VJoyMergeAxis = 20 # action to merge another axis
+    VJoyHatToButton = 21 # action to map a hat to a button
+    VJoySetAxisStepped = 22 # like VjoySetAxis but uses a list of values to bump the index
+    VJoyButtonPress = 23 # action on button press
+    VJoyButtonInverted = 24 # hold state (inverted = off means pressed, on means released)
+    
+    @staticmethod
+    def is_button_action(mode):
+        ''' true if the mode is a button output mode '''
+        return mode in (VjoyAction.VJoyButton,
+                        VjoyAction.VJoyButtonInverted,
+                        VjoyAction.VJoyAxisToButton,
+                        VjoyAction.VJoyButtonPress,
+                        VjoyAction.VJoyButtonRelease,
+                        VjoyAction.VJoyPulse,
+                        VjoyAction.VJoyToggle,
+        )
+                        
+  
+
+    @staticmethod
+    def to_string(mode):
+        return mode.name
+    
+    def __str__(self):
+        return str(self.value)
+    
+    @classmethod
+    def _missing_(cls, name):
+        for item in cls:
+            if item.name.lower() == name.lower():
+                return item
+            return cls.VJoyButtonPress
+
+    
+    @staticmethod
+    def from_string(str):
+        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        str = str.lower().strip()
+        if str.isnumeric():
+            mode = int(str)
+            return VjoyAction(mode)
+        for item in VjoyAction:
+            if item.name.lower() == str:
+                return item
+
+        return None
+    
+    @staticmethod
+    def to_description(action):
+        ''' returns a descriptive string for the action '''
+        match action:
+            case VjoyAction.VJoyAxis:
+                return "Maps a vjoy axis"
+            case VjoyAction.VJoyButtonPress:
+                return "Press a vjoy button"
+            case VjoyAction.VJoyHat:
+                return "Maps to a vjoy hat"
+            case VjoyAction.VJoyHatToButton:
+                return "Maps a hat position to a vjoy button"
+            case VjoyAction.VJoyInvertAxis:
+                return "Inverts all output to the specififed axis"
+            case VjoyAction.VJoyPulse:
+                return "Pulse the vjoy button for a given duration"
+            case VjoyAction.VJoySetAxis:
+                return "Sets the vjoy axis to a specific value (-1..+1)"
+            case VjoyAction.VJoyToggle:
+                return "Toggles the vjoy button state"
+            case VjoyAction.VJoyRangeAxis:
+                return "Sets the vjoy axis active output range"
+            case VjoyAction.VJoyAxisToButton:
+                return "Maps an axis range to a button value when the axis is in that range"
+            case VjoyAction.VJoyEnableLocalOnly:
+                return "Enables local output mode and disables remote control"
+            case VjoyAction.VJoyEnableRemoteOnly:
+                return "Enables remote control and disables local control"
+            case VjoyAction.VJoyEnableLocal:
+                return "Enables local output (can be concurrent with remote control)"
+            case VjoyAction.VJoyEnableRemoteOnly:
+                return "Enables remote control (can be concurrent with local control)"
+            case VjoyAction.VJoyEnableLocalAndRemote:
+                return "Enables local and remote control concurrently"
+            case VjoyAction.VJoyToggleRemote:
+                return "Toggles between local and remote output modes"
+            case VjoyAction.VJoyEnablePairedRemote:
+                return "Enables paired remote output mode - remote will echo local"
+            case VjoyAction.VJoyDisablePairedRemote:
+                return "Disables paired remote output mode"
+            case VjoyAction.VJoyEnableRemote:
+                return "Enables remote control (remote clients will get inputs)"
+            case VjoyAction.VJoyDisableLocal:
+                return "Disables local control mode (local input will be disabled)"
+            case VjoyAction.VJoyDisableRemote:
+                return "Disables remote control mode (remote clients will not get inputs except for paired commands)"
+            case VjoyAction.VJoyButtonRelease:
+                return "Releases a button"
+            case VjoyAction.VJoyMergeAxis:
+                return "Merges two (or more) axes into one"
+            case VjoyAction.VJoySetAxisStepped:
+                return "Steps through set axis values"
+            case VjoyAction.VJoyButton:
+                return "Presses or releases a button by input state"
+            case VjoyAction.VJoyButtonInverted:
+                return "Presses or releases a button by inverted input state"
+
+        
+        msg  = f"Unknown [{action}]"
+        syslog.debug(f"Warning: missing action description mapping: {msg}")
+        return msg
+        
+    @staticmethod
+    def to_name(action):
+        ''' returns a name string for the action '''
+        match action:
+            case  VjoyAction.VJoyAxis:
+                return "Axis"
+            case  VjoyAction.VJoyButtonPress:
+                return "Button Press"
+            case  VjoyAction.VJoyHat:
+                return "Hat"
+            case  VjoyAction.VJoyHatToButton:
+                return "Hat to Button"
+            case  VjoyAction.VJoyInvertAxis:
+                return "Invert Axis"
+            case  VjoyAction.VJoyPulse:
+                return "Pulse Button"
+            case  VjoyAction.VJoySetAxis:
+                return "Set Fixed Axis Value"
+            case  VjoyAction.VJoyToggle:
+                return "Toggle Button"
+            case VjoyAction.VJoyRangeAxis:
+                return "Set Axis Range"
+            case  VjoyAction.VJoyAxisToButton:
+                return "Axis to Button"
+            case  VjoyAction.VJoyEnableLocalOnly:
+                return "Enable Local Control (exclusive)"
+            case  VjoyAction.VJoyEnableRemoteOnly:
+                return "Enable Remote Control (exclusive)"
+            case  VjoyAction.VJoyEnableLocal:
+                return "Enables Local Control"
+            case  VjoyAction.VJoyEnableRemoteOnly:
+                return "Enables Remote Control (exclusive)"
+            case  VjoyAction.VJoyEnableLocalAndRemote:
+                return "Enable Concurrent Local and Remote control"
+            case  VjoyAction.VJoyToggleRemote:
+                return "Toggle Remote Control"
+            case  VjoyAction.VJoyEnablePairedRemote:
+                return "Enable remote pairing"
+            case  VjoyAction.VJoyDisablePairedRemote:
+                return "Disable remote pairing"
+            case  VjoyAction.VJoyEnableRemote:
+                return "Enable remote control"
+            case  VjoyAction.VJoyDisableLocal:
+                return "Disable local control"
+            case  VjoyAction.VJoyDisableRemote:
+                return "Disable remote control"
+            case  VjoyAction.VJoyButtonRelease:
+                return "Button release"
+            case  VjoyAction.VJoyMergeAxis:
+                return "Merge Axis"
+            case VjoyAction.VJoySetAxisStepped:
+                return "Stepped/Linear Axis Value"
+            case VjoyAction.VJoyButton:
+                return "Button"
+            case VjoyAction.VJoyButtonInverted:
+                return "Button (inverted)"
+
+        
+        msg  = f"Unknown [{action}]"
+        syslog.debug(f"Warning: missing action name mapping: {msg}")
+        return msg
+    
+
+    @staticmethod
+    def is_command(value):
+        return value in (
+        VjoyAction.VJoyDisableLocal,
+        VjoyAction.VJoyDisableRemote,
+        VjoyAction.VJoyEnableLocalOnly,
+        VjoyAction.VJoyEnableRemoteOnly,
+        VjoyAction.VJoyEnableLocalAndRemote,
+        VjoyAction.VJoyEnableLocal,
+        VjoyAction.VJoyEnableRemote,
+        VjoyAction.VJoyToggleRemote,
+        VjoyAction.VJoyEnablePairedRemote,
+        VjoyAction.VJoyDisablePairedRemote,
+        )
+

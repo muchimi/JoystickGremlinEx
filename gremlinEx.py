@@ -59,6 +59,7 @@ import gremlin.input_types
 
 import gremlin.event_handler
 import gremlin.base_classes
+import gremlin.remote
 
 
 import gremlin.config
@@ -3517,9 +3518,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             #widget.refresh(False)
 
                             item : gremlin.base_profile.InputItem = widget.input_item_list_view.select_item(index, emit = False)
-                            if verbose: assert item is not None, f"SELECT: sync issue: no selection"
-                            item = widget.input_item_list_view.selected_item()
-                            if verbose: assert item is not None, f"SELECT: sync issue: no selection"
+                            if not item:
+                                item = widget.input_item_list_view.selected_item()
+                            
 
                             #widget.select_item(index)
                             widget.setContentWidget(input_type, input_id)
@@ -4282,7 +4283,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _update_status_bar_active(self, is_active):
         import gremlin.input_devices
         self._is_active = is_active
-        self._update_status_bar(gremlin.input_devices.remote_state.to_state_event())
+        self._update_status_bar(gremlin.remote.remote_state.to_state_event())
 
     def _remote_control_changed(self, enabled : bool):
         gremlin.util.InvokeUiMethod(self._remote_control_changed_ui, enabled)
@@ -4313,7 +4314,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # remote control status
             if not event:
-                event = gremlin.input_devices.remote_state.to_state_event()
+                event = gremlin.remote.remote_state.to_state_event()
                 
             if event.is_local:
                 local_msg = f"<font color=\"{Color.activeColor()}\">Active</font>"

@@ -32,13 +32,14 @@ import win32api
 
 import gremlin
 import gremlin.config
-import gremlin.config
 import gremlin.event_handler
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.input_types import InputType
 import gremlin.error
 import gremlin.keyboard
 import gremlin.sendinput
+import gremlin.types
+import gremlin.remote
 
 import gremlin.util
 import enum
@@ -239,7 +240,7 @@ def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False
                 if is_local:
                     gremlin.sendinput.mouse_wheel(direction)
                 if is_remote:
-                    gremlin.input_devices.remote_client.send_mouse_wheel(direction)
+                    gremlin.remote.remote_client.send_mouse_wheel(direction)
         elif button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
             if is_pressed:
                 direction = -wheel_factor
@@ -248,7 +249,7 @@ def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False
                 if is_local:
                     gremlin.sendinput.mouse_h_wheel(direction)
                 if is_remote:
-                    gremlin.input_devices.remote_client.send_mouse_h_wheel(direction)                    
+                    gremlin.remote.remote_client.send_mouse_h_wheel(direction)                    
         else:
             if is_pressed:
                 if is_local:
@@ -257,13 +258,13 @@ def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False
                     else:
                         gremlin.sendinput.mouse_press(button_id)
                 if is_remote:
-                    gremlin.input_devices.remote_client.send_mouse_button(button_id, True)
+                    gremlin.remote.remote_client.send_mouse_button(button_id, True)
             else:
                 if not dbl_click: # double click always releases - no need to release again
                     if is_local:
                         gremlin.sendinput.mouse_release(button_id)
                     if is_remote:
-                        gremlin.input_devices.remote_client.send_mouse_button(button_id.value, False)
+                        gremlin.remote.remote_client.send_mouse_button(button_id.value, False)
 
 
 def _send_key_down(key, is_local = True, is_remote = False, force_remote = False):
@@ -288,7 +289,7 @@ def _send_key_down(key, is_local = True, is_remote = False, force_remote = False
 
         # win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
-        gremlin.input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags, force_remote)
+        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, force_remote)
     
 
 
@@ -306,7 +307,7 @@ def _send_key_up(key, is_local = True, is_remote = False, force_remote = False):
     if is_local:
         gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
     if is_remote:
-        gremlin.input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags, force_remote )
+        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, force_remote )
 
 def key_from_code(scan_code, is_extended):
     ''' returns a key from a code '''
@@ -623,7 +624,7 @@ class MacroManager(QtCore.QObject):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_macro
         if verbose: syslog.info(f"MACRO: execute [{macro.id}]")
-        (state_is_local, state_is_remote) = gremlin.input_devices.remote_state.state
+        (state_is_local, state_is_remote) = gremlin.remote.remote_state.state
         if not is_remote:
             is_remote = state_is_remote
         if not is_local:
@@ -929,7 +930,7 @@ class MacroAbstractAction(QtCore.QObject):
     
     def _update_flags(self, is_local = None, is_remote = None, force_remote = None):
         # updates flags based on local/remote overrides
-        (state_is_local, state_is_remote) = gremlin.input_devices.remote_state.state
+        (state_is_local, state_is_remote) = gremlin.remote.remote_state.state
         if is_local is None:
             is_local = state_is_local
         if is_remote is None:
@@ -1139,14 +1140,14 @@ class MouseButtonAction(MacroAbstractAction):
                 if verbose: syslog.info(f"MACRO: mouse wheel up")
                 gremlin.sendinput.mouse_wheel(1)
             if is_remote:
-                gremlin.input_devices.remote_client.send_mouse_wheel(1, force_remote)
+                gremlin.remote.remote_client.send_mouse_wheel(1, force_remote)
 
         elif self.button == gremlin.types.MouseButton.WheelUp:
             if is_local:
                 if verbose: syslog.info(f"MACRO: mouse wheel down")
                 gremlin.sendinput.mouse_wheel(-1)
             if is_remote:
-                gremlin.input_devices.remote_client.send_mouse_wheel(-1, force_remote)
+                gremlin.remote.remote_client.send_mouse_wheel(-1, force_remote)
         else:
             if is_local:
                 if self.is_pressed:
@@ -1156,7 +1157,7 @@ class MouseButtonAction(MacroAbstractAction):
                     if verbose: syslog.info(f"MACRO: mouse release {self.button}")
                     gremlin.sendinput.mouse_release(self.button)
             if is_remote:
-                gremlin.input_devices.remote_client.send_mouse_button(self.button, self.is_pressed, force_remote)
+                gremlin.remote.remote_client.send_mouse_button(self.button, self.is_pressed, force_remote)
 
 
 class MouseMotionAction(MacroAbstractAction):
@@ -1195,7 +1196,7 @@ class MouseMotionAction(MacroAbstractAction):
             if verbose: syslog.info(f"MACRO: mouse motion {self.dx}, {self.dy}")
             gremlin.sendinput.mouse_relative_motion(self.dx, self.dy)
         if is_remote:
-            gremlin.input_devices.remote_client.send_mouse_motion(self.dx, self.dy, force_remote)
+            gremlin.remote.remote_client.send_mouse_motion(self.dx, self.dy, force_remote)
 
 class ProcessEventsAction(MacroAbstractAction):
     ''' process event action - allows queued events to complete '''
@@ -1389,7 +1390,7 @@ class VJoyMacroAction(MacroAbstractAction):
                 if is_local:
                     vjoy.axis(self.input_id).value = self.value
                 if is_remote:
-                    gremlin.input_devices.remote_client.send_axis(self.vjoy_id, self.input_id, self.value, force_remote)
+                    gremlin.remote.remote_client.send_axis(self.vjoy_id, self.input_id, self.value, force_remote)
 
             elif self.axis_type == "relative":
 
@@ -1399,7 +1400,7 @@ class VJoyMacroAction(MacroAbstractAction):
                         min(1.0, vjoy.axis(self.input_id).value + self.value)
                     )
                 if is_remote:
-                    gremlin.input_devices.remote_client.send_relative_axis(self.vjoy_id, self.input_id, self.value, force_remote)
+                    gremlin.remote.remote_client.send_relative_axis(self.vjoy_id, self.input_id, self.value, force_remote)
         elif self.input_type == InputType.JoystickButton:
             if is_local:
                 if verbose: syslog.info(f"MACRO: vjoy {self.vjoy_id} button: {self.input_id} press: {self.value}")
@@ -1416,12 +1417,12 @@ class VJoyMacroAction(MacroAbstractAction):
 
             vjoy.button(self.input_id).is_pressed = is_pressed
             if is_remote:
-                gremlin.input_devices.remote_client.send_button(self.vjoy_id, self.input_id, is_pressed, force_remote)
+                gremlin.remote.remote_client.send_button(self.vjoy_id, self.input_id, is_pressed, force_remote)
         elif self.input_type == InputType.JoystickHat:
             if is_local:
                 vjoy.hat(self.input_id).direction = self.value
             if is_remote:
-                gremlin.input_devices.remote_client.send_hat(self.vjoy_id, self.input_id, self.value, force_remote)
+                gremlin.remote.remote_client.send_hat(self.vjoy_id, self.input_id, self.value, force_remote)
 
 
 class RemoteControlAction(MacroAbstractAction):
@@ -1430,7 +1431,7 @@ class RemoteControlAction(MacroAbstractAction):
 
     def __init__(self):
         super().__init__()
-        self.command =  gremlin.input_devices.VjoyAction.VJoyEnableRemoteOnly
+        self.command =  gremlin.types.VjoyAction.VJoyEnableRemoteOnly
 
     def __getstate__(self):
         ''' serialize '''
@@ -1449,7 +1450,7 @@ class RemoteControlAction(MacroAbstractAction):
         ''' execute the mode change '''
         verbose = gremlin.config.Configuration().verbose_mode_macro
         if verbose: syslog.info(f"MACRO: set remote control: {self.command.name}")
-        gremlin.input_devices.remote_state.mode = self.command
+        gremlin.remote.remote_state.mode = self.command
 
 
 class MacroDescriptionAction(MacroAbstractAction):

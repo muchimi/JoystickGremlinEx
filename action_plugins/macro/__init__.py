@@ -26,7 +26,7 @@ from gremlin.input_types import InputType
 import gremlin.macro
 from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
 
-from gremlin.input_devices import VjoyAction
+from gremlin.remote import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name
 import gremlin.base_profile
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -40,6 +40,7 @@ import gremlin.joystick_handling
 import gremlin.input_devices
 import gremlin.config
 import gremlin.macro_handler
+import gremlin.types
 import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
@@ -1059,7 +1060,7 @@ class MacroActionEditor(QtWidgets.QWidget):
     def _modify_remote_control(self, index):
         ''' occurs when the remote control command changes '''
         command = self.ui_elements["remote_control_cb"].itemData(index)
-        self.ui_elements["remote_control_label"].setText(gremlin.input_devices.VjoyAction.to_description(command))
+        self.ui_elements["remote_control_label"].setText(gremlin.types.VjoyAction.to_description(command))
         self.model.get_entry(self.index.row()).command = command
         self._update_model()
 

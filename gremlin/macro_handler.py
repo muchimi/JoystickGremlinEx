@@ -24,7 +24,7 @@ import time
 from PySide6 import QtCore, QtGui, QtWidgets
 import gremlin.config
 from gremlin.input_types import InputType
-from gremlin.input_devices import VjoyAction
+from gremlin.remote import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name
 import gremlin.types
 import psygnal

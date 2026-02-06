@@ -33,6 +33,7 @@ import gremlin.keyboard
 import gremlin.macro
 import gremlin.shared_state
 import gremlin.ui.ui_common
+import gremlin.remote
 import gremlin.ui.input_item
 import enum
 from gremlin.profile import safe_format, safe_read
@@ -508,7 +509,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         self.use_macros = False # true to use macros, false to send direct keys
         self._press_keys = []
         self._release_keys = []
-        self.remote_client : gremlin.input_devices.RemoteClient = input_devices.remote_client
+        self.remote_client : gremlin.remote.RemoteClient = gremlin.remote.remote_client
         self.verbose = gremlin.config.Configuration().verbose_mode_keyboard
         self.pulse_worker_map = {}  # map of (device_id, input_id) to pulse worker object
 
@@ -674,7 +675,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         ''' callback for manual releases '''
         for key in self._release_keys:
             if key.is_mouse:
-                (is_local, is_remote) = input_devices.remote_state.state
+                (is_local, is_remote) = gremlin.remote.remote_state.state
                 gremlin.macro._send_mouse_button(key.mouse_button, False, is_local, is_remote, wheel_factor=self.action_data.wheel_factor)
             else:
                 gremlin.keyboard.send_key_up(key)
@@ -734,7 +735,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         auto_release = False
 
         #verbose = True
-        (is_local, is_remote) = input_devices.remote_state.state
+        (is_local, is_remote) = gremlin.remote.remote_state.state
         is_pressed = event.is_pressed
         mode = self.action_data.mode
 

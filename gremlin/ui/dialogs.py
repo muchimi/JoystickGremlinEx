@@ -1138,7 +1138,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.enable_remote_control_widget.setToolTip("When set, this instance will accepts commands from a master computer on the local network when a profile runs.")
 
 
-        self.enable_remote_broadcast_widget = QtWidgets.QCheckBox("Enable server master control broadcast")
+        self.enable_remote_broadcast_widget = QtWidgets.QCheckBox("Enable server broadcast (must be enabled to control remote clients)")
         self.enable_remote_broadcast_widget.setChecked(self.config.enable_remote_broadcast)
         self.enable_remote_broadcast_widget.clicked.connect(self._enable_remote_broadcast)
         self.enable_remote_broadcast_widget.setToolTip("When set, this instance is a master control instance and sends data to local network clients")

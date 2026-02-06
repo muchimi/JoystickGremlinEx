@@ -25,7 +25,7 @@ import time
 
 
 import gremlin.config
-
+import gremlin.types
 
 import gremlin.shared_state
 import gremlin.types
@@ -33,7 +33,7 @@ from gremlin.types import DeviceType
 import gremlin.hid
 import gremlin.singleton_decorator
 import gremlin.util
-
+import gremlin.types
 
 
 from . import common, error, util
@@ -391,9 +391,9 @@ def set_button(guid, index : int, is_pressed : bool, update_remote : bool = Fals
         proxy[vjoy_id].button(index).is_pressed = is_pressed
 
         if update_remote:
-            (_, is_remote) = gremlin.input_devices.remote_state.state
+            (_, is_remote) = gremlin.remote.remote_state.state
             if is_remote:
-                remote_client = gremlin.input_devices.remote_client
+                remote_client = gremlin.remote.remote_client
                 remote_client.send_button(vjoy_id, index, is_pressed)
              
     
@@ -419,9 +419,9 @@ def set_axis(guid, index : int, value : float, update_remote : bool = False):
             proxy[vjoy_id].axis(index).value = value
 
             if update_remote:
-                (_, is_remote) = gremlin.input_devices.remote_state.state
+                (_, is_remote) = gremlin.remote.remote_state.state
                 if is_remote:
-                    remote_client = gremlin.input_devices.remote_client
+                    remote_client = gremlin.remote.remote_client
                     remote_client.send_axis(vjoy_id, index, value)
 
 
@@ -1489,7 +1489,8 @@ class VJoyUsageState():
         if vjoy_id in self._button_usage and button_id in self._button_usage_map[vjoy_id]:
         
             current_state = len(self._button_usage_map[vjoy_id][button_id]) > 0
-            verbose = gremlin.config.Configuration().verbose_mode_vjoy
+            config = gremlin.config.Configuration()
+            verbose = config.verbose_mode_vjoy and config.verbose_mode_extra
             #verbose = True
             if verbose: syslog.info(f"Set usage state: [{vjoy_id}] [{button_id}] [{state}]  current state [{current_state}] from {key}")
             if state:
@@ -1580,7 +1581,7 @@ class VJoyUsageState():
                                         if isinstance(action, action_plugins.remap.Remap) or isinstance(action, action_plugins.map_to_vjoy.VjoyRemap):
                                             if hasattr(action,"action_mode"):
                                                 action_mode = action.action_mode # vjoy remap
-                                                trigger = gremlin.input_devices.VjoyAction.is_button_action(action_mode)
+                                                trigger = gremlin.types.VjoyAction.is_button_action(action_mode)
                                                 button_id = action.vjoy_button_id
                                             else:
                                                 # legacy remap 
@@ -1674,7 +1675,7 @@ class VjoyStart():
     def apply(self):
         ''' applies the startup data '''
         import gremlin.input_devices
-        remote_client = gremlin.input_devices.remote_client
+        remote_client = gremlin.remote.remote_client
         for device_id in self._axis_data:
             for id in self._axis_data[device_id]:
                 value = self._axis_data[device_id][id]

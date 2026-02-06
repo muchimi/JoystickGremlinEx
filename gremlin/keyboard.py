@@ -509,7 +509,7 @@ def send_key_down(key):
     from gremlin import input_devices
     key: gremlin.keyboard.Key
 
-    is_local, is_remote = input_devices.remote_state.state
+    is_local, is_remote = gremlin.remote.remote_state.state
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
         dbl_click = "_d_" in key.lookup_name
@@ -564,7 +564,7 @@ def send_key_up(key):
     from gremlin import input_devices
     key: gremlin.keyboard.Key
     verbose = gremlin.config.Configuration().verbose_mode_outputs
-    (is_local, is_remote) = input_devices.remote_state.state
+    (is_local, is_remote) = gremlin.remote.remote_state.state
 
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons

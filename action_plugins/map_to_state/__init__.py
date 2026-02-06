@@ -23,7 +23,7 @@ import gremlin.ui.input_item
 from gremlin import input_devices
 from gremlin.types import ButtonOutputMode
 import vjoy.vjoy
-from gremlin.input_devices import VjoyAction, remote_state
+from gremlin.remote import VjoyAction, remote_state
 import gremlin.joystick_handling
 import psygnal
 from psygnal import Signal

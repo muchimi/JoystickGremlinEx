@@ -193,23 +193,23 @@ class ControlFunctor(gremlin.base_conditions.AbstractFunctor):
                     return True
                 case ControlAction.LocalDisable:
                     # disable local output
-                    input_devices.remote_state.setLocal(False)
+                    gremlin.remote.remote_state.setLocal(False)
                     return True
                 case ControlAction.LocalEnable:
                     # disable local output
-                    input_devices.remote_state.setLocal(True)
+                    gremlin.remote.remote_state.setLocal(True)
                     return True
                 case ControlAction.RemoteDisable:
                     # disable local output
-                    input_devices.remote_state.setRemote(False)
+                    gremlin.remote.remote_state.setRemote(False)
                     return True
                 case ControlAction.RemoteEnable:
                     # disable local output
-                    input_devices.remote_state.setRemote(True)
+                    gremlin.remote.remote_state.setRemote(True)
                     return True
                 case ControlAction.RemoteToggle:
                     # disable local output
-                    input_devices.remote_state.toggleRemote()
+                    gremlin.remote.remote_state.toggleRemote()
                     return True
 
 

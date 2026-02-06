@@ -52,6 +52,7 @@ import gremlin.user_plugin
 import gremlin.sendinput as sendinput
 import gremlin.execution_graph
 import gremlin.ui
+import gremlin.remote
 import anytree
 import traceback
 import psygnal
@@ -567,8 +568,8 @@ class CodeRunner:
             evt_listener.gremlin_active = True
 
             # connect remote gremlin client
-            gremlin.input_devices.remote_server.start()
-            gremlin.input_devices.remote_client.start()
+            gremlin.remote.remote_server.start()
+            gremlin.remote.remote_client.start()
 
             # listen to MIDI
             if config.midi_enabled:
@@ -709,8 +710,8 @@ class CodeRunner:
         vjoy_debug.UnHook()
 
         # stop remote client
-        gremlin.input_devices.remote_client.stop()
-        gremlin.input_devices.remote_server.stop()
+        gremlin.remote.remote_client.stop()
+        gremlin.remote.remote_server.stop()
 
         # call stop function in plugins
         gremlin.input_devices.stop_registry.start()

@@ -822,7 +822,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
     
     def get_state(self):
         ''' gets the control state '''
-        (is_local, is_remote) = input_devices.remote_state.state
+        (is_local, is_remote) = gremlin.remote.remote_state.state
         if self.action.force_remote_output:
             is_remote = True
         if self.action.force_remote_output_only:

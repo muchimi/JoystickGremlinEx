@@ -288,7 +288,7 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
 
         if is_pressed:
             # button press
-            if self.verbose: syslog.info("trigger 0")
+            if self.verbose: syslog.info("BUTTON CONTAINER: trigger [press]")
             self._trigger(0, event, value, extra_data)
             if self.autorelease:
                 # setup autorelease trigger
@@ -304,7 +304,7 @@ class ButtonContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor)
         else:
             # button release
             event.is_pressed = True
-            if self.verbose: syslog.info("trigger 1")
+            if self.verbose: syslog.info("BUTTON CONTAINER: trigger [release]")
             self._trigger(1, event, value, extra_data)
             if self.autorelease:
                 # setup autorelease trigger
