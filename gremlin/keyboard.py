@@ -506,7 +506,7 @@ def send_key_down(key):
 
     :param key the key for which to send the KEYDOWN event
     """
-    from gremlin import input_devices
+    import gremlin.remote
     key: gremlin.keyboard.Key
 
     is_local, is_remote = gremlin.remote.remote_state.state
@@ -525,10 +525,11 @@ def send_key_down(key):
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
         if verbose: syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
-        input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
+        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
 def key_from_mousebutton(button_id):
     ''' maps a mouse button to a key'''
+    import gremlin.types
     match button_id:
         case gremlin.types.MouseButton.Left:
             map_key = "mouse_1"
@@ -580,7 +581,7 @@ def send_key_up(key):
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
         if verbose: syslog.info(f"OUTPUT: (remote) keyup {key.debug_name}")
-        input_devices.remote_client.send_key(key.virtual_code, key.scan_code, flags )
+        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags )
 
 def mouse_from_name(name):
     ''' validates if this is a special mouse key - returns None if it is not'''

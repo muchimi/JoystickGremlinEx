@@ -3395,9 +3395,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             switch_input = True
 
                             index = self._find_tab_index(device_guid)
-                            if index is None:
-                                syslog.warning(f"SELECT INPUT: default device not found in device tabs: {str(device)} - aborting selection")
-                                return
+                            
+                    if index is None:
+                        syslog.warning(f"SELECT INPUT: default device not found in device tabs: {str(device)} - aborting selection")
+                        return
 
                 
                     with QtCore.QSignalBlocker(self.ui.devices):

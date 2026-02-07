@@ -369,7 +369,7 @@ def set_button(guid, index : int, is_pressed : bool, update_remote : bool = Fals
     
     '''
     import gremlin.event_handler
-    import gremlin.input_devices
+    import gremlin.remote
     sd = gremlin.event_handler.JoystickState()
     device = get_device(guid)
     if not device:

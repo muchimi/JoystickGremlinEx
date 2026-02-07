@@ -29,7 +29,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m76T174):
+### (m76T175):
+- Fix: refactor for new remote package on all files
+- Fix: Map to mouse Ex: does not release buttons post refactor.
+- Fix: sorting refactor for input lists (left panel) for joystick devices
+- Fix: OSC exception when registering inputs for uninitialized devices
+
+Known issue: OSC: input search box may not do anything.
+
+### (m76T174A):
 - Change: VJoy Remap: UI rework (still needs improvements).
 - Change: Internal code reorg to move remote control related code to its own package for ease of maintenance and clarity.
 - Change: If the host IP is not configured in settings (defaults to localhost), a warning will be issued and GremlinEx will default to the first available IP address on the system to avoid further errors.  This works fine on most systems with a single NIC, but if you have dual homed setups (multiple IPs), this may fail.  The correct procedure is to set the IP address you wish to use in the broadcast options.

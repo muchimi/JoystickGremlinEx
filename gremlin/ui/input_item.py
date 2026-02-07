@@ -304,6 +304,9 @@ class InputItemListModel(ui_common.AbstractModel):
             index+=1
         return index
     
+           
+
+    
     def updateData(self, apply_filter = True, emit_change = True):
         ''' loads into the data model all the items for the current mode and device '''
         import gremlin.base_profile
@@ -337,45 +340,25 @@ class InputItemListModel(ui_common.AbstractModel):
         for input_type in self._allowed_input_types:
 
             input_items = registry.getInputItems(device_guid, mode, input_type = input_type)
+           
             
-            if input_items and device.device_type == DeviceType.Joystick:
+            if input_items and device.device_type in (DeviceType.Joystick, DeviceType.VJoy):
                 # sort by axes and buttons
-                input_items.sort(key = lambda x: x.input_id)
-                
+                input_items.sort(key = lambda x: x.sortKey)
+       
             for input_item in input_items:
-                    if self._show_filtered_only or device.device_type == DeviceType.Joystick:
-                        filtered = profile.settings.getFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
-                        
-                        if filtered:
-                            continue
-                        if verbose: syslog.info(f"Input {device.name} : {input_item.input_type.name} {input_item.input_id} visible")
+                if self._show_filtered_only or device.device_type in (DeviceType.Joystick, DeviceType.VJoy):
+                    filtered = profile.settings.getFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
                     
-                    self._index_map[index] = input_item
-                    self._item_map[input_item.input_id] = index 
-                    index += 1
-            
+                    if filtered:
+                        continue
+                    if verbose: syslog.info(f"Input {device.name} : {input_item.input_type.name} {input_item.input_id} visible")
+                
+                self._index_map[index] = input_item
+                self._item_map[input_item.input_id] = index 
+                index += 1
 
-            # if input_type in mode_object.config.keys():
-            #     sorted_keys = sorted(mode_object.config[input_type].keys())
-            #     for data_key in sorted_keys:
-            #         input_id = data_key
-            #         input_item : gremlin.base_profile.InputItem =  mode_object.config[input_type][data_key]
-            #         if input_item.input_type == InputType.JoystickAxis and input_item.input_id == 4:
-            #             pass
-            #         # add hardware GUID reference to data block so we have an easier reference to it
-            #         device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(input_item.device_guid)
-            #         if self._show_filtered_only or device.device_type == DeviceType.Joystick:
-            #             filtered = profile.settings.getFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
-                        
-            #             if filtered:
-            #                 continue
-            #             if verbose: syslog.info(f"Input {device.name} : {input_item.input_type.name} {input_item.input_id} visible")
-            #         input_item.device_guid = self._device_data.device_guid
-            #         self._index_map[index] = input_item
-            #         self._item_map[input_item.input_id] = index
-                    
-            #         index += 1
-
+  
         if self._show_master_mode:
             master_mode = gremlin.shared_state.master_mode
             if master_mode in self._device_data.modes:
@@ -645,12 +628,7 @@ class InputItemListModel(ui_common.AbstractModel):
                 return index
             
             return 0
-            # axis_keys = sorted(input_items.config[InputType.JoystickAxis].keys())
-            # for l_idx, a_idx in enumerate(axis_keys):
-            #     axis_index_to_linear_index[a_idx] = l_idx
 
-            # return offset_map[event.event_type] + \
-            #        axis_index_to_linear_index[event.identifier]
         else:
             return offset_map[event.event_type] + event.identifier - 1
 

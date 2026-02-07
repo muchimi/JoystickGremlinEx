@@ -549,7 +549,7 @@ class RemoteClient():
             data["device"] = device_id
             data["target"] = axis_id
             data["value"] = value
-            data["relative_value"] = relative_value
+            data["relative_value"] = None
             raw_data = msgpack.packb(data)
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set axis: {device_id} {axis_id} {value}")

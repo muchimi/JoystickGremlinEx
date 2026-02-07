@@ -228,7 +228,7 @@ def _unicode_to_key(character):
 def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False, force_remote = False, dbl_click = False, wheel_factor = 1):
         from gremlin.types import MouseButton
         import gremlin.sendinput
-        import gremlin.input_devices
+        import gremlin.remote
 
         if force_remote:
             is_remote = True

@@ -4371,7 +4371,7 @@ class InputOscClient(QtCore.QObject):
         profile = gremlin.shared_state.current_profile
         if profile:
             for device in profile.devices.values():
-                if device.name.casefold() == "osc":
+                if device.name and device.name.casefold() == "osc":
                     for mode in device.modes.values():
                         if InputType.OpenSoundControl in mode.config:
                             for input_item in mode.config[InputType.OpenSoundControl].values():

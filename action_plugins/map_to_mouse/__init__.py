@@ -36,6 +36,7 @@ from gremlin import input_devices
 import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
+import gremlin.remote
 
 syslog = logging.getLogger("system")
 
@@ -374,7 +375,7 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
                 if is_local:
                     gremlin.sendinput.mouse_wheel(direction)
                 if is_remote:
-                    input_devices.remote_client.send_mouse_wheel(direction)
+                    gremlin.remote.remote_client.send_mouse_wheel(direction)
         elif self.config.button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
             if value.current:
                 direction = -wheel_factor
@@ -383,18 +384,18 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
                 if is_local:
                     gremlin.sendinput.mouse_h_wheel(direction)
                 if is_remote:
-                    input_devices.remote_client.send_mouse_h_wheel(direction)                      
+                    gremlin.remote.remote_client.send_mouse_h_wheel(direction)                      
         else:
             if value.current:
                 if is_local:
                     gremlin.sendinput.mouse_press(self.config.button_id)
                 if is_remote:
-                    input_devices.remote_client.send_mouse_button(self.config.button_id.value, True)
+                    gremlin.remote.remote_client.send_mouse_button(self.config.button_id.value, True)
             else:
                 if is_local:
                     gremlin.sendinput.mouse_release(self.config.button_id)
                 if is_remote:
-                    input_devices.remote_client.send_mouse_button(self.config.button_id.value, False)
+                    gremlin.remote.remote_client.send_mouse_button(self.config.button_id.value, False)
 
     def _perform_axis_motion(self, event, value):
         """Processes events destined for an axis.
@@ -413,7 +414,7 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
         if is_local:
             self.mouse_controller.set_absolute_motion(dx, dy)
         if is_remote:
-            input_devices.remote_client.send_mouse_motion(dx, dy)
+            gremlin.remote.remote_client.send_mouse_motion(dx, dy)
 
     def _perform_button_motion(self, event, value):
         (is_local, is_remote) = gremlin.remote.remote_state.state
@@ -426,13 +427,13 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
                     self.config.time_to_max_speed
                 )
             if is_remote:
-                input_devices.remote_client.send_mouse_acceleration(self.config.direction, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
+                gremlin.remote.remote_client.send_mouse_acceleration(self.config.direction, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
      
         else:
             if is_local:
                 self.mouse_controller.set_absolute_motion(0, 0)
             if is_remote:
-                input_devices.remote_client.send_mouse_motion(0, 0)
+                gremlin.remote.remote_client.send_mouse_motion(0, 0)
 
     def _perform_hat_motion(self, event, value):
         """Processes events destined for a hat.
@@ -440,13 +441,13 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
         :param event the event triggering the code execution
         :param value the current value of the event chain
         """
-        is_local = input_devices.remote_client.is_local
-        is_remote = input_devices.remote_client.is_remote
+        is_local = gremlin.remote.remote_client.is_local
+        is_remote = gremlin.remote.remote_client.is_remote
         if value.current == (0, 0):
             if is_local:
                 self.mouse_controller.set_absolute_motion(0, 0)
             if is_remote:
-                input_devices.remote_client.send_mouse_motion(0, 0)
+                gremlin.remote.remote_client.send_mouse_motion(0, 0)
 
         else:
             a = rad2deg(math.atan2(-value.current[1], value.current[0])) + 90.0
@@ -458,7 +459,7 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
                     self.config.time_to_max_speed
                 )
             if is_remote:
-                input_devices.remote_client.send_mouse_acceleration(a, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
+                gremlin.remote.remote_client.send_mouse_acceleration(a, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
 
 
 class MapToMouse(gremlin.base_profile.AbstractAction):

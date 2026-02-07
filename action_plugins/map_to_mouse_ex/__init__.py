@@ -26,7 +26,7 @@ import gremlin.repeater
 import gremlin.event_handler
 import win32api, win32com, ctypes, win32gui
 import gremlin.process
-
+import gremlin.remote
 
 import enum, threading,time, random
 
@@ -748,12 +748,6 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
     properly with a single input, at least partially.
     """
 
-    # shared wiggle thread
-    _wiggle_local_thread = None
-    _wiggle_remote_thread = None
-    _wiggle_local_stop_requested = False
-    _wiggle_remote_stop_requested = False
-    _mouse_controller = None
 
 
     def __init__(self, action : MapToMouseEx, parent = None):
@@ -766,11 +760,11 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         self.action_data : MapToMouseEx = action
         self.input_type = action.get_input_type()
         
-        self.action_mode = action.action_mode
+        
         self.click_mode = action.click_mode
         self.dx = 0 # current mouse motion = x axis
         self.dy = 0 # current mouse motion = y axis
-        self.pulse_worker_map = {} # tracks pulse requests
+        
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_mouse
         self.verbose_extra = self.verbose and config.verbose_mode_extra
@@ -794,28 +788,23 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         trigger = self.action_data.execute_on_press and event.is_pressed or \
                   self.action_data.execute_on_release and not event.is_pressed
         
-        if trigger:
-
-            match self.action_mode:
-                case MouseAction.MouseMotion:
-                    # handle motion requests
+        match self.action_data.action_mode:
+            case MouseAction.MouseMotion:
+                # handle motion requests
+                if trigger:
                     match event.event_type:
                         case InputType.JoystickAxis: 
-                            # sa = gremlin.event_handler.AxisState()
-                            # should_process = sa.shouldProcess(event, self.id)
-                            # if should_process:
                             self._perform_axis_motion(event, value)
                         case InputType.JoystickHat: 
                             self._perform_hat_motion(event, value) 
                         case InputType.JoystickButton:
                             self._perform_button_motion(event, value)
                 
+            case MouseAction.MouseButton:
+                self._perform_mouse_button(event, value, wheel_factor = self.action_data.wheel_factor)
 
-                
-                case MouseAction.MouseButton:
-                    self._perform_mouse_button(event, value, wheel_factor = self.action_data.wheel_factor)
-
-                case MouseAction.MousePosition:
+            case MouseAction.MousePosition:
+                if trigger:
                     self._perform_mouse_position(self.action_data.mouse_x, self.action_data.mouse_y)
 
         return True
@@ -823,76 +812,81 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
     def get_state(self):
         ''' gets the control state '''
         (is_local, is_remote) = gremlin.remote.remote_state.state
-        if self.action.force_remote_output:
+        if self.action_data.force_remote_output:
             is_remote = True
-        if self.action.force_remote_output_only:
+        if self.action_data.force_remote_output_only:
             # force remote only
             is_local = False
         return (is_local, is_remote)
 
     def _perform_mouse_button(self, event, value, wheel_factor = 1):
-        assert self.action.motion_input is False
+        assert self.action_data.motion_input is False
         verbose = gremlin.config.Configuration().verbose_mode_mouse
         (is_local, is_remote) = self.get_state()
-        if self.action.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
-            if value.current:
-                direction = -wheel_factor
-                if self.action.button_id == MouseButton.WheelDown:
-                    direction = wheel_factor
-                if verbose: syslog.info(f"MOUSE: send wheel up/dn [{direction}]")
-                if is_local:
-                    gremlin.sendinput.mouse_wheel(direction)
-                if is_remote:
-                    input_devices.remote_client.send_mouse_wheel(direction)
-        elif self.action.button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
-            if value.current:
-                direction = -wheel_factor
-                if self.action.button_id == MouseButton.WheelRight:
-                    direction = wheel_factor
-                if verbose: syslog.info(f"MOUSE: send wheel l/r [{direction}]")
-                if is_local:
-                    gremlin.sendinput.mouse_h_wheel(direction)
-                if is_remote:
-                    input_devices.remote_client.send_mouse_h_wheel(direction)
-        else:
-            if self.action.click_mode == MouseClickMode.Normal:
+        match self.action_data.button_id:
+            case MouseButton.WheelDown | MouseButton.WheelUp:
                 if value.current:
-                    if verbose: syslog.info(f"MOUSE: press button [{self.action.button_id}]")
+                    direction = -wheel_factor
+                    if self.action_data.button_id == MouseButton.WheelDown:
+                        direction = wheel_factor
+                    if verbose: syslog.info(f"MOUSE: send wheel up/dn [{direction}]")
                     if is_local:
-                        gremlin.sendinput.mouse_press(self.action.button_id)
+                        gremlin.sendinput.mouse_wheel(direction)
                     if is_remote:
-                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
-                else:
-                    if verbose: syslog.info(f"MOUSE: release button [{self.action.button_id}]")
-                    if is_local:
-                        gremlin.sendinput.mouse_release(self.action.button_id)
-                    if is_remote:
-                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
-            elif self.action.click_mode == MouseClickMode.DoubleClick:
+                        gremlin.remote.remote_client.send_mouse_wheel(direction)
+            case MouseButton.WheelLeft | MouseButton.WheelRight:
                 if value.current:
-                    if verbose: syslog.info(f"MOUSE: press dclick button [{self.action.button_id}]")
+                    direction = -wheel_factor
+                    if self.action_data.button_id == MouseButton.WheelRight:
+                        direction = wheel_factor
+                    if verbose: syslog.info(f"MOUSE: send wheel l/r [{direction}]")
                     if is_local:
-                        gremlin.sendinput.mouse_press_double_click(self.action.button_id)    
+                        gremlin.sendinput.mouse_h_wheel(direction)
                     if is_remote:
-                        input_devices.remote_client.send_mouse_button_double_click(self.action.button_id.value, True)
-                else:
-                    if verbose: syslog.info(f"MOUSE: release dclick button [{self.action.button_id}]")
-                    if is_local:
-                        gremlin.sendinput.mouse_release(self.action.button_id)
-                    if is_remote:
-                        input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)                        
-            elif self.action.click_mode == MouseClickMode.Press:
-                if verbose: syslog.info(f"MOUSE: press button [{self.action.button_id}]")
-                if is_local:
-                    gremlin.sendinput.mouse_press(self.action.button_id)
-                if is_remote:
-                    input_devices.remote_client.send_mouse_button(self.action.button_id.value, True)
-            elif self.action.click_mode == MouseClickMode.Release:
-                if verbose: syslog.info(f"MOUSE: release button [{self.action.button_id}]")
-                if is_local:
-                    gremlin.sendinput.mouse_release(self.action.button_id)
-                if is_remote:
-                    input_devices.remote_client.send_mouse_button(self.action.button_id.value, False)
+                        gremlin.remote.remote_client.send_mouse_h_wheel(direction)
+            case _:
+                match self.action_data.click_mode:
+                    case MouseClickMode.Normal:
+                        if value.current:
+                            if verbose: syslog.info(f"MOUSE: press button [{self.action_data.button_id}]")
+                            if is_local:
+                                gremlin.sendinput.mouse_press(self.action_data.button_id)
+                            if is_remote:
+                                gremlin.remote.remote_client.send_mouse_button(self.action_data.button_id.value, True)
+                        else:
+                            if verbose: syslog.info(f"MOUSE: release button [{self.action_data.button_id}]")
+                            if is_local:
+                                gremlin.sendinput.mouse_release(self.action_data.button_id)
+                            if is_remote:
+                                gremlin.remote.remote_client.send_mouse_button(self.action_data.button_id.value, False)
+
+                    case MouseClickMode.DoubleClick:
+                        if value.current:
+                            if verbose: syslog.info(f"MOUSE: press dclick button [{self.action_data.button_id}]")
+                            if is_local:
+                                gremlin.sendinput.mouse_press_double_click(self.actiaction_dataon.button_id)    
+                            if is_remote:
+                                gremlin.remote.remote_client.send_mouse_button_double_click(self.action_data.button_id.value, True)
+                        else:
+                            if verbose: syslog.info(f"MOUSE: release dclick button [{self.action_data.button_id}]")
+                            if is_local:
+                                gremlin.sendinput.mouse_release(self.action_data.button_id)
+                            if is_remote:
+                                gremlin.remote.remote_client.send_mouse_button(self.action_data.button_id.value, False)                        
+
+                    case MouseClickMode.Press:
+                        if verbose: syslog.info(f"MOUSE: press button [{self.action_data.button_id}]")
+                        if is_local:
+                            gremlin.sendinput.mouse_press(self.action_data.button_id)
+                        if is_remote:
+                            gremlin.remote.remote_client.send_mouse_button(self.action_data.button_id.value, True)
+
+                    case MouseClickMode.Release:
+                        if verbose: syslog.info(f"MOUSE: release button [{self.action_data.button_id}]")
+                        if is_local:
+                            gremlin.sendinput.mouse_release(self.action_data.button_id)
+                        if is_remote:
+                            gremlin.remote.remote_client.send_mouse_button(self.action_data.button_id.value, False)
 
 
     def _perform_mouse_position(self, x :int, y : int):
@@ -961,7 +955,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 mc.set_absolute_motion(None, 0)
             return
 
-        if self.action.invert:
+        if self.action_data.invert:
             # invert the input
             inverted_value = gremlin.util.scale_to_range(value, invert=True)
             value = inverted_value
@@ -971,8 +965,8 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         delta_motion = gremlin.util.scale_to_range(motion_value,
                                                    source_min= deadzone,
                                                    source_max = 1,
-                                                   target_min=self.action.min_speed,
-                                                   target_max=self.action.max_speed)
+                                                   target_min=self.action_data.min_speed,
+                                                   target_max=self.action_data.max_speed)
 
         delta_motion = math.copysign(delta_motion, raw_value)
 
@@ -991,20 +985,23 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         if event.is_pressed:
             if is_local:
                 mc.set_accelerated_motion(
-                    self.action.direction,
-                    self.action.min_speed,
-                    self.action.max_speed,
-                    self.action.time_to_max_speed
+                    self.action_data.direction,
+                    self.action_data.min_speed,
+                    self.action_data.max_speed,
+                    self.actiaction_dataon.time_to_max_speed
                 )
                 
             if is_remote:
-                input_devices.remote_client.send_mouse_acceleration(self.action.direction, self.action.min_speed, self.action.max_speed, self.action.time_to_max_speed)
+                gremlin.remote.remote_client.send_mouse_acceleration(self.action_data.direction,
+                                                                    self.action_data.min_speed,
+                                                                    self.action_data.max_speed,
+                                                                    self.action_data.time_to_max_speed)
      
         else:
             if is_local:
                 mc.set_absolute_motion(0, 0)
             if is_remote:
-                input_devices.remote_client.send_mouse_motion(0, 0)
+                gremlin.remote.remote_client.send_mouse_motion(0, 0)
 
     def _perform_hat_motion(self, event, value):
         """Processes events destined for a hat.
@@ -1018,19 +1015,22 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
             if is_local:
                 mc.set_absolute_motion(0, 0)
             if is_remote:
-                input_devices.remote_client.send_mouse_motion(0, 0)
+                gremlin.remote.remote_client.send_mouse_motion(0, 0)
 
         else:
             a = rad2deg(math.atan2(-value.current[1], value.current[0])) + 90.0
             if is_local:
                 mc.set_accelerated_motion(
                     a,
-                    self.action.min_speed,
-                    self.action.max_speed,
-                    self.action.time_to_max_speed
+                    self.action_data.min_speed,
+                    self.action_data.max_speed,
+                    self.action_data.time_to_max_speed
                 )
             if is_remote:
-                input_devices.remote_client.send_mouse_acceleration(a, self.action.min_speed, self.action.max_speed, self.action.time_to_max_speed)
+                gremlin.remote.remote_client.send_mouse_acceleration(a,
+                                                                    self.action_data.min_speed,
+                                                                    self.action_data.max_speed,
+                                                                    self.action_data.time_to_max_speed)
 
 
 

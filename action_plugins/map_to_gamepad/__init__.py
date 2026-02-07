@@ -40,6 +40,7 @@ from gremlin.input_devices import CallbackActions
 import psygnal
 from psygnal import Signal
 import html
+import gremlin.remote
 
 
 # import vigem.vigem_gamepad as vg
@@ -229,7 +230,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                     vigem.right_trigger_float(vscaled)
             else:
                 # remote
-                input_devices.remote_client.send_gamepad_axis(self.action_data.device_index, output_mode, vscaled)
+                gremlin.remote.remote_client.send_gamepad_axis(self.action_data.device_index, output_mode, vscaled)
                 return True
         else: # momentary
             if output_mode == GamePadOutput.ButtonA:
@@ -284,7 +285,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                         if verbose: syslog.error(f"VIGEM: button {button.name}: release")
                         vigem.release_button(button)
                 else:
-                    input_devices.remote_client.send_gamepad_button(self.action_data.device_index, button, value.is_pressed)
+                    gremlin.remote.remote_client.send_gamepad_button(self.action_data.device_index, button, value.is_pressed)
                     return True
 
         

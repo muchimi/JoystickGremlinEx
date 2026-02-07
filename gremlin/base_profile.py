@@ -2726,6 +2726,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def callbackKey(self):
         ''' callback key unique to the input type, input id '''
         return (self._device_guid, self._input_type, self._input_id)
+    
+    @property
+    def sortKey(self):
+        ''' gets the sorting key for the particular input '''
+        if isinstance(self.input_id, int) or isinstance(self.input_id, float):
+            return self.input_id
+        return self.message_key
 
     @property
     def hasActions(self) -> bool:
