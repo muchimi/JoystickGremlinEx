@@ -1027,6 +1027,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#map-to-mouse-ex-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to mouse EX action
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1611,6 +1620,15 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-to-mouse-ex-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      Map to mouse EX action
+    </span>
+  </a>
   
 </li>
       
@@ -2352,6 +2370,43 @@ This container was specifically created for output needs that have "gates", such
 <p><a class="glightbox" href="../assets/action_state_add.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="action state add" src="../assets/action_state_add.png" /></a></p>
 <h3 id="input-synchronization">Input synchronization<a class="headerlink" href="#input-synchronization" title="Permanent link">&para;</a></h3>
 <p>The action can synchronize the state value on profile start with the input.  This ensures the state value is set to the value matching the input's state on start.  This is helpful to match hardware panel switch positions for example.</p>
+<h2 id="map-to-mouse-ex-action">Map to mouse EX action<a class="headerlink" href="#map-to-mouse-ex-action" title="Permanent link">&para;</a></h2>
+<p>This plugin is identical to the Map to Mouse plugin but adds a wiggle function, easy execute on release and button hold functionality. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  </p>
+<p>The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off separately for remote/local clients.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mouse Button</td>
+<td>Outputs one of the mouse buttons</td>
+</tr>
+<tr>
+<td>Mouse Axis</td>
+<td>Moves the mouse</td>
+</tr>
+<tr>
+<td>Wiggle Enable (local)</td>
+<td>Jolts the mouse every few seconds</td>
+</tr>
+<tr>
+<td>Wiggle Disable (local)</td>
+<td>Stops the mouse wiggling if it was turned on.</td>
+</tr>
+<tr>
+<td>Wiggle Enable (remote)</td>
+<td>Jolts the mouse every few seconds on remote clients</td>
+</tr>
+<tr>
+<td>Wiggle Disable (remote)</td>
+<td>Stops the mouse wiggling if it was turned on for remote clients</td>
+</tr>
+</tbody>
+</table>
 
 
 
