@@ -27,6 +27,7 @@ import gremlin.event_handler
 import win32api, win32com, ctypes, win32gui
 import gremlin.process
 import gremlin.remote
+from gremlin.types import *
 
 import enum, threading,time, random
 
@@ -73,6 +74,9 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
+        self._send_selector = gremlin.ui.ui_common.QSendModeSelector(value = self.action_data.sendMode, callback = self._handle_sendmode_changed)
+
+
 
         self.mode_widget = gremlin.ui.ui_common.QDataComboBox()
 
@@ -97,16 +101,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.mode_label = QtWidgets.QLabel("Description")
 
         
-
-        self.chkb_force_remote_output = QtWidgets.QCheckBox("Force Remote output")
-        self.chkb_force_remote_output_only = QtWidgets.QCheckBox("Remote Only")
-
-        self.chkb_force_remote_output.clicked.connect(self._force_remote_output_changed)
-        self.chkb_force_remote_output_only.clicked.connect(self._force_remote_output_only_changed)
-
-        
-        
-        
         self.mode_group = QtWidgets.QButtonGroup()
         self.mode_normal = QtWidgets.QRadioButton("Click")
         self.mode_double_click = QtWidgets.QRadioButton("Double-Click")
@@ -129,12 +123,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.click_options_layout.addWidget(self.mode_press)
         self.click_options_layout.addWidget(self.mode_release)
         self.click_options_layout.addStretch()
-
-        
-        
-        
-        self.options_layout.addWidget(self.chkb_force_remote_output)
-        self.options_layout.addWidget(self.chkb_force_remote_output_only)
         
         self.options_layout.addStretch()
 
@@ -217,7 +205,8 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
      
         self.main_layout.addLayout(self.mode_layout)
-        self.main_layout.addWidget(self._execute_widget)
+        widget = gremlin.ui.ui_common.getHContainer([self._execute_widget, self._send_selector], widget_only= True)
+        self.main_layout.addWidget(widget)
         self.main_layout.addWidget(self.release_widget)
         self.main_layout.addWidget(self.button_widget)
         # self.main_layout.addWidget(wheel_factor_container)
@@ -239,6 +228,11 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self._populate_monitor_selector()
         self._update_ui()
+
+    def _handle_sendmode_changed(self, mode : SendType):
+        ''' sets the send mode'''
+        self.action_data.sendMode = mode
+
 
     @QtCore.Slot(bool)
     def _handle_process_relative_changed(self, checked : bool):
@@ -811,7 +805,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
     
     def get_state(self):
         ''' gets the control state '''
-        (is_local, is_remote) = gremlin.remote.remote_state.state
+        (is_local, is_remote) = self.action_data.sendFlags()
         if self.action_data.force_remote_output:
             is_remote = True
         if self.action_data.force_remote_output_only:
@@ -1189,11 +1183,16 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         if "exec_on_release" in node.attrib:
             self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
 
-        if "force_remote" in node.attrib:
-            self.force_remote_output = safe_read(node,"force_remote_output",bool, False)
+        # if "force_remote" in node.attrib:
+        #     self.force_remote_output = safe_read(node,"force_remote_output",bool, False)
 
         if "remote_only" in node.attrib:
-            self.force_remote_output_only = safe_read(node,"force_remote_output_only",bool, False)
+            #     self.force_remote_output_only = safe_read(node,"force_remote_output_only",bool, False)
+            value = safe_read(node,"force_remote_output_only",bool, False)
+            if value:
+                self.sendMode = SendType.RemoteOnly
+
+        
 
         if "click_mode" in node.attrib:
             self.click_mode = MouseClickMode.from_string(safe_read(node,"click_mode", str, "normal"))

@@ -501,15 +501,14 @@ class Key():
     
 
 
-def send_key_down(key):
+def send_key_down(key, is_local : bool, is_remote : bool):
     """Sends the KEYDOWN event for a single key.
 
     :param key the key for which to send the KEYDOWN event
     """
     import gremlin.remote
     key: gremlin.keyboard.Key
-
-    is_local, is_remote = gremlin.remote.remote_state.state
+  
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
         dbl_click = "_d_" in key.lookup_name
@@ -556,7 +555,7 @@ def key_from_mousebutton(button_id):
         return key_from_name(map_key)
     return None
 
-def send_key_up(key):
+def send_key_up(key, is_local : bool, is_remote : bool):
     """Sends the KEYUP event for a single key.
 
     :param key the key for which to send the KEYUP event
@@ -565,7 +564,6 @@ def send_key_up(key):
     from gremlin import input_devices
     key: gremlin.keyboard.Key
     verbose = gremlin.config.Configuration().verbose_mode_outputs
-    (is_local, is_remote) = gremlin.remote.remote_state.state
 
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons

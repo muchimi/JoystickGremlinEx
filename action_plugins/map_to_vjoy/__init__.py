@@ -48,6 +48,7 @@ import os
 import enum
 from gremlin.remote import remote_state
 from gremlin.util import *
+from gremlin.types import *
 import gremlin.util
 import vjoy.vjoy
 from functools import partial
@@ -975,7 +976,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         ]
 
         # wrap horizontal setup in vertical containers for independent height
-        self.container_repeater_widget, self.container_repeater_layout = gremlin.ui.ui_common.getHContainer(widgets, use_vcontainers=True)
+        self.container_repeater_widget, self.container_repeater_layout = gremlin.ui.ui_common.getHContainer(widgets, use_vcontainers=True, left_margin = 12)
         self.main_layout.addWidget(self.container_repeater_widget)
         #self.container_repeater_widget.setStyleSheet("background: orange;")
 
@@ -1454,7 +1455,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._sync_widget.valueChanged.connect(self._default_value_changed)
         widgets = [self._sync_widget]
         self.sync_on_start_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
-        self.sync_on_start_widget.setContentsMargins(0,8,0,8)
+        self.sync_on_start_widget.setContentsMargins(12,8,0,8)
         self.main_layout.addWidget(self.sync_on_start_widget)
 
     def _default_value_changed(self, value):
@@ -1512,7 +1513,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.relative_scaling_widget.setMaximum(1000.0)
         self.relative_scaling_widget.setDecimals(3)
 
-        self.container_reverse_widget = gremlin.ui.ui_common.getHContainer(self.reverse_checkbox, min_height = self.container_height, widget_only = True)
+        self.container_reverse_widget = gremlin.ui.ui_common.getHContainer(self.reverse_checkbox, min_height = self.container_height, widget_only = True, left_margin = 12)
         self.main_layout.addWidget(self.container_reverse_widget)
 
         widgets = [
@@ -1520,7 +1521,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.relative_checkbox,
             self._use_relative_value_widget,
         ]
-        self.container_output_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, "Output mode:", min_height = self.container_height, widget_only = True)
+        self.container_output_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, "Output mode:", min_height = self.container_height, widget_only = True, left_margin = 12)
         self.main_layout.addWidget(self.container_output_mode_widget)
 
 
@@ -1536,7 +1537,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.relative_scaling_widget
         ]
 
-        self.container_relative_widget = gremlin.ui.ui_common.getHContainer(widgets, "Relative mode options:", min_height = self.container_height, widget_only = True)
+        self.container_relative_widget = gremlin.ui.ui_common.getHContainer(widgets, "Relative mode options:", min_height = self.container_height, widget_only = True, left_margin = 12)
 
         widgets = [
             "Relative Value:",
@@ -1544,7 +1545,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._relative_pulse_widget,
         ]
 
-        self.container_target_widget = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height, widget_only = True)
+        self.container_target_widget = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height, widget_only = True, left_margin = 12)
 
         self.main_layout.addWidget(self.container_relative_widget)
         self.main_layout.addWidget(self.container_target_widget)
@@ -1614,7 +1615,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.curve_clear_widget,
         ]
 
-        self.container_output_curve_widget = gremlin.ui.ui_common.getHContainer(widgets,"Output Curve Options", min_height = self.container_height, widget_only = True)
+        self.container_output_curve_widget = gremlin.ui.ui_common.getHContainer(widgets,"Output Curve Options", min_height = self.container_height, widget_only = True, left_margin = 12)
         self.main_layout.addWidget(self.container_output_curve_widget)
 
         widgets = [
@@ -2252,6 +2253,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
+        self._send_selector = gremlin.ui.ui_common.QSendModeSelector(value = self.action_data.sendMode, callback = self._handle_sendmode_changed)
+
         self.chkb_ignore_release = QtWidgets.QCheckBox("Ignore release")
         self.chkb_ignore_release.setToolTip("If enabled, the action will ignore release triggers (this is input and container dependent) - normal is OFF")
         self.chkb_ignore_release.setStyleSheet("")
@@ -2273,10 +2276,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         widgets = [
-            # "Default value:",
-            # self.rb_start_released,
-            # self.rb_start_pressed,
-            # gremlin.ui.ui_common.QHorizontalSeparator(),
             self._execute_widget,
             self.chkb_ignore_release,
             self.chkb_paired,
@@ -2286,6 +2285,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             ]
 
+
+        self.container_send_widget = gremlin.ui.ui_common.getVContainer(self._send_selector, widget_only=True)
         self.container_options_widget = gremlin.ui.ui_common.getHContainer(widgets, min_height = self.container_height, widget_only = True)
 
 
@@ -2356,11 +2357,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.target_value_container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         self.main_layout.addWidget(self.selector_widget)
-        
         self.main_layout.addWidget(self.container_warning_widget)
+        self.main_layout.addWidget(self.container_send_widget)
         self.main_layout.addWidget(self.container_options_widget)
-        #self.main_layout.addWidget(self.pulse_widget)
-        #self.main_layout.addWidget(self.start_widget)
         self.main_layout.addWidget(self.axis_range_container_widget)
         self.main_layout.addWidget(self.target_value_container_widget)
 
@@ -2423,6 +2422,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             # update warning if needed
             self._vjoy_id_changed(self.cb_vjoy_device_selector.currentIndex())
 
+
+    def _handle_sendmode_changed(self, mode : SendType):
+        ''' sets the send mode'''
+        self.action_data.sendMode = mode
 
     @QtCore.Slot(bool)
     def _handle_show_vjoy_disconnect_changed(self, checked : bool):
@@ -4235,7 +4238,8 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
     def profile_start(self):
         ''' occurs on profile start '''
         # setup initial state
-        (is_local, is_remote) = gremlin.remote.remote_state.state
+
+        (is_local, is_remote) = self.action_data.sendFlags()
         is_paired = gremlin.remote.remote_state.paired
         config =  gremlin.config.Configuration()
         verbose = self.verbose or config.verbose_mode_outputs or config.verbose_mode_vjoy
@@ -4799,7 +4803,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
     
     def _process_event(self, event : gremlin.event_handler.Event, action_value : gremlin.actions.Value, extra_data):
         ''' runs when a joystick even occurs like a button press or axis movement when a profile is running '''
-        (is_local, is_remote) = gremlin.remote.remote_state.state
+        (is_local, is_remote) = self.action_data.sendFlags()
 
         verbose = self.verbose
         verbose_extra = self.verbose_extra
@@ -5363,7 +5367,7 @@ class VJoyRemapFunctor(gremlin.base_conditions.AbstractFunctor):
             self.thread_running = True
             vjoy_dev = joystick_handling.VJoyProxy()[self.vjoy_id]
             self.axis_value = vjoy_dev.axis(self.vjoy_input_id).value
-            (is_local, is_remote) = gremlin.remote.remote_state.state
+            (is_local, is_remote) = self.action_data.sendFlags()
             while self.thread_running:
                 try:
                     # If the vjoy value has was changed from what we set it to
@@ -6315,7 +6319,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             input_type = InputType.JoystickAxis
         elif self.action_mode == VjoyAction.VJoyHat:
             input_type = InputType.JoystickHat
-        elif self.action_mode in (VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease,  VjoyAction.VJoyButton, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton):
+        elif self.action_mode in (VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease,  VjoyAction.VJoyButton, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton,VjoyAction.VJoyAxisToButton):
             input_type = InputType.JoystickButton
         else:
             input_type = None

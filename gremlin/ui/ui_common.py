@@ -873,6 +873,9 @@ class Icons():
     @staticmethod
     def syncIcon():
         return Icons._icon("mdi6.format-horizontal-align-left")
+    @staticmethod
+    def remoteControlIcon():
+        return Icons._icon("mdi.remote")
     
 
     def _icon(value : str, qta_color = None):
@@ -11774,23 +11777,24 @@ class QExecuteWidget(QtWidgets.QWidget):
         self._execute_on_press = execute_on_press
         self._execute_on_release = execute_on_release
 
-        self._press_widget = QtWidgets.QCheckBox("Execute on press")
-        self._press_widget.setChecked(execute_on_press)
-        self._press_widget.setToolTip("If checked, commands sends on a press event")
-        self._press_widget.clicked.connect(self._press_changed)
-
-        self._release_widget = QtWidgets.QCheckBox("Execute on release")
-        self._release_widget.setChecked(execute_on_release)
-        self._release_widget.setToolTip("If checked, commands sends on a release event")
-        self._release_widget.clicked.connect(self._release_changed)
+        self._press_widget = QDataCheckbox("Execute on press",
+                                           value = execute_on_press,
+                                           callback = self._press_changed,
+                                           tooltip = "If checked, commands sends on a press event")
+        
+        self._release_widget = QDataCheckbox("Release on press",
+                                           value = execute_on_release,
+                                           callback = self._release_changed,
+                                           tooltip = "If checked, commands sends on a release event")
 
         self._press_callback = press_callback
         self._release_callback = release_callback
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        widget, _ = getHContainer([self._press_widget, self._release_widget], label = label)
+
+        widget = getHContainer([self._press_widget, self._release_widget], label = label, widget_only= True)
         self.main_layout.addWidget(widget)
-        self.main_layout.setSpacing(0)
+        
         
 
     @QtCore.Slot(bool)
@@ -13751,3 +13755,51 @@ class QProcessSelectorWidget(QtWidgets.QWidget):
         self.container_args.setEnabled(enabled)
         if self._autostart_enabled:
             self.container_timeout.setEnabled(enabled)
+
+
+class QSendModeSelector(QtWidgets.QWidget):
+    ''' send mode selector for actions '''
+    def __init__(self, value = gremlin.types.SendType.Normal, callback = None, tooltip = None, parent = None):
+        super().__init__(parent = parent)
+
+        if value is None:
+            value = gremlin.types.SendType.Normal
+        self.mode = value
+        self._callback = callback
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+        items = [
+            ("Normal", gremlin.types.SendType.Normal),
+            ("Local Only", gremlin.types.SendType.LocalOnly),
+            ("Remote Only", gremlin.types.SendType.RemoteOnly),
+            ("Local & Remote", gremlin.types.SendType.LocalAndRemote),
+        ]
+        self._selector_widget = QDataComboBox(source = items,
+                                              value = value,
+                                              callback = self._handle_mode_changed
+                                              )
+        
+        icon = Icons.remoteControlIcon()
+        widgets = [
+            QIconLabel(icon, "Send:"),
+            self._selector_widget,
+            " "
+        ]
+        widget = getGridContainer(widgets, widget_only = True)
+        widget = getVContainer(widget, widget_only = True)
+        self._tooltip = tooltip
+        main_layout.addWidget(widget)
+        self._update_tooltip()
+
+
+    def _handle_mode_changed(self, value):
+        self.mode = value
+        self._update_tooltip()
+        if self._callback:
+            self._callback(value)
+
+    def _update_tooltip(self):
+        if not self._tooltip:
+            self.setToolTip(f"Send mode: {gremlin.types.SendType.to_description(self.mode)}")
+
+        

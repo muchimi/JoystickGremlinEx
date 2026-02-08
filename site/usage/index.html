@@ -28,6 +28,9 @@
     
       <link rel="stylesheet" href="../assets/stylesheets/main.2afb09e1.min.css">
       
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
       
 
 
@@ -64,7 +67,14 @@
     body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}</style> <script src="../assets/javascripts/glightbox.min.js"></script></head>
   
   
-    <body dir="ltr">
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -115,6 +125,32 @@
         </div>
       </div>
     </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
     
     
       <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
@@ -1060,6 +1096,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#override-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Override mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#client-machine-setup" class="md-nav__link">
     <span class="md-ellipsis">
       Client machine setup
@@ -1857,16 +1902,7 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#map-to-mouse-ex-action" class="md-nav__link">
-    <span class="md-ellipsis">
-      Map to mouse EX action
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Map to mouse EX action">
+    <nav class="md-nav" aria-label="Profile map visualization">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3203,6 +3239,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#override-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Override mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#client-machine-setup" class="md-nav__link">
     <span class="md-ellipsis">
       Client machine setup
@@ -4000,16 +4045,7 @@
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#map-to-mouse-ex-action" class="md-nav__link">
-    <span class="md-ellipsis">
-      Map to mouse EX action
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Map to mouse EX action">
+    <nav class="md-nav" aria-label="Profile map visualization">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4948,7 +4984,7 @@ A hat with a push (or pull) function will show as a separate momentary input for
 <p>GremlinEx will display a device for processing OSC and MIDI messages sent to the local machine.  The messages can originate locally or from a remote machine.</p>
 <p>While MIDI and OSC are protocols associated with musical instruments, they are also sophisticated stage controllers with touch-screen surfaces or physical sliders, dials, button and touch pads.   GremlinEx can use signals from these devices to control a game.</p>
 <h3 id="state-device">State device<a class="headerlink" href="#state-device" title="Permanent link">&para;</a></h3>
-<p>Starting with 1.0ex m74, GremlinEx supports user-defined  <a href="./#states">states</a>.  A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a <a href="https://en.wikipedia.org/wiki/Finite-state_machine">state machine</a> in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the <a href="./#map-to-state">map to state</a> action anywhere in the profile, via a <a href="#macro">macro</a>, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.</p>
+<p>Starting with 1.0ex m74, GremlinEx supports user-defined  <a href="./#states">states</a>.  A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a <a href="https://en.wikipedia.org/wiki/Finite-state_machine">state machine</a> in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the <a href="../actions/#map-to-state">map to state</a> action anywhere in the profile, via a <a href="../actions/#macro">macro</a>, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.</p>
 <p>Currently states are either pressed (on/true) or released (off/false) and function like a virtual joystick button.  When a state has mapping, the actions and containers mapped to it will see the input as a joystick button, so all containers/actions able to use momentary inputs can be mapped to a state.</p>
 <p>States can be set to auto-release after being set.  If this option is selected, whenever the state is set, it will start a timer.  If the timer lapses, the state's value will be reset based on the auto-release mode.</p>
 <table>
@@ -4976,7 +5012,7 @@ A hat with a push (or pull) function will show as a separate momentary input for
 <p>States are read by <a href="#conditions">conditions</a> and specifically the <a href="#state-condition">state condition</a>.</p>
 <p>In GremlinEx, states can be mapped via the State Device, the "map to state" action is used to clear, set, toggle or pulse a state, and the state condition is used to determine, based on state, if a container or action should execute or not.</p>
 <h3 id="octavi-ifr1-device">Octavi IFR1 device<a class="headerlink" href="#octavi-ifr1-device" title="Permanent link">&para;</a></h3>
-<p>The Octavi IFR1 device is supported by GremlinEx directly at the HID layer.  The device offers a number of button actions and functions in GremlinEx like a joystick.  The companion <a class="glightbox" href="#map-to-octavi-ifr1" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to Octavi IFR1" src="#map-to-octavi-ifr1" /></a> action lets GremlinEx set state and LEDs on the Octavi.</p>
+<p>The Octavi IFR1 device is supported by GremlinEx directly at the HID layer.  The device offers a number of button actions and functions in GremlinEx like a joystick.  The companion <a class="glightbox" href="../actions/#map-to-octavi-ifr1" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to Octavi IFR1" src="../actions/#map-to-octavi-ifr1" /></a> action lets GremlinEx set state and LEDs on the Octavi.</p>
 <p><a class="glightbox" href="../assets/octavi_ifr1.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="image" src="../assets/octavi_ifr1.png" /></a></p>
 <h3 id="reordering-of-devices">Reordering of devices<a class="headerlink" href="#reordering-of-devices" title="Permanent link">&para;</a></h3>
 <p>Microsoft Windows does not currently offer a way to set the order of devices connected to a computer, and furthermore, this order may change depending on connections/disconnections, reboot status, and the order of detection by the operating system.  To this end, GremlinEx offers a way to manually re-order devices as displayed in GremlinEx for convenience via drag and drop of the device tabs.   The order only exists within GremlinEx and it does not change the device order in the operating system.</p>
@@ -5154,11 +5190,14 @@ In the example below, the action is enabled when the input axis is between -0.09
 <p>The status bar displays</p>
 <p><a class="glightbox" href="../assets/remote_control.jpg" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="remote control" src="../assets/remote_control.jpg" /></a></p>
 <h4 id="concurrent-mode">Concurrent mode<a class="headerlink" href="#concurrent-mode" title="Permanent link">&para;</a></h4>
-<p>GremlinEx can send to the local and remote clients at the same time (concurrent mode) by sending the Concurrent command. </p>
+<p>GremlinEx can send to the local and remote clients at the same time (concurrent mode) by sending the Concurrent command.</p>
+<h3 id="override-mode">Override mode<a class="headerlink" href="#override-mode" title="Permanent link">&para;</a></h3>
+<p>As of T176, the Vjoy Remap and Map to Keyboard Ex actions have the ability to override the current remote control context and map outputs that only go to the local client, the remote client, or both.  In the default mode, the action follows the current profile remote control state.  These actions have a drop down selection box that lets you select the desired remote control options for that action only.</p>
+<p>The override mode is meant to simplify some mapping tasks independently of the global profile setting.</p>
 <h3 id="client-machine-setup">Client machine setup<a class="headerlink" href="#client-machine-setup" title="Permanent link">&para;</a></h3>
 <p>Each GremlinEx client needs to have the remote control option enabled in options to be able to receive events from the master machine.   The master machine must also be setup to broadcast these events.</p>
 <p>The client must be in run mode to accept broadcast events, and the profile can be empty.  No profile needs to be loaded on the client when the client is in remote control mode.</p>
-<p>Clients will only output to VJOY outputs that match the master.  So if the client has the same setup for VJOY (number of VJOY devices, button counts and hat counts) as the master machine, all VJOY events will be synchronized with the master machine.   This is the recommended setup.   </p>
+<p>Clients will only output to VJOY outputs that match the master.  So if the client has the same setup for VJOY (number of VJOY devices, button counts and hat counts) as the master machine, all VJOY events will be synchronized with the master machine.   This is the recommended setup.</p>
 <p>Clients will ignore events for devices that do not exist on the client (such as an invalid VJOY device number, or an invalid button for that defined device).</p>
 <p><sup>GremlinEx options setup for a client:</sup></p>
 <p><a class="glightbox" href="../assets/client_options.jpg" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="client options" src="../assets/client_options.jpg" /></a></p>
@@ -5712,7 +5751,7 @@ In the example below, the action is enabled when the input axis is between -0.09
 <h2 id="states">States<a class="headerlink" href="#states" title="Permanent link">&para;</a></h2>
 <p>Starting with 1.0ex m74, GremlinEx includes a state machine.  States are used in multiple use-cases to solve simple to complex mapping scenarios.  For example states can help with latching, triggering the same mapping from multiple inputs, and conditional mapping based on boolean logic on multiple states without having to revert to a custom user plugin.</p>
 <h3 id="what-is-a-state">What is a state?<a class="headerlink" href="#what-is-a-state" title="Permanent link">&para;</a></h3>
-<p>A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a <a href="https://en.wikipedia.org/wiki/Finite-state_machine">state machine</a> in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the <a href="./#map-to-state">map to state</a> action anywhere in the profile, via a <a href="#macro">macro</a>, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.</p>
+<p>A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a <a href="https://en.wikipedia.org/wiki/Finite-state_machine">state machine</a> in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the <a href="../actions/#map-to-state">map to state</a> action anywhere in the profile, via a <a href="../actions/#macro">macro</a>, or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.</p>
 <p>Attributes of a state:</p>
 <ul>
 <li>States are stored in a profile and specific to that profile.</li>
@@ -6068,44 +6107,6 @@ We would define a third state, called a_or_b, defined as:</p>
 <p>However the status bar (bottom left) will always reflect the active run modes of GremlinEx including the remote/local state and active run time profile mode and the toolbar (top left) will always reflect the run mode (green when active).</p>
 <h2 id="profile-map-visualization">Profile map visualization<a class="headerlink" href="#profile-map-visualization" title="Permanent link">&para;</a></h2>
 <p>GremlinEx has a dialog visualizer to show, in text form, the current mappings and modes for the profile.  This text can be copied to the clipboard and pasted as plain text.</p>
-<h2 id="map-to-mouse-ex-action">Map to mouse EX action<a class="headerlink" href="#map-to-mouse-ex-action" title="Permanent link">&para;</a></h2>
-<p>This plugin is identical to the Map to Mouse plugin but adds a wiggle function, easy execute on release and button hold functionality. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  </p>
-<p>The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off separately for remote/local clients.</p>
-<table>
-<thead>
-<tr>
-<th>Command</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Mouse Button</td>
-<td>Outputs one of the mouse buttons</td>
-</tr>
-<tr>
-<td>Mouse Axis</td>
-<td>Moves the mouse</td>
-</tr>
-<tr>
-<td>Wiggle Enable (local)</td>
-<td>Jolts the mouse every few seconds</td>
-</tr>
-<tr>
-<td>Wiggle Disable (local)</td>
-<td>Stops the mouse wiggling if it was turned on.</td>
-</tr>
-<tr>
-<td>Wiggle Enable (remote)</td>
-<td>Jolts the mouse every few seconds on remote clients</td>
-</tr>
-<tr>
-<td>Wiggle Disable (remote)</td>
-<td>Stops the mouse wiggling if it was turned on for remote clients</td>
-</tr>
-</tbody>
-</table>
-<p>Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.</p>
 <h3 id="dragons">Dragons<a class="headerlink" href="#dragons" title="Permanent link">&para;</a></h3>
 <p>This action is an experimental feature.</p>
 <p>Make sure that if you use a press action, there is a companion release action somewhere.  If that doesn't happen, you can press the key on your keyboard and it will release the key.</p>

@@ -1147,6 +1147,7 @@ class AbstractAction(ProfileData):
         self.data_ex = None # additional data for
         self.condition_view = None # holds the condition view object for this action
         self._is_multi_mode_action = False # true if a multimode action
+        self._send_mode = SendType.Normal # normal send type
 
 
         self._hooked = False
@@ -1174,6 +1175,30 @@ class AbstractAction(ProfileData):
             el.profile_started.disconnect(self.profile_started)
             el.profile_stop.disconnect(self.profile_stop)
             self._hooked = False
+
+    @property
+    def sendMode(self) -> SendType:
+        return self._send_mode
+    @sendMode.setter
+    def sendMode(self, value : SendType):
+        self._send_mode = value
+
+    def sendFlags(self) -> tuple:
+        ''' returns a (is_local, is_remote) boolean tuple based on the action's current send mode '''
+        match self._send_mode:
+            case SendType.Normal:
+                return gremlin.remote.remote_state.state
+            case SendType.LocalAndRemote:
+                return (True, True)
+            case SendType.LocalOnly:
+                return (True, False)
+            case SendType.RemoteOnly:
+                return (False, True)
+        
+        syslog.warning(f"Don't know how to handle sendmode: [{self._send_mode}]")
+        return gremlin.remote.remote_state.state
+            
+            
 
     def isMultiMode(self) -> bool:
         ''' true if the action is a multimode action'''
@@ -1364,6 +1389,8 @@ class AbstractAction(ProfileData):
         return "N/A"
 
 
+
+
     def from_xml(self, node, data = None, extra_data = None):
         """Populates the instance with data from the given XML node.
 
@@ -1376,15 +1403,11 @@ class AbstractAction(ProfileData):
         if "action_id" in node.attrib:
             self._id = node.get("action_id")
 
-        # if self._id in import_data.used_ids:
-        #     new_id = gremlin.util.get_guid()
-        #     verbose = gremlin.config.Configuration().verbose
-        #     if verbose: syslog.warning(f"PROFILE: duplicate ID found - Action: [{id}] - assigning new id: [{new_id}]")
-        #     self.id = new_id
-
-        # import_data.used_ids[self._id] = self
-
-
+        if "send-mode" in node.attrib:
+            mode_int = safe_read(node, "send-mode", int, 0)
+            mode = SendType(mode_int)
+            self._send_mode = mode
+        
 
         comment = None
         if "comment" in node.attrib:
@@ -1425,6 +1448,11 @@ class AbstractAction(ProfileData):
 
         # output the ID
         node.set("action_id", self.action_id)
+
+        # send mode
+        if self._send_mode != SendType.Normal:
+            # only save if not default
+            node.set("send-mode", safe_format(self._send_mode.value, int))
 
         # output any notes
         if self.comment:

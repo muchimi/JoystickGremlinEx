@@ -1480,3 +1480,28 @@ class VjoyAction(enum.Enum):
         VjoyAction.VJoyDisablePairedRemote,
         )
 
+
+
+class SendType(enum.IntEnum):
+    ''' send type overrides '''
+    Normal = 0 # send normal
+    LocalOnly = 1 # local only
+    RemoteOnly = 2 # remote only
+    LocalAndRemote = 3 # send to both always
+
+
+    @staticmethod
+    def to_description(value):
+        match value:
+            case SendType.Normal:
+                return "Based on profile settings."
+            case SendType.LocalOnly:
+                return "Local client only regardless of profile setting."
+            case SendType.RemoteOnly:
+                return "Remote clients only regardless of profile setting."
+            case SendType.LocalAndRemote:
+                return "Local and remote clients regardless of profile setting."
+            case _:
+                return f"Don't know how to handle: [{value}]"
+            
+

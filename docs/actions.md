@@ -477,7 +477,7 @@ The keyboard behavior is hard-coded in the hardware to send duplicative scan cod
 
 ## Map to State Action
 
-This feature is only available in 1.0ex m74 and above.  For more information on states, consult the [state device section](#states) of the documentation.
+This feature is only available in 1.0ex m74 and above.  For more information on states, consult the [state device section](usage.md#states) of the documentation.
 
 The map to state action manipulates a state when it's triggered.  This action lets you select the state to act on, and what should happen to the state value:
 
@@ -503,3 +503,20 @@ A new state can be created directly from the action by pressing the add button.
 ### Input synchronization
 
 The action can synchronize the state value on profile start with the input.  This ensures the state value is set to the value matching the input's state on start.  This is helpful to match hardware panel switch positions for example.
+
+
+
+## Map to mouse EX action
+
+This plugin is identical to the Map to Mouse plugin but adds a wiggle function, easy execute on release and button hold functionality. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  
+  
+The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off separately for remote/local clients.
+
+| Command      | Description |
+| ----------- | ----------- |
+| Mouse Button | Outputs one of the mouse buttons |
+| Mouse Axis | Moves the mouse |
+| Wiggle Enable (local) | Jolts the mouse every few seconds |
+| Wiggle Disable (local) | Stops the mouse wiggling if it was turned on. |
+| Wiggle Enable (remote) | Jolts the mouse every few seconds on remote clients |
+| Wiggle Disable (remote) | Stops the mouse wiggling if it was turned on for remote clients |

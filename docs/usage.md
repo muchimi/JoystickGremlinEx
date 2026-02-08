@@ -451,7 +451,7 @@ While MIDI and OSC are protocols associated with musical instruments, they are a
 
 ### State device
 
-Starting with 1.0ex m74, GremlinEx supports user-defined  [states](usage.md#states).  A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](usage.md#map-to-state) action anywhere in the profile, via a [macro](#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
+Starting with 1.0ex m74, GremlinEx supports user-defined  [states](usage.md#states).  A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](actions.md#map-to-state) action anywhere in the profile, via a [macro](actions.md#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
 
 Currently states are either pressed (on/true) or released (off/false) and function like a virtual joystick button.  When a state has mapping, the actions and containers mapped to it will see the input as a joystick button, so all containers/actions able to use momentary inputs can be mapped to a state.
 
@@ -469,7 +469,7 @@ In GremlinEx, states can be mapped via the State Device, the "map to state" acti
 
 ### Octavi IFR1 device
 
-The Octavi IFR1 device is supported by GremlinEx directly at the HID layer.  The device offers a number of button actions and functions in GremlinEx like a joystick.  The companion ![map to Octavi IFR1](#map-to-octavi-ifr1) action lets GremlinEx set state and LEDs on the Octavi.
+The Octavi IFR1 device is supported by GremlinEx directly at the HID layer.  The device offers a number of button actions and functions in GremlinEx like a joystick.  The companion ![map to Octavi IFR1](actions.md#map-to-octavi-ifr1) action lets GremlinEx set state and LEDs on the Octavi.
 
 ![image](assets/octavi_ifr1.png)
 
@@ -693,7 +693,13 @@ The status bar displays
 
 #### Concurrent mode
 
-GremlinEx can send to the local and remote clients at the same time (concurrent mode) by sending the Concurrent command. 
+GremlinEx can send to the local and remote clients at the same time (concurrent mode) by sending the Concurrent command.
+
+### Override mode
+
+As of T176, the Vjoy Remap and Map to Keyboard Ex actions have the ability to override the current remote control context and map outputs that only go to the local client, the remote client, or both.  In the default mode, the action follows the current profile remote control state.  These actions have a drop down selection box that lets you select the desired remote control options for that action only.
+
+The override mode is meant to simplify some mapping tasks independently of the global profile setting.
 
 ### Client machine setup
 
@@ -701,7 +707,7 @@ Each GremlinEx client needs to have the remote control option enabled in options
 
 The client must be in run mode to accept broadcast events, and the profile can be empty.  No profile needs to be loaded on the client when the client is in remote control mode.
 
-Clients will only output to VJOY outputs that match the master.  So if the client has the same setup for VJOY (number of VJOY devices, button counts and hat counts) as the master machine, all VJOY events will be synchronized with the master machine.   This is the recommended setup.   
+Clients will only output to VJOY outputs that match the master.  So if the client has the same setup for VJOY (number of VJOY devices, button counts and hat counts) as the master machine, all VJOY events will be synchronized with the master machine.   This is the recommended setup.
 
 Clients will ignore events for devices that do not exist on the client (such as an invalid VJOY device number, or an invalid button for that defined device).
 
@@ -1380,7 +1386,7 @@ Starting with 1.0ex m74, GremlinEx includes a state machine.  States are used in
 
 ### What is a state?
 
-A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](usage.md#map-to-state) action anywhere in the profile, via a [macro](#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
+A state is an internal entity that only exists in memory at runtime.  States have a unique, case sensitive, name.  States have an on/off behavior (also known as pressed/released or true/false) that can be set or read by profiles at runtime.  States can be used to implement a [state machine](https://en.wikipedia.org/wiki/Finite-state_machine) in a profile, and behave like virtual on/off or boolean switches.  They are either set/on/true or unset/off/false.  States initialize to a default starting value when a profile starts.  States can then be changed at runtime by the [map to state](actions.md#map-to-state) action anywhere in the profile, via a [macro](actions.md#macro), or by a user plugin via the StateData() API.  States can be read as a condition (state condition) that performs a check on the state to see if the conditioned container or action should execute or not.  States are also mappaple via the state device tab, so a state can trigger a set of actions when their value changes.
 
 Attributes of a state:
 
@@ -1758,23 +1764,6 @@ GremlinEx has a dialog visualizer to show, in text form, the current mappings an
 
 
 
-## Map to mouse EX action
-
-This plugin is identical to the Map to Mouse plugin but adds a wiggle function, easy execute on release and button hold functionality. When wiggle is enabled, the mouse will move slightly by itself every 10 to 40 seconds and move back.  It will do that until wiggle mode is turned off.  
-  
-The purpose of wiggle is to keep an application alive.   Wiggle is turned on/off separately for remote/local clients.
-
-| Command      | Description |
-| ----------- | ----------- |
-| Mouse Button | Outputs one of the mouse buttons |
-| Mouse Axis | Moves the mouse |
-| Wiggle Enable (local) | Jolts the mouse every few seconds  |
-| Wiggle Disable (local) | Stops the mouse wiggling if it was turned on.  |
-| Wiggle Enable (remote) | Jolts the mouse every few seconds on remote clients  |
-| Wiggle Disable (remote) | Stops the mouse wiggling if it was turned on for remote clients  |
-
-
-Mouse commands can forced to be sent to remote hosts only, or to send them concurrently to the remote host regardless of the remote control state.
 
 ### Dragons
 

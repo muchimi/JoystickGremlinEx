@@ -5,6 +5,17 @@ theme:
   features:
       - navigation.tabs
       - navigation.tabs.sticky  
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7 # Icon for light mode
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4 # Icon for dark mode
+        name: Switch to light mode  
 plugins:
   - search
   - glightbox

@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T176):
+- New: several mouse, keyboard and joystick output actions gain a remote control override option. The default mode is "normal", meaning the action will observe current remote control state set by the profile controls.  The mode override can be used to change the action's target to local client, remote clients, or both independently of the current profile's global remote control state.
+- Change: documentation adds an option for dark mode.
+
 ### (m76T175):
 - Fix: refactor for new remote package on all files
 - Fix: Map to mouse Ex: does not release buttons post refactor.

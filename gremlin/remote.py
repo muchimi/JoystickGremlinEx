@@ -746,7 +746,8 @@ class RemoteClient():
     @property
     def enabled(self):
         ''' enables or disabled sending remote events'''
-        return remote_state.is_remote
+        return True # as of T176 always enable due to the overrides
+        # return remote_state.is_remote
     
 
     @property

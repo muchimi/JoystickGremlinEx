@@ -170,7 +170,7 @@ def cruise_toggle(event, vjoy):
 def speed_limit_increase(event, vjoy):
 	
     if event.is_pressed:
-        (is_local, is_remote) = gremlin.remote.remote_state.state
+        (is_local, is_remote) = self.action_data.sendFlags()
         global bump_a_table, bump_a_index
         current = vjoy[1].axis(6).value
         new_value = get_value(+1, current)
@@ -182,7 +182,7 @@ def speed_limit_increase(event, vjoy):
 
 def speed_limit_decrease(event, vjoy):
     if event.is_pressed:
-        (is_local, is_remote) = gremlin.remote.remote_state.state
+        (is_local, is_remote) = self.action_data.sendFlags()
         global bump_a_table, bump_a_index
         current = vjoy[1].axis(6).value
         new_value = get_value(-1, current)
@@ -193,7 +193,7 @@ def speed_limit_decrease(event, vjoy):
             gremlin.remote.remote_client.send_axis(1, 6, new_value)
 
 def init_speed_limiter(vjoy):
-    (is_local, is_remote) = gremlin.remote.remote_state.state
+    (is_local, is_remote) = self.action_data.sendFlags()
     global bump_a_table, bump_a_index
     current = bump_a_table[bump_a_index]
     vjoy[1].axis(6).value = current
@@ -220,7 +220,7 @@ def speed_dec_a(event, vjoy):
 
 def acc_limit_increase(event, vjoy):
     if event.is_pressed:
-        (is_local, is_remote) = gremlin.remote.remote_state.state
+        (is_local, is_remote) = self.action_data.sendFlags()
         global bump_a_table, bump_a_index
         current = vjoy[1].axis(7).value
         new_value = get_value(+1, current)
@@ -235,7 +235,7 @@ def acc_limit_increase(event, vjoy):
 
 def acc_limit_decrease(event, vjoy):
     if event.is_pressed:
-        (is_local, is_remote) = gremlin.remote.remote_state.state
+        (is_local, is_remote) = self.action_data.sendFlags()
         global bump_a_table, bump_a_index
         current = vjoy[1].axis(7).value
         new_value = get_value(-1, current)
