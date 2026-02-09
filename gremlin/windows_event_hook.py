@@ -29,6 +29,11 @@ user32 = ctypes.WinDLL("user32")
 g_keyboard_callbacks = []
 g_mouse_callbacks = [] # holds callbacks specific to non mouse movement 
 g_mouse_move_callbacks = [] # holds callbacks specific to mouse movement 
+g_mouse_wheel_callbacks = [] # holds callbacks specific to mouse wheel
+g_suppress_mouse = 0 # block stack for mouse (shift + esc to terminate)
+g_suppress_keyboard = 0 # block stack for keyboard (shift + esc to terminate)
+g_shift_state = False # true if either shift keys are down
+
 import win32api
 import logging
 syslog = logging.getLogger("system")
@@ -218,6 +223,7 @@ def process_keyboard_event(n_code, w_param, l_param):
     :param w_param message type identifier
     :param l_param message content
     """
+    global g_suppress_keyboard, g_shift_state, g_suppress_mouse
     msg = ctypes.cast(l_param, LPKBDLLHOOKSTRUCT)[0]
 
     # Only handle events we're supposed to, see
@@ -232,6 +238,9 @@ def process_keyboard_event(n_code, w_param, l_param):
 
         #print (f"****** KEYBOARD HOOK: raw scancode: 0x{msg.scanCode:X} w_param: 0x{w_param:X} flags: 0x{msg.flags:X} scan code: {scan_code} (0x{scan_code:x}) ext: {is_extended} pressed: {is_pressed}")
 
+        # track left shift state
+        if scan_code == 0x2a:
+            g_shift_state = is_pressed
 
         # A scan code of 541 indicates AltGr being pressed. AltGr is sent
         # as a combination of RAlt + RCtrl to the system and as such
@@ -247,7 +256,16 @@ def process_keyboard_event(n_code, w_param, l_param):
             for cb in g_keyboard_callbacks:
                 cb(evt)
 
+    if scan_code == 0x01 and g_shift_state:
+        # breaker tripped - turn off suppression for mouse and keyboard 
+        g_suppress_keyboard = 0 
+        g_suppress_mouse = 0
+
     # Pass the event on to the next callback in the chain
+    if g_suppress_keyboard:
+        # suppress keyboard        
+        return 1 # suppress
+    # syslog.info(f"{g_suppress_keyboard} {scan_code:x} {g_shifted_state}")
     return user32.CallNextHookEx(None, n_code, w_param, l_param)
 
 
@@ -256,6 +274,7 @@ _mouse_wheel_state = {} # holds the current state (pressed) of the wheel button
 _mouse_wheel_delay = 0.5 # mouse wheel delay in ms
 _mouse_x = None 
 _mouxe_y = None
+
 
 _is_runtime = False # true if in runtime
 
@@ -280,6 +299,7 @@ def process_mouse_event(n_code, w_param, l_param):
     import gremlin.types
     global g_mouse_callbacks, _is_runtime, _mouse_x, _mouse_y
     global g_mouse_move_callbacks
+    global g_suppress_mouse
     verbose = False
     if n_code == HC_ACTION: # and w_param != WM_MOUSEMOVE:
         msg = ctypes.cast(l_param, LPMSLLHOOKSTRUCT)[0]
@@ -320,6 +340,8 @@ def process_mouse_event(n_code, w_param, l_param):
                 button_id = gremlin.types.MouseButton.WheelDown
                 release_button_id = gremlin.types.MouseButton.WheelUp
             is_wheel = True
+            for callback in g_mouse_wheel_callbacks:
+                callback(delta, False)
         elif w_param == WM_MOUSEHWHEEL:
             # horizontal mouse wheel
             delta = msg.mouseData >> 16 # high word
@@ -330,6 +352,9 @@ def process_mouse_event(n_code, w_param, l_param):
                 button_id = gremlin.types.MouseButton.WheelLeft
                 release_button_id = gremlin.types.MouseButton.WheelRight
             is_wheel = True
+            for callback in g_mouse_wheel_callbacks:
+                callback(delta, True)
+
         elif w_param == WM_MOUSEMOVE:
             # mouse movement
             _mouse_x = msg.pt.x
@@ -377,7 +402,10 @@ def process_mouse_event(n_code, w_param, l_param):
             
 
     # Pass the event on to the next callback in the chain
-    return user32.CallNextHookEx(None, n_code, w_param, l_param)
+    if g_suppress_mouse == 0 or w_param == WM_MOUSEMOVE:
+        return user32.CallNextHookEx(None, n_code, w_param, l_param)
+    return 1 # suppress
+    
 
 
 
@@ -411,6 +439,22 @@ class KeyboardHook:
         self._listen_thread.name = "keyboard hook"
         
 
+        
+    def pushSuppress(self):
+        ''' suspend mouse processing on the local client '''
+        global g_suppress_keyboard
+        g_suppress_keyboard += 1
+
+    def popSuppress(self, reset = False):
+        ''' resume mouse processing on the local client '''
+        global g_suppress_keyboard
+        if reset:
+            g_suppress_keyboard = 0
+        elif g_suppress_keyboard > 0:
+            g_suppress_keyboard -=1
+            
+        
+
     def register(self, callback):
         """Registers a new message callback.
 
@@ -418,6 +462,13 @@ class KeyboardHook:
         """
         global g_keyboard_callbacks
         g_keyboard_callbacks.append(callback)
+        self.start()
+
+    def unregister(self, callback):
+        ''' unregisters a keyboard hook '''
+        global g_keyboard_callbacks
+        if callback and callback in g_keyboard_callbacks:
+            g_keyboard_callbacks.remove(callback)
 
     def start(self):
         """Starts the hook if it is not yet running."""
@@ -482,6 +533,7 @@ class MouseHook:
 
         self._running = False
         self._listen_thread = None 
+        self._supress = 0 # true if the mouse hook should not process on the local box
 
         global _mouse_wheel_state, _mouse_wheel_timer, _mouse_wheel_delay
         wheel_buttons = [gremlin.types.MouseButton.WheelDown,
@@ -499,6 +551,20 @@ class MouseHook:
         SM_SWAPBUTTON = 23
         self._is_swapped =  ctypes.windll.user32.GetSystemMetrics(SM_SWAPBUTTON) != 0
         
+    def pushSuppress(self):
+        ''' suspend mouse processing on the local client '''
+        global g_suppress_mouse
+        g_suppress_mouse += 1
+
+    def popSuppress(self, reset = False):
+        ''' resume mouse processing on the local client '''
+        global g_suppress_mouse
+        if reset:
+            g_suppress_mouse = 0
+        elif g_suppress_mouse > 0:
+            g_suppress_mouse -=1
+        
+
 
 
     def register(self, callback):
@@ -518,6 +584,13 @@ class MouseHook:
             g_mouse_move_callbacks.append(callback)
             self.start()
 
+    def registerMouseWheel(self, callback):
+        ''' registers a mouse move callback '''
+        global g_mouse_wheel_callbacks
+        if callback and not callback in g_mouse_wheel_callbacks:
+            g_mouse_wheel_callbacks.append(callback)
+            self.start()            
+
     def unregister(self, callback):
         ''' removes a mouse callback '''
         global g_mouse_callbacks
@@ -533,6 +606,13 @@ class MouseHook:
         global g_mouse_move_callbacks
         if callback in g_mouse_move_callbacks:
             g_mouse_move_callbacks.remove(callback)
+
+
+    def unregisterMouseWheel(self, callback):
+        ''' unregisters a mouse move callback '''
+        global g_mouse_wheel_callbacks
+        if callback in g_mouse_wheel_callbacks:
+            g_mouse_wheel_callbacks.remove(callback)
 
         
 
@@ -600,8 +680,10 @@ class MouseHook:
                 break
             if result == -1:
                 raise ctypes.WinError(get_last_error())
-            user32.TranslateMessage(ctypes.byref(msg))
-            user32.DispatchMessageW(ctypes.byref(msg))
+            
+            if self._supress == 0:
+                user32.TranslateMessage(ctypes.byref(msg))
+                user32.DispatchMessageW(ctypes.byref(msg))
 
     @property            
     def is_swapped(self) -> bool:

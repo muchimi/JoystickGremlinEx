@@ -24,6 +24,8 @@ import logging
 import time
 import threading
 from typing import Callable
+import uuid
+import socket
 
 from PySide6 import QtCore
 
@@ -48,7 +50,7 @@ import vjoy.vjoy
 
 from . import error
 
-import win32api
+import win32api, win32con
 import gremlin.sendinput, gremlin.tts
 
 import socketserver, socket, msgpack
@@ -76,16 +78,27 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
     
     '''
 
+    
+    # def __init__(self, request, client_address, server):
+    #     super().__init__(request, client_address, server)
+    #     self._last_y = None
+    #     self._last_x = None
+
+
 
     def handle(self):
-        
-        verbose = gremlin.config.Configuration().verbose_mode_remote
+        config =  gremlin.config.Configuration()
+        verbose = config.verbose_mode_remote and config.verbose_mode_extra
         # handles input data
         raw_data = self.request[0].strip()
         # socket = self.request[1]
         
-        data = msgpack.unpackb(raw_data)
-        if verbose: syslog.info(f"REMOTE: received remote data: {data}")
+        try:
+            data = msgpack.unpackb(raw_data)
+            if verbose: syslog.info(f"REMOTE: received remote data: {data}")
+        except ValueError:
+            # unpack error
+            return
 
         sender = data["sender"]
         if sender == remote_client.id:
@@ -93,158 +106,242 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             return
         
         action = data["action"]
-        if action == "hb":
-            # heart beat
-            return
+
+        match action:
+            case "hb":
+                # heartbeat
+                return
+            case "register":
+                # register client
+                rc = RemoteControl()
+                client_id = data["client_id"]
+                client_name = data["client_name"]
+                rc.registerClient(client_id, client_name)
+                
+
+
+            case "key":
+                # keyboard output
+                virtual_code = data["vc"]
+                scan_code = data["sc"]
+                flags = data["flags"]
+                if verbose: syslog.info(f"REMOTE: key 0x{scan_code:X}")
+                win32api.keybd_event(virtual_code, scan_code, flags, 0)
         
-        if action == "key":
-            # keyboard output
-            virtual_code = data["vc"]
-            scan_code = data["sc"]
-            flags = data["flags"]
-            if verbose: syslog.info(f"REMOTE: key 0x{scan_code:X}")
-            win32api.keybd_event(virtual_code, scan_code, flags, 0)
-        elif action == "mouse":
-            
-            subtype = data["subtype"]
-            if subtype == "wheel":
-                direction = data["direction"]
-                if verbose: syslog.info(f"REMOTE: wheel {direction}")
-                gremlin.sendinput.mouse_wheel(direction)
-            elif subtype == "hwheel":
-                direction = data["direction"]
-                if verbose: syslog.info(f"REMOTE: wheel {direction}")
-                gremlin.sendinput.mouse_h_wheel(direction)
-            elif subtype == "button":
-                button_id = data["button"]
-                button = gremlin.types.MouseButton.to_enum(button_id)
-                
-                is_pressed = data["value"]
-                if is_pressed:
-                    if verbose: syslog.info(f"REMOTE: mouse button down {button.name}")    
-                    gremlin.sendinput.mouse_press(button)
-                else:
-                    if verbose: syslog.info(f"REMOTE: mouse button up {button.name}")    
-                    gremlin.sendinput.mouse_release(button)
-            elif subtype == "button_double":
-                button_id = data["button"]
-                button = gremlin.types.MouseButton.to_enum(button_id)
-                is_pressed = data["value"]
-                if is_pressed:
-                    if verbose: syslog.info(f"REMOTE: double click {button.name}")    
-                    gremlin.sendinput.mouse_press_double_click(button)
-            elif subtype == "axis":
-                dx = data["dx"]
-                dy = data["dy"]
-                mouse_controller = gremlin.sendinput.MouseController()
-                if verbose: syslog.info(f"REMOTE: mouse axis [{dx},{dy}]")    
-                mouse_controller.set_absolute_motion(dx, dy)
-
-            elif subtype == "amotion":
-                # accelerated motion
-                a = data["acc"]
-                min_speed = data["min_speed"]
-                max_speed = data["max_speed"]
-                time_to_max_speed = data["time_to_speed"]
-                mouse_controller = gremlin.sendinput.MouseController()
-                if verbose: syslog.info(f"REMOTE: mouse accelerated motion")    
-                mouse_controller.set_accelerated_motion(a,min_speed,max_speed,time_to_max_speed)
-        elif action == "gamepad":
-            # gamepad handling
-            index = data["index"] # id of the gamepad to send the data to
-            subtype = data["subtype"] # axis or button
-            output_mode = data["mode"] # either a gamepadoutput or the translated button code
-            vigem = gremlin.gamepad_handling.getGamepad(index)
-            if vigem is not None:
-                if subtype == "axis":
-                    value = data["value"]
-                    
-                    if vigem:
-                        if output_mode == GamePadOutput.LeftStickX:
-                            if verbose: syslog.info(f"REMOTE: pad left x {value:0.3f}")
-                            vigem.left_joystick_float_x(value)
-                        elif output_mode == GamePadOutput.LeftStickY:
-                            if verbose: syslog.info(f"REMOTE: pad left y {value:0.3f}")
-                            vigem.left_joystick_float_y(value)
-                        if output_mode == GamePadOutput.RightStickX:
-                            if verbose: syslog.info(f"REMOTE: pad right x {value:0.3f}")
-                            vigem.right_joystick_float_x(value)
-                        elif output_mode == GamePadOutput.RightStickY:
-                            if verbose: syslog.info(f"REMOTE: pad right y {value:0.3f}")
-                            vigem.right_joystick_float_y(value)
-                        if output_mode == GamePadOutput.LeftTrigger:
-                            #vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
-                            if verbose: syslog.info(f"REMOTE: pad left trigger {value:0.3f}")
-                            vigem.left_trigger_float(value)
-                        if output_mode == GamePadOutput.RightTrigger:
-                            #vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
-                            if verbose: syslog.info(f"REMOTE: pad right trigger {value:0.3f}")
-                            vigem.right_trigger_float(value)
-
-                elif subtype == "button":
-                    is_pressed = data["is_pressed"]
-                    if is_pressed:
-                        if verbose: syslog.info(f"REMOTE: pad button press {button}")
-                        vigem.press_button(button)
-                    else:
-                        if verbose: syslog.info(f"REMOTE: pad button release {button}")
-                        vigem.release_button(button)
-                vigem.update()
-            
-
-
-
-
-
-        elif action in ("button","axis","hat","relative_axis","toggle"):
-            # joystick button
-            
-            device = data["device"]
-            target = data["target"]
-            value = data["value"]
-            if "relative_value" in data:
-                relative_value = data["relative_value"]
-            else:
-                relative_value = 0.0
-            proxy = gremlin.joystick_handling.VJoyProxy()
-            if device in proxy.vjoy_devices:
-                # valid device
-                vjoy = proxy[device]
-                
-                match action:
+            case "mouse":
+                # mouse output
+                subtype = data["subtype"]
+                match subtype:
+                    case"wheel":
+                        direction = data["direction"]
+                        if verbose: syslog.info(f"REMOTE: wheel {direction}")
+                        gremlin.sendinput.mouse_wheel(direction)
+                    case "hwheel":
+                        direction = data["direction"]
+                        if verbose: syslog.info(f"REMOTE: wheel {direction}")
+                        gremlin.sendinput.mouse_h_wheel(direction)
                     case "button":
-                        # emit button change
-
-                        if verbose: syslog.info(f"REMOTE: button vjoy {device} input id: {target} pressed: {value}")
-                        if target > 0 and target < vjoy.button_count:
-                            proxy[device].button(target).is_pressed = value
-                    case "toggle":
-                        # emit toggle
-                        if verbose: syslog.info(f"REMOTE: button toggle vjoy {device} input id: {target}")
-                        if target > 0 and target < vjoy.button_count:
-                            proxy[device].button(target).is_pressed = not proxy[device].button(target).is_pressed
+                        button_id = data["button"]
+                        button = gremlin.types.MouseButton.to_enum(button_id)
+                        
+                        is_pressed = data["value"]
+                        if is_pressed:
+                            if verbose: syslog.info(f"REMOTE: mouse button down {button.name}")    
+                            gremlin.sendinput.mouse_press(button)
+                        else:
+                            if verbose: syslog.info(f"REMOTE: mouse button up {button.name}")    
+                            gremlin.sendinput.mouse_release(button)
+                    case "button_double":
+                        button_id = data["button"]
+                        button = gremlin.types.MouseButton.to_enum(button_id)
+                        is_pressed = data["value"]
+                        if is_pressed:
+                            if verbose: syslog.info(f"REMOTE: double click {button.name}")    
+                            gremlin.sendinput.mouse_press_double_click(button)
                     case "axis":
-                        if value is None:
-                            # relative mode = get the current value
-                            value = proxy[device].axis(target).value    
-                        if relative_value:
-                            # apply the relative value
-                            value = gremlin.util.clamp(value + relative_value)
-                            if verbose: syslog.info(f"REMOTE: relative axis vjoy {device} input id: {target} relative value: {relative_value:0.3f}")
-                        if target > 0 and target <= vjoy.axis_count:
-                            if verbose: syslog.info(f"REMOTE: axis vjoy {device} input id: {target} {value:0.3f}")
-                            proxy[device].axis(target).value = value
-                    case "hat":
-                        if target > 0 and target <= vjoy.hat_count:
-                            if verbose: syslog.info(f"REMOTE: hat vjoy {device} input id: {target} direction: {value}")
-                            proxy[device].hat(target).direction = value
-                    case "relative_axis":
-                        if target > 0 and target <= vjoy.axis_count:
-                            new_value = gremlin.util.clamp(proxy[device].axis(target).value + value)
-                            if verbose: syslog.info(f"REMOTE: relative axis vjoy {device} input id: {target} relative value: {value:0.3f} new value: {new_value:0.3f}")
-                            proxy[device].axis(target).value = new_value
-                    case _:
-                        syslog.error(f"REMOTE: unknown action code received [{action}]")
+                        dx = data["dx"]
+                        dy = data["dy"]
+                        mouse_controller = gremlin.sendinput.MouseController()
+                        if verbose: syslog.info(f"REMOTE: mouse axis [{dx},{dy}]")    
+                        mouse_controller.set_absolute_motion(dx, dy)
+
+                    case "amotion":
+                        # accelerated motion
+                        a = data["acc"]
+                        min_speed = data["min_speed"]
+                        max_speed = data["max_speed"]
+                        time_to_max_speed = data["time_to_speed"]
+                        mouse_controller = gremlin.sendinput.MouseController()
+                        if verbose: syslog.info(f"REMOTE: mouse accelerated motion")    
+                        mouse_controller.set_accelerated_motion(a,min_speed,max_speed,time_to_max_speed)
+
+            case "kvm":
+                # kvm mode
+                subtype = data["subtype"]
+                match subtype:
+                    case "start" | "stop":
+                        # set/reset
+                        pass
+                    case "motion":
+                        # mouse movement
+                        # x = data["x"]
+                        # y = data["y"]
+
+                        # use deltas
+                        dx = data["dx"]
+                        dy = data["dy"]
+                        x, y = win32api.GetCursorPos()
+                        
+
+                        # get monitor orientation to apply the deltas properly
+                        hwnd = win32api.MonitorFromPoint((x, y), win32con.MONITOR_DEFAULTTONEAREST)
+                        orientation, orientation_name = gremlin.util.getMonitorOrientation(hwnd)
+                        match orientation:
+                            case 0:
+                                # normal
+                                x += dx
+                                y += dy
+                                
+                            case 1:
+                                # 90 degrees
+                                x += dy
+                                y -= dx
+                                dx, dy = dy, dx
+                                
+                            case 2:
+                                # flipped
+                                x -= dx
+                                y -= dy
+                                dx, dy = -dx, -dy
+                            case 3:
+                                # 270 degrees
+                                x -= dy
+                                y += dx
+                                dx, dy = -dy, dx
+                        
+
+                        if verbose: syslog.info(f"KVM (client): received motion {x} {y} orientation: {orientation_name}")
+                        gremlin.sendinput.mouse_relative_motion(dx, dy)
+                        # win32api.SetCursorPos((x,y))
+                    case "button":
+                        # mouse button
+                        button = data["button"]
+                        is_pressed = data["is_pressed"]
+                        if is_pressed:
+                            gremlin.sendinput.mouse_press(button)
+                        else:
+                            gremlin.sendinput.mouse_release(button)
+                    case "wheel":
+                        delta = data["delta"]
+                        gremlin.sendinput.mouse_wheel(delta)
+                    case "hwheel":
+                        delta = data["delta"]
+                        gremlin.sendinput.mouse_h_wheel(delta)
+                    case "key":
+                        virtual_code = data["vc"]
+                        scan_code = data["sc"]
+                        flags = data["flags"]
+                        win32api.keybd_event(virtual_code, scan_code, flags, 0)
+
+
+                
+
+            case "gamepad":
+                # gamepad handling
+                index = data["index"] # id of the gamepad to send the data to
+                subtype = data["subtype"] # axis or button
+                output_mode = data["mode"] # either a gamepadoutput or the translated button code
+                vigem = gremlin.gamepad_handling.getGamepad(index)
+                if vigem is not None:
+                    if subtype == "axis":
+                        value = data["value"]
+                        
+                        if vigem:
+                            if output_mode == GamePadOutput.LeftStickX:
+                                if verbose: syslog.info(f"REMOTE: pad left x {value:0.3f}")
+                                vigem.left_joystick_float_x(value)
+                            elif output_mode == GamePadOutput.LeftStickY:
+                                if verbose: syslog.info(f"REMOTE: pad left y {value:0.3f}")
+                                vigem.left_joystick_float_y(value)
+                            if output_mode == GamePadOutput.RightStickX:
+                                if verbose: syslog.info(f"REMOTE: pad right x {value:0.3f}")
+                                vigem.right_joystick_float_x(value)
+                            elif output_mode == GamePadOutput.RightStickY:
+                                if verbose: syslog.info(f"REMOTE: pad right y {value:0.3f}")
+                                vigem.right_joystick_float_y(value)
+                            if output_mode == GamePadOutput.LeftTrigger:
+                                #vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
+                                if verbose: syslog.info(f"REMOTE: pad left trigger {value:0.3f}")
+                                vigem.left_trigger_float(value)
+                            if output_mode == GamePadOutput.RightTrigger:
+                                #vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
+                                if verbose: syslog.info(f"REMOTE: pad right trigger {value:0.3f}")
+                                vigem.right_trigger_float(value)
+
+                    elif subtype == "button":
+                        is_pressed = data["is_pressed"]
+                        if is_pressed:
+                            if verbose: syslog.info(f"REMOTE: pad button press {button}")
+                            vigem.press_button(button)
+                        else:
+                            if verbose: syslog.info(f"REMOTE: pad button release {button}")
+                            vigem.release_button(button)
+                    vigem.update()
+            
+
+
+
+
+
+            case "button" | "axis" | "hat" | "relative_axis" | "toggle":
+                # joystick button
+                
+                device = data["device"]
+                target = data["target"]
+                value = data["value"]
+                if "relative_value" in data:
+                    relative_value = data["relative_value"]
+                else:
+                    relative_value = 0.0
+                proxy = gremlin.joystick_handling.VJoyProxy()
+                if device in proxy.vjoy_devices:
+                    # valid device
+                    vjoy = proxy[device]
+                    
+                    match action:
+                        case "button":
+                            # emit button change
+
+                            if verbose: syslog.info(f"REMOTE: button vjoy {device} input id: {target} pressed: {value}")
+                            if target > 0 and target < vjoy.button_count:
+                                proxy[device].button(target).is_pressed = value
+                        case "toggle":
+                            # emit toggle
+                            if verbose: syslog.info(f"REMOTE: button toggle vjoy {device} input id: {target}")
+                            if target > 0 and target < vjoy.button_count:
+                                proxy[device].button(target).is_pressed = not proxy[device].button(target).is_pressed
+                        case "axis":
+                            if value is None:
+                                # relative mode = get the current value
+                                value = proxy[device].axis(target).value    
+                            if relative_value:
+                                # apply the relative value
+                                value = gremlin.util.clamp(value + relative_value)
+                                if verbose: syslog.info(f"REMOTE: relative axis vjoy {device} input id: {target} relative value: {relative_value:0.3f}")
+                            if target > 0 and target <= vjoy.axis_count:
+                                if verbose: syslog.info(f"REMOTE: axis vjoy {device} input id: {target} {value:0.3f}")
+                                proxy[device].axis(target).value = value
+                        case "hat":
+                            if target > 0 and target <= vjoy.hat_count:
+                                if verbose: syslog.info(f"REMOTE: hat vjoy {device} input id: {target} direction: {value}")
+                                proxy[device].hat(target).direction = value
+                        case "relative_axis":
+                            if target > 0 and target <= vjoy.axis_count:
+                                new_value = gremlin.util.clamp(proxy[device].axis(target).value + value)
+                                if verbose: syslog.info(f"REMOTE: relative axis vjoy {device} input id: {target} relative value: {value:0.3f} new value: {new_value:0.3f}")
+                                proxy[device].axis(target).value = new_value
+                        case _:
+                            syslog.error(f"REMOTE: unknown action code received [{action}]")
 
 class RPCGremlin():
     ''' remote UDP multicast listener '''
@@ -348,6 +445,8 @@ class RemoteServer(QtCore.QObject):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
         self._rpc = None
+        self._instance_id = uuid.getnode() # unique ID of the host based on the mac address
+        self._instance_name = socket.gethostname()
 
 
     def start(self):
@@ -403,6 +502,10 @@ class RemoteClient():
         self._alive_thread_stop_requested = False
         self._started = False
 
+
+        self._instance_id = uuid.getnode() # unique ID of the host based on the mac address
+        self._instance_name = socket.gethostname()
+
         el = gremlin.event_handler.EventListener()
         # el.profile_stop.connect(self.stop) # hook stop event
         el.shutdown.connect(self.stop) # hook stop event
@@ -414,6 +517,16 @@ class RemoteClient():
         self.start()
         remote_control = RemoteControl()
         remote_control.setRemote(True) # enable remote control
+
+    def getDatablock(self, action : str = None) -> dict:
+        ''' gets a dict with the sender info '''
+        data = {}
+        data["sender"] = self._id
+        if action:
+            data["action"] = action
+
+        return data
+
 
     def start(self):
         ''' creates a multicast client send socket on profile start '''
@@ -454,6 +567,19 @@ class RemoteClient():
             syslog.error("SOCKET: unable to open remote control socket. Feature will be disabled.")
             self._sock = None
             return False
+        
+    def registerClient(self):
+        ''' sends server client data '''
+        enabled = gremlin.config.Configuration().enable_remote_broadcast
+        if enabled:
+                data = self.getDatablock("register")
+                data["client_id"] = self._instance_id
+                data["client_name"] = self._instance_name
+                data["client_type"] = "client"
+                raw_data = msgpack.packb(data)
+                self._send(raw_data)
+                verbose = gremlin.config.Configuration().verbose
+                if verbose: syslog.info(f"Register client [{self._instance_name}] [{self._instance_id}]")
 
 
     def stop(self):
@@ -483,9 +609,10 @@ class RemoteClient():
         ''' sends an alive packet to keep the ports alive '''
         enabled = gremlin.config.Configuration().enable_remote_broadcast
         if enabled:
-                data = {}
-                data["sender"] = self._id
-                data["action"] = "hb"
+                data = self.getDatablock("hb")
+                data["client_id"] = self._instance_id
+                data["client_name"] = self._instance_name
+                data["client_type"] = "client"
                 raw_data = msgpack.packb(data)
                 self._send(raw_data)
                 verbose = gremlin.config.Configuration().verbose
@@ -510,9 +637,7 @@ class RemoteClient():
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: send button: VJoyId: {device_id} button {button_id} pressed: {is_pressed}")               
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "button"
+            data = self.getDatablock("button")
             data["device"] = device_id
             data["target"] = button_id
             data["value"] = is_pressed
@@ -527,9 +652,7 @@ class RemoteClient():
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: toggle button: VJoyId: {device_id} button {button_id}")            
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "toggle"
+            data = self.getDatablock("toggle")
             data["device"] = device_id
             data["target"] = button_id
             raw_data = msgpack.packb(data)
@@ -543,9 +666,7 @@ class RemoteClient():
             if verbose:
                 stub = f"{value:0.3f}" if value is not None else 'None'
                 syslog.info(f"REMOTE OUTPUT: send axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "axis"
+            data = self.getDatablock("axis")
             data["device"] = device_id
             data["target"] = axis_id
             data["value"] = value
@@ -561,9 +682,7 @@ class RemoteClient():
             if verbose:
                 stub = f"{value:0.3f}" if value is not None else 'None'
                 syslog.info(f"REMOTE OUTPUT: send relative axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "relative_axis"
+            data = self.getDatablock("relative_axis")
             data["device"] = device_id
             data["target"] = axis_id
             data["value"] = value
@@ -577,9 +696,7 @@ class RemoteClient():
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: VJoyId: {device_id} hat: {hat_id} direction: {direction}")
         
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "hat"
+            data = self.getDatablock("hat")
             data["device"] = device_id
             data["target"] = hat_id
             data["value"] = direction
@@ -595,9 +712,7 @@ class RemoteClient():
                 code = int(scan_code)
                 syslog.info(f"REMOTE OUTPUT: key: 0x{code:02x} flags: 0x{flags:02x}")
         
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "key"
+            data = self.getDatablock("key")
             data["vc"] = virtual_code
             data["sc"] = scan_code
             data["flags"] = flags
@@ -605,15 +720,15 @@ class RemoteClient():
             self._send(raw_data)
             #syslog.debug(f"remote gremlin event set key: virtual code: {virtual_code} scan code: {scan_code} flags: {flags}")
 
+    
+
     def send_mouse_button(self, button_id, is_pressed, force_remote = False):
         ''' sends a mouse button press or release '''
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse button: {button_id} pressed: {is_pressed}")
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "mouse"
+            data = self.getDatablock("mouse")
             data["subtype"] = "button"
             data["button"] = button_id
             data["value"] = is_pressed
@@ -629,9 +744,7 @@ class RemoteClient():
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse dblclick {button_id} pressed: {is_pressed}")
         
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "mouse"
+            data = self.getDatablock("mouse")
             data["subtype"] = "button_double"
             data["button"] = button_id
             data["value"] = is_pressed
@@ -646,9 +759,7 @@ class RemoteClient():
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse wheel: {direction}")
         
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "mouse"
+            data = self.getDatablock("mouse")
             data["subtype"] = "wheel"
             data["direction"] = direction
             
@@ -663,9 +774,7 @@ class RemoteClient():
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse H wheel: {direction}")
         
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "mouse"
+            data = self.getDatablock("mouse")
             data["subtype"] = "hwheel"
             data["direction"] = direction
             
@@ -680,9 +789,7 @@ class RemoteClient():
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse motion: {dx}, {dy}")
         
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "mouse"
+            data = self.getDatablock("mouse")
             data["subtype"] = "axis"
             data["dx"] = dx
             data["dy"] = dy
@@ -697,9 +804,7 @@ class RemoteClient():
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse motion acceleration")
         
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "mouse"
+            data = self.getDatablock("mouse")
             data["subtype"] = "amotion"
             data["acc"] = a
             data["min_speed"] = min_speed
@@ -715,9 +820,7 @@ class RemoteClient():
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: gamepad axis: index: {index} mode: {mode} value: {value:0.3f}")
         
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "gamepad"
+            data = self.getDatablock("gamepad")
             data["subtype"] = "axis"
             data["index"] = index # which device to send to
             data["mode"] = mode
@@ -732,15 +835,71 @@ class RemoteClient():
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: gamepad: index: {index} mode: {mode} pressed: {is_pressed}")
             
-            data = {}
-            data["sender"] = self._id
-            data["action"] = "gamepad"
+            data = self.getDatablock("gamepad")
             data["index"] = index  # which device to send to
             data["subtype"] = "button"
             data["mode"] = mode
             data["is_pressed"] = is_pressed
             raw_data = msgpack.packb(data)
             self._send(raw_data)
+
+    def send_kvm_mouse_motion_start(self):
+        ''' sends kvm init '''
+        data = self.getDatablock("kvm")
+        data["subtype"] = "start"
+        raw_data = msgpack.packb(data)
+        self._send(raw_data)
+
+    def send_kvm_mouse_motion_stop(self):
+        ''' sends kvm terminate '''
+        data = self.getDatablock("kvm")
+        data["subtype"] = "stop"
+        raw_data = msgpack.packb(data)
+        self._send(raw_data)
+
+    def send_kvm_mouse_motion(self, x : int, y: int, dx : int, dy : int):
+        ''' sends mouse position '''
+        if self.enabled:
+            data = self.getDatablock("kvm")
+            data["subtype"] = "motion"
+            data["x"] = x
+            data["y"] = y
+            data["dx"] = dx
+            data["dy"] = dy
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+
+    def send_kvm_mouse_button(self, button_id : int, is_pressed: bool):
+        ''' sends mouse button '''
+        if self.enabled:
+            data = self.getDatablock("kvm")
+            data["subtype"] = "button"
+            data["button"] = button_id
+            data["is_pressed"] = is_pressed
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+
+    def send_kvm_mouse_wheel(self, delta : int, leftright : bool):
+        ''' sends mouse wheel '''
+        if self.enabled:
+            data = self.getDatablock("kvm")
+            data["subtype"] = "hwheel" if leftright else "wheel"
+            data["delta"] = 1 if delta > 0 else -1  # 120 for up, 65416 for down
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+    
+    def send_kvm_keyboard(self, virtual_code, scan_code, flags):
+        ''' handles a kvm key event '''
+        if self.enabled:
+            data = self.getDatablock("kvm")
+            data["subtype"] = "key"
+            data["vc"] = virtual_code
+            data["sc"] = scan_code
+            data["flags"] = flags
+            raw_data = msgpack.packb(data)
+            self._send(raw_data)
+
+
 
 
     @property
@@ -784,6 +943,17 @@ class RemoteControl():
         el = gremlin.event_handler.EventListener()
         el.config_changed.connect(self._config_changed)
         el.broadcast_changed.connect(self._broadcast_changed)
+        self._instance_id = uuid.getnode() # unique ID of the host based on the mac address
+        self._instance_name = socket.gethostname()
+
+        # map of clients
+        self._clients = {}
+
+    
+
+    def registerClient(self, client_id, client_name):
+        ''' registers a client '''
+        self._clients[client_id] = client_name
         
     def _update(self, value):
         import gremlin.event_handler

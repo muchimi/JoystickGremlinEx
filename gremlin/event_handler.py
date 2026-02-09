@@ -1912,23 +1912,6 @@ class EventListener:
 			if not self._running:
 				return
 
-			# translate mouse input to a keyboard input
-			# key = gremlin.keyboard.key_from_mousebutton(event.button_id)
-			# if key:
-			# 	evt = gremlin.windows_event_hook.KeyEvent(
-			# 		virtual_code = key.virtual_code, 
-			# 		scan_code = key.scan_code, 
-			# 		is_extended = key.is_extended,
-			# 		is_pressed = event.is_pressed,
-			# 		is_injected = event.is_injected
-			# 		)
-			# 	self._keyboard_handler(evt)
-			
-			# key_id = (event.button_id.value + 0x1000, False)
-			# self._keyboard_state[key_id] = event.is_pressed
-
-			# syslog.info(f"mouse event: {str(event)} key id: {key_id}")
-
 			mouse_event = Event(
 				event_type= InputType.Mouse,
 				device_guid=dinput.GUID_Keyboard,

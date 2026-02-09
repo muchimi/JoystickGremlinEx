@@ -28,7 +28,9 @@ import time
 import shutil
 import uuid
 import dinput
-import winreg
+import winreg, win32api, win32con
+from ctypes import Structure, c_long, sizeof
+
 import qtawesome as qta
 from lxml import etree as ElementTree
 from typing import Callable
@@ -2565,3 +2567,38 @@ def textWordsToUnderscore(text : str, word_count : int = 5):
             suggested_name += "_"
         suggested_name += word
     return suggested_name
+
+
+class MONITORINFO(Structure):
+    _fields_ = [
+        ("cbSize", c_long),
+        ("rcMonitor", c_long * 4),
+        ("rcWork", c_long * 4),
+        ("dwFlags", c_long)
+    ]
+
+def getMouseMonitorHandle():
+    ''' gets the handle of the monitor the mouse cursor is currently on '''
+    x, y = win32api.GetCursorPos()
+    hwnd = win32api.MonitorFromPoint((x, y), win32con.MONITOR_DEFAULTTONEAREST)
+    if hwnd is None:
+        return None
+
+    return hwnd
+
+def getMonitorOrientation(hwnd):
+    info = win32api.GetMonitorInfo(hwnd)
+    if info is not None:
+        device_name = info['Device']
+        settings = win32api.EnumDisplaySettings(device_name, win32con.ENUM_CURRENT_SETTINGS)
+        orientation = settings.DisplayOrientation
+        orientations = {
+                0: "Landscape (Normal)",
+                1: "Portrait (90 degrees)",
+                2: "Landscape (Flipped/Inverted)",
+                3: "Portrait (270 degrees)"
+        }
+    
+        return orientation, orientations.get(orientation, "Unknown")
+    return None, None
+
