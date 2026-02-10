@@ -29,7 +29,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m76T177):
+### (m76T178):
 - Change: KVM action (experimental).  Local control will now be suspended, and remote control will be enabled automatically when a KVM action is active (triggered).  This allows the regular remote control function to work when KVM is active.
 - Fix: OSC: device input button repeaters not always showing a state.
 
