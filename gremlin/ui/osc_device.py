@@ -4423,7 +4423,7 @@ class InputOscClient(QtCore.QObject):
             else:
                 source_index = 0
 
-            syslog.info(f"OSC: runtime: processing {message_key}  hit key: {hit_key}  source index: {source_index}")
+            if verbose: syslog.info(f"OSC: runtime: processing {message_key}  hit key: {hit_key}  source index: {source_index}")
             input_item : OscInputItem
             for input_item in self._osc_map[hit_key]:
 
@@ -4440,7 +4440,7 @@ class InputOscClient(QtCore.QObject):
                     if index < len(args):
                         raw_value = args[input_item.source_index]
                         value = normalized_args[input_item.source_index]
-                        syslog.info(f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}")
+                        if verbose: syslog.info(f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}")
                     else:
                         syslog.error(f"OSC: command [{input_item.message}] : source index {index} specifies an invalid parameter index. Valid parameters received: {args}")
                         raw_value = args[0]

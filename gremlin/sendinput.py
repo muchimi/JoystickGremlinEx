@@ -429,7 +429,14 @@ class _INPUT(ctypes.Structure):
 
 
 def mouse_relative_motion(dx, dy):
+    ''' sends relative motion '''
+    # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-mouse_event
     _send_input(_mouse_input(MOUSEEVENTF_MOVE, dx, dy))
+
+def mouse_absolute_motion(dx, dy):
+    ''' sends absolute coordinates '''
+    # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-mouse_event
+    _send_input(_mouse_input(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE , dx, dy))
 
 
 def mouse_press(button):

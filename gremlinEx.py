@@ -3514,7 +3514,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             
                             widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = emit)
                             index = widget.input_item_list_view.current_index
-                            widget.input_item_list_view.redraw_index(index)
+                            # widget.input_item_list_view.redraw_index(index)
                             widget._select_item_cb(index)
                             #widget.refresh(False)
 

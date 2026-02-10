@@ -30,6 +30,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m76T177):
+- Change: KVM action (experimental).  Local control will now be suspended, and remote control will be enabled automatically when a KVM action is active (triggered).  This allows the regular remote control function to work when KVM is active.
+- Fix: OSC: device input button repeaters not always showing a state.
+
+### (m76T177):
 - New: KVM action (experimental).  This new action is the first iteration of a KVM (keyboard/video/mouse - sans video) action.  When enabled, the action disables local mouse clicks and keyboard input from being processed while sending the keys and mouse motion/mouse clicks to the remote clients.  Important: local mouse motion is NOT disabled because that would prevent the mouse from moving in some situations.  A circuit breaker is provided (left-shift + esc) to forcibly re-enable local control of keyboard/mouse in case the input is blocked for whatever reason.  Normally this is not needed as the KVM is on only when the input is pressed, and turns off when the input is released.  There will be additional iterations on this feature to include a few more options as functionality is tested.  Some caveats: the mouse output on the client is impacted by monitor resolution, the number of monitors, the DPI settings. To this end, GremlinEx sends mouse motion deltas to the client instead of raw coordinates which get interpreted on the client based on which monitor the mouse is and any rotations/transforms.  As such, it may be difficult to move the mouse on the client to all corners without repositioning the mouse on the master system. This is not needed if the resolution of the master is greater or equal to the resolution of the client.  Remote mouse control gets into complicated territory once you include DPI scaling.  Again - work in progress and use with caution.  Unlike normal KVMs that do input scaling, GremlinEx does not have a target remote control viewer to scale the input from. This feature will get refined.
 
 - Fix: incomplete buffer deserialization handling.

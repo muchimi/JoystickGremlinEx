@@ -453,6 +453,9 @@ class KeyboardHook:
         elif g_suppress_keyboard > 0:
             g_suppress_keyboard -=1
             
+    def isSupressed(self) -> bool:
+        global g_suppress_keyboard
+        return g_suppress_keyboard != 0
         
 
     def register(self, callback):
@@ -565,7 +568,10 @@ class MouseHook:
             g_suppress_mouse -=1
         
 
-
+    def isSupressed(self) -> bool:
+        global g_suppress_mouse
+        return g_suppress_mouse != 0
+        
 
     def register(self, callback):
         """Registers a new message callback.

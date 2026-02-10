@@ -76,10 +76,16 @@ class Color():
     ''' general UI color and stylesheet handling '''
     @staticmethod
     def activeColor():
-        return "#51f56f" if gremlin.shared_state.is_dark_theme else "#365a75"
+        return "#51f56f" if gremlin.shared_state.is_dark_theme else "#3BAC41"
     @staticmethod
     def inactiveColor():
         return "#686a6e" if gremlin.shared_state.is_dark_theme else "#8c8c8c"
+    @staticmethod
+    def onColor():
+        return "#93f551" if gremlin.shared_state.is_dark_theme else "#3BAC41"
+    @staticmethod
+    def offColor():
+        return "#08420B" if gremlin.shared_state.is_dark_theme else "#8c8c8c"
     @staticmethod
     def normalColor():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
@@ -5483,12 +5489,12 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self._icon_size = QtCore.QSize(16,16)
         self._device_guid = None
         self._input_id = None
-        self._input_type = None
+        self._input_type = InputType.JoystickButton # default to a button
         self._button_widget = QtWidgets.QLabel()
         self._button_widget.setContentsMargins(0,0,0,0)
-        on_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.activeColor())
+        on_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.onColor())
         self._on_pixmap = on_icon.pixmap(self._icon_size)
-        off_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.inactiveColor())
+        off_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.offColor())
         self._off_pixmap = off_icon.pixmap(self._icon_size)
         height = self._icon_size.height()+2
         self._button_widget.setMinimumHeight(height)
@@ -5516,7 +5522,6 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
-
 
     def event(self, event):
         if event.type() == QEvent.Show:
@@ -5634,13 +5639,13 @@ class ButtonStateWidget(QtWidgets.QWidget):
         
     def updateState(self):
         ''' updates the widget state with the cached state  '''
-        if not self._input_type ==InputType.JoystickButton:
+        if self._input_type == InputType.JoystickAxis:
             # not a button device
             return
         state = gremlin.joystick_handling.get_button(self._device_guid, self._input_id)
         if state is not None:
             self._update_value(state)
-
+            
 
   
         

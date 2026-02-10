@@ -2267,7 +2267,9 @@ class InputItemWidget(QBoxFrame):
                         widget.hookDevice(hook_id, self.identifier.device_guid, self.identifier.input_type, self.identifier.input_id)
                         #widget.hookDevice(self._device_guid, input_type, self._input_id )
                         self.button_widget = widget
-                        self._repeater_container_layout.addWidget(widget)                
+                        self._repeater_container_layout.addWidget(widget)
+                        widget.updateState()       
+                                 
                         self._repeater_container_layout.addStretch()
                         if self._debug_layout:
                             widget.setStyleSheet("background: purple;")
