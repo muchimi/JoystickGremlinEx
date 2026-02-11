@@ -893,8 +893,19 @@ class Icons():
         ''' convers an icon to a pixmap'''
         #icon : QtGui.QIcon = Icons.warningIcon()
         return icon.pixmap(QtCore.QSize(pixels, pixels))
-        
-        
+@SingletonDecorator
+class Pixmaps():
+    ''' holds common pixmaps '''
+    def __init__(self):
+        self._icon_size = QtCore.QSize(16,16)
+        on_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.onColor())
+        self.onIconPixmap = on_icon.pixmap(self._icon_size)
+        off_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.offColor())
+        self.offIconPixmap = off_icon.pixmap(self._icon_size)
+        self.warningIconPixmap =  Icons.to_pixmap(Icons.warningIcon(), pixels = 24)
+        icon = gremlin.ui.ui_common.Icons.horizontalSeparatorIcon()
+        self.horizontalSeparatorPixmap = icon.pixmap(QtCore.QSize(24,24))
+
 
 class Buttons():
     ''' common UI button widgets '''
@@ -944,7 +955,7 @@ class Buttons():
     def getAddWidget(label = "Add", tooltip = "Add", callback = None, no_keyboard = True, data = None):
         button =  Buttons._template(label, "ri.add-line", tooltip, callback, no_keyboard, data)
         button.setMinimumHeight(24)
-        button.setMaximumWidth(24 + get_text_width(label))
+        #button.setFixedWidth(get_text_width(label)*1.3)
         # button.setStyleSheet(f" QPushButton {{margin-left: none;}}")
         return button
     
@@ -1613,29 +1624,7 @@ class LeftRightPushButton(QtWidgets.QPushButton):
             super().mousePressEvent(event)
 
 
-class NoKeyboardPushButton(QtWidgets.QPushButton):
 
-    """Standard PushButton which does not react to keyboard input."""
-
-    def __init__(self, *args, **kwargs):
-        """Creates a new instance."""
-        super().__init__(*args, **kwargs)
-
-    def keyPressEvent(self, event):
-        """Handles key press events by ignoring them.
-
-        :param event the key event to handle
-        """
-        pass
-
-
-
-    @property
-    def data(self):
-        return self._data
-    @data.setter
-    def data(self, value):
-        self._data = value
 
 
 class QLineEdit(QtWidgets.QLineEdit):
@@ -4340,6 +4329,23 @@ class QDataPushButton(QtWidgets.QPushButton):
     def data(self, value):
         self._data = value
 
+class NoKeyboardPushButton(QDataPushButton):
+
+    """Standard PushButton which does not react to keyboard input."""
+
+    def __init__(self, *args, **kwargs):
+        """Creates a new instance."""
+        super().__init__(*args, **kwargs)
+        
+
+    def keyPressEvent(self, event):
+        """Handles key press events by ignoring them.
+
+        :param event the key event to handle
+        """
+        pass
+
+
 class QIconButton(QDataPushButton):
     def __init__(self, icon : str, icon_size = 24,  text = None, data = None, parent = None, tooltip = None):
         super().__init__(text,data, parent, tooltip)
@@ -5492,10 +5498,6 @@ class ButtonStateWidget(QtWidgets.QWidget):
         self._input_type = InputType.JoystickButton # default to a button
         self._button_widget = QtWidgets.QLabel()
         self._button_widget.setContentsMargins(0,0,0,0)
-        on_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.onColor())
-        self._on_pixmap = on_icon.pixmap(self._icon_size)
-        off_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.offColor())
-        self._off_pixmap = off_icon.pixmap(self._icon_size)
         height = self._icon_size.height()+2
         self._button_widget.setMinimumHeight(height)
         self._button_widget.setMaximumHeight(height)
@@ -5708,9 +5710,9 @@ class ButtonStateWidget(QtWidgets.QWidget):
         if not Shiboken.isValid(self._button_widget):
             return
         if state:
-            self._button_widget.setPixmap(self._on_pixmap)
+            self._button_widget.setPixmap(Pixmaps().onIconPixmap)
         else:
-            self._button_widget.setPixmap(self._off_pixmap)
+            self._button_widget.setPixmap(Pixmaps().offIconPixmap)
 
     def _update_hat(self, position):
         ''' updates a hat position '''
@@ -5760,9 +5762,9 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
         off_pixmap, on_pixmap = self._hat_icons[position]
         if position != HatDirection.Center:
-            self._button_widget.setPixmap(on_pixmap)
+            self._button_widget.setPixmap(Pixmaps().onIconPixmap)
         else:
-            self._button_widget.setPixmap(off_pixmap)
+            self._button_widget.setPixmap(Pixmaps().offIconPixmap)
 
 
     def setValue(self, is_pressed):
@@ -8077,8 +8079,8 @@ class QLockToggle(QtWidgets.QWidget):
         main_layout = QtWidgets.QVBoxLayout(self)
         self._toggle_widget = QToggle()
         label = QtWidgets.QLabel()
-        pixmap = Icons.to_pixmap(Icons.warningIcon())
-        label.setPixmap(pixmap)
+        label.setPixmap(Pixmaps().warningIconPixmap)
+        main_layout.addWidget(label)
 
 class QAnimatedToggle(QToggle):
 
@@ -8352,8 +8354,8 @@ class QDelayWidget(QtWidgets.QWidget):
             self.valueChanged.emit(value)
 
 
-import gremlin.singleton_decorator
-@gremlin.singleton_decorator.SingletonDecorator
+
+@SingletonDecorator
 class QHelper():
 
     def __init__(self, show_percent = False, decimals = 3, single_step = 0.01):
@@ -10073,9 +10075,7 @@ class QHorizontalSeparator(QtWidgets.QLabel):
     ''' horizontal separator widget '''
     def __init__(self, parent = None):
         super().__init__(parent)
-        icon = gremlin.ui.ui_common.Icons.horizontalSeparatorIcon()
-        pixmap = icon.pixmap(QtCore.QSize(24,24))
-        self.setPixmap(pixmap)
+        self.setPixmap(Pixmaps().horizontalSeparatorPixmap)
 
 class QHorizontalLine(QtWidgets.QFrame):
     def __init__(self, size = 1, parent = None):
@@ -13807,4 +13807,26 @@ class QSendModeSelector(QtWidgets.QWidget):
         if not self._tooltip:
             self.setToolTip(f"Send mode: {gremlin.types.SendType.to_description(self.mode)}")
 
-        
+
+class QNoWheelPainTextEdit(QtWidgets.QPlainTextEdit):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.installEventFilter(self)
+        self._hover = False
+ 
+ 
+    def eventFilter(self, object, event):
+        t = event.type()
+        if t == QtCore.QEvent.Type.Leave:
+            self._hover = False
+        elif t == QtCore.QEvent.Type.Enter:
+            self._hover = True
+        elif t == QtCore.QEvent.Type.Wheel:
+            if self._hover:
+                # blitz wheel
+                return True
+            
+        return False
+
+
+

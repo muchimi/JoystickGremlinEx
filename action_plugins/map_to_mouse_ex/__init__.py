@@ -27,7 +27,7 @@ import gremlin.event_handler
 import win32api, win32com, ctypes, win32gui
 import gremlin.process
 import gremlin.remote
-from gremlin.types import *
+from gremlin.types import MouseAction, MouseButton
 
 import enum, threading,time, random
 
@@ -67,8 +67,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.release_widget = QtWidgets.QWidget()
         self.options_layout = QtWidgets.QHBoxLayout(self.release_widget)
 
-        self.click_widget = QtWidgets.QWidget()
-        self.click_options_layout = QtWidgets.QHBoxLayout(self.click_widget)
+        
 
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.execute_on_press, self.action_data.execute_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
@@ -85,7 +84,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             actions = [MouseAction.MouseMotion]
             self.action_data.action_mode = MouseAction.MouseMotion # force motion for linear input
         else:
-         actions = [MouseAction.MouseButton, MouseAction.MouseMotion, MouseAction.MousePosition]
+         actions = [MouseAction.MouseButton, MouseAction.MouseMotion, MouseAction.MousePosition, MouseAction.MouseSetPrecisionPosition]
         
         for mode in actions:
             self.mode_widget.addItem(MouseAction.to_name(mode), mode)
@@ -118,11 +117,14 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.mode_group.addButton(self.mode_release)
 
 
-        self.click_options_layout.addWidget(self.mode_normal)
-        self.click_options_layout.addWidget(self.mode_double_click)
-        self.click_options_layout.addWidget(self.mode_press)
-        self.click_options_layout.addWidget(self.mode_release)
-        self.click_options_layout.addStretch()
+        widgets = [
+            self.mode_normal,
+            self.mode_double_click,
+            self.mode_press,
+            self.mode_release,
+            ]
+        self.click_options_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+
         
         self.options_layout.addStretch()
 
@@ -210,7 +212,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.release_widget)
         self.main_layout.addWidget(self.button_widget)
         # self.main_layout.addWidget(wheel_factor_container)
-        self.main_layout.addWidget(self.click_widget)
+        self.main_layout.addWidget(self.click_options_widget)
         self.main_layout.addWidget(self.motion_widget)
 
         self.main_layout.addWidget(self.container_monitor)
@@ -283,13 +285,42 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.action_data.monitor_index = self._monitor_selector_widget.currentData()
 
     def _update_ui(self):
-        visible = self.action_data.action_mode == MouseAction.MousePosition
+        ''' updates UI component visibility based on the options selected '''
+        action_mode = self.action_data.action_mode
+
+        show_button = False
+        show_motion = False
+        
+        show_click_mode = False
+
+        if action_mode == MouseAction.MouseButton:
+            show_button = True
+            if not self.action_data.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
+                show_click_mode = True
+        elif action_mode == MouseAction.MouseMotion:
+            show_motion = True
+
+        self.action_data.motion_input = show_motion
+        #show_motion = self.action_data.motion_input
+        self.motion_widget.setVisible(show_motion)
+        self.button_widget.setVisible(show_button)
+        self.click_options_widget.setVisible(show_click_mode)
+
+        visible = action_mode in (MouseAction.MousePosition, MouseAction.MouseSetPrecisionPosition)
         self.container_monitor.setVisible(False) # disable monitor selection for now as it's not used
         self.container_position.setVisible(visible)
 
         visible = self.action_data.process_position_relative
         self.container_process.setVisible(visible)
         self.focus_widget.setEnabled(visible)
+
+        if action_mode == MouseAction.MouseButton:
+            # hide click options for mouse wheel
+            visible = self.action_data.button_id not in (MouseButton.WheelDown, MouseButton.WheelRight, MouseButton.WheelLeft, MouseButton.WheelUp)
+            self.click_options_widget.setVisible(visible)
+        
+
+
 
 
     def _handle_mouse_position_record(self, widget):
@@ -452,37 +483,39 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._connect_button_hat()
 
     def _create_mouse_button_ui(self):
-        self.mouse_button = gremlin.ui.ui_common.NoKeyboardPushButton(
-            gremlin.types.MouseButton.to_string(self.action_data.button_id)
+        self.mouse_button_listen_widget = gremlin.ui.ui_common.NoKeyboardPushButton(
+            gremlin.types.MouseButton.to_string(self.action_data.button_id),
+            tooltip = "Listen for a mouse button"
         )
-        self.mouse_button.clicked.connect(self._request_user_input)
+        self.mouse_button_listen_widget.clicked.connect(self._handle_button_listen)
+
 
         self.mouse_container_widget = QtWidgets.QWidget()
         self.mouse_container_layout = QtWidgets.QHBoxLayout()
         self.mouse_container_widget.setLayout(self.mouse_container_layout)
 
         self.mouse_container_layout.addWidget(QtWidgets.QLabel("Mouse Button"))
-        self.mouse_container_layout.addWidget(self.mouse_button)
+        self.mouse_container_layout.addWidget(self.mouse_button_listen_widget)
 
 
-        self.mouse_button_widget = gremlin.ui.ui_common.QDataComboBox()
-        self.mouse_button_widget.addItem("Left (mouse 1)",gremlin.types.MouseButton.Left)
-        self.mouse_button_widget.addItem("Middle (mouse 2)",gremlin.types.MouseButton.Middle)
-        self.mouse_button_widget.addItem("Right (mouse 3)",gremlin.types.MouseButton.Right)
-        self.mouse_button_widget.addItem("Forward (mouse 4)",gremlin.types.MouseButton.Forward)
-        self.mouse_button_widget.addItem("Back (mouse 5)",gremlin.types.MouseButton.Back)
-        self.mouse_button_widget.addItem("Wheel up",gremlin.types.MouseButton.WheelUp)
-        self.mouse_button_widget.addItem("Wheel down",gremlin.types.MouseButton.WheelDown)
+        self.mouse_button_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.mouse_button_selector_widget.addItem("Left (mouse 1)", MouseButton.Left)
+        self.mouse_button_selector_widget.addItem("Middle (mouse 2)",MouseButton.Middle)
+        self.mouse_button_selector_widget.addItem("Right (mouse 3)", MouseButton.Right)
+        self.mouse_button_selector_widget.addItem("Forward (mouse 4)", MouseButton.Forward)
+        self.mouse_button_selector_widget.addItem("Back (mouse 5)", MouseButton.Back)
+        self.mouse_button_selector_widget.addItem("Wheel up", MouseButton.WheelUp)
+        self.mouse_button_selector_widget.addItem("Wheel down", MouseButton.WheelDown)
 
 
         # update based on the current data
-        index = self.mouse_button_widget.findData(self.action_data.button_id)
-        self.mouse_button_widget.setCurrentIndex(index)
+        index = self.mouse_button_selector_widget.findData(self.action_data.button_id)
+        self.mouse_button_selector_widget.setCurrentIndex(index)
 
-        self.mouse_button_widget.currentTextChanged.connect(self._change_mouse_button_cb)
+        self.mouse_button_selector_widget.currentTextChanged.connect(self._change_mouse_button_cb)
 
         self.mouse_container_layout.addWidget(QtWidgets.QLabel("Selected action:"))
-        self.mouse_container_layout.addWidget(self.mouse_button_widget)
+        self.mouse_container_layout.addWidget(self.mouse_button_selector_widget)
         self.mouse_container_layout.addStretch(1)
 
         # add to main layout
@@ -547,7 +580,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._connect_button_hat()
 
     def _populate_mouse_button_ui(self):
-        self.mouse_button.setText(
+        self.mouse_button_listen_widget.setText(
             gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
 
@@ -560,8 +593,8 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _change_mouse_button_cb(self):
         ''' mouse event drop down selected '''
-        self.action_data.button_id = self.mouse_button_widget.currentData()
-        self.mouse_button.setText(
+        self.action_data.button_id = self.mouse_button_selector_widget.currentData()
+        self.mouse_button_listen_widget.setText(
             gremlin.types.MouseButton.to_string(self.action_data.button_id)
         )
 
@@ -641,14 +674,15 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         ''' mouse event - runs on UI thread'''
         if isinstance(event, list):
             key = event.pop()
-            self.action_data.button_id = key.mouse_button
+            self.action_data.button_id = MouseButton(key.mouse_button)
         else:
             self.action_data.button_id = event.identifier
-        self.mouse_button.setText(gremlin.types.MouseButton.to_string(self.action_data.button_id))
+        self.mouse_button_listen_widget.setText(gremlin.types.MouseButton.to_string(self.action_data.button_id))
         # update the drop down
-        with QtCore.QSignalBlocker(self.mouse_button_widget):
-            index = self.mouse_button_widget.findData(self.action_data.button_id)
-            self.mouse_button_widget.setCurrentIndex(index)
+        with QtCore.QSignalBlocker(self.mouse_button_selector_widget):
+            index = self.mouse_button_selector_widget.findData(self.action_data.button_id)
+            if index != -1:
+                self.mouse_button_selector_widget.setCurrentIndex(index)
 
 
 
@@ -682,55 +716,35 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _change_mode(self):
         self.action_data.motion_input = False
-        show_button = False
-        show_motion = False
-        show_release = False
-        show_click_mode = False
-
-        if self.action_data.get_input_type() == InputType.JoystickButton:
-            show_release = True
-
-        action_mode = self.action_data.action_mode
-        if action_mode == MouseAction.MouseButton:
-            show_button = True
-            if not self.action_data.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
-                show_click_mode = True
-        elif action_mode == MouseAction.MouseMotion:
-            show_motion = True
-
-        self.action_data.motion_input = show_motion
-        
+        self._update_ui()
             
-        #show_motion = self.action_data.motion_input
-        self.motion_widget.setVisible(show_motion)
-        self.button_widget.setVisible(show_button)
-        self.click_widget.setVisible(show_click_mode)
+        
         
 
         # Emit modification signal to ensure virtual button settings
         # are updated correctly
         self.action_modified.emit()
 
-    def _request_user_input(self):
+    def _handle_button_listen(self):
         """Prompts the user for the input to bind to this item."""
-        self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
+        dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Mouse],
             return_kb_event=False
         )
-        self.button_press_dialog.item_selected.connect(self._update_mouse_button)
+        dialog.item_selected.connect(self._update_mouse_button)
         # Display the dialog centered in the middle of the UI
         root = self
         while root.parent():
             root = root.parent()
         geom = root.geometry()
 
-        self.button_press_dialog.setGeometry(
+        dialog.setGeometry(
             int(geom.x() + geom.width() / 2 - 150),
             int(geom.y() + geom.height() / 2 - 75),
             300,
             150
         )
-        self.button_press_dialog.show()
+        dialog.show()
 
 
 class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
@@ -797,10 +811,11 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
             case MouseAction.MouseButton:
                 self._perform_mouse_button(event, value, wheel_factor = self.action_data.wheel_factor)
 
-            case MouseAction.MousePosition:
+            case MouseAction.MousePosition | MouseAction.MouseSetPrecisionPosition:
                 if trigger:
                     self._perform_mouse_position(self.action_data.mouse_x, self.action_data.mouse_y)
 
+      
         return True
     
     def get_state(self):
@@ -817,9 +832,10 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         assert self.action_data.motion_input is False
         verbose = gremlin.config.Configuration().verbose_mode_mouse
         (is_local, is_remote) = self.get_state()
+        is_pressed = event.is_pressed
         match self.action_data.button_id:
             case MouseButton.WheelDown | MouseButton.WheelUp:
-                if value.current:
+                if is_pressed:
                     direction = -wheel_factor
                     if self.action_data.button_id == MouseButton.WheelDown:
                         direction = wheel_factor
@@ -829,7 +845,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                     if is_remote:
                         gremlin.remote.remote_client.send_mouse_wheel(direction)
             case MouseButton.WheelLeft | MouseButton.WheelRight:
-                if value.current:
+                if is_pressed:
                     direction = -wheel_factor
                     if self.action_data.button_id == MouseButton.WheelRight:
                         direction = wheel_factor
@@ -841,7 +857,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
             case _:
                 match self.action_data.click_mode:
                     case MouseClickMode.Normal:
-                        if value.current:
+                        if is_pressed:
                             if verbose: syslog.info(f"MOUSE: press button [{self.action_data.button_id}]")
                             if is_local:
                                 gremlin.sendinput.mouse_press(self.action_data.button_id)
@@ -855,10 +871,10 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                                 gremlin.remote.remote_client.send_mouse_button(self.action_data.button_id.value, False)
 
                     case MouseClickMode.DoubleClick:
-                        if value.current:
+                        if is_pressed:
                             if verbose: syslog.info(f"MOUSE: press dclick button [{self.action_data.button_id}]")
                             if is_local:
-                                gremlin.sendinput.mouse_press_double_click(self.actiaction_dataon.button_id)    
+                                gremlin.sendinput.mouse_press_double_click(self.action_data.button_id)    
                             if is_remote:
                                 gremlin.remote.remote_client.send_mouse_button_double_click(self.action_data.button_id.value, True)
                         else:
@@ -908,7 +924,12 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 gremlin.process.ProcessHelper().setFocus(hwnd)
         
         if verbose: syslog.info(f"MOUSE: set position: {x} {y}")
-        win32api.SetCursorPos((x, y))
+        match self.action_data.action_mode:
+            case MouseAction.MousePosition:
+                win32api.SetCursorPos((x,y))
+            case MouseAction.MouseSetPrecisionPosition:
+                gremlin.sendinput.send_mouse_position(x, y)
+        
 
     def _handle_process_started(self, started : bool):
         ''' callback on process start request '''
@@ -1243,7 +1264,10 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
 
         node.set("mode", self.action_mode.name)
         node.set("motion-input", safe_format(self.motion_input, bool))
-        node.set("button-id", safe_format(self.button_id.value, int))
+        if isinstance(self.button_id, int):
+            node.set("button-id", safe_format(self.button_id, int))
+        else:
+            node.set("button-id", safe_format(self.button_id.value, int))
         node.set("direction", safe_format(self.direction, int))
         node.set("min-speed", safe_format(self.min_speed, int))
         node.set("max-speed", safe_format(self.max_speed, int))

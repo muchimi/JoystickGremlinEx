@@ -29,6 +29,17 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T179):
+- New: Map to Mouse/Ex: add mouse position using the Win32 precision API call.  The regular mouse position mode uses the regular Win32 API SetCursorPos call.
+- Fix: OS Action: add encoding/decoding of process window class name to avoid issues in XML.
+- Fix: OS Action: resolve potential duplicate process start
+- Fix: Sequence Container: add step button partially visible
+- Fix: Map to Mouse/Ex: wheel buttons do not update drop down correctly on listen selection.
+- Fix: Input Viewer: Keyboard/mouse repeater: prevent mouse wheel event from scrolling input viewer if the mouse is over the repeater area.
+- Update to Python 3.13.12
+- Update to QT for Python 6.10.2 (QT bug fixes)
+
+
 ### (m76T178):
 - Change: KVM action (experimental).  Local control will now be suspended, and remote control will be enabled automatically when a KVM action is active (triggered).  This allows the regular remote control function to work when KVM is active.
 - Fix: OSC: device input button repeaters not always showing a state.

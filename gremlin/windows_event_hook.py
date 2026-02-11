@@ -21,7 +21,7 @@ from ctypes import wintypes
 import threading
 import time
 import gremlin.singleton_decorator 
-
+import win32con
 
 
 user32 = ctypes.WinDLL("user32")
@@ -166,6 +166,7 @@ user32.TranslateMessage.argtypes = (wintypes.LPMSG,)
 # Dispatch message to hooked processes
 user32.DispatchMessageW.argtypes = (wintypes.LPMSG,)
 
+
 # Action definitions
 HC_ACTION       = 0
 WH_KEYBOARD_LL  = 13
@@ -256,13 +257,13 @@ def process_keyboard_event(n_code, w_param, l_param):
             for cb in g_keyboard_callbacks:
                 cb(evt)
 
-    if scan_code == 0x01 and g_shift_state:
-        # breaker tripped - turn off suppression for mouse and keyboard 
-        g_suppress_keyboard = 0 
-        g_suppress_mouse = 0
+        if scan_code == 0x01 and g_shift_state:
+            # breaker tripped - turn off suppression for mouse and keyboard 
+            g_suppress_keyboard = 0 
+            g_suppress_mouse = 0
 
     # Pass the event on to the next callback in the chain
-    if g_suppress_keyboard:
+    if g_suppress_keyboard != 0:
         # suppress keyboard        
         return 1 # suppress
     # syslog.info(f"{g_suppress_keyboard} {scan_code:x} {g_shifted_state}")
@@ -434,24 +435,32 @@ class KeyboardHook:
     """
 
     def __init__(self):
+        
         self._running = False
         self._listen_thread = threading.Thread(target=self._listen, daemon=False)
         self._listen_thread.name = "keyboard hook"
-        
 
         
     def pushSuppress(self):
-        ''' suspend mouse processing on the local client '''
+        ''' suspend keyboard processing on the local client '''
         global g_suppress_keyboard
+        if g_suppress_keyboard == 0:
+            syslog.info("KVM: local keyboard events DISABLED")
         g_suppress_keyboard += 1
 
     def popSuppress(self, reset = False):
-        ''' resume mouse processing on the local client '''
+        ''' resume keyboard processing on the local client '''
         global g_suppress_keyboard
         if reset:
-            g_suppress_keyboard = 0
+            if g_suppress_keyboard != 0:
+                syslog.info("KVM: local keyboard events ENABLED")
+                g_suppress_keyboard = 0
         elif g_suppress_keyboard > 0:
             g_suppress_keyboard -=1
+            if g_suppress_keyboard == 0:
+                syslog.info("KVM: local keyboard events ENABLED")
+            
+        
             
     def isSupressed(self) -> bool:
         global g_suppress_keyboard

@@ -332,19 +332,6 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
                     os.startfile(path, arguments = args)
                 else:
                     os.startfile(path)
-                os.startfile(path, arguments = args)
-                # cmd_list = [path]
-                # if args:
-                #     if args_per_line:
-                #         args = args.splitlines()
-                #     if isinstance(args,list) or isinstance(args,tuple):
-                #         cmd_list.extend(arg for arg in args)
-                #     else:
-                #         cmd_list.append(args)
-                # # attemp start (no wait)
-                # # attemp start (no wait) as a detached process with separate file descriptors
-                # creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
-                # subprocess.Popen(cmd_list, creationflags = creationflags, close_fds = True)
                 
             except Exception as e:
                 syslog.error(f"OSACTION: process start error: {e}")
@@ -400,7 +387,7 @@ class OsAction(gremlin.base_profile.AbstractAction):
         except:
             pass
         if "window-class" in node.attrib:
-            self.window_class = node.get("window-class")
+            self.window_class = safe_read(node, "window-class", str,'', unescape=True)
         if "window-title" in node.attrib:
             self.window_title = node.get("window-title")
         if "process-name" in node.attrib:
@@ -418,7 +405,7 @@ class OsAction(gremlin.base_profile.AbstractAction):
         if self.process_name:
             node.set("process-name", self.process_name)
         if self.window_class:
-            node.set("window-class", self.window_class)
+            node.set("window-class", safe_format(self.window_class, str, escape=True))
         if self.window_title:
             node.set("window-title", self.window_title)
         node.set("auto-start",safe_format(self.start_process, bool))

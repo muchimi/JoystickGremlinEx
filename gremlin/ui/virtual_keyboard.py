@@ -287,6 +287,8 @@ class QKeyboardWidget(QtWidgets.QWidget):
         ''' creates a full keyboard widget for manual data entry '''
         super().__init__(parent)
 
+        self._last_event = None
+
         self.installEventFilter(self)  # capture keys so the window doesn't go nuts when we hit special keys
 
         main_layout = QtWidgets.QVBoxLayout(self)
@@ -333,7 +335,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self.options_widget, _= gremlin.ui.ui_common.getHContainer([clear_widget, capture_mouse_widget, invert_display_widget])
 
         self.repeater_container_layout.addWidget(self.options_widget)
-        self.repeater_widget = QtWidgets.QPlainTextEdit()
+        self.repeater_widget = gremlin.ui.ui_common.QNoWheelPainTextEdit()
         self.repeater_widget.setReadOnly(True)
         self.repeater_container_layout.addWidget(self.repeater_widget)
 
@@ -707,7 +709,9 @@ class QKeyboardWidget(QtWidgets.QWidget):
         ''' adds a key to the repeater '''
         
         now = datetime.datetime.now()
-        timestamp = now.strftime("%H:%M:%S")
+        self._last_event 
+        
+        timestamp = now.strftime(f"%H:%M:%S.{now.microsecond // 1000:03d}")
         interval = None
         key_id = key.key_id_translated
         if is_pressed:
@@ -717,13 +721,22 @@ class QKeyboardWidget(QtWidgets.QWidget):
             if key_id in self._repeater_timestamp:
                 interval = time.time() - self._repeater_timestamp[key_id]
 
+        stub = ''
+        
+        if self._last_event is not None:
+            lapsed = now - self._last_event
+            #lapsed = delta.total_seconds() * 1000
+            #duration = datetime.timedelta(milliseconds=lapsed)
+            stub = f" (lapsed {str(lapsed)})"
+            
 
-        line = f"{timestamp}: [{key.name}] 0x{key.scan_code:X} ({key.scan_code}) {'[EX]' if key.is_extended else ''} {'pressed' if is_pressed else 'released'}"
+        line = f"{timestamp}: [{key.name}] 0x{key.scan_code:X} ({key.scan_code}) {'[EX]' if key.is_extended else ''} {'pressed' if is_pressed else 'released'}{stub}"
 
         if interval is not None:
             line += f" ({int(interval*1000)} ms)"
         
         self._add_line(line)
+        self._last_event = now
         
 
     def _add_line(self, line : str):

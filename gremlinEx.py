@@ -5491,6 +5491,11 @@ if __name__ == "__main__":
     # Ensure joystick devices are correctly setup
     dinput.DILL.init()
     time.sleep(0.25)
+
+
+    
+    # instance
+    _pixmaps = gremlin.ui.ui_common.Pixmaps()
     
 
     # check for gamepad availability via VIGEM

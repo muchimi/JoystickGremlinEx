@@ -809,12 +809,8 @@ class MouseClickMode(Enum):
 class MouseAction(Enum):
     MouseButton = 0 # output a mouse button
     MouseMotion = 1 # output a mouse motion
-    MousePosition = 2 # set the exact mouse position
-
-    # MouseWiggleOnLocal = 2 # enable mouse wiggle - local machine only
-    # MouseWiggleOffLocal = 3 # disable mouse wiggle - locla machine only
-    # MouseWiggleOnRemote = 4 # enable mouse wiggle - remote machines only
-    # MouseWiggleOffRemote = 5 # disable mouse wiggle - remote machines only
+    MousePosition = 2 # set the exact mouse position (via setcursorposition)
+    MouseSetPrecisionPosition = 3 # set the exact mouse position via send input precision
 
     @staticmethod
     def to_string(mode):
@@ -853,15 +849,7 @@ class MouseAction(Enum):
                 return "Maps to a mouse motion axis"
             case MouseAction.MousePosition:
                 return "Sets the mouse position"
-        
-        # elif action == MouseAction.MouseWiggleOffLocal:
-        #     return "Turns wiggle mode off (local only)"
-        # elif action == MouseAction.MouseWiggleOnLocal:
-        #     return "Turns wiggle mode on (local only)"
-        # elif action == MouseAction.MouseWiggleOffRemote:
-        #     return "Turns wiggle mode off (remote only)"
-        # elif action == MouseAction.MouseWiggleOnRemote:
-        #     return "Turns wiggle mode on (remote only)"
+
 
         return f"Unknown [{action}]"
     
@@ -875,20 +863,11 @@ class MouseAction(Enum):
                 return "Mouse axis"
             case MouseAction.MousePosition:
                 return "Mouse position"
+            case MouseAction.MouseSetPrecisionPosition:
+                return "Mouse position (precision)"
             
 
-        # if action == MouseAction.MouseButton:
-        #     return "Mouse button"
-        # elif action == MouseAction.MouseMotion:
-        #     return "Mouse axis"
-        # elif action == MouseAction.MouseWiggleOffLocal:
-        #     return "Wiggle Disable (local)"
-        # elif action == MouseAction.MouseWiggleOnLocal:
-        #     return "Wiggle Enable (local)"
-        # elif action == MouseAction.MouseWiggleOffRemote:
-        #     return "Wiggle Disable (remote)"
-        # elif action == MouseAction.MouseWiggleOnRemote:
-        #     return "Wiggle Enable (remote)"
+
 
                 
         return f"Unknown [{action}]"

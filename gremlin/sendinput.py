@@ -22,6 +22,7 @@ import enum
 import math
 import threading
 import time
+import win32api, win32con
 
 
 import gremlin.util 
@@ -355,7 +356,7 @@ class MouseController:
             
             
             if dx or dy:
-                mouse_relative_motion(int(dx), int(dy))
+                send_mouse_motion(int(dx), int(dy))
             #     syslog.info(f"controller: send {int(dx)} {int(dy)}")
             # else:
             #     syslog.info("Controller: skip")
@@ -428,15 +429,41 @@ class _INPUT(ctypes.Structure):
     )
 
 
-def mouse_relative_motion(dx, dy):
+def send_mouse_motion(dx, dy):
     ''' sends relative motion '''
     # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-mouse_event
     _send_input(_mouse_input(MOUSEEVENTF_MOVE, dx, dy))
 
-def mouse_absolute_motion(dx, dy):
+def send_mouse_position(x, y):
     ''' sends absolute coordinates '''
     # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-mouse_event
+
+    width = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+    height = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+    fx = 65535 / width
+    fy = 65535 / height
+    dx = int(x * fx)
+    dy = int(y * fy)
     _send_input(_mouse_input(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE , dx, dy))
+
+
+def send_mouse_wheel_up():
+    ''' sends a mouse wheel up '''
+    _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data = 120 ))
+
+def send_mouse_wheel_down():
+    ''' sends a mouse wheel down '''
+    _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data = 65416 ))
+
+def send_mouse_wheel_left():
+    ''' sends a mouse wheel left '''
+    _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data = 120 ))
+
+def send_mouse_wheel_right():
+    ''' sends a mouse wheel right  '''
+    _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data = 65416 ))
+
+
 
 
 def mouse_press(button):

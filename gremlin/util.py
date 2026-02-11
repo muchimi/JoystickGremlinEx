@@ -46,6 +46,7 @@ from shiboken6 import Shiboken
 import inspect
 import lxml
 import copy
+import html
 
 
 from . import error
@@ -1116,7 +1117,7 @@ def write_guid(guid):
     return normalize_guid(guid)
 
 
-def safe_read(node, key, type_cast, default_value):
+def safe_read(node, key, type_cast, default_value, unescape : bool = False):
     """Safely reads an attribute from an XML node.
 
     If the attempt at reading the attribute fails, due to the attribute not
@@ -1126,6 +1127,7 @@ def safe_read(node, key, type_cast, default_value):
     :param key the attribute to read
     :param type_cast the type to which to cast the read value, if specified
     :param default_value value to return in case the key is not present
+    :param unescape: unescape string value if html encoded (only use if the string is html encoded)
     :return the value stored in the node with the given key
     """
     # Attempt to read the value and if present use the provided default value
@@ -1167,6 +1169,9 @@ def safe_read(node, key, type_cast, default_value):
                             value = int(float(value))
                         elif type_cast == float and isinstance(value, str) and isNumeric(value):
                             value = float(value)
+                        elif unescape and type_cast == str and isinstance(value, str):
+                            value = html.unescape(value)
+                        
                         else:
                             value = type_cast(value)
                     except:
@@ -1180,7 +1185,7 @@ def safe_read(node, key, type_cast, default_value):
     return value
 
 
-def safe_format(value, data_type, formatter=str):
+def safe_format(value, data_type, formatter=str, escape : bool = False):
     """Returns a formatted value ensuring type correctness.
 
     This function ensures that the value being formatted is of correct type
@@ -1204,6 +1209,10 @@ def safe_format(value, data_type, formatter=str):
             value = float(value) != 0
         else:
             return formatter(bool(value))
+    elif data_type is str and escape:
+        # safe format for xml
+        return html.escape(value)
+
     if isinstance(value, data_type):
         return formatter(value)
     else:

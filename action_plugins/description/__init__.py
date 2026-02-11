@@ -19,7 +19,7 @@
 import os
 from lxml import etree as ElementTree
 
-import gremlin.base_classes 
+
 import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.input_item

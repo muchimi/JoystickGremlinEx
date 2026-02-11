@@ -894,10 +894,10 @@ class EventListener:
 
 		self._profile_started = False
 
-		self.profile_start.connect(self._profile_start)
-		self.profile_stopping.connect(self._profile_stopping_cb)
-		self.profile_after_start.connect(self._profile_started_cb)
-		self.config_option_changed.connect(self._options_changed)
+		self.profile_start.connect(self._handle_profile_start)
+		self.profile_stopping.connect(self._handle_profile_stopping)
+		self.profile_after_start.connect(self._handle_profile_started)
+		self.config_option_changed.connect(self._handle_options_changed)
 		
 		
 
@@ -1078,7 +1078,7 @@ class EventListener:
 
 
 
-	def _options_changed(self):
+	def _handle_options_changed(self):
 		''' options were changed '''
 		config = gremlin.config.Configuration()
 		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
@@ -1091,8 +1091,9 @@ class EventListener:
 		self._verbose_extra = config.verbose_mode_extra
 
 		
-	def _profile_start(self):
+	def _handle_profile_start(self):
 		''' occurs on profile start EVENT LISTENER '''
+		import gremlin.windows_event_hook
 
 		self._profile_started = False
 		config = gremlin.config.Configuration()
@@ -1110,8 +1111,13 @@ class EventListener:
 		# enable mouse hooks 
 		self.enableMouse(True)
 
-	def _profile_stopping_cb(self):
-		# mode events
+		# reset keyboard suppression
+		gremlin.windows_event_hook.MouseHook().popSuppress(True)
+		gremlin.windows_event_hook.KeyboardHook().popSuppress(True)
+
+	def _handle_profile_stopping(self):
+		''' called when profile is stopping '''
+		import gremlin.windows_event_hook
 		self._profile_started = False
 		device_guid = gremlin.shared_state.mode_tab_guid
 		delay = 0.250 # delay in seconds between press/release events for mode control change
@@ -1141,9 +1147,13 @@ class EventListener:
 
 		if not self.enable_mouse_hook:
 			self.disableMouse()
+
+		# reset keyboard suppression
+		gremlin.windows_event_hook.MouseHook().popSuppress(True)
+		gremlin.windows_event_hook.KeyboardHook().popSuppress(True)
 		
 	
-	def _profile_started_cb(self):
+	def _handle_profile_started(self):
 		''' occurs on profile start '''
 		device_guid = gremlin.shared_state.mode_tab_guid
 		mode_enter = gremlin.ui.mode_device.ModeInputModeType.ModeEnter

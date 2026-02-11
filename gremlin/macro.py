@@ -1194,7 +1194,7 @@ class MouseMotionAction(MacroAbstractAction):
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if is_local:
             if verbose: syslog.info(f"MACRO: mouse motion {self.dx}, {self.dy}")
-            gremlin.sendinput.mouse_relative_motion(self.dx, self.dy)
+            gremlin.sendinput.send_mouse_motion(self.dx, self.dy)
         if is_remote:
             gremlin.remote.remote_client.send_mouse_motion(self.dx, self.dy, force_remote)
 

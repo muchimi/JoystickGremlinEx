@@ -316,7 +316,7 @@ def speed_brake(event, vjoy):
 def update_mouse(vjoy):
     global mouse_dx, mouse_dy, is_mouse_mode
     if is_mouse_mode: # and (mouse_dx != 0 or mouse_dy != 0):
-        gremlin.sendinput.mouse_relative_motion(mouse_dx,mouse_dy)
+        gremlin.sendinput.send_mouse_motion(mouse_dx,mouse_dy)
 
 @gremlin.input_devices.periodic(0.05)
 def periodic_function(vjoy):

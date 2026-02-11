@@ -210,13 +210,6 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
                 pass
 
 
-
-    def profile_stop(self):
-        ''' called on profile stop or shutdown'''
-        self.stop() # stop kvm if active
-        gremlin.windows_event_hook.MouseHook().popSuppress(True)
-        gremlin.windows_event_hook.KeyboardHook().popSuppress(True)
-
     def _mouse_button_handler(self, event : gremlin.windows_event_hook.MouseEvent):
         ''' handles a mouse button '''
         verbose = gremlin.config.Configuration().verbose_mode_remote

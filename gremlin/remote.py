@@ -217,7 +217,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                         
 
                         if verbose: syslog.info(f"KVM (client): received motion delta {dx} {dy} orientation: {orientation_name}")
-                        gremlin.sendinput.mouse_relative_motion(dx, dy)
+                        gremlin.sendinput.send_mouse_motion(dx, dy)
                         
                     case "button":
                         # mouse button
