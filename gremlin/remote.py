@@ -177,46 +177,11 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                         # set/reset
                         pass
                     case "motion":
-                        # mouse movement
-                        # x = data["x"]
-                        # y = data["y"]
-
-                        # use deltas
+                        # mouse movement (via deltas)
                         dx = data["dx"]
                         dy = data["dy"]
-                        
-                        
-                        
-                        # get monitor orientation to apply the deltas properly
-                        x, y = win32api.GetCursorPos()
-                        hwnd = win32api.MonitorFromPoint((x, y), win32con.MONITOR_DEFAULTTONEAREST)
-                        orientation, orientation_name = gremlin.util.getMonitorOrientation(hwnd)
-                        match orientation:
-                            case 0:
-                                # normal
-                                # x += dx
-                                # y += dy
-                                pass
-                                
-                            case 1:
-                                # 90 degrees
-                                # x += dy
-                                # y -= dx
-                                dx, dy = dy, dx
-                                
-                            case 2:
-                                # flipped
-                                # x -= dx
-                                # y -= dy
-                                dx, dy = -dx, -dy
-                            case 3:
-                                # 270 degrees
-                                # x -= dy
-                                # y += dx
-                                dx, dy = -dy, dx
-                        
 
-                        if verbose: syslog.info(f"KVM (client): received motion delta {dx} {dy} orientation: {orientation_name}")
+                        if verbose: syslog.info(f"KVM (client): received motion delta {dx} {dy}")
                         gremlin.sendinput.send_mouse_motion(dx, dy)
                         
                     case "button":
@@ -238,7 +203,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                         scan_code = data["sc"]
                         flags = data["flags"]
                         gremlin.sendinput.send_key(virtual_code, scan_code, flags)
-                        # win32api.keybd_event(virtual_code, scan_code, flags, 0)
+                        
 
 
                 

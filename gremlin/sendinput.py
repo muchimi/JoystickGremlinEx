@@ -430,7 +430,7 @@ class _INPUT(ctypes.Structure):
 
 
 def send_mouse_motion(dx, dy):
-    ''' sends relative motion '''
+    ''' sends mouse relative motion '''
     # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-mouse_event
     _send_input(_mouse_input(MOUSEEVENTF_MOVE, dx, dy))
 

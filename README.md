@@ -28,6 +28,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T180):
+- Change: KVM Action: mouse mode will now block on the master while KVM (remote control) is enabled. 
 
 ### (m76T179):
 - New: Map to Mouse/Ex: add mouse position using the Win32 precision API call.  The regular mouse position mode uses the regular Win32 API SetCursorPos call.

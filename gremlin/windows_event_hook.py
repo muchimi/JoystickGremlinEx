@@ -21,7 +21,7 @@ from ctypes import wintypes
 import threading
 import time
 import gremlin.singleton_decorator 
-import win32con
+import win32con, win32api, win32gui
 
 
 user32 = ctypes.WinDLL("user32")
@@ -403,7 +403,7 @@ def process_mouse_event(n_code, w_param, l_param):
             
 
     # Pass the event on to the next callback in the chain
-    if g_suppress_mouse == 0 or w_param == WM_MOUSEMOVE:
+    if g_suppress_mouse == 0: #  or w_param == WM_MOUSEMOVE:
         return user32.CallNextHookEx(None, n_code, w_param, l_param)
     return 1 # suppress
     
@@ -704,5 +704,9 @@ class MouseHook:
     def is_swapped(self) -> bool:
         ''' true if right button is button 1 on windows '''
         return self._is_swapped
+    
+
+
+        
             
 _mouse_hook = MouseHook()

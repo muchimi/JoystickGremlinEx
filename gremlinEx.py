@@ -46,7 +46,7 @@ from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
 from gremlin.types import TabDeviceType
 from shiboken6 import Shiboken
 import gremlin.tabstate
-import win32api, win32con
+import win32api, win32con, win32gui
 
 import gremlin.joystick_handling
 
@@ -60,6 +60,7 @@ import gremlin.input_types
 import gremlin.event_handler
 import gremlin.base_classes
 import gremlin.remote
+import gremlin.raw_input
 
 
 import gremlin.config
@@ -5355,6 +5356,10 @@ def exception_hook(exception_type, value, trace):
     syslog.error(msg)
     gremlin.util.display_error(msg)
 
+WM_INPUT = 0x00FF
+
+
+
 
 
 if __name__ == "__main__":
@@ -5602,7 +5607,9 @@ if __name__ == "__main__":
     app.processEvents()
 
 
-        
+
+    # gremlin.raw_input.Register(ui.winId())
+    
     gremlin.shared_state.ui_ready = True
 
     syslog.info("Init completed...")

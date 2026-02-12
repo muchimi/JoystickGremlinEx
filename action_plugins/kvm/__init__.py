@@ -40,11 +40,14 @@ import gremlin.remote
 import threading
 import gremlin.keyboard
 import gremlin.windows_event_hook
-import win32con, win32api
+import win32con, win32api, win32gui
+import ctypes
 from gremlin.types import SyncMode
 import gremlin.joystick_handling
 import gremlin.ui.osc_device
 import gremlin.event_handler
+import gremlin.raw_input
+
 
 syslog = logging.getLogger("system")
 
@@ -81,26 +84,79 @@ class KVMWidget(gremlin.ui.input_item.AbstractActionWidget):
             callback = self._handle_keyboard_enabled_changed
         )
 
+        invert_x_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Invert X",
+            value = self.action_data.invert_x,
+            tooltip = "Inverts the x motion",
+            callback = self._handle_invert_x_changed
+        )
+
+        invert_y_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Invert Y",
+            value = self.action_data.invert_y,
+            tooltip = "Inverts the y motion",
+            callback = self._handle_invert_y_changed
+        )
+
+        rotate_widget  = gremlin.ui.ui_common.QDataCheckbox(
+            "Flip X/Y (rotation)",
+            value = self.action_data.rotate,
+            tooltip = "Flips mouse x and y for rotated displays",
+            callback = self._handle_rotation_changed
+        )
+
+        widgets = [
+            "Mapping options:",
+            invert_x_widget,
+            invert_y_widget,
+            rotate_widget,
+        ]
+
+        self.container_output_options = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, left_margin=12)
+         
+
         sync_modes = [SyncMode.Ignore, SyncMode.Input]
         sync_widget = gremlin.ui.ui_common.QSyncModeWidget(mode = self.action_data.sync_mode, label = "State on profile start:", callback = self._sync_changed, sync_modes= sync_modes)
 
         info_widget = gremlin.ui.ui_common.QInfoBox("Press <i>left-shift + esc</i> to return local control if the input becomes blocked.")
 
+
+
         
         widgets = [
             mouse_widget,
+            self.container_output_options,
             keyboard_widget,
             sync_widget,
             info_widget,
         ]
 
         widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
-        self.main_layout.addWidget(widget)            
+        self.main_layout.addWidget(widget)      
+
+        self._update_ui()
+
+    def _update_ui(self):
+        visible = self.action_data.mouse_enabled
+        self.container_output_options.setVisible(visible)
 
 
     @QtCore.Slot(bool)
     def _handle_mouse_enabled_changed(self, checked : bool):
         self.action_data.mouse_enabled = checked
+        self._update_ui()
+
+    @QtCore.Slot(bool)
+    def _handle_invert_x_changed(self, checked : bool):
+        self.action_data.invert_x = checked
+
+    @QtCore.Slot(bool)
+    def _handle_invert_y_changed(self, checked : bool):
+        self.action_data.invert_y = checked        
+
+    @QtCore.Slot(bool)
+    def _handle_rotation_changed(self, checked : bool):
+        self.action_data.rotate = checked    
         
     @QtCore.Slot(bool)
     def _handle_keyboard_enabled_changed(self, checked : bool):
@@ -114,6 +170,73 @@ class KVMWidget(gremlin.ui.input_item.AbstractActionWidget):
         pass
 
 
+RIDEV_INPUTSINK = 0x00000100
+RID_INPUT = 0x10000003
+WM_INPUT = 0x00FF
+HID_USAGE_PAGE_GENERIC = 0x01
+HID_USAGE_GENERIC_MOUSE = 0x02
+
+class RAWINPUTDEVICE(ctypes.Structure):
+    _fields_ = [
+        ("usUsagePage", ctypes.c_ushort),
+        ("usUsage", ctypes.c_ushort),
+        ("dwFlags", ctypes.c_ulong),
+        ("hwndTarget", ctypes.c_void_p)
+    ]
+
+class RAWINPUTHEADER(ctypes.Structure):
+    _fields_ = [
+        ("dwType", ctypes.c_ulong),
+        ("dwSize", ctypes.c_ulong),
+        ("hDevice", ctypes.c_void_p),
+        ("wParam", ctypes.c_ulong)
+    ]
+
+class RAWMOUSE(ctypes.Structure):
+    _fields_ = [
+        ("usFlags", ctypes.c_ushort),
+        ("ulButtons", ctypes.c_ulong),
+        ("usButtonFlags", ctypes.c_ushort),
+        ("usButtonData", ctypes.c_ushort),
+        ("ulRawButtons", ctypes.c_ulong),
+        ("lLastX", ctypes.c_long),
+        ("lLastY", ctypes.c_long),
+        ("ulExtraInformation", ctypes.c_ulong)
+    ]
+
+class RAWINPUT(ctypes.Structure):
+    _fields_ = [
+        ("header", RAWINPUTHEADER),
+        ("data", RAWMOUSE)
+    ]
+
+
+
+def handle_raw_input(lparam):
+    raw_input_data = ctypes.create_string_buffer(1024)
+    raw_input_size = ctypes.wintypes.UINT(ctypes.sizeof(raw_input_data))
+
+    # Get raw input data
+    ctypes.windll.user32.GetRawInputData(
+        lparam,
+        RID_INPUT,
+        raw_input_data,
+        ctypes.byref(raw_input_size),
+        ctypes.sizeof(RAWINPUTHEADER)
+    )
+
+    raw = RAWINPUT.from_buffer_copy(raw_input_data)
+    if raw.header.dwType == 0:  # Mouse
+        print(f"Mouse moved: dx={raw.data.lLastX}, dy={raw.data.lLastY}")
+
+
+
+def wnd_proc(hwnd, msg, wparam, lparam):
+    if msg == win32con.WM_INPUT:
+        # GetRawInputData logic goes here
+        print("Raw input received!")
+        return 0
+    return win32gui.DefWindowProc(hwnd, msg, wparam, lparam)
 
 
 class KVMFunctor(gremlin.base_profile.AbstractFunctor):
@@ -136,6 +259,8 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
         self._is_running = False # true if kvm is active
         self._last_x = None # last mouse position x
         self._last_y = None # last mouse position y
+        self.action_data : KVM = action
+        self._raw_input_hooked = False
 
     def start(self):
         ''' start the kvm function '''
@@ -144,11 +269,21 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
             syslog.info("KVM: start")
             if self.action_data.mouse_enabled:
                 mh = gremlin.windows_event_hook.MouseHook()
-                mh.register(self._mouse_button_handler)
-                mh.registerMouseMove(self._mouse_move_handler)
-                mh.registerMouseWheel(self._mouse_wheel_handler)
+                # mh.register(self._mouse_button_handler)
+                # mh.registerMouseMove(self._mouse_move_handler)
+                # mh.registerMouseWheel(self._mouse_wheel_handler)
                 gremlin.remote.remote_client.send_kvm_mouse_motion_start()
                 mh.pushSuppress()
+
+                # hook raw mouse movement
+                self.raw_hook()
+
+                # release any mouse capture
+                hwnd = win32gui.GetCapture()
+                if hwnd:
+                    win32gui.ReleaseCapture()
+                    
+                # win32gui.ShowCursor(False)
             
             kh = gremlin.windows_event_hook.KeyboardHook()
             kh.register(self._keyboard_handler)
@@ -168,10 +303,10 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
             if self.action_data.mouse_enabled:
                 mh = gremlin.windows_event_hook.MouseHook()
                 mh.popSuppress()
-                mh.unregister(self._mouse_button_handler)
-                mh.unregisterMouseMove(self._mouse_move_handler)
-                mh.unregisterMouseWheel(self._mouse_wheel_handler)
                 gremlin.remote.remote_client.send_kvm_mouse_motion_stop()
+
+                # unhook raw mouse callbacks
+                self.raw_unhook()
             
             kh = gremlin.windows_event_hook.KeyboardHook()
             kh.unregister(self._keyboard_handler)
@@ -210,6 +345,19 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
                 pass
 
 
+    def raw_hook(self):
+        ''' sets up a fake window to capture raw inputs '''
+        if not self._raw_input_hooked:
+            self._raw_input_hooked = True
+            gremlin.raw_input.registerHook(self._mouse_move_handler)
+            
+
+    def raw_unhook(self):
+        if self._raw_input_hooked:
+            gremlin.raw_input.registerUnhook(self._mouse_move_handler)
+            self._raw_input_hooked = False
+
+    
     def _mouse_button_handler(self, event : gremlin.windows_event_hook.MouseEvent):
         ''' handles a mouse button '''
         verbose = gremlin.config.Configuration().verbose_mode_remote
@@ -219,21 +367,21 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
     
 
 
-    def _mouse_move_handler(self, x, y):
+    def _mouse_move_handler(self, dx, dy):
         ''' handles mouse motion '''
         verbose = gremlin.config.Configuration().verbose_mode_remote
-        if verbose: syslog.info(f"KVM: motion {x} {y}")
-        if self._last_x is None or self._last_y is None:
-            # get init mouse position if not set this session
-            self._last_x, self._last_y = win32api.GetCursorPos()
-        # hwnd = win32api.MonitorFromPoint((x, y), win32con.MONITOR_DEFAULTTONEAREST)
-        # orientation, orientation_name = gremlin.util.getMonitorOrientation(hwnd)
-                                
-        dx = self._last_x - x
-        dy = self._last_y - y
-        self._last_x = x
-        self._last_y = y
-        gremlin.remote.remote_client.send_kvm_mouse_motion(x, y, dx, dy)
+        if verbose: syslog.info(f"KVM: motion {dx} {dy}")
+
+        # apply transforms if any
+        if self.action_data.invert_x:
+            dx = -dx
+        if self.action_data.invert_y:
+            dy = -dy
+        if self.action_data.rotate:
+            dx, dy = dy, dx
+
+        # send to remote client
+        gremlin.remote.remote_client.send_kvm_mouse_motion(0, 0, dx, dy)
         
 
     def _mouse_wheel_handler(self, delta : int, leftright : bool):
@@ -296,6 +444,10 @@ class KVM(gremlin.base_profile.AbstractAction):
         self.mouse_enabled = True
         self.keyboard_enabled = True
         self.sync_mode = SyncMode.Ignore # ignore by default
+        self.invert_x = False # x mouse motion inversion
+        self.invert_y = False # y mouse motion inversion
+        self.rotate = False # flip x/y for non standard monitor orientations
+
         
        
 
@@ -331,6 +483,9 @@ class KVM(gremlin.base_profile.AbstractAction):
         self.keyboard_enabled= safe_read(node,"keyboard",bool, True)
         if "sync-mode" in node.attrib:
             self.sync_mode = SyncMode(safe_read(node,"sync-mode", int, 0))
+        self.invert_x = safe_read(node,"invert-x",bool, False)
+        self.invert_y = safe_read(node,"invert-y",bool, False)
+        self.rotate = safe_read(node,"rotate",bool, False)
 
 
     def _generate_xml(self):
@@ -343,6 +498,10 @@ class KVM(gremlin.base_profile.AbstractAction):
         node.set("keyboard", safe_format(self.keyboard_enabled, bool))
         node.set("mouse", safe_format(self.mouse_enabled, bool))
         node.set("sync-mode", safe_format(self.sync_mode, int))
+        node.set("invert-x", safe_format(self.invert_x, bool))
+        node.set("invert-y", safe_format(self.invert_y, bool))
+        node.set("rotate", safe_format(self.rotate, bool))
+
 
         return node
 
