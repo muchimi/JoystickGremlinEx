@@ -2809,6 +2809,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         widgets = [
             self.slider_widget,
             self.step_value_container_widget,
+            self.step_widget_container,
             self.progression_container_widget
         ]
         self.container_ticks_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
@@ -3453,6 +3454,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self.container_merge_widget.setVisible(merge_visible)
 
         self.container_stepped_widget.setVisible(stepped_visible)
+        
 
         # self.hardware_input_container_widget.setVisible(hardware_widget_visible)
         self.axis_range_container_widget.setVisible(output_range_visible)

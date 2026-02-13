@@ -28,8 +28,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
-### (m76T181):
+### (m76T181A):
 - Fix: KVM Action: resolved an issue with T180 with mouse mode blocking buttons and wheel inputs in KVM (remote control) mode.
+- Fix: Vjoy Mapper: steps no longer visible in some situations in stepped axis mode.
 
 
 
