@@ -541,15 +541,20 @@ def mouse_release(button):
         _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON2))
 
 
-def mouse_wheel(motion):
-    # vertical mouse wheel
-    _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data=-motion*WHEEL_DELTA))
+def mouse_wheel(factor : int):
+    ''' send vertical mouse wheel 
+    
+    :param factor: 1 for up, -1 for down, factor
+    
+    '''
+    _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data = factor*WHEEL_DELTA))
 
-def mouse_h_wheel(motion):
-    # horizontal mouse wheel
-    import logging
-    # syslog.info(f"send h wheel direction {motion}")
-    _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data=-motion*WHEEL_DELTA))
+def mouse_h_wheel(factor : int):
+    ''' send horizontal mouse wheel 
+    :param factor: 1 for up, -1 for down, factor
+    
+    '''
+    _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data = factor*WHEEL_DELTA))
 
 def mousePos():
     ''' gets the current mouse position in pixels '''

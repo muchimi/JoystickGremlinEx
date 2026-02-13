@@ -170,75 +170,6 @@ class KVMWidget(gremlin.ui.input_item.AbstractActionWidget):
         pass
 
 
-RIDEV_INPUTSINK = 0x00000100
-RID_INPUT = 0x10000003
-WM_INPUT = 0x00FF
-HID_USAGE_PAGE_GENERIC = 0x01
-HID_USAGE_GENERIC_MOUSE = 0x02
-
-class RAWINPUTDEVICE(ctypes.Structure):
-    _fields_ = [
-        ("usUsagePage", ctypes.c_ushort),
-        ("usUsage", ctypes.c_ushort),
-        ("dwFlags", ctypes.c_ulong),
-        ("hwndTarget", ctypes.c_void_p)
-    ]
-
-class RAWINPUTHEADER(ctypes.Structure):
-    _fields_ = [
-        ("dwType", ctypes.c_ulong),
-        ("dwSize", ctypes.c_ulong),
-        ("hDevice", ctypes.c_void_p),
-        ("wParam", ctypes.c_ulong)
-    ]
-
-class RAWMOUSE(ctypes.Structure):
-    _fields_ = [
-        ("usFlags", ctypes.c_ushort),
-        ("ulButtons", ctypes.c_ulong),
-        ("usButtonFlags", ctypes.c_ushort),
-        ("usButtonData", ctypes.c_ushort),
-        ("ulRawButtons", ctypes.c_ulong),
-        ("lLastX", ctypes.c_long),
-        ("lLastY", ctypes.c_long),
-        ("ulExtraInformation", ctypes.c_ulong)
-    ]
-
-class RAWINPUT(ctypes.Structure):
-    _fields_ = [
-        ("header", RAWINPUTHEADER),
-        ("data", RAWMOUSE)
-    ]
-
-
-
-def handle_raw_input(lparam):
-    raw_input_data = ctypes.create_string_buffer(1024)
-    raw_input_size = ctypes.wintypes.UINT(ctypes.sizeof(raw_input_data))
-
-    # Get raw input data
-    ctypes.windll.user32.GetRawInputData(
-        lparam,
-        RID_INPUT,
-        raw_input_data,
-        ctypes.byref(raw_input_size),
-        ctypes.sizeof(RAWINPUTHEADER)
-    )
-
-    raw = RAWINPUT.from_buffer_copy(raw_input_data)
-    if raw.header.dwType == 0:  # Mouse
-        print(f"Mouse moved: dx={raw.data.lLastX}, dy={raw.data.lLastY}")
-
-
-
-def wnd_proc(hwnd, msg, wparam, lparam):
-    if msg == win32con.WM_INPUT:
-        # GetRawInputData logic goes here
-        print("Raw input received!")
-        return 0
-    return win32gui.DefWindowProc(hwnd, msg, wparam, lparam)
-
-
 class KVMFunctor(gremlin.base_profile.AbstractFunctor):
 
     """Implements the functionality required to move a mouse cursor.
@@ -278,12 +209,6 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
                 # hook raw mouse movement
                 self.raw_hook()
 
-                # release any mouse capture
-                hwnd = win32gui.GetCapture()
-                if hwnd:
-                    win32gui.ReleaseCapture()
-                    
-                # win32gui.ShowCursor(False)
             
             kh = gremlin.windows_event_hook.KeyboardHook()
             kh.register(self._keyboard_handler)
@@ -367,21 +292,31 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
     
 
 
-    def _mouse_move_handler(self, dx, dy):
+    def _mouse_move_handler(self, packets : list[gremlin.raw_input.RawInputData]):
         ''' handles mouse motion '''
         verbose = gremlin.config.Configuration().verbose_mode_remote
-        if verbose: syslog.info(f"KVM: motion {dx} {dy}")
+        for data in packets:
+            match data.contentType:
+                case gremlin.raw_input.RawInputDataType.Motion:
+                    dx = data.dx
+                    dy = data.dy
+                    if verbose: syslog.info(f"KVM: motion {dx} {dy}")
 
-        # apply transforms if any
-        if self.action_data.invert_x:
-            dx = -dx
-        if self.action_data.invert_y:
-            dy = -dy
-        if self.action_data.rotate:
-            dx, dy = dy, dx
+                    # apply transforms if any
+                    if self.action_data.invert_x:
+                        dx = -dx
+                    if self.action_data.invert_y:
+                        dy = -dy
+                    if self.action_data.rotate:
+                        dx, dy = dy, dx
 
-        # send to remote client
-        gremlin.remote.remote_client.send_kvm_mouse_motion(0, 0, dx, dy)
+                    # send to remote client
+                    gremlin.remote.remote_client.send_kvm_mouse_motion(0, 0, dx, dy)
+
+                case gremlin.raw_input.RawInputDataType.Button:
+                    # button type
+                    gremlin.remote.remote_client.send_kvm_mouse_button(data.button_id, data.is_pressed)
+
         
 
     def _mouse_wheel_handler(self, delta : int, leftright : bool):

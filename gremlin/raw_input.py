@@ -30,17 +30,39 @@ import ctypes as ct
 import ctypes.wintypes as w
 import win32api, win32gui, win32con
 import threading
+import enum
+import gremlin.types
 
 import logging
 syslog = logging.getLogger("system")
 
-# Constants derived from WinSDK headers.
-RIDEV_INPUTSINK = 0x00000100
-RID_HEADER = 0x10000005
-RID_INPUT = 0x10000003
-WM_INPUT = 0x00FF
-HID_USAGE_PAGE_GENERIC = 0x01
-HID_USAGE_GENERIC_MOUSE = 0x02
+
+class RawInputCon:
+    RIM_TYPEMOUSE = 0
+    RIM_TYPEKEYBOARD  = 1
+    RIM_TYPEHID = 2
+    MOUSE_MOVE_RELATIVE = 0x0
+    MOUSE_MOVE_ABSOLUTE = 0x1
+    RI_MOUSE_BUTTON_1_DOWN = 0x0001 # left
+    RI_MOUSE_BUTTON_1_UP = 0x0002
+    RI_MOUSE_BUTTON_2_DOWN = 0x0004 # right
+    RI_MOUSE_BUTTON_2_UP = 0x0008
+    RI_MOUSE_BUTTON_3_DOWN = 0x0010 # middle
+    RI_MOUSE_BUTTON_3_UP = 0x0020
+    RI_MOUSE_BUTTON_4_DOWN = 0x0040 
+    RI_MOUSE_BUTTON_4_UP = 0x0080
+    RI_MOUSE_BUTTON_5_DOWN = 0x0100 
+    RI_MOUSE_BUTTON_5_UP = 0x0200
+    RI_MOUSE_WHEEL = 0x400 # up/down wheel
+    RI_MOUSE_HWHEEL = 0x0800 # left/right wheel
+    
+    # Constants derived from WinSDK headers.
+    RIDEV_INPUTSINK = 0x00000100
+    RID_HEADER = 0x10000005
+    RID_INPUT = 0x10000003
+    WM_INPUT = 0x00FF
+    HID_USAGE_PAGE_GENERIC = 0x01
+    HID_USAGE_GENERIC_MOUSE = 0x02
 
 # Types not available in ctypes.wintypes
 LRESULT = ct.c_ssize_t
@@ -178,26 +200,119 @@ _raw_input_callbacks = [] # callback to call when hooking the raw input (x,y)
 
 
 
+class RawInputDataType(enum.Enum):
+    Motion = 0 # data holds motion
+    Button = 1 # data holds button info
+
+
+class RawInputData():
+    ''' holds raw input data passed to a callback '''
+    def __init__(self):
+        self.contentType : RawInputDataType = None # "motion", "button"
+        self.dx = None
+        self.dy = None
+        #self.direction : int = None
+        self.button : gremlin.types.MouseButton = None
+        self.is_pressed : bool = None
+
+    @staticmethod
+    def Button(button : gremlin.types.MouseButton, is_pressed : bool):
+        data = RawInputData()
+        data.contentType = RawInputDataType.Button
+        data.button = button
+        data.is_pressed = is_pressed
+        return data
+    
+    @property
+    def button_id(self) -> int:
+        return int(self.button)
+
+    # @staticmethod
+    # def Wheel(button : gremlin.types.MouseButton, direction : int):
+    #     data = RawInputData()
+    #     data.contentType = RawInputDataType.Button
+    #     data.button = button
+    #     data.direction = direction
+    #     return data
+    
+    @staticmethod
+    def Motion(dx : int, dy : int):
+        data = RawInputData()
+        data.contentType = RawInputDataType.Motion
+        data.dx = dx
+        data.dy = dy
+        return data
+    
+    
+
 def handle_raw_input(lparam):
     ''' called when a raw mouse input is received '''
-    global _raw_input_callbacks
+    # global _raw_input_callbacks
     if _raw_input_callbacks:
         raw_input_data = RAWINPUT()
         raw_input_size = w.UINT(ct.sizeof(raw_input_data))
 
         # convert to the delta values 
-        GetRawInputData(HRAWINPUT(lparam), RID_INPUT, ct.byref(raw_input_data), ct.byref(raw_input_size), ct.sizeof(RAWINPUTHEADER))
-        if raw_input_data.header.dwType == 0:
-            dx = raw_input_data.data.mouse.lLastX
-            dy = raw_input_data.data.mouse.lLastY
-            for callback in _raw_input_callbacks:
-                callback(dx, dy)
-            
+        GetRawInputData(HRAWINPUT(lparam), RawInputCon.RID_INPUT, ct.byref(raw_input_data), ct.byref(raw_input_size), ct.sizeof(RAWINPUTHEADER))
+        if raw_input_data.header.dwType == RawInputCon.RIM_TYPEMOUSE:
+            # raw input is a mouse
+            data : RAWMOUSE = raw_input_data.data.mouse
+            packets = []
+            if data.usFlags == RawInputCon.MOUSE_MOVE_RELATIVE:
+                    dx = data.lLastX
+                    dy = data.lLastY
+                    # skip zero offsets
+                    if dx or dy:
+                        packets.append(RawInputData.Motion(dx, dy))
+
+            # process buttons and wheel
+            buttonflag = data.usButtonFlags
+            if buttonflag & RawInputCon.RI_MOUSE_BUTTON_1_DOWN:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Left, True))
+            if buttonflag & RawInputCon.RI_MOUSE_BUTTON_1_UP:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Left, False))
+            if buttonflag & RawInputCon.RI_MOUSE_BUTTON_2_DOWN:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Right, True))
+            if buttonflag & RawInputCon.RI_MOUSE_BUTTON_2_UP:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Right, False))                    
+            if buttonflag & RawInputCon.RI_MOUSE_BUTTON_3_DOWN:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Middle, True))
+            if buttonflag & RawInputCon.RI_MOUSE_BUTTON_3_UP:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Middle, False))                    
+            if buttonflag & RawInputCon.RI_MOUSE_BUTTON_4_DOWN:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Forward, True))
+            if buttonflag & RawInputCon.RI_MOUSE_BUTTON_4_UP:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Forward, False))
+            if buttonflag & RawInputCon.RI_MOUSE_BUTTON_5_DOWN:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Back, True))
+            if buttonflag & RawInputCon.RI_MOUSE_BUTTON_5_UP:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.Back, False))     
+            if buttonflag & RawInputCon.RI_MOUSE_WHEEL:
+                direction = data.usButtonData
+                if direction == 120:
+                    packets.append( RawInputData.Button(gremlin.types.MouseButton.WheelUp, True))
+                else:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.WheelDown, True))
+            if buttonflag & RawInputCon.RI_MOUSE_HWHEEL:
+                direction = data.usButtonData
+                if direction == 120:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.WheelLeft, True))
+                else:
+                    packets.append(RawInputData.Button(gremlin.types.MouseButton.WheelRight, True)) 
+        
+            # run the callbacks
+            if packets:
+                for callback in _raw_input_callbacks:
+                    callback(packets)
+
+
+
+                
 
 @WNDPROC 
 def raw_input_wnd_proc(hwnd, msg, wparam, lparam):
     ''' custom message loop message processor '''
-    if msg == WM_INPUT:
+    if msg == RawInputCon.WM_INPUT:
         handle_raw_input(lparam)
     elif msg == win32con.WM_QUIT:
             syslog.info("quit")
@@ -244,9 +359,9 @@ def _raw_input_runner():
 
     # Register raw input device
     rid = RAWINPUTDEVICE()
-    rid.usUsagePage = HID_USAGE_PAGE_GENERIC
-    rid.usUsage = HID_USAGE_GENERIC_MOUSE
-    rid.dwFlags = RIDEV_INPUTSINK
+    rid.usUsagePage = RawInputCon.HID_USAGE_PAGE_GENERIC
+    rid.usUsage = RawInputCon.HID_USAGE_GENERIC_MOUSE
+    rid.dwFlags = RawInputCon.RIDEV_INPUTSINK
     rid.hwndTarget = hwnd
 
     RegisterRawInputDevices(ct.byref(rid), 1, ct.sizeof(rid)) # will also fail if already registered

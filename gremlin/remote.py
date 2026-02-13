@@ -41,6 +41,7 @@ from gremlin.types import GamePadOutput
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
+from gremlin.types import MouseButton
 from dinput import DILL, GUID, GUID_Invalid
 import gremlin.util
 from gremlin.util import get_guid
@@ -171,6 +172,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
 
             case "kvm":
                 # kvm mode
+                verbose = True
                 subtype = data["subtype"]
                 match subtype:
                     case "start" | "stop":
@@ -185,13 +187,29 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
                         gremlin.sendinput.send_mouse_motion(dx, dy)
                         
                     case "button":
-                        # mouse button
-                        button = data["button"]
-                        is_pressed = data["is_pressed"]
-                        if is_pressed:
-                            gremlin.sendinput.mouse_press(button)
+                        # mouse button 1 to 5 for normal buttons, > 5 for wheel codes
+                        button_id = data["button"]
+                        if button_id > 5:
+                            # wheel
+                            button = MouseButton(button_id)
+                            if verbose: syslog.info(f"KVM (client): received mouse wheel: {button.name}")
+                            match button:
+                                case MouseButton.WheelUp:
+                                    gremlin.sendinput.mouse_wheel(1)
+                                case MouseButton.WheelDown:
+                                    gremlin.sendinput.mouse_wheel(-1)
+                                case MouseButton.WheelLeft:
+                                    gremlin.sendinput.mouse_h_wheel(-1)
+                                case MouseButton.WheelRight:
+                                    gremlin.sendinput.mouse_h_wheel(1)
                         else:
-                            gremlin.sendinput.mouse_release(button)
+                            # mouse button 1 to 5
+                            is_pressed = data["is_pressed"]
+                            if verbose: syslog.info(f"KVM (client): received mouse button: {button_id} pressed: {is_pressed}")
+                            if is_pressed:
+                                gremlin.sendinput.mouse_press(button_id)
+                            else:
+                                gremlin.sendinput.mouse_release(button_id)
                     case "wheel":
                         delta = data["delta"]
                         gremlin.sendinput.mouse_wheel(delta)

@@ -28,6 +28,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m76T181):
+- Change: KVM Action: mouse mode blocking in TRT181 also blocks mouse click/wheel action while KVM (remote control) is enabled.
+
+
 ### (m76T180):
 - Change: KVM Action: mouse mode will now block on the master while KVM (remote control) is enabled. 
 - Change: KVM action: manual mouse mapping options if the orientation of the target client is different from the orientation of the master and for special situations like mirrored output (this can happen with some projector systems).
