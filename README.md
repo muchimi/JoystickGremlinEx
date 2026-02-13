@@ -29,7 +29,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 ### (m76T181):
-- Change: KVM Action: mouse mode blocking in TRT181 also blocks mouse click/wheel action while KVM (remote control) is enabled.
+- Change: KVM Action: mouse mode blocking in TRT181 also blocks mouse click/wheel action while KVM (remote control) is enabled.  
+
 
 
 ### (m76T180):
