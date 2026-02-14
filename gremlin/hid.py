@@ -17,10 +17,31 @@
 
 
 from __future__ import annotations
+import os
+from pathlib import Path
+import logging
+import ctypes
+syslog = logging.getLogger("system")
+
+dll_folder = os.path.dirname(__file__)
+dll_file = "hidapi.dll"
+dll_path = os.path.join(dll_folder, dll_file )
+if not os.path.isfile(dll_path):
+    # look one level up for packaging in 3.12
+    parent = Path(dll_folder).parent
+    dll_path = os.path.join(parent, dll_file)
+    if not os.path.isfile(dll_path):
+        msg = f"Unable to continue - missing dll: {dll_path}"
+        syslog.critical(msg)
+        os._exit(1)
+    dll_folder = parent
+    
+
+ctypes.CDLL(dll_path)
+
 import hid
 
-import logging
-syslog = logging.getLogger("system")
+
 
 from gremlin.singleton_decorator import SingletonDecorator
 

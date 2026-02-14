@@ -84,6 +84,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
     def handle(self):
         config =  gremlin.config.Configuration()
         verbose = config.verbose_mode_remote and config.verbose_mode_extra
+        verbose = True
         # handles input data
         raw_data = self.request[0].strip()
         # socket = self.request[1]
@@ -172,7 +173,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
 
             case "kvm":
                 # kvm mode
-                verbose = True
+                
                 subtype = data["subtype"]
                 match subtype:
                     case "start" | "stop":
