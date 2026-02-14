@@ -83,15 +83,12 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
         config =  gremlin.config.Configuration()
-        verbose = config.verbose_mode_remote and config.verbose_mode_extra
-        verbose = True
-        # handles input data
         raw_data = self.request[0].strip()
-        # socket = self.request[1]
+
         
         try:
             data = msgpack.unpackb(raw_data)
-            if verbose: syslog.info(f"REMOTE: received remote data: {data}")
+
         except ValueError:
             # unpack error
             return
@@ -100,6 +97,9 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
         if sender == remote_client.id:
             # ignore our own broadcasts
             return
+
+        verbose = config.verbose_mode_remote and config.verbose_mode_extra
+        if verbose: syslog.info(f"REMOTE: received remote data: {data}")
         
         action = data["action"]
 
@@ -107,6 +107,7 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             case "hb":
                 # heartbeat
                 return
+            
             case "register":
                 # register client
                 rc = RemoteControl()
@@ -512,57 +513,12 @@ class RemoteClient():
     def start(self):
         ''' creates a multicast client send socket on profile start '''
         if not self._started:
-            if  self.ensure_socket():
+            if self.ensure_socket():
                 el = gremlin.event_handler.EventListener()
                 el.heartbeat.connect(self._alive_ticker)
                 self._started = True
+
             
-
-
-    def ensure_socket(self):
-        # makes sure the socket exists
-        import struct
-        try:
-            if not self._sock:
-                config = gremlin.config.Configuration()
-                broadcast_host = config.broadcast_host_ip
-                if broadcast_host == "127.0.0.1":
-                     if broadcast_host == '127.0.0.1':
-                        broadcast_host = gremlin.util.getHostIp()[0]
-                        syslog.warning(f'RPC: broadcast host is not configured (using localhost). Using [{broadcast_host}].  This may not be correct if you have multiple IP addresses.')
-                    
-                bind_all = config.broadcast_bind_all_ips
-                port = config.broadcast_port
-                self._address = (RPCGremlin.MULTICAST_GROUP, port)
-                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                ttl = struct.pack('b', RPCGremlin.MULTICAST_TTL)
-                #self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, socket.inet_aton(broadcast_host), ttl)
-                self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-                if bind_all and broadcast_host:
-                    self._sock.bind((broadcast_host, port))
-                    syslog.debug(f"Gremlin RPC client started... IP: {broadcast_host} port: {port}")
-                else:
-                    syslog.debug(f"Gremlin RPC client started... ALL IP - port: {port}")
-            return self._sock is not None
-        except Exception as e:
-            syslog.error("SOCKET: unable to open remote control socket. Feature will be disabled.")
-            self._sock = None
-            return False
-        
-    def registerClient(self):
-        ''' sends server client data '''
-        enabled = gremlin.config.Configuration().enable_remote_broadcast
-        if enabled:
-                data = self.getDatablock("register")
-                data["client_id"] = self._instance_id
-                data["client_name"] = self._instance_name
-                data["client_type"] = "client"
-                raw_data = msgpack.packb(data)
-                self._send(raw_data)
-                verbose = gremlin.config.Configuration().verbose
-                if verbose: syslog.info(f"Register client [{self._instance_name}] [{self._instance_id}]")
-
-
     def stop(self):
         ''' closes the client socket'''
         if self._started:
@@ -584,7 +540,54 @@ class RemoteClient():
                 self._sock = None
                 syslog.debug("Gremlin RPC client stopped.")
 
-            self._started = False
+            self._started = False            
+
+
+    def ensure_socket(self):
+        # makes sure the socket exists
+        import struct
+        try:
+            if not self._sock:
+                config = gremlin.config.Configuration()
+                broadcast_host = config.broadcast_host_ip
+                if broadcast_host == "127.0.0.1":
+                     if broadcast_host == '127.0.0.1':
+                        broadcast_host = gremlin.util.getHostIp()[0]
+                        syslog.warning(f'RPC: broadcast host is not configured (using localhost). Using [{broadcast_host}].  This may not be correct if you have multiple IP addresses.')
+                    
+                bind_all = config.broadcast_bind_all_ips
+                port = config.broadcast_port
+                self._address = (RPCGremlin.MULTICAST_GROUP, port)
+                self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                ttl = struct.pack('b', RPCGremlin.MULTICAST_TTL)
+                self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+                if bind_all and broadcast_host:
+                    self._sock.bind((broadcast_host, port))
+                    syslog.info(f"Gremlin RPC client started... IP: {broadcast_host} port: {port}")
+                else:
+                    syslog.info(f"Gremlin RPC client started... ALL IP - port: {port}")
+            return self._sock is not None
+        except Exception as e:
+            syslog.error("SOCKET: unable to open remote control socket. Feature will be disabled.")
+            self._sock = None
+            return False
+        
+        
+    def registerClient(self):
+        ''' sends server client data '''
+        enabled = gremlin.config.Configuration().enable_remote_broadcast
+        if enabled:
+                data = self.getDatablock("register")
+                data["client_id"] = self._instance_id
+                data["client_name"] = self._instance_name
+                data["client_type"] = "client"
+                raw_data = msgpack.packb(data)
+                self._send(raw_data)
+                verbose = gremlin.config.Configuration().verbose
+                if verbose: syslog.info(f"Register client [{self._instance_name}] [{self._instance_id}]")
+
+
+  
 
     def _alive_ticker(self):
         ''' sends an alive packet to keep the ports alive '''
@@ -625,7 +628,7 @@ class RemoteClient():
             raw_data = msgpack.packb(data)
             self._send(raw_data)
 
-            #syslog.debug(f"remote gremlin event set button: {device_id} {button_id} {is_pressed}")
+            
 
     def toggle_button(self, device_id, button_id, force_remote = False):
         ''' toggles a button '''

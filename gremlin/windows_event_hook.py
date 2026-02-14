@@ -405,6 +405,7 @@ def process_mouse_event(n_code, w_param, l_param):
     # Pass the event on to the next callback in the chain
     if g_suppress_mouse == 0: #  or w_param == WM_MOUSEMOVE:
         return user32.CallNextHookEx(None, n_code, w_param, l_param)
+    
     return 1 # suppress
     
 
@@ -568,6 +569,9 @@ class MouseHook:
         global g_suppress_mouse
         g_suppress_mouse += 1
 
+        verbose = gremlin.config.Configuration().verbose_mode_remote
+        if verbose: syslog.info(f"MOUSE: push suppress [{g_suppress_mouse}]")
+
     def popSuppress(self, reset = False):
         ''' resume mouse processing on the local client '''
         global g_suppress_mouse
@@ -575,6 +579,9 @@ class MouseHook:
             g_suppress_mouse = 0
         elif g_suppress_mouse > 0:
             g_suppress_mouse -=1
+
+        verbose = gremlin.config.Configuration().verbose_mode_remote
+        if verbose: syslog.info(f"MOUSE: pop supress [{g_suppress_mouse}]")
         
 
     def isSupressed(self) -> bool:

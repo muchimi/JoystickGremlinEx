@@ -333,13 +333,15 @@ def registerHook(callback):
         # already hooked
         return
     
+    verbose = gremlin.config.Configuration().verbose_mode_remote
+    if verbose: syslog.info("KVM: start")
+    
     # start the message loop if not started
     _raw_input_hooked = True
     _raw_input_running = True
     _raw_input_thread = threading.Thread(target = _raw_input_runner)
     _raw_input_thread.name = "raw input runner"
     _raw_input_thread.start()
-
 
     
 def _raw_input_runner():
@@ -381,22 +383,27 @@ def registerUnhook(callback):
 
     # kill the message loop if there are no more callbacks
     if not _raw_input_callbacks and _raw_input_hooked:
-            _raw_input_running = False
-            # kill the window
-            win32api.PostThreadMessage(_raw_input_thread_id, win32con.WM_QUIT, 0, 0)
-            # # win32gui.DestroyWindow(_raw_input_hwnd)
-            # syslog.info("destroyed")
-    
-            # wait for the dispatch to finish
-            if _raw_input_thread.is_alive():
-                # wait for quit message to have been processed
-                _raw_input_thread.join()
-            _raw_input_thread = None
-            _raw_input_hwnd = None
-            _raw_input_hooked = False 
+        rawInputShutdown()
 
 
+def rawInputShutdown():
+    global _raw_input_hooked, _raw_input_hwnd, _raw_input_thread, _raw_input_running, _raw_input_callbacks,_raw_input_thread_id
+    if _raw_input_running:
+        _raw_input_running = False
+        # kill the window
+        win32api.PostThreadMessage(_raw_input_thread_id, win32con.WM_QUIT, 0, 0)
+        # # win32gui.DestroyWindow(_raw_input_hwnd)
+        verbose = gremlin.config.Configuration().verbose_mode_remote
+        if verbose: syslog.info("KVM: shutdown")
 
+        # wait for the dispatch to finish
+        if _raw_input_thread.is_alive():
+            # wait for quit message to have been processed
+            _raw_input_thread.join()
+        _raw_input_thread = None
+        _raw_input_hwnd = None
+        _raw_input_hooked = False 
+        
 
-
+     
         

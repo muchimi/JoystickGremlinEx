@@ -226,12 +226,14 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
             syslog.info("KVM: stop")
             self._is_running = False
             if self.action_data.mouse_enabled:
-                mh = gremlin.windows_event_hook.MouseHook()
-                mh.popSuppress()
                 gremlin.remote.remote_client.send_kvm_mouse_motion_stop()
 
                 # unhook raw mouse callbacks
                 self.raw_unhook()
+
+                mh = gremlin.windows_event_hook.MouseHook()
+                syslog.info("mouse enable")
+                mh.popSuppress()
             
             kh = gremlin.windows_event_hook.KeyboardHook()
             kh.unregister(self._keyboard_handler)
@@ -240,7 +242,7 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
                 kh.popSuppress()
             
             
-    def profile_start(self):
+    def profile_started(self):
         ''' called on profile start '''
         device_guid = self.action_data.hardware_device_guid
         input_id = self.action_data.hardware_input_id
@@ -268,6 +270,16 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
                   
             case SyncMode.Ignore:
                 pass
+
+    def profile_stop(self):
+        ''' called when profile stops '''
+        # ensure raw mode is off and mouse/keyboard suppression is turned off
+        gremlin.raw_input.rawInputShutdown()
+        mh = gremlin.windows_event_hook.MouseHook()
+        mh.popSuppress(True)
+        kh = gremlin.windows_event_hook.KeyboardHook()
+        kh.popSuppress(True)
+            
 
 
     def raw_hook(self):
