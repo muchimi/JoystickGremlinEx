@@ -1087,6 +1087,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#important-security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Important security considerations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#master-machine-setup" class="md-nav__link">
     <span class="md-ellipsis">
       Master machine setup
@@ -1115,15 +1124,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#master-remote-control-functions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Master remote control functions
-    </span>
-  </a>
   
 </li>
       
@@ -3230,6 +3230,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#important-security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Important security considerations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#master-machine-setup" class="md-nav__link">
     <span class="md-ellipsis">
       Master machine setup
@@ -3258,15 +3267,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#master-remote-control-functions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Master remote control functions
-    </span>
-  </a>
   
 </li>
       
@@ -5162,15 +5162,37 @@ In the example below, the action is enabled when the input axis is between -0.09
 <p>Holding the left-shift key and the left-control key when in button detect mode temporarily enables exclusive axis detection and ignores button presses.  This is helpful when you have a hardware axis that also has detents along the way that send button inputs.  In this mode, these buttons will be ignored.</p>
 <h2 id="remote-control-feature">Remote control feature<a class="headerlink" href="#remote-control-feature" title="Permanent link">&para;</a></h2>
 <p>GremlinEx adds a feature to link multiple GremlinEx instances running on separate computers.  This is helpful to share a single set of controls and a single profile on a master machine to one or more client machines on the local network.</p>
+<p>As of T183, GremlinEx, actions that support remote output can now select any (all) or specific available network clients.</p>
+<p>The use of remote control is concurrent with local control, so actions that support it can output concurrently to the local machine, and selected clients.</p>
+<p>Clients automatically register when they are started if they are setup for remote control.  </p>
 <p>The use-case for this need came up in a couple of scenarios in my own setup:  I wanted to be able to share my hardware panels and input controllers with another machine without having to duplicate them.</p>
-<p>Events sent over the network include all GremlinEX output functions:
-- VJOY joystick axis events (when an axis is moved)
-- VJOY joystick button events
-- keyboard output events (press/release keys including extended keys)
-- mouse output events (pres/release mice button 1 to 5, mouse wheel events, and mouse motion events)
-- Gremlin macro outputs</p>
+<p>Events sent over the network include all GremlinEX output functions:</p>
+<ul>
+<li>VJOY joystick axis events (when an axis is moved)</li>
+<li>VJOY joystick button events</li>
+<li>keyboard output events (press/release keys including extended keys)</li>
+<li>mouse output events (pres/release mice button 1 to 5, mouse wheel events, and mouse motion events)</li>
+<li>Gremlin macro outputs</li>
+</ul>
 <p>By output events, we mean that inputs into GremlinEx are not broadcast to clients, only events that GremlinEx outputs are synchronized with clients.  </p>
-<p>To use the remote control features, it is intended you use the new plugins VjoyRemap and MapToMouseEx</p>
+<p>Not all actions support remote control.  The current actions that do are</p>
+<ul>
+<li>Vjoy Remap</li>
+<li>Map to Keyboard/Mouse Ex</li>
+<li>Map to Mouse Ex</li>
+<li>KVM</li>
+</ul>
+<h3 id="important-security-considerations">Important security considerations<a class="headerlink" href="#important-security-considerations" title="Permanent link">&para;</a></h3>
+<p>GremlinEx ensures security by:</p>
+<ul>
+<li>using non-routable UDP traffic (the data will not cross routers).</li>
+<li>clients must be on the local network</li>
+<li>clients must have remote control enabled in the configuration.</li>
+<li>clients must have a blank, running profile to be remotely controlled.</li>
+<li>the firewall must allow the configured port.</li>
+</ul>
+<p>This said, GremlinEx is not designed to handle sensitive data given its purpose as a gaming hardware integrator.  </p>
+<p><a class="glightbox" href="../assets/warning.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png" /></a> Do not use GremlinEx to transmit secure or PII data as transmitted data is not encrypted (by design for speed) as the scope of GremlinEx is game control</p>
 <h3 id="master-machine-setup">Master machine setup<a class="headerlink" href="#master-machine-setup" title="Permanent link">&para;</a></h3>
 <p>The master machine is the machine responsible for broadcasting control events to clients on the local network.  Thus it will typically be the primary system with all the physical hardware managed by GremlinEx.</p>
 <p>The broadcast machine or master system will have the broadcast option enabled and an available UDP port setup (default 6012).  When the broadcast feature is enabled, GremlinEx will broadcast all output events.</p>
@@ -5202,9 +5224,8 @@ In the example below, the action is enabled when the input axis is between -0.09
 <p><sup>GremlinEx options setup for a client:</sup></p>
 <p><a class="glightbox" href="../assets/client_options.jpg" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="client options" src="../assets/client_options.jpg" /></a></p>
 <p>The enable remote control checkbox is checked, and the port (default 6012) must match the broadcast machine's port.</p>
-<h2 id="master-remote-control-functions">Master remote control functions<a class="headerlink" href="#master-remote-control-functions" title="Permanent link">&para;</a></h2>
-<p>Local and broadcast (sending output to remote GremlinEx instances on network machines) control can be enabled or disabled via GremlinEx commands bound to a joystick button (or in script).</p>
-<p>Commands are available in the VjoyRemap plugin when bound to a joystick button and available from the drop down of actions for that button.</p>
+<p>By default, actions only output to the local machine. Actions that support remote output support output to any (all) client, one or more selected clients, or the local machine.  Note that when sending data remotely, the local client is excluded.  To send both remotely and locally, local and remote mode must be selected.  It is not possible to select the local client as a remote client from the local machine.</p>
+<p>Important: the GremlinEx client controlling other clients must be in broadcast mode.  Other clients being remote controlled must have remote control enabled in options, and must also have a blank profile running.</p>
 <h2 id="profile-mapping">Profile mapping<a class="headerlink" href="#profile-mapping" title="Permanent link">&para;</a></h2>
 <p>GremlinEx has multiple options to automate the loading and activation of profiles based on what process has the current focus (meaning, the active window).</p>
 <p><a class="glightbox" href="../assets/gremlin_ex_profile_options.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="profile options" src="../assets/gremlin_ex_profile_options.png" /></a></p>
