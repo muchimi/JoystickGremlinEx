@@ -595,8 +595,6 @@ Container conditions apply to the whole container.  In the example below, button
 
 Action conditions only apply to a specific condition.  In this case, the play sound action will only be active if the F4 key is pressed.  Because the play action is also subject to the container condition, both conditions must be true for the sound to play.  Because the container is mapped to an axis, and a virtual button is defined, not only do the action and container conditions be true, the axis must also be in the correct range.
 
-
-
 ## Automatic Input detection
 
 GremlinEx can usually detect at edit time and auto-highlight hardware joystick input devices by clicking a button or moving an axis on them.   This eliminates the guesswork on how the hardware maps to buttons or axes, and what the state of the input is.
@@ -625,7 +623,7 @@ As of 13.40.16ex, GremlinEx has an input options bar at the bottom right of the 
 
 A pair of modifiers can be used to modify how input is detected.  
 
-| Option      | Description |
+| Option | Description |
 | ----------- | ----------- |
 | Left shift | If you hold the left shift key, GremlinEx will track axes instead of just buttons regardless of the options selected .|
 | Left control | If you hold the left control key, GremlinEx will only track axes  regardless of the options selected .|
@@ -638,25 +636,73 @@ Holding the left-shift key down when in button detect mode temporarily enables a
 
 Holding the left-shift key and the left-control key when in button detect mode temporarily enables exclusive axis detection and ignores button presses.  This is helpful when you have a hardware axis that also has detents along the way that send button inputs.  In this mode, these buttons will be ignored.
 
-## Remote control feature
+## Remote control
 
-GremlinEx adds a feature to link multiple GremlinEx instances running on separate computers.  This is helpful to share a single set of controls and a single profile on a master machine to one or more client machines on the local network.
+GremlinEx can link multiple GremlinEx instances running on separate computers on the local network.  One instance (the broadcaster) can remote control another GremlinEx (client) as well as output to itself.  This is helpful to share a single set of controls or profile on a master machine to one or more client machines on the local network.
 
-As of T183, GremlinEx, actions that support remote output can now select any (all) or specific available network clients.
+As of T183, GremlinEx, actions that support remote output can control specific GremlinEx instances on the network, or any (all).
 
-The use of remote control is concurrent with local control, so actions that support it can output concurrently to the local machine, and selected clients.
+| Supported output mode | Description |
+| --- | ---- |
+| Local (default) | The profile output sends controls to the local machine.  This is the default mode and is the primary way to use GremlinEx.  In this mode, the profile output sends joystick, keyboard and mouse data to the local machine only. |
+| Remote (any) | The profile output sends controls to all GremlinEx instances running on machines attached to the local network.  This mode was the only "remote control mode" prior to T183.  All clients receive the control data.  As of T183, the "any" client must be selected to send to all remote clients at once. This is the default remote starting configuration for T183 to maintain compatibility with older profiles. |
+| Remote (specific) | The profile sends controls to specific clients.  This mode is only available after T183.  Only the selected clients receive the control data. |
+| Combined | Local and remote modes can be combined together.  In this mode, the control data is processed by the local instance, and any selected clients or all of them depending on the remote mode selected. |
+| KVM mode | A special action called the KVM action will route all keyboard and mouse outputs to the listed clients and disable local keyboard/mouse output.  This is active while the KVM action is triggered (input on).  While active, the local instance no longer processes keyboard or mouse inputs, including profile inputs so any process running ont he local machine will not get keyboard/mouse data either.  Joystick and OSC/MIDI inputs continue to function in KVM mode, only keyboard and mouse inputs are impacted. |
 
-Clients automatically register when they are started if they are setup for remote control.  
+GremlinEx offers actions to enable/disable remote control at runtime so remote control can be enabled or disabled as needed while a profile is running.  This can be toggled from any button input like a joystick button, an OSC command or a keyboard input.  A best practice is to attach the remote control mode to a physical switch on a hardware panel to enable or disable remote control of other GremlinEx clients as needed.
 
-The use-case for this need came up in a couple of scenarios in my own setup:  I wanted to be able to share my hardware panels and input controllers with another machine without having to duplicate them.
+Clients automatically register with each other when started if they are setup for remote control in the global options.
 
-Events sent over the network include all GremlinEX output functions:
+Clients can only be remote controlled if they are running an active (blank) profile.
 
-- VJOY joystick axis events (when an axis is moved)
-- VJOY joystick button events
-- keyboard output events (press/release keys including extended keys)
-- mouse output events (pres/release mice button 1 to 5, mouse wheel events, and mouse motion events)
-- Gremlin macro outputs
+| Requirements for remote control | Description |
+| --- | ---- |
+| Local network connection | The instance must run on a computer connected to the local network only.  Instances connected via VPN or across a router will not work which is a security design feature. |
+| Similar version | The instance must run a similar version to the broadcast machine or connections may not work as intended because the older client may not understand the data it receives. |
+| Firewall port open | The local firewall on each computer must allow GremlinEx to communicate over the UDP port (6012 is the default).  This normally happens automatically the first time GremlinEx runs and attempts to open a connection.  Some Windows installation may not allow this automatic firewall registration depending on the local security policies and User Access Controls (UAC) settings.  In this event, the firewall must be manually configured.  |
+| Profile running | Remote control is only enabled if a profile is running on each client.  The broadcast machine must run a profile and be in broadcast mode (profile controlled), and each client must have remote control enabled in the options, and run a profile.  For clients, a blank profile is ok to run and this is the recommended configuration. |
+| Specific client remote control | The client must be selected on the broadcast system as a target client.  If the client does not show on the available list, it is not communicating.  This means it is the wrong version, is not allowed to communicate (blocked by network security or UAC or is on a differnet subnet or VPN), or some other issue that can usually be resolved via a restart of both the client and the broadcast machine. |
+| GremlinEx instances must use the same port | Check the port number is the same for all GremlinEx machines. |
+| Multicast must be enabled. | This is the default for all Windows machines, however some network configurations may block multicast from working.  GremlinEx requires multicast to be enabled.  Enabling multicast is outside of the scope of this documentation.  It is enabled by default in Windows and used by many services so there is no reason it should be off, unless it was turned off or forced off. |
+
+| Supported remote control events | Description |
+| --- | ---- |
+| VJOY output | The remote clients understand VJOY output including axis, button and hats.  The local VJOY configuration must match the data received, so should match the configuration of the broadcast machine and profile being used.  It's okay for a client to have fewer VJOY devices than the broadcast machine, however the axis, hat and button count should be the same. |
+| Keyboard output | The remote clients accepts keyboard output sent via the Map to Keyboard/Mouse Ex action.  Use this for mouse button/wheel output as well. |
+| Mouse output | The remote clients accepts mouse output including motion sent via the Map to Mouse Ex action. Use the Map to Keyboard/Mouse Ex action for button/wheel output. |
+| KVM mode | The KVM action on the broadcast machine sends all keyboard/mouse on the broadcast machine directly to the client, and local keyboard/mouse is disabled in this mode.  OSC, MIDI, Joystick and State inputs are not disabled in this mode and the profile continues to process those normally. |
+
+| Not supported for remote control | Description |
+| --- | ---- |
+| OSC and MIDI | Local clients must handle this directly, or via the broadcast machine to map these input types to VJOY, keyboard or mouse outputs that are processed on the remote client. |
+| Mismatched VJOY configuration | Local clients must have matching VJOY device, axis, button and hat setup to accept data that outputs to these specific devices.  The best practice is to setup VJOY on the remote client exactly the same way as the broadcast machine to avoid issues. |
+| Clients not on the local network | Clients that are on different subnets or VPN will typically be unable to communicate with the broadcast machine due to designed security measures. |
+| Clients running an older version | Clients ideally will run the same version as the broadcast machine to understand the data it receives. |
+
+| Common issues with remote control | Description |
+| --- | ---- |
+| Client is not visible to the broadcast machine | This indicates there is no communication between the client and the broadcast machine.  See above for requirements.  A restart of both broadcast and remote client can help if the issue is not security related, or after making necessary changes to the network configuration. |
+| Client doesn't do anything. | Check that the remote control option is enabled in global options, that the ports match.  The broadcase machine should show the client in the list of clients when connected and use the "any" mode or the specific client.  The client may also have timed out.  A restart usually resolves the issue. |
+
+### Client Configuration Options
+
+Remote control options are setup in the global options in GremlinEx.  The normal setup is only one client is designated as the broadcast server.  The broadcast client will send data to other clients.  Technically, multiple clients and broadcast to other clients as well, so it is possble to have more than one broadcast client, hence why usually the broadcast server can also be remote controlled by other clients.
+
+![configuration](assets/remote_control_config.png)
+
+### Action Output Configuration
+
+The following actions can be configured for output:
+
+| Action | Description |
+| --- | ---- |
+| Vjoy Remap | Send VJOY events (axis, button, hat) to remote clients. |
+| Map to Keyboard/Mouse Ex | Send keyboard and mouse button/wheel events to clients. |
+| Map to Mouse Ex | Send mouse button and motion events to clients.  For buttons and wheel, it is preferrable to use the Map to Keyboard/Mouse Ex action instead. |
+| KVM | This special action sends all keyboard and mouse events (including motion) to the clients and disables local keyboard/mouse events while active.  This mode is exclusive when active and disables local keyboard/mouse handling, and allows joystick, OSC, MIDI and State actions to execute as normal. |
+
+![action configuration](assets/remote_control_output.png)
 
 By output events, we mean that inputs into GremlinEx are not broadcast to clients, only events that GremlinEx outputs are synchronized with clients.  
 

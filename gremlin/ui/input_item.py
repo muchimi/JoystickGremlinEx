@@ -543,12 +543,15 @@ class InputItemListModel(ui_common.AbstractModel):
                     # cannot remove other types
                     return False
 
-                input_item = data.input_id
+                input_item = data
+                input_id = data.input_id
+
                 registry = gremlin.base_profile.ProfileRegistry()
-                input_id_key = registry.getInputIdKey(input_item)
+                input_id_key = registry.getInputIdKey(input_id)
 
                 input_items = self._device_data.modes[self._mode]
-                del input_items.config[input_type][input_id_key]
+                if input_type in input_items.config and input_id_key in input_items.config[input_type]:
+                    del input_items.config[input_type][input_id_key]
                 registry.removeInputItem(input_item)
                 
 

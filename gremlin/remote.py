@@ -271,6 +271,10 @@ class RemoteClient():
         self._instance_id = uuid.getnode() # unique ID of the host based on the mac address
         self._instance_name = socket.gethostname()
 
+        
+        
+
+
         self.remote_control = RemoteControl()
 
         el = gremlin.event_handler.EventListener()
@@ -283,6 +287,19 @@ class RemoteClient():
     @property
     def clientName(self) -> str:
         return self._instance_name
+    
+    @property
+    def customName(self) -> str:
+        ''' custom client name, if any '''
+        config = gremlin.config.Configuration()
+        return config.custom_host_name
+    
+    def getClientName(self) -> str:
+        ''' gets the custom or host name '''
+        custom_name = self.customName
+        if self.customName: return custom_name
+        return self.clientName
+
     
     @property
     def clientId(self) -> str:
@@ -735,8 +752,8 @@ class RemoteClient():
         sender = data["sender_id"]
         action = data["action"]
         if sender == remote_client.clientId:
-            # ignore our own broadcasts unless they need to be processed
-            if action != 'identify':
+            # ignore our own broadcasts unless they need to be processed by the local client
+            if not action in ('identify','identify_client'):
                 return
 
         verbose = gremlin.config.Configuration().verbose_mode_remote_extra
@@ -1234,20 +1251,28 @@ class ClientData():
     def __init__(self, auto : bool = True):
         self.client_id = remote_client.clientId if auto else None # id is a unique id corresponding to the host 
         self.client_name = remote_client.clientName if auto else None # name of the client (optional)
+        self.custom_name = remote_client.customName if auto else None # custom name of the client (optional)
         self.client_version = gremlin.shared_state.application_version if auto else None # version of the client (optional)
         self.client_timestamp = gremlin.shared_state.application_start_time if auto else None # start time of the client (optional)
 
+    def getClientName(self):
+        ''' gets the client name custom or system'''
+        return self.custom_name if self.custom_name else self.client_name
+
     @staticmethod
     def fromData(
-                 client_id,
-                 client_name,
-                 client_version = None,
-                 client_timestamp = None):
+                 client_id : int,
+                 client_name : str,
+                 custom_name : str,
+                 client_version : str = None,
+                 client_timestamp : int = None):
         self = ClientData(False)
         self.client_name = client_name
+        self.custom_name = custom_name
         self.client_id = client_id
         self.client_version = client_version
         self.client_timestamp = client_timestamp
+
         return self
 
     def toPayload(self) -> dict:
@@ -1255,6 +1280,7 @@ class ClientData():
         return {
             'client_id' : self.client_id,
             'client_name' : self.client_name,
+            'client_custom' : self.custom_name,
             'client_version' : self.client_version,
             'client_timestamp' : self.client_timestamp
         }
@@ -1265,6 +1291,7 @@ class ClientData():
         cd = ClientData(auto = False)
         cd.client_id = data['client_id']
         cd.client_name = data['client_name']
+        cd.custom_name = data['client_custom']
         cd.client_version = data['client_version']
         cd.client_timestamp =  data['client_timestamp']
         return cd
@@ -1276,8 +1303,12 @@ class ClientData():
             return time.time() - self.client_timestamp
         return None
 
+    def __hash__(self):
+        return hash((self.client_id, self.client_name, self.custom_name, self.client_version))
+
     def __str__(self):
-        return f"client: [{self.client_name}]/[{self.client_id}]"
+        stub = f"({self.custom_name})" if self.custom_name else ''
+        return f"client: {stub}[{self.client_name}]/[{self.client_id}]"
 
 @gremlin.singleton_decorator.SingletonDecorator
 class RemoteControl():
@@ -1297,17 +1328,18 @@ class RemoteControl():
         el.broadcast_changed.connect(self._broadcast_changed)
         self._instance_id = uuid.getnode() # unique ID of the host based on the mac address
         self._instance_name = socket.gethostname()
+        self._custom_name = config.custom_host_name # custom host name
 
         # map of clients
         self._clients = {}
         
-        # register self
+        # register self on start
         self.registerClient(ClientData.fromData(self._instance_id,
                                                 self._instance_name,
+                                                self._custom_name,
                                                 gremlin.shared_state.application_version,
                                                 gremlin.shared_state.application_start_time))
 
-        
 
     @property
     def serverRunning(self) -> bool:
@@ -1336,12 +1368,23 @@ class RemoteControl():
     def registerClient(self, data : ClientData):
         ''' registers a client '''
         client_id = data.client_id
-        if not client_id in self._clients:
+        changed = False
+        if client_id in self._clients:
+            # client already exists, detect changes
+            client = self._clients[client_id]
+            if client != data:
+                # at least one param changed
+                self._clients[client_id] = data
+                changed = True
+        else:                
+            changed = True
             self._clients[client_id] = data
             # fire an update event
+
+        if changed:
             el = gremlin.event_handler.EventListener()
             verbose = gremlin.config.Configuration().verbose_mode_remote
-            if verbose: syslog.info(f"RPC: new client registered: {data}")
+            if verbose: syslog.info(f"RPC: new/updated client registered: {data}")
             
             el.remote_control_client_change.emit()
 
@@ -1567,8 +1610,9 @@ class PacketData:
 
 
 class RemoteClientData():
-    def __init__(self, client_name : str = None, client_id : int = 0, client_version : str = None, selected : bool = False):
+    def __init__(self, client_name : str = None, custom_client_name : str = None, client_id : int = 0, client_version : str = None, selected : bool = False):
         self.client_name = client_name # client to send the data to (we store the name) - None = ANY
+        self.custom_name = custom_client_name
         self._client_id = 0
         self.client_id = client_id # client MAC address (the client ID may change session to session) - None = ANY
         self.client_version = client_version
@@ -1576,12 +1620,17 @@ class RemoteClientData():
         self.discovered = False # true if discovered on the network
     
      
+    def getClientName(self) -> str:
+        ''' gets the custom or host name '''
+        return self.custom_name if self.custom_name else self.client_name
+
     @staticmethod
     def fromClientData(client : ClientData):
         self = RemoteClientData()
         self.client_name = client.client_name
         self.client_id = client.client_id
         self.client_version = client.client_version
+        self.custom_name = client.custom_name
         return self
     
     @property
@@ -1599,6 +1648,8 @@ class RemoteClientData():
         # only save selected clients
         if self.client_name:
             node.set("client-name", self.client_name)
+        if self.custom_name:
+            node.set("custom-name", self.custom_name)
         if self.client_id:
             node.set("client-id", safe_format(self.client_id, int))
         node.set("selected", safe_format(self.selected, bool))
@@ -1609,6 +1660,8 @@ class RemoteClientData():
         ''' reads from the xml node - the node should be the parent node '''
         if "client-name" in node.attrib:
             self.client_name = node.get("client-name")
+        if "custom-name" in node.attrib:
+            self.custom_name = node.get("custom-name")
         if "client-id" in node.attrib:
             client_id = node.get("client-id")
             if client_id == "any":
@@ -1706,12 +1759,18 @@ class RemoteConfig():
         if clients:
             # update clients
             for client_id in clients:
+                client : ClientData = clients[client_id]
                 if not client_id in self._clients:
-                    client : ClientData = clients[client_id]
                     # if verbose: syslog.info(f"RPC: config: register new client [{client.client_name}]")
-                    self.addClient(client.client_name, client.client_id, client.client_version)
+                    self.addClient(client.client_name, client.client_id, client.client_version, client.custom_name)
                     client.discovered = True
                     changed = True
+                else:
+                    c1 : RemoteClientData = self._clients[client_id]
+                    # record changes
+                    if c1.custom_name != client.custom_name:
+                        c1.custom_name = client.custom_name
+                        changed = True
 
 
             client : RemoteClientData
@@ -1809,14 +1868,14 @@ class RemoteConfig():
     def getLocalClientId(self):
         return remote_control.getLocalClientId()
    
-    def addClient(self, client_name : str, client_id : str, client_version : str = None) -> RemoteClientData:
+    def addClient(self, client_name : str,  client_id : str, client_version : str = None, custom_name : str = None) -> RemoteClientData:
         ''' adds a new client to the config if it doesn't exist, can also update the name  '''
         if client_id in self._clients:
             client = self._clients[client_id]
             if client.client_name != client_name:
                 client.client_name = client_name
         else:
-            client = RemoteClientData(client_name, client_id, client_version)
+            client = RemoteClientData(client_name, custom_name, client_id, client_version)
             self._clients[client_id] = client
 
         return client
@@ -1843,22 +1902,12 @@ class RemoteConfig():
         self.ensureAnyClient()
         client_list = [client for client in self._clients.values()]
         if client_list:
-            client_list.sort(key = lambda x: x.client_name.casefold() if x.client_name else '')
+            client_list.sort(key = lambda x: x.getClientName().casefold() if x.getClientName() else '')
         return client_list
    
     def getClientCount(self) -> int:
         ''' gets the number of clients '''
         return len(self._clients)
-
-   
-    def refreshClients(self) -> list:
-        ''' gets a list of currently connected clients '''
-        items = [(name, id) for id, name in remote_control.getClients()]
-        for client_name, client_id in items:
-            client = self.getClient(client_id)
-            if not client:
-                # add it
-                self.addClient(client_name, client_id)
 
     def getSelectedCount(self) -> int:
         ''' returns the number of selected clients '''

@@ -469,6 +469,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.setMinimumWidth(400)
         self._max_content_width = 800
         
+        self._custom_host_name = self.config.custom_host_name # to detect changes 
 
         self.setWindowTitle("Options")
 
@@ -577,6 +578,9 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         # change the host ip if needed
         el.host_ip_changed.emit(self._host_ip)
+
+        if self._custom_host_name != self.config.custom_host_name:
+            el.remote_control_identify.emit() # indicate client name changed
 
 
 
@@ -1121,6 +1125,7 @@ class OptionsUi(ui_common.BaseDialogUi):
 
     # --------------------------------------------------------------------------------------------------------------------
     def _create_remote_control_page(self):
+        import gremlin.remote
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
         page_widget.setMaximumWidth(self._max_content_width)
 
@@ -1143,8 +1148,18 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.enable_remote_broadcast_widget.clicked.connect(self._enable_remote_broadcast)
         self.enable_remote_broadcast_widget.setToolTip("When set, this instance is a master control instance and sends data to local network clients")
 
+        
+
         page_layout.addWidget(self.enable_remote_control_widget)
         page_layout.addWidget(self.enable_remote_broadcast_widget)
+
+        host_widget = gremlin.ui.ui_common.QLineEdit(text = gremlin.remote.remote_client.clientName, readonly = True)
+        widget = gremlin.ui.ui_common.getHContainer(host_widget, "Host Name:", widget_only=True,tooltip = "Client host name (system defined)")
+        page_layout.addWidget(widget)
+
+        self.custom_host_widget = gremlin.ui.ui_common.QLineEdit(text = self.config.custom_host_name, callback = self._handle_custom_host_changed)
+        widget = gremlin.ui.ui_common.getHContainer(self.custom_host_widget, "Custom Client Name:", widget_only=True,tooltip = "Custom client name (leave bank to use host name)")
+        page_layout.addWidget(widget)
 
         self.remote_control_server_all_ip_widget = QtWidgets.QCheckBox("All IPs")
         self.remote_control_server_all_ip_widget.setToolTip("Bind unicast to all IPs")
@@ -1208,6 +1223,9 @@ There should only be one GremlinEx master server on the subnet.
 
         self.remote_control_select_ip_widget.setEnabled(enabled)
         self.remote_control_server_widget.setEnabled(enabled)
+
+    def _handle_custom_host_changed(self, value : str):
+        self.config.custom_host_name = value
 
     def _handle_reset_hidden(self, widget):
         self.config.resetVisualHidden()

@@ -1644,20 +1644,24 @@ class QLineEdit(QtWidgets.QLineEdit):
 
     focusOut = QtCore.Signal()
 
-    def __init__(self, text = None, callback = None, parent = None, tooltip = None):
+    def __init__(self, text : str = None, callback = None, parent = None, tooltip : str = None, readonly : bool = None):
         super().__init__(text = text, parent = parent)
         self._callback = callback
         self.focusOut.connect(self._handle_text_changed)
         if tooltip:
             self.setToolTip(tooltip)
+        if readonly is not None:
+            self.setReadOnly(readonly)
 
-    def _handle_text_changed(self, value : str):
+    def _handle_text_changed(self):
         if self._callback:
-            self._callback(value)
+            self._callback(self.text())
 
     def focusOutEvent(self, event):
         self.focusOut.emit()
         return super().focusOutEvent(event)
+    
+
 
 
 class QFloatLineEdit(QtWidgets.QWidget):
@@ -14261,17 +14265,21 @@ class RemoteClientWidget(QtWidgets.QWidget):
 
         any_selected = config.anySelected()
 
+        used_names = []
         for client in clients:
             #if verbose: syslog.info(f"got client: [{client.client_name}]")
             if client.client_id != 0:
                 # only add the specific connected clients
-                # if verbose: syslog.info(f"adding client: {client.client_name}")
+                client_name = client.getClientName()
+                if client_name in used_names:
+                    # custom name duplicated
+                    client_name = f"{client.custom_name} [{client.client_name}]"
+                used_names.append(client_name)
                 if client.client_id == client_id:
                     # local
-                    client_name = f"{client.client_name} (self)"
+                    client_name = f"{client_name} (self)"
                     enabled = False # cannot send to self but display the data
                 else:
-                    client_name = client.client_name
                     enabled = not any_selected
                 widget = QDataCheckbox(client_name,
                                         data = client.client_id,

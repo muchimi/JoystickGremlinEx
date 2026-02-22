@@ -1001,9 +1001,17 @@ class Configuration(QtCore.QObject):
     @enable_remote_broadcast.setter
     def enable_remote_broadcast(self, value):
         ''' remote broadcast master switch enable '''
-        import gremlin.event_handler
         if type(value) == bool and self._get_data("enable_remote_broadcast",False)!= value:
             self._set_data("enable_remote_broadcast", value)
+
+    @property
+    def custom_host_name(self) -> str:
+        ''' custom host name for the host '''
+        return self._get_data("custom_host_name", None)
+    @custom_host_name.setter
+    def custom_host_name(self, value : str):
+        self._set_data("custom_host_name", value)
+
 
     def remoteEnabled(self) -> bool:
         return self.enable_remote_broadcast or self.enable_remote_control 
