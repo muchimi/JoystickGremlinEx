@@ -798,7 +798,7 @@ class Wiggle():
 
 
         msg = "local wiggle mode on"
-        gremlin.remote.remote_state.say(msg)
+        gremlin.remote.remote_control.say(msg)
 
         if self._step_count > 0:
             while not self._wiggle_local_stop_requested.is_set():
@@ -815,7 +815,7 @@ class Wiggle():
                 time.sleep(0.1)
             
         syslog.debug("Wiggle local stop...")
-        gremlin.remote.remote_state.say("local wiggle mode off")
+        gremlin.remote.remote_control.say("local wiggle mode off")
 
 
     def _wiggle_remote(self):
@@ -823,7 +823,7 @@ class Wiggle():
         syslog.debug("Wiggle remote start...")
 
         msg = "remote wiggle mode on"
-        gremlin.remote.remote_state.say(msg)
+        gremlin.remote.remote_control.say(msg)
 
         if self._step_count > 0:
             while not self._wiggle_remote_stop_requested.is_set():
@@ -840,7 +840,7 @@ class Wiggle():
             time.sleep(0.1)
             
         syslog.debug("Wiggle remote stop...")
-        gremlin.remote.remote_state.say("remote wiggle mode off")
+        gremlin.remote.remote_control.say("remote wiggle mode off")
 
 
 wiggle = Wiggle()
@@ -866,9 +866,9 @@ def local_wiggle(event):
 @gremlin.input_devices.gremlin_state()
 def state_changed(event):
     ''' called when Gremlin's state changes '''
-    # remote_state.is_remote = event.is_remote
-    # remote_state.is_local = event.is_local
-    # remote_state.is_broadcast = event.is_broadcast_enabled
+    # remote_control.is_remote = event.is_remote
+    # remote_control.is_local = event.is_local
+    # remote_control.is_broadcast = event.is_broadcast_enabled
 
 # init function when profile is starting
 @gremlin.input_devices.gremlin_start()

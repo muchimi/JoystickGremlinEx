@@ -893,7 +893,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         return f"Sequence: {" -> ".join([", ".join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
 
 
-class SequenceContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
+class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     def __init__(self, container : SequenceContainer, parent = None):
         super().__init__(container, parent)

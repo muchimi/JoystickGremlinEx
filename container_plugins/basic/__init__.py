@@ -25,10 +25,9 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.clipboard
 import gremlin.types
-from gremlin.base_profile import AbstractContainer
+from gremlin.base_profile import AbstractContainer, AbstractFunctor
 import gremlin.execution_graph
 from gremlin.ui.input_item import AbstractContainerWidget
-from gremlin.base_conditions import AbstractFunctor
 from shiboken6 import Shiboken
 import logging
 

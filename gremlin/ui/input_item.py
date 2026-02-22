@@ -1501,8 +1501,13 @@ class ActionSetView(ui_common.AbstractView):
                 if verbose_ui: syslog.info(f"ActionSet: redraw cleanup start: {object_name}")
                 for widget in widgets:
                     cache.clearWidget(widget)
-                    if hasattr(widget,"_cleanup_ui"):
-                        widget._cleanup_ui()
+                    gremlin.util.delete_widget(widget)
+                    # if hasattr(widget,"unhook"):
+                    #     widget.unhook()
+                    # if hasattr(widget,"_cleanup_ui"):
+                    #     widget._cleanup_ui()
+
+
                     widget.hide()
                     widget.setParent(None)
                     widget.deleteLater()
@@ -1564,6 +1569,8 @@ class ActionSetView(ui_common.AbstractView):
                 clipboard.enable()
 
             if verbose_ui: syslog.info(f"ActionSet: redraw complete: {object_name}")
+        # except:
+        #     pass
         finally:
             self._redraw_lock = False
 
@@ -3864,7 +3871,6 @@ class AbstractActionWidget(QtWidgets.QFrame):
         self._create(action_data)
         self._create_ui()
         self._populate_ui()
-        
 
     @QtCore.Slot(object)
     def _action_delete(self, input_item, container, action):

@@ -140,7 +140,7 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
     
     def getActionFunctors(self):
         functor_list = self.getFunctors()
-        return [functor for functor in functor_list if isinstance(functor, gremlin.base_conditions.AbstractFunctor)]
+        return [functor for functor in functor_list if isinstance(functor, gremlin.base_profile.AbstractFunctor)]
         
     @property
     def is_condition(self) -> bool:
@@ -1239,12 +1239,12 @@ class ExecutionContext():
 
     def _get_container_functor(self, container, node):
         ''' creates a functor instance of a container '''
-        functor : gremlin.base_conditions.AbstractFunctor = container.functor(container, node)
+        functor : gremlin.base_profile.AbstractFunctor = container.functor(container, node)
         return functor
 
     def _get_action_functor(self, action, node, container_condition_node, action_condition_node):
         ''' creates a functor instance for an action '''
-        functor : gremlin.base_conditions.AbstractFunctor = action.functor(action, node)
+        functor : gremlin.base_profile.AbstractFunctor = action.functor(action, node)
          
         extra_inputs = functor.latch_extra_inputs(container_condition_node, action_condition_node)
         if extra_inputs:
@@ -1268,7 +1268,7 @@ class ExecutionContext():
         return functor
     
     def _get_gate_action_functor(self, action, node):
-        functor : gremlin.base_conditions.AbstractFunctor = self._get_action_functor()
+        functor : gremlin.base_profile.AbstractFunctor = self._get_action_functor()
         event = gremlin.event_handler.Event(
                     event_type= gremlin.input_types.InputType.VirtualButton,
                     device_guid = gremlin.shared_state.virtual_device_guid,
@@ -1966,7 +1966,7 @@ class ExecutionContext():
                 result = True
                 for functor in container_functors:
                     result = self.process_functor(functor, event, value, extra_data, manual)
-                    if isinstance(functor, gremlin.base_conditions.AbstractTriggerFunctor):
+                    if isinstance(functor, gremlin.base_profile.AbstractTriggerFunctor):
                         # do not execute other items because the functor self triggers subsequent nodes as needed
                         return True
                     if not result:
@@ -2565,7 +2565,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                 
 
             # Create action functor
-            functor : gremlin.base_conditions.AbstractFunctor = action.functor(action, nodes[action])
+            functor : gremlin.base_profile.AbstractFunctor = action.functor(action, nodes[action])
             extra_inputs = functor.latch_extra_inputs()
             if extra_inputs:
                 # register the extra inputs for this functor

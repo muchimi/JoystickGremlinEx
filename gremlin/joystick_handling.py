@@ -391,7 +391,7 @@ def set_button(guid, index : int, is_pressed : bool, update_remote : bool = Fals
         proxy[vjoy_id].button(index).is_pressed = is_pressed
 
         if update_remote:
-            (_, is_remote) = gremlin.remote.remote_state.state
+            (_, is_remote) = gremlin.remote.remote_control.state
             if is_remote:
                 remote_client = gremlin.remote.remote_client
                 remote_client.send_button(vjoy_id, index, is_pressed)
@@ -419,7 +419,7 @@ def set_axis(guid, index : int, value : float, update_remote : bool = False):
             proxy[vjoy_id].axis(index).value = value
 
             if update_remote:
-                (_, is_remote) = gremlin.remote.remote_state.state
+                (_, is_remote) = gremlin.remote.remote_control.state
                 if is_remote:
                     remote_client = gremlin.remote.remote_client
                     remote_client.send_axis(vjoy_id, index, value)

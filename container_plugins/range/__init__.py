@@ -482,7 +482,7 @@ class RangeReleaseTrigger():
     def __hash__(self):
         return hash(self.id)
 
-class RangeContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
+class RangeContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     """Executes the contents of the associated range container."""
 

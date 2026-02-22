@@ -242,7 +242,7 @@ class RepeatContainerWidget(AbstractContainerWidget):
         return title
 
 
-class RepeatContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
+class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     """Executes the contents of the associated Repeat container."""
 

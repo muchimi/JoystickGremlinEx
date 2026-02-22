@@ -18,7 +18,7 @@
 import json
 import logging
 import time
-import os
+import os, shutil
 import re
 import sys
 import traceback
@@ -44,9 +44,15 @@ class Configuration(QtCore.QObject):
 
     changed = Signal(str, object) # fires on some configuration value changes, passes the method to get the value that has changed
 
-    def get_config(self):
+    def get_config(self) -> str:
         ''' local config file (version based)'''
         return os.path.join(self.data_path(), "config.json")
+    
+    def get_backup_config(self) -> str:
+        import gremlin.util
+        fname =  gremlin.util.swap_ext(self.get_config(), suffix = ".backup")
+        return fname
+
  
 
     def get_profile_config(self):
@@ -131,7 +137,71 @@ class Configuration(QtCore.QObject):
             sys.exit(-1)
 
 
+    def backup(self) -> bool:
+        ''' backs the config up '''
+        import gremlin.util
+        backup_fname = self.get_backup_config()
+        try:
 
+            if os.path.isfile(backup_fname):
+                # backup to an alternate file
+                max_count = 5 # number of backups to maintain
+                index = 1
+                flist = [backup_fname]
+                c1 = gremlin.util.swap_ext(backup_fname, suffix=f".{index}")
+                while os.path.isfile(c1):
+                    flist.append(c1)
+                    index += 1
+                    c1 = gremlin.util.swap_ext(backup_fname, suffix=f".{index}")
+
+                count = len(flist)
+                # cascade the backup files
+                while count > max_count:
+                    c2 = flist.pop()
+                    os.unlink(c2)
+                    count -= 1
+
+                
+
+                alt_backup = c1
+                
+                if alt_backup:
+                    shutil.copy(backup_fname, alt_backup)
+                os.unlink(backup_fname)
+
+            self.save(backup_fname)
+            gremlin.ui.ui_common.MessageBoxInfo(title = "Backup Configuration", prompt = "Backup saved")
+        except:
+            gremlin.ui.ui_common.MessageBoxWarning(title = "Backup Configuration", prompt = "The backup file could not be saved due to a file I/O error.")
+            return False
+        return True
+
+    
+    def restore(self) -> bool:
+        import gremlin.ui.ui_common
+        backup_fname = self.get_backup_config()
+        if os.path.isfile(backup_fname):
+            fname = self.get_config()
+            try:
+                if os.path.isfile(fname):
+                    os.unlink(fname)
+                shutil.copy(backup_fname, fname)
+                syslog.info("CONFIG: backup restored")
+                self._reload()
+                gremlin.ui.ui_common.MessageBoxInfo(title = "Restore Configuration", prompt = "Backup restored")
+            except:
+                gremlin.ui.ui_common.MessageBoxWarning(title = "Restore Configuration", prompt = "The backup file could not be restored due to a file I/O error.")
+                return False
+        else:
+            gremlin.ui.ui_common.MessageBoxWarning(title = "Restore Configuration", prompt = "The backup file could not be restored.\nNo Backup found.")
+            
+        return True
+
+
+
+        
+
+    
 
     def _clean_string(self, value):
         chars = ". "
@@ -294,27 +364,28 @@ class Configuration(QtCore.QObject):
         self.save_profile()
 
 
-    def save(self):
+    def save(self, fname : str = None):
         import gremlin.util
         import gremlin.event_handler
         if QtWidgets.QApplication.instance():
-            gremlin.util.InvokeUiMethod(self._save_ui) # ensure on UI thread
+            gremlin.util.InvokeUiMethod(self._save_ui, fname) # ensure on UI thread
         else:
-            self._save_ui()
+            self._save_ui(fname)
 
         # tell UI of config changes
         
         el = gremlin.event_handler.EventListener()
         el.config_option_changed.emit()
 
-    def _save_ui(self):
+    def _save_ui(self, fname : str = None):
         """Writes the version specific configuration file to disk."""
         if self._lock:
             # ignore concurrent save requests (technically not necessary due to UI thread placement)
             return
         try:
             self._lock = True
-            fname = self.get_config() 
+            if not fname:
+                fname = self.get_config() 
             with open(fname, "w") as hdl:
                 encoder = json.JSONEncoder(sort_keys=True,indent=4)
                 hdl.write(encoder.encode(self._data))
@@ -934,6 +1005,9 @@ class Configuration(QtCore.QObject):
         if type(value) == bool and self._get_data("enable_remote_broadcast",False)!= value:
             self._set_data("enable_remote_broadcast", value)
 
+    def remoteEnabled(self) -> bool:
+        return self.enable_remote_broadcast or self.enable_remote_control 
+
     @property
     def enable_broadcast_speech(self):
         ''' speech on broadcast change mode enable'''
@@ -995,9 +1069,15 @@ class Configuration(QtCore.QObject):
         self._set_data("broadcast_bind_all_ips", value)
     
 
+    @property
+    def master(self) -> bool:
+        return self._get_data("master", False)
+    @master.setter
+    def master(self, value : bool):
+        self._set_data("master", value)
 
     @property
-    def mode_change_message(self):
+    def mode_change_message(self) -> bool:
         """Returns whether or not to show a windows notification on mode change.
 
         :return True if the feature is enabled, False otherwise
@@ -1464,6 +1544,11 @@ class Configuration(QtCore.QObject):
     def verbose_mode_remote(self):
         ''' true if verbose mode is in output mode '''
         return self.verbose and VerboseMode.Remote in self.verbose_mode
+    
+    @property
+    def verbose_mode_remote_extra(self):
+        ''' true if extra remote verbose mode on '''
+        return self.verbose and VerboseMode.Remote in self.verbose_mode and VerboseMode.Extra in self.verbose_mode
         
     @property
     def verbose_mode_tts(self):

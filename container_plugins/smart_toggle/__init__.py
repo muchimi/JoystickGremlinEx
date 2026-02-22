@@ -182,7 +182,7 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         return title
 
 
-class SmartToggleContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
+class SmartToggleContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     """Executes the contents of the associated SmartToggle container."""
 

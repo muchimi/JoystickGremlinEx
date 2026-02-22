@@ -567,7 +567,7 @@ class CodeRunner:
             # mark active
             evt_listener.gremlin_active = True
 
-            # connect remote gremlin client
+            # ensure remote gremlin client connected
             gremlin.remote.remote_server.start()
             gremlin.remote.remote_client.start()
 
@@ -710,8 +710,8 @@ class CodeRunner:
         vjoy_debug.UnHook()
 
         # stop remote client
-        gremlin.remote.remote_client.stop()
-        gremlin.remote.remote_server.stop()
+        # gremlin.remote.remote_client.stop()
+        # gremlin.remote.remote_server.stop()
 
         # call stop function in plugins
         gremlin.input_devices.stop_registry.start()

@@ -231,7 +231,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
             return "Double Tap"
 
 
-class DoubleTapContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
+class DoubleTapContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     """Executes the contents of the associated DoubleTap container."""
 

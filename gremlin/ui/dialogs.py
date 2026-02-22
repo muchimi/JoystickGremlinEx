@@ -1157,6 +1157,14 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.remote_control_server_widget.textChanged.connect(self._remote_control_server_ip_changed)
         self.remote_control_server_widget.setToolTip("Host IP of the broadcast host (local machine IP)")
 
+        self.remote_control_master_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Master",
+            value = self.config.master,
+            callback = self._handle_master_changed,
+            tooltip = "Enable to make this the GremlinEx server on the network.\nClients should point to this machine as the broadcast host.\nOnly one machine should act as the server."
+            )
+        
+
         self.remote_control_select_ip_widget = QtWidgets.QPushButton("Select")
         self.remote_control_select_ip_widget.setToolTip("Selects a different IP address for the GremlinEx Broadcast server if the host has more than one IP address.")
         self.remote_control_select_ip_widget.clicked.connect(self._remote_control_server_ip_select)
@@ -1174,6 +1182,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         widget, _ = ui_common.getHContainer([self.remote_control_server_widget, self.remote_control_select_ip_widget], "Broadcast Server:")
         page_layout.addWidget(widget)
 
+        page_layout.addWidget(self.remote_control_master_widget)
 
         widget, _ = ui_common.getHContainer(self.remote_control_port_widget, "Broadcast Port:")
         page_layout.addWidget(widget)
@@ -2763,6 +2772,10 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def _remote_control_server_ip_changed(self):
         widget = self.sender()
         self.config.broadcast_host_ip = widget.text()
+
+    @QtCore.Slot()
+    def _handle_master_changed(self, checked):
+        self.config.master = checked
 
     @QtCore.Slot(bool)
     def _remote_control_all_ip_changed(self, checked : bool):

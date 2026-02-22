@@ -310,7 +310,7 @@ class TickContainerWidget(AbstractContainerWidget):
             title += f"({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
         return title
 
-class TickContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
+class TickContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     def __init__(self, container : TickContainer, parent = None):
         super().__init__(container, parent)

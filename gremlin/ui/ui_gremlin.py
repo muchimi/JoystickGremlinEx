@@ -104,6 +104,18 @@ class Ui_Gremlin(object):
         self.actionActivate.setObjectName("actionActivate")
         self.actionActivate.setToolTip("Activate Gremlin Ex")
 
+  
+        self.actionBackupConfig = QtGui.QAction(main_window)
+        self.actionBackupConfig.setToolTip("Backup the configuration")
+        self.actionBackupConfig.setText("Config Backup")
+
+        self.actionRestoreConfig = QtGui.QAction(main_window)
+        self.actionRestoreConfig.setToolTip("Restores a configuration from backup")
+        self.actionRestoreConfig.setText("Config Restore")
+
+        
+
+
         self.actionToggleRemoteControl = QtGui.QAction(main_window)
         self.actionToggleRemoteControl.setCheckable(True)
         self.actionToggleRemoteControl.setToolTip("Enable or disable remote control of GremlinEx clients")
@@ -218,6 +230,7 @@ class Ui_Gremlin(object):
         self.menuFile.addAction(self.actionSaveProfile)
         self.menuFile.addAction(self.actionSaveProfileAs)
         #self.menuFile.addSeparator()
+        
         #self.menuFile.addAction(self.actionImportProfile)
        
         #self.menuFile.addSeparator()
@@ -258,6 +271,9 @@ class Ui_Gremlin(object):
         self.menuActions.addAction(self.actionOpenLogFile)
         self.menuActions.addAction(self.actionOpenXmlProfile)
         self.menuActions.addAction(self.actionOpenGremlinExFolder)
+        self.menuActions.addSeparator()
+        self.menuActions.addAction(self.actionBackupConfig)
+        self.menuActions.addAction(self.actionRestoreConfig)
 
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuActions.menuAction())

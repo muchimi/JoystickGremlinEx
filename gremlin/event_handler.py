@@ -103,7 +103,9 @@ class Event:
 		"is_repeater",
 		"override_input_type",
 		"extra_data",
-		"timestamp"
+		"timestamp",
+		"is_remote",
+		"client_list"
 
 
 	]
@@ -125,6 +127,8 @@ class Event:
 			mode = None, # mode to fire the event on - leave null for current mode,
 			override_input_type = None,
 			extra_data : dict = None, # extra data to pass on (dict)
+			is_remote : bool = False, # true if remote
+			client_list = None, # list of remote clients if remote
 	):
 		"""Creates a new Event object.
 
@@ -160,6 +164,8 @@ class Event:
 		self.override_input_type = override_input_type # override input type - used as the input type for actions 
 		self.extra_data = extra_data
 		self.timestamp = time.time()
+		self.is_remote = is_remote
+		self.client_list = client_list
 
 
 	# @property
@@ -835,6 +841,11 @@ class EventListener:
 	process_manual_event = Signal(object, object, object) # fires when a manual event should be processed (event, value, extra_data)
 
 	reload_axis_state = Signal() # sent when input items should re-register their axes with AxisState
+
+	remote_control_client_change = Signal() # emits when the list of network clients changes via network activity (clients reporting in)
+	remote_config_client_change = Signal() # emits when list of configured clients changes
+	remote_control_state_change = Signal() # called when the remote control server status changes
+	remote_control_identify = Signal() # emits when a client needs to get a current list of clients on the network (this will update all clients)
 
 	def __init__(self):
 		"""Creates a new instance."""

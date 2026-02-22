@@ -4096,10 +4096,7 @@ class RangeInfoWidget(QtWidgets.QWidget):
 
 
         self.range_widget = gremlin.ui.ui_common.QDataLabel() #  gremlin.ui.ui_common.QDataLineEdit()
-
-        #self.range_widget.setStyleSheet("background: red;")
         
-        #self.range_widget.setReadOnly(True)
         self.range_widget.data = (rng, self.range_widget)
         self.setup_widget = gremlin.ui.ui_common.QDataPushButton(data = rng)
         

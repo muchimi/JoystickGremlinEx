@@ -22,19 +22,17 @@ import time
 import threading
 import anytree
 import os
-from typing import Optional
+
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
-from typing import NamedTuple
 
 
 import gremlin.config
 import gremlin.error
 import qtawesome as qta
-import gremlin.event_handler
+
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
-import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.shared_state
@@ -63,9 +61,11 @@ import gremlin.util
 import gremlin.ui.ui_common
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import HatDirection
+import gremlin.remote
 from dinput import DeviceSummary
 import psygnal
 from psygnal import Signal
+import gremlin.event_handler
 
 syslog = logging.getLogger("system")
 
@@ -154,7 +154,7 @@ class Color():
         return "#66612f" if gremlin.shared_state.is_dark_theme else "#FFF4B0"
     @staticmethod
     def borderColor():
-        return "#444444" if gremlin.shared_state.is_dark_theme else "#111111"
+        return "#585858" if gremlin.shared_state.is_dark_theme else "#111111"
     @staticmethod
     def menuSeparatorColor():
         return "#CACACA" if gremlin.shared_state.is_dark_theme else "#111111"
@@ -495,6 +495,22 @@ class Color():
             QListView {{
                 border: 1px solid {border_color};
             }}
+
+          
+
+            QGroupBox::indicator:checked {{
+                image: url({relative_path}{checkbox_checked});
+            }}
+            QGroupBox::indicator:unchecked {{
+                image: url({relative_path}{checkbox_unchecked}); 
+                width: 18px;
+                height: 18px;
+            }}
+            QGroupBox  {{
+                border: 1px solid {border_color};
+                margin-top: 27px;
+            }}
+         
 
 
             '''
@@ -903,7 +919,7 @@ class Pixmaps():
         off_icon = load_icon("mdi.checkbox-blank-circle",use_qta=True,qta_color=Color.offColor())
         self.offIconPixmap = off_icon.pixmap(self._icon_size)
         self.warningIconPixmap =  Icons.to_pixmap(Icons.warningIcon(), pixels = 24)
-        icon = gremlin.ui.ui_common.Icons.horizontalSeparatorIcon()
+        icon = Icons.horizontalSeparatorIcon()
         self.horizontalSeparatorPixmap = icon.pixmap(QtCore.QSize(24,24))
 
 
@@ -1176,6 +1192,7 @@ class DeviceWidgetTracker():
 @SingletonDecorator
 class StateTracker():
     def __init__(self):
+        
         self._axis_cache = {}
         
         self._button_cache = {}
@@ -1508,10 +1525,6 @@ class AbstractModel(QtCore.QAbstractItemModel):
     data_changed = Signal()
 
     def __init__(self, parent=None):
-        """Creates a new model.
-
-        :param parent the parent of this model
-        """
         super().__init__(parent)
 
     def rows(self):
@@ -2564,7 +2577,7 @@ class AbstractInputSelector(QtWidgets.QWidget):
         )
 
     def _create_device_dropdown(self):
-        self.device_dropdown = gremlin.ui.ui_common.QDataComboBox(self)
+        self.device_dropdown = QDataComboBox(self)
         for device in self.device_list:
             self.device_dropdown.addItem(self._format_device_name(device))
             self._device_id_registry.append(self._device_identifier(device))
@@ -2772,7 +2785,7 @@ class ActionSelector(QtWidgets.QWidget):
         """
         super().__init__(parent)
         import gremlin.base_profile
-        import gremlin.ui.ui_common
+        
 
         # if not input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
         #     pass
@@ -2782,7 +2795,7 @@ class ActionSelector(QtWidgets.QWidget):
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
         self._input_type = input_type if input_type else self._input_item.getInputType()
 
-        self.action_dropdown = gremlin.ui.ui_common.QDataComboBox()
+        self.action_dropdown = QDataComboBox()
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
         self.refresh()
         
@@ -2793,7 +2806,7 @@ class ActionSelector(QtWidgets.QWidget):
         # self.help_widget = Buttons.getHelpWidget(callback = self._handle_help)
 
         # clipboard
-        self.paste_button = gremlin.ui.ui_common.Buttons.getPasteWidget(callback=self._paste_action)
+        self.paste_button = Buttons.getPasteWidget(callback=self._paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste Action")
 
@@ -2856,6 +2869,7 @@ class ActionSelector(QtWidgets.QWidget):
 
     def _action_changed(self):
         ''' remember the last selection '''
+        
         if not Shiboken.isValid(self):
             return
         name = self.action_dropdown.currentText()
@@ -2905,7 +2919,7 @@ class ActionSelector(QtWidgets.QWidget):
         else:
             hint = gremlin.hints.hint.get(action.tag, "")  
         if hint:
-            gremlin.ui.ui_common.MessageBox(title = f"About the {action_name} action:", prompt = hint, width = 300, is_warning=False)
+            MessageBox(title = f"About the {action_name} action:", prompt = hint, width = 300, is_warning=False)
 
 
 
@@ -2949,7 +2963,7 @@ class ActionSelector(QtWidgets.QWidget):
             return
         
 
-        valid_actions = self._valid_action_list(self.input_type)
+        valid_actions = self._valid_action_list(self._input_type)
         warning = False
         for action in action_list:
             if action.name in valid_actions:
@@ -3079,6 +3093,7 @@ class ModeWidget(QtWidgets.QWidget):
 
         :param parent the parent widget
         """
+        
         QtWidgets.QWidget.__init__(self, parent)
 
         self.mode_list = []
@@ -3097,7 +3112,7 @@ class ModeWidget(QtWidgets.QWidget):
 
     def setRuntimeDisabled(self, value):
         ''' enables or disables profile runtime behavior'''
-
+        
         el = gremlin.event_handler.EventListener()
         try:
             if value:
@@ -3232,7 +3247,7 @@ class ModeWidget(QtWidgets.QWidget):
         )
 
         self.profile_options_button_widget = QtWidgets.QPushButton()
-        self.profile_options_button_widget.setIcon(gremlin.ui.ui_common.Icons.gearIcon())
+        self.profile_options_button_widget.setIcon(Icons.gearIcon())
         self.profile_options_button_widget.setToolTip("Profile Options")
         self.profile_options_button_widget.clicked.connect(self._profile_options_cb)
 
@@ -3281,7 +3296,7 @@ class ModeWidget(QtWidgets.QWidget):
         import gremlin.ui.dialogs
         import gremlin.ui.ui_common
         if not self.profile.profile_file or not os.path.isfile(self.profile.profile_file):
-            gremlin.ui.ui_common.MessageBox(prompt = "Please save the profile before setting options.")
+            MessageBox(prompt = "Please save the profile before setting options.")
             return
 
         dialog = gremlin.ui.dialogs.ProfileOptionsUi()
@@ -3428,6 +3443,7 @@ class InputListenerWidget(QBoxFrame):
         :param callback : callback on selection
         :param parent the parent widget of this widget
         """
+        
         super().__init__(parent)
         from gremlin.keyboard import key_from_code, key_from_name
         self._event_types = event_types
@@ -3456,7 +3472,7 @@ class InputListenerWidget(QBoxFrame):
 
         if self._multi_keys:
             self.main_layout.addWidget(QtWidgets.QLabel("<center>Multi-Key/Mouse Listen Mode</center>"))
-            self.repeater_container_widget, self.repeater_container_layout = gremlin.ui.ui_common.getHContainer()
+            self.repeater_container_widget, self.repeater_container_layout = getHContainer()
             self.repeater_container_widget.setMinimumHeight(32)
             self.repeater_container_layout.addWidget(QtWidgets.QLabel("<i>waiting for input...</i>",alignment= QtCore.Qt.AlignmentFlag.AlignHCenter))
             self.main_layout.addWidget(self.repeater_container_widget)
@@ -3467,9 +3483,9 @@ class InputListenerWidget(QBoxFrame):
 
         if self._multi_keys:
             
-            self.cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback = self._cancel)
-            self.ok_widget = gremlin.ui.ui_common.Buttons.getOkWidget(callback = self._accept)
-            widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], widget_only = True)
+            self.cancel_widget = Buttons.getCancelWidget(callback = self._cancel)
+            self.ok_widget = Buttons.getOkWidget(callback = self._accept)
+            widget = getHContainer([self.ok_widget, self.cancel_widget], widget_only = True)
             self.main_layout.addWidget(widget, alignment= QtCore.Qt.AlignmentFlag.AlignHCenter)
             msg = f"""<center>Press Ok to accept, Cancel to quit.</center>"""
         else:
@@ -3503,6 +3519,7 @@ class InputListenerWidget(QBoxFrame):
 
     def unhook(self):
         ''' called on widget destruction '''
+        
         el = gremlin.event_handler.EventListener()
         el.keyboard_event.disconnect(self._kb_event_cb)
         el.joystick_event_ui.disconnect(self._joy_event_cb)
@@ -3710,6 +3727,7 @@ class InputListenerWidget(QBoxFrame):
 
     def closeEvent(self, evt):
         """Closes the overlay window."""
+        
         event_listener = gremlin.event_handler.EventListener()
         event_listener.keyboard_event.disconnect(self._kb_event_cb)
         if InputType.JoystickAxis in self._event_types or \
@@ -3850,7 +3868,7 @@ class ConfirmPushButton(QtWidgets.QPushButton):
         message_box = QtWidgets.QMessageBox()
         # pixmap = load_pixmap("warning.svg")
         # pixmap = pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio)
-        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
+        pixmap = Icons.to_pixmap(Icons.warningIcon())
         message_box.setIconPixmap(pixmap)
         message_box.setText(self.title)
         message_box.setInformativeText(self.prompt)
@@ -3947,15 +3965,15 @@ def _message_box_ui(title = "Notice", prompt = "Operation", informative_text = N
     match mode:
         case "warning":
             # warning icon
-            icon = gremlin.ui.ui_common.Icons.warningIcon()
+            icon = Icons.warningIcon()
         case "question" | "yesno":
-            icon = gremlin.ui.ui_common.Icons.questionIcon()
+            icon = Icons.questionIcon()
             buttons = QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
         case "okcancel":
-            icon = gremlin.ui.ui_common.Icons.questionIcon()
+            icon = Icons.questionIcon()
             buttons = QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel
         case _:
-            icon = gremlin.ui.ui_common.Icons.infoIcon()
+            icon = Icons.infoIcon()
 
         
     pixmap = icon.pixmap(48)
@@ -4151,6 +4169,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         self.stateChanged.connect(self._handle_clicked)
         if tooltip:
             self.setToolTip(tooltip)
+
 
     def _handle_clicked(self):
         checked = self.isChecked()
@@ -4377,16 +4396,16 @@ class QReorderToolbar(QtWidgets.QWidget):
 
         self.setContentsMargins(0,0,0,0)
 
-        self.up_widget = gremlin.ui.ui_common.QIconButton(data = "up", icon = "ph.caret-circle-up-light", tooltip="Move up")
+        self.up_widget = QIconButton(data = "up", icon = "ph.caret-circle-up-light", tooltip="Move up")
         self.up_widget.clicked.connect(self._move)
         
-        self.down_widget = gremlin.ui.ui_common.QIconButton(data = "down", icon = "ph.caret-circle-down-light", tooltip = "Move down")
+        self.down_widget = QIconButton(data = "down", icon = "ph.caret-circle-down-light", tooltip = "Move down")
         self.down_widget.clicked.connect(self._move)
 
-        self.top_widget = gremlin.ui.ui_common.QIconButton(data = "top", icon = "ph.caret-circle-double-up-light", tooltip = "Move top")
+        self.top_widget = QIconButton(data = "top", icon = "ph.caret-circle-double-up-light", tooltip = "Move top")
         self.top_widget.clicked.connect(self._move)
 
-        self.bottom_widget = gremlin.ui.ui_common.QIconButton(data = "bottom", icon = "ph.caret-circle-double-down-light",  tooltip = "Move bottom")
+        self.bottom_widget = QIconButton(data = "bottom", icon = "ph.caret-circle-double-down-light",  tooltip = "Move bottom")
         self.bottom_widget.clicked.connect(self._move)
 
         self._index = index
@@ -4568,6 +4587,18 @@ class QDataComboBox(QComboBox):
         if tooltip:
             self.setToolTip(tooltip)
 
+    def setSource(self, source, value = None):
+        ''' sets the source of the combo box as a list of (name, data)'''
+        self.clear()
+        if source:
+            for display, item in source:
+                self.addItem(display, item)
+        if value:
+            index = self.findData(value)
+            if index != -1:
+                self.setCurrentIndex(index)
+
+
     def _handle_callback(self):
         if self._callback:
             with QtCore.QSignalBlocker(self):
@@ -4578,6 +4609,7 @@ class QDataComboBox(QComboBox):
 
     
     def eventFilter(self, widget, event):
+        
         if not self._wheel_enabled:
             t = event.type()
             if t == QtCore.QEvent.Type.Wheel:
@@ -4585,7 +4617,7 @@ class QDataComboBox(QComboBox):
                 if not gremlin.event_handler.EventListener().get_shifted_state():
                     return True # skip the event
         return super().eventFilter(widget, event)
-        
+
     def setWheelEnabled(self, value : bool):
         ''' enables/disables the wheel function to change'''
         self._wheel_enabled = value
@@ -4935,6 +4967,7 @@ class QProgressBar(QtWidgets.QWidget):
 
     def _update_tooltip(self, value):
         ''' updates the tooltip for the repeater '''
+        
         stub = None
         if isinstance(value, gremlin.event_handler.AxisValues):
             # calibration data
@@ -4976,6 +5009,7 @@ class QProgressBar(QtWidgets.QWidget):
         return self._value
         
     def eventFilter(self, widget, event):
+        
         if self._readOnly:
             # ignore
             return super().eventFilter(widget, event)
@@ -5771,6 +5805,44 @@ class ButtonStateWidget(QtWidgets.QWidget):
         ''' value '''
         self._update_value(is_pressed)
 
+class QOnOffStatusfWidget(QtWidgets.QWidget):
+    ''' on/off widget '''
+    def __init__(self, state : bool = False, on_icon : str = None, off_icon : str = None, tooltip : str = None, parent=None):
+        super().__init__(parent)
+        self._button_widget = QtWidgets.QLabel()
+        self._button_widget.setContentsMargins(0,0,0,0)
+        self._button_widget.setFixedWidth(20)
+        self.setFixedWidth(22)
+        icon_size = QtCore.QSize(16,16)
+        if on_icon:
+            icon = load_icon(on_icon,use_qta=True,qta_color=Color.onColor())
+            self._on_pixmap = icon.pixmap(icon_size)
+        else:
+            self._on_pixmap = Pixmaps().onIconPixmap
+
+        if off_icon:
+            icon = load_icon(off_icon,use_qta=True,qta_color=Color.offColor())
+            self._off_pixmap = icon.pixmap(icon_size)
+        else:
+            self._off_pixmap = Pixmaps().offIconPixmap
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.addWidget(self._button_widget)
+        self._set_state_ui(state)
+
+        if tooltip:
+            self.setToolTip(tooltip)
+        
+
+    def setState(self, state : bool):
+        gremlin.util.InvokeUiMethod(self._set_state_ui, state)
+
+    def _set_state_ui(self, state : bool):
+        if state:
+            self._button_widget.setPixmap(self._on_pixmap)
+        else:
+            self._button_widget.setPixmap(self._off_pixmap) 
+
 
 
 # class AxisStateWidget(QtWidgets.QWidget, gremlin.event_handler.JoystickHook):
@@ -5959,7 +6031,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
 #         if not Shiboken.isValid(self):
 #             return
 #         try:
-#             gremlin.ui.ui_common.clear_layout(self.container_layout)
+#             clear_layout(self.container_layout)
 #             self._display_curve_widget = None
 #             self._display_label_widget = None
 #             self._display_percent_widget = None
@@ -5984,9 +6056,9 @@ class ButtonStateWidget(QtWidgets.QWidget):
 #         if not Shiboken.isValid(self):
 #             return
 
-#         # gremlin.ui.ui_common.clear_layout(self.container_layout)
+#         # clear_layout(self.container_layout)
 #         alignment = QtCore.Qt.AlignmentFlag.AlignCenter if self._orientation == QtCore.Qt.Orientation.Vertical else QtCore.Qt.AlignmentFlag.AlignLeft
-#         gremlin.ui.ui_common.clear_layout(self.container_layout)
+#         clear_layout(self.container_layout)
         
 #         # progress bar label
 #         if self._show_label:
@@ -6037,7 +6109,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
 #         # progress bar value
 #         if self._show_value:
 #             if self.device and self.device.is_virtual:
-#                 self._display_value_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self._value)
+#                 self._display_value_widget = QFloatLineEdit(value = self._value)
 #                 self._display_value_widget.valueChanged.connect(self._value_changed)
 #             else:
 #                 self._display_value_widget = QtWidgets.QLabel(self._label_value)
@@ -8245,7 +8317,7 @@ class QDelayWidget(QtWidgets.QWidget):
         self._max_value = max_value_seconds * 1000 # max value possible
         self._min_value = min_value_seconds * 1000 # min value
 
-        width = gremlin.ui.ui_common.get_char_width(8)
+        width = get_char_width(8)
         self.delay_label = QtWidgets.QLabel(label) if label else None
         self._delay_widget = QIntLineEdit()
         self._delay_widget.invalid.connect(self._handle_invalid_input)
@@ -8274,7 +8346,7 @@ class QDelayWidget(QtWidgets.QWidget):
             }
 
             for label, value in shortcuts.items():
-                widgets.append( gremlin.ui.ui_common.QDataPushButton(label, data = value, callback = self._handle_shortcut))
+                widgets.append( QDataPushButton(label, data = value, callback = self._handle_shortcut))
 
             self.main_layout.addWidget(getHContainer(widgets, widget_only = True))
 
@@ -8862,9 +8934,14 @@ class QFlowLayout(QtWidgets.QLayout):
         self._item_list = []
 
     def __del__(self):
+        self.clear()
+
+    def clear(self):
+        ''' removes all widgets '''
         item = self.takeAt(0)
         while item:
             item = self.takeAt(0)
+
 
     def addItem(self, item):
         self._item_list.append(item)
@@ -8948,6 +9025,27 @@ class QFlowLayout(QtWidgets.QLayout):
             line_height = max(line_height, item.sizeHint().height())
 
         return y + line_height - rect.y()
+
+
+class QFlowWidget(QtWidgets.QWidget):
+    ''' flow layout widget '''
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.main_layout = QFlowLayout(self)
+        
+
+    def addWidget(self, widget):
+        ''' adds widget to the flow layout'''
+        self.main_layout.addWidget(widget)
+
+    def clear(self):
+        ''' removes all widgets from the contents '''
+        self.main_layout.clear()
+
+    def getWidgets(self) -> list:
+        ''' gets a list of widgets in the flow widget'''
+        return gremlin.util.get_layout_widgets(self.main_layout)
+
 
 
 
@@ -10143,8 +10241,9 @@ def getHContainer(widget_or_list = None,
     '''
     widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QHBoxLayout(widget)
-    widget.setContentsMargins(left_margin, top_margin, right_margin, bottom_margin)
-    layout.setContentsMargins(0,0,0,0)
+    widget.setContentsMargins(0,0,0,0)
+    layout.setContentsMargins(left_margin, top_margin, right_margin, bottom_margin)
+    
 
     stretch = False if no_stretch else left_stretch
 
@@ -10501,14 +10600,14 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
         main_layout = QtWidgets.QVBoxLayout(self)
 
-        w = gremlin.shared_state.char_width * 12 # gremlin.ui.ui_common.get_text_width("0000000.0000")
+        w = gremlin.shared_state.char_width * 12 # get_text_width("0000000.0000")
 
         output_data_entry_widget= QtWidgets.QWidget()
         output_data_entry_layout = QtWidgets.QGridLayout(output_data_entry_widget)
 
 
          # output range                 
-        border_color = gremlin.ui.ui_common.Color.warningColor()
+        border_color = Color.warningColor()
         css = f'''
             QLineEdit {{
                 border: 1px solid {border_color};
@@ -10562,7 +10661,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         
 
         # normalized is -1 to + 1
-        self._normalized_min_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._normalized_min_widget = QFloatLineEdit()
         self._normalized_min_widget.setRange(-1,1)
         self._normalized_min_widget.setValue(min_norm)
         self._normalized_min_widget.setMinimumWidth(w)
@@ -10570,21 +10669,21 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         
         
         
-        self._normalized_max_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self._normalized_max_widget = QFloatLineEdit()
         self._normalized_max_widget.setRange(-1,1)
         self._normalized_max_widget.setValue(max_norm)
         self._normalized_max_widget.setMinimumWidth(w)
         
         self._normalized_max_widget.valueChanged.connect(self._update_from_normalized)
 
-        self._percent_min_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
+        self._percent_min_widget = QFloatLineEdit(decimals=2)
         #self._output_min_percent_range_widget.setReadOnly(True)
         self._percent_min_widget.setRange(0,100)
         self._percent_min_widget.setValue(min_percent)
         self._percent_min_widget.setMinimumWidth(w)
         self._percent_min_widget.valueChanged.connect(self._update_from_percent)
 
-        self._percent_max_widget = gremlin.ui.ui_common.QFloatLineEdit(decimals=2)
+        self._percent_max_widget = QFloatLineEdit(decimals=2)
         #self._output_max_percent_range_widget.setReadOnly(True)
         self._percent_max_widget.setRange(0,100)
         self._percent_max_widget.setValue(max_percent)
@@ -11402,13 +11501,43 @@ class IconGenerator():
         pixmap = QtGui.QPixmap.fromImage(image)
         pixmap.save(image_path, "PNG")
 
-        
 
 class QGroupBox(QtWidgets.QGroupBox):
-    def __init__(self, parent = None):
+    pass
+
+
+        
+
+class QGroupBoxV(QtWidgets.QGroupBox):
+    def __init__(self, title : str = None, value : bool = None, callback = None, parent = None):
         super().__init__(parent)
-        #self.setContentsMargins(0,0,0,0)
-        #self.setStyleSheet("QGroupBox {border: none;}")
+        self.setContentsMargins(0,0,0,0)
+
+        if title:
+            self.setTitle(title)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self._callback = None
+        if value is not None:
+            self.setCheckable(True)
+            self._callback = callback
+            self.toggled.connect(self._handle_toggled)
+
+        if title is None:
+            # push the margin up
+            self.setStyleSheet("QGroupBox{padding-top:0px; margin-top: 0px; }")
+
+
+
+    def _handle_toggled(self, checked : bool):
+        if self._callback:
+            self._callback(checked)
+
+    def addWidget(self, widget):
+        self.main_layout.addWidget(widget)
+
+
+    def clear(self):
+        gremlin.util.clear_layout(self.main_layout)
 
 
 class QHatDirectionSelector(QHatSelectorComboBox):
@@ -11711,13 +11840,13 @@ class QRangeWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
 
-        self._min_widget = gremlin.ui.ui_common.QFloatLineEdit(min_value, min_range = min_range, max_range = max_range)
+        self._min_widget = QFloatLineEdit(min_value, min_range = min_range, max_range = max_range)
         self._min_widget.valueChanged.connect(self._min_changed)
-        self._max_widget = gremlin.ui.ui_common.QFloatLineEdit(max_value, min_range = min_range, max_range = max_range)
+        self._max_widget = QFloatLineEdit(max_value, min_range = min_range, max_range = max_range)
         self._min_widget.valueChanged.connect(self._max_changed)
 
 
-        self._scale_widget, self._scale_layout = gremlin.ui.ui_common.getHContainer([QtWidgets.QLabel(f"{label + ' ' if label else ''}Min:"),
+        self._scale_widget, self._scale_layout = getHContainer([QtWidgets.QLabel(f"{label + ' ' if label else ''}Min:"),
                                                                                      self._min_widget,
                                                                                      QtWidgets.QLabel("Max:"),
                                                                                      self._max_widget,
@@ -12133,7 +12262,7 @@ class QButtonGrid(QtWidgets.QWidget):
             h_box = QtWidgets.QHBoxLayout(h_cont)
             h_box.setContentsMargins(0,0,0,0)
             h_box.setAlignment(QtCore.Qt.AlignCenter)
-            cb = gremlin.ui.ui_common.QDataRadioButton()
+            cb = QDataRadioButton()
 
             self.button_group.addButton(cb)
             self.button_group.setId(cb, id)
@@ -12260,9 +12389,9 @@ class QInputDialog(QRememberDialog):
         self.main_layout.addWidget(self._widget)
 
 
-        self.cancel_widget = gremlin.ui.ui_common.Buttons.getCancelWidget(callback = self._cancel)
-        self.ok_widget = gremlin.ui.ui_common.Buttons.getOkWidget(callback = self._accept)
-        widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], widget_only = True)
+        self.cancel_widget = Buttons.getCancelWidget(callback = self._cancel)
+        self.ok_widget = Buttons.getOkWidget(callback = self._accept)
+        widget = getHContainer([self.ok_widget, self.cancel_widget], widget_only = True)
         self.main_layout.addWidget(widget, alignment= QtCore.Qt.AlignmentFlag.AlignHCenter)
 
     def text(self) -> str:
@@ -12281,27 +12410,35 @@ class QInputDialog(QRememberDialog):
 
 class QWarningWidget(QtWidgets.QWidget):
     ''' warning widget'''
-    def __init__(self, text = None,  parent = None):
+    def __init__(self, text = None, split : bool = False, parent = None):
         super().__init__(parent)
         
-        self._label_widget = QtWidgets.QLabel(text)
+        
+        self._label_widget = QtWidgets.QLabel(text if split else None)
         main_layout = QtWidgets.QVBoxLayout(self)
+        self.setContentsMargins(0,0,0,0)
+        main_layout.setContentsMargins(0,0,0,0)
         
         icon = Icons.warningIcon()
-        widget = QIconLabel(icon_path = icon)
-
-        left_panel, _ = getVContainer(widget)
-        left_panel.setFixedWidth(32)
+        self._icon_widget = QIconLabel(icon_path = icon, text = text if not split else None)
+        left_panel, _ = getVContainer(self._icon_widget)
         right_panel, _ = getVContainer(self._label_widget)
 
+        self._split = split
         widget, _ = getHContainer([left_panel, right_panel],alignment = QtCore.Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(widget)
+        self._text = text
 
     def text(self) -> str:
-        return  self._label_widget.text()
+        return self._text
+        
     
     def setText(self, text : str):
-         self._label_widget.setText(text)
+        if self._split:
+            self._label_widget.setText(text)
+        else:
+            self._icon_widget.setText(text)
+        self._text = text
 
     def hasText(self) -> bool:
         return bool(self._text)
@@ -12464,17 +12601,17 @@ class QInputLockWidget(QtWidgets.QWidget):
     def _handle_context(self, widget, is_control : bool, is_shift : bool, is_alt : bool, is_right: bool):
         ''' right click of filter button '''
         if is_right:
-            import gremlin.event_handler
+            
             el = gremlin.event_handler.EventListener()
             el.jump_to_mapped_input.emit() # request jump to first mapped input 
 
     def _handle_lock(self):
-        import gremlin.event_handler
+        
         el = gremlin.event_handler.EventListener()
         el.lock_inputs.emit(self.data)
 
     def _handle_unlock(self):
-        import gremlin.event_handler
+        
         el = gremlin.event_handler.EventListener()
         el.unlock_inputs.emit(self.data)
 
@@ -13095,13 +13232,13 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
 
         self.lbl_vjoy_device_selector = QtWidgets.QLabel("Device:")
         grid.addWidget(self.lbl_vjoy_device_selector,row,0)
-        self.device_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.device_selector_widget = QDataComboBox()
         grid.addWidget(self.device_selector_widget,row,1)
 
 
 
         row += 1
-        self.input_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.input_selector_widget = QDataComboBox()
         self.lbl_vjoy_input_selector = QtWidgets.QLabel("Input:")
         grid.addWidget(self.lbl_vjoy_input_selector,row,0)
         grid.addWidget(self.input_selector_widget,row,1)
@@ -13277,7 +13414,7 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
         self.selector_widget.selectionChanged.connect(self._handle_selection_changed)
         main_layout.addWidget(self.selector_widget)
 
-        listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._handle_listen_request)
+        listen_widget = Buttons.getListenWidget(callback = self._handle_listen_request)
 
         ok_button_widget =  QtWidgets.QPushButton("Ok")
         ok_button_widget.clicked.connect(self._execute_cb)
@@ -13299,7 +13436,7 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
 
     def _handle_listen_request(self):
         ''' calls up a listen box to select the input '''
-        dialog = gremlin.ui.ui_common.InputListenerWidget(
+        dialog = InputListenerWidget(
                 event_types = self._input_types,
                 return_kb_event=True,
                 callback = self._handle_listen_selection,
@@ -13370,7 +13507,7 @@ class QBorderWidget(QtWidgets.QFrame):
         super().__init__(parent = parent)
 
         is_dark = gremlin.shared_state.is_dark_theme
-        border_color = gremlin.ui.ui_common.Color.borderColor()
+        border_color = Color.borderColor()
 
         css = f"# frame {{border: 1px solid {border_color};}}')"
         self.setStyleSheet(css) 
@@ -13394,7 +13531,7 @@ class QBorderWidget(QtWidgets.QFrame):
         return self.main_layout
     def setBackgroundColor(self, color : str):
         ''' sets the background color of the title bar '''
-        border_color = gremlin.ui.ui_common.Color.borderColor()
+        border_color = Color.borderColor()
         if color:
             css = f"# frame {{border: 1px solid {border_color}; background-color: {color}}}')"
         else:
@@ -13461,7 +13598,7 @@ class FindWindowDialog(BaseDialogUi):
         self.data = [] # tuples of (class : str, title : str)
         self.selected_index = None # nothing selected
         
-        refresh_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget("Refresh", callback = self._update_data)
+        refresh_widget = Buttons.getRefreshWidget("Refresh", callback = self._update_data)
 
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
@@ -13514,7 +13651,7 @@ class FindWindowDialog(BaseDialogUi):
             close_button
             ]
         
-        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
+        widget = getHContainer(widgets, widget_only = True)
         self.main_layout.addWidget(widget)
 
 
@@ -13628,12 +13765,12 @@ class QProcessSelectorWidget(QtWidgets.QWidget):
 
         if enable_autostart:
 
-            start_widget = gremlin.ui.ui_common.QDataCheckbox("Auto-start process if not running",
+            start_widget = QDataCheckbox("Auto-start process if not running",
                                                         value = self._autostart,
                                                         callback = self._handle_autostart_changed,
                                                         tooltip = "Attemps to start the process if not running.")
             
-            self.timeout_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self._timeout,
+            self.timeout_widget = QFloatLineEdit(value = self._timeout,
                                                             min_range=1,
                                                             max_range = 1000,
                                                             step = 1.0,
@@ -13830,3 +13967,328 @@ class QNoWheelPainTextEdit(QtWidgets.QPlainTextEdit):
 
 
 
+
+class RemoteClientWidget(QtWidgets.QWidget):
+    ''' UI element that shows the list of available network clients '''
+    def __init__(self, config, parent = None):
+        
+        super().__init__(parent = parent)
+
+        self.config : gremlin.remote.RemoteConfig = config
+        self.config.client_changed.connect(self._handle_client_changed)
+   
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+   
+ 
+        self.custom_widget = QDataCheckbox("Custom output configuration",
+                                       value = self.config.isCustom,
+                                       callback = self._handle_custom_changed,
+                                       tooltip = "Enable custom send targets",
+                                       )
+     
+        self.group_widget = QGroupBoxV()
+        widget = QtWidgets.QLabel("List of clients:")
+
+        self.any_widget = QDataCheckbox("Any",
+                                        value = self.config.anySelected(),
+                                        callbackEx= self._handle_client_selected,
+                                        tooltip = "Sends to all remote clients when selected",
+                                        data = 0,
+                                        )
+
+
+        self.send_local_widget = QDataCheckbox("Local", 
+                                        value = self.config.local,
+                                        callback = self._handle_local_changed,
+                                        tooltip="Send to local instance")
+        
+        self.send_remote_widget = QDataCheckbox("Remote", 
+                                        value = self.config.remote,
+                                        callback = self._handle_remote_changed,
+                                        tooltip="Send to ore or more remote instances")
+        
+        self.warning_remote_widget = QWarningWidget("<i>Remote control is currently disabled</i>")
+        self.warning_no_output_widget = QWarningWidget("No output mode selected")
+        
+        
+
+        widgets = [
+            self.send_local_widget,
+            self.send_remote_widget,
+            self.warning_remote_widget,
+            self.warning_no_output_widget,
+        ]
+
+        widget = getHContainer(widgets, widget_only=True)
+        self.group_widget.addWidget(widget)
+
+         
+        self.refresh_widget = Buttons.getRefreshWidget("Refresh",callback = self._trigger_identify, tooltip = "This will refresh the list of available network instances.\nClients must be running and allowed to communicate with the current instance to be detected.")
+        self.select_all_widget = QDataPushButton("All", callback=self._handle_select_all)
+        self.select_none_widget = QDataPushButton("Clear", callback=self._handle_select_none)
+
+        widgets = [
+            self.refresh_widget,
+            self.select_all_widget,
+            self.select_none_widget,
+        ]
+        
+
+        self.container_buttons = getHContainer(widgets, widget_only=True)
+
+     
+
+        
+        widget = getHContainer(widget, widget_only=True)
+        self.group_widget.addWidget(widget)
+
+        self.flow_container_widget, self.flow_container_layout = getVContainer()
+
+        self.client_count_widget = QtWidgets.QLabel()
+
+        icon = Icons.remoteControlIcon()
+        client_widget = getHContainer([QIconLabel(icon, "Target Client(s):"),
+                                       self.client_count_widget
+                                       ],
+                                       widget_only = True)
+  
+
+        # any client
+        widgets = [
+            client_widget,
+            self.any_widget,
+            self.flow_container_widget,
+            QHorizontalLine(),
+            self.container_buttons
+        ]
+        
+        self.container_client = getVContainer(widgets, widget_only = True, left_margin = 12)
+        self.group_widget.addWidget(self.container_client)
+
+
+        self.main_layout.addWidget(self.custom_widget)
+        widget = getVContainer(self.group_widget, widget_only = True)
+        self.main_layout.addWidget(widget)
+        self.main_layout.addStretch()
+        
+
+        self.refreshClients()
+        
+        self._update_ui()
+  
+    def _update_ui(self):
+        
+        config = self.config
+
+        if not config.isCustom:
+            # custom output disabled - only show the checkbox 
+            self.group_widget.setVisible(False)
+            return
+        
+        self.group_widget.setVisible(True)
+
+        enabled = config.enabled
+
+
+        # remote control only visible if remote control is allowed
+        self.send_remote_widget.setEnabled(enabled)
+
+        self.warning_remote_widget.setVisible(not enabled)
+
+        self.warning_no_output_widget.setVisible(not(config.local or config.remote))
+
+        visible = enabled and config.remote
+        self.container_buttons.setVisible(visible)
+        self.container_client.setVisible(visible)
+        
+        if visible:
+            count = config.getClientCount()
+            self.client_count_widget.setText(f"({count-1} found)" if count-1 else "(none detected)")
+            selected_count = config.getSelectedCount()
+            self.select_all_widget.setEnabled(count > 0 and selected_count < count)
+            self.select_none_widget.setEnabled(selected_count > 0)
+
+            # disable individual client selection if "any" is selected
+            enabled = not config.anySelected()
+            self.flow_container_widget.setEnabled(enabled)
+
+        count = config.getClientCount()
+        self.select_all_widget.setEnabled(count > 0)
+        selected_count = config.getSelectedCount()
+        self.select_none_widget.setEnabled(selected_count > 0)            
+
+
+
+    def _handle_client_changed(self):
+        ''' update on client change '''
+        # syslog.info("remote config client change")
+        if Shiboken.isValid(self):
+            self.refreshClients()
+        else:
+            # unregister if called and we're deleted already
+            self.config.unregisterClientChangeCallback(self._handle_client_changed)
+
+
+    def _handle_custom_changed(self, checked : bool):
+        self.config.isCustom = checked
+        self._update_ui()
+
+
+    def _handle_identify(self, widget):
+        gremlin.remote.remote_client.requestIdentify()
+
+
+    def _handle_client_response(self, data: gremlin.remote.PacketData ):
+        syslog.info(f"REMOTE: received client response:")
+        syslog.info(f"client [{data.client_id}]")
+        syslog.info(f"Status: [{data.status.name}]")
+
+    def _handle_remote_control_changed(self, enabled : bool):
+        ''' called when GEX remote control state changes '''
+
+        gremlin.util.InvokeUiMethod(self._handle_remote_control_ui, enabled)
+
+    def _handle_remote_control_ui(self, enabled : bool):
+        if Shiboken.isValid(self):
+            self._update_ui()
+
+    def _handle_local_changed(self, checked):
+        self.config.local = checked
+        self._update_ui()
+
+    def _handle_remote_changed(self, checked):
+        self.config.remote = checked
+        if checked:
+            # ensure at least one client is selected
+            count = self.config.getSelectedCount()
+            if not count:
+                self.any_widget.setChecked(True)
+            
+        self._update_ui()
+        
+    def _handle_client_selected(self, widget, checked):
+        client_id = widget.data
+        client = self.config.getClient(client_id)
+        if client:
+            client.selected = checked
+            self._refresh_clients_ui()
+            self._update_ui()
+
+    def _getClientWidgets(self) -> list:
+        widgets = [self.any_widget]
+        widgets.extend(self.flow_widget.getWidgets())
+        return widgets
+
+    def _handle_singleton_changed(self, checked):
+        self.config.singleton = checked
+        if checked:
+            # ensure only one client is selected
+            count = self.config.getSelectedCount()
+            if count > 1:
+                # pick the first one that is selected, clear the others
+                selected = True
+                for widget in self._getClientWidgets():
+                    client : gremlin.remote.RemoteClientData = widget.data
+                    if selected and client.selected:
+                        selected = False
+                        continue
+                    widget.setChecked(selected)
+
+    def _trigger_identify(self):
+        ''' refreshes the list of network clients '''
+        el = gremlin.event_handler.EventListener()
+        el.remote_control_identify.emit()
+
+    def _handle_select_all(self, widget):
+        ''' selects all widgets '''
+        self.config.selectAll()
+        self._refresh_clients_ui()
+        self._update_ui()
+
+    def _handle_select_none(self, widget):
+        ''' clears selection'''
+        self.config.selectNone()
+        self._refresh_clients_ui()
+        self._update_ui()
+        
+
+    def _handle_select_any(self):
+        ''' only selects the ANY '''
+        self.any_widget.setChecked(True)
+        self._update_ui()
+
+    
+    def refreshClients(self):
+        self._refresh_clients()
+        self._update_ui()
+
+    def _refresh_clients(self):
+        gremlin.util.InvokeUiMethod(self._refresh_clients_ui) # ensure on UI thread
+
+
+    def _refresh_clients_ui(self):
+
+
+        if not Shiboken.isValid(self):
+            # already deleted
+            return
+        
+        verbose = gremlin.config.Configuration().verbose_mode_remote
+        
+        config = self.config
+        client = config.getClient(0)
+
+        self.send_local_widget.setEnabled(config.localEnabled)
+        self.send_remote_widget.setEnabled(config.remoteEnabled)
+
+        with QtCore.QSignalBlocker(self.send_local_widget):
+            self.send_local_widget.setChecked(config.local)
+        with QtCore.QSignalBlocker(self.send_remote_widget):
+            self.send_remote_widget.setChecked(config.remote)
+        with QtCore.QSignalBlocker(self.any_widget):            
+            self.any_widget.setChecked(client.selected)
+        
+
+        gremlin.util.clear_layout(self.flow_container_layout)
+
+        flow_layout = QFlowLayout()
+        self.flow_container_layout.addLayout(flow_layout)
+
+
+        # ANY client is not selected, show the distinct list of clients
+        clients = config.getClients()
+        client_id = config.getLocalClientId() # local client ID
+
+        any_selected = config.anySelected()
+
+        for client in clients:
+            #if verbose: syslog.info(f"got client: [{client.client_name}]")
+            if client.client_id != 0:
+                # only add the specific connected clients
+                # if verbose: syslog.info(f"adding client: {client.client_name}")
+                if client.client_id == client_id:
+                    # local
+                    client_name = f"{client.client_name} (self)"
+                    enabled = False # cannot send to self but display the data
+                else:
+                    client_name = client.client_name
+                    enabled = not any_selected
+                widget = QDataCheckbox(client_name,
+                                        data = client.client_id,
+                                        value = client.selected,
+                                        callbackEx= self._handle_client_selected,
+                                        tooltip = str(client))
+
+                widget.setEnabled(enabled)
+                
+                
+                flow_layout.addWidget(widget)
+
+        self._update_ui()
+
+    
+    def setClientId(self, client_id):
+        ''' sets the client id '''
+        index = self.client_selector.findData(client_id)
+        if index != -1:
+            self.client_selector.setCurrentIndex(index)

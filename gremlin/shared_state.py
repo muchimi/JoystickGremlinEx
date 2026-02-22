@@ -19,7 +19,7 @@
 import threading
 import sys
 import uuid
-
+import time
 
 import gremlin.joystick_handling
 from gremlin.input_types import InputType
@@ -74,6 +74,8 @@ _suspend_input_highlighting_enabled = 0
 _suspend_timer = None
 
 application_version = "0.0" # application version (set at runtime)
+
+application_start_time = time.time() # application start time
 
 abort = False # global abort flag - used to mark a profile start should abort - used along with the abort signal
 

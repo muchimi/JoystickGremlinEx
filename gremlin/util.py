@@ -1724,6 +1724,37 @@ def strip_ext(path):
 def swap_ext(path, ext = None, prefix= '', suffix = ''):
     return swapext(path, ext, prefix, suffix)
 
+def get_next_file(path : str, max_index = 100, roundrobin : bool = True, delete = True):
+    if os.path.isfile(path):
+        index = 1
+        width = len(str(max_index))
+        current = swap_ext(path, suffix=f".{index:0{width}}")
+        file_list = []
+        while os.path.isfile(current):
+            file_list.append(current)
+            index += 1
+            if index > max_index:
+                # round robin the file
+                if roundrobin and file_list:
+                    # get the oldest file
+                    flist = [(fname, os.path.getmtime(fname)) for fname in file_list]
+                    flist.sort(key = lambda x: x[1]) # oldest first
+                    blitz, _ = flist[0]
+                    if delete:
+                        try:
+                            os.unlink(blitz)
+                        except:
+                            syslog.error(f"NEXT: roundrobin: unable to delete file: {blitz}")
+                            return None
+                    return blitz
+                        
+                return None
+            current = swap_ext(path, suffix=f".{index:0{width}}")
+    else:
+        current = path # no index 
+    return current
+
+
 
 def display_file(path):
     ''' opens a file in the current editor associated with the extension '''
@@ -2038,6 +2069,13 @@ def getHostIp() -> list:
 
     return [host_ip]
 
+def getHostIpSingle():
+    import gremlin.config        
+    host = gremlin.config.Configuration().broadcast_host_ip
+    if host == "127.0.0.1":
+        if host == '127.0.0.1':
+            host = getHostIp()[0]
+    return host
 
 def to_byte_string(source) -> tuple:
     ''' converts a byte string or regular string to (string, bytestring) '''

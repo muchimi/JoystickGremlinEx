@@ -166,7 +166,7 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
         gremlin.config.Configuration().last_control_action = action
         
 
-class ControlFunctor(gremlin.base_conditions.AbstractFunctor):
+class ControlFunctor(gremlin.base_profile.AbstractFunctor):
     ''' control functor '''
     
     def __init__(self, action_data, parent = None):
@@ -193,23 +193,23 @@ class ControlFunctor(gremlin.base_conditions.AbstractFunctor):
                     return True
                 case ControlAction.LocalDisable:
                     # disable local output
-                    gremlin.remote.remote_state.setLocal(False)
+                    gremlin.remote.remote_control.setLocal(False)
                     return True
                 case ControlAction.LocalEnable:
                     # disable local output
-                    gremlin.remote.remote_state.setLocal(True)
+                    gremlin.remote.remote_control.setLocal(True)
                     return True
                 case ControlAction.RemoteDisable:
                     # disable local output
-                    gremlin.remote.remote_state.setRemote(False)
+                    gremlin.remote.remote_control.setRemote(False)
                     return True
                 case ControlAction.RemoteEnable:
                     # disable local output
-                    gremlin.remote.remote_state.setRemote(True)
+                    gremlin.remote.remote_control.setRemote(True)
                     return True
                 case ControlAction.RemoteToggle:
                     # disable local output
-                    gremlin.remote.remote_state.toggleRemote()
+                    gremlin.remote.remote_control.toggleRemote()
                     return True
 
 

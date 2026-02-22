@@ -20,6 +20,7 @@ Main UI of JoystickGremlin.
 """
 
 from __future__ import annotations
+import qt5reactor
 import faulthandler
 import argparse
 import ctypes
@@ -129,6 +130,8 @@ import gremlin.util
 import graphviz
 
 
+
+
 # Figure out the location of the code / executable and change the working
 # directory accordingly
 install_path = os.path.normcase(os.path.dirname(os.path.abspath(sys.argv[0])))
@@ -149,7 +152,7 @@ import gremlin.version
 from PySide6 import QtCore
 
 from gremlin.ui.ui_gremlin import Ui_Gremlin
-#from gremlin.input_devices import remote_state
+
 
 
 import gremlin.reporting
@@ -339,7 +342,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # hook status bar to events
         el = gremlin.event_handler.EventListener()
-        el.broadcast_changed.connect(self._update_status_bar)
+        el.broadcast_changed.connect(self._update_status_bar) # broadcast mode changes 
+        el.remote_control_state_change.connect(self._update_status_bar) # remote control state changes
+
         el.keyboard_event.connect(self._kb_event_cb) # for repeaters
         
         el.suspend_keyboard_input.connect(self._kb_suspend_cb)
@@ -1312,6 +1317,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # request to disable
             el.remote_control_disable.emit()
 
+        el.remote_control_changed.emit(enable)
+
 
 
 
@@ -1578,6 +1585,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if gremlin.config.Configuration().input_viewer_disables_repeaters:
                 gremlin.shared_state.pop_repeater()
 
+    def backup_config(self):
+        config = gremlin.config.Configuration()
+        config.backup()
+
+    def restore_config(self):
+        config = gremlin.config.Configuration()
+        config.restore()
+
 
     def load_profile(self, fname = None):
         """Prompts the user to select a profile file to load."""
@@ -1812,7 +1827,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionActivate.triggered.connect(self.menu_activate)
         self.ui.actionOpen.triggered.connect(self.load_profile)
         self.ui.actionSave.triggered.connect(self.save_profile)
+
+
+        # config backup/restore
+        self.ui.actionBackupConfig.triggered.connect(self.backup_config)
+        self.ui.actionRestoreConfig.triggered.connect(self.restore_config)
+
+        connected = gremlin.config.Configuration().remoteEnabled()
+        self.ui.actionToggleRemoteControl.setChecked(connected)
         self.ui.actionToggleRemoteControl.triggered.connect(self.toggle_remote)
+        
         
 
         # Tray icon
@@ -1850,6 +1874,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.status_bar_repeater_widget = QtWidgets.QLabel("")
         self.status_bar_repeater_widget.setContentsMargins(5, 0, 5, 0)
 
+        self.status_bar_server_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
+            on_icon = "fa6s.server",
+            off_icon = "fa6s.server",
+            tooltip = "Server state")
+        self.status_bar_client_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
+            on_icon = "mdi.wifi-arrow-up-down",
+            off_icon = "mdi.wifi-arrow-up-down",
+            tooltip="Client state")
+
         self.status_bar_highlight_tabswitch_widget = QtWidgets.QPushButton()
         self.status_bar_highlight_tabswitch_widget.setStyleSheet("border: none")
         self.status_bar_highlight_tabswitch_widget.clicked.connect(self._toggle_tabswitch_highlight)
@@ -1883,11 +1916,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el = gremlin.event_handler.EventListener()
         el.module_state_change.connect(self._module_state_changed)
         el.module_state_register.connect(self.registerStatusModule)
+
+        widgets = [
+            self.status_bar_server_widget,
+            self.status_bar_client_widget,
+        ]
         
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
+        self.ui.statusbar_layout.addWidget(widget)
 
         self.ui.statusbar_layout.addWidget(self.status_bar_is_active_widget)
         self.ui.statusbar_layout.addWidget(self.status_bar_repeater_widget)
         self.ui.statusbar_layout.addWidget(self.status_bar_mode_widget)
+       
         self.ui.statusbar_layout.addWidget(QtWidgets.QLabel(" "))
         self.ui.statusbar_layout.addWidget(self.status_bar_module_container_widget)
 
@@ -4285,7 +4326,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _update_status_bar_active(self, is_active):
         import gremlin.input_devices
         self._is_active = is_active
-        self._update_status_bar(gremlin.remote.remote_state.to_state_event())
+        self._update_status_bar(gremlin.remote.remote_control.to_state_event())
 
     def _remote_control_changed(self, enabled : bool):
         gremlin.util.InvokeUiMethod(self._remote_control_changed_ui, enabled)
@@ -4316,18 +4357,29 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # remote control status
             if not event:
-                event = gremlin.remote.remote_state.to_state_event()
+                event = gremlin.remote.remote_control.to_state_event()
                 
-            if event.is_local:
-                local_msg = f"<font color=\"{Color.activeColor()}\">Active</font>"
-            else:
-                local_msg = f"<font color=\"{Color.inactiveColor()}\">Disabled</font>"
-            if event.is_remote:
-                remote_msg = f"<font color=\"{Color.activeColor()}\">Active</font>"
-            else:
-                remote_msg = f"<font color=\"{Color.inactiveColor()}\">Disabled</font>"
 
-            self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
+
+            server_state = gremlin.remote.remote_control.serverRunning
+            client_state = gremlin.remote.remote_control.clientRunning
+            self.status_bar_client_widget.setState(client_state)
+            self.status_bar_client_widget.setToolTip(f"Client {'enabled' if client_state else 'disabled'}")
+            self.status_bar_server_widget.setState(server_state)
+            self.status_bar_server_widget.setToolTip(f"Master server {'enabled' if server_state else 'disabled'}")
+
+
+            # if event.is_local:
+            #     local_msg = f"<font color=\"{Color.activeColor()}\">Active</font>"
+            # else:
+            #     local_msg = f"<font color=\"{Color.inactiveColor()}\">Disabled</font>"
+            # if event.is_remote:
+            #     remote_msg = f"<font color=\"{Color.activeColor()}\">Active</font>"
+            # else:
+            #     remote_msg = f"<font color=\"{Color.inactiveColor()}\">Disabled</font>"
+            # self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
+            
+            self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running}")
 
 
         except Exception as err:
@@ -5465,6 +5517,7 @@ if __name__ == "__main__":
             gremlin.shared_state.is_dark_theme = True
             app = QtWidgets.QApplication(sys.argv)
 
+
     # application style and css
     app.setStyle("Fusion")
     app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
@@ -5595,9 +5648,13 @@ if __name__ == "__main__":
     # event regsitry
     event_registry = gremlin.event_handler.EventRegistry() 
 
+    # RPC server if enabled in configuration
+    if config.remoteEnabled():
+        gremlin.remote.remote_server.start()
+        gremlin.remote.remote_client.start()
+        
 
     # Run UI
-
 
     # for some reason QT shows the window with a white background and ignores stylesheets/background color
     # workaround for now: show the window minimized so it doesnt' flash on the screen
@@ -5605,8 +5662,6 @@ if __name__ == "__main__":
     # show the window normally
     ui.showMinimized()
     app.processEvents()
-
-
 
     # gremlin.raw_input.Register(ui.winId())
     
@@ -5619,11 +5674,17 @@ if __name__ == "__main__":
     syslog.info("Apply settings...")
     ui.apply_user_settings() 
 
+    # identify self to the network on start
+    gremlin.remote.remote_client.requestIdentify()
+
     if not config.start_minimized:
         ui.showNormal()
     
     syslog.info("GremlinEx UI launching")
     try:
+        # integrate twisted with QT framework
+        # twisted framework
+
         app.exec()
     except Exception as err:
         syslog.error(f"{err}\n{traceback.format_exc()}")

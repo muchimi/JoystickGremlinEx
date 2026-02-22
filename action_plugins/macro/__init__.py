@@ -2070,12 +2070,16 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
 
     def __init__(self, action, parent = None):
         super().__init__(action, parent)
+        self.action_data : Macro = action
         self.macro = gremlin.macro.Macro(self.id)
         for seq in action.sequence:
             self.macro.add_action(seq)
         self.macro.exclusive = action.exclusive
         self.macro.repeat = action.repeat
+        self.client_list = [0] # list of remote clients, default to any
         
+    def profile_start(self):
+        self.client_list = self.action_data.remote_config
         
 
     def process_event(self, event, value, extra_data = None):

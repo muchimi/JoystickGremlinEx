@@ -4,9 +4,6 @@
 
 from __future__ import annotations
 import logging
-import math
-import os
-import traceback
 from lxml import etree as ElementTree
 
 from PySide6 import QtCore, QtWidgets, QtGui
@@ -20,14 +17,9 @@ import gremlin.ui.state_device
 import gremlin.ui.ui_common
 import gremlin.ui.input_item
 
-from gremlin import input_devices
+
 from gremlin.types import ButtonOutputMode
 import vjoy.vjoy
-from gremlin.remote import VjoyAction, remote_state
-import gremlin.joystick_handling
-import psygnal
-from psygnal import Signal
-import enum, threading,time, random
 
 import gremlin.util
 from gremlin.util import *

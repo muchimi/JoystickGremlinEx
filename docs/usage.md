@@ -642,9 +642,16 @@ Holding the left-shift key and the left-control key when in button detect mode t
 
 GremlinEx adds a feature to link multiple GremlinEx instances running on separate computers.  This is helpful to share a single set of controls and a single profile on a master machine to one or more client machines on the local network.
 
+As of T183, GremlinEx, actions that support remote output can now select any (all) or specific available network clients.
+
+The use of remote control is concurrent with local control, so actions that support it can output concurrently to the local machine, and selected clients.
+
+Clients automatically register when they are started if they are setup for remote control.  
+
 The use-case for this need came up in a couple of scenarios in my own setup:  I wanted to be able to share my hardware panels and input controllers with another machine without having to duplicate them.
 
 Events sent over the network include all GremlinEX output functions:
+
 - VJOY joystick axis events (when an axis is moved)
 - VJOY joystick button events
 - keyboard output events (press/release keys including extended keys)
@@ -653,7 +660,26 @@ Events sent over the network include all GremlinEX output functions:
 
 By output events, we mean that inputs into GremlinEx are not broadcast to clients, only events that GremlinEx outputs are synchronized with clients.  
 
-To use the remote control features, it is intended you use the new plugins VjoyRemap and MapToMouseEx
+Not all actions support remote control.  The current actions that do are
+
+- Vjoy Remap
+- Map to Keyboard/Mouse Ex
+- Map to Mouse Ex
+- KVM
+
+### Important security considerations
+
+GremlinEx ensures security by:
+
+- using non-routable UDP traffic (the data will not cross routers).
+- clients must be on the local network
+- clients must have remote control enabled in the configuration.
+- clients must have a blank, running profile to be remotely controlled.
+- the firewall must allow the configured port.
+
+This said, GremlinEx is not designed to handle sensitive data given its purpose as a gaming hardware integrator.  
+
+![warning](assets/warning.png) Do not use GremlinEx to transmit secure or PII data as transmitted data is not encrypted (by design for speed) as the scope of GremlinEx is game control
 
 ### Master machine setup
 
@@ -717,11 +743,10 @@ Clients will ignore events for devices that do not exist on the client (such as 
 
 The enable remote control checkbox is checked, and the port (default 6012) must match the broadcast machine's port.
 
-## Master remote control functions
+By default, actions only output to the local machine. Actions that support remote output support output to any (all) client, one or more selected clients, or the local machine.  Note that when sending data remotely, the local client is excluded.  To send both remotely and locally, local and remote mode must be selected.  It is not possible to select the local client as a remote client from the local machine.
 
-Local and broadcast (sending output to remote GremlinEx instances on network machines) control can be enabled or disabled via GremlinEx commands bound to a joystick button (or in script).
 
-Commands are available in the VjoyRemap plugin when bound to a joystick button and available from the drop down of actions for that button.
+Important: the GremlinEx client controlling other clients must be in broadcast mode.  Other clients being remote controlled must have remote control enabled in options, and must also have a blank profile running.
 
 ## Profile mapping
 

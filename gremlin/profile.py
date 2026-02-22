@@ -28,8 +28,8 @@ import uuid
 #from xml.dom import minidom
 import lxml
 from lxml import etree
-import gremlin.base_classes
-import gremlin.base_profile
+
+
 
 from PySide6 import QtCore
 
@@ -50,6 +50,7 @@ def mode_list(profile = None):
     :param node a node from a profile tree
     :return list of modes in the profile 
     """
+    import gremlin.base_profile
     profile : gremlin.base_profile.Profile
     if not profile:
         profile = gremlin.shared_state.current_profile

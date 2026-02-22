@@ -24,7 +24,7 @@ import gremlin.ui.input_item
 from gremlin import input_devices
 from gremlin.types import ButtonOutputMode
 import vjoy.vjoy
-from gremlin.remote import VjoyAction, remote_state
+from gremlin.remote import VjoyAction, remote_control
 import gremlin.joystick_handling
 from psygnal import Signal
 from shiboken6 import Shiboken

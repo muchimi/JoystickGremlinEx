@@ -73,8 +73,8 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        self._send_selector = gremlin.ui.ui_common.QSendModeSelector(value = self.action_data.sendMode, callback = self._handle_sendmode_changed)
-
+        #self._send_selector = gremlin.ui.ui_common.QSendModeSelector(value = self.action_data.sendMode, callback = self._handle_sendmode_changed)
+        self.remote_widget = gremlin.ui.ui_common.RemoteClientWidget(self.action_data.remote_config)
 
 
         self.mode_widget = gremlin.ui.ui_common.QDataComboBox()
@@ -207,8 +207,8 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
      
         self.main_layout.addLayout(self.mode_layout)
-        widget = gremlin.ui.ui_common.getHContainer([self._execute_widget, self._send_selector], widget_only= True)
-        self.main_layout.addWidget(widget)
+
+        self.main_layout.addWidget(self._execute_widget)
         self.main_layout.addWidget(self.release_widget)
         self.main_layout.addWidget(self.button_widget)
         # self.main_layout.addWidget(wheel_factor_container)
@@ -218,6 +218,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.container_monitor)
         self.main_layout.addWidget(self.container_position)
         self.main_layout.addWidget(self.container_process)
+        self.main_layout.addWidget(self.remote_widget)
         
 
 
@@ -231,7 +232,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self._populate_monitor_selector()
         self._update_ui()
 
-    def _handle_sendmode_changed(self, mode : SendType):
+    def _handle_sendmode_changed(self, mode):
         ''' sets the send mode'''
         self.action_data.sendMode = mode
 
@@ -767,6 +768,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
 
         self.action_data : MapToMouseEx = action
         self.input_type = action.get_input_type()
+        self.client_list = [0] # default list of remote clients - send to all
         
         
         self.click_mode = action.click_mode
@@ -779,15 +781,11 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
 
     def profile_start(self):
         ''' occurs on profile start '''
-        pass
+        self.client_list = self.action_data.remote_config.getClientList()
 
     def profile_stop(self):
         ''' occurs on profile stop '''
         pass
-    
-
-
-    
 
     def process_event(self, event, value, extra_data = None):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
@@ -818,20 +816,11 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
       
         return True
     
-    def get_state(self):
-        ''' gets the control state '''
-        (is_local, is_remote) = self.action_data.sendFlags()
-        if self.action_data.force_remote_output:
-            is_remote = True
-        if self.action_data.force_remote_output_only:
-            # force remote only
-            is_local = False
-        return (is_local, is_remote)
 
     def _perform_mouse_button(self, event, value, wheel_factor = 1):
         assert self.action_data.motion_input is False
         verbose = gremlin.config.Configuration().verbose_mode_mouse
-        (is_local, is_remote) = self.get_state()
+        is_local, is_remote = self.action_data.sendFlags()
         is_pressed = event.is_pressed
         match self.action_data.button_id:
             case MouseButton.WheelDown | MouseButton.WheelUp:
@@ -995,7 +984,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
 
 
     def _perform_button_motion(self, event, value):
-        (is_local, is_remote) = self.get_state()
+        is_local, is_remote = self.action_data.sendFlags()
         mc = gremlin.sendinput.MouseController()    
         if event.is_pressed:
             if is_local:
@@ -1024,7 +1013,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         :param event the event triggering the code execution
         :param value the current value of the event chain
         """
-        (is_local, is_remote) = self.get_state()
+        is_local, is_remote = self.action_data.sendFlags()
         mc = gremlin.sendinput.MouseController()    
         if value.current == (0, 0):
             if is_local:

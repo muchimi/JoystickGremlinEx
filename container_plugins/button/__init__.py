@@ -264,7 +264,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
             return "Press/Release:"
 
 
-class ButtonContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
+class ButtonContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     def __init__(self, container, parent = None):
         super().__init__(container, parent)

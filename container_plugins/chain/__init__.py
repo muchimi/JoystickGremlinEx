@@ -178,7 +178,7 @@ class ChainContainerWidget(AbstractContainerWidget):
         return f"Chain: {" -> ".join([", ".join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
 
 
-class ChainContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
+class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     def __init__(self, container, parent = None):
         super().__init__(container, parent)

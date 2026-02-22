@@ -310,7 +310,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             el.icon_changed.emit(event)            
 
 
-class RemapFunctor(gremlin.base_conditions.AbstractFunctor):
+class RemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     """Executes a remap action when called."""
 

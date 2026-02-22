@@ -25,10 +25,9 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 import gremlin.clipboard
 import gremlin.types
-from gremlin.base_profile import AbstractContainer, ConditionContainer
+from gremlin.base_profile import AbstractContainer, AbstractFunctor, ConditionContainer
 import gremlin.execution_graph
 from gremlin.ui.input_item import AbstractContainerWidget
-from gremlin.base_conditions import AbstractFunctor
 from shiboken6 import Shiboken
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -244,7 +243,7 @@ If the timer is set to 0, the actions get executed immediately if the condition 
 
 
 
-class TriggerContainerFunctor(gremlin.base_conditions.AbstractSelfTriggerFunctor):
+class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     ''' functor is a trigger functor as we need to trigger the content only if some conditions are met '''
 

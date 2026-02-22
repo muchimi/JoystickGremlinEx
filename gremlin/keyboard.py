@@ -25,7 +25,7 @@ import win32api
 import win32con
 
 # from gremlin.base_classes import TraceableList
-import gremlin.macro
+
 from gremlin.types import MouseButton
 # from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.config
@@ -501,18 +501,19 @@ class Key():
     
 
 
-def send_key_down(key, is_local : bool, is_remote : bool):
+def send_key_down(key, is_local : bool, is_remote : bool, client_list = None):
     """Sends the KEYDOWN event for a single key.
 
     :param key the key for which to send the KEYDOWN event
     """
     import gremlin.remote
+    import gremlin.macro
     key: gremlin.keyboard.Key
   
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
         dbl_click = "_d_" in key.lookup_name
-        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote, dbl_click = dbl_click)
+        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote, dbl_click = dbl_click, client_list = client_list)
         return
 
 
@@ -524,7 +525,7 @@ def send_key_down(key, is_local : bool, is_remote : bool):
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
         if verbose: syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
-        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags )
+        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, client_list )
 
 def key_from_mousebutton(button_id):
     ''' maps a mouse button to a key'''
@@ -555,19 +556,19 @@ def key_from_mousebutton(button_id):
         return key_from_name(map_key)
     return None
 
-def send_key_up(key, is_local : bool, is_remote : bool):
+def send_key_up(key, is_local : bool, is_remote : bool, client_list = None):
     """Sends the KEYUP event for a single key.
 
     :param key the key for which to send the KEYUP event
     """
 
-    from gremlin import input_devices
+    import gremlin.macro
     key: gremlin.keyboard.Key
     verbose = gremlin.config.Configuration().verbose_mode_outputs
 
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
-        gremlin.macro._send_mouse_button(key.mouse_button, False, is_local, is_remote)
+        gremlin.macro._send_mouse_button(key.mouse_button, False, is_local, is_remote, client_list = client_list)
         return
 
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
@@ -579,7 +580,7 @@ def send_key_up(key, is_local : bool, is_remote : bool):
         win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
         if verbose: syslog.info(f"OUTPUT: (remote) keyup {key.debug_name}")
-        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags )
+        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, client_list )
 
 def mouse_from_name(name):
     ''' validates if this is a special mouse key - returns None if it is not'''
@@ -1104,6 +1105,9 @@ class KeyMap:
         ''' gets the mouse keys '''
         keys = []
         for button in MouseButton:
+            if button in (MouseButton.NotSet, MouseButton.Wheel, MouseButton.HWheel):
+                # not user selectable buttons
+                continue
             lookup_name = MouseButton.to_lookup_string(button)
             key = KeyMap.find_by_name(lookup_name)
             keys.append(key)

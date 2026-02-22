@@ -267,7 +267,7 @@ class TempoContainerWidget(AbstractContainerWidget):
         return title
 
 
-class TempoContainerFunctor(gremlin.base_conditions.AbstractTriggerFunctor):
+class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
     def __init__(self, container : TempoContainer, parent = None):
         super().__init__(container, parent)

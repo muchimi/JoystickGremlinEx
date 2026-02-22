@@ -28,6 +28,20 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+
+### (m76T183)
+- New: major remote control enhancements. 
+
+- New: KVM Action: ability to target a specific client.  Other actions will be added as the feature is being tested only with KVM at this time.
+- New: Vjoy Remap Action: ability to target a specific client.
+- New: Map to keyboard/mouse Ex Action: ability to target a specific client.
+- New: Map to mouse Ex Action: ability to target a specific client.
+- New: UI status bar reflect server/remote control state.
+
+- Fix: minor UI layout issues.
+- Fix: toolbar remote control icon incorrect active color (was showing inactive when active).
+- Fix: paste action exception in some situations.
+
 ### (m76T182)
 - Fix: KVM Action: ensure local control returned on sync mode auto-enable
 - Change: HID dll search load logic

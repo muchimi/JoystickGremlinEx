@@ -463,6 +463,8 @@ class QKeyboardWidget(QtWidgets.QWidget):
                             key = "MWR"
                             icon = "mdi.mouse"
                             toolltip = "Tilt Right"
+                        case "null" | "v_wheel" | "h_wheel":
+                            continue
                       
 
                     

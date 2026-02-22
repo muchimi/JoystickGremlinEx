@@ -164,51 +164,6 @@ _AxisButtonDirection_to_enum_lookup = {
 }
 
 
-class MouseButton(Enum):
-
-    """Enumeration of all possible mouse buttons."""
-
-    Left = 1
-    Right = 2
-    Middle = 3
-    Forward = 4
-    Back = 5
-    WheelUp = 10
-    WheelDown = 11
-
-    @staticmethod
-    def to_string(value: MouseButton) -> str:
-        try:
-            return _MouseButton_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-    @staticmethod
-    def to_enum(value: str) -> MouseButton:
-        try:
-            return _MouseButton_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid type in lookup")
-
-
-_MouseButton_to_string_lookup = {
-    MouseButton.Left: "Left",
-    MouseButton.Right: "Right",
-    MouseButton.Middle: "Middle",
-    MouseButton.Forward: "Forward",
-    MouseButton.Back: "Back",
-    MouseButton.WheelUp: "Wheel Up",
-    MouseButton.WheelDown: "Wheel Down",
-}
-_MouseButton_to_enum_lookup = {
-    "Left": MouseButton.Left,
-    "Right": MouseButton.Right,
-    "Middle": MouseButton.Middle,
-    "Forward": MouseButton.Forward,
-    "Back": MouseButton.Back,
-    "Wheel Up": MouseButton.WheelUp,
-    "Wheel Down": MouseButton.WheelDown,
-}
 
 class xIntEnum(IntEnum):
     def __eq__(self, other):
@@ -875,7 +830,7 @@ class MouseAction(Enum):
 class MouseButton(IntEnum):
 
     """Enumeration of all possible mouse buttons."""
-
+    NotSet = 0, # not a button
     Left = 1
     Right = 2
     Middle = 3
@@ -888,6 +843,8 @@ class MouseButton(IntEnum):
     WheelDown = 11
     WheelLeft = 12
     WheelRight = 13
+    Wheel = 14 # up down wheel
+    HWheel = 15# left right wheel
 
 
     @staticmethod
@@ -919,24 +876,25 @@ class MouseButton(IntEnum):
         if isinstance(value, int):
             return MouseButton(value)
         try:
-            return _MouseButton_lookup_to_button_lookup[value]
+            return _MouseButton_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
         
     def to_short_name(value):
-        if value in _MouseButton_lookup_to_button_lookup:
-            value = _MouseButton_lookup_to_button_lookup[value] # to enum
+        if value in _MouseButton_to_enum_lookup:
+            value = _MouseButton_to_enum_lookup[value] # to enum
         if value in _MouseButton_to_short_string_lookup:
             return _MouseButton_to_short_string_lookup[value] # to short name
         return value
         
     def is_lookup_valid(value):
         # true if the enum is a mouse button
-        return value in _MouseButton_lookup_to_button_lookup
+        return value in _MouseButton_to_enum_lookup
 
 
 
 _MouseButton_to_string_lookup = {
+    MouseButton.NotSet: "N/A",
     MouseButton.Left: "Mouse 1 (left)",
     MouseButton.Right: "Mouse 2 (right)",
     MouseButton.Middle: "Mouse 3 (middle)",
@@ -949,9 +907,12 @@ _MouseButton_to_string_lookup = {
     MouseButton.DoubleLeft: "Mouse DClick Left",
     MouseButton.DoubleRight: "Mouse DClick Right",
     MouseButton.DoubleMiddle: "Mouse DClick Middle",
+    MouseButton.Wheel: "Vertical Wheel",
+    MouseButton.HWheel: "Horizontal Wheel"
 }
 
 _MouseButton_to_short_string_lookup = {
+    MouseButton.NotSet: "N/A",
     MouseButton.Left: "M1",
     MouseButton.Right: "M2",
     MouseButton.Middle: "M3",
@@ -964,9 +925,12 @@ _MouseButton_to_short_string_lookup = {
     MouseButton.DoubleLeft: "DC1",
     MouseButton.DoubleRight: "DC2",
     MouseButton.DoubleMiddle: "DC3",
+    MouseButton.Wheel: "VW",
+    MouseButton.HWheel: "HW"
 }
 
 _MouseButton_to_lookup_string_lookup = {
+    MouseButton.NotSet: "null",
     MouseButton.Left: "mouse_1",
     MouseButton.Right: "mouse_2",
     MouseButton.Middle: "mouse_3",
@@ -979,11 +943,15 @@ _MouseButton_to_lookup_string_lookup = {
     MouseButton.DoubleLeft: "mouse_d_1",
     MouseButton.DoubleRight: "mouse_d_2",
     MouseButton.DoubleMiddle: "mouse_d_3",
+    MouseButton.Wheel: "v_wheel",
+    MouseButton.HWheel: "h_wheel"
 }
 
 
 
 _MouseButton_to_enum_lookup = {
+    "N/A" : MouseButton.NotSet,
+    "null" : MouseButton.NotSet,
     "Mouse Left": MouseButton.Left,
     "Mouse Right": MouseButton.Right,
     "Mouse Middle": MouseButton.Middle,
@@ -997,27 +965,21 @@ _MouseButton_to_enum_lookup = {
     "Forward": MouseButton.Forward,
     "Back": MouseButton.Back,
     "Wheel Up": MouseButton.WheelUp,
-    "Wheel Down": MouseButton.WheelDown,
-    "Wheel Left": MouseButton.WheelLeft,
-    "Wheel Right": MouseButton.WheelRight,
-    "mouse_d_1" : MouseButton.DoubleLeft,
-    "mouse_d_2" : MouseButton.DoubleRight,
-    "mouse_d_3" :MouseButton.DoubleMiddle,
-}
-
-_MouseButton_lookup_to_button_lookup = {
-    "mouse_1": MouseButton.Left,
-    "mouse_2": MouseButton.Right,
-    "mouse_3": MouseButton.Middle,
-    "mouse_4": MouseButton.Forward,
-    "mouse_5": MouseButton.Back,
     "wheel_up": MouseButton.WheelUp,
+    "Wheel Down": MouseButton.WheelDown,
     "wheel_down": MouseButton.WheelDown,
+    "Wheel Left": MouseButton.WheelLeft,
     "wheel_left": MouseButton.WheelLeft,
+    "Wheel Right": MouseButton.WheelRight,
     "wheel_right": MouseButton.WheelRight,
     "mouse_d_1" : MouseButton.DoubleLeft,
     "mouse_d_2" : MouseButton.DoubleRight,
-    "mouse_d_3" :MouseButton.DoubleMiddle,
+    "mouse_d_3" : MouseButton.DoubleMiddle,
+    "v_wheel": MouseButton.Wheel,
+    "h_wheel": MouseButton.HWheel,
+    "VW": MouseButton.Wheel,
+    "HW": MouseButton.HWheel,
+
 }
 
 
