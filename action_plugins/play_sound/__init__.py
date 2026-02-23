@@ -166,7 +166,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         for name, data, tooltip in options:
             rb = gremlin.ui.ui_common.QDataRadioButton(name,
                                                         data,
-                                                        callback = self._handle_mode_change,
+                                                        callbackEx = self._handle_mode_change,
                                                         value = self.action_data.mode == data,
                                                         tooltip = tooltip
                                                         )
@@ -491,8 +491,7 @@ class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
         
 
 
-    def _handle_mode_change(self):
-        widget = self.sender()
+    def _handle_mode_change(self, widget, mode):
         mode = widget.data
         self.action_data.mode = mode
         self._update_ui()

@@ -1649,11 +1649,15 @@ class QLineEdit(QtWidgets.QLineEdit):
         self._callback = callback
         self.focusOut.connect(self._handle_text_changed)
         if update_on_text_change:
-            self.textChanged.connect(self._handle_text_changed)
+            self.textChanged.connect(self._handle_text_internal_changed)
         if tooltip:
             self.setToolTip(tooltip)
         if readonly is not None:
             self.setReadOnly(readonly)
+
+    def _handle_text_internal_changed(self, value : str):
+        if self._callback:
+            self._callback(value)
 
     def _handle_text_changed(self):
         if self._callback:
