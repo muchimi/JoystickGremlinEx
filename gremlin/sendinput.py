@@ -574,6 +574,10 @@ def send_key(virtual_code, scan_code, flags):
     _send_input(_keyboard_input(virtual_code, scan_code, flags))
 
 
+def send_key_hwnd(hwnd, virtual_code, scan_code, flags):
+    ''' sends a key to a specific process '''
+    import win32gui
+    win32gui.PostMessage(hwnd, _keyboard_input(virtual_code, scan_code, flags))
 
 def _send_input(*inputs):
     # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput

@@ -29,6 +29,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T184)
+- New: Map to keyboard/Mouse Ex Action: ability to optionally target a specific process by window title or executable path.  This enables output to specific background processes who may not be in focus (such as, minimized or in the system tray). The process is located by window title or executable.  If selected, can match on a partial match and will send to the first process found that matches the partial title or exe.  If a target process is selected, and that process cannot be found, the action will be ignored and an error log entry placed in the log file at profile start.  Supports local and remote.  Note: this only applies to keystrokes.  Mouse output from this action is not  directed to target processes.  Keys sent in this manner post directly to the process message queue.  Note: for performance reasons, GremlinEx does not look for the process list all the time.  If you start a process after profile start, you will need to restart the profile for it to find the missing process.
+- New: remote control API: support for remote process search.
+- New: output API: support for background process direct queue post.
+- Fix: Map to keyboard/mouse Ex Action: duplicate remote configuration options in UI
+- Fix: various remote control API fixes.
+
+
 ### (m76T183)
 - New: major remote control enhancements. [See documentation on new features.](https://muchimi.github.io/JoystickGremlinEx/usage/#remote-control)
 - New: KVM Action: ability to target a specific client.  Other actions will be added as the feature is being tested only with KVM at this time.

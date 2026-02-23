@@ -226,7 +226,7 @@ def _unicode_to_key(character):
     return gremlin.keyboard.Key(character, scan_code, is_extended, virtual_code)
 
 
-def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False, force_remote = False, dbl_click = False, wheel_factor = 1, client_list = None):
+def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False, force_remote = False, dbl_click = False, wheel_factor = 1, client_list = None, extra_data : dict = None):
         from gremlin.types import MouseButton
         import gremlin.sendinput
         import gremlin.remote
@@ -241,7 +241,7 @@ def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False
                 if is_local:
                     gremlin.sendinput.mouse_wheel(direction)
                 if is_remote:
-                    gremlin.remote.remote_client.send_mouse_wheel(direction, client_list)
+                    gremlin.remote.remote_client.send_mouse_wheel(direction, client_list, extra_data = extra_data)
         elif button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
             if is_pressed:
                 direction = -wheel_factor
@@ -250,7 +250,7 @@ def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False
                 if is_local:
                     gremlin.sendinput.mouse_h_wheel(direction)
                 if is_remote:
-                    gremlin.remote.remote_client.send_mouse_h_wheel(direction, client_list)                    
+                    gremlin.remote.remote_client.send_mouse_h_wheel(direction, client_list, extra_data = extra_data)                    
         else:
             if is_pressed:
                 if is_local:
@@ -259,13 +259,13 @@ def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False
                     else:
                         gremlin.sendinput.mouse_press(button_id)
                 if is_remote:
-                    gremlin.remote.remote_client.send_mouse_button(button_id, True, client_list)
+                    gremlin.remote.remote_client.send_mouse_button(button_id, True, client_list, extra_data = extra_data)
             else:
                 if not dbl_click: # double click always releases - no need to release again
                     if is_local:
                         gremlin.sendinput.mouse_release(button_id)
                     if is_remote:
-                        gremlin.remote.remote_client.send_mouse_button(button_id.value, False, client_list )
+                        gremlin.remote.remote_client.send_mouse_button(button_id, False, client_list, extra_data = extra_data )
 
 
 def _send_key_down(key, is_local = True, is_remote = False, force_remote = False, client_list = None):

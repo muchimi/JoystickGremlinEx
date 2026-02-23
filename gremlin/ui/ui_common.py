@@ -1644,10 +1644,12 @@ class QLineEdit(QtWidgets.QLineEdit):
 
     focusOut = QtCore.Signal()
 
-    def __init__(self, text : str = None, callback = None, parent = None, tooltip : str = None, readonly : bool = None):
+    def __init__(self, text : str = None, callback = None, parent = None, tooltip : str = None, readonly : bool = None, update_on_text_change : bool = False):
         super().__init__(text = text, parent = parent)
         self._callback = callback
         self.focusOut.connect(self._handle_text_changed)
+        if update_on_text_change:
+            self.textChanged.connect(self._handle_text_changed)
         if tooltip:
             self.setToolTip(tooltip)
         if readonly is not None:
@@ -14300,3 +14302,117 @@ class RemoteClientWidget(QtWidgets.QWidget):
         index = self.client_selector.findData(client_id)
         if index != -1:
             self.client_selector.setCurrentIndex(index)
+
+
+class TargetProcessWidget(QtWidgets.QWidget):
+    ''' UI element that lets the user pick a target process name '''
+    def __init__(self, config, parent = None):
+        
+        super().__init__(parent = parent)
+
+        self.config : gremlin.remote.RemoteConfig = config
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+
+        self.custom_widget = QDataCheckbox("Target Process configuration",
+                                       value = self.config.isProcess,
+                                       callback = self._handle_custom_changed,
+                                       tooltip = "Enable send to a specific process title or path.\nIf no process is specified, the output is sent to the process currently with focus (default behavior).",
+                                       )
+        
+        self.group_widget = QGroupBoxV()
+        
+        self.process_path_widget = QLineEdit(text = self.config.process,
+                                             update_on_text_change=True,
+                                             callback = self._handle_process_path_changed)
+        
+        widget =getHContainer(self.process_path_widget, "Process title or path:", widget_only = True)
+        #self.process_path_widget.setMinimumWidth(300)
+
+        self.group_widget.addWidget(widget)
+        select_window = QDataPushButton("Select Window...", callback = self._handle_find_window)
+        select_process = QDataPushButton("Select Executable...", callback=self._handle_select_executable)
+
+        self.group_widget.addWidget(self.process_path_widget)
+
+        widget = getHContainer([select_window, select_process], widget_only = True)
+       
+        self.group_widget.addWidget(widget)
+
+        partial_match_widget = QDataCheckbox("Match partial entry", 
+                                            value = self.config.partialMatch,
+                                            callback = self._handle_partial_match_changed,
+                                            tooltip="Match title partially when locating a processss window by title or executable."
+                                            )
+
+        self.group_widget.addWidget(partial_match_widget)
+
+        msg = '''Enter the process path or window title for the target process. 
+         If the target process is specified and it is not found when the profile is started, output will be disabled.
+         If match on partial is enabled, GremlinEx will look for process windows containing the specified text, or for a specific .exe when locating for the target process.
+         The search is not case sensitive and returns the first match.  If multiple matches are expected, use the process path (exe) instead.
+         
+        '''
+        widget = QInfoBox(msg, hide_key = "target_process_widget")
+
+        self.group_widget.addWidget(widget)
+        self.main_layout.addWidget(self.custom_widget)
+        self.main_layout.addWidget(self.group_widget)
+
+        self._update_ui()
+
+    def _handle_select_executable(self, widget):
+        ''' opens the process executable '''
+        import gremlin.ui.dialogs
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+            None,
+            "Process",
+            self.config.process,
+            "Executable files (*.exe)"
+        )
+        if fname and os.path.isfile(fname):
+            self.config.process = fname
+            with QtCore.QSignalBlocker(self.process_path_widget):
+                self.process_path_widget.setText(fname)
+            self._update_ui()
+
+    def _handle_custom_changed(self, checked : bool):
+        self.config.isProcess = checked
+        self._update_ui()
+
+    @QtCore.Slot(bool)
+    def _handle_partial_match_changed(self, checked : bool):
+        self.config.partialMatch = checked
+
+        
+    @QtCore.Slot(object)
+    def _handle_find_window(self, widget):
+        ''' show find window dialog '''
+        self.dialog = FindWindowDialog()
+        self.dialog.closed.connect(self._handle_dialog_closed)
+        self.dialog.exec()
+
+    @QtCore.Slot()
+    def _handle_dialog_closed(self):
+        selected = self.dialog.selected
+        if selected:
+            # self.config.process = selected["process_path"]
+            self.config.process = selected["window_title"]
+            # self.config.window_class = selected["window_class"]
+            # self.config.window_title = selected["window_title"]
+
+            with QtCore.QSignalBlocker(self.process_path_widget):
+                self.process_path_widget.setText(self.config.process)        
+
+    @QtCore.Slot(str)
+    def _handle_process_path_changed(self, value : str):
+        self.config.process = value
+
+
+    def _update_ui(self):
+        config = self.config
+        if not config.isProcess:
+            # custom output disabled - only show the checkbox 
+            self.group_widget.setVisible(False)
+            return
+        self.group_widget.setVisible(True)

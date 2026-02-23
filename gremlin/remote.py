@@ -507,78 +507,79 @@ class RemoteClient():
             data = self.getDatablock("hat", payload)
             self._dispatch(data, client_list)
 
-    def send_key(self, virtual_code, scan_code, flags, client_list = None, force_remote = False):
+    def send_key(self, virtual_code, scan_code, flags, client_list = None, force_remote = False, extra_data = None):
         ''' sends keyboard events to clients '''
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 code = int(scan_code)
                 syslog.info(f"REMOTE OUTPUT: key: 0x{code:02x} flags: 0x{flags:02x}")
-            payload = KeyData.create(virtual_code, scan_code, flags, action = 'value').toPayload()
+            payload = KeyData.create(virtual_code, scan_code, flags, action = 'value', extra_data = extra_data).toPayload()
+            
             data = self.getDatablock("key", payload)
             self._dispatch(data, client_list)
 
-    def send_mouse_button(self, button_id, is_pressed, client_list = None, force_remote = False):
+    def send_mouse_button(self, button_id, is_pressed, client_list = None, force_remote = False, extra_data : dict = None):
         ''' sends a mouse button press or release to clients '''
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse button: {button_id} pressed: {is_pressed}")
 
-            payload = MouseData().create(button_id, is_pressed, "button").toPayload()
+            payload = MouseData().create(button_id, is_pressed, "button", extra_data).toPayload()
             data = self.getDatablock("mouse", payload)
             self._dispatch(data, client_list)
 
 
-    def send_mouse_button_double_click(self, button_id, is_pressed, client_list = None, force_remote = False):
+    def send_mouse_button_double_click(self, button_id, is_pressed, client_list = None, force_remote = False, extra_data : dict = None):
         ''' sends a mouse button press or release to clients  '''
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse dblclick {button_id} pressed: {is_pressed}")
-            payload = MouseData().create(button_id, is_pressed, "button_double").toPayload()
+            payload = MouseData().create(button_id, is_pressed, "button_double", extra_data).toPayload()
             data = self.getDatablock("mouse", payload)
             self._dispatch(data, client_list)        
 
-    def send_mouse_wheel(self, direction, client_list = None, force_remote = False):
+    def send_mouse_wheel(self, direction, client_list = None, force_remote = False, extra_data : dict = None):
         ''' sends vertical mousewheel data  to clients '''
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse wheel: {direction}")
-            payload = MouseData().create(MouseButton.Wheel, direction, "wheel").toPayload()
+            payload = MouseData().create(MouseButton.Wheel, direction, "wheel", extra_data).toPayload()
             data = self.getDatablock("mouse", payload)
             self._dispatch(data, client_list)      
 
-    def send_mouse_h_wheel(self, direction, client_list = None,  force_remote = False):
+    def send_mouse_h_wheel(self, direction, client_list = None,  force_remote = False, extra_data : dict = None):
         ''' sends horizontal mousewheel data to clients '''
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse H wheel: {direction}")
         
-            payload = MouseData().create(MouseButton.HWheel, direction, "hwheel").toPayload()
+            payload = MouseData().create(MouseButton.HWheel, direction, "hwheel", extra_data).toPayload()
             data = self.getDatablock("mouse", payload)
             self._dispatch(data, client_list) 
 
-    def send_mouse_motion(self, dx, dy, client_list = None, force_remote = False):
+    def send_mouse_motion(self, dx, dy, client_list = None, force_remote = False, extra_data : dict = None):
         ''' sends mouse motion data to clients '''
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse motion: {dx}, {dy}")
             
-            payload = MouseData().create(MouseButton.NotSet, (dx,dy), "axis").toPayload()
+            payload = MouseData().create(MouseButton.NotSet, (dx,dy), "axis", extra_data).toPayload()
             data = self.getDatablock("mouse", payload)
             self._dispatch(data, client_list)
 
-    def send_mouse_motion_acceleration(self, a, min_speed, max_speed, time_to_max_speed, client_list = None, force_remote = False):
+    def send_mouse_motion_acceleration(self, a, min_speed, max_speed, time_to_max_speed, client_list = None, force_remote = False, extra_data : dict = None):
         ''' sends mouse acceleration data to clients '''
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse motion acceleration")
-            payload = MouseData().create(MouseButton.NotSet, (a, min_speed, max_speed, time_to_max_speed), "amotion").toPayload()
+            payload = MouseData().create(MouseButton.NotSet, (a, min_speed, max_speed, time_to_max_speed), "amotion", extra_data).toPayload()
             data = self.getDatablock("mouse", payload)
             self._dispatch(data, client_list)
 
@@ -751,10 +752,21 @@ class RemoteClient():
 
         sender = data["sender_id"]
         action = data["action"]
-        if sender == remote_client.clientId:
-            # ignore our own broadcasts unless they need to be processed by the local client
-            if not action in ('identify','identify_client'):
+        target = data["to"]
+
+        client_id = self.clientId
+        if not action in ('identify','identify_client', 'unregister_client', 'register_client'):
+            if sender == client_id:
+                # ignore our own broadcasts unless they need to be processed by the local client
+                    return
+            if target and target != client_id:
+                # ignore target if not the current client
                 return
+           
+            if  not gremlin.shared_state.is_running:
+                # profile must be running
+                return 
+        
 
         verbose = gremlin.config.Configuration().verbose_mode_remote_extra
         if verbose: syslog.info(f"REMOTE: received remote data: {data}")
@@ -774,12 +786,40 @@ class RemoteClient():
 
             case "key":
                 # keyboard output
+                import win32gui, win32con
                 key_data = KeyData().fromPayload(data['data'])
                 virtual_code = key_data.virtual_code
                 scan_code = key_data.scan_code
                 flags = key_data.flags
                 if verbose: syslog.info(f"REMOTE: key 0x{scan_code:X}")
-                win32api.keybd_event(virtual_code, scan_code, flags, 0)
+                extra_data = key_data.extra_data
+                process_name = extra_data['process_name'] if extra_data and 'process_name' in extra_data else None
+   
+                hwnd = 0
+                if process_name:
+                    partial_match = extra_data['partial_match'] if extra_data and 'partial_match' in extra_data else False
+                    
+                    
+                    ph = gremlin.process.ProcessHelper()
+                    hwnd = ph.findProcessHwnd(process_name, partial_match)
+                    if hwnd:
+                        # Keyup Bits: (Transition=0, Previous=0, Extended=0, Scancode=0x1E, Repeat=1)
+                        lparam = 0x00000001 | scan_code << 16 # Scan code, repeat=1
+                        is_extended = flags & win32con.KEYEVENTF_EXTENDEDKEY 
+                        msg = win32con.WM_KEYUP if flags & win32con.KEYEVENTF_KEYUP else win32con.WM_KEYDOWN
+                        if is_extended:
+                            lparam |= 0x01000000; # Extended code if required
+                        hwnd_list = gremlin.keyboard.getInnerWindows(hwnd)
+                        if msg == win32con.WM_KEYUP:
+                            lparam |= 0xC0000000 # key up
+                        for sub_hwnd in hwnd_list:  # must send to specific process subhandles for POST method
+                            win32gui.PostMessage(sub_hwnd, msg, virtual_code, lparam)
+                    else:
+                        # send to window with focus
+                        gremlin.sendinput.send_key(virtual_code, scan_code, flags)
+                
+                
+                # win32api.keybd_event(virtual_code, scan_code, flags, 0) # deprecated
         
             case "mouse":
                 # mouse output
@@ -1187,14 +1227,16 @@ class KeyData():
         self.scan_code : int = None
         self.flags : int = None
         self.action : str = None
+        self.extra_data : dict = None
 
     @staticmethod
-    def create(virtual_code : int, scan_code : int, flags : int, action : str = None ) -> KeyData:
+    def create(virtual_code : int, scan_code : int, flags : int, action : str = None, extra_data : dict = None) -> KeyData:
         self = KeyData()
         self.virtual_code = virtual_code
         self.scan_code = scan_code
         self.flags = flags
         self.action = action
+        self.extra_data = extra_data
         return self
     
     def toPayload(self) -> dict:
@@ -1203,6 +1245,7 @@ class KeyData():
             'sc' : self.scan_code,
             'flags' : self.flags,
             'action' : self.action,
+            'extra' : self.extra_data
         }
     
     @staticmethod
@@ -1212,6 +1255,7 @@ class KeyData():
         self.scan_code = data['sc']
         self.flags = data['flags']
         self.action = data['action']
+        self.extra_data = data['extra']
         return self
 
 class MouseData():
@@ -1220,14 +1264,16 @@ class MouseData():
         self.button_id : int = None
         self.value = None
         self.action : str = None
+        self.extra_data : dict = None
         
 
     @staticmethod
-    def create(button_id: int, value, action : str = None) -> MouseData:
+    def create(button_id: int, value, action : str = None, extra_data : dict = None) -> MouseData:
         self = MouseData()
         self.button_id = button_id
         self.value = value
         self.action = action
+        self.extra_data = extra_data
         return self
 
     def toPayload(self) -> dict:
@@ -1235,6 +1281,7 @@ class MouseData():
             'button' : self.button_id,
             'value' : self.value,
             'action' : self.action,
+            'extra' : self.extra_data
         }
     
     @staticmethod
@@ -1243,6 +1290,7 @@ class MouseData():
         self.button_id = data['button']
         self.value = data['value']
         self.action = data['action']
+        self.extra_data = data['extra']
         return self
     
 
@@ -1712,6 +1760,10 @@ class RemoteConfig():
         self._is_custom : bool = False # true if the configuration is custom set
         self._local_enabled : bool = local_enabled # true if the action can send to the local client
         self._remote_enabled : bool = remote_enabled # true if the action can send to a remote client
+        self._process_name : str = None # target process name (None if target is the window with focus)
+        self._is_target_process : bool = False # true if a target process is defined
+        self._is_partial_match : bool = True # true if we are matching partial titles when looking for a target process by title
+
         self._client_changed_callbacks = []
         if client_change_callback:
             self._client_change_callbacks.append(client_change_callback)
@@ -1792,10 +1844,26 @@ class RemoteConfig():
 
     @property
     def isCustom(self) -> bool:
+        ''' true if using custom routing '''
         return self._is_custom
     @isCustom.setter
     def isCustom(self, value : bool):
         self._is_custom = value
+
+    @property
+    def isProcess(self) -> bool:
+        ''' true if a custom target process is used '''
+        return self._is_target_process
+    @isProcess.setter
+    def isProcess(self, value : bool):
+        self._is_target_process = value        
+
+    @property
+    def partialMatch(self) -> bool:
+        return self._is_partial_match
+    @partialMatch.setter
+    def partialMatch(self, value : bool):
+        self._is_partial_match = value
 
     @property
     def localEnabled(self) -> bool:
@@ -1809,7 +1877,7 @@ class RemoteConfig():
         return self._remote_enabled
     @remoteEnabled.setter
     def remoteEnabled(self, value : bool):
-        self._remote_enabled = value        
+        self._remote_enabled = value       
 
     @property
     def remote(self) -> bool:
@@ -1828,6 +1896,14 @@ class RemoteConfig():
     @local.setter
     def local(self, value : bool):
         self._local= value
+
+
+    @property
+    def process(self) -> str:
+        return self._process_name
+    @process.setter
+    def process(self, value : str):
+        self._process_name = value
 
     def selectAll(self):
         ''' selects all clients '''
@@ -1929,6 +2005,11 @@ class RemoteConfig():
         node.set("local", safe_format(self._local, bool))
         node.set("remote", safe_format(self._remote, bool))
         node.set("singleton", safe_format(self.singleton, bool))
+        if self.process:
+            node.set("process", safe_format(self.process, str, escape = True))
+        node.set("target-process", safe_format(self.isProcess, bool))
+        node.set("partial-title", safe_format(self.partialMatch, bool))
+
         client : RemoteClientData
         for client in self._clients.values():
             if client.selected:
@@ -1943,6 +2024,11 @@ class RemoteConfig():
         self._local = safe_read(node, "local", bool, True)
         self._remote = safe_read(node, "remote", bool, True)
         self.singleton = safe_read(node, "singleton", bool, False)
+        if "process" in node.attrib:
+            self.process = safe_read(node,"process", str, None, unescape=True)
+        self.isProcess = safe_read(node,"target-process", bool, False)
+        self.partialMatch = safe_read(node,"partial-title", bool, True)
+
         # list of clients
         client_nodes = node.xpath(".//client")
         for client_node in client_nodes:

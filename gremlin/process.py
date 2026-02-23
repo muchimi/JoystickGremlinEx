@@ -203,7 +203,6 @@ class ProcessMonitor(QtCore.QObject):
             for process_name in process_names:
                 if exe.casefold() == process_name:
                     return True
-            
         return False
     
 
@@ -216,12 +215,24 @@ def list_current_processes():
     return _process_monitor.list_current_processes()
 
 
-          
+@SingletonDecorator          
 class ProcessHelper:
 
     def __init__(self):
         self._lock = threading.Lock()
         self._is_running = False
+
+    def findProcessHwnd(self, process_name : str, partial_match : bool = False):
+        ''' gets a process handle using partial match of title or EXE - 0 if not found '''
+        hwnd = 0
+        if partial_match:
+            hwnd = self.getWindowHwndTitlePartialMatch(process_name) # look by title first
+        else:
+            hwnd = win32gui.FindWindow(None, process_name) # look by title first
+        if not hwnd:
+            hwnd = self.getProcessWindowHwnd(process_name, partial_match) # will be 0 if not found
+        return hwnd
+                        
 
     def getWindows(self):
         """
@@ -253,12 +264,29 @@ class ProcessHelper:
         win32gui.EnumWindows(callback, None)
         return windows
     
-    def getProcessWindowHwnd(self, path : str):
-        ''' gets the window handle for the given process '''
-        if not path or not os.path.isfile(path):
+    def getProcessWindowHwnd(self, path : str, partial_match : bool = False):
+        ''' gets the window handle for the given process - partial match matches the EXE portion'''
+        if not path or (not partial_match and not os.path.isfile(path)):
             return None
         data = self.getWindows()
-        info = next((item for item in data if item["process_path"].casefold() == path.casefold()), None)
+        searchpath = os.path.normpath(path).casefold()
+        info = next((item for item in data if item["process_path"] and item["process_path"].casefold() == searchpath), None)
+        if not info and partial_match:
+            path = path.casefold()
+            info = next((item for item in data if item["process_path"] and searchpath in os.path.basename(item["process_path"]).casefold() == searchpath), None)
+            
+
+        if info:
+            return info["hwnd"]
+        return None
+    
+
+
+    def getWindowHwndTitlePartialMatch(self, title : str):
+        ''' gets the window handle for process windows with the matching title in the window title '''
+        data = self.getWindows()
+        title = title.casefold() # case insensitive
+        info = next((item for item in data if item["window_title"] and title in item["window_title"].casefold()), None)
         if info:
             return info["hwnd"]
         return None
@@ -283,8 +311,12 @@ class ProcessHelper:
             # 2. Open the process to get a process handle
             # PROCESS_QUERY_LIMITED_INFORMATION (0x1000) is a required access right
             # False means inherit handle is not set.
-            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-            process_handle = win32api.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, process_id)
+            try:
+                PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+                process_handle = win32api.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, process_id)
+            except:
+                # access denied
+                return None
             process_path = None
             process_name = None
             

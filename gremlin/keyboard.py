@@ -23,6 +23,8 @@ from ctypes import wintypes
 import enum
 import win32api
 import win32con
+import gremlin.sendinput
+import win32gui
 
 # from gremlin.base_classes import TraceableList
 
@@ -96,8 +98,6 @@ _vk_key_scan_ex = _create_function(
     [ctypes.c_wchar, wintypes.HKL],
     ctypes.c_short
 )
- 
-
 
 
 class Key():
@@ -501,32 +501,6 @@ class Key():
     
 
 
-def send_key_down(key, is_local : bool, is_remote : bool, client_list = None):
-    """Sends the KEYDOWN event for a single key.
-
-    :param key the key for which to send the KEYDOWN event
-    """
-    import gremlin.remote
-    import gremlin.macro
-    key: gremlin.keyboard.Key
-  
-    if key.is_mouse:
-        # special handling of virtual keys for mouse buttons
-        dbl_click = "_d_" in key.lookup_name
-        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote, dbl_click = dbl_click, client_list = client_list)
-        return
-
-
-    flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
-    verbose = gremlin.config.Configuration().verbose_mode_outputs
-    
-    if is_local:
-        if verbose: syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
-        win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
-    if is_remote:
-        if verbose: syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
-        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, client_list )
-
 def key_from_mousebutton(button_id):
     ''' maps a mouse button to a key'''
     import gremlin.types
@@ -556,13 +530,68 @@ def key_from_mousebutton(button_id):
         return key_from_name(map_key)
     return None
 
-def send_key_up(key, is_local : bool, is_remote : bool, client_list = None):
+def getInnerWindows(whndl, as_list : bool = True):
+    ''' gets sub handles from a process handle '''
+    def callback(hwnd, hwnds):
+        if win32gui.IsWindowVisible(hwnd) and win32gui.IsWindowEnabled(hwnd):
+            hwnds[win32gui.GetClassName(hwnd)] = hwnd
+        return True
+    hwnds = {}
+    win32gui.EnumChildWindows(whndl, callback, hwnds)
+    if as_list:
+        return hwnds.values()
+    return hwnds
+
+
+
+def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, hwnd = 0, extra_data : dict = None):
+    """Sends the KEYDOWN event for a single key.
+
+    :param key the key for which to send the KEYDOWN event
+    """
+    import gremlin.remote
+    import gremlin.macro
+    key: gremlin.keyboard.Key
+  
+    if key.is_mouse:
+        # special handling of virtual keys for mouse buttons
+        dbl_click = "_d_" in key.lookup_name
+        gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote, dbl_click = dbl_click, client_list = client_list)
+        return
+
+
+    flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
+    verbose = gremlin.config.Configuration().verbose_mode_outputs
+    
+    if is_local:
+        if verbose: syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
+        process_name = extra_data['process_name'] if extra_data and 'process_name' in extra_data else None
+        if hwnd == 0 and process_name:
+            hwnd = win32gui.FindWindow(process_name) # find the process handle, 0 if not found
+        if hwnd:
+            # Keyup Bits: (Transition=0, Previous=0, Extended=0, Scancode=0x1E, Repeat=1)
+            lparam = 0x00000001 | key.scan_code << 16 # Scan code, repeat=1
+            if key.is_extended:
+                lparam |= 0x01000000; # Extended code if required
+            hwnd_list = getInnerWindows(hwnd)
+            for sub_hwnd in hwnd_list:  # must send to specific process subhandles for POST method
+                win32gui.PostMessage(sub_hwnd, win32con.WM_KEYDOWN, key.virtual_code, lparam)
+        else:
+            gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+            # win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0) # keybd_event is deprecated by win32
+    if is_remote:
+        if verbose: syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
+        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, client_list, extra_data = extra_data)
+
+
+def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, hwnd : int = 0, extra_data : dict = None):
     """Sends the KEYUP event for a single key.
 
     :param key the key for which to send the KEYUP event
     """
 
     import gremlin.macro
+
     key: gremlin.keyboard.Key
     verbose = gremlin.config.Configuration().verbose_mode_outputs
 
@@ -577,10 +606,24 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None):
     
     if is_local:
         if verbose: syslog.info(f"OUTPUT: (local) keyup {key.debug_name}")
-        win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
+        process_name = extra_data['process_name'] if extra_data and 'process_name' in extra_data else None
+        if hwnd == 0 and process_name:
+            hwnd = win32gui.FindWindow(process_name) # find the process handle, 0 if not found
+        if hwnd:
+            # Keydown Bits: (Transition=1, Previous=1, Extended=0, Scancode=0x1E, Repeat=1)
+            lparam = 0x00000001 | key.scan_code << 16 # Scan code, repeat=1
+            lparam |= 0xC0000000 # key up
+            if key.is_extended:
+                lparam |= 0x01000000; # Extended code if required
+            hwnd_list = getInnerWindows(hwnd) # must send to specific process subhandles for POST method
+            for sub_hwnd in hwnd_list:
+                win32gui.PostMessage(sub_hwnd, win32con.WM_KEYUP, key.virtual_code, lparam)
+        else:
+            gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+            #win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0) # keybd_event is deprecated by win32
     if is_remote:
         if verbose: syslog.info(f"OUTPUT: (remote) keyup {key.debug_name}")
-        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, client_list )
+        gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, client_list, extra_data = extra_data)
 
 def mouse_from_name(name):
     ''' validates if this is a special mouse key - returns None if it is not'''
