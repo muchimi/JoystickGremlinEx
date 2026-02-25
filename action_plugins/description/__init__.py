@@ -54,8 +54,7 @@ class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
         #                                                             self.action_data.exec_on_release,
         #                                                             press_callback = self._execute_on_press_changed, 
         #                                                             release_callback = self._execute_on_release_changed)
-        # # self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
-        # self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
+
 
         self.main_layout.addLayout(self.inner_layout)
         # self.main_layout.addWidget(self._execute_widget)

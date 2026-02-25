@@ -28,6 +28,8 @@ import win32api, win32com, ctypes, win32gui
 import gremlin.process
 import gremlin.remote
 from gremlin.types import MouseAction, MouseButton
+import gremlin.curve_handler
+import gremlin.types
 
 import enum, threading,time, random
 
@@ -58,6 +60,9 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         # Layouts to use
         if not Shiboken.isValid(self):
             return
+        
+
+        self.container_height = 42
         self.mode_layout = QtWidgets.QHBoxLayout()
 
         self.button_widget = QtWidgets.QWidget()
@@ -66,6 +71,9 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.motion_layout = QtWidgets.QGridLayout(self.motion_widget)
         self.release_widget = QtWidgets.QWidget()
         self.options_layout = QtWidgets.QHBoxLayout(self.release_widget)
+
+
+
 
         
 
@@ -218,19 +226,111 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.container_monitor)
         self.main_layout.addWidget(self.container_position)
         self.main_layout.addWidget(self.container_process)
-        self.main_layout.addWidget(self.remote_widget)
-        
+
 
 
         # Create the different UI elements
         self._create_mouse_button_ui()
         if self.action_data.get_input_type() == InputType.JoystickAxis:
             self._create_axis_ui()
+            self._create_curve_ui()
         else:
             self._create_button_hat_ui()
 
+        self.main_layout.addWidget(self.remote_widget)
+                    
+
         self._populate_monitor_selector()
         self._update_ui()
+
+    def _create_curve_ui(self):
+        ''' creates the input curve widget '''
+
+        self.curve_button_widget = QtWidgets.QPushButton("Curve")
+
+        active_color = gremlin.ui.ui_common.Color.activeColor()
+        normal_color = gremlin.ui.ui_common.Color.normalColor()
+        self.curve_icon_inactive = gremlin.util.load_icon("mdi.chart-bell-curve",qta_color=normal_color)
+        self.curve_icon_active = gremlin.util.load_icon("mdi.chart-bell-curve",qta_color=active_color)
+        self.curve_button_widget.setToolTip("Curve output")
+        self.curve_button_widget.clicked.connect(self._curve_button_cb)
+
+        self.curve_clear_widget = QtWidgets.QPushButton("Clear curve")
+        delete_icon = gremlin.util.load_icon("mdi.delete")
+        self.curve_clear_widget.setIcon(delete_icon)
+        self.curve_clear_widget.setToolTip("Removes the curve output")
+        self.curve_clear_widget.clicked.connect(self._curve_delete_button_cb)
+
+
+        widgets = [
+            self.curve_button_widget,
+            self.curve_clear_widget,
+        ]
+
+        self.container_output_curve_widget = gremlin.ui.ui_common.getHContainer(widgets,"Input Curve Options", min_height = self.container_height, widget_only = True, left_margin = 12)
+        self.main_layout.addWidget(self.container_output_curve_widget)
+
+        self._update_curve_icon()
+
+    QtCore.Slot()
+    def _curve_delete_button_cb(self):
+        ''' removes the curve data '''
+        message_box = QtWidgets.QMessageBox()
+        message_box.setText("Confirmation")
+        message_box.setInformativeText("Delete curve data for this output?")
+        message_box.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Ok |
+            QtWidgets.QMessageBox.StandardButton.Cancel
+        )
+        message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
+        gremlin.util.centerDialog(message_box)
+        is_cursor = gremlin.util.isCursorActive()
+        if is_cursor:
+            gremlin.util.popCursor()
+        response = message_box.exec()
+        if is_cursor:
+            gremlin.util.pushCursor()
+        if response == QtWidgets.QMessageBox.StandardButton.Ok:
+            self.action_data.curve_data = None
+            self._update_curve_icon()        
+
+    QtCore.Slot()
+    def _curve_button_cb(self):
+        if not self.action_data.curve_data:
+            curve_data = gremlin.curve_handler.AxisCurveData()
+            curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+            curve_data.curve_update()
+            self.action_data.curve_data = curve_data
+
+        syslog.info(f"Before curve update: {self.action_data.curve_data}")
+
+        dialog = gremlin.curve_handler.AxisCurveDialog(self.action_data.curve_data)
+        gremlin.util.centerDialog(dialog, dialog.width(), dialog.height())
+        # setup the update handler for value inputs into the curve
+        self.curve_update_handler = dialog.curve_update_handler
+        
+
+        # disable highlighting
+        gremlin.shared_state.push_suspend_highlighting()
+        dialog.exec()
+        gremlin.shared_state.pop_suspend_highlighting()
+        self.curve_update_handler = None
+        self.action_data.curve_data = dialog.getCurveData()
+        self.action_data.curve_data.curve_update() # update any changes to the curve
+
+
+        syslog.info(f"After curve update: {self.action_data.curve_data}")
+
+        self._update_curve_icon()
+
+
+    def _update_curve_icon(self):
+        if self.action_data.curve_data:
+            self.curve_button_widget.setIcon(self.curve_icon_active)
+            self.curve_clear_widget.setEnabled(True)
+        else:
+            self.curve_button_widget.setIcon(self.curve_icon_inactive)
+            self.curve_clear_widget.setEnabled(False)
 
     def _handle_sendmode_changed(self, mode):
         ''' sets the send mode'''
@@ -782,10 +882,48 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
     def profile_start(self):
         ''' occurs on profile start '''
         self.client_list = self.action_data.remote_config.getClientList()
+        if self.action_data.curve_data:
+            self.action_data.curve_data.curve_update() # ensure curve data is populated 
 
     def profile_stop(self):
         ''' occurs on profile stop '''
         pass
+
+    def getCurveActions(self):
+        ''' finds curve action siblings to this remap action '''
+        actions = []
+        nodes = []
+        for node in self.getSiblings():
+            if gremlin.base_profile._is_curve_tag(node.action.tag):
+                nodes.append(node)
+
+
+        # sort the list in reverse priority order (highest prority runs first)
+        if nodes:
+            nodes.sort(key = lambda x: x.priority)
+            nodes.reverse()
+            for node in nodes:
+                action = node.action
+                actions.append(action)
+        return actions    
+
+    def getCurveData(self, event, value):
+        ''' returns active curve data that applies to the container through included response curve actions '''
+        actions = self.getCurveActions()
+        curves = []
+        if actions:
+            for action in actions:
+                if action.curve_data:
+                    # see if the curve should apply
+                    if event is None or self.shouldExecute(event, value, action):
+                        curves.append(action.curve_data)
+
+        # add self
+        if self.action_data.curve_data is not None:
+            curves.append(self.action_data.curve_data)
+
+        return curves
+
 
     def process_event(self, event, value, extra_data = None):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
@@ -794,20 +932,30 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         trigger = self.action_data.execute_on_press and event.is_pressed or \
                   self.action_data.execute_on_release and not event.is_pressed
         
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_curve
+        
         match self.action_data.action_mode:
             case MouseAction.MouseMotion:
                 # handle motion requests
-                if trigger:
-                    match event.event_type:
-                        case InputType.JoystickAxis: 
-                            self._perform_axis_motion(event, value)
-                        case InputType.JoystickHat: 
-                            self._perform_hat_motion(event, value) 
-                        case InputType.JoystickButton:
-                            self._perform_button_motion(event, value)
+                value = event.value
+                curves = self.getCurveData(None, value)
+                for curve_data in curves:
+                    curve_value = curve_data.curve_value(value) # remember to make sure curve_data had curve_update() called or the data will be incorrect
+                    if verbose: curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
+                    value = curve_value
+                event.curve_value = value
+                match event.event_type:
+                    case InputType.JoystickAxis: 
+                        self._perform_axis_motion(event, value)
+                    case InputType.JoystickHat: 
+                        self._perform_hat_motion(event, value) 
+                    case InputType.JoystickButton:
+                        self._perform_button_motion(event, value)
                 
             case MouseAction.MouseButton:
-                self._perform_mouse_button(event, value, wheel_factor = self.action_data.wheel_factor)
+                if trigger:
+                    self._perform_mouse_button(event, value, wheel_factor = self.action_data.wheel_factor)
 
             case MouseAction.MousePosition | MouseAction.MouseSetPrecisionPosition:
                 if trigger:
@@ -1097,6 +1245,9 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         # deadzone in percent
         self.deadzone = 0.01
 
+        # curve data
+        self.curve_data = None
+
         self.wheel_factor = 1 # factor for wheel motion
 
         # exact mouse position option
@@ -1200,7 +1351,7 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
             #     self.force_remote_output_only = safe_read(node,"force_remote_output_only",bool, False)
             value = safe_read(node,"force_remote_output_only",bool, False)
             if value:
-                self.sendMode = SendType.RemoteOnly
+                self.sendMode = gremlin.types.SendType.RemoteOnly
 
         
 
@@ -1237,6 +1388,14 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
             args = node.get("process-args")
             if args:
                 self.process_args = args
+
+        for child in node:
+            if child.tag == "curve-data":
+                # curve data node
+                curve_data = gremlin.curve_handler.AxisCurveData()
+                curve_data._parse_xml(child)
+                self.curve_data = curve_data
+
 
         self.profile_timeout = safe_read(node,"process-timeout", float, 5.0)
         self.process_position_relative = safe_read(node,"position-relative", bool, False)
@@ -1282,6 +1441,10 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         node.set("execute-on-press",safe_format(self.execute_on_press, bool))
         node.set("execute-on-release",safe_format(self.execute_on_release, bool))
         
+
+        if self.curve_data:
+            curve_node = self.curve_data._generate_xml()
+            node.append(curve_node)
 
         return node
     

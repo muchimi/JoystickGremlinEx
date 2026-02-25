@@ -131,6 +131,9 @@ class Color():
     def orangeColor():
         return "#ebd034" if gremlin.shared_state.is_dark_theme else "#968215"
     @staticmethod
+    def orangeOffColor():
+        return "#4e4511" if gremlin.shared_state.is_dark_theme else "#3D3B30"
+    @staticmethod
     def greenColor():
         return "#2abd38" if gremlin.shared_state.is_dark_theme else "#088814"
     @staticmethod
@@ -5817,21 +5820,33 @@ class ButtonStateWidget(QtWidgets.QWidget):
 
 class QOnOffStatusfWidget(QtWidgets.QWidget):
     ''' on/off widget '''
-    def __init__(self, state : bool = False, on_icon : str = None, off_icon : str = None, tooltip : str = None, parent=None):
+    def __init__(self, state : bool = False, on_icon : str = None, off_icon : str = None, off_color : str = None, on_color : str = None, tooltip : str = None, icon_size = 16, fixed_width = None, parent=None):
         super().__init__(parent)
         self._button_widget = QtWidgets.QLabel()
         self._button_widget.setContentsMargins(0,0,0,0)
         self._button_widget.setFixedWidth(20)
-        self.setFixedWidth(22)
-        icon_size = QtCore.QSize(16,16)
+        
+        if not icon_size:
+            icon_size = 16
+
+        if fixed_width:
+            self.setFixedWidth(fixed_width)
+
+
+        icon_size = QtCore.QSize(icon_size, icon_size)
+        if not off_color:
+            off_color = Color.offColor()
+        if not on_color:
+            on_color = Color.onColor()
+
         if on_icon:
-            icon = load_icon(on_icon,use_qta=True,qta_color=Color.onColor())
+            icon = load_icon(on_icon,use_qta=True,qta_color=on_color)
             self._on_pixmap = icon.pixmap(icon_size)
         else:
             self._on_pixmap = Pixmaps().onIconPixmap
 
         if off_icon:
-            icon = load_icon(off_icon,use_qta=True,qta_color=Color.offColor())
+            icon = load_icon(off_icon,use_qta=True,qta_color=off_color)
             self._off_pixmap = icon.pixmap(icon_size)
         else:
             self._off_pixmap = Pixmaps().offIconPixmap
@@ -12919,17 +12934,16 @@ class QSyncModeWidget(QtWidgets.QWidget):
 
         main_layout = QtWidgets.QVBoxLayout(self)
     
-        self._selector_widget = QDataComboBox(auto_adjust=True)
         modes = sync_modes if sync_modes else [mode for mode in gremlin.types.SyncMode]
-        
-        for data in modes:
-            self._selector_widget.addItem(data.name, data)
+        items = [(data.name, data) for data in modes]
 
-        index = self._selector_widget.findData(mode)
-        if index != -1:
-            self._selector_widget.setCurrentIndex(index)
-        else:
-            self._mode = self._selector_widget.currentData()
+        self._selector_widget = QDataComboBox(
+            value = mode,
+            source = items,
+            auto_adjust=True,
+            callback = self._handle_mode_changed
+            )
+
         
 
         widgets = [self._selector_widget]
@@ -13005,9 +13019,10 @@ class QSyncModeWidget(QtWidgets.QWidget):
     def value(self) -> float | bool:
         ''' gets the selected start value '''
         return self._value
-    
 
-
+    @QtCore.Slot(object)
+    def _handle_mode_changed(self, value):
+        self._mode_changed()
 
     def _mode_changed(self, emit = True):
         ''' called when mode changes'''
@@ -14010,12 +14025,18 @@ class RemoteClientWidget(QtWidgets.QWidget):
         self.send_local_widget = QDataCheckbox("Local", 
                                         value = self.config.local,
                                         callback = self._handle_local_changed,
-                                        tooltip="Send to local instance")
+                                        tooltip="Send to the local instance.")
         
         self.send_remote_widget = QDataCheckbox("Remote", 
                                         value = self.config.remote,
                                         callback = self._handle_remote_changed,
-                                        tooltip="Send to ore or more remote instances")
+                                        tooltip="Send to remote clients.")
+        
+        self.send_remote_profile_widget = QDataCheckbox("Only send to remote when profile is in remote mode", 
+                                        value = self.config.remoteProfile,
+                                        callback = self._handle_remote_profile_changed,
+                                        tooltip="Send to remote clients when profile is in remote mode.  In this mode, any local output is disabled while the profile is in remote control mode.")
+                
         
         self.warning_remote_widget = QWarningWidget("<i>Remote control is currently disabled</i>")
         self.warning_no_output_widget = QWarningWidget("No output mode selected")
@@ -14023,13 +14044,21 @@ class RemoteClientWidget(QtWidgets.QWidget):
         
 
         widgets = [
+            "Enable output to:",
             self.send_local_widget,
             self.send_remote_widget,
             self.warning_remote_widget,
             self.warning_no_output_widget,
         ]
 
-        widget = getHContainer(widgets, widget_only=True)
+        output_container = getHContainer(widgets, widget_only=True)
+
+        widgets = [
+            output_container,
+            getHContainer(self.send_remote_profile_widget, widget_only=True, left_margin = 12)
+        ]
+
+        widget = getVContainer(widgets, widget_only=True)
         self.group_widget.addWidget(widget)
 
          
@@ -14052,7 +14081,7 @@ class RemoteClientWidget(QtWidgets.QWidget):
         widget = getHContainer(widget, widget_only=True)
         self.group_widget.addWidget(widget)
 
-        self.flow_container_widget, self.flow_container_layout = getVContainer()
+        self.flow_container_widget, self.flow_container_layout = getVContainer(left_margin = 12)
 
         self.client_count_widget = QtWidgets.QLabel()
 
@@ -14066,7 +14095,7 @@ class RemoteClientWidget(QtWidgets.QWidget):
         # any client
         widgets = [
             client_widget,
-            self.any_widget,
+            getHContainer(self.any_widget, widget_only=True, left_margin = 12),
             self.flow_container_widget,
             QHorizontalLine(),
             self.container_buttons
@@ -14087,6 +14116,7 @@ class RemoteClientWidget(QtWidgets.QWidget):
         self._update_ui()
   
     def _update_ui(self):
+        ''' updates UI widget states and visibility based on context '''
         
         config = self.config
 
@@ -14099,9 +14129,10 @@ class RemoteClientWidget(QtWidgets.QWidget):
 
         enabled = config.enabled
 
-
         # remote control only visible if remote control is allowed
-        self.send_remote_widget.setEnabled(enabled)
+        self.send_remote_widget.setEnabled(config.remoteEnabled)
+        self.send_remote_profile_widget.setEnabled(config.remote)
+        self.send_remote_profile_widget.setVisible(config.remoteProfileEnabled)
 
         self.warning_remote_widget.setVisible(not enabled)
 
@@ -14164,6 +14195,16 @@ class RemoteClientWidget(QtWidgets.QWidget):
 
     def _handle_local_changed(self, checked):
         self.config.local = checked
+        self._update_ui()
+
+    def _handle_remote_profile_changed(self, checked):
+        self.config.remoteProfile = checked
+        if checked:
+            # ensure at least one client is selected
+            count = self.config.getSelectedCount()
+            if not count:
+                self.any_widget.setChecked(True)
+            
         self._update_ui()
 
     def _handle_remote_changed(self, checked):
@@ -14276,6 +14317,8 @@ class RemoteClientWidget(QtWidgets.QWidget):
             #if verbose: syslog.info(f"got client: [{client.client_name}]")
             if client.client_id != 0:
                 # only add the specific connected clients
+                if not client.connected:
+                    continue # client is not connected
                 client_name = client.getClientName()
                 if client_name in used_names:
                     # custom name duplicated

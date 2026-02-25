@@ -2432,6 +2432,8 @@ class AxisCurveData():
         if update or self.deadzone_fn is None or self.response_fn is None:
             self.curve_update()
         if self.deadzone_fn is not None:
+            # v1 = self.deadzone_fn(value)
+            # syslog.info(f"deadzone: input [{value:0.4f}] output [{v1:0.4f}]")
             value = self.deadzone_fn(value)
         if self.response_fn is not None:
             value = self.response_fn(value)

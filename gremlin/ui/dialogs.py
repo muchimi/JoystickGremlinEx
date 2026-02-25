@@ -582,6 +582,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         if self._custom_host_name != self.config.custom_host_name:
             el.remote_control_identify.emit() # indicate client name changed
 
+        el.remote_control_state_change.emit() # update the status bar
+
 
 
     def _tab_changed_cb(self, new_index):
@@ -1184,12 +1186,19 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.remote_control_select_ip_widget.setToolTip("Selects a different IP address for the GremlinEx Broadcast server if the host has more than one IP address.")
         self.remote_control_select_ip_widget.clicked.connect(self._remote_control_server_ip_select)
 
-        self.remote_control_port_widget = QtWidgets.QDoubleSpinBox()
-        self.remote_control_port_widget.setRange(4096,65535)
-        self.remote_control_port_widget.setDecimals(0)
-        self.remote_control_port_widget.setValue(float(self.config.broadcast_port))
-        self.remote_control_port_widget.valueChanged.connect(self._remote_control_server_port)
-        self.remote_control_port_widget.setToolTip("This specifies the UDP port used to communicate with other Joystick Gremlin Ex instances on the network.  The local firewall must allow the ports to broadcast.  The +1 port is used to receive messages.")
+        self.remote_control_port_widget = gremlin.ui.ui_common.QIntLineEdit(
+            value = self.config.server_port,
+            callback = self._handle_remote_server_port_changed,
+            min_range = 4096,
+            max_range = 65535,
+            tooltip = "This specifies the UDP port used to communicate with other Joystick Gremlin Ex instances on the network.  The local firewall must allow the ports to broadcast.  The +1 port is used to receive messages.")
+        
+        # QtWidgets.QDoubleSpinBox()
+        # self.remote_control_port_widget.setRange(4096,65535)
+        # self.remote_control_port_widget.setDecimals(0)
+        # self.remote_control_port_widget.setValue(float(self.config.broadcast_port))
+        # self.remote_control_port_widget.valueChanged.connect(self._handle_remote_server_port_changed)
+        # self.remote_control_port_widget.setToolTip("This specifies the UDP port used to communicate with other Joystick Gremlin Ex instances on the network.  The local firewall must allow the ports to broadcast.  The +1 port is used to receive messages.")
 
 
         page_layout.addWidget(self.remote_control_server_all_ip_widget)
@@ -2781,7 +2790,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         self.config.save()
 
     @QtCore.Slot(int)
-    def _remote_control_server_port(self, value : int):
+    def _handle_remote_server_port_changed(self, value : int):
         ''' updates the remote control server port'''
         self.config.server_port = value
         self.config.save()

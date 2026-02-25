@@ -1044,22 +1044,6 @@ class Configuration(QtCore.QObject):
             self._set_data("server_port", value)
 
     @property
-    def broadcast_port(self):
-        ''' port number to use for the gremlin server '''
-        return self._get_data("broadcast_port",6012)
-    
-    @broadcast_port.setter
-    def broadcast_port(self, value):
-        if type(value) == float:
-            value = int(value)
-        elif type(value) == str and value.isnumeric():
-            value = int(value)
-
-        if type(value) == int:
-            self._set_data("broadcast_port", value)
-
-
-    @property
     def broadcast_host_ip(self):
         ''' host for the broadcast server '''
         return self._get_data("broadcast_host_ip","127.0.0.1")

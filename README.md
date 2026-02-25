@@ -29,6 +29,20 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T185)
+- New: Map to Mouse/Ex Action: gains ability to curve the axis input when mapping an axis to mouse motion. This should help with overly sensitive thumbstick scenarios.
+- New: Remote Control: gains a new option to mimic pre T183 remote control. When an action is setup for remote output (remote is checked), it will use the profile's current remote mode setting and disable local mode (if selected) when checked. If unchecked, the action will output to local or remote based on the checked output options.  The profile remote mode can be set at runtime via the control action (or vjoy remap's legacy control modes).
+- New: Control Action: gains execute on input press/release option.
+- New: Control Action: gains sync input option. The action will send, on profile start, the appropriate initial control command based on the input if the input is an enable/disable command.  For example, if the action is set to enable remote control on trigger, it will disable remote control if the input is not on, and vice versa.
+- New: Remote Control: client name will appear in title bar for easier reference if a remote mode is enabled.
+- New: UI gains a new status icon in the lower left to reflect the profile remote state.  This will change dynamically at runtime as the profile's "remote" state changes.
+
+- Fix: UI remote control status icon reflect broadcast/receive options global states.  A new icon for remote profile is added to separately track the profile's remote state (set by the control action).
+- Fix: remote control port persistence if changed (removed one unused property)
+- Fix: check connection state when refreshing available clients.
+- Fix: status bar no longer updates the runtime mode.
+- Fix: map to mouse/ex action: mouse motion disabled.
+
 ### (m76T184A)
 - Fix: exception when adding vjoy to macro
 - Fix: exception when changing modes in playsound action.

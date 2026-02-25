@@ -402,8 +402,8 @@ class KVM(gremlin.base_profile.AbstractAction):
         self.rotate = False # flip x/y for non standard monitor orientations
 
         # this action can only send to remote clients
-        self.remote_config.localEnabled = False
-        self.remote_config.remoteEnabled = True
+        self.remote_config.localEnabled = False # do not allow local mode
+        self.remote_config.remoteProfileEnabled = False # do not allow exlusive mode
         self.remote_config.remote = True
         
 

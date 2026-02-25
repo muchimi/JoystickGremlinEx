@@ -73,7 +73,16 @@ syslog = logging.getLogger("system")
 
 
 class GremlinServer(socketserver.ThreadingMixIn,socketserver.UDPServer):
-    pass
+    def handle_timeout(self):
+        import gremlin.event_handler
+        el = gremlin.event_handler.EventListener()
+        el.remote_control_socket_timeout.emit() # fire the event to indicate we had a timeout
+        return super().handle_timeout()
+    
+    def handle_error(self, request, client_address):
+        el = gremlin.event_handler.EventListener()
+        el.remote_control_socket_error.emit() # fire the event to indicate we had a timeout
+        # return super().handle_error(request, client_address)
 
 class GremlinSocketHandler(socketserver.BaseRequestHandler):
     ''' handles remote input from a gremlin client on the network
@@ -200,11 +209,16 @@ class RemoteServer(QtCore.QObject):
 
     def __init__(self):
         """Initialises a new object."""
+
         QtCore.QObject.__init__(self)
         self._rpc = None
-        self._instance_id = uuid.getnode() # unique ID of the host based on the mac address
-        self._instance_name = socket.gethostname()
         self._started = False
+
+        el = gremlin.event_handler.EventListener()
+        el.remote_control_socket_timeout.connect(self._handle_socket_timeout)
+        el.remote_control_socket_error.connect(self._handle_socket_error)
+
+
 
 
     def start(self):
@@ -242,6 +256,13 @@ class RemoteServer(QtCore.QObject):
         self._enabled = value
 
 
+    def _handle_socket_timeout(self):
+        syslog.info("RPC: socket timeout")
+        pass
+
+    def _handle_socket_error(self):
+        syslog.info("RPC: socket error")
+        pass
 
 @gremlin.singleton_decorator.SingletonDecorator
 class RemoteClient():
@@ -264,51 +285,59 @@ class RemoteClient():
         self._alive_thread_stop_requested = False
         self._started = False
 
-
         self._callbacks = {} # map of callbacks by client ID
-
-
-        self._instance_id = uuid.getnode() # unique ID of the host based on the mac address
-        self._instance_name = socket.gethostname()
-
-        
-        
-
 
         self.remote_control = RemoteControl()
 
         el = gremlin.event_handler.EventListener()
         # el.profile_stop.connect(self.stop) # hook stop event
         el.shutdown.connect(self.stop) # hook stop event
-        el.remote_control_enable.connect(self._enable_control)
-        el.remote_control_disable.connect(self.stop)
+        el.config_option_changed.connect(self._handle_config_options_changed)
+        el.remote_control_enable.connect(self._handle_enable_control_request)
         el.remote_control_identify.connect(self.requestIdentify) # request network clients to identify
+        el.profile_stop.connect(self._handle_profile_stop)
+
+        # enable control if enabled
+        if self.remote_control.remoteEnabled():
+            self._handle_enable_control_request()
 
     @property
     def clientName(self) -> str:
-        return self._instance_name
+        return self.remote_control.clientName
     
     @property
     def customName(self) -> str:
         ''' custom client name, if any '''
-        config = gremlin.config.Configuration()
-        return config.custom_host_name
-    
+        return self.remote_control.customName
+        
     def getClientName(self) -> str:
         ''' gets the custom or host name '''
-        custom_name = self.customName
-        if self.customName: return custom_name
-        return self.clientName
+        return self.remote_control.clientName
 
+
+    def _handle_profile_stop(self):
+        self.remote_control.is_remote = False # turn off profile remote mode on profile stop
     
     @property
-    def clientId(self) -> str:
-        return self._instance_id
+    def clientId(self) -> int:
+        ''' unique client ID'''
+        return self.remote_control.clientId
+    
 
-    def _enable_control(self):
+    def _handle_config_options_changed(self):
+        ''' called when configuration options are changed '''
+
+        # get remote control options and start/stop as needed
+        enabled = self.remote_control.remoteEnabled()
+        if self._started and not enabled:
+            self.stop() # terminate connection if remote control is no longer enabled and it was previously on
+        elif not self._started and enabled:
+            self._handle_enable_control_request() # enable remote control if it was previously off and now enabled
+
+    def _handle_enable_control_request(self):
         ''' called when request to enable remote control has been made '''
         self.start()
-        self.remote_control.setRemote(True) # enable remote control
+
 
     def getDatablock(self, action : str = None, data = None) -> dict:
         ''' gets a dict with the sender info '''
@@ -324,10 +353,14 @@ class RemoteClient():
     def start(self):
         ''' creates a multicast client send socket on profile start '''
         if not self._started:
-            if self.ensure_socket():
-                el = gremlin.event_handler.EventListener()
-                el.heartbeat.connect(self._alive_ticker)
-                self._started = True
+            if self.remote_control.remoteEnabled:
+                if self.ensure_socket():
+                    el = gremlin.event_handler.EventListener()
+                    el.heartbeat.connect(self._alive_ticker)
+                    self._started = True
+
+                    # send ID request when starting to update clients
+                    self.requestIdentify()
 
             
     def stop(self):
@@ -371,7 +404,7 @@ class RemoteClient():
                         syslog.warning(f'RPC: broadcast host is not configured (using localhost). Using [{broadcast_host}].  This may not be correct if you have multiple IP addresses.')
                     
                 bind_all = config.broadcast_bind_all_ips
-                port = config.broadcast_port
+                port = config.server_port
                 self._address = (RPCGremlin.MULTICAST_GROUP, port)
                 self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 ttl = struct.pack('b', RPCGremlin.MULTICAST_TTL)
@@ -413,11 +446,6 @@ class RemoteClient():
         if enabled:
             data = self.getDatablock("identify")
             self.send(data)
-
-            # # send our own client info
-            # data = self.getDatablock("identify_client", ClientData().toPayload())
-            # self.send(data) # send to all
-
 
     def requestDisconnect(self):
         ''' sends a network notice the current client is disconnecting '''
@@ -679,8 +707,8 @@ class RemoteClient():
     def send(self, data = None, client_id : int = 0):
         ''' sends data to the socket'''
         if data:
-            data["sender_id"] = self._instance_id
-            data["sender_name"] = self._instance_name
+            data["sender_id"] = self.clientId
+            data["sender_name"] = self.clientName
             data["to"] = client_id if client_id is not None else 0
 
             # ensure started
@@ -756,16 +784,17 @@ class RemoteClient():
 
         client_id = self.clientId
         if not action in ('identify','identify_client', 'unregister_client', 'register_client'):
+            # non global commands
             if sender == client_id:
-                # ignore our own broadcasts unless they need to be processed by the local client
+                # ignore our own broadcasts
                     return
             if target and target != client_id:
-                # ignore target if not the current client
+                # ignore target if not the current client unless sending to all clients (target == 0)
                 return
            
-            if  not gremlin.shared_state.is_running:
+            if not gremlin.shared_state.is_running:
                 # profile must be running
-                return 
+                return
         
 
         verbose = gremlin.config.Configuration().verbose_mode_remote_extra
@@ -778,12 +807,6 @@ class RemoteClient():
                 # heartbeat
                 return
             
-            case "register":
-                # register client
-                client_data = ClientData(auto=False).fromPayload(data['data'])
-                self.remote_control.registerClient(client_data)
-
-
             case "key":
                 # keyboard output
                 import win32gui, win32con
@@ -1089,6 +1112,10 @@ class RemoteClient():
                 time.sleep(duration)
 
 
+            case _:
+                syslog.error(f"REMOTE: don't know how to handle action [{action}]")
+
+
 
    
  
@@ -1360,46 +1387,93 @@ class ClientData():
 
 @gremlin.singleton_decorator.SingletonDecorator
 class RemoteControl():
-    ''' holds remote control status information'''
+    ''' holds remote control status information and known network client tracker '''
 
     def __init__(self):
         
         self._is_remote = False
         self._is_local = False
         self._is_paired = False
-        self._mode = VjoyAction.VJoyEnableLocalOnly
-        config = gremlin.config.Configuration()
-        self._is_broadcast = config.enable_remote_broadcast
-        self._update(self._mode)
-        el = gremlin.event_handler.EventListener()
-        el.config_changed.connect(self._config_changed)
-        el.broadcast_changed.connect(self._broadcast_changed)
-        self._instance_id = uuid.getnode() # unique ID of the host based on the mac address
-        self._instance_name = socket.gethostname()
-        self._custom_name = config.custom_host_name # custom host name
-
-        # map of clients
+        self._global_remote_enabled = gremlin.config.Configuration().remoteEnabled() # initial state of global options
         self._clients = {}
         
-        # register self on start
-        self.registerClient(ClientData.fromData(self._instance_id,
-                                                self._instance_name,
-                                                self._custom_name,
-                                                gremlin.shared_state.application_version,
-                                                gremlin.shared_state.application_start_time))
+        self._mode = VjoyAction.VJoyEnableLocalOnly
+        self._update(self._mode)
+        el = gremlin.event_handler.EventListener()
+        el.config_changed.connect(self._handle_options_changed)
+        el.remote_control_enable.connect(self._handle_remote_control_enable)
+        el.remote_control_disable.connect(self._handle_remote_control_disable)
+        
+
+        # map of clients
+
+        self.registerSelf()
+        
+        
+    def registerSelf(self):
+        ''' registers the current client '''
+        
+        self.registerClient(
+            ClientData.fromData(
+                self.clientId,
+                self.hostName,
+                self.customName,
+                gremlin.shared_state.application_version,
+                gremlin.shared_state.application_start_time
+            )
+        )
+
+    def _handle_remote_control_enable(self):
+        ''' called when remote control should be enabled '''
+        gremlin.config.Configuration().enable_remote_broadcast = True
+
+    def _handle_remote_control_disable(self):
+        ''' called when remote control should be enabled '''
+        gremlin.config.Configuration().enable_remote_broadcast = False
 
 
     @property
-    def serverRunning(self) -> bool:
-        return self._is_broadcast
+    def customName(self) -> str:
+        config = gremlin.config.Configuration()
+        return config.custom_host_name
+    
+    @property
+    def hostName(self) -> str:
+        ''' host name of the current instance '''
+        return socket.gethostname()
+    
+    @property
+    def clientId(self) -> int:
+        ''' unique instance id for this instance '''
+        return uuid.getnode()
+    
+    @property
+    def clientName(self) -> str:
+        custom_name = self.customName
+        return custom_name if custom_name else self.hostName
+
+    
+
+    @property
+    def clientEnabled(self) -> bool:
+        ''' true if remote control by another client is enabled'''
+        config = gremlin.config.Configuration()
+        return config.enable_remote_control
     
     @property 
-    def clientRunning(self) -> bool:
-        return self._is_remote
+    def serverEnabled(self) -> bool:
+        ''' true if remote control enabled for broadcast/server '''
+        config = gremlin.config.Configuration()
+        return config.enable_remote_broadcast
+    
+    def remoteEnabled(self) -> bool:
+        ''' true if remote control is enabled - client or server - this checks the global options '''
+        config = gremlin.config.Configuration()
+        return config.remoteEnabled()
     
     def getLocalClientId(self):
         ''' gets the local client ID (this machine)'''
-        return self._instance_id
+        return self.clientId
     
     def getClients(self) -> dict:
         ''' gets all clients '''
@@ -1447,6 +1521,8 @@ class RemoteControl():
             
         el = gremlin.event_handler.EventListener()
         el.remote_control_client_change.emit()
+
+
         
     def _update(self, value):
         import gremlin.event_handler
@@ -1485,15 +1561,12 @@ class RemoteControl():
 
         if self._is_local != is_local or self._is_remote != is_remote:
             # status changed
-            self._is_local = is_local
-            self._is_remote = is_remote
+            self.is_local = is_local
+            self.is_remote = is_remote
 
-            syslog.info(f"REMOTE CONTROL: local [{'ENABLED' if self._is_local else 'DISABLED'}] remote [{'ENABLED' if self._is_remote and self._is_broadcast else 'DISABLED (broadcast mode off)' if self._is_remote else 'DISABLED'}]")            
+            syslog.info(f"REMOTE CONTROL: local [{'ENABLED' if self._is_local else 'DISABLED'}] remote [{'ENABLED' if self._is_remote and self.remoteEnabled() else 'DISABLED' if self._is_remote else 'DISABLED'}]")            
 
-            
-            el = gremlin.event_handler.EventListener()
-            el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
-            el.remote_control_changed.emit(is_remote)
+            self._handle_options_changed()
 
         if self._is_paired != is_paired:
             # pairing mode changed
@@ -1508,14 +1581,18 @@ class RemoteControl():
             thread.start()
 
 
-    def _config_changed(self):
+    def _handle_options_changed(self):
         ''' called when broadcast config item changes '''
         
         config = gremlin.config.Configuration()
-        if self._is_broadcast != config.enable_remote_broadcast:
-            self._is_broadcast = config.enable_remote_broadcast
+        if self._global_remote_enabled != config.enable_remote_broadcast:
+            self._global_remote_enabled = config.enable_remote_broadcast
+
             el = gremlin.event_handler.EventListener()
-            el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._is_broadcast))
+            el.broadcast_changed.emit(gremlin.event_handler.StateChangeEvent(self._is_local, self._is_remote, self._global_remote_enabled))
+            el.remote_control_state_change.emit()
+
+            self.registerSelf() # update
 
     def say(self, msg):
         speech = InternalSpeech()
@@ -1578,10 +1655,22 @@ class RemoteControl():
     def is_local(self):
         ''' status of local control '''
         return self._is_local
+    @is_local.setter
+    def is_local(self, value : bool):
+        self._is_local = value
+    
     @property
     def is_remote(self):
         ''' status of remote control - requires both remote and broadcast to be enabled '''
-        return self._is_remote and self._is_broadcast
+        config = gremlin.config.Configuration()
+        return self._is_remote and config.remoteEnabled()
+    
+    @is_remote.setter
+    def is_remote(self, value : bool):
+        if self._is_remote != value:
+            self._is_remote = value
+            el = gremlin.event_handler.EventListener()
+            el.remote_control_state_change.emit() # indicate remote control changed
     
     @property
     def state(self):
@@ -1598,7 +1687,8 @@ class RemoteControl():
     def to_state_event(self):
         ''' returns event data for the current state '''
         from gremlin.event_handler import StateChangeEvent
-        event = StateChangeEvent(self.is_local, self.is_remote, self._is_broadcast)
+        config = gremlin.config.Configuration()
+        event = StateChangeEvent(self.is_local, self.is_remote, config.enable_remote_broadcast)
         return event
   
 
@@ -1752,14 +1842,24 @@ class RemoteConfig():
                  remote : bool = False,
                  local_enabled : bool = True,
                  remote_enabled : bool = True,
+                 remote_profile_enabled : bool = True,
                  singleton : bool = False,
                  client_change_callback = None):
+        
         self._local : bool = local # send to local client
-        self._clients = {} # map of client [client_id] -> RemoteClientData 
-        self._remote : bool = remote # send to remote client
-        self._is_custom : bool = False # true if the configuration is custom set
         self._local_enabled : bool = local_enabled # true if the action can send to the local client
-        self._remote_enabled : bool = remote_enabled # true if the action can send to a remote client
+
+        self._clients = {} # map of client [client_id] -> RemoteClientData 
+
+        self._remote : bool = remote # send to remote client
+        self._remote_enabled : bool = remote_enabled # true if remote is enabled
+
+        self._remote_profile: bool = True # true if the action is sending local when profile is not in remote mode, and remote when profile is in remote mode
+        self._remote_profile_enabled : bool = remote_profile_enabled # true when remote profile is enabled for this configuration (this is set by actions that don't allow this mode)
+
+        self._is_custom : bool = False # true if the configuration is custom set
+        
+        self._profile_remote_mode_enabled : bool = remote_enabled # true if the action can send to a remote client
         self._process_name : str = None # target process name (None if target is the window with focus)
         self._is_target_process : bool = False # true if a target process is defined
         self._is_partial_match : bool = True # true if we are matching partial titles when looking for a target process by title
@@ -1788,9 +1888,9 @@ class RemoteConfig():
     def _clients_changed(self):
         ''' known client list chagned - synchronize with current list '''
 
-        verbose = gremlin.config.Configuration().verbose_mode_remote
-        
+        verbose = gremlin.config.Configuration().verbose_mode_remote_extra
         if verbose: syslog.info(f"RPC: remote config: received client change event")
+
         changed = self._sync_clients()
 
 
@@ -1867,27 +1967,76 @@ class RemoteConfig():
 
     @property
     def localEnabled(self) -> bool:
+        ''' true if local mode is enabled for active output '''
+        if self._remote_profile:
+            # exclusive mode
+            rc = RemoteControl()
+            return self._local_enabled and rc.is_local
         return self._local_enabled
+    
     @localEnabled.setter
     def localEnabled(self, value : bool):
         self._local_enabled = value
 
     @property
     def remoteEnabled(self) -> bool:
-        return self._remote_enabled
-    @remoteEnabled.setter
-    def remoteEnabled(self, value : bool):
-        self._remote_enabled = value       
-
+        ''' true if profile remote mode is enabled for active output '''
+        rc = RemoteControl()
+        if self._remote_profile:
+            # exclusive mode 
+            return rc.is_remote and rc.remoteEnabled
+        return rc.remoteEnabled
+    
+   
+    
     @property
     def remote(self) -> bool:
         ''' true if remote control is enabled '''
-        config = gremlin.config.Configuration()
-        return self._remote_enabled and self._remote and config.remoteEnabled()
+        return self._remote
    
     @remote.setter
     def remote(self, value : bool):
         self._remote = value
+
+    @property
+    def remoteEnabled(self) -> bool:
+        return self._remote_enabled
+    
+    @remoteEnabled.setter
+    def remoteEnabled(self, value : bool):
+        self._remote_enabled = value
+
+    @property
+    def activeRemote(self) -> bool:
+        ''' true if remote control is actively enabled for this action (runtime) '''
+        if gremlin.shared_state.is_running:
+            # profile must be running
+            rc = RemoteControl()
+            if self._remote_profile:
+                return self.remoteProfileEnabled and rc.is_remote
+            if self._remote:
+                return self.remoteEnabled and rc.remoteEnabled
+        return False
+    
+    @property
+    def activeLocal(self) -> bool:
+        ''' true if local mode is enabled (runtime)'''
+        return gremlin.shared_state.is_running and self._local and self.localEnabled
+        
+
+    @property
+    def remoteProfile(self) -> bool:
+        return self._remote_profile
+    @remoteProfile.setter
+    def remoteProfile(self, value : bool):
+        self._remote_profile = value
+
+    @property
+    def remoteProfileEnabled(self) -> bool:
+        return self._remote_profile_enabled 
+    @remoteProfileEnabled.setter
+    def remoteProfileEnabled(self, value : bool):
+        self._remote_profile_enabled = value      
 
     @property
     def local(self) -> bool:
@@ -1896,6 +2045,8 @@ class RemoteConfig():
     @local.setter
     def local(self, value : bool):
         self._local= value
+
+    
 
 
     @property
@@ -1916,8 +2067,8 @@ class RemoteConfig():
 
     @property
     def state(self) -> tuple:
-        ''' gets the local, remote state '''
-        return (self.local, self.remote)
+        ''' gets the active local, remote state '''
+        return (self.activeLocal, self.activeRemote)
 
 
     def _handle_request_client_response(self, packet: PacketData ):
@@ -1933,7 +2084,7 @@ class RemoteConfig():
 
     def getState(self) -> tuple:
         ''' gets the connection state '''
-        return (self.local, self.remote)
+        return (self.activeLocal, self.activeRemote)
    
     def getClient(self, client_id : int) -> RemoteClientData:
         ''' gets a client by ID '''
@@ -2004,6 +2155,7 @@ class RemoteConfig():
         node.set("custom",safe_format(self._is_custom, bool) )
         node.set("local", safe_format(self._local, bool))
         node.set("remote", safe_format(self._remote, bool))
+        node.set("remote-profile", safe_format(self._remote_profile, bool))
         node.set("singleton", safe_format(self.singleton, bool))
         if self.process:
             node.set("process", safe_format(self.process, str, escape = True))
@@ -2023,6 +2175,7 @@ class RemoteConfig():
         self._is_custom  = safe_read(node,"custom", bool, False)
         self._local = safe_read(node, "local", bool, True)
         self._remote = safe_read(node, "remote", bool, True)
+        self._remote_profile = safe_read(node, "remote-profile", bool, True)
         self.singleton = safe_read(node, "singleton", bool, False)
         if "process" in node.attrib:
             self.process = safe_read(node,"process", str, None, unescape=True)

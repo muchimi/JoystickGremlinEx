@@ -846,6 +846,8 @@ class EventListener:
 	remote_config_client_change = Signal() # emits when list of configured clients changes
 	remote_control_state_change = Signal() # called when the remote control server status changes
 	remote_control_identify = Signal() # emits when a client needs to get a current list of clients on the network (this will update all clients)
+	remote_control_socket_timeout = Signal() # emits when the socket times out
+	remote_control_socket_error = Signal() # emits when the socket has an error
 
 	def __init__(self):
 		"""Creates a new instance."""

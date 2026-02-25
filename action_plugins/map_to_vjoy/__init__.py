@@ -4574,10 +4574,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     )
             
                 if self.verbose: syslog.info(f"STEPPED AXIS: linear pulse: direction: [{self.step_direction}] delta: [{delta:0.3f}] new value: [{value:0.3f}]")
-            if is_local:
                 self._set_axis(device_id, input_id, value)
-            if is_remote:
-                self.remote_client.send_axis(device_id, input_id, value, client_list = self.client_list, force_remote = force_remote)
 
         else:
 

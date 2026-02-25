@@ -190,7 +190,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self.ui = Ui_Gremlin()
         self.ui.setupUi(self)
-  
+        self._is_active = False # status bar active flag
         
         
         
@@ -260,7 +260,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.update_mode_status_bar.connect(self._update_mode_status_bar)
         el.request_ui_refresh.connect(self.refresh)
         el.shutdown.connect(self.handle_shutdown)
-
+ 
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon("mdi.checkbox-blank-circle", qta_color= gremlin.ui.ui_common.Color.activeColor())
@@ -342,7 +342,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # hook status bar to events
         el = gremlin.event_handler.EventListener()
-        el.broadcast_changed.connect(self._update_status_bar) # broadcast mode changes 
+        
         el.remote_control_state_change.connect(self._update_status_bar) # remote control state changes
 
         el.keyboard_event.connect(self._kb_event_cb) # for repeaters
@@ -414,6 +414,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         GremlinUi.ui = self
 
         self.ui.update_toolbar()
+        self._update_status_bar()
         el.config_option_changed.connect(self._config_option_changed)
         el.device_change_event.connect(self._device_change_cb)
         el.ui_initialized.connect(self._update_start_tab)
@@ -1318,6 +1319,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             el.remote_control_disable.emit()
 
         el.remote_control_changed.emit(enable)
+        el.remote_control_state_change.emit()
 
 
 
@@ -1873,15 +1875,29 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.status_bar_is_active_widget.setContentsMargins(5, 0, 5, 0)
         self.status_bar_repeater_widget = QtWidgets.QLabel("")
         self.status_bar_repeater_widget.setContentsMargins(5, 0, 5, 0)
-
+  
+        server_icon = "mdi6.wifi-arrow-up"
+        client_icon = "ph.cloud-arrow-down-bold"
+        remote_icon = "mdi6.wifi-arrow-up"
         self.status_bar_server_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
-            on_icon = "fa6s.server",
-            off_icon = "fa6s.server",
+            on_icon = server_icon,
+            off_icon = server_icon,
+            icon_size = 20,
             tooltip = "Server state")
         self.status_bar_client_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
-            on_icon = "mdi.wifi-arrow-up-down",
-            off_icon = "mdi.wifi-arrow-up-down",
+            on_icon = client_icon,
+            off_icon = client_icon,
+            icon_size = 20,
             tooltip="Client state")
+        self.status_bar_remote_widget = gremlin.ui.ui_common.QOnOffStatusfWidget(
+            on_icon = remote_icon,
+            off_icon = remote_icon,
+            off_color = gremlin.ui.ui_common.Color.orangeOffColor(),
+            on_color = gremlin.ui.ui_common.Color.orangeColor(),
+            icon_size = 20,
+            tooltip="Profile remote state")
+        
+        
 
         self.status_bar_highlight_tabswitch_widget = QtWidgets.QPushButton()
         self.status_bar_highlight_tabswitch_widget.setStyleSheet("border: none")
@@ -1920,6 +1936,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         widgets = [
             self.status_bar_server_widget,
             self.status_bar_client_widget,
+            self.status_bar_remote_widget,
         ]
         
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
@@ -1987,6 +2004,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
         self._update_highlight_toolbar_enabled()
+        self._update_status_bar()
 
 
 
@@ -4338,7 +4356,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _update_status_bar(self, event = None):
         # updates the status bar
+        gremlin.util.InvokeUiMethod(self._update_status_bar_ui, event)
 
+    def _update_status_bar_ui(self, event = None):
 
         """Updates the status bar with the current state of the system.
 
@@ -4350,7 +4370,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 text_active = f"<font color=\"{Color.activeColor()}\">Active</font>"
             else:
                 text_active = f"<font color=\"{Color.inactiveColor()}\">Paused</font>"
-            if self.ui.actionActivate.isChecked():
+
+            if gremlin.shared_state.is_running:
                 text_running = f"Running and {text_active}"
             else:
                 text_running = "Not Running"
@@ -4358,16 +4379,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # remote control status
             if not event:
                 event = gremlin.remote.remote_control.to_state_event()
-                
 
-
-            server_state = gremlin.remote.remote_control.serverRunning
-            client_state = gremlin.remote.remote_control.clientRunning
+            server_state = gremlin.remote.remote_control.serverEnabled
+            client_state = gremlin.remote.remote_control.clientEnabled
+            remote_state = gremlin.remote.remote_control.is_remote
             self.status_bar_client_widget.setState(client_state)
-            self.status_bar_client_widget.setToolTip(f"Client {'enabled' if client_state else 'disabled'}")
+            self.status_bar_client_widget.setToolTip("Client enabled - this client can receive remote control commands." if client_state else "Client disabled.  This client cannot receive remote control commands.")
             self.status_bar_server_widget.setState(server_state)
-            self.status_bar_server_widget.setToolTip(f"Master server {'enabled' if server_state else 'disabled'}")
-
+            self.status_bar_server_widget.setToolTip(f"Broadcast enabled.  This client can send remote control commands to other clients." if server_state else "Broadcast disabled.  This client cannot send remote control commands to other clients.")
+            self.status_bar_remote_widget.setState(remote_state)
+            self.status_bar_remote_widget.setToolTip(f"Profile remote mode is currently {'active.' if remote_state else 'inactive.'}")
 
             # if event.is_local:
             #     local_msg = f"<font color=\"{Color.activeColor()}\">Active</font>"
@@ -4380,6 +4401,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running} <b>Local Control</b> {local_msg} <b>Broadcast:</b> {remote_msg}")
             
             self.status_bar_is_active_widget.setText(f"<b>Status:</b> {text_running}")
+            self._update_mode_status_bar_ui()
 
 
         except Exception as err:
@@ -5350,12 +5372,21 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             profile_fname = None
             if gremlin.shared_state.current_profile is not None:
                 profile_fname = gremlin.shared_state.current_profile.profile_file
-            if profile_fname is not None:
-                self.setWindowTitle(f"{os.path.basename(profile_fname)}")
+            if profile_fname:
+                the_title = f"{os.path.basename(profile_fname)}"
             else:
-                self.setWindowTitle("Untitled")
+                the_title = "Untitled"
+                
         else:
-            self.setWindowTitle(title)
+            the_title = title
+
+        # add client name to title bar if remote mode is enabled
+        config = gremlin.config.Configuration()
+        if config.remoteEnabled():
+            # add client name as a reference to title bar if a remote mode is enabled
+            the_title = f"{the_title} [{gremlin.remote.remote_client.getClientName()}]"
+        
+        self.setWindowTitle(the_title)
 
 
 
