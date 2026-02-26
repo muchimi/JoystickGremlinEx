@@ -29,6 +29,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T186)
+- Change: Clipboard - check format before reading text to avoid a (caught) exception.
+- Fix: UI exception in Input Viewer in some situations with controllers with no hats in hat display mode.
+- Fix: 1:1 mapping not creating profile entries in new API model.
+
 ### (m76T185)
 - New: Map to Mouse/Ex Action: gains ability to curve the axis input when mapping an axis to mouse motion. This should help with overly sensitive thumbstick scenarios.
 - New: Remote Control: gains a new option to mimic pre T183 remote control. When an action is setup for remote output (remote is checked), it will use the profile's current remote mode setting and disable local mode (if selected) when checked. If unchecked, the action will output to local or remote based on the checked output options.  The profile remote mode can be set at runtime via the control action (or vjoy remap's legacy control modes).

@@ -208,11 +208,15 @@ class Clipboard(QtCore.QObject):
         else:
             try:
                 win32clipboard.OpenClipboard()
-                value = win32clipboard.GetClipboardData(win32clipboard.CF_TEXT)
+                if win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_TEXT):
+                    value = win32clipboard.GetClipboardData(win32clipboard.CF_TEXT)
+                else:
+                    # not text content
+                    return None
                 win32clipboard.CloseClipboard()
                 return value
             except:
-                syslog.error("CLIBOARD: failed to get text")
+                syslog.error("CLIPBOARD: failed to get text")
                 return None
 
         

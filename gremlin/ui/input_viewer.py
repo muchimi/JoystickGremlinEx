@@ -239,6 +239,8 @@ class VisualizationSelector(QtWidgets.QWidget):
         #gremlin.util.clear_layout(self.main_layout)
         change_callback = self._change_callback
 
+        bh_cb, at_cb, ac_cb, bo_cb, ho_cb = None
+
 
         dev : dinput.DeviceSummary
         for dev in self._devices:
@@ -327,19 +329,22 @@ class VisualizationSelector(QtWidgets.QWidget):
             if combine_button_hats:
                 # combined button/hat
                 checked = config.getValue(device_guid, VisualizationType.ButtonHat, False)
-                bh_cb.setChecked(checked)
+                if bh_cb:
+                    bh_cb.setChecked(checked)
                 if checked: change_callback(dev, VisualizationType.ButtonHat, True)
             else:
                 # button only
                 if has_buttons:
                     checked = config.getValue(device_guid, VisualizationType.Button, False)
-                    bo_cb.setChecked(checked)
+                    if bo_cb:
+                        bo_cb.setChecked(checked)
                     if checked: change_callback(dev, VisualizationType.ButtonHat, True)
 
                 # hat only
                 if has_hats:
                     checked = config.getValue(device_guid, VisualizationType.Hat, False)
-                    ho_cb.setChecked(checked)
+                    if ho_cb:
+                        ho_cb.setChecked(checked)
                     if checked: change_callback(dev, VisualizationType.Hat, True)
 
 

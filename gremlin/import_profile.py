@@ -2545,6 +2545,75 @@ class Mapper():
             self.close()
 
 
+        def getInputMap(self, l1, l2, rollover : MapperMode):
+            ''' builds a mapping of device input id to vjoy input id based on relative sizes, returns list of pairs '''
+            c1 = len(l1)
+            c2 = len(l2)
+            input_map = None
+            if c1 and c2:
+                # both lists contain at least one mapping
+                if c1 == c2:
+                    # same number of elements
+                    input_map = list(zip(l1,l2))
+                elif c1 > c2:
+                    if rollover == MapperMode.RoundRobin:
+                        # 8, 3
+                        factor = c1 // c2 # div
+                        repeated_list = l2 * factor
+                        repeated_list = repeated_list[:c1]
+                        input_map = list(zip(l1, repeated_list))
+                    else:
+                        # use a truncated list
+                        truncated_list = l1[:c2]
+                        input_map = list(zip(truncated_list, l2))
+                else:
+                    # c1 < c2
+                    truncated_list = l2[:c1]
+                    input_map = list(zip(l1, truncated_list))
+
+            return input_map
+
+            
+
+            
+
+
+
+
+
+        def mapSingle(self,
+                      device_guid,
+                      device_type,
+                      mode_name: str,
+                      input_type: InputType,
+                      input_id : int,
+                      vjoy_id : int,
+                      vjoy_input_type : InputType,
+                      vjoy_input_id : int,
+                      vjoy_mapper : str = "Vjoy Remap"):
+            registry = gremlin.base_profile.ProfileRegistry()
+            input_item = registry.getInputItem(
+                                    device_guid,
+                                    device_type,
+                                    mode_name,
+                                    input_type,
+                                    input_id,
+                                    autocreate = True
+            )
+
+            container_plugins = gremlin.plugin_manager.ContainerPlugins()
+            action_plugins = gremlin.plugin_manager.ActionPlugins()
+
+            container = container_plugins.repository["basic"](input_item)
+            action = action_plugins.repository[vjoy_mapper](container)
+            action.input_type = input_type
+            action.vjoy_input_id = vjoy_input_id
+            action.vjoy_id = vjoy_id
+            container.add_action(action)
+
+            input_item.containers.append(container)
+
+            return input_item
 
 
 
@@ -2552,6 +2621,8 @@ class Mapper():
             """Creates a 1 to 1 mapping of the given device to the first
             vJoy device.
             """
+            import gremlin.base_profile
+            import gremlin.joystick_handling
             # Don't attempt to create the mapping for the "Getting Started"
             # widget
 
@@ -2592,6 +2663,7 @@ class Mapper():
                 current_profile = gremlin.shared_state.current_profile
                 tab_guid = gremlin.util.parse_guid(gremlin_ui._active_tab_guid())
                 device : gremlin.base_profile.Device = current_profile.devices[tab_guid]
+           
 
                 tab_map = gremlin_ui._get_tab_map()
                 if device.type != DeviceType.Joystick:
@@ -2608,117 +2680,93 @@ class Mapper():
                     tab_guid = gremlin.util.parse_guid(tab_ids[0])
                     device = current_profile.devices[tab_guid]
 
+               
                 mode = device.modes[current_mode]
+                mode_name = mode.name
+                device_guid = device.device_guid
+                device_type = device.device_type
+                device_info : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid) 
+                
+                device_axis_list = [i for i in range(1, device_info.axis_count+1)]
+                device_button_list = [i for i in range(1, device_info.button_count+1)]
+                device_hat_list = [i for i in range(1, device_info.hat_count+1)]
+
+                vjoy_info : dinput.DeviceSummary = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
+                vjoy_axis_list = [i for i in range(1, vjoy_info.axis_count+1)]
+                vjoy_hat_list = [i for i in range(1, vjoy_info.hat_count+1)]
+                vjoy_button_list = [i for i in range(1, vjoy_info.button_count+1)]
+
+
+         
                 if rollover == MapperMode.Unused:
-                    item_list = current_profile.list_unused_vjoy_inputs()
-                    for input_type in input_types:
-                        for entry in mode.config[input_type].values():
-                            input_list  = item_list[vjoy_id][type_name[input_type]]
-                            if len(input_list) > 0:
-                                vjoy_input_id = input_list.pop(0)
-                                container = container_plugins.repository["basic"](entry)
-                                action = action_plugins.repository[vjoy_mapper](container)
-                                action.input_type = input_type
-                                action.vjoy_input_id = vjoy_input_id
-                                action.vjoy_id = vjoy_id
+                    unused_entries = current_profile.list_unused_vjoy_inputs()
+                    # gets dict[vjoy_id][axis | button | hat] = list[unused_vjoy_ids]
+                    if vjoy_id in unused_entries:
+                        unused_axes = unused_entries['axis']
+                        if unused_axes:
+                            vjoy_axis_list = [id for id in vjoy_axis_list if id in unused_axes]
+                        unused_buttons = unused_entries['button']
+                        if unused_buttons:
+                            vjoy_button_list = [id for id in vjoy_button_list if id in unused_buttons]
+                        unused_hats = unused_entries['hat']
+                        if unused_hats:
+                            vjoy_hat_list = [id for id in vjoy_hat_list if id in unused_hats]
 
-                                container.add_action(action)
-                                entry.containers.append(container)
 
-                elif rollover == MapperMode.Stop:
-                    info : dinput.DeviceSummary = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
-                    axis_list = [i for i in range(1, info.axis_count+1)]
-                    hat_list = [i for i in range(1, info.hat_count+1)]
-                    button_list = [i for i in range(1, info.button_count+1)]
+                
 
-                    for input_type in input_types:
-                        for entry in mode.config[input_type].values():
-                            if input_type == InputType.JoystickAxis:
-                                if not axis_list:
-                                    continue
-                                input_list = axis_list
-                            elif input_type == InputType.JoystickHat:
-                                if not hat_list:
-                                    continue
-                                input_list = hat_list
-                            elif input_type == InputType.JoystickButton:
-                                if not button_list:
-                                    continue
-                                input_list = button_list
-                            else:
-                                continue
+                source = []
+                if device_axis_list and vjoy_axis_list:
+                    # axis to map
+                    input_map = self.getInputMap(device_axis_list, vjoy_axis_list, rollover)
+                    if input_map:
+                        source.append((InputType.JoystickAxis, input_map))   
 
-                            if len(input_list) > 0:
-                                vjoy_input_id = input_list.pop(0)
-                                container = container_plugins.repository["basic"](entry)
-                                action = action_plugins.repository[vjoy_mapper](container)
-                                action.input_type = input_type
-                                action.vjoy_input_id = vjoy_input_id
-                                action.vjoy_id = vjoy_id
+                if device_button_list and vjoy_button_list:
+                    # buttons to map
+                    input_map = self.getInputMap(device_button_list, vjoy_button_list, rollover)
+                    if input_map:
+                        source.append((InputType.JoystickButton, input_map))   
 
-                                container.add_action(action)
-                                entry.containers.append(container)
+                if device_hat_list and vjoy_hat_list:
+                    # hats to map
+                    input_map = self.getInputMap(device_hat_list, vjoy_hat_list, rollover)
+                    if input_map:
+                        source.append((InputType.JoystickHat, input_map))   
 
-                elif rollover == MapperMode.RoundRobin:
-                    info = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
-                    axis_list = [i for i in range(1, info.axis_count+1)]
-                    hat_list = [i for i in range(1, info.hat_count+1)]
-                    button_list = [i for i in range(1, info.button_count+1)]
-                    axis_index = 0
-                    hat_index = 0
-                    button_index = 0
 
-                    for input_type in input_types:
-                        for entry in mode.config[input_type].values():
-                            if input_type == InputType.JoystickAxis:
-                                if not axis_list:
-                                    continue
-                                vjoy_input_id = axis_list[axis_index]
-                                axis_index +=1
-                                if axis_index >= len(axis_list):
-                                    axis_index = 0
-                            elif input_type == InputType.JoystickHat:
-                                if not hat_list:
-                                    continue
-                                vjoy_input_id = hat_list[hat_index]
-                                hat_index +=1
-                                if hat_index >= len(hat_list):
-                                    hat_index = 0
+                for input_type, input_map in source:
+                    for input_id, vjoy_input_id in input_map:
+                        self.mapSingle(device_guid, 
+                                        device_type,
+                                        mode_name,
+                                        input_type = input_type,
+                                        input_id = input_id,
+                                        vjoy_id = vjoy_id,
+                                        vjoy_input_type= input_type,
+                                        vjoy_input_id = vjoy_input_id
+                                        )
+                        
+                
 
-                            elif input_type == InputType.JoystickButton:
-                                if not button_list:
-                                    continue
-                                vjoy_input_id = button_list[button_index]
-                                button_index +=1
-                                if button_index >= len(button_list):
-                                    button_index = 0
-                            else:
-                                continue
-
-                            container = container_plugins.repository["basic"](entry)
-                            action = action_plugins.repository[vjoy_mapper](container)
-                            action.input_type = input_type
-                            action.vjoy_input_id = vjoy_input_id
-                            action.vjoy_id = vjoy_id
-
-                            container.add_action(action)
-                            entry.containers.append(container)
-
-                            
+                # synchronize
+                registry = gremlin.base_profile.ProfileRegistry()
+                registry.sync(current_profile)
 
                             
 
                 # refresh the input tabs
 
-                tab_widget = gremlin_ui.getActiveTabWidget()
-                tab_widget.refresh()
+                # tab_widget = gremlin_ui.getActiveTabWidget()
+                # tab_widget.refresh()
 
                 # update the selection
-                device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
-                if input_type and input_id:
-                    el.select_input.emit(device_guid, input_type, input_id, True, False, False)
+                # device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
+                # if input_type and input_id:
+                #     el.select_input.emit(device_guid, input_type, input_id, True, False, False)
             finally:
-                el.update_action_icons.emit() # asks all inputs to refresh their action icons
+                #el.update_action_icons.emit() # asks all inputs to refresh their action icons
+                el.request_ui_refresh.emit()
                 gremlin.util.popCursor()
 
             
