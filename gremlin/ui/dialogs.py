@@ -1155,12 +1155,12 @@ class OptionsUi(ui_common.BaseDialogUi):
         page_layout.addWidget(self.enable_remote_control_widget)
         page_layout.addWidget(self.enable_remote_broadcast_widget)
 
-        host_widget = gremlin.ui.ui_common.QLineEdit(text = gremlin.remote.remote_client.clientName, readonly = True)
-        widget = gremlin.ui.ui_common.getHContainer(host_widget, "Host Name:", widget_only=True,tooltip = "Client host name (system defined)")
+        host_widget = gremlin.ui.ui_common.QLineEdit(text = gremlin.remote.remote_control.hostName, readonly = True)
+        widget = gremlin.ui.ui_common.getHContainer(host_widget, "Host Name:", widget_only=True,tooltip = "Client host name (system defined - cannot be changed here)")
         page_layout.addWidget(widget)
 
-        self.custom_host_widget = gremlin.ui.ui_common.QLineEdit(text = self.config.custom_host_name, callback = self._handle_custom_host_changed)
-        widget = gremlin.ui.ui_common.getHContainer(self.custom_host_widget, "Custom Client Name:", widget_only=True,tooltip = "Custom client name (leave bank to use host name)")
+        self.custom_host_widget = gremlin.ui.ui_common.QLineEdit(text = gremlin.remote.remote_control.customName, callback = self._handle_custom_host_changed)
+        widget = gremlin.ui.ui_common.getHContainer(self.custom_host_widget, "Custom Client Name:", widget_only=True,tooltip = "Custom client name (leave bank to use the host name)")
         page_layout.addWidget(widget)
 
         self.remote_control_server_all_ip_widget = QtWidgets.QCheckBox("All IPs")

@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m76RC1)
+- After almost 200 releases in test mode, moving to release candidate 1.  No new features will be added, only dragon and stability fixes as they present themselves as we shift to working to a final release.
+
 ### (m76T186E)
 - Minor change to include keyboard hook diagnostics data for troubleshooting an external application.  This is enabled with the keyboard and extra verbose modes and produces increased messaging when keyboard inputs are processed.
 

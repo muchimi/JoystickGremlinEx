@@ -20,7 +20,7 @@ import gremlin.ui.input_item
 
 from gremlin.types import ButtonOutputMode
 import vjoy.vjoy
-
+import random
 import gremlin.util
 from gremlin.util import *
 import gremlin.ui.state_device
@@ -168,6 +168,8 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_repeat_widget.setToolTip("When enabled, pulses are repeated while the input is triggered.")
         self.button_repeat_widget.setChecked(self.action_data.pulse_repeat)
         self.button_repeat_widget.clicked.connect(self._pulse_repeat_mode_changed)
+
+        
 
         widgets = [
             self.button_pulse_widget,

@@ -741,35 +741,43 @@ While more than one master machine can broadcast, it's recommended to only have 
 
 The enable speech checkbox can be selected for GremlinEx to send a verbal mode change event whenever local/remote mode control is changed in case the GremlinEx window is not visible.
 
-GremlinEx shows what output mode is active in the status bar.
+![server options](assets/server_options.png)
 
-<sup>GremlinEx options setup for a broadcast machine:</sup>
+| Option | Description |
+| --- | --- |
+| Enable control of this client by a remote server | Enables this client to receive commands / input from another GremlinEx instance on the network. |
+| Enable server broadcast | Enables this client to send (broadcast) commands / input to other GremlinEx instances on the network. |
+| Host name | name of the current client (this can only be changed by the operating system) |
+| Custom client name | Custom name used by GremlinEx if the host name is not used.  This is also known as the friendly client name. |
+| All IPs | Controls which IPs are used.  Default is on to support multicast.  This is not used in normal circumstances. |
+| Broadcast server IP | Leave automatic.  This is for multi-homed machines (machines with more than one active IP address). If you have multiple active network connections, specify which one to use here. |
+| Master | Leave this on.  This is from a legacy setup. |
+| Broadcast port | This is the commmunication port to use between all GremlinEx instances.  All GremlinEx instances should use the same port. 6012 is the default. |
 
-![server options](assets/server_options.jpg)
-
-#### Local mode
-
-In this mode, GremlinEx sends VJOY, keyboard and mouse events to the local machine.
-
-The status bar displays
-
-![local control](assets/local_control.jpg)
-
-#### Broadcast mode
+#### Remote control status indicators
 
 In this mode, GremlinEx sends VJOY, keyboard and mouse events to clients on the network.    The clients must have the remote control checkbox enabled, match the port number, and have a profile running (empty profile is fine) to respond to the broadcast events.
 
-The status bar displays
+GremlinEx's main window displays the remote control current status in the lower left of the UI:
 
-![remote control](assets/remote_control.jpg)
+![remote control](assets/remote_control.png)
 
-#### Concurrent mode
+| Indicator | Description |
+| --- | --- |
+| Broadcast mode | Indicates if the instance is able to send to remote instances on the network.  This is set in global options under the Enable Server Broadcast.  GEX may need to be restarted after this change in some situations. |
+| Remote control mode | Indicates if the instance is currently able to be controlled by another network instance.   This is set in global options with "Enable remote control". |
+| Profile remote mode | Indicates the profile was set to remote mode by a control action at runtime.  This acts on actions configured to send output to remote instances, like vjoy remap and map to keyboard/mouse Ex, and toggles between local output and remote output if the option is selected in the action.  This mode is enabled or disabled via the control action and is meant to easily toggle between local mode and remote mode without having separate mappings for each. |
 
-GremlinEx can send to the local and remote clients at the same time (concurrent mode) by sending the Concurrent command.
+#### Action remote control configuration
+
+Certain actions support output to remote instances (clients) on the network.  The following options can be set to configure this behavior:
+
+![remote action configuration](assets/action_remote_control_configuration.png)
+GremlinEx can send to the local and remote clients at the same time by selecting in the actions that support remote control local and remote modes.  When remote is enabled in the action, the 
 
 ### Override mode
 
-As of T176, the Vjoy Remap and Map to Keyboard Ex actions have the ability to override the current remote control context and map outputs that only go to the local client, the remote client, or both.  In the default mode, the action follows the current profile remote control state.  These actions have a drop down selection box that lets you select the desired remote control options for that action only.
+As of T176, the Vjoy Remap and Map to Keyboard/Mouse Ex actions have the ability to override the current remote control context and map outputs that only go to the local client, the remote client, or both.  In the default mode, the action follows the current profile remote control state.  These actions have a drop down selection box that lets you select the desired remote control options for that action only.
 
 The override mode is meant to simplify some mapping tasks independently of the global profile setting.
 
