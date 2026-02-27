@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76T186E)
+- Minor change to include keyboard hook diagnostics data for troubleshooting an external application.  This is enabled with the keyboard and extra verbose modes and produces increased messaging when keyboard inputs are processed.
+
 ### (m76T186)
 - Change: Clipboard - check format before reading text to avoid a (caught) exception.
 - Fix: UI exception in Input Viewer in some situations with controllers with no hats in hat display mode.

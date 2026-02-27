@@ -33,6 +33,7 @@ g_mouse_wheel_callbacks = [] # holds callbacks specific to mouse wheel
 g_suppress_mouse = 0 # block stack for mouse (shift + esc to terminate)
 g_suppress_keyboard = 0 # block stack for keyboard (shift + esc to terminate)
 g_shift_state = False # true if either shift keys are down
+g_verbose_keyboard : bool = False # verbose mode for keyboards
 
 import win32api
 import logging
@@ -224,7 +225,7 @@ def process_keyboard_event(n_code, w_param, l_param):
     :param w_param message type identifier
     :param l_param message content
     """
-    global g_suppress_keyboard, g_shift_state, g_suppress_mouse
+    global g_suppress_keyboard, g_shift_state, g_suppress_mouse, g_verbose_keyboard
     msg = ctypes.cast(l_param, LPKBDLLHOOKSTRUCT)[0]
 
     # Only handle events we're supposed to, see
@@ -262,11 +263,16 @@ def process_keyboard_event(n_code, w_param, l_param):
             g_suppress_keyboard = 0 
             g_suppress_mouse = 0
 
+    
+
     # Pass the event on to the next callback in the chain
     if g_suppress_keyboard != 0:
         # suppress keyboard        
+        if g_verbose_keyboard: syslog.info(f"KBDHK: suppress: [{g_suppress_keyboard}] vk [{virtual_code}] sc [{scan_code:x}] ext [{is_extended}]")
         return 1 # suppress
-    # syslog.info(f"{g_suppress_keyboard} {scan_code:x} {g_shifted_state}")
+
+    if g_verbose_keyboard: syslog.info(f"KBDHK: nexthook: [{g_suppress_keyboard}] vk [{virtual_code}] sc [{scan_code:x}] ext [{is_extended}]")
+    
     return user32.CallNextHookEx(None, n_code, w_param, l_param)
 
 
@@ -436,11 +442,14 @@ class KeyboardHook:
     """
 
     def __init__(self):
-        
         self._running = False
         self._listen_thread = threading.Thread(target=self._listen, daemon=False)
         self._listen_thread.name = "keyboard hook"
 
+    def updateVerbose(self):
+        import gremlin.config
+        global g_verbose_keyboard
+        g_verbose_keyboard = gremlin.config.Configuration().verbose_mode_keyboard_extra
         
     def pushSuppress(self):
         ''' suspend keyboard processing on the local client '''
@@ -489,6 +498,9 @@ class KeyboardHook:
             return
         self._running = True
         self._listen_thread.start()
+
+        
+
 
     def stop(self):
         """Stops the hook from running."""

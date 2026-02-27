@@ -1093,6 +1093,7 @@ class EventListener:
 
 	def _handle_options_changed(self):
 		''' options were changed '''
+		import gremlin.config
 		config = gremlin.config.Configuration()
 		self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
 		self._verbose_perf = config.verbose_mode_perf
@@ -1102,6 +1103,10 @@ class EventListener:
 		self._verbose_queue =  self._verbose_dinput
 		self._verbose_inputs = config.verbose_mode_inputs
 		self._verbose_extra = config.verbose_mode_extra
+
+		import gremlin.windows_event_hook
+		hook = gremlin.windows_event_hook.KeyboardHook()
+		hook.updateVerbose()
 
 		
 	def _handle_profile_start(self):
