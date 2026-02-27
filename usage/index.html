@@ -5398,21 +5398,81 @@ In the example below, the action is enabled when the input axis is between -0.09
 <p>Profile commands can be mapped via the VjoyRemap plugin to control whether GemlinEx sends outputs to the local (internal) or clients, or both concurrently.</p>
 <p>While more than one master machine can broadcast, it's recommended to only have one.  Multiple machines will allow more than one machine to send broadcast commands to clients for unique setup needs.</p>
 <p>The enable speech checkbox can be selected for GremlinEx to send a verbal mode change event whenever local/remote mode control is changed in case the GremlinEx window is not visible.</p>
-<p>GremlinEx shows what output mode is active in the status bar.</p>
-<p><sup>GremlinEx options setup for a broadcast machine:</sup></p>
-<p><a class="glightbox" href="../assets/server_options.jpg" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="server options" src="../assets/server_options.jpg" /></a></p>
-<h4 id="local-mode">Local mode<a class="headerlink" href="#local-mode" title="Permanent link">&para;</a></h4>
-<p>In this mode, GremlinEx sends VJOY, keyboard and mouse events to the local machine.</p>
-<p>The status bar displays</p>
-<p><a class="glightbox" href="../assets/local_control.jpg" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="local control" src="../assets/local_control.jpg" /></a></p>
-<h4 id="broadcast-mode">Broadcast mode<a class="headerlink" href="#broadcast-mode" title="Permanent link">&para;</a></h4>
+<p><a class="glightbox" href="../assets/server_options.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="server options" src="../assets/server_options.png" /></a></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Enable control of this client by a remote server</td>
+<td>Enables this client to receive commands / input from another GremlinEx instance on the network.</td>
+</tr>
+<tr>
+<td>Enable server broadcast</td>
+<td>Enables this client to send (broadcast) commands / input to other GremlinEx instances on the network.</td>
+</tr>
+<tr>
+<td>Host name</td>
+<td>name of the current client (this can only be changed by the operating system)</td>
+</tr>
+<tr>
+<td>Custom client name</td>
+<td>Custom name used by GremlinEx if the host name is not used.  This is also known as the friendly client name.</td>
+</tr>
+<tr>
+<td>All IPs</td>
+<td>Controls which IPs are used.  Default is on to support multicast.  This is not used in normal circumstances.</td>
+</tr>
+<tr>
+<td>Broadcast server IP</td>
+<td>Leave automatic.  This is for multi-homed machines (machines with more than one active IP address). If you have multiple active network connections, specify which one to use here.</td>
+</tr>
+<tr>
+<td>Master</td>
+<td>Leave this on.  This is from a legacy setup.</td>
+</tr>
+<tr>
+<td>Broadcast port</td>
+<td>This is the commmunication port to use between all GremlinEx instances.  All GremlinEx instances should use the same port. 6012 is the default.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="remote-control-status-indicators">Remote control status indicators<a class="headerlink" href="#remote-control-status-indicators" title="Permanent link">&para;</a></h4>
 <p>In this mode, GremlinEx sends VJOY, keyboard and mouse events to clients on the network.    The clients must have the remote control checkbox enabled, match the port number, and have a profile running (empty profile is fine) to respond to the broadcast events.</p>
-<p>The status bar displays</p>
-<p><a class="glightbox" href="../assets/remote_control.jpg" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="remote control" src="../assets/remote_control.jpg" /></a></p>
-<h4 id="concurrent-mode">Concurrent mode<a class="headerlink" href="#concurrent-mode" title="Permanent link">&para;</a></h4>
-<p>GremlinEx can send to the local and remote clients at the same time (concurrent mode) by sending the Concurrent command.</p>
+<p>GremlinEx's main window displays the remote control current status in the lower left of the UI:</p>
+<p><a class="glightbox" href="../assets/remote_control.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="remote control" src="../assets/remote_control.png" /></a></p>
+<table>
+<thead>
+<tr>
+<th>Indicator</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Broadcast mode</td>
+<td>Indicates if the instance is able to send to remote instances on the network.  This is set in global options under the Enable Server Broadcast.  GEX may need to be restarted after this change in some situations.</td>
+</tr>
+<tr>
+<td>Remote control mode</td>
+<td>Indicates if the instance is currently able to be controlled by another network instance.   This is set in global options with "Enable remote control".</td>
+</tr>
+<tr>
+<td>Profile remote mode</td>
+<td>Indicates the profile was set to remote mode by a control action at runtime.  This acts on actions configured to send output to remote instances, like vjoy remap and map to keyboard/mouse Ex, and toggles between local output and remote output if the option is selected in the action.  This mode is enabled or disabled via the control action and is meant to easily toggle between local mode and remote mode without having separate mappings for each.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="action-remote-control-configuration">Action remote control configuration<a class="headerlink" href="#action-remote-control-configuration" title="Permanent link">&para;</a></h4>
+<p>Certain actions support output to remote instances (clients) on the network.  The following options can be set to configure this behavior:</p>
+<p><a class="glightbox" href="../assets/action_remote_control_configuration.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="remote action configuration" src="../assets/action_remote_control_configuration.png" /></a>
+GremlinEx can send to the local and remote clients at the same time by selecting in the actions that support remote control local and remote modes.  When remote is enabled in the action, the </p>
 <h3 id="override-mode">Override mode<a class="headerlink" href="#override-mode" title="Permanent link">&para;</a></h3>
-<p>As of T176, the Vjoy Remap and Map to Keyboard Ex actions have the ability to override the current remote control context and map outputs that only go to the local client, the remote client, or both.  In the default mode, the action follows the current profile remote control state.  These actions have a drop down selection box that lets you select the desired remote control options for that action only.</p>
+<p>As of T176, the Vjoy Remap and Map to Keyboard/Mouse Ex actions have the ability to override the current remote control context and map outputs that only go to the local client, the remote client, or both.  In the default mode, the action follows the current profile remote control state.  These actions have a drop down selection box that lets you select the desired remote control options for that action only.</p>
 <p>The override mode is meant to simplify some mapping tasks independently of the global profile setting.</p>
 <h3 id="client-machine-setup">Client machine setup<a class="headerlink" href="#client-machine-setup" title="Permanent link">&para;</a></h3>
 <p>Each GremlinEx client needs to have the remote control option enabled in options to be able to receive events from the master machine.   The master machine must also be setup to broadcast these events.</p>
