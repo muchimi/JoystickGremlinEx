@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC3)
+- Fix: progress bar color initialization on a new installation could cause an exception.
+
 ### (m76RC2)
 - Fix: input viewer unpack error in some situations.
 

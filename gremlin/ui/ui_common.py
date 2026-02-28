@@ -4964,6 +4964,7 @@ class QProgressBar(QtWidgets.QWidget):
             self._end_color[index] = c2
             index += 1
         
+        
         self._sub_color_start = c1
         self._sub_color_end = c2
 
@@ -4973,6 +4974,8 @@ class QProgressBar(QtWidgets.QWidget):
 
         if value is not None:
             self._set_value_ui(value)
+
+        #self._update_value_ui() # set color gradients
 
     @property
     def valid(self) -> bool:
@@ -5346,7 +5349,11 @@ class QProgressBar(QtWidgets.QWidget):
 
             index = 0
             for percent in self._percent.values():
-                c1,c2 = self._colors[index]
+                if not index in self._colors:
+                    c1 =  "#448044"
+                    c2 = "#61BB61"
+                else:
+                    c1,c2 = self._colors[index]
                 if is_vertical:
                     gradient = QLinearGradient(QPoint(x, y), QPoint(w,h))
                     
