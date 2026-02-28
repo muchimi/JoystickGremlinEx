@@ -29,6 +29,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC2)
+- Fix: input viewer unpack error in some situations.
 
 ### (m76RC1)
 - After almost 200 releases in test mode, moving to release candidate 1.  No new features will be added, only dragon and stability fixes as they present themselves as we shift to working to a final release.

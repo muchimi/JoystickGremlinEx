@@ -239,7 +239,11 @@ class VisualizationSelector(QtWidgets.QWidget):
         #gremlin.util.clear_layout(self.main_layout)
         change_callback = self._change_callback
 
-        bh_cb, at_cb, ac_cb, bo_cb, ho_cb = None
+        bh_cb = None
+        at_cb = None
+        ac_cb = None
+        bo_cb = None
+        ho_cb = None
 
 
         dev : dinput.DeviceSummary
