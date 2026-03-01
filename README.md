@@ -29,6 +29,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC4):
+- Fix: Map to Mouse/Ex Action: fix attribute exception in profile visualizer.
+- Fix: Map to keyboard/Ex Action: latched/multi keys: ensure key press/releases follow LIFO sequence.
+- Fix: MIDI device: resolved MIDI input not triggering.
+- Fix: Vjoy Remap: resolved UI exception in some situations when updating repeaters.
+
 ### (m76RC3)
 - Fix: progress bar color initialization on a new installation could cause an exception.
 

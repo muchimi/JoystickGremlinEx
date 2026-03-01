@@ -1505,10 +1505,6 @@ class ActionSetView(ui_common.AbstractView):
                 for widget in widgets:
                     cache.clearWidget(widget)
                     gremlin.util.delete_widget(widget)
-                    # if hasattr(widget,"unhook"):
-                    #     widget.unhook()
-                    # if hasattr(widget,"_cleanup_ui"):
-                    #     widget._cleanup_ui()
 
 
                     widget.hide()

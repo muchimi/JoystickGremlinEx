@@ -2837,10 +2837,30 @@ class ActionSelector(QtWidgets.QWidget):
         self.main_layout.addWidget(widget)
         eh = gremlin.event_handler.EventHandler()
         eh.last_action_changed.connect(self._last_action_changed)
+
+        el = gremlin.event_handler.EventListener()
+        el.request_action_list_refresh.connect(self._handle_action_list_refresh)
+
         self._container = None
 
 
         self._handle_lock_changed_ui(self._input_item) # initial lock state
+
+    def _cleanup_ui(self):
+        
+        el = gremlin.event_handler.EventListener()
+        el.request_action_list_refresh.disconnect(self._handle_action_list_refresh)
+
+        eh = gremlin.event_handler.EventHandler()
+        eh.last_action_changed.discconnect(self._last_action_changed)
+
+
+    def _handle_action_list_refresh(self):
+        gremlin.util.InvokeUiMethod(self._handle_action_list_refresh_ui)
+
+    def _handle_action_list_refresh_ui(self):
+        if Shiboken.isValid(self):
+            self.refresh()
 
     def _handle_lock_changed(self, input_item):
         gremlin.util.InvokeUiMethod(self._handle_lock_changed_ui, input_item) # ensure on UI thread
@@ -5309,9 +5329,10 @@ class QProgressBar(QtWidgets.QWidget):
         count = len(self._percent)
         if count != self._row_count:
             self._row_count = count
-            self.sizeChanged.emit()                    
+            self.sizeChanged.emit()    
 
         self.update() # repaint
+
 
     
     def paintEvent(self, event):
@@ -5350,8 +5371,8 @@ class QProgressBar(QtWidgets.QWidget):
             index = 0
             for percent in self._percent.values():
                 if not index in self._colors:
-                    c1 =  "#448044"
-                    c2 = "#61BB61"
+                    # default colors if none found
+                    c1,c2 = Color.ChannelColors()[0]
                 else:
                     c1,c2 = self._colors[index]
                 if is_vertical:

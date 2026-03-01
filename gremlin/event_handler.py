@@ -842,6 +842,8 @@ class EventListener:
 
 	reload_axis_state = Signal() # sent when input items should re-register their axes with AxisState
 
+	request_action_list_refresh = Signal() # ask action drop downs to refresh their lists
+
 	remote_control_client_change = Signal() # emits when the list of network clients changes via network activity (clients reporting in)
 	remote_config_client_change = Signal() # emits when list of configured clients changes
 	remote_control_state_change = Signal() # called when the remote control server status changes

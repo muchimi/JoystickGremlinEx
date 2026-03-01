@@ -1033,23 +1033,30 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                         #self._repeater_button_widget.setValue(False)
                 case VjoyAction.VJoyAxis:
                     # plain axis output
-
-                    values = self.action_data.get_filtered_axis_value(curves=curves, channels = True)
-                    #syslog.info(f"got data: {data}")
                     if not Shiboken.isValid(self._repeater_axis_widget):
                         return
-                    axis_widget_visible = True
 
-                    self._repeater_axis_widget.setValue(values)
-                    self._repeater_value_widget.setText(f"{values.actual:+0.4f}")
+                    values = self.action_data.get_filtered_axis_value(value, curves=curves, channels = True)
+                    #syslog.info(f"got data: {data}")
+                    if values is not None:
+                        axis_widget_visible = True
+                        self._repeater_axis_widget.setValue(values)
+                        if self._repeater_value_widget:
+                            self._repeater_value_widget.setText(f"{values.actual:+0.4f}")
+                    else:
+                        syslog.error(f'VJOY: repeater: got invalid value for axis - received value {value}')
                 case VjoyAction.VJoyMergeAxis:
                     # axis merging
                     if not Shiboken.isValid(self._repeater_axis_widget):
                         return
-                    values = self.action_data.get_filtered_axis_value(curves=curves, channels = True)
-                    axis_widget_visible = True
-                    self._repeater_axis_widget.setValue(values)
-                    self._repeater_value_widget.setText(f"{values.actual:+0.4f}")
+                    values = self.action_data.get_filtered_axis_value(value, curves=curves, channels = True)
+                    if values is not None:
+                        axis_widget_visible = True
+                        self._repeater_axis_widget.setValue(values)
+                        if self._repeater_value_widget:
+                            self._repeater_value_widget.setText(f"{values.actual:+0.4f}")
+                    else:
+                        syslog.error(f'VJOY: repeater: got invalid value for axis - received value {value}')
 
 
 

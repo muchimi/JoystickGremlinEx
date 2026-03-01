@@ -77,7 +77,7 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.execute_on_press, self.action_data.execute_on_release)
+        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
@@ -107,7 +107,6 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
         
         self.mode_label = QtWidgets.QLabel("Description")
 
-        
         self.mode_group = QtWidgets.QButtonGroup()
         self.mode_normal = QtWidgets.QRadioButton("Click")
         self.mode_double_click = QtWidgets.QRadioButton("Double-Click")
@@ -361,11 +360,11 @@ class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
  
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked : bool):
-        self.action_data.execute_on_press = checked
+        self.action_data.exec_on_press = checked
 
     @QtCore.Slot(bool)
     def _execute_on_release_changed(self, checked : bool):
-        self.action_data.execute_on_release = checked
+        self.action_data.exec_on_release = checked
 
 
     def _populate_monitor_selector(self):
@@ -929,8 +928,8 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         ''' processes an input event - must return True on success, False to abort the input sequence '''
 
         
-        trigger = self.action_data.execute_on_press and event.is_pressed or \
-                  self.action_data.execute_on_release and not event.is_pressed
+        trigger = self.action_data.exec_on_press and event.is_pressed or \
+                  self.action_data.exec_on_release and not event.is_pressed
         
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_curve
@@ -1201,18 +1200,7 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
     
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
-    # input_types = [
-    #     InputType.JoystickAxis,
-    #     InputType.JoystickButton,
-    #     InputType.JoystickHat,
-    #     InputType.Keyboard
-    # ]
-
-    # input_types = [
-    #      InputType.JoystickButton,
-    #      InputType.JoystickHat,
-    #      InputType.JoystickAxis
-    # ]
+    
 
     functor = MapToMouseExFunctor
     widget = MapToMouseExWidget
@@ -1267,8 +1255,8 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         else:
             self.action_mode = MouseAction.MouseButton
 
-        self.execute_on_press = True # true if macro executes on input press/change
-        self.execute_on_release = False # true if macro executs on input release
+        self.exec_on_press = True # true if macro executes on input press/change
+        self.exec_on_release = False # true if macro executs on input release
         
         self.force_remote_output = False
         self.force_remote_output_only = False
@@ -1291,7 +1279,7 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         if self.motion_input:
             return f"Map to Mouse Ex: (motion) angle: [{self.direction}] speed: [{self.min_speed}] [{self.max_speed}] TTMS: [{self.time_to_max_speed:0.3f}] invert: [{self.invert}]"    
         else:
-            return f"Map to Mouse Ex: (button) [{self.button_id.name}] Mode: [{self.click_mode.name}] Exec on press: [{self.execute_on_press}] Exec on release: [{self.execute_on_release}]"
+            return f"Map to Mouse Ex: (button) [{self.button_id.name}] Mode: [{self.click_mode.name}] Exec on press: [{self.exec_on_press}] Exec on release: [{self.exec_on_release}]"
         
 
     def icon(self):
@@ -1334,8 +1322,8 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         self.min_speed = safe_read(node, "min-speed", int, 5)
         self.max_speed = safe_read(node, "max-speed", int, 5)
         self.time_to_max_speed = safe_read(node, "time-to-max-speed", float, 0.0)
-        self.execute_on_press = True # true if macro executes on input press/change
-        self.execute_on_release = False # true if macro executs on input release
+        self.exec_on_press = True # true if macro executes on input press/change
+        self.exec_on_release = False # true if macro executs on input release
      
         
 
@@ -1370,14 +1358,14 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
 
 
         if "execute-on-press" in node.attrib:
-            self.execute_on_press = safe_read(node,"execute-on-press",bool,True)
+            self.exec_on_press = safe_read(node,"execute-on-press",bool,True)
 
         # legacy
         if "exec_on_release" in node.attrib:
-            self.execute_on_release = safe_read(node,"exec_on_release",bool,True)            
+            self.exec_on_release = safe_read(node,"exec_on_release",bool,True)            
             
         if "execute-on-release" in node.attrib:
-            self.execute_on_release = safe_read(node,"execute-on-release",bool,True)     
+            self.exec_on_release = safe_read(node,"execute-on-release",bool,True)     
 
         if "target-process" in node.attrib:
             self.process_path = node.get("target-process")
@@ -1438,8 +1426,8 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
         node.set("process-focus", safe_format(self.process_focus, bool))
 
 
-        node.set("execute-on-press",safe_format(self.execute_on_press, bool))
-        node.set("execute-on-release",safe_format(self.execute_on_release, bool))
+        node.set("execute-on-press",safe_format(self.exec_on_press, bool))
+        node.set("execute-on-release",safe_format(self.exec_on_release, bool))
         
 
         if self.curve_data:

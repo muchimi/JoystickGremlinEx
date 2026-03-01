@@ -5676,6 +5676,9 @@ if __name__ == "__main__":
     # sound engine
     sound = gremlin.sound.Sound() 
 
+    # MIDI
+    midi_client = gremlin.ui.midi_device.MidiClient()
+
     # event regsitry
     event_registry = gremlin.event_handler.EventRegistry() 
 

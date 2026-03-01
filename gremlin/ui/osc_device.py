@@ -4172,6 +4172,9 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_item._update() # refresh other properties
         self.input_item_list_view.update_item(index)
 
+        el = gremlin.event_handler.EventListener()
+        el.request_action_list_refresh.emit() # ask action lists to refresh
+
     def _dialog_rejected_cb(self):
         index = self._edit_dialog.index
         self.input_item_list_view.update_item(index)

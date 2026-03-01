@@ -210,6 +210,33 @@ class Key():
     def is_toggle(self) -> bool:
         ''' true if the key is a toggle key (send keydown on keyup) like scroll lock '''
         return self.virtual_code in KeyMap._g_toggle_keys
+    
+    @property
+    def is_shifted_state(self) -> bool:
+        ''' true if the key is a shifted state key (ctrl, alt, shft) '''
+        return self._virtual_code in (
+            win32con.VK_LSHIFT,
+            win32con.VK_RSHIFT,
+            win32con.VK_RCONTROL,
+            win32con.VK_LCONTROL,
+            win32con.VK_LMENU, # left alt
+            win32con.VK_RMENU, # right alt
+            win32con.VK_MENU, # left alt (default)
+        )
+    
+    @property
+    def weight(self) -> int:
+        ''' sorting order weight for keys - the higher the number - the higher the precedence in a sequence '''
+        if self._virtual_code in (win32con.VK_LSHIFT, win32con.VK_RSHIFT):
+            return 4000
+        if self._virtual_code in (win32con.VK_LCONTROL, win32con.VK_RCONTROL):
+            return 2000
+        if self._virtual_code in (win32con.VK_LMENU, win32con.VK_RMENU, win32con.VK_MENU):
+            return 1000
+        if self._virtual_code == win32con.VK_KANJI:
+            return 8000
+        
+        return 1000 - self.virtual_code # no sorting
 
     
     def index_tuple(self):
