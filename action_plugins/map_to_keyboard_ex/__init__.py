@@ -93,14 +93,14 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
         self.delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.delay) 
-        self.autorepeat_delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.autorepeat_delay,label="Interval (ms)") 
+        self.autorepeat_delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.autorepeat_delay) 
         
         self.delay_box.setValue(self.action_data.delay)
         self.autorepeat_delay_box.setValue(self.action_data.autorepeat_delay)
 
         widgets = []
         for mode in KeyboardOutputMode:
-            rb = gremlin.ui.ui_common.QDataRadioButton(mode.name, mode)
+            rb = gremlin.ui.ui_common.QDataRadioButton(KeyboardOutputMode.to_displayname(mode), mode)
             rb.setChecked(self.action_data.mode == mode)
             rb.clicked.connect(self._mode_changed)
             widgets.append(rb)
@@ -113,15 +113,22 @@ class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.delay_box.valueChanged.connect(self._delay_changed)
         self.autorepeat_delay_box.valueChanged.connect(self._autorepeat_changed)
 
-        self.container_options_widget = gremlin.ui.ui_common.getHContainer(widgets, "Mode:", widget_only = True, left_margin = 12)
+        self.container_options_widget = gremlin.ui.ui_common.getGridContainer (
+            gremlin.ui.ui_common.getGridContainer(widgets, widget_only = True),
+            "Output Mode:",
+            widget_only = True,
+            left_margin = 12
+            )
 
 
         widgets = [
-            self.delay_box,
-            self.autorepeat_delay_box,
+            gremlin.ui.ui_common.getGridContainer(self.delay_box, "Duration (ms):", widget_only = True),
+            gremlin.ui.ui_common.getGridContainer(self.autorepeat_delay_box, "Interval (ms):", widget_only = True),
         ]
         
-        self.container_delay_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
+        self.container_delay_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True, left_margin=12)
+        widgets.append(self.container_options_widget)
+        gremlin.ui.ui_common.synchronize_grids(widgets)
 
 
         widgets = [
@@ -922,7 +929,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                         if is_pressed:
                             if verbose: syslog.info(f"MapToKeyboardEx: pulse")
                             repeat_interval = -1 # do not repeat
-                            self.pulse_start(self.action_data.keys, self.action_data.delay/1000, repeat_interval)
+                            self.pulse_start((self._press_keys, self._release_keys), self.action_data.delay/1000, repeat_interval)
                         else:
                             # stop pulsing on release
                             self.pulse_stop()
@@ -949,7 +956,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 case KeyboardOutputMode.AutoRepeat:
                     # setup autorepeat thread
                     repeat_interval =  self.action_data.autorepeat_delay/1000
-                    self.pulse_start(self._press_keys, self.action_data.delay/1000, repeat_interval)
+                    self.pulse_start((self._press_keys, self._release_keys), self.action_data.delay/1000, repeat_interval)
         else:
             # release the keys
             if self.has_keys:

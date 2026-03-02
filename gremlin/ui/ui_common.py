@@ -2852,7 +2852,7 @@ class ActionSelector(QtWidgets.QWidget):
         el.request_action_list_refresh.disconnect(self._handle_action_list_refresh)
 
         eh = gremlin.event_handler.EventHandler()
-        eh.last_action_changed.discconnect(self._last_action_changed)
+        eh.last_action_changed.disconnect(self._last_action_changed)
 
 
     def _handle_action_list_refresh(self):

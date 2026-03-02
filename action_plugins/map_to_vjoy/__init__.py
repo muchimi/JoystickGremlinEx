@@ -2141,20 +2141,26 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_rb_noop.setChecked(self.action_data.button_mode == ButtonOutputMode.NoOp)
 
 
-        self.button_pulse_widget = gremlin.ui.ui_common.QDelayWidget()
-        self.button_pulse_widget.setToolTip("Pulse Delay in milliseconds")
-        self.button_pulse_widget.setValue(self.action_data.pulse_delay)
-        self.button_pulse_widget.valueChanged.connect(self._pulse_value_changed)
+        self.pulse_duration_widget = gremlin.ui.ui_common.QDelayWidget(
+            value = self.action_data.pulse_delay,
+            callback = self._pulse_value_changed,
+            tooltip = "Pulse Delay in milliseconds",
+        )
+        
 
-        self.button_pulse_repeat_widget = gremlin.ui.ui_common.QDelayWidget()
-        self.button_pulse_repeat_widget.setToolTip("Repeat delay in milliseconds")
-        self.button_pulse_repeat_widget.setValue(self.action_data.pulse_repeat_delay)
-        self.button_pulse_repeat_widget.valueChanged.connect(self._pulse_repeat_value_changed)
+        self.pulse_interval_widget = gremlin.ui.ui_common.QDelayWidget(
+            value = self.action_data.pulse_repeat_delay,
+            tooltip = "Repeat delay in milliseconds",
+            callback = self._pulse_repeat_value_changed
+            )
+        
 
-        self.button_repeat_widget = QtWidgets.QCheckBox("Pulse repeat")
-        self.button_repeat_widget.setToolTip("When enabled, pulses are repeated while the input is triggered.")
-        self.button_repeat_widget.setChecked(self.action_data.pulse_repeat)
-        self.button_repeat_widget.clicked.connect(self._pulse_repeat_mode_changed)
+                                                                            
+        self.button_repeat_widget = gremlin.ui.ui_common.QDataCheckbox(
+            value = self.action_data.pulse_repeat,
+            callback = self._pulse_repeat_mode_changed,
+            tooltip = "When enabled, pulses are repeated while the input is triggered."
+        )
 
 
         widgets = [
@@ -2169,13 +2175,30 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         self.container_button_mode_widget = gremlin.ui.ui_common.getHContainer(widgets,"Output Mode:", min_height = self.container_height, widget_only = True)
 
+        self.container_pulse_widget = gremlin.ui.ui_common.getGridContainer(self.pulse_duration_widget ,"Duration (ms):", widget_only = True)
+        self.container_repeat_widget = gremlin.ui.ui_common.getGridContainer(self.button_repeat_widget ,"Pulse Repeat:", widget_only = True)
+        self.container_interval_widget = gremlin.ui.ui_common.getGridContainer(self.pulse_interval_widget,"Interval (ms):", widget_only = True)
+
+        
+
         widgets = [
-            self.button_pulse_widget,
-            self.button_repeat_widget,
-            self.button_pulse_repeat_widget,
+            self.container_pulse_widget,
+            self.container_repeat_widget,
+            self.container_interval_widget,
         ]
 
-        self.container_pulse_widget = gremlin.ui.ui_common.getHContainer(widgets,"Pulse Options:", min_height = self.container_height, widget_only = True)
+
+        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True, left_margin=12)
+        gremlin.ui.ui_common.synchronize_grids(widgets)
+
+        widgets = [
+            widget,
+            
+            
+        ]
+
+
+        self.container_pulse_widget = gremlin.ui.ui_common.getVContainer(widgets,widget_only = True)
 
 
         self.button_rb_hold.clicked.connect(self._button_mode_changed)
@@ -3505,8 +3528,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_merge_widget.setVisible(merge_visible)
 
         self.container_pulse_widget.setVisible(pulse_visible)
-        self.button_pulse_widget.setVisible(pulse_visible)
-        self.button_pulse_repeat_widget.setVisible(repeat_visible)
+        self.pulse_duration_widget.setVisible(pulse_visible)
+        self.container_interval_widget.setVisible(repeat_visible)
 
         self.container_linear_timings.setVisible(step_repeat_visible)
         self.container_ticks_widget.setVisible(ticks_visible)
@@ -3833,7 +3856,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             if is_button_mode:
                 #self.pulse_widget.setValue(self.action_data.pulse_delay)
-                self.button_pulse_widget.setValue(self.action_data.pulse_delay)
+                self.pulse_duration_widget.setValue(self.action_data.pulse_delay)
 
 
                 with QtCore.QSignalBlocker(self.sb_button_range_low):
@@ -4584,6 +4607,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 self._set_axis(device_id, input_id, value)
 
         else:
+            if self.verbose_extra: syslog.info(f"pulse ON vjoy [{device_id}] button [{input_id}]")
 
             if is_local:
                 if gremlin.joystick_handling.is_vjoy_connected(device_id):
@@ -4597,8 +4621,12 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         if self.action_data._target_step_linear_mode:
             return # nothing to do if in PID mode
        
+
+    
+    
         device_id, input_id, is_local, is_remote, force_remote = data
-        if self.verbose_extra: syslog.info(f"Pulse OFF {device_id} button {input_id}")
+
+        if self.verbose_extra: syslog.info(f"Pulse OFF vjoy [{device_id}] button {input_id}")
         if is_local:
             if gremlin.joystick_handling.is_vjoy_connected(device_id):
                 joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = False

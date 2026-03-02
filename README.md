@@ -29,6 +29,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC5):
+- Fix: Map to keyboard/Ex Action: exception in some pulse modes.
+- Change: Map to keyboard/Ex Action: update to pulse/repeat layout.
+- Change: Vjoy Remap Action: update to pulse/repeat layout.
+
 ### (m76RC4):
 - Fix: Map to Mouse/Ex Action: fix attribute exception in profile visualizer.
 - Fix: Map to keyboard/Ex Action: latched/multi keys: ensure key press/releases follow LIFO sequence.

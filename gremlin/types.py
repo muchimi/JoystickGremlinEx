@@ -50,6 +50,15 @@ class KeyboardOutputMode(Enum): # order is that of the display order for keyboar
     Release = 3 # keyboard release only
     Hold = 4 # press while held (default GremlinEx behavior)
     Toggle = 5 # toggles make / break
+
+    @staticmethod
+    def to_displayname(value : KeyboardOutputMode):
+        match value:
+            case  KeyboardOutputMode.Pulse:
+                return "Pulse Single"
+            case  KeyboardOutputMode.AutoRepeat:
+                return "Pulse Repeat"
+        return value.name
     
     
 
@@ -1350,7 +1359,7 @@ class VjoyAction(enum.Enum):
             case  VjoyAction.VJoyAxis:
                 return "Axis"
             case  VjoyAction.VJoyButtonPress:
-                return "Button Press"
+                return "Button (Press)"
             case  VjoyAction.VJoyHat:
                 return "Hat"
             case  VjoyAction.VJoyHatToButton:
@@ -1358,11 +1367,11 @@ class VjoyAction(enum.Enum):
             case  VjoyAction.VJoyInvertAxis:
                 return "Invert Axis"
             case  VjoyAction.VJoyPulse:
-                return "Pulse Button"
+                return "Button (Pulse)"
             case  VjoyAction.VJoySetAxis:
                 return "Set Fixed Axis Value"
             case  VjoyAction.VJoyToggle:
-                return "Toggle Button"
+                return "Button (Toggle)"
             case VjoyAction.VJoyRangeAxis:
                 return "Set Axis Range"
             case  VjoyAction.VJoyAxisToButton:
@@ -1390,15 +1399,15 @@ class VjoyAction(enum.Enum):
             case  VjoyAction.VJoyDisableRemote:
                 return "Disable remote control"
             case  VjoyAction.VJoyButtonRelease:
-                return "Button release"
+                return "Button (Release)"
             case  VjoyAction.VJoyMergeAxis:
                 return "Merge Axis"
             case VjoyAction.VJoySetAxisStepped:
                 return "Stepped/Linear Axis Value"
             case VjoyAction.VJoyButton:
-                return "Button"
+                return "Button (Hold)"
             case VjoyAction.VJoyButtonInverted:
-                return "Button (inverted)"
+                return "Button (Inverted)"
 
         
         msg  = f"Unknown [{action}]"
