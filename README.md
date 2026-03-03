@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC6):
+- Fix: Cycle mode action: incorrect handling of blank modes.
+- Change:  Cycle mode action: validation of input modes against profile mode definitions and error output to log if needed.
+
 ### (m76RC5):
 - Fix: Map to keyboard/Ex Action: exception in some pulse modes.
 - Change: Map to keyboard/Ex Action: update to pulse/repeat layout.

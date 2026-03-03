@@ -34,6 +34,10 @@ from shiboken6 import Shiboken
 import gremlin.util
 import html
 
+import logging
+syslog = logging.getLogger("system")
+
+
 class CycleModeModel(QtCore.QAbstractItemModel):
     def __init__(self):
         super().__init__()
@@ -176,7 +180,7 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
     def save_changes(self):
         """Saves UI state to the profile."""
         mode_list = self.model.modes()
-        self.action_data.mode_list = mode_list
+        self.action_data.mode_list = [m for m in mode_list if m]
         self._update_mode_list()
         # self.action_modified.emit()
 
@@ -190,15 +194,15 @@ class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
             mode_list = gremlin.ui.ui_common.get_mode_list(profile)
             self.model.clear()
             for display, mode in mode_list:
-                self.mode_list_widget.addItem(display, mode)
-
-
+                if mode:
+                    self.mode_list_widget.addItem(display, mode)
+                    
         modes = [mode for _, mode in mode_list]
         # verify the modes in the cycle are valid
         mode_list = self.action_data.mode_list
         
         for mode in mode_list:
-            if not mode in modes:
+            if mode is None or not mode in modes:
                 mode_list.remove(mode)
         self.model.clear()
         for mode in mode_list:
@@ -332,8 +336,19 @@ on a round robin sequence.'''
         ]
 
     def _parse_xml(self, node, data = None, extra_data = None):
+        # get the list of current modes
+        self.mode_list.clear()
+        mode_list = gremlin.ui.ui_common.get_mode_list(gremlin.shared_state.current_profile)
         for child in node:
-            self.mode_list.append(child.get("name"))
+            mode = child.get("name")
+            if not mode:
+                syslog.error(f"CYCLE MODE: null mode in profile XML -  offending line: {child.sourceline}")
+                continue
+            if not mode in mode_list:
+                syslog.error(f"CYCLE MODE: mode [{mode}] does not exist in the profile -  offending line: {child.sourceline}")
+                syslog.error(f"\tValid modes: {"".join(f"[{m}] " for m in mode_list)}")
+                continue
+            self.mode_list.append(mode)
 
     def _is_valid(self):
         return len(self.mode_list) > 0
@@ -341,9 +356,10 @@ on a round robin sequence.'''
     def _generate_xml(self):
         node = ElementTree.Element("cycle-modes")
         for mode_name in self.mode_list:
-            child = ElementTree.Element("mode")
-            child.set("name", mode_name)
-            node.append(child)
+            if mode_name:
+                child = ElementTree.Element("mode")
+                child.set("name", mode_name)
+                node.append(child)
         return node
 
     def to_html(self) -> str:
@@ -352,7 +368,8 @@ on a round robin sequence.'''
         table = ReportTable(cellpadding=4) 
         
         for index, mode in enumerate(self.mode_list):
-            table.addField(f"Mode {index}", html.escape(mode))
+            if mode:
+                table.addField(f"Mode {index}", html.escape(mode))
 
         return table.to_html()
 
