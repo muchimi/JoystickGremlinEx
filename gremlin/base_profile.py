@@ -5131,6 +5131,10 @@ class Profile():
     def list_actions(self):
         ''' lists all actions in the current profile '''
         # Create a list of all used remap actions
+
+        registry = ProfileRegistry()
+        registry.sync(self)
+        
         remap_actions = []
         for dev_guid in self.devices:
             dev = self.devices[dev_guid]
@@ -5148,7 +5152,7 @@ class Profile():
     def list_unused_vjoy_inputs(self):
         """Returns a list of unused vjoy inputs for the given profile.
 
-        :return dictionary of unused inputs for each input type
+        :return dictionary of unused inputs for each input type  [vjoy_dev_id: int]["axis" | "button" | "hat"] = list[input_id : int]
         """
         vjoy_devices = gremlin.joystick_handling.vjoy_devices()
 

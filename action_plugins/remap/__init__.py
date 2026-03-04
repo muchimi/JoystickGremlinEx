@@ -204,9 +204,12 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             input_type = self.name_to_type_map[input_name.capitalize()]
             if vjoy_dev_id == 0:
                 vjoy_dev_id = sorted(free_inputs.keys())[0]
-            input_list = free_inputs[vjoy_dev_id][input_name]
+            if vjoy_dev_id in free_inputs and input_name in free_inputs[vjoy_dev_id]:
+                input_list = free_inputs[vjoy_dev_id][input_name]
+            else:
+                input_list = []
             # If we have an unused item use it, otherwise use the first one
-            if len(input_list) > 0:
+            if input_list:
                 vjoy_input_id = input_list[0]
             else:
                 vjoy_input_id = 1
