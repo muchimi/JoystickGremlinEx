@@ -29,9 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m76RC7):
+### (m76RC7A):
 - Fix: (legacy) Remap Action: exception on find next available vjoy input.
 - Fix: Profile: list actions missing sync under new API.
+- Fix: UI: number input validation exception when pasting or using blank values.
 
 ### (m76RC6):
 - Fix: Cycle mode action: incorrect handling of blank modes.

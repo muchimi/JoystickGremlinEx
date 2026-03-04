@@ -2264,11 +2264,12 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         elif t == QtCore.QEvent.Type.FocusAboutToChange:
             # check the range
             value = self.value()
+            if value is not None:
+                if self._min_range is not None and value < self._min_range:
+                    self.setValue(self._min_range)
+                if self._max_range is not None and value > self._max_range:
+                    self.setValue(self._max_range)
             
-            if self._min_range is not None and value < self._min_range:
-                self.setValue(self._min_range)
-            if self._max_range is not None and value > self._max_range:
-                self.setValue(self._max_range)
         elif t == QtCore.QEvent.Type.FocusOut:
             if not self.hasAcceptableInput():
                 return True # skip the event
