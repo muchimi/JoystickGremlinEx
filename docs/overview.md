@@ -6,13 +6,17 @@ GremlinEx is oriented towards simpits and hardware vendor integration, without t
 
 The integration piece comes from the ability to combine inputs together into a logical output via a set of filters and transformations, and output this to applications running on the same system.
 
+The project's [home is on GitHub](https://github.com/muchimi/JoystickGremlinEx) from where you can download the latest releases and view patch notes.
+
+The project has a dedicated [Discord server](https://discord.com/channels/1279461873317707827) where you can lookup solutions to typical mapping questions, how-to, ask questions and report any issues.
+
 ## Key Features: What can GremlinEx do?
 
 This is a summary of some of the feature set in GremlinEx.
 
 ### Mapping and transforms
 
-GEX takes input such physical (hardware) USB connected joysticks, gamepads, keyboard, mouse, and other specialized input devices like state and OSC network messages, and lets you apply a mapping, also known as a transform, to each input.  GEX supports mapping of buttons, axes, sliders, hats, or more complex inputs such as latched keystrokes (one or more keypress combination), and other input such as MIDI or OSC input (described below).
+GremlinEx (GEX) takes input such physical (hardware) USB connected joysticks, gamepads, keyboard, mouse, and other specialized input devices like state and OSC network messages, and lets you apply a mapping, also known as a transform, to each input. GEX also understands network inputs that come from other devices on the network via the OSC protocol.  GEX supports mapping of buttons, axes, sliders, hats, or more complex inputs such as latched keystrokes (one or more keypress combination), and other input such as MIDI or OSC input (described below).  GEX can also remote control other GEX clients on the network, including output of axis, button, keyboard and mouse, as well as two-way controls of hardware panels and glass surfaces via the OSC protocol.
 
 The mapping process can have logic applied to it, such as conditions, so that the mapping can be conditional on a specific context being true.  This can be "is this button also pressed", "is this axis value in this range", "are these keys also pressed", "is this state off", all in various combinations.  Conditions work across all inputs so one input can be used to manage the mapping of another device.
 
@@ -104,21 +108,23 @@ HIDHide solves both these problems: the idea is to "hide" the raw hardware input
 
 It is essential to have the GremlinEx executable white listed in HIDHide so it sees the raw hardware devices.
 
-### Joystick curves
+### Axis curves
 
-GremlinEx can apply linear, cubic and bezier curves to an input to modify the response.  Such curves are usually called response curves or sensitivity curves.  Multiple curves can be applied to the same input, for example, a curve on the input itself, and a curve on the outputs.  Curves applied to outputs are only applied to a particular mapping.  Curves can be manipulated, and GremlinEx supports presets, both built-in and custom user.
+GremlinEx can apply linear, cubic and bezier curves to an axis (linear) input to modify the input response, the output response, and both concurrently.  Such curves are usually called response curves or sensitivity curves.  Multiple curves can be applied to the same input, for example, a curve on the input itself, and a curve on the outputs.  Curves applied to outputs are only applied to a particular mapping.  Curves can be manipulated, and GremlinEx supports presets, both built-in and custom user.
 
 It generally is not appropriate to apply two response curves on the mapping side as that can lead to undesirable output values, so while it's possible, ensure the applied curves do not inadvertently produce undesirable data.
 
 While curves can be applied as a standalone mapping, it is recommended to apply curves directly to the vjoy remap action.  One reason: this curve is applied to the merged axes.  Execution at runtime is also faster as it avoids a step.
 
-### Joystick calibration
+Profile modes, states and condition let you control how and when curves are applied, so you can, for example, have two or three sensitivity settings for an axis output based on the state of input buttons on a hardware panel, or you can toggle them by pressing a button.
+
+### Axis calibration
 
 GremlinEx can apply calibrations to noisy joystick inputs to dampen the input received.  The calibration can automatically detect the range of inputs and normalize it to min/max values, and adjust the center position as well.  Calibrations apply to the device, and thus to all profiles.
 
 Rare: If you need to apply different calibrations to each device on a per profile basis, please use the response curve ex action.
 
-### Axis gating and processing
+### Axis gating and splitting
 
 GremlinEx supports several axis splitting tools, including the advanced Gated Axis that introduces the notion of gates (fixed points on an axis) and the ranges between them.  Gates and ranges have their own trigger points.  Gated axis is aware of when a gate is crossed, the direction the crossing happened, and if the current position is entering or exiting a range, outside a range, or within a range.
 
@@ -145,6 +151,8 @@ GremlinEx's vjoy mapper can merge multiple input axes (two or more) from the sam
 A use-case for this feature is the need to combine two inputs into a single output, such as brake pedal toe-brakes to a single linear axis (used in Star Citizen staffe for example).
 
 Another use case is to scale one axis with another.
+
+Mergine of axes is helpful in many output scenarios, and the merging can also be controlled on the fly using profile modes, conditions and profile states to, at runtime, control how merging occurs.
 
 ### Integrates with Elgato (R) Streamdeck, LoupeDeck and any support panels by BitFocus Companion
 
@@ -227,11 +235,13 @@ Modes also have a pair of triggers associated with them, so a mode can trigger m
 A profile must have one mode defined at all times.
 
 
-### Remote control
+### Remote control and KVM support
 
 GremlinEx can control another GremlinEx instance running on the local network.  This is useful if you have HID devices on one machine, but need to send that output to another machine on the network.  GremlinEx sends the same output to network clients, and buttons can be mapped to enable or disable the feature on the fly.
 
 This particular feature is used to use inputs from one machine to control outputs on another on the fly.  This was created specifically to support simpits with multiple computers accepting inputs either for performance reasons, hardware needs, or for convenience.  This is a good use of older hardware as well.
+
+A special action, called KVM, lets you take over a specific client and send all local keyboard and mouse to that client without any mapping needed.
 
 ### Conditions
 
@@ -245,9 +255,11 @@ GremlinEx can trigger on multiple key combinations, including unusual ones. It i
 
 ### Support of atypical keys
 
-GremlinEx supports input/output of atypical keys such as media controls and F13 to F24.   GremlinEx also treats mouse output as a key, which is helpful for some scenarios. The keyboard mapper can output any mouse button and wheel output (mouse motion is also supported via the mouse mapper if mouse motion is needed).
+GremlinEx supports input/output of atypical keys such as media controls (for volume and playback control) and F13 to F24.   GremlinEx also treats mouse output as a key, which is helpful for some scenarios. The keyboard mapper can output any mouse button and wheel output (mouse motion is also supported via the mouse mapper if mouse motion is needed).
 
-GremlinEx also has for each output the notion of a press (make) and release (break).
+### Targeting of specific processes
+
+GremlinEx also has for each output the notion of a press (make) and release (break) and works at very low levels in Windows, and is able to target a specific process, including background processes.
 
 ### Pulse function
 
@@ -262,7 +274,37 @@ The other is the sequential container which allows for actions that are not dire
 
 In both cases, the order of output is always top to bottom, so the execution order is predictable.
 
-### Available Containers
+### Audio playback support for .WAV and .MP3 with fader/speed controls
+
+GremlinEx can playback audio files in the .WAV and .MP3 format (.WAV recommended for performance).  The playback action can play random sounds from a specific folder, and it can play multiple sounds concurrently on the same or multiple audio devices.  The action can also fade the sound in or out, and adjust the playback rate in a pitch controlled manner (the pitch will not change based on the playback speed).
+
+This action can be use to output audio cues for specific actions.
+
+### Text to speech
+
+GremlinEx supports TTS (text to speech) using the internal Windows TTS API and can leverage multiple languages based on installed language packs.  This said, with the /available AI tools online, it is recommended that the TTS action be replaced by the playback of .WAV files instead which is more performant at runtime than the older TTS Windows API with often a significant quality improvement in audio as well.
+
+### Random execution
+
+GremlinEx can, via the sequence container, output randomized actions, either in a loop or not, with varied timings called "wiggle" mode.  This enables randomized output to be selected from a list of actions to execute, in round robin fashion or not.
+
+### Concurrent output and input
+
+GremlinEx can output to multiple devices and clients at the same time, and accept concurrent input as well due to its multi-threaded approach.
+
+### Profile start and stop triggers
+
+GremlinEx has the ability to execute containers and actions at profile start, and profile stop.  This enables you to configure outputs in a known, specific way, whenever a profile is started, and return to a known setup on profile stop.
+
+### Mode start and stop triggers
+
+GremlinEx can execute containers and actions when a mode is entered, or a mode is exited.
+
+### Synchronization at profile start
+
+Many actions have the optional ability to read the current state of the input (for example the position of an axis, a switch state) on profile start, and to synchronize the output to that input.  This is helpful to ensure that hardware switch positions and axis output (such as a throttle) are reflected by the output to match the input.
+
+## Available Containers
 
 GremlinEx has a rich set of mapping actions aimed at simulation and game output.  These actions are defined inside containers.  Containers types have different functionality to determine how these actions are executed.  Containers also have conditions applied to them optionally, either at the entire container level, or the individual actions contained within containers.  It should be noted that some containers may handle conditions differently based on what they do.
 
@@ -405,15 +447,17 @@ There are two types of inputs:
 
 ### Mappings
 
-A mapping is a set of containers and actions attached to an input. A mapping includes at least one container, the simplest one called the basic container.  The type of containers and actions available depend on the input type.  So actions for an axis are different from actions for a button.
+A mapping is a set of [containers](containers.md) and [actions](actions.md) attached to an input. A mapping includes at least one container, the simplest one called the basic container.  The type of containers and actions available depend on the input type.  So actions for an axis are different from actions for a button.
 
-Containers contain one or more actions.  Some containers add functionality to actions, such as chain or sequence, or long/short press functionality.
+[Containers](containers.md) contain one or more [actions](actions.md).  Many [containers](containers.md) are specialized and add functionality to [actions](actions.md), such as chain or sequence, or long/short press functionality.  Containers by themselves do not produce any output, but they manage the behavior of the actions they contain.
 
-Some actions, like Gated Axis, also have containers.
+Some [actions](actions.md), like [Gated Axis](actions.md#gated-axis-action), also have containers embedded in the action for each trigger condition.
 
 Actions are the actual items that produce output.
 
-Note: it is usually the case that multiple combinations of containers and actions can get to the same result.  There is no method better than the other.  The key is to pick a combination that works for you.  It is also the case that while many actions are similar (they may even be called the same except for an "ex" for "extended functionality"), that some may be better than others.
+Note: it is usually the case that different combinations of [containers](containers.md) and [actions](actions.md) can produce the same output.  There is no method better than the other.  The key is to pick a combination that works for you.  It is also the case that while many [actions](actions.md) are similar (they may even be called the same except for an "ex" for "extended functionality"), that some may be better than others as they offer different output options.
+
+For example, a simple key press can be output using a [macro action](actions.md#macro) with three steps (press key, pause, release key), or a single [map to keyboard/mouse Ex action](actions.md#map-to-keyboardmouse-ex-action) in pulse mode.
 
 If you have a mapping questions such as "How do I do this", please ask the question in the [binding discussion forum on Discord](https://discord.com/channels/1279461873317707827/1342271810338553896).
 
@@ -508,15 +552,14 @@ This also explains why GremlinEx uses a lot of GUIDs (globally unique identifier
 
 As a result, most processing of events in GremlinEx is measured in milliseconds, including complex ones like Gated Axis, and the execution speed is usually not dependent on the complexity of the profile.  Most events are processed in under 10 milliseconds (speed of course is dependent on the hardware used) and the number of execution nodes evaluated is usually quite small as events are discarded as quickly as possible.
 
-
 ## Security related concerns
 
-First of, as this has been asked, GremlinEx is NOT:
+First of all, as this has been asked, GremlinEx is NOT:
 
 - a keylogger
 - a virus or malware
 
-First, you tell GremlinEx what you want it to do, by itself GremlinEx does nothing.  You control the input and the output.  GremlinEx does not by itself record keys unless you tell it to listen to input, and you decide what it does with that data.
+You tell GremlinEx what you want it to do, by itself GremlinEx does nothing.  You control the input and the output and where it goes.  GremlinEx does not by itself record keys unless you tell it to listen to input, and you decide what it does with that data.  Clients also have to be configured to enable remote-control.
 
 Any security concerns can be alleviated by reviewing the open source code and compiling/running the code for yourself directly from Python.  This does require the installation of a Python environment, as well as the installation via PIP of all the dependencies (requirements.txt file is provided for this purpose).  This documentation will not go into how to setup a Python environment as this is outside of the scope of GremlinEx and a software development topic.  GremlinEx releases come as pre-pacakged, easy to use and ready to use executables that includes all dependencies and ready to go.
 
@@ -532,9 +575,93 @@ As noted, GremlinEx is open source, it was writen with the best of intentions to
 
 Windows 11 can cause some issues if GremlinEx is located in one of the system protected folders like "Program Files".  Recommendation: use a folder "GremlinEx" to unzip the files to, that folder should not be in "Program Files" or "Windows" or any of the protected system folders.
 
+Windows 11 security can also get in the way of sending output to specific processes as the default security setup lets you send keys to the active (focus) process only.  Windows 11 may prevent GremlinEx from sending output to certain processes depending on group policies and account permissions, both are outside of the scope of GremlinEx as security is set at the operating system level.   The default configuration for a typical user account on Windows 11 works well with GremlinEx.
+
 GremlinEx sends keyboard and mouse commands you map via the Windows API to other processes.  While in most cases it is not necessary to run GremlinEx as an administrator, some group policies and Windows configurations may prevent this output to go to other processes.  This is not an issue with GremlinEx but a feature of the Windows API GremlinEx uses.  This is not normally a requirement in testing.  However it can also materialize itself with using tools like HIDHide, ViGEM and VJOY for the same reason, depending on what group policies and account restrictions are setup on your particular system.   Most home users do not have this issue provided that you are allowed to install software and configure ports.  Some enterprise users may run into this issue depending on the settings setup by their IT department.
 
 When GremlinEx attempts to open a port, Windows will prompt the first time to allow this, and allow GremlinEx to communicate on the network.  This is automatic and should be accepted or GremlinEx will not be able to communicate with OSC, BitFocus or other GremlinEx instances.
+
+## General Q&A
+
+| Question | Answer |
+| --- | --- |
+| Do I need to install Python for this? | No.  The packaged version (zip) includes all you need. |
+| Outside of GremlinEx, what do I need? | You will need to download and install HIDHide, and download and install VJOY.  Optional components include Bitfocus Companion (to manage certain input panels) and VIGEM if you want to output to virtual console game controllers (xbox 360 emulation). |
+| Will this conflict with another Python installation on my machine? | No.  The packaged version (zip) includes all you need and will use the built-in runtimes and not use any existing Python environments you have setup. |
+| What devices does GremlinEx work with? | GremlinEx works with any game controller visible to Windows via the DINPUT standard.  This includes most if not all devices that report as an HID USB game controller. |
+| Do I need to run my joystick hardware manufacturer's software like T.A.R.G.E.T or Virpil? | No.  The device should function as a basic game controller without any software just by plugging it in.  Some devices however need to be configured to look to Windows like a gamecontroller to enable different features such as axes and buttons and hats.  This is programmed in their firmware by the manufacturer's software and not done by GremlinEx and should be done only once to enable all the features if it does not come factory set like this.  In most cases this step is not necessary.  GremlinEx handles all of the input mapping for all these devices regardless of the manufacturer.  The requirement is the device must shows up as a DINPUT device. |
+| How do I get started? | Download the software, run it, and do a simple mapping.  This documentation should get you started, however if you need help, visit the [GremlinEx Discord community](https://discord.com/channels/1279461873317707827/1341211588404842547) and ask questions!  There is a forum on bindings, one on how-tos, and a general support/testing channel. |
+| What's HIDHide and why do I need it? | HIDHide is a tool that "hides" the real game controllers mapped by GremlinEx to VJOY virtual joysticks.  You whitelist the GremlinEx process in HIDHide, and other processes including Windows won't see the raw hardware.  This makes sure that games so it will not be confused with multiple concurrent inputs and only see the VJOY devices. |
+| How do I use a Streamdeck with GremlinEx? | GremlinEx uses the OSC protocol to communicate with devices supported by Bitfocus Companion including the Elgato devices and devices by other manufacturers such as a Loupedeck. Bitfocus (also free) replaces the Elgato control software and lets you map on theser hardware panels buttons and rotary buttons to OSC messages sent to GremlinEx.  If you need help configuring Bitfocus and GremlinEx for OSC, please head over to the [Discord channel](https://discord.com/channels/1279461873317707827/1341211588404842547). |
+| What is remote control? | GremlinEx is able to control other GremlinEx instances over the local network. This can be a single client, or multiple clients at once. This allows you to route output to these clients and that routing can be enabled / disabled by the profile.  This helps when running games on multiple machines.  Each client does need to have HIDHide and VJOY installed, and GremlinEx must be running on each, be configured for remote control (option enabled), and a blank profile should be executing. You can also have hardware on different clients send messages to the primary computer running GremlinEx such as over OSC so you can send axis, hat and button data that way as well.  GremlinEx clients can send and receive data at the same time so they can all talk to each other in real time. |
+| What about performance? | In most cases GremlinEx can process inputs and convert them to outputs at runtime in under one millisecond, and certainly all under ten milliseconds even on network connections. |
+| Can GremlinEx generate keystrokes? | Yes. Use the map to keyboard/mouse EX action to generate keystrokes, mouse buttons, mouse wheel events, and access even special keys like F13 to F24 and volume control keys. |
+| Can GremlinEx generate mouse output? | Yes.  For motion, use the Map to mouse/Ex action.  For buttons including wheel, use the map to keyboard/mouse EX action. |
+| Can GremlinEx split up axes into buttons or sub-axes? | Yes.  Use the gated axis action attached to an axis to split up an axis into button triggers (which can be directional), or range (linear) triggers to rescale an axis, create deadzones or special "gates" on an axis. |
+| Can GremlinEx work with touchscreens like GameGlass? | Yes.  The touchscreen has to be on a separate machine (Windows limitation), and run someting like Open Stage Control to send OSC messages for axis and buttons to GremlinEx. Open Stage Control is a free app that lets you design input panels exactly like Gameglass. You can also use OSC output from GremlinEx back to the touchscreen panel to control its state?  OSC is a network protocol developed for hardware and software stage control (so things like lighting systems, musical instruments, network connected actuators) and used here to communicate easily with various hardware and touchscreen (interactive) components.  |
+| Can GremlinEx work with MIDI control systems? | Yes.  GremlinEx supports MIDI in the box and can accept axis (linear) and buttons from a MIDI controller attached to the local machine, or via the network using things like RPTMidi.  While MIDI is an old protocol for musical instruments, its use here is to be able to use controllers with faders, rotary encorders and buttons as input systems for games. |
+| Does GremlinEx work with Microsoft Flight Simulator? | Yes.  GremlinEx includes a WASM module for MSFS 2024 and you can send axis and buttons directly to MSFS via its API, including run calculator expressions for special add-ons that have variables and controls not available via the Simconnect API. |
+| Is GremlinEx hard to use? | No, but that's up to you and the level of complexity you want to have in your profile. The basic mapping functions are very simple.  You pick a device, you pick an input from the list, you add an action to that input, and tell GremlinEx what you want to happen.  Save, run the profile and that's it. GremlinEx also has many advanced features such as advanced curving of inputs and outputs, calibrations, profile modes, profile states, axis merging, key latching, conditions, sequences, macros, axis splitting and gating, remote control, a KVM function, input and output from/to network devices and hardware panels like a Streamdeck and touchscreens.  The most advanced is the custom plugin that requires knowledge of Python and the GremlinEx API.  Just because the features are there doesn't mean they need to be used.  No, you do not need to create five profile modes and ten states to manage your avatar's walking profile! You can if you want to, that's the point. Advanced features vary in learning curve, with a heavy emphasis on, usually not needed for basic usage although not difficult to use.  The [GremlinEx Discord community](https://discord.com/channels/1279461873317707827/1341211588404842547) is available to help so ask questions and has a lot of screenshots and examples of typical how-to.  Each situation is different so please, ask a question! |
+| How do I map X? | You'll find that in GremlinEx there are multiple ways to do a mapping ranging from simple to more advanced and conditional.  Usually it's very straightforward and simple. This documentation has a list of the building blocks that can be found [here for containers](#available-containers), and [here for actions](#available-actions).  Each is also described individualy [the usage section](usage.md) of this documentation. |
+| Why GremlinEx? |  GremlinEx is an integrator and stand-in for multiple solutions.  It's designed to be a one stop shop for all hardware and software controller needs.  It has a swiss-army knife of options when it comes to various ways to take inputs, manipulate that input, and create meaningful outputs for simple games to very complicated simulators with lots of controls.  GremlinEx is for single joystick scenarios to full hardware network enabled cockpit setups. |
+
+
+
+## Troubleshooting
+
+The [GremlinEx Discord community](https://discord.com/channels/1279461873317707827/1341211588404842547) is a great place to ask for help, report issues and get how-to answers.
+
+### Typical issues
+
+### GremlinEx warns me this is an unknown publisher
+
+Windows will generate this warning the first time you run the packaged GremlinEx.  This is because the packaged application is not signed.  If you are concerned by this, you can always run this Python application from the source code and create a package for yourself.  GremlinEx comes pre-packaged as a convenience as it's not expected that everyone will setup a development environment and dependencies on their system.  However it is definitely an option if this warning box is a concern.
+GremlinEx is an open source project and all sources are available as an alternative.
+
+### GremlinEx gives a startup error
+
+Startup errors usually are due to missing components or incompatible components.  GremlinEx includes all it needs in the distribution package (zip), including the correct version of the Python runtime needed and any support DLLs needed.  To this end, when installing a new version, make sure you delete any prior files (if installing in the same folder).  The log file  ```%userprofile%\joystick gremlin ex\system.log``` will contain any critical errors.  GremlinEx includes all it needs and is self contained.
+
+Another cause of a startup error may be security related, specifically, insufficient permissions on the account to run.  This is rare. 
+
+### GremlinEx is unable to communicate with clients on the network
+
+Make sure that the port is configured the same for all clients (6012 is the default).  When GremlinEx first runs and remote communication is enabled (either to send/broadcast or receive), you will get a Windows prompt to authorize this in the firewall.  If you denied the request, you will need to manually enable the port in the Windows Firewall settings.
+
+### My devices show all disconnected (or do not show at all)
+
+| Suggestion | Description |
+| --- | --- |
+| Check HIDHide configuration | Make sure HIDHide is whitelisting the gremlinex.exe process.  If you have multiple versions installed (for testing for example), ensure that each executable is white listed. |
+| Firmware, driver updates or USB connection changes for your physical joysticks. | It is known that firmware and driver updates from hardware vendors change the unique device GUID of each device. Connecting your device to another USB port (or hub) can also change device GUIDs.  Profiles created with older GUIDs need to be updated which can be done by grabbing the new GUID from the GremlinEx device information dialog (copy to clipboard) and do a search/replace in the profile XML data to swap the old ID with the new.  Make a backup copy of the profile XML first, and use an editor like Notepad++ to make the changes as this editor will show XML properly with syntax highlighting, which makes the process easier. |
+| Device is asleep | Some older devices tend to go to sleep if not used for a period of time.  There are ways to prevent Windows 11 from placing them in standby / sleep mode via Device Manager.  There are multiple online articles on this subject if this happens to you.  The symptoms are - devices are visible when you first boot the computer, but go offline on their own after a while. |
+| Device is not a DINPUT device | GremlinEx can currently only see DINPUT compatible devices, and most HID game controllers are.  Some may not report as a game controller and are incompatible with DINPUT.  Some devices like touch screens and the Elgato Streamdeck are not DINPUT devices but can be used with GremlinEx via the OSC protocol and the use of [BitFocus Companion](https://bitfocus.io/companion). |
+
+### User interface is blank
+
+This usually indicates an internal exception occured.  You can change tabs, close GremlinEx and re-open and see if the issue persists.  Please report these to the [GremlinEx Discord community channel](https://discord.com/channels/1279461873317707827/1341211588404842547).  There may still be a dragon in the software to look into.  Be ready to provide the log file and screenshots if requested, including the GremlinEx version number.  Patches can be frequent and it's highly possible an update has resolved the issue already.   Check for updates frequently in the release section of [the project GitHub page](https://github.com/muchimi/JoystickGremlinEx).  The log file is located at ```%userprofile%\joystick gremlin ex\system.log```.
+
+### Nothing is happening (or the wrong thing is happening)
+
+| Suggestion | Description |
+| --- | --- |
+| Profile must be running | GremlinEx only creates output if the profile is running. |
+| Make sure you are using the latest stable version of GremlinEx | GremlinEx is regularly updated when issues are reported and resolved, so be sure to run a current release and check Discord/Github regularly for any updates. |
+| Ensure the input is triggering | Ensure the input is registering in GremlinEx, for example using the Input Viewer.  If GremlinEx does not detect an input, there will be no output. |
+| Check profile modes | If you are using multiple modes in your profile, ensure the profile is in the correct mode, and selects the correct mode at startup. |
+| Check the output outside of the target application | Sometimes using the target application to check outputs is not helpful as it can be the target application iself not registering inputs. |
+| Use a keyboard checker to look at output mouse buttons and keystrokes outside of the game. | Use a tool like `Thrustmaster's Event Checker` (part of T.A.R.G.E.T) or a free keyboard checker utility like `YAKD` or `Keyboard Key Info`. These will show you what keys (and mouse buttons for the TM tool) are output by GremlinEx. This eliminates any issues with the target game by verifying that GremlinEx's output is what you are expecting first.  This is particularly helpful with timing issues.|
+| Use `VJOY Monitor` to validate joystick outputs. | VJoy Monitor is one of the utilities that comes with your isntallation of VJOY and it shows the status of each vjoy device in real-time.  You can also use the built-in GremlinEx Input Viewer, however VJOY Monitor runs as a separate process and verifies that VJOY is being programmed by GremlinEx correctly.  This will help identify where the issue may be - with the profile - or with the target application's mapping. |
+| Use the GremlinEx Input Viewer | The Input Viewer dialog can show inputs, and outputs as well for quick checks. |
+| Use `verbose` options | GremlinEx as a comprehensive set of verbosity options to enabled certain subsystem output to the log file.  This is helpful to troubleshoot a specific input or output as you can isolate issues that way easily.  There are separate verbose options for VJOy, macros, keyboard and mouse, as well as OSC. These options can generate a copious amount of data to the log file ```%userprofile%\joystick gremlin ex\system.log``` so only enable the options you need when troubleshooting inputs or outputs. |
+| Use a small, new, test profile | It is best to setup a simple test profile to check the input and action configuration. It can be difficult to troubleshoot a complex profile so simplify the task by breaking it down to manageable pieces to validate each issue separately. |
+| Ensure the output isn't happening too fast or too slow. | Many games use a loop to read inputs, and there are two scenarios: The output generated by GremlinEx is too fast: most button and key presses require about 100ms to register with a game. It does vary with the application, but if you have an output that triggers a key press, and 4ms later triggers a release, the game may not see that key (button) at all.   Conversely, some games cannot detect sequence of keys if they occur too slowly, and the sweet spot for this tends to be around 250ms between a press and a release (for games that expect a momentary action like a single key press or a button press.) |
+| Ensure the mappings on the target application are correct. |  Ensure HIDHide "hides" the raw inputs you are processing via GremlinEx so the target application isn't confused by two concurrent inputs (raw plus the one generated by GremlinEx).  The target application should not be whitelisted in HIDHide.  Also ensure the application is mapped to the correct VJOY device.  Because they are (unfortunately) all named the same, it can be difficult sometimes to map to the correct VJOY device because the order they appear in the application may not be the order of the VJOY device ID. |
+| Ensure you rebooted the machine at least once before designing a profile so the device order from a game's perspective is repeatable. |  Windows changes the order of devices (that includes VJOY devices) at boot time and runtime, and the order is not going to be repeatable until you reboot the machine after connecting a device.  To this day Microsoft does not allow end-user game controller ordering in Windows.  This happens usually when you connect/disconnect devices while Windows is running, and this can confuse the target application to no-end.  GremlinEx doesn't usually care because it uses the unique hardware GUIDs, not the order of devices, but the same is typically not true of many games.  In particular, VJOY devices can have their order change, so what you see as device 1 may not be device 1 in the game.  Microsoft Flight Simulator is one of these applications that gets confused with that as of this writing.  So if you are using multiple VJOY devices, know that the first one in the device list on the game side may not be the device you are expecting.  Rebooting the machine (with the devices connected) ensures that device order will be steady - hence why it is not recommended to keep on disconnecting/connecting devices to the machine because it usually leads to device ordering problems outside of GremlinEx. If you connect (reconnect) anything - you have to reboot the machine after you do to avoid problems. |
+
+
+
+
 
 ### General support
 

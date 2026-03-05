@@ -8,7 +8,6 @@ Actions are contained in [containers](containers.md#containers).
 
 ## Available actions
 
-
 | Action | Description | Typical Use-Case |
 | ----------- | ----------- | ----------- |
 | Control | Modifies GremlinEx runtime options  | Enable or disable remote control, pause a profile, etc... |
@@ -17,7 +16,7 @@ Actions are contained in [containers](containers.md#containers).
 | Gated Axis | This action is an advanced linear axis mapper and executes actions based on axis movement, such as crossing a particular point on an axis, entering or exiting a range between two points. | Use for advanced axis mapping if you need something to happen at specific points on an axis, or specific ranges.  The action can also scale, remap or split up an axis into multiple outputs |
 | Macro | This action defines simple steps to execute such as pressing or releasing a key, setting an axis value or a state | Use this for simple macro situations.  For more advanced features, look at the sequence container |
 | Map to Gamepad | This action lets you map to a console game controller output via VIGEM | Use this if your target application only understands game controllers |
-| Map to Keyboard | This action is a legacy action to create keyboard output, included here to be compatible with original Joystick Gremlin profiles |
+| Map to Keyboard (legacy) | This action is a legacy action to create keyboard output, included here to be compatible with original Joystick Gremlin profiles |
 | Map to Keyboard/Mouse Ex | This action lets you output keyboard, and mouse button or mouse wheel to the output.  Supports advanced options for auto-repeat, hold, latching and various other controls.  Support multimedia key output such as volume control. | Use this when you need to send keyboard / mouse output to the target application |
 | Map to Mouse | This action is a legacy action to create mouse output.  Supports button and axis (mouse movement) actions.  | Use this to send mouse movement to the target application.  For mouse button, look at Map to Keyboard/Mouse Ex instead as it has more features. |
 | Map to Mouse Ex | More advanced version of the legacy action to create mouse output. Ability to trigger a mouse button, mouse motion, or set the mouse to a set position. |Use this to send mouse movement to the target application.  For mouse button, look at Map to Keyboard/Mouse Ex instead as it has more features. |
@@ -32,7 +31,7 @@ Actions are contained in [containers](containers.md#containers).
 | Pause | This action adds a delay or pauses profile execution.  | Use this as a pause/delay in sequence or chained containers.  See the Resume action to re-enable a suspended profile if used in that mode. |
 | Play Sound | This action plays an audio file.  Optionally let you play a random audio file from a folder at every trigger for variety.  Supports audio output to multiple concurrent audio devices, and supports concurrent audio on the same device.  Supports faders to manage clip duration, ramp up and ramp down, volume, and pitch corrected playback rate. | Use this to play WAV or MP3 audio (WAV recommended for low latency). |
 | Previous Mode | Returns the profile to the last mode before the most recent mode switch.  | Use this to revert to a prior mode. |
-| Remap | This is the legacy remap for VJOY from the original Joystick Gremlin (with minor modifications) to maintain compatibility with older profiles | Use the Map to VJoy action instead. |
+| Remap (legacy) | This is the legacy remap for VJOY from the original Joystick Gremlin (with minor modifications) to maintain compatibility with older profiles | Use the Map to VJoy action instead. |
 | Response Curve | This is a legacy action to add a curve to an input to maintain compatibility with older profiles. | Use the curve mapper on the input device directly, or use the Map to VJOY action to curve the output to VJOY instead. |
 | Response Curve Ex | This is a more advanced legacy action added early on to GremlinEx. | Use the curve mapper on the input device directly, or use the Map to VJOY action to curve the output to VJOY instead. |
 | Resume | Resumes profile execution paused with the Pause action | Use this to resume a profile after it has been paused |
@@ -255,6 +254,7 @@ This is the most common action in GremlinEx and lets you map an input (linear or
 This action replaces the legacy remap option.  In GremlinEx, this action is the main way to send output to a VJOY device. 
 
 Some of the features of vjoy remap:
+
 - map an input axis to a vjoy axis
 - apply an output curve to the vjoy axis based on input
 - scale or apply a range to the vjoy axis based on input
@@ -300,13 +300,6 @@ This action lets you cycle modes with each press.
 
 ![cycle modes](assets/action_cycle_mode.png)
 
-### Map to Keyboard Ex
-
-![map to keyboard](assets/action_map_to_keyboard_ex.png)
-
-This action lets you send a keyboard or mouse button/wheel click to the output.
-
-
 ### Map to Mouse Ex
 
 ![map to mouse ex](assets/action_mouse_ex.png)
@@ -330,7 +323,6 @@ This includes sending calculation and expressions via the GremlinEX WASM module 
 
 ![map to simconnect calculator action](assets/action_map_to_simconnect_calculator.png)
 
-
 Using the SimConnect mapper from sim variables to calculator expressions requires knowledge of the [Microsoft Flight Simulator SDK](https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/SimConnect_SDK.htm).  
 
 The recommended setup is to have a single profile for Microsoft Flight Simulator, and have a mode for each aircraft type, and under that if needed, a mode for each subtype/variant.  Recommendations including having a setup for Boeing, Airbus, single prop, dual prop, single turboprop and dual turboprop, and quad engine as the base.  The Simconnect options page in GremlinEx while the sim is running will pull the current aircraft and let you associate a mode with that aircraft.  If you find the aircraft uses the default mode, it means it's being reported as a new type and likely needs to be associated with a profile mode for that type.
@@ -344,7 +336,6 @@ SimConnect itself is a bit of an arcane art due to the historically poor documen
 I often use the built-in debug tools in MSFS to determine what variable to set or what the values should be, including the SimConnect inspector and the example Simvars explorer that comes as a sample project to compile with the Simconnect SDK.
 
 Another avanced used of Simconnect is to have a user plugin capture sim state, for example parking brakes, and update a glass surface widget with the state. This can be done via a custom plugin in GremlinEx using the existing event model and API fro Simconnect via Simconnect Manager, an internal control class in GremlinEx.
-
 
 ### Map to OSC
 
@@ -427,41 +418,54 @@ Examples of how this action can be used:
 
 ![trigger map button](assets/trigger_map_button.png)
 
-
-
-
 ## Map to keyboard/Mouse EX action
 
 This is identical to the base keyboard mapper but adds a few functions I thought would be handy.
 
 The updated keyboard mapper adds separate press (make), release (break) functionality so keys can stay pressed, or just released separately.
 
-It also adds a delay (pulse) function to hold a key down for a preset period of time (default is 250 milliseconds or 1/4 of a second which is the typical game "detect" range as some games cannot detect key presses under 250ms in my experience.
+It also adds a delay (pulse) function to hold a key down for a preset period of time (default is 250 milliseconds or 1/4 of a second) which is the typical game "detect" range as some games cannot detect key presses under 250ms in my experience.
 
 The make/break/pulse behavior applies to all keys in the action, and the keys are released in the reverse order they were pressed.
 
 ![keyboard mapper](assets/keyboard_mapper_ex.png)
 
+### Output modes
+
+| Output modes | Description |
+| --- | --- |
+| Pulse Single | Presses the latched keys, waits for the specified time, release the latched keys. |
+| Pulse Repeat | Same as pulse single, but auto-repeats while the input is triggered.  The interval between pulses can be specified. |
+| Press | Presses the keys |
+| Release | Releases the keys |
+| Hold | Keeps the keys pressed while the input is triggered.  When the input is no longer triggered, the keys are released.  This is the default mode. |
+| Toggle | If the keys are released, they are pressed, and if they are pressed, they are released. |
+
+### Special keys
+
+This action supports the output of non-standard keys, such as F13 to F24 and media keys.  The action also supports mouse buttons 1 to 5 and vertical/horizontal wheel buttons for convenience to avoid having to use a dedicated mouse action for sequences like "left-shift + mouse button 1" or "right-alt + wheel up".
+
+### Wheel factor
+
+For mouse wheel output, the wheel factor determines the distance of the wheel travel.  The default is 1, the smallest possible travel distance, and the number acts like a multiplier (factor).  So for a 3x wheel travel, you would enter a 3.  The default is 1.
+
+### Key order
+
+If state keys are part of the selected key sequence (state keys are left-shift, right-shift, left-alt, right-alt, left-control, right control) - the state keys will be pressed first and released last.  Other keys will be pressed in the order selected.
+
+### Listen option
+
+While the virtual keyboard is recommended to select keys as it lets you pick a specific order, you can also have the action listen to key presses to record them (single or multiple).
+
 ### Virtual keyboard
 
-This action provides a visual keyboard to select one or more keys from. 
+This action provides a visual keyboard to select one or more keys from.
 
 The virtual keyboard is sometimes the only way to specify extended keys such as F13 to F24, audio keys.
 
-The virtual keyboard in GremlinEx also provides easy mappings for mouse buttons including buttons one to five, and the four wheel events, and the media keys.
+The virtual keyboard in GremlinEx includes special keys, such as F13 to F24 and media control keys.  The virtual keyboard also includes mouse button and mouse wheel for convenience to make them behave like keys.
 
 ![virtual keyboard](assets/virtual_keyboard.png)
-
-### Action modes
-
-| Mode     | Description |
-| ----------- | ----------- |
-| Hold | Keys will be pressed while the input is active, and released when the input is not.  The meaning of active depends on the input type.  For example, keys will be pressed while a joystick button is held down and will release when the button is released.  The input does not auto-repeat in this mode - only one make/break is sent for each latched key. |
-| Pulse | This mode triggers a press action, waits the pulse delay, and releases the keys.  This happens regardless of the input state.  If the input is pressed again while the pulse delay has not elapsed, the pulse is restarted.  In this mode, the keys are always released after the pulse delay.   Keep the pulse delay at or above 200ms as most game loops will fail to capture key presses under 200ms. |
-| Auto Repeat | This mode is similar to pulse mode, except the pulse will repeat while the input is held.  The interval specifies the time between pulses.  Set to 0 for no delay, keeping again in mind that most game loops will not detect key presses if they occur within 200ms of each other.|
-| Press | This mode triggers a press only (a "make" in keyboard hardware parlance).  This mode does not release the keys so it's expected at some point, the profile will release the keys.  Dragons: when used to send mouse clicks - it will keep the mouse pressed until the release which can cause behavior issues in the operating system.  Use with caution and only paired with a release mapping somewhere in the profile. Usually you can manually press the keys or the mouse to "undo" a press, provided that input is available (example F13 would not be).|
-| Release | Ths mode triggers a release only (a "break" in keyboard hardware parlance).  This is the companion action to the press mode. |
-| Toggle | Ths mode toggles the key or mouse button. If a key is released, the key is pressed.  If it is pressed, it is released.|
 
 ### Sync mode
 
@@ -469,11 +473,15 @@ As of m76T117, the action can synchronize with the mapped input.  If the input t
 
 ### Latching
 
-This action can send very complex and unusual keys and mouse buttons, including keys that are not typically available on a regular keyboard like the F13 to F24 function keys.   The action can also combine unusual "latched" sequences such as pressing more than multiple keys and mouse buttons at once.
+The map to keyboard/mouse Ex action can send very complex and unusual keys and mouse buttons, including keys that are not typically available on a regular keyboard like the F13 to F24 function keys.   The action can also combine unusual "latched" sequences such as pressing more than multiple keys and mouse buttons at once.
 
 ### Numlock behavior
 
 The keyboard behavior is hard-coded in the hardware to send duplicative scan codes depending on the state of the numlock key.  To avoid issues, GremlinEx automatically turns off numlock (if it was on) while the profile is running to ensure that the keyboard sends the correct and predictable scan codes.  This can be a challenge in some situations but was necessary to ensure the keyboard mapper sends consistent keystrokes and mouse buttons when the hardware, depending on the state of numlock, sends duplicate scan codes based on its mode.   This ensures that numeric keypad keystrokes all show up as numeric keypad.
+
+### Target process
+
+The default keyboard output behavior in Windows is to send keys to the process that has the focus, known as the active window or the active process.  Other processes called background processes may not see the keys.  To this end, the keyboard action has a way to specifically target a process at runtime if you run into a situation where this is the case.  The target process can be specified by its executable, or its runtime name (including a partial match).  GremlinEx will search for the process at profile start and output keys to that specific process if target mode is enabled and the process is found.  If the process is not found, an error message will be output to the log file and no keys will be output.
 
 ## Map to State Action
 

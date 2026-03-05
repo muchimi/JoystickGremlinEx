@@ -4,27 +4,33 @@
 
 ## What is GremlinEx?
 
-GremlinEx is a universal game/simpit controller integrator: it allows you to take input hardware devices from different manufacturers connected to a local machine, or those connected on a remote machine, such as joysticks, panels,  and HID game controllers, Audio-Visual hardware and software that supports OSC (Open Source Control), MIDI, keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.  GremlinEx maps this input to a simplified and consolidated set of outputs, and it is vendor agnostic.   GremlinEx also has the ability to directly send data to Microsoft Flight Simulator via the SimConnect API.
+GremlinEx is a universal game/simpit controller integrator: it allows you to take concurrnt input from various hardware or network devices, such as joysticks, panels, game controllers, and audio-visual hardware and software that supports OSC (Open Source Control) such as a glass surface (touch screen) panel, MIDI, keyboard and mouse inputs and map them to virtual outputs like VJOY, or keyboard or mouse output, and send that to a game or another process.  GremlinEx maps this input to a simplified and consolidated set of outputs, and it is vendor agnostic.   GremlinEx also has the ability to directly send data to Microsoft Flight Simulator via the SimConnect API and a custom WASM module.
 
 Gremlin supports glass surfaces (touch screens), hardware panels like StreamDeck, and even MIDI control panels and works well with tools like Bitfocus Companion and Open Stage Control.
 
-The audience for GremlinEx is anyone looking to easily integrate multiple hardware input devices from joysticks to control panels and map it to a game without having to use proprietary vendor software.  GremlinEx includes a rich set of mapping tools for the transformations, from joystick curve editing to conditional output, modes and management of profiles.
+The audience for GremlinEx is anyone looking to easily integrate multiple hardware input devices from joysticks to control panels and map it to a game without having to use proprietary vendor software.  GremlinEx is simple to use for simple mapping scenarios, and it also includes a rich set of tools for the transformations, manipulation and routing of inputs.  GEX supports anything from custom joystick curve editing to conditional output, execution, and has modes and states to dynamically control the execution of mappings at runtime.  GremlinEx can also remote control other GremlinEx instances on the network, playback audio, supports dynamic text to speech, axis merging and axis splitting and scaling, curving and calibration.
 
 A more detailed look at features supported by GremlinEx can be found in the [overview section](overview.md) of the documentation.
 
-GremlinEx is independent from any controller software.  It does not require you to run any specific software from a hardware manufacturer to "map" the device.  So long as the device shows up on Windows as an HID device with axes and buttons, GremlinEx will let you map this input.  It is vendor agnostic and relies on standard APIs that are not vendor specific. GremlinEx works with any HID compliant controller device, so supports any device up to eight (8) axes, up to a hundred and twenty eight (128) buttons, and up to four (4) hats.
+## How can I support the project?
 
-There is no limit to the number of input devices GremlinEx supports.
+The project is a labor of love and started as "I really want to be able to do [missing feature here] and can't find a way to do this".  The project has evolved in the last few years to take significant time and resources to support and develop.
 
-Some of these inputs can be virtual, so GremlinEx can also accept inputs from VJOY while sending outputs to VJOY so long as the input device is not the same as the output device to avoid a loop.
+Please consider supporting the project by making a secure donation, either one time or recurring, via the sponsor link on [the home project on Github](https://github.com/muchimi/JoystickGremlinEx).
 
-GremlinEx can accomplish very sophisticated condition based routing based on one or more concurrent inputs using conditions and states.
+This project is open source.  It has as of this writing, more than 133,000 of lines of code (almost 200,000 if you include comments) - it is a large project.  Donations help with the purchase of hardware, maintaining computing resources for testing and development platform purposes.  Donations make more time available to research, develop features and support the project on an on-going basis.  Thanks to your help, the project has already seen hundreds of updates, many of them daily.  It has seen the implementation of nearly all requested features, many of which are not available in other similar tools.  It has a [rich set of features](overview.md#key-features-what-can-gremlinex-do), many of them not found in payware tools.   It is your support and shared passion for this hobby that makes GremlinEx, and its continuing support, possible.  
 
-GremlinEx supports the Open Sound Control (OSC) protocol which allows it to receive or send OSC messages to/from suitable devices.  This capability allows GremlinEx to process inputs from touch screen surfaces and hardware panels connected to devices on the network, including the local machine.  GremlinEx can also send data back to these devices to update their configuration, for example, selecting pages to display based on the active profile or mode loaded in GremlinEx.
+Thank you for considering supporting the project if you have not already, and thank you to those of you who have already supported.
 
-GremlinxEx (as of M76) supports templates: individual mappings can be saved to template files.  These templates can then be loaded into another input, profile, or shared. Templates have no input information - only mappings.
+Every bit helps!
 
-GremlinEx supports custom Python user scripts for complete programmatic control over the mapping if the built-in capabilities are insufficient or impractical.
+## Project Home on Github
+
+The project's [home is on GitHub](https://github.com/muchimi/JoystickGremlinEx) from where you can download the latest releases and view patch notes.
+
+## Support and chat
+
+The project has a dedicated [Discord server](https://discord.com/channels/1279461873317707827) where you can lookup solutions to typical mapping questions, view how-to guides and setup screenshots, ask questions and report any issues.  You can also report issues on GitHub if you wish.
 
 ## General Architecture
 
@@ -36,15 +42,33 @@ There should be no expectation that a single input always results in a single ou
 
 ## Differences with Joystick Gremlin
 
-GremlinEx is not Joystick Gremlin or a new version of Joystick Gremlin.  They may have a lot in common, however they are significantly different in how they work and function in many respects, including runtime.  GremlinEx started as a fork, however in the last several years is mostly a gut/replace.
+GremlinEx started as a fork of the excellent Joystick Gremlin serveral years ago, with the goal of seeing if it could be ported to 64 bit and a more up to date version of Python.
 
-GremlinEx is heavily event driven, uses multi-threading, has networking and support for non-joystick devices, and has many actions, functions and options that do not exist in the original because they evolved differently.  Available [containers are listed here](containers.md#containers) and available mapping [actions are found here](actions.md#actions).
+Fast forward to today: GremlinEx (GEX) at this point is not Joystick Gremlin nor a new version of Joystick Gremlin - it's been re-architected and converted, while keeping with the spirit of the original.  While common in origin, GEX is very significantly different internally with a different run engine, multi-threading, new and reworked mapping actions and containers, and core new functionality. GremlinEx may have started as a fork, however in the last several years has evolved to look similar, and functions differently and is now more than hundred thousand line of codes, two hundred if you include comments - I am a firm believer in comments to understand what the code does and perhaps more importantly, why.
 
-The internal wiring is significantly different along with a completely new execution graph logic so any expectation that GremlinEx works like Joystick Gremlin may be misplaced and not applicable.  GremlinEx is the essence of the original it's based on, has a general shared pedigree, however it does things differently.
+GremlinEx is now heavily event driven, uses multi-threading, has networking and support for non-joystick devices, and has many actions, functions and options that do not exist in the original because they evolved differently.  Available [containers are listed here](containers.md#containers) and available mapping [actions are found here](actions.md#actions).
+
+GremlinEx is squarely focused on performance, with most mappings aiming for millisecond processing time, and has many UI features to reduce the UI complexity to help with performance at design time.
+
+GremlinEx is heavily networked: it supports remote control of multiple clients.  It supports network protocols to accept inputs from other devices on the network, and send data to other devices on the network for two-way communication/updates.
+
+GremlinEx even has a KVM mode to completly take over a client for game control purposes.
+
+The internal wiring is completely new, implementing a high performance execution graph runtime engine.
 
 While most Joystick Gremlin profiles should load as-is, some may not depending on the version of the profile and features used, especially if the features were deprecated in GremlinEx and replaced.  This said, simpler profiles should work "as-is".  A lot of care was applied to ensuring older profiles can load "as is" with the necessary conversions happening automatically - however this only goes so far.
 
 Also note that once a profile has been touched by GremlinEx, it may not work at all with any other prior version, including Joystick Gremlin because of changes to the profile file.
+
+GremlinEx also has several UI (user interface) enhancements aimed at improving the understanding of "what is my hardware doing now", for example, visual repeaters on buttons and axes, and automatic input switching for that time when you don't remember what button is what and you need to go to that input fast.
+
+GremlinEx lets you re-order your devices internally so the ones most often used can show up first in the user interface.
+
+GremlinEx is Windows theme aware, so has a dark mode.
+
+GremlinEx has a new sound processing engine, and features to play back audio at different speeds while maintaining the pitch.
+
+GremlinEx has a new API that makes it easier for custom plugins to be written and interface with inputs and outputs.
 
 ## Installation
 

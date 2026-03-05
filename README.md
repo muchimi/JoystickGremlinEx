@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC8):
+- Fix: Vjoy Remap Action: design time merge output only updates for added merged axes changes, not self).
+- Change: Vjoy Remap Action: UI update for merged axis to match other container styling.
+
 ### (m76RC7A):
 - Fix: (legacy) Remap Action: exception on find next available vjoy input.
 - Fix: Profile: list actions missing sync under new API.

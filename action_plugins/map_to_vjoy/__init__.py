@@ -108,7 +108,11 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         config = gremlin.config.Configuration()
 
         self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-        self.main_layout.addWidget(QtWidgets.QLabel(label if label else "Merge axis:"))
+
+        step_widget = gremlin.ui.ui_common.QFrameBox(f"<b>{label if label else 'Merge Axis'}</b>")
+        self.main_layout.addWidget(gremlin.ui.ui_common.getHContainer(step_widget, widget_only=True))
+
+        #self.main_layout.addWidget(QtWidgets.QLabel(label if label else "Merge axis:"))
 
         # merge operations
         self.container_merge_widget = QtWidgets.QWidget()
@@ -6166,9 +6170,11 @@ Supports axis merging, curved output, command, hat and button mappings.
         if event.is_axis:
             device_guid = gremlin.util.normalize_guid(event.device_guid)
             input_id = event.identifier
-            if event.device_guid == self.get_device_guid() and event.identifier == self.get_input_id():
+            if (event.device_guid == self.hardware_device_guid and event.identifier == self.hardware_input_id) or \
+                (event.device_guid == self.get_device_guid() and event.identifier == self.get_input_id()):
                 # process self
                 return True
+
             key = (device_guid, input_id)
             keys = [md.key for md in self._merge_data]
             return key in keys
