@@ -822,15 +822,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#map-to-keyboard-ex" class="md-nav__link">
-    <span class="md-ellipsis">
-      Map to Keyboard Ex
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#map-to-mouse-ex" class="md-nav__link">
     <span class="md-ellipsis">
       Map to Mouse Ex
@@ -936,18 +927,54 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#virtual-keyboard" class="md-nav__link">
+  <a href="#output-modes" class="md-nav__link">
     <span class="md-ellipsis">
-      Virtual keyboard
+      Output modes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#action-modes" class="md-nav__link">
+  <a href="#special-keys" class="md-nav__link">
     <span class="md-ellipsis">
-      Action modes
+      Special keys
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wheel-factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wheel factor
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key order
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listen-option" class="md-nav__link">
+    <span class="md-ellipsis">
+      Listen option
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#virtual-keyboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      Virtual keyboard
     </span>
   </a>
   
@@ -975,6 +1002,15 @@
   <a href="#numlock-behavior" class="md-nav__link">
     <span class="md-ellipsis">
       Numlock behavior
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      Target process
     </span>
   </a>
   
@@ -1418,15 +1454,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#map-to-keyboard-ex" class="md-nav__link">
-    <span class="md-ellipsis">
-      Map to Keyboard Ex
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#map-to-mouse-ex" class="md-nav__link">
     <span class="md-ellipsis">
       Map to Mouse Ex
@@ -1532,18 +1559,54 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#virtual-keyboard" class="md-nav__link">
+  <a href="#output-modes" class="md-nav__link">
     <span class="md-ellipsis">
-      Virtual keyboard
+      Output modes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#action-modes" class="md-nav__link">
+  <a href="#special-keys" class="md-nav__link">
     <span class="md-ellipsis">
-      Action modes
+      Special keys
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wheel-factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      Wheel factor
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key order
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#listen-option" class="md-nav__link">
+    <span class="md-ellipsis">
+      Listen option
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#virtual-keyboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      Virtual keyboard
     </span>
   </a>
   
@@ -1571,6 +1634,15 @@
   <a href="#numlock-behavior" class="md-nav__link">
     <span class="md-ellipsis">
       Numlock behavior
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      Target process
     </span>
   </a>
   
@@ -2173,20 +2245,22 @@ The offset applied is scaled based on the deviation, so maximum deviation of the
 <p><a class="glightbox" href="../assets/action_vjoy_remap.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="vjoy remap action" src="../assets/action_vjoy_remap.png" /></a></p>
 <p>This is the most common action in GremlinEx and lets you map an input (linear or momentary) to a VJOY device.</p>
 <p>This action replaces the legacy remap option.  In GremlinEx, this action is the main way to send output to a VJOY device. </p>
-<p>Some of the features of vjoy remap:
-- map an input axis to a vjoy axis
-- apply an output curve to the vjoy axis based on input
-- scale or apply a range to the vjoy axis based on input
-- merge the output axis value with one or more input axes using add, substract, multiply, average.
-- map an input button to a vjoy button
-- map an input hat to a button or a hat
-- synchonize the input value to the output on profile start or pick a default value.
-- force a button pressed
-- force a button release
-- toggle a button
-- increase and decrease an output vjoy axis using two momentary inputs using a table of values
-- convert an axis value to a button
-- view which buttons are in-use profile wise</p>
+<p>Some of the features of vjoy remap:</p>
+<ul>
+<li>map an input axis to a vjoy axis</li>
+<li>apply an output curve to the vjoy axis based on input</li>
+<li>scale or apply a range to the vjoy axis based on input</li>
+<li>merge the output axis value with one or more input axes using add, substract, multiply, average.</li>
+<li>map an input button to a vjoy button</li>
+<li>map an input hat to a button or a hat</li>
+<li>synchonize the input value to the output on profile start or pick a default value.</li>
+<li>force a button pressed</li>
+<li>force a button release</li>
+<li>toggle a button</li>
+<li>increase and decrease an output vjoy axis using two momentary inputs using a table of values</li>
+<li>convert an axis value to a button</li>
+<li>view which buttons are in-use profile wise</li>
+</ul>
 <h3 id="gated-axis">Gated Axis<a class="headerlink" href="#gated-axis" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_gated_axis.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="gated axis" src="../assets/action_gated_axis.png" /></a></p>
 <p>This action lets you split an input axis and define what should happen when</p>
@@ -2205,9 +2279,6 @@ This container was specifically created for output needs that have "gates", such
 <h3 id="cycle-modes">Cycle Modes<a class="headerlink" href="#cycle-modes" title="Permanent link">&para;</a></h3>
 <p>This action lets you cycle modes with each press.</p>
 <p><a class="glightbox" href="../assets/action_cycle_mode.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="cycle modes" src="../assets/action_cycle_mode.png" /></a></p>
-<h3 id="map-to-keyboard-ex">Map to Keyboard Ex<a class="headerlink" href="#map-to-keyboard-ex" title="Permanent link">&para;</a></h3>
-<p><a class="glightbox" href="../assets/action_map_to_keyboard_ex.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to keyboard" src="../assets/action_map_to_keyboard_ex.png" /></a></p>
-<p>This action lets you send a keyboard or mouse button/wheel click to the output.</p>
 <h3 id="map-to-mouse-ex">Map to Mouse Ex<a class="headerlink" href="#map-to-mouse-ex" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_mouse_ex.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="map to mouse ex" src="../assets/action_mouse_ex.png" /></a></p>
 <p>This action lets you send a mouse button/wheel or mouse position change to the output.</p>
@@ -2277,55 +2348,65 @@ This container was specifically created for output needs that have "gates", such
 <h2 id="map-to-keyboardmouse-ex-action">Map to keyboard/Mouse EX action<a class="headerlink" href="#map-to-keyboardmouse-ex-action" title="Permanent link">&para;</a></h2>
 <p>This is identical to the base keyboard mapper but adds a few functions I thought would be handy.</p>
 <p>The updated keyboard mapper adds separate press (make), release (break) functionality so keys can stay pressed, or just released separately.</p>
-<p>It also adds a delay (pulse) function to hold a key down for a preset period of time (default is 250 milliseconds or 1/4 of a second which is the typical game "detect" range as some games cannot detect key presses under 250ms in my experience.</p>
+<p>It also adds a delay (pulse) function to hold a key down for a preset period of time (default is 250 milliseconds or 1/4 of a second) which is the typical game "detect" range as some games cannot detect key presses under 250ms in my experience.</p>
 <p>The make/break/pulse behavior applies to all keys in the action, and the keys are released in the reverse order they were pressed.</p>
 <p><a class="glightbox" href="../assets/keyboard_mapper_ex.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="keyboard mapper" src="../assets/keyboard_mapper_ex.png" /></a></p>
-<h3 id="virtual-keyboard">Virtual keyboard<a class="headerlink" href="#virtual-keyboard" title="Permanent link">&para;</a></h3>
-<p>This action provides a visual keyboard to select one or more keys from. </p>
-<p>The virtual keyboard is sometimes the only way to specify extended keys such as F13 to F24, audio keys.</p>
-<p>The virtual keyboard in GremlinEx also provides easy mappings for mouse buttons including buttons one to five, and the four wheel events, and the media keys.</p>
-<p><a class="glightbox" href="../assets/virtual_keyboard.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="virtual keyboard" src="../assets/virtual_keyboard.png" /></a></p>
-<h3 id="action-modes">Action modes<a class="headerlink" href="#action-modes" title="Permanent link">&para;</a></h3>
+<h3 id="output-modes">Output modes<a class="headerlink" href="#output-modes" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Mode</th>
+<th>Output modes</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Hold</td>
-<td>Keys will be pressed while the input is active, and released when the input is not.  The meaning of active depends on the input type.  For example, keys will be pressed while a joystick button is held down and will release when the button is released.  The input does not auto-repeat in this mode - only one make/break is sent for each latched key.</td>
+<td>Pulse Single</td>
+<td>Presses the latched keys, waits for the specified time, release the latched keys.</td>
 </tr>
 <tr>
-<td>Pulse</td>
-<td>This mode triggers a press action, waits the pulse delay, and releases the keys.  This happens regardless of the input state.  If the input is pressed again while the pulse delay has not elapsed, the pulse is restarted.  In this mode, the keys are always released after the pulse delay.   Keep the pulse delay at or above 200ms as most game loops will fail to capture key presses under 200ms.</td>
-</tr>
-<tr>
-<td>Auto Repeat</td>
-<td>This mode is similar to pulse mode, except the pulse will repeat while the input is held.  The interval specifies the time between pulses.  Set to 0 for no delay, keeping again in mind that most game loops will not detect key presses if they occur within 200ms of each other.</td>
+<td>Pulse Repeat</td>
+<td>Same as pulse single, but auto-repeats while the input is triggered.  The interval between pulses can be specified.</td>
 </tr>
 <tr>
 <td>Press</td>
-<td>This mode triggers a press only (a "make" in keyboard hardware parlance).  This mode does not release the keys so it's expected at some point, the profile will release the keys.  Dragons: when used to send mouse clicks - it will keep the mouse pressed until the release which can cause behavior issues in the operating system.  Use with caution and only paired with a release mapping somewhere in the profile. Usually you can manually press the keys or the mouse to "undo" a press, provided that input is available (example F13 would not be).</td>
+<td>Presses the keys</td>
 </tr>
 <tr>
 <td>Release</td>
-<td>Ths mode triggers a release only (a "break" in keyboard hardware parlance).  This is the companion action to the press mode.</td>
+<td>Releases the keys</td>
+</tr>
+<tr>
+<td>Hold</td>
+<td>Keeps the keys pressed while the input is triggered.  When the input is no longer triggered, the keys are released.  This is the default mode.</td>
 </tr>
 <tr>
 <td>Toggle</td>
-<td>Ths mode toggles the key or mouse button. If a key is released, the key is pressed.  If it is pressed, it is released.</td>
+<td>If the keys are released, they are pressed, and if they are pressed, they are released.</td>
 </tr>
 </tbody>
 </table>
+<h3 id="special-keys">Special keys<a class="headerlink" href="#special-keys" title="Permanent link">&para;</a></h3>
+<p>This action supports the output of non-standard keys, such as F13 to F24 and media keys.  The action also supports mouse buttons 1 to 5 and vertical/horizontal wheel buttons for convenience to avoid having to use a dedicated mouse action for sequences like "left-shift + mouse button 1" or "right-alt + wheel up".</p>
+<h3 id="wheel-factor">Wheel factor<a class="headerlink" href="#wheel-factor" title="Permanent link">&para;</a></h3>
+<p>For mouse wheel output, the wheel factor determines the distance of the wheel travel.  The default is 1, the smallest possible travel distance, and the number acts like a multiplier (factor).  So for a 3x wheel travel, you would enter a 3.  The default is 1.</p>
+<h3 id="key-order">Key order<a class="headerlink" href="#key-order" title="Permanent link">&para;</a></h3>
+<p>If state keys are part of the selected key sequence (state keys are left-shift, right-shift, left-alt, right-alt, left-control, right control) - the state keys will be pressed first and released last.  Other keys will be pressed in the order selected.</p>
+<h3 id="listen-option">Listen option<a class="headerlink" href="#listen-option" title="Permanent link">&para;</a></h3>
+<p>While the virtual keyboard is recommended to select keys as it lets you pick a specific order, you can also have the action listen to key presses to record them (single or multiple).</p>
+<h3 id="virtual-keyboard">Virtual keyboard<a class="headerlink" href="#virtual-keyboard" title="Permanent link">&para;</a></h3>
+<p>This action provides a visual keyboard to select one or more keys from.</p>
+<p>The virtual keyboard is sometimes the only way to specify extended keys such as F13 to F24, audio keys.</p>
+<p>The virtual keyboard in GremlinEx includes special keys, such as F13 to F24 and media control keys.  The virtual keyboard also includes mouse button and mouse wheel for convenience to make them behave like keys.</p>
+<p><a class="glightbox" href="../assets/virtual_keyboard.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="virtual keyboard" src="../assets/virtual_keyboard.png" /></a></p>
 <h3 id="sync-mode">Sync mode<a class="headerlink" href="#sync-mode" title="Permanent link">&para;</a></h3>
 <p>As of m76T117, the action can synchronize with the mapped input.  If the input the action is mapped to is triggered at profile start (for example, a hardware switch is in the on position), the mapped keys / mouse buttons will be set to match the state of the input when the profile starts.  This mode is designed to keep the profile in synchronized with hardware input panels in simpits.</p>
 <h3 id="latching">Latching<a class="headerlink" href="#latching" title="Permanent link">&para;</a></h3>
-<p>This action can send very complex and unusual keys and mouse buttons, including keys that are not typically available on a regular keyboard like the F13 to F24 function keys.   The action can also combine unusual "latched" sequences such as pressing more than multiple keys and mouse buttons at once.</p>
+<p>The map to keyboard/mouse Ex action can send very complex and unusual keys and mouse buttons, including keys that are not typically available on a regular keyboard like the F13 to F24 function keys.   The action can also combine unusual "latched" sequences such as pressing more than multiple keys and mouse buttons at once.</p>
 <h3 id="numlock-behavior">Numlock behavior<a class="headerlink" href="#numlock-behavior" title="Permanent link">&para;</a></h3>
 <p>The keyboard behavior is hard-coded in the hardware to send duplicative scan codes depending on the state of the numlock key.  To avoid issues, GremlinEx automatically turns off numlock (if it was on) while the profile is running to ensure that the keyboard sends the correct and predictable scan codes.  This can be a challenge in some situations but was necessary to ensure the keyboard mapper sends consistent keystrokes and mouse buttons when the hardware, depending on the state of numlock, sends duplicate scan codes based on its mode.   This ensures that numeric keypad keystrokes all show up as numeric keypad.</p>
+<h3 id="target-process">Target process<a class="headerlink" href="#target-process" title="Permanent link">&para;</a></h3>
+<p>The default keyboard output behavior in Windows is to send keys to the process that has the focus, known as the active window or the active process.  Other processes called background processes may not see the keys.  To this end, the keyboard action has a way to specifically target a process at runtime if you run into a situation where this is the case.  The target process can be specified by its executable, or its runtime name (including a partial match).  GremlinEx will search for the process at profile start and output keys to that specific process if target mode is enabled and the process is found.  If the process is not found, an error message will be output to the log file and no keys will be output.</p>
 <h2 id="map-to-state-action">Map to State Action<a class="headerlink" href="#map-to-state-action" title="Permanent link">&para;</a></h2>
 <p>This feature is only available in 1.0ex m74 and above.  For more information on states, consult the <a href="../usage/#states">state device section</a> of the documentation.</p>
 <p>The map to state action manipulates a state when it's triggered.  This action lets you select the state to act on, and what should happen to the state value:</p>
