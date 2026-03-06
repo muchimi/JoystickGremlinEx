@@ -44,6 +44,7 @@ import gremlin.types
 import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
+import html
 
 syslog = logging.getLogger("system")
 
@@ -2328,7 +2329,8 @@ To send complex sequences, please look at the sequence container.'''
             elif child.tag == "description":
                 action = gremlin.macro.MacroDescriptionAction()
                 if "description" in child.attrib:
-                    action.description = child.get("description")
+                    description = child.get("description")
+                    action.description = html.unescape(description)
                 action.log = safe_read(child,"log",bool,False)
                 self.sequence.append(action)
 
@@ -2419,7 +2421,7 @@ To send complex sequences, please look at the sequence container.'''
             elif isinstance(entry, gremlin.macro.MacroDescriptionAction):
                 desc_node =  ElementTree.Element("description")
                 if entry.description:
-                    desc_node.set("description", entry.description)
+                    desc_node.set("description", html.escape(entry.description))
                 desc_node.set("log", safe_format(entry.log, bool))
                 action_list.append(desc_node)
 

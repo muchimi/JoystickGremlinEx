@@ -12577,6 +12577,20 @@ class QJoystickInputWidget(QtWidgets.QWidget):
         f_axis = stats.visible_axis_count
         f_button = stats.visible_button_count
         f_hat = stats.visible_hat_count
+        device = None
+        if f_axis < 0:
+            device = gremlin.joystick_handling.getDevice(stats.device_guid)
+            syslog.error(f"STATS: used axis count is reporting negative [{f_axis}] for device [{device.name}]")
+            f_axis = 0
+        if f_button < 0: 
+            if not device: device = gremlin.joystick_handling.getDevice(stats.device_guid)
+            syslog.error(f"STATS: used axis count is reporting negative [{f_button}] for device [{device.name}]")
+            f_button = 0
+        if f_hat < 0:
+            if not device: device = gremlin.joystick_handling.getDevice(stats.device_guid)
+            syslog.error(f"STATS: used axis count is reporting negative [{f_hat}] for device [{device.name}]")
+            f_hat = 0
+
         f_visible = f_axis + f_button + f_hat
         gremlin.util.InvokeUiMethod(self._update_ui, f_axis, f_button, f_hat, f_visible)
 

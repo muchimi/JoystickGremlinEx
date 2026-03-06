@@ -1213,7 +1213,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
 
 
         if "description" in node.attrib:
-            self.description = node.get("description")
+            self.description = html.unescape(node.get("description"))
         if "mode" in node.attrib:
             self.mode = node.get("mode")
         if "delay" in node.attrib:

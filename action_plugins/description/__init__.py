@@ -117,9 +117,6 @@ Also see notes on actions and containers.
         super().__init__(parent)
         self.description = ""
         self.parent = parent
-        # self.exec_on_press = True # true if trigger should execute on input press event
-        # self.exec_on_release = False # true if trigger should execute on input release event
-
 
     def icon(self):
         return "mdi.text"
@@ -128,16 +125,13 @@ Also see notes on actions and containers.
         return False
 
     def _parse_xml(self, node, data = None, extra_data = None):
-        self.description = gremlin.profile.safe_read(node, "description", str, "")
-        # self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
-        # self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
+        self.description = html.unescape(gremlin.profile.safe_read(node, "description", str, ""))
+
 
 
     def _generate_xml(self):
         node = ElementTree.Element("description")
-        node.set("description", str(self.description))
-        # node.set("exec_on_press", safe_format(self.exec_on_press, bool))
-        # node.set("exec_on_release", safe_format(self.exec_on_release, bool))  
+        node.set("description", html.escape(self.description))
         return node
 
     def _is_valid(self):
@@ -153,12 +147,6 @@ Also see notes on actions and containers.
         table = ReportTable(cellpadding=4) 
         
         table.addField("Description", html.escape(self.description))
-
-        # if self.exec_on_press:
-        #     table.addField("Exec (press)", "Yes")
-        # if self.exec_on_release:
-        #     table.addField("Exec (release)", "Yes")
-
         return table.to_html()
 
 

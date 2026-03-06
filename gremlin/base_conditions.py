@@ -20,6 +20,7 @@ import gremlin.execution_graph
 from psygnal import Signal
 from shiboken6 import Shiboken
 import traceback
+import html
 syslog = logging.getLogger("system")
 
 
@@ -302,7 +303,7 @@ class StateCondition(AbstractCondition):
         
         self.key = node.get("key")
         if "description" in node.attrib:
-            self.description = node.get("description")
+            self.description = html.unescape(node.get("description"))
         self.comparison = safe_read(node, "comparison", str, "")
         self.ignore_release = safe_read(node,"ignore-release",bool,False)
         sd =  gremlin.ui.state_device.StateData()
@@ -315,7 +316,7 @@ class StateCondition(AbstractCondition):
         node.set("key", self.key)
         node.set("ignore-release", safe_format(self.ignore_release, bool))
         if self.description:
-            node.set("description", self.description)
+            node.set("description", html.escape(self.description))
 
         return node
 

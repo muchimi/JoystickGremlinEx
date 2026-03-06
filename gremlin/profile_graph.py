@@ -90,6 +90,8 @@ from abc import ABC, abstractmethod
 import sys
 import psygnal
 from psygnal import Signal
+import html
+
 syslog = logging.getLogger("system")
 
 
@@ -1018,7 +1020,7 @@ class ProfileInputNode(ProfileBaseNode):
         ''' reads an input node '''
         import gremlin.ui.octavi_device
         self.input_type = InputType.to_enum(node.tag)
-        self.description = safe_read(node, "description", str, "")
+        self.description = html.unescape(safe_read(node, "description", str, ""))
         self.always_execute = read_bool(node, "always-execute", False)
 
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
@@ -1198,7 +1200,7 @@ class ProfileInputNode(ProfileBaseNode):
             node.set("always-execute", "True")
 
         if self.description:
-            node.set("description", safe_format(self._description, str))
+            node.set("description", html.escape(safe_format(self._description, str)))
         else:
             node.set("description", "")
 

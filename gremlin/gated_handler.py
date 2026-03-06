@@ -3348,7 +3348,7 @@ class GateData():
             
             # description
             if gate_info.description:
-                child.set("description", gate_info.description)
+                child.set("description", html.escape(gate_info.description))
 
             for condition, item_data in gate_info.item_data_map.items():
                 if item_data.containers:
@@ -3382,7 +3382,7 @@ class GateData():
 
             # description
             if range_info.description:
-                child.set("description", range_info.description)
+                child.set("description", html.escape(range_info.description))
 
             # last condition selected
             child.set("condition",_gate_condition_to_name[range_info.condition])
@@ -3525,7 +3525,7 @@ class GateData():
 
             description = None
             if "description" in node_range.attrib:
-                description = node_range.get("description")
+                description = html.unescape(node_range.get("description"))
                 if description:
                     gate_info.description = description
 
@@ -3583,7 +3583,7 @@ class GateData():
 
             description = None
             if "description" in node_range.attrib:
-                description = node_range.get("description")
+                description = html.unescape(node_range.get("description"))
 
             min_id = safe_read(node_range, "min_id", str, "")
             max_id = safe_read(node_range, "max_id", str, "")
@@ -3620,7 +3620,7 @@ class GateData():
             range_info.delay = safe_read(node_range, "delay", int, 250)
 
             description = safe_read(node_range, "description", str, "")
-            range_info.description = description
+            range_info.description = html.unescape(description)
 
             range_condition = safe_read(node_range, "condition", str, "")
             if range_condition in _gate_condition_to_enum.keys():

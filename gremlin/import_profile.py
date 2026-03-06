@@ -85,6 +85,7 @@ from gremlin.ui import ui_common,midi_device,osc_device, keyboard_device
 
 #from xml.dom import minidom
 from lxml import etree as ElementTree
+import html
 
 
 NodeItem = namedtuple("NodeItem","device_name device_guid device_type node")
@@ -991,7 +992,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 # read all mode node children - these are all the inputs by input type
                 description = None
                 if "description" in node_mode.attrib:
-                    description = safe_read(node_mode,"description",str,"")
+                    description = html.unescape(safe_read(node_mode,"description",str,""))
                     self._register_description(item.device_guid, mode, item.input_id, description)
                 if len(node_mode) == 0:
                         # no containers
@@ -1017,7 +1018,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         input_id = safe_read(node_input,"id",int, 0)
                         description = None
                         if "description" in node_input.attrib:
-                            description = safe_read(node_input,"description",str,"")
+                            description = html.unescape(safe_read(node_input,"description",str,""))
                             self._register_description(item.device_guid, mode, input_id, description)
 
                         data = ContainerItem(device_name=item.device_name,
@@ -1036,7 +1037,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         input_id = safe_read(node_input,"id",int, 0)
                         description = None
                         if "description" in node_input.attrib:
-                            description = safe_read(node_input,"description",str,"")
+                            description = html.unescape(safe_read(node_input,"description",str,""))
                             self._register_description(item.device_guid, mode, input_id, description)
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
@@ -1055,7 +1056,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         input_id = safe_read(node_input,"id",int, 0)
                         description = None
                         if "description" in node_input.attrib:
-                            description = safe_read(node_input,"description",str,"")
+                            description = html.unescape(safe_read(node_input,"description",str,""))
                             self._register_description(item.device_guid, mode, input_id, description)
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
@@ -1082,7 +1083,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                             syslog.info(f"Import: read KeyboardLatched node {input_id}")
                         description = None
                         if "description" in child_input_node.attrib:
-                            description = safe_read(child_input_node,"description",str,"")
+                            description = html.unescape(safe_read(child_input_node,"description",str,""))
                             self._register_description(item.device_guid, mode, input_id, description)
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
@@ -1111,7 +1112,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                             syslog.info(f"Import: read MIDI node {input_id}")
                         description = None
                         if "description" in child_input_node.attrib:                            
-                            description = safe_read(child_input_node,"description",str,"")
+                            description = html.unescape(safe_read(child_input_node,"description",str,""))
                             self._register_description(item.device_guid, mode, input_id, description)
                         data = ContainerItem(device_name=item.device_name,
                                             device_guid=item.device_guid,
@@ -1137,7 +1138,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         osc_input_item.id = input_id
                         description = None
                         if "description" in child_input_node.attrib:                            
-                            input_description = safe_read(child_input_node,"description",str,"")     
+                            input_description = html.unescape(safe_read(child_input_node,"description",str,""))
                             self._register_description(item.device_guid, mode, input_id, description)                   
                         if verbose:
                             syslog.info(f"Import: read OSC node {input_id}")

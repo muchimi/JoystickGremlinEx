@@ -1949,6 +1949,8 @@ class JoystickInputStats:
             self.updateFilters(input_filter)
             self.updateMappings()
 
+        
+
     @property
     def isFiltered(self) -> bool:
         ''' true if the device is filtered '''
@@ -1982,6 +1984,10 @@ class JoystickInputStats:
 
         '''
         profile = gremlin.shared_state.current_profile
+        
+        registry = ProfileRegistry()
+        registry.sync(profile)
+
         # device = gremlin.joystick_handling.getDevice(self.device_guid)
         devices = profile.devices
         device_guid = self.device_guid
@@ -3448,7 +3454,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         if not skip_root: # skip header processing if set
 
-            self._description = safe_read(node, "description", str, "")
+            self._description = html.unescape(safe_read(node, "description", str, ""))
             self.always_execute = read_bool(node, "always-execute", False)
 
             if extra_data and "mode_object" in extra_data:
@@ -3677,7 +3683,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             node.set("always-execute", "True")
 
         if self._description:
-            node.set("description", safe_format(self._description, str))
+            node.set("description", html.escape(self._description))
 
 
         # lock state

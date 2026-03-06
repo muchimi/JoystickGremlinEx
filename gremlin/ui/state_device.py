@@ -794,7 +794,8 @@ class StateInputItem(gremlin.base_profile.InputItem):
         node.set("id", self._id)
 
         if description:
-            node.set("description", description)
+            node.set("description", html.escape(description))
+
         if isinstance(value, str):
             node.set("value", value)
             node.set("type", "str")
@@ -812,8 +813,6 @@ class StateInputItem(gremlin.base_profile.InputItem):
             test = self._category.id
             node.set("category_id", self._category.id)
         
-        if self._description:
-            node.set("description", self._description)
 
         if self._expression:
             node.set("expression", self._expression)
@@ -840,7 +839,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
         
         description = None
         if "description" in node.attrib:
-            description = node.get("description")
+            description = html.unescape(node.get("description"))
         
         self.setDescription(description)
 
@@ -1271,7 +1270,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
         table.addField("State", state.key)
 
         if self.description:
-            table.addField("Description", self.description)
+            table.addField("Description", html.escape(self.description))
 
         
         category_name = state.category_name

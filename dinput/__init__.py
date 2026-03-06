@@ -27,6 +27,7 @@ import logging
 import gremlin.types
 from glob import glob
 from pathlib import Path
+import traceback
 
 
 syslog = logging.getLogger("system")
@@ -750,6 +751,7 @@ class DeviceSummary:
         except Exception as e:
             syslog.error(f"GET AXIS NAME: unable to get axis name for device : {self.name}")
             syslog.error(f"{str(e)}")
+            syslog.error(f"{traceback.format_exc()}")
 
         return None
     
