@@ -33,6 +33,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: UI: In-use button/axis/hat count can report negative values in some cases. This fix is visual only.
 - Fix: General: description/comment string data safe encoding/decoding in profiles.
 - Diagnostics: added additional instrumentation to the log file when GEX is unable to derive an axis name.
+- Fix: UI: exception when device is not longer f
 
 ### (m76RC8):
 - Fix: Vjoy Remap Action: design time merge output only updates for added merged axes changes, not self).

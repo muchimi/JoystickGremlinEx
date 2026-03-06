@@ -6645,8 +6645,11 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                     axis_widget.valueChanged.connect(self._manual_bar_changed) # axis set by the user
                 axis_widget.setReadOnly(self._readonly)
                 
-                
-                value = values[0]
+                if values is None:
+                    value = 0
+                else:
+                    value = values[0]
+
                 #value = gremlin.joystick_handling.get_axis(device.device_guid, index)
                 value_widget = QFloatLineEdit(data = axis_id)
                 if self.device.is_virtual:
@@ -6716,10 +6719,11 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         astate = gremlin.event_handler.AxisState()
         input_id = event.identifier
         values = astate.getAxisValues(event.device_guid, input_id, event.value)
-        if input_id in self.axis_widgets:
-            self.axis_widgets[input_id].setValue(values)
-        if input_id in self.value_label_widgets:
-            self.value_label_widgets[input_id].setValue(values.actual)
+        if values is not None:
+            if input_id in self.axis_widgets:
+                self.axis_widgets[input_id].setValue(values)
+            if input_id in self.value_label_widgets:
+                self.value_label_widgets[input_id].setValue(values.actual)
         
 
 
@@ -7099,7 +7103,7 @@ class AxesTimeline(QtWidgets.QGroupBox):
         while self._is_running:
             for input_id in self.input_id_list:
                 values = astate.getAxisValues(self.device_guid, input_id)
-                if values:
+                if values is not None:
                     self.add_point(values.actual, input_id)
             time.sleep(self.interval)
 

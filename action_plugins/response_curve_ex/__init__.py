@@ -81,7 +81,9 @@ class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
         # get the current value and update the curve on start
         astate = gremlin.event_handler.AxisState()
         values = astate.getAxisValues(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
-        self.curve_widget.update_value(values[0])
+        if values is not None:
+            self.curve_widget.update_value(values[0])
+        
 
 
     @QtCore.Slot()
