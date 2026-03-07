@@ -171,7 +171,7 @@ class RPCGremlin():
         
         config = gremlin.config.Configuration()
         if not config.enable_remote_control:
-            syslog.debug("Remote control disabled - Gremlin listener not started")
+            syslog.info("Remote control disabled - Gremlin listener not started")
             return
       
         # register the devices we will need
@@ -230,7 +230,7 @@ class RemoteServer(QtCore.QObject):
         if self._enabled:
             self._rpc = RPCGremlin()
             self._rpc.start()
-            syslog.debug("Gremlin RPC server started...")
+            syslog.info("Gremlin RPC server started...")
             self._started = True
         
 
@@ -374,19 +374,19 @@ class RemoteClient():
             el.heartbeat.disconnect(self._alive_ticker)
 
             if self._alive_thread:
-                syslog.debug("Alive stop requested...")
+                syslog.info("Alive stop requested...")
 
     
                 self._alive_thread_stop_requested = True
                 if self._alive_thread.is_alive():
                     self._alive_thread.join()
-                syslog.debug("Alive thread stopped")
+                syslog.info("Alive thread stopped")
                 self._alive_thread = None
             
             if self._sock:
                 self._sock.close()
                 self._sock = None
-                syslog.debug("Gremlin RPC client stopped.")
+                syslog.info("Gremlin RPC client stopped.")
 
             self._started = False            
 
@@ -1575,7 +1575,7 @@ class RemoteControl():
                 msg = "Paired mode enabled"
             else:
                 msg = "Paired mode disabled"
-            syslog.debug(f"REMOTE CONTROL: Paired mode changed: {msg}")
+            syslog.info(f"REMOTE CONTROL: Paired mode changed: {msg}")
             thread = threading.Thread(target = self.say, args=(msg,), daemon=False)
             thread.name = "REMOTE CONTROL remote control paired update"
             thread.start()

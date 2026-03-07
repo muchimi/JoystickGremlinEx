@@ -1064,7 +1064,7 @@ class SimConnect():
 			for m in self._dll.EventID:
 				if name.decode() == m.name:
 					if self.verbose_details:
-						syslog.debug(f"SIMCONNECT: already have event: {name} {m}")
+						syslog.info(f"SIMCONNECT: already have event: {name} {m}")
 					return m
 
 			names = [m.name for m in self._dll.EventID] + [name.decode()]

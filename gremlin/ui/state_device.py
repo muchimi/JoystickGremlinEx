@@ -577,17 +577,51 @@ class StateInputItem(gremlin.base_profile.InputItem):
     @value.setter
     def value(self, data : bool):
         self.setValue(data)
+
+    def latch(self, delay : float):
+        ''' latches the state if the state is OFF and the state is not an expression state
+        :param delay: delay in seconds 
+        '''
+        if delay > 0 and not self._expression:
+            self._autorelease_trigger_mode = "latch"
+            self._autorelease_mode = "latch"
+            self._autorelease_delay = delay
+            self.autorelease = True
+            self.setValue(True) # turn ON
+
         
     def setValue(self, data : bool, force = False):
+        ''' sets the state
+        
+        in latch mode, the state will ignore a retrigger while the timer is running
+        
+        '''
+        verbose = gremlin.config.Configuration().verbose_mode_state
         if data is None or not isinstance(data, bool):
             syslog.warning(f"State setter: state: [{self.key}] id: [{self.id}] attempt to set unrecognized value [{data}] - defaulting state to default value: [{self.default_value}]")
             data = self.default_value
+
+        is_auto = self._autorelease and self._autorelease_delay > 0
+
+
+
+        if self._autorelease_trigger_mode == "latch" and \
+            data and self._value and self._autorelease_timer:
+                # latch mode - state is ON, data is ON and timer has not lapsed yet - ignore
+                if verbose: syslog.info(f"STATE: [{self.key}] latched mode retrigger - ignoring")
+                return
+     
             
         # verbose = gremlin.config.Configuration().verbose_mode_state
         # if verbose: syslog.info(f"STATE: set state: [{self.key}] -> [{data}]")
         if self._autorelease_timer:
+            # cancel any current timer
             self._autorelease_timer.cancel()
             self._autorelease_timer = None
+
+        
+
+
 
         if force or not self._expression and self._value != data:
             # only set value on non expression states and only if the value has changed
@@ -595,7 +629,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
             self._value = data
             self._fire_changed(data)
 
-            if self._autorelease and self._autorelease_delay > 0:
+            if is_auto:
                 trigger_mode = self._autorelease_trigger_mode
                 trigger = False
                 match trigger_mode:
@@ -605,20 +639,24 @@ class StateInputItem(gremlin.base_profile.InputItem):
                         trigger = data == True
                     case "off":
                         trigger = data == False
+                    case "latch":
+                        trigger = True
                 if trigger:
+                    if verbose: syslog.info(f"STATE: [{self.key}] start release timer")
                     self._autorelease_timer = threading.Timer(self._autorelease_delay, self._handle_autorelease)
                     self._autorelease_timer.start()
 
     def _handle_autorelease(self):
         ''' called when the auto release timer lapses '''
         verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose:
-            syslog.info(f"State: autorelease - mode {self._autorelease_mode}")
+        if verbose: syslog.info(f"State: autorelease - mode {self._autorelease_mode}")
         match self._autorelease_mode:
             case "toggle":
                 value = not self._value
             case "on":
                 value = True
+            case "latch":
+                value = False
             case _:
                 value = False
         self.setValue(value)
@@ -1289,7 +1327,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
     
 
 @SingletonDecorator
-class StateData(QtCore.QObject):
+class StateData():
     ''' holds state information '''
     changed  = Signal(object) # fires when the value changes (StateInputItem)
     crud = Signal() # fires when a state is added or removed or changed
@@ -1297,7 +1335,7 @@ class StateData(QtCore.QObject):
     expression_changed = Signal(object) # fires when a state expression changes (if the state is an expression state)
 
     def __init__(self):
-        super().__init__()
+        # super().__init__()
         self._data = {}
         self._id_map = {}
         self.changed.connect(self._state_changed)
@@ -1446,8 +1484,21 @@ class StateData(QtCore.QObject):
         ''' sets state value (and registers if needed) '''
         key = key.casefold().strip()
         verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose: syslog.info(f"STATE SET: set state [{key}] -> {value}")
-        self._data[key].setValue(value, force)
+        if key in self._data:
+            if verbose: syslog.info(f"STATE SET: set state [{key}] -> {value}")
+            self._data[key].setValue(value, force)
+        else:
+            syslog.error(f"STATE: latch state: [{key}] not found")
+
+    def latch(self, key: str, delay : float):
+        key = key.casefold().strip()
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        
+        if key in self._data:
+            if verbose: syslog.info(f"STATE SET: latch state [{key}] delay: [{delay:0.3f}]")
+            self._data[key].latch(delay)
+        else:
+            syslog.error(f"STATE: latch state: [{key}] not found")
                                  
 
     

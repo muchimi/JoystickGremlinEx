@@ -1194,6 +1194,8 @@ class ButtonOutputMode (IntEnum):
     Press = 2 # press / on
     Release = 3 # release / off
     NoOp = 4 # do nothing
+    Latch = 5 # latch mode (triggers on, sets a timer, an ignores ON retriggers until OFF or until timer lapses)
+
 
 
 class SyncMode(IntEnum):
@@ -1349,7 +1351,7 @@ class VjoyAction(enum.Enum):
 
         
         msg  = f"Unknown [{action}]"
-        syslog.debug(f"Warning: missing action description mapping: {msg}")
+        syslog.warning(f"Warning: missing action description mapping: {msg}")
         return msg
         
     @staticmethod
@@ -1411,7 +1413,7 @@ class VjoyAction(enum.Enum):
 
         
         msg  = f"Unknown [{action}]"
-        syslog.debug(f"Warning: missing action name mapping: {msg}")
+        syslog.warning(f"Warning: missing action name mapping: {msg}")
         return msg
     
 

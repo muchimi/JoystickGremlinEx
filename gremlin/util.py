@@ -304,7 +304,7 @@ def log(msg):
 
 def log_sys(msg):
     ''' logs to the system log '''
-    syslog.debug(str(msg))
+    syslog.info(str(msg))
 
 def log_info(msg):
     ''' logs to the system log '''

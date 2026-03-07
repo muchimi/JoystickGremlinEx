@@ -1131,7 +1131,7 @@ def joystick_devices_initialization():
                     # register the vjoy device with the proxy
                     vjoy_dev = vjoy_proxy[vjoy_index]
                 except error.VJoyError as e:
-                    syslog.debug(f"vJoy id {vjoy_index:} can't be acquired")
+                    syslog.error(f"vJoy id {vjoy_index:} can't be acquired")
 
         if not should_terminate:
             if len(_joystick_device_guid_map) == 0:

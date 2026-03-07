@@ -151,7 +151,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.state_selector_widget,layout = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector, self.add_widget])
         self.main_layout.addWidget(self.state_selector_widget)
 
-        widget,layout = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget])
+        widget = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget], widget_only=True)
         self.main_layout.addWidget(widget)
  
         self.button_pulse_widget = gremlin.ui.ui_common.QDelayWidget()
@@ -168,6 +168,8 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_repeat_widget.setToolTip("When enabled, pulses are repeated while the input is triggered.")
         self.button_repeat_widget.setChecked(self.action_data.pulse_repeat)
         self.button_repeat_widget.clicked.connect(self._pulse_repeat_mode_changed)
+
+
 
         
 
@@ -220,6 +222,12 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         rb.clicked.connect(self._mode_changed)
         widgets.append(rb)
 
+        rb = gremlin.ui.ui_common.QDataRadioButton("Latch", data = "latch")
+        rb.setToolTip("When the state is set, it starts a timer that will ignore ON re-triggers until the state is set to OFF or the timer lapses.")
+        if mode == "latch":
+            rb.setChecked(True)
+        rb.clicked.connect(self._mode_changed)
+        widgets.append(rb)
         
 
         
@@ -249,8 +257,16 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
 
 
        
+        widget = gremlin.ui.ui_common.QDelayWidget(value = self.action_data.latch_delay, 
+                                                   callback = self._handle_latch_delay_changed,
+                                                   )
+        self.container_latch_widget = gremlin.ui.ui_common.getHContainer(widget,"Latch delay (ms):", widget_only=True, left_margin = 12,tooltip = "Latch timeout delay in milliseconds")
+
+
+
         self.main_layout.addWidget(self.container_pulse_widget)
         self.main_layout.addWidget(self.container_randomize_widget)
+        self.main_layout.addWidget(self.container_latch_widget)
 
 
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
@@ -294,7 +310,9 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _handle_randomize_weight_changed(self, value : int):
         self.action_data.randomize_weight = value / 100
 
-
+    @QtCore.Slot(int)
+    def _handle_latch_delay_changed(self, value : int):
+        self.action_data.latch_delay = value
 
     @QtCore.Slot(bool)
     def _handle_reset_default_changed(self, checked : bool):
@@ -404,10 +422,14 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
             return
         
         input_type = self._get_input_type()
+        latch_delay_visible = self.action_data.mode == "latch"
         hat_visible = input_type == InputType.JoystickHat
         state_visible = not hat_visible
         repeat_visible = self.action_data.pulse_repeat
         pulse_visible = hat_visible or self.action_data.mode == "pulse"
+        
+
+        self.container_latch_widget.setVisible(latch_delay_visible)
 
         self.state_selector_widget.setVisible(state_visible)
         # self.button_pulse_widget.setVisible(state_visible and self.action_data.mode == "pulse")
@@ -477,6 +499,11 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.hat_noop_widget.setToolTip("Sets all mappings to NoOp (do nothing) mode")
 
 
+        self.hat_latch_widget = QtWidgets.QPushButton("All Latch")
+        self.hat_latch_widget.setToolTip("Sets all mappings to Latch mode")
+
+        
+
         self.hat_unmap_widget =  QtWidgets.QPushButton("Clear Buttons")
         self.hat_unmap_widget.setToolTip("Clears all mappings")
         self.hat_map_widget =  QtWidgets.QPushButton("Map Buttons")
@@ -487,6 +514,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.hat_press_widget.clicked.connect(self._set_all_press)
         self.hat_release_widget.clicked.connect(self._set_all_release)
         self.hat_noop_widget.clicked.connect(self._set_all_noop)
+        self.hat_latch_widget.clicked.connect(self._set_all_latch)
 
         self.hat_unmap_widget.clicked.connect(self._clear_map)
         self.hat_map_widget.clicked.connect(self._auto_map)
@@ -496,6 +524,7 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.container_hat_options_layout.addWidget(self.hat_press_widget)
         self.container_hat_options_layout.addWidget(self.hat_release_widget)
         self.container_hat_options_layout.addWidget(self.hat_noop_widget)
+        self.container_hat_options_layout.addWidget(self.hat_latch_widget)
         self.container_hat_options_layout.addWidget(self.hat_unmap_widget)
         self.container_hat_options_layout.addWidget(self.hat_map_widget)
         self.container_hat_options_layout.addStretch()
@@ -608,6 +637,11 @@ class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
     def _set_all_noop(self):
         ''' sets all mappings to pulse mode '''
         self._set_all_mode(ButtonOutputMode.NoOp)                
+
+    @QtCore.Slot()
+    def _set_all_latch(self):
+        ''' sets all mappings to pulse mode '''
+        self._set_all_mode(ButtonOutputMode.Latch)                
 
 
     @QtCore.Slot()
@@ -750,6 +784,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action, parent)
         
         self._started = False
+        self.action_data : MapToState = action
         
         self.verbose = gremlin.config.Configuration().verbose_mode_state
         
@@ -1011,6 +1046,12 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                             if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] INVERT ->  {'ON' if state else 'OFF'}")
                             self.sd.setValue(key, state)
 
+                        case "latch":
+                            # latch mode is like autorelease but ignores ON retriggers
+                            if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] LATCH")
+                            self.sd.latch(key, self.action_data.latch_delay / 1000)
+  
+
 
                 case InputType.JoystickHat:
                     # hat button handling
@@ -1069,6 +1110,13 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
                                 is_pressed = False # force a release on trigger
                                 if position in self.pressed_hat_buttons:
                                     del self.pressed_hat_buttons[position]
+
+                            case ButtonOutputMode.Latch:
+                                # latch mode is like autorelease but ignores ON retriggers
+                                if verbose: syslog.info(f"STATE FUNCTOR: set [{key}] LATCH")
+                                self.sd.latch(self.action_data.latch_delay / 1000)                                    
+                                return True
+
                             case ButtonOutputMode.NoOp:
                                 # do nothing
                                 return True
@@ -1145,6 +1193,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         self.hat_mode_map = {} # bool table keyed by hat position
         self.randomize_mode = False # true if the action mode is randomized for toggle, press, release or invert.
         self.randomize_weight = 0.5 # chance of randomizing if in randomize mode.  The value 0 to 1 indicates the chance of randomization with 1 = 100%, 0 = no chance.
+        self.latch_delay = 1000 # default latch delay in milliseconds
 
         for position in self.hat_positions:
             self.hat_map[position] = "" # not mapped by default
@@ -1228,6 +1277,8 @@ class MapToState(gremlin.base_profile.AbstractAction):
             self.pulse_repeat_delay = safe_read(node, "repeat-delay", int, 250)
         if "sync-mode" in node.attrib:
             self.sync_mode = SyncMode(safe_read(node,"sync-mode", int, 0))
+        
+        self.latch_delay = safe_read(node,"latch-delay", int, 1000)
 
         self.reset_default_on_stop = safe_read(node,"default-reset", bool, True)
         self.randomize_mode = safe_read(node,"randomize-mode", bool, False)
@@ -1279,6 +1330,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
             node.set("delay", safe_format(self.pulse_delay, int))
             node.set("exec_on_press", safe_format(self.exec_on_press, bool))
             node.set("exec_on_release", safe_format(self.exec_on_release, bool))
+            node.set("latch-delay", safe_format(self.latch_delay, int))
             node.set("sync-mode", safe_format(self.sync_mode, int))
             if self.pulse_repeat:
                 node.set("repeat", safe_format(self.pulse_repeat, bool))

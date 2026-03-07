@@ -29,6 +29,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC10):
+- Change: Map to State: enable latch mode.  This mode is a variant where when a state is triggered ON, retriggers are ignored until a timer lapses or the state is turned OFF again.  When the timer lapses, the state automatically turns OFF.  The use-case is for situations when you need something triggered once in a given amount of time.  Thiis is a variant of autorelease.  The state's mode do not matter if latching.  The state is expected to be a vanilla (non expression) state and default to OFF.
+- Fix: Map to State: harden code against invalid states.
+- Fix: older log DEBUG entries switched to INFO entries.
+- Fix: (experimental) coercing QT to handle input panel width correctly
+
+
 ### (m76RC9A):
 - Fix: UI: In-use button/axis/hat count can report negative values in some cases. This fix is visual only.
 - Fix: General: description/comment string data safe encoding/decoding in profiles.

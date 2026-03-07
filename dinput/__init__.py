@@ -735,9 +735,16 @@ class DeviceSummary:
                         return am.getName() + stub
             else:
                 if self.connected:
-                    if index in self.axis_id_map:
-                        linear_id = self.axis_id_map[index]
-                        stub = f" L{linear_id}"
+                    if not self.axis_id_map or not index in self.axis_id_map:
+                        return f"Axis[{index}]"
+                    try:
+                        if index in self.axis_id_map:
+                            linear_id = self.axis_id_map[index]
+                            stub = f" L{linear_id}"
+                    except:
+                        return f"Axis [{index}]"
+                    
+
                     for am in self.axismap_list:
                         
                             if not hasattr(am,"axis_index"):
@@ -752,6 +759,9 @@ class DeviceSummary:
             syslog.error(f"GET AXIS NAME: unable to get axis name for device : {self.name}")
             syslog.error(f"{str(e)}")
             syslog.error(f"{traceback.format_exc()}")
+            
+            
+
 
         return None
     

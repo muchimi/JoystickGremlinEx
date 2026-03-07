@@ -68,6 +68,6 @@ class FiniteStateMachine:
         assert(self.transitions[key].new_state in self.states)
         value = self.transitions[key].callback()
         if self.debug:
-            syslog.debug(f"FSM: {self.current_state} -> {self.transitions[key].new_state} ({action})")
+            syslog.info(f"FSM: {self.current_state} -> {self.transitions[key].new_state} ({action})")
         self.current_state = self.transitions[key].new_state
         return value

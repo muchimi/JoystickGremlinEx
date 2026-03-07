@@ -9548,8 +9548,8 @@ class QSplitTabWidget(QDataWidget):
         # resize the splitter to the container's size as it doesn't happen by itself for some reason
         width = self._content_widget.frameGeometry().width()
         height = self._content_widget.frameGeometry().height()
-        if width > 400:
-            self._splitter.setFixedWidth(width)
+        #if width > 400:
+        self._splitter.setFixedWidth(width)
         self._splitter.setFixedHeight(height)
 
     @property
