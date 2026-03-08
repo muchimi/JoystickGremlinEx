@@ -1873,6 +1873,9 @@ class OscInterface(QtCore.QObject):
         self._output_port = None
         self._target_ip = None
         self._target_port = None
+        self._client_pool = {}
+        self._client_map = {}
+        self.osc_enabled = False
 
        
         el = gremlin.event_handler.EventListener()
