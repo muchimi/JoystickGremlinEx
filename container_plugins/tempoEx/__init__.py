@@ -658,6 +658,7 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.valid = False # validated during profile start
 
     def profile_started(self):
+        super().profile_started()
         # reset any prior values before start
         self.start_time = time.time()
         self.long_press_timer = None

@@ -249,6 +249,7 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
             
     def profile_started(self):
         ''' called on profile start '''
+        super().profile_started()
         device_guid = self.action_data.hardware_device_guid
         input_id = self.action_data.hardware_input_id
         input_type = self.action_data.get_input_type()

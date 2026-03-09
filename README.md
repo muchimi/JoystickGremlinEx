@@ -29,6 +29,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC12):
+- Change: Sequence Action: add sync on profile start option.
+- Fix: Sequence Action: step interval in non wiggle mode was using incorrect entry.
+- Fix: UI: minor layout improvements.
+
 ### (m76RC11):
 - Fix: OSC: incomplete interface declaration before some properties are used.
 - Fix: Hat to button container: incomplete import

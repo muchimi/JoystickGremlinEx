@@ -72,7 +72,7 @@ class Value:
 
     """Represents an input value, keeping track of raw and "seen" value."""
 
-    def __init__(self, value : float, raw : float = None, is_pressed : bool = None):
+    def __init__(self, value : float = 0.0, raw : float = None, is_pressed : bool = None):
         """Creates a new value and initializes it.
 
         :param raw the initial raw data

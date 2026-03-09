@@ -1316,6 +1316,7 @@ class MapToOscExFunctor(gremlin.base_profile.AbstractFunctor):
    
     def profile_started(self):
         ''' called on profile start '''
+        super().profile_started()
         if not self.action_data.started:
             self.action_data.started = True
             self.action_data._start_client()

@@ -2826,7 +2826,7 @@ class ActionSelector(QtWidgets.QWidget):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self.action_label = QtWidgets.QLabel("Actions")
+        self.action_label = QtWidgets.QLabel("Actions:")
 
         widget, _ = getHContainer([self.action_label, 
                                    self.action_dropdown,
@@ -2881,6 +2881,7 @@ class ActionSelector(QtWidgets.QWidget):
                 self.action_dropdown.addItem(name)
             config = gremlin.config.Configuration()
             self.action_dropdown.setCurrentText(config.last_action)
+            self.action_dropdown.autoSize()
         
 
     @property
@@ -4616,6 +4617,11 @@ class QDataComboBox(QComboBox):
                 if index != -1:
                     self.setCurrentIndex(index)
 
+            if auto_adjust:
+                self.adjustSize()
+
+        self.changeEvent
+
         self.currentIndexChanged.connect(self._handle_callback)
 
         if tooltip:
@@ -4632,6 +4638,16 @@ class QDataComboBox(QComboBox):
             if index != -1:
                 self.setCurrentIndex(index)
 
+
+    def autoSize(self, min_width : int = 32,  margin : int = 4):
+        ''' forces the drowpdown to size to its contents '''
+        # autosize the combo box
+        count = self.count()
+        if count:
+            all_items = [self.itemText(i) for i in range(count)]
+            max_width = max((get_text_width(text) for text in all_items))
+            max_width = max(max_width, min_width)
+            self.setFixedWidth(max_width + margin * 2)
 
     def _handle_callback(self):
         if self._callback:
@@ -8409,6 +8425,8 @@ class QDelayWidget(QtWidgets.QWidget):
             self.main_layout.addWidget(getHContainer(widgets, widget_only = True))
 
 
+        self.main_layout.addStretch()
+
         if tooltip:
             self.setToolTip(tooltip)
 
@@ -10464,8 +10482,9 @@ def getGridContainer(widget_or_list = None,
                      stretch_col = None,
                      add_to_widget = None,
                      widget_only = False,
+                     tooltip = None,
                      left_margin = 0,
-                     bottom_margin = 0):
+                     bottom_margin = 0,):
     ''' gets a qt grid container widget
      
     :param widget_or_list: the widget or widgets to add to the next row - if the item is a string, it's converted to a label, use "|" for a separator
@@ -10526,6 +10545,11 @@ def getGridContainer(widget_or_list = None,
             col = layout.columnCount()
         layout.addWidget(QtWidgets.QWidget(), 0, col)
         layout.setColumnStretch(col, 2)
+
+    if tooltip:
+        widget.setToolTip(tooltip)
+        
+    
     if widget_only:
         return widget
     return (widget, layout)
@@ -13043,6 +13067,8 @@ class QSyncModeWidget(QtWidgets.QWidget):
         main_layout.addWidget(widget)
 
         self._selector_widget.currentIndexChanged.connect(self._mode_changed)
+        self._selector_widget.autoSize()
+
 
         self._mode_changed(emit = False)
         main_layout.setContentsMargins(0,0,0,0)

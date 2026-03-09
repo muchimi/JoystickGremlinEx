@@ -903,6 +903,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         
     def profile_started(self):
         # occurs on profile start once profile start sequence is completed
+        super().profile_started()
         self._started = True
 
 

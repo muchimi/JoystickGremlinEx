@@ -1816,8 +1816,10 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
     def profile_started(self):
         ''' occurs after all stat init completed - update based on current axis position '''
+
         if self._started:
             return
+        super().profile_started()
         self._started = True
         gate_data : gremlin.gated_handler.GateData = self.action_data.gate_data
         device_guid = gate_data.device_guid
