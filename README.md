@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC13):
+- Fix: API: check for invalid button state requests (button or device)
+
 ### (m76RC12):
 - Change: Sequence Action: add sync on profile start option.
 - Fix: Sequence Action: step interval in non wiggle mode was using incorrect entry.

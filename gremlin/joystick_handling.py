@@ -331,13 +331,20 @@ def get_hat_position(guid, index) -> tuple:
     return (0,0)
 
 def get_button(guid, input_id) -> bool:
-    ''' gets the button pressed state '''
+    ''' gets the button pressed state if the button and device exists - defaults to FALSE if not found'''
     dev : dinput.DeviceSummary = get_device(guid)
-    if dev:
+    if dev and input_id:
         if dev.button_count:
             if dev.is_virtual and dev.vjoy_id:
                 # query the vjoy interface rather than dinput
-                return VJoyProxy()[dev.vjoy_id].button(input_id).is_pressed
+                button = VJoyProxy()[dev.vjoy_id].button(input_id)
+                if button:
+                    return button.is_pressed
+                else:
+                    syslog.warning(f"GetButton(): invalid vjoy [{dev.vjoy_id}] button [{input_id}] not found")
+                # invalid button
+                return False
+            # physical device
             return dev.get_button(input_id)
         else:
             if dev.device_type == DeviceType.Osc:
