@@ -53,6 +53,8 @@ import psygnal
 from psygnal import Signal
 import gremlin.ui.ui_common
 
+import numpy as np
+from scipy.signal import savgol_filter
 
 import logging
 syslog = logging.getLogger("system")
@@ -1579,7 +1581,7 @@ class ControlPointEditorWidget(QtWidgets.QWidget):
         self.active_point = point
 
 class AxisCurveWidget(QtWidgets.QWidget):
-    ''' response curve standalone widget '''
+    ''' response curve standalone widget - displays the curve option UI '''
 
     def __init__(self, curve_data : AxisCurveData, parent=None):
         """Creates a new instance.
@@ -1669,6 +1671,64 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.curve_type_selection.addItem("Cubic Bezier Spline", CurveType.Bezier)
         self.curve_type_selection.setCurrentIndex(0)
         self.curve_type_selection.currentIndexChanged.connect(self._curve_type_changed)
+
+        # filter widget
+        
+        widget = gremlin.ui.ui_common.QDataCheckbox("Noise Filter (experimental)",
+                                                    value= self.curve_data.isFiltered,
+                                                    callback = self._handle_filter_changed,
+                                                    tooltip = "Enables a Savitzky-Golay low-pass noise filter to the input."
+                                                    )
+        
+        
+        widgets = [widget]
+        
+        grids = []
+        
+        self.filter_sample_widget = gremlin.ui.ui_common.QIntLineEdit(min_range = 10, # 10 is the smallest
+                                                   value = self.curve_data.filterSamples,
+                                                   callback = self._handle_filter_samples_changed,
+                                                   tooltip = "Number of input data points tracked for smoothing")
+        
+        grids.append("Filter samples:")
+        grids.append(self.filter_sample_widget)
+        
+        self.filter_order_widget = gremlin.ui.ui_common.QIntLineEdit(min_range = 2, max_range = 10,
+                                                   value = self.curve_data.filterOrder,
+                                                   callback_ex = self._handle_filter_order_changed,
+                                                   tooltip = "Polynomial smoothing order, must be less than the window size")
+        
+        grids.append("Polynomial order:")
+        grids.append(self.filter_order_widget)
+        
+                
+        self.filter_window_widget = gremlin.ui.ui_common.QIntLineEdit(step=2,
+                                                   value = self.curve_data.filterWindow,
+                                                   callback_ex = self._handle_filter_window_changed,
+                                                   tooltip = "Sliding window size (must be an odd number and less than the sample size)")
+        
+        grids.append("Window size:")
+        grids.append(self.filter_window_widget)
+
+        widget = gremlin.ui.ui_common.QDataPushButton("Defaults", callback = self._handle_filter_default, tooltip = "Reset to default values")
+        grids.append(widget)
+
+        self.container_filter_options = gremlin.ui.ui_common.getHContainer(grids, widget_only=True, left_margin=12)
+
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QGridLayout(widget)
+        widget.setContentsMargins(0,0,0,0)
+        layout.setContentsMargins(0,0,0,0)
+        layout.addWidget(self.container_filter_options,0,0)
+        layout.addWidget(QtWidgets.QWidget(), 0, 1)
+        layout.setColumnStretch(1,3)
+        
+        # widgets.append(self.container_filter_options)
+        widgets.append(widget)
+        self.container_filter_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+
+
+        
 
         # help button
         help_button = QtWidgets.QPushButton()
@@ -1836,6 +1896,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         # Add all widgets to the layout
         self.main_layout.addWidget(self.container_options_widget)
+        self.main_layout.addWidget(self.container_filter_widget)
         self.main_layout.addWidget(self.container_presets_widget)
         self.main_layout.addWidget(self.container_curve_widget)
         self.main_layout.addWidget(self.container_repeater_widget)
@@ -1865,6 +1926,10 @@ class AxisCurveWidget(QtWidgets.QWidget):
 
         # update repeater
         self._update_value_ui(0) # assume centered as a default
+
+        # filter 
+        visible = self.curve_data.isFiltered
+        self.container_filter_options.setVisible(visible)
 
 
     @QtCore.Slot(bool)
@@ -2011,7 +2076,57 @@ class AxisCurveWidget(QtWidgets.QWidget):
         curve_type = self.curve_type_selection.currentData()
         self._change_curve_type(curve_type)
 
+    @QtCore.Slot(bool)
+    def _handle_filter_changed(self, checked : bool):
+        self.curve_data.isFiltered = checked
+        self._update_ui()
 
+    @QtCore.Slot(int)
+    def _handle_filter_samples_changed(self, value : int):
+        if self.curve_data.filterSamples != value:
+            if value < 10:
+                value = 10 # 10 is the smallest sample size
+            self.curve_data.filterSamples = value
+            if self.curve_data.filterWindow > value:
+                # sliding window must be less than the total samples
+                if value % 0 == 0:
+                    # even
+                    value -= 1
+                if value < 1:
+                    value = 1
+                self.curve_data.filterWindow = value
+
+    @QtCore.Slot(int)
+    def _handle_filter_order_changed(self, widget, value : int):
+        if self.curve_data.filterOrder != value:
+            if value < 2:
+                value = 2 # min value is 2 for polynomial smoothing
+                widget.setValue(2)
+
+            self.curve_data.filterOrder = value
+
+    @QtCore.Slot(int)
+    def _handle_filter_window_changed(self, widget, value : int):
+        if self.curve_data.filterSamples != value:
+            p_value = value
+            if value > self.curve_data.filterSamples:
+                value = self.curve_data.filterSamples
+            if value % 2 == 0:
+                # even
+                value -= 1
+            self.curve_data.filterWindow = value
+            if p_value != value:
+                # update the correct value
+                widget.setValue(value)
+
+    @QtCore.Slot()
+    def _handle_filter_default(self):
+        self.filter_window_widget.setValue(200)
+        self.filter_order_widget.setValue(2)
+        self.filter_window_widget.setValule(51)
+        
+
+            
     
     def _change_curve_type(self, curve_type : CurveType, control_points = None):
         """Changes the type of curve used.
@@ -2226,6 +2341,47 @@ class AxisCurveWidget(QtWidgets.QWidget):
     def _invert_curve(self):
         self.curve_model.invert()
 
+class SmoothingFilter():
+    ''' smoothing filter for time lapsed data '''
+    def __init__(self, samples = 200, window_size = 51, poly_order = 2):
+        self.data = []
+        samples = max(samples,10) # 10 is the min
+        self.count = 0 # number of values in the array
+        self.filtered_data = None
+        if window_size > samples: 
+            if samples % 2 == 0:
+                window_size = samples - 1
+        self.samples = samples
+        self.window_size = window_size
+        self.poly_order = poly_order
+
+    def update(self, value : float, ts = None) -> float:
+        ''' updates the filter with a single value '''
+        if ts is None:
+            ts = time.time() # current timestamp of the data
+        pt = [ts, value]
+        
+        if len(self.data) < self.samples:
+            self.data.append(pt)
+        else:
+            # shift the data
+            self.data.pop(0)
+            self.data.append(pt)
+
+        a = np.array(self.data)
+        # window length must be an odd number
+        count = len(self.data)
+        if count % 2 == 0:
+            # even number -> odd number
+            count -= 1
+        window_length = min(count, self.window_size)
+        poly_order = min(window_length-1, self.poly_order)
+        fd = savgol_filter(a, window_length= window_length, polyorder = poly_order, axis = 0)
+        return float(fd[-1][1])
+
+        
+
+
 
 class AxisCurveData():
     ''' holds the data for a curved axis '''   
@@ -2247,6 +2403,12 @@ class AxisCurveData():
         self.deadzone_fn = None
         self.response_fn = None
         self.isCentered = False 
+        self.curve_filter = None
+        self.isFiltered = False # true if filtered
+        self.filterSamples = 200 # number of samples to use for filtering
+        self.filterWindow = 51 # window size (must be odd number)
+        self.filterOrder = 2 # polynomial order for filtering
+
 
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self.profile_start)
@@ -2265,6 +2427,11 @@ class AxisCurveData():
         table.addField("Deadzone Ctr Low",f"{self.deadzone[1]}")
         table.addField("Deadzone Ctr High",f"{self.deadzone[2]}")
         table.addField("Deadzone High",f"{self.deadzone[3]}")
+        table.addField("Filtered","Yes" if self.isFiltered else "No")
+        if self.isFiltered:
+            table.addField("Filter Samples", f"{self.filterSamples:,}")
+            table.addField("Filter Window", f"{self.filterWindow:,}")
+            table.addField("Filter PolyOrder", f"{self.filterOrder}")
 
 
         return table.to_html()
@@ -2303,6 +2470,15 @@ class AxisCurveData():
         if "centered" in node.attrib:
             self.isCentered = safe_read(node,"centered", bool, False)
 
+        # filter data
+        self.isFiltered = safe_read(node,"filtered", bool, False)
+        self.filterSamples = safe_read(node,"samples", int, 200)
+        self.filterWindow = safe_read(node,"window", int, 51)
+        self.filterOrder = safe_read(node,"poly", int, 2)
+
+
+            
+
         self.control_points = []
         for child in node:
             if child.tag == "deadzone":
@@ -2324,6 +2500,7 @@ class AxisCurveData():
 
 
         self.curve_update()
+        
 
     def setPreset(self, preset : CurvePreset):
         ''' applies a preset to this curve'''
@@ -2369,6 +2546,13 @@ class AxisCurveData():
         node.set("centered", str(self.isCentered))
         node.set("id", self.id)
 
+        # filter data
+        node.set("filtered", safe_format(self.isFiltered, bool))
+        node.set("samples", safe_format(self.filterSamples, int))
+        node.set("poly", safe_format(self.filterOrder, int))
+        node.set("window", safe_format(self.filterWindow, int))
+        
+
         # Response curve mapping
         if len(self.control_points) > 0:
             mapping_node = ElementTree.Element("mapping")
@@ -2409,9 +2593,27 @@ class AxisCurveData():
 
         return node
 
+    def filter_update(self):
+        ''' updates the curve filter '''
+        if self.isFiltered:
+            if not self.curve_filter:
+                self.curve_filter = SmoothingFilter(self.filterSamples,
+                                                    self.filterWindow,
+                                                    self.filterOrder)
+            else:
+                self.curve_filter.poly_order = self.filterOrder
+                self.curve_filter.samples = self.filterSamples
+                self.curve_filter.window_size = self.filterWindow
+        else:
+            self.curve_filter = None
+    
 
     def curve_update(self):
         ''' updates the curve params '''
+
+        # update filter options
+        self.filter_update()
+
         self.deadzone_fn = lambda value: gremlin.input_devices.deadzone(
             value,
             self.deadzone[0],
@@ -2426,6 +2628,8 @@ class AxisCurveData():
                 gremlin.spline.CubicBezierSpline(self.control_points)
         else:
             raise gremlin.error.GremlinError("Invalid curve type")
+        
+
 
     def curve_value(self, value : float, update : bool = False):
         ''' processes an input value -1 to +1 and outputs the curved value based on the current curve model '''
@@ -2437,6 +2641,10 @@ class AxisCurveData():
             value = self.deadzone_fn(value)
         if self.response_fn is not None:
             value = self.response_fn(value)
+
+        if self.curve_filter:
+            value = self.curve_filter.update(value)
+            
         
         return value
     

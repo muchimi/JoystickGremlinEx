@@ -29,6 +29,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m76RC14):
+- New: Joystick Curve: experimental input noise filter.  This filter, when enabled, applies a [Savitzky-Golay low pass filter](https://en.wikipedia.org/wiki/Savitzky%E2%80%93Golay_filter) to the input data.  The purpose of this filter is to smooth data on noisy input sensors, which aims at eliminating spikes. GremlinEx exposes three filter parameters: (1) historical points included in the filtering funnction - this is the number of data points part of the computation, (2) sliding window sample size - this is a subset of the input data, and (3), the polynomial order.  The default for this filter setting is off.  Filtering is not usually needed for hall-effect or digital inputs.  This feature is experimental for testing only.
+- Fix: Map to Vjoy Action: stepped value repeater UI may clip the displayed step value.
+
+
 ### (m76RC13):
 - Fix: API: check for invalid button state requests (button or device)
 

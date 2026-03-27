@@ -515,7 +515,10 @@ class StepWidget(gremlin.ui.ui_common.QDataWidget):
         self.index = index
         layout = QtWidgets.QHBoxLayout(self)
 
+        w = gremlin.ui.ui_common.get_text_width("-0.000")
+
         self.value_widget = gremlin.ui.ui_common.QFloatLineEdit()
+        self.value_widget.setMinimumWidth(w)
         self.value_widget.setValue(value)
         self.value_widget.valueChanged.connect(self._step_value_changed)
         self.default_cb = gremlin.ui.ui_common.QDataRadioButton("")

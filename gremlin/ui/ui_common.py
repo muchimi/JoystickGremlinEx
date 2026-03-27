@@ -2175,7 +2175,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
     doubleClick = QtCore.Signal() # fires when the input is double clicked
     invalid = QtCore.Signal() # fires when there is an invalid value entered
 
-    def __init__(self, data = None, min_range = None, max_range = None, step = 1, value = 0, chars = 8, callback = None, tooltip = None, parent = None):
+    def __init__(self, data = None, min_range = None, max_range = None, step = 1, value = 0, chars = 8, callback = None, callback_ex = None, tooltip = None, parent = None):
         super().__init__(parent)
         if min_range is not None and max_range is not None:
             if min_range > max_range:
@@ -2204,8 +2204,19 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         if tooltip:
             self.setToolTip(tooltip)
 
-        if callback:
-            self.valueChanged.connect(callback)
+        self._callback = callback
+
+        
+        self.valueChanged.connect(self._handle_changed)
+
+        self._callback_ex = callback_ex
+
+    @QtCore.Slot(int)
+    def _handle_changed(self, value : int):
+        if self._callback:
+            self._callback(value)
+        if self._callback_ex:
+            self._callback_ex(self, value)
 
     def setSuppressed(self, value : bool):
         self._supressed = value
