@@ -569,22 +569,23 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
         # execute press/release with a delay before releasing (pulse)
         if verbose:
+            logtabs = gremlin.shared_state.logTabs(True)
             if self.use_macros:
-                if verbose:  syslog.info(f"KEY ACTION: DelayPressMacro:")
+                if verbose:  syslog.info(f"{logtabs}KEY ACTION: DelayPressMacro:")
                 for key in action.keys:
-                    if verbose: syslog.info(f"\tPress: {key}")
+                    if verbose: syslog.info(f"{logtabs}\tPress: {key}")
                     self.delay_press_release.press(key)
                 if self.delay > 0:
-                    if verbose: syslog.info(f"\tPause: {self.delay}")
+                    if verbose: syslog.info(f"{logtabs}\tPause: {self.delay}")
                     self.delay_press_release.pause(self.delay)
                 for key in reversed(action.keys):
-                    if verbose: syslog.info(f"\tRelease: {key}")
+                    if verbose: syslog.info(f"{logtabs}\tRelease: {key}")
                     self.delay_press_release.release(key)
             else:
                 stub = "".join([f"{key.name}, " for key in self._press_keys])
-                syslog.info(f"KEY ACTION: Key press: {stub}")
+                syslog.info(f"{logtabs}KEY ACTION: Key press: {stub}")
                 stub = "".join([f"{key.name}, " for key in self._release_keys])
-                syslog.info(f"KEY ACTION: Key release: {stub}")
+                syslog.info(f"{logtabs}KEY ACTION: Key release: {stub}")
             
 
         # tell the time delay or release macros to inform us when they are done running

@@ -265,14 +265,14 @@ def process_keyboard_event(n_code, w_param, l_param):
 
     
 
-    # Pass the event on to the next callback in the chain
-    if g_suppress_keyboard != 0:
-        # suppress keyboard        
-        if g_verbose_keyboard: syslog.info(f"KBDHK: suppress: [{g_suppress_keyboard}] vk [{virtual_code}] sc [{scan_code:x}] ext [{is_extended}]")
-        return 1 # suppress
+        # Pass the event on to the next callback in the chain
+        if g_suppress_keyboard != 0:
+            # suppress keyboard        
+            if g_verbose_keyboard: syslog.info(f"KBDHK: suppress: [{g_suppress_keyboard}] vk [{virtual_code}] sc [{scan_code:x}] ext [{is_extended}]")
+            return 1 # suppress
 
-    if g_verbose_keyboard: syslog.info(f"KBDHK: nexthook: [{g_suppress_keyboard}] vk [{virtual_code}] sc [{scan_code:x}] ext [{is_extended}]")
-    
+        if g_verbose_keyboard: syslog.info(f"KBDHK: nexthook: [{g_suppress_keyboard}] vk [{virtual_code}] sc [{scan_code:x}] ext [{is_extended}]")
+        
     return user32.CallNextHookEx(None, n_code, w_param, l_param)
 
 

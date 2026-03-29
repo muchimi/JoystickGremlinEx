@@ -713,7 +713,11 @@ class RangeInfo():
         else:
             rr = self.range_display()
         return rr
-
+    
+    def getKey(self):
+        ''' returns a unique key specific to this range - range objects with similar gates will return the same key  '''
+        return (self.g1.id, self.g2.id)
+    
 
     def valueInRange(self, value: float) -> bool:
         ''' true if the value is within the current range '''
@@ -1064,7 +1068,92 @@ class RangeInfo():
     
     def __hash__(self):
         return hash((self.g1.id, self.g2.id))
+
+
+
+@gremlin.singleton_decorator.SingletonDecorator
+class RangeTracking():
+    ''' tracks range triggers '''
+    def __init__(self):
+        self._tracking_map = {}  # range
+        
+    def getKey(self, range : RangeInfo) -> tuple:
+        ''' converts a range to its gate objects so ranges are unique '''
+        return range.getKey()
+
+    def isState(self, range, mode : TriggerMode):
+        ''' checks to see if the range has a particular state '''
+        key = self.getKey(range)
+        if key in self._tracking_map:
+            return mode in self._tracking_map[key]
+        return False
     
+    def isEnterExitState(self, range : RangeInfo):
+        ''' true if the range has an exit or enter trigger state '''
+        key = self.getKey(range)
+        if key in self._tracking_map:
+            return TriggerMode.RangeEnter in self._tracking_map[key] or \
+                   TriggerMode.RangeExit in self._tracking_map[key]
+        return False
+    
+    def isExitState(self, range : RangeInfo):
+        ''' true if the exir state is set on this range '''
+        return self.isState(range, TriggerMode.RangeExit)
+    
+    
+    def isEnterState(self, range : RangeInfo):
+        ''' true if the enter state is set on this range '''
+        return self.isState(range, TriggerMode.RangeEnter)
+    
+    
+    def setState(self, range, mode : TriggerMode):
+        ''' sets a range state '''
+        key = self.getKey(range)
+        if not key in self._tracking_map:
+            self._tracking_map[key] = []
+        if not mode in self._tracking_map[key]:
+            self._tracking_map[key].append(mode)
+            
+            config = gremlin.config.Configuration()
+            verbose_extra = config.verbose_mode_gate and config.verbose_mode_extra
+            verbose_extra = True
+            if verbose_extra:
+                syslog.info(f"RANGE SET STATE: [{mode.name}] for range [{range.to_display()}]")
+
+
+        
+    
+    def clearState(self, range, mode : TriggerMode):
+        ''' clears a range state '''
+        key = self.getKey(range)
+        if not key in self._tracking_map:
+            self._tracking_map[key] = []
+        if mode in self._tracking_map[key]:
+            self._tracking_map[key].remove(mode)
+            config = gremlin.config.Configuration()
+            verbose_extra = config.verbose_mode_gate and config.verbose_mode_extra
+            # verbose_extra = True
+            if verbose_extra:
+                syslog.info(f"RANGE CLEAR STATE: [{mode.name}] for range [{range.to_display()}]")
+
+    def dumpState(self, range):
+        ''' dumps to log file the tracked states for a given range '''
+        key = self.getKey(range)
+        stub = "n/a"
+        if key in self._tracking_map:
+            if self._tracking_map[key]:
+                stub = ''
+                for mode in self._tracking_map[key]:
+                    if stub:
+                        stub += ", "
+                    stub += f"{mode.name}"
+        syslog.info(f"RANGE STATE: [{range.to_display()}]: {stub}")
+            
+            
+        
+
+
+_range_tracking = RangeTracking()
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -1073,6 +1162,7 @@ class TriggerTracking():
 
     def __init__(self):
         self._tracking_map = {} # map of gate or range by generated triggers
+        # self._fired_triggers = {} # map of previously fired triggers by owner
         self._triggers = [] # list of triggers
 
         eh = gremlin.event_handler.EventListener()
@@ -1098,9 +1188,53 @@ class TriggerTracking():
         
         if verbose_extra:
             if isinstance(owner, RangeInfo):
-                syslog.info(f"TRIGGER: register range {owner.range_display()}  trigger mode: {trigger.mode} ")
+                syslog.info(f"REGISTER RANGE TRIGGER: register range {owner.range_display()}  trigger mode: {trigger.mode} ")
             elif isinstance(owner, GateInfo):
-                syslog.info(f"TRIGGER: register gate {owner.slider_index}  trigger mode: {trigger.mode} ")
+                syslog.info(f"REGISTER GATE TRIGGER: register gate {owner.slider_index}  trigger mode: {trigger.mode} ")
+
+    # def registerFiredTrigger(self, owner, trigger : TriggerData):
+    #     if not owner in self._fired_triggers:
+    #         self._fired_triggers[owner] = {}
+    #     condition = trigger.condition
+    #     if condition in (GateConditionType.EnterRange, GateConditionType.ExitRange):
+    #         if not condition in self._fired_triggers[owner]:
+    #             self._fired_triggers[owner][condition] = []
+    #         range = trigger.range
+    #         for r in self._fired_triggers[owner][condition]:
+    #             if r == range:
+    #                 return # already fired
+    #         self._fired_triggers[owner][condition].append(range)
+
+    # def getFired(self, owner, trigger : TriggerData) -> bool:
+    #     ''' true if the specified trigger was already fired '''
+    #     if not owner in self._fired_triggers:
+    #         return False
+    #     condition = trigger.condition
+    #     if not condition in (GateConditionType.EnterRange, GateConditionType.ExitRange):
+    #         return False
+    #     if not condition in self._fired_triggers[owner]:
+    #         return False
+    #     for r in self._fired_triggers[owner][condition]:
+    #         if r == trigger.range:
+    #             return True
+        
+    #     return False
+    
+    # def clearFired(self, owner, trigger : TriggerData):
+    #     ''' removes the previously fired trigger type '''
+    #     if owner in self._fired_triggers:
+    #         condition = trigger.condition
+    #         if condition in self._fired_triggers[owner]:
+    #             t : TriggerData
+    #             remove_list = []
+    #             for r in self._fired_triggers[owner][condition]:
+    #                 if r == trigger.range:
+    #                     remove_list.append(r)
+
+    #             if remove_list:
+    #                 for r in remove_list:
+    #                     self._fired_triggers[owner][condition].remove(r)
+
 
 
     def getTrigger(self, owner, mode: TriggerMode):
@@ -1117,7 +1251,10 @@ class TriggerTracking():
             if mode in self._tracking_map[owner]:
                 del self._tracking_map[owner][mode]
                 verbose = gremlin.config.Configuration().verbose_mode_gate
-                if verbose: syslog.info(f"TRIGGER: clear {str(owner)}  trigger mode: {mode} ")
+                if verbose: syslog.info(f"CLEAR TRIGGER: clear {str(owner)} trigger mode: {mode} ")
+
+                
+        
 
 
     def clear(self):
@@ -1282,6 +1419,8 @@ class GateData():
 
         el.shutdown.connect(self.unhook) # unhook on shutdown
         el.profile_unload.connect(self.unhook) # unkook on profile change
+
+
 
 
     def ensureGates(self):
@@ -1614,6 +1753,8 @@ class GateData():
         import gremlin.execution_graph
 
         
+
+        
         if not self._action_data:
             # not initialized yet
             return False
@@ -1702,10 +1843,6 @@ class GateData():
                 range_event.extra_data = {}
             range_event.extra_data["triggers"] = triggers
 
-            # for trigger in triggers:
-            #     syslog.info(f"Trigger: {trigger.mode.name}")
-            #     if trigger.mode == TriggerMode.RangeHold:
-            #         break
 
 
             for trigger in triggers:
@@ -1812,9 +1949,13 @@ class GateData():
                     extra_data["source"] = "Gate Condition"
                     if trigger.condition in (GateConditionType.EnterRange, GateConditionType.ExitRange, GateConditionType.InRange, GateConditionType.OutsideRange):
                         # range condition
-                        if verbose: syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f}")
+                       
+                        # state was not already processed = fire it
+                        if verbose: syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f} range: [{trigger.range.to_display()}]")
                         action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
                         self._ec.execute_functor_id(self._action_data.id, trigger_event, action_value, extra_data, True)
+                        
+                            
                     else:
                         # non range trigger (gate crossing or range enter/exit/hold)
                         # use a fake button for momentary event
@@ -2958,7 +3099,7 @@ class GateData():
         with self._process_trigger_lock:
 
 
-            tt = TriggerTracking() # tracking object
+            tt = TriggerTracking() # trigger tracking object
             tt.clear() # reset any prior triggers
             ranges = self.getUsedRanges() # list of all ranges
 
@@ -3070,7 +3211,6 @@ class GateData():
                                 mode = TriggerMode.FixedValue
                             td.mode = mode
                             td.condition = GateConditionType.InRange
-                            if verbose_extra: syslog.info("RANGE TRIGGER: in range trigger")
                             td.value = value
                             td.raw_value = current_value
                             td.range = range_info
@@ -3079,6 +3219,7 @@ class GateData():
                             tt.registerTrigger(range_info, td)
                             tt.clearTrigger(range_info, TriggerMode.ValueOutOfRange)
                             self._last_in_range_trigger_map[range_info.id] = td
+                            if verbose_extra: syslog.info(f"IN RANGE TRIGGER: [{td.range.to_display()}]")
 
 
                 
@@ -3087,7 +3228,7 @@ class GateData():
             outside_trigger_ranges = [rng for rng in self._active_ranges if rng != range_info and rng.hasContainers(GateConditionType.OutsideRange)]
             for outside_range in outside_trigger_ranges:
                 if not tt.getTrigger(outside_range, TriggerMode.ValueOutOfRange):
-                    if verbose_extra: syslog.info("RANGE TRIGGER: out of range trigger")
+                    
                     td = TriggerData()
                     td.mode = TriggerMode.ValueOutOfRange
                     td.value = current_value
@@ -3099,6 +3240,7 @@ class GateData():
                     tt.triggers.append(td)
                     tt.registerTrigger(outside_range, TriggerMode.ValueOutOfRange)
                     tt.clearTrigger(range_info, TriggerMode.ValueInRange)
+                    if verbose_extra: syslog.info(f"OUT OF RANGE TRIGGER: [{td.range.to_display()}]")
 
 
             # get the list of crossed gates since last check
@@ -3109,6 +3251,7 @@ class GateData():
             gate : GateInfo
 
             tt = TriggerTracking() # tracking data to remember what triggers were already issued so we don't issue them multiple times
+            rt = RangeTracking() # tracking data for range enter/exit 
 
             for gate in crossed_gates:
                 # check for one way gates we passed
@@ -3121,41 +3264,49 @@ class GateData():
                         continue
                     if verbose_extra: syslog.info(f"GATE CROSSED: processing range {r.range_display()}")
                     in_range = r.valueInRange(last_value)
-
-                    if in_range:
-                        # range exited and previously entered
-                        if not tt.getTrigger(r,TriggerMode.RangeExit):
-                            td = TriggerData()
-                            td.mode = TriggerMode.RangeExit
-                            td.condition = GateConditionType.ExitRange
-                            td.value = current_value
-                            td.range = r
-                            td.delay = r.delay
-                            tt.triggers.append(td)
-                            tt.registerTrigger(r, td)
-                            tt.clearTrigger(r,TriggerMode.RangeEnter)
-                    
+                    exit_range = r if in_range else None
 
                     in_range = r.valueInRange(current_value)
-                    if in_range:
-                        if tt.getTrigger(r, TriggerMode.RangeEnter):
-                            if verbose: syslog.info(f"\talready has RangeEnter trigger")
-                            continue
-                        # range enter and previously exited
+                    enter_range = r if in_range else None
+
+                    
+
+                    if exit_range and exit_range != enter_range and not rt.isExitState(exit_range):
+                        # the range is the range being exited 
                         td = TriggerData()
+                        td.mode = TriggerMode.RangeExit
+                        td.condition = GateConditionType.ExitRange
+                        td.value = current_value
+                        td.range = exit_range
+                        td.delay = exit_range.delay
+                    
+                        # not triggered yet
+                        tt.triggers.append(td)
+                        tt.registerTrigger(exit_range, td)
+                        rt.setState(exit_range, TriggerMode.RangeExit) # indicate the range exit trigger was set
+                        rt.clearState(exit_range, TriggerMode.RangeEnter) # indicate the enter trigger can be set
+                        if verbose_extra: syslog.info(f"ENTER EXIT TRIGGER: [{td.range.to_display()}]")
+                    
+
+                    
+                    if enter_range and not rt.isEnterState(enter_range):
+                        # the range is the range being entered
+                        td = TriggerData()
+
                         td.mode = TriggerMode.RangeEnter
                         td.condition = GateConditionType.EnterRange
                         td.value = current_value
-                        td.range = r
-                        td.delay = r.delay
+                        td.range = enter_range
+                        td.delay = enter_range.delay
+
+                        # trigger does not exist
                         tt.triggers.append(td)
-                        tt.registerTrigger(r, td)
-                        tt.clearTrigger(r,TriggerMode.RangeExit)
-                    
-                   
-                        # if tt.getTrigger(r, TriggerMode.RangeHold):
-                        #     if verbose: syslog.info(f"\talready has RangeHold trigger")
-                        #     continue
+                        tt.registerTrigger(enter_range, td)
+                        rt.clearState(enter_range, TriggerMode.RangeExit) # indicate the range exit can be triggered again
+                        rt.setState(enter_range, TriggerMode.RangeEnter) # indicate that the enter state was set+
+
+                        if verbose_extra: syslog.info(f"ENTER RANGE TRIGGER: [{td.range.to_display()}]")
+
                     
                     # range hold event for each gate crossing
                     td = TriggerData()
@@ -3250,7 +3401,7 @@ class GateData():
                 
                 
 
-            if verbose_extra:
+            if verbose_extra and tt.triggers:
                 # dump the triggerrs
                 syslog.info(f"Trigger results for value {current_value}:")
                 for trigger in tt.triggers:
@@ -3756,6 +3907,15 @@ class TriggerData():
     #     if isinstance(v, bool) and v:
     #         pass
     #     self._value = v
+
+    # @property
+    # def range(self):
+    #     return self._range
+    # @range.setter
+    # def range(self, value):
+    #     assert isinstance(value, RangeInfo),"Invalid data type"
+    #     self._range = value
+
 
     @property
     def is_range(self) -> bool:

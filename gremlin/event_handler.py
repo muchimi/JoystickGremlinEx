@@ -449,13 +449,11 @@ class JoystickEventQueue:
 	def get(self):
 		"""Removes and returns an item from the front of the queue."""
 		if not self.empty():
-			#self._lock.acquire()
 			with self._lock:
 				event : Event = self._queue.popleft()
 				if event.is_axis:
-					key = key = event.callbackKey
+					key = event.callbackKey
 					self._seen.remove(key)  # Remove from seen set when dequeued
-				# self._lock.release()
 				return event
 		else:
 			raise IndexError("Queue is empty")

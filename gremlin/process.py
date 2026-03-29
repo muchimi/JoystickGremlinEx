@@ -407,6 +407,9 @@ class ProcessHelper:
 
         self._is_running = False
         
+    def getFocus(self):
+        ''' gets the active window hwnd '''
+        return win32gui.GetForegroundWindow()
 
     
     def setFocus(self, hwnd):

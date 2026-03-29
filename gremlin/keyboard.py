@@ -32,6 +32,8 @@ from gremlin.types import MouseButton
 # from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.config
 
+FOCUS_METHOD = False
+
 
 user32 = ctypes.WinDLL("user32")
 syslog = logging.getLogger("system")
@@ -578,6 +580,7 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, hw
     """
     import gremlin.remote
     import gremlin.macro
+    import gremlin.process
     key: gremlin.keyboard.Key
   
     if key.is_mouse:
@@ -588,7 +591,9 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, hw
 
 
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
-    verbose = gremlin.config.Configuration().verbose_mode_outputs
+    config = gremlin.config.Configuration()
+    verbose = config.verbose_mode_outputs or config.verbose_mode_keyboard
+    verbose_extra = verbose and config.verbose_mode_extra 
     
     if is_local:
         if verbose: syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
@@ -596,15 +601,37 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, hw
         if hwnd == 0 and process_name:
             hwnd = win32gui.FindWindow(process_name) # find the process handle, 0 if not found
         if hwnd:
-            # Keyup Bits: (Transition=0, Previous=0, Extended=0, Scancode=0x1E, Repeat=1)
-            lparam = 0x00000001 | key.scan_code << 16 # Scan code, repeat=1
-            if key.is_extended:
-                lparam |= 0x01000000; # Extended code if required
-            hwnd_list = getInnerWindows(hwnd)
-            for sub_hwnd in hwnd_list:  # must send to specific process subhandles for POST method
-                win32gui.PostMessage(sub_hwnd, win32con.WM_KEYDOWN, key.virtual_code, lparam)
+            
+            if FOCUS_METHOD:
+                ph = gremlin.process.ProcessHelper()
+                current_hwnd = ph.getFocus()
+                if current_hwnd != hwnd:
+                    ph.setFocus(hwnd)
+                gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+                if verbose:
+                    syslog.info(f"SENDKEY DOWN (target hwnd 0x{hwnd}) vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
+                if current_hwnd != hwnd:
+                    ph.setFocus(current_hwnd)
+            else:
+                # POST method
+                
+                # Keyup Bits: (Transition=0, Previous=0, Extended=0, Scancode=0x1E, Repeat=1)
+                lparam = 0x00000001 | key.scan_code << 16 # Scan code, repeat=1
+                if key.is_extended:
+                    lparam |= 0x01000000; # Extended code if required
+                hwnd_list = getInnerWindows(hwnd)
+                # hwnd_list.append(hwnd)
+                if verbose:
+                    syslog.info(f"\tSENDKEY DN via MESSAGE POST: hwnd: 0x{hwnd:x} message: [0x{win32con.WM_KEYUP:x}] vk: [0x{key.virtual_code:x}] lparam: [0x{lparam:x}]")
+                for sub_hwnd in hwnd_list:  # must send to specific process subhandles for POST method
+                    win32gui.PostMessage(sub_hwnd, win32con.WM_KEYDOWN, key.virtual_code, lparam)
+                    if verbose_extra:
+                       syslog.info(f"\t[0x{sub_hwnd:x}]") 
+
         else:
             gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+            if verbose_extra:
+                syslog.info(f"SENDKEY DOWN vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
             # win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0) # keybd_event is deprecated by win32
     if is_remote:
         if verbose: syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
@@ -618,9 +645,12 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, hwnd
     """
 
     import gremlin.macro
+    import gremlin.process
 
     key: gremlin.keyboard.Key
-    verbose = gremlin.config.Configuration().verbose_mode_outputs
+    config = gremlin.config.Configuration()
+    verbose = config.verbose_mode_outputs or config.verbose_mode_keyboard
+    verbose_extra = verbose and config.verbose_mode_extra 
 
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
@@ -637,16 +667,36 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, hwnd
         if hwnd == 0 and process_name:
             hwnd = win32gui.FindWindow(process_name) # find the process handle, 0 if not found
         if hwnd:
-            # Keydown Bits: (Transition=1, Previous=1, Extended=0, Scancode=0x1E, Repeat=1)
-            lparam = 0x00000001 | key.scan_code << 16 # Scan code, repeat=1
-            lparam |= 0xC0000000 # key up
-            if key.is_extended:
-                lparam |= 0x01000000; # Extended code if required
-            hwnd_list = getInnerWindows(hwnd) # must send to specific process subhandles for POST method
-            for sub_hwnd in hwnd_list:
-                win32gui.PostMessage(sub_hwnd, win32con.WM_KEYUP, key.virtual_code, lparam)
+
+            if FOCUS_METHOD:
+                ph = gremlin.process.ProcessHelper()
+                current_hwnd = ph.getFocus()
+                if current_hwnd != hwnd:
+                    ph.setFocus(hwnd)
+                gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+                if verbose:
+                    syslog.info(f"SENDKEY UP (target hwnd 0x{hwnd:x}) vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
+                if current_hwnd != hwnd:
+                    ph.setFocus(current_hwnd)
+            else:
+                # POST method
+                # Keydown Bits: (Transition=1, Previous=1, Extended=0, Scancode=0x1E, Repeat=1)
+                lparam = 0x00000001 | key.scan_code << 16 # Scan code, repeat=1
+                lparam |= 0xC0000000 # key up
+                if key.is_extended:
+                    lparam |= 0x01000000; # Extended code if required
+                hwnd_list = getInnerWindows(hwnd) # must send to specific process subhandles for POST method
+                # hwnd_list.append(hwnd)
+                if verbose:
+                    syslog.info(f"\tSENDKEY UP via MESSAGE POST: hwnd: {hwnd:x} message: [{win32con.WM_KEYUP:x}] vk: [{key.virtual_code:x}] lparam: [{lparam:x}]")
+                for sub_hwnd in hwnd_list:
+                    win32gui.PostMessage(sub_hwnd, win32con.WM_KEYUP, key.virtual_code, lparam)
+                    if verbose_extra:
+                        syslog.info(f"\t[{sub_hwnd:x}]")
         else:
             gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+            if verbose_extra:
+                syslog.info(f"SENDKEY UP vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
             #win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0) # keybd_event is deprecated by win32
     if is_remote:
         if verbose: syslog.info(f"OUTPUT: (remote) keyup {key.debug_name}")
