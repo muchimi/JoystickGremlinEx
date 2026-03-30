@@ -409,9 +409,11 @@ class ProcessHelper:
         
     def getFocus(self):
         ''' gets the active window hwnd '''
-        return win32gui.GetForegroundWindow()
-
+        return win32gui.GetForegroundWindow()  
     
+    
+
+   
     def setFocus(self, hwnd):
         ''' sets the focus to the given window handle '''
         if win32gui.IsIconic(hwnd):

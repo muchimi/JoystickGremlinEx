@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC16):
+- Changed: Keyboard Ex and keyboard API: Implemented an experimental alternate method to send keyboard input to a background process.
+
 ### (m76RC15):
 - Fix: Gated Axis Action: resolved an issue where range exit actions could trigger multiple times.  The tracking logic for range entry/exit was refactored.
 - New: Keyboard Ex and keyboard API additional instrumentation (keyboard and extra mode) for target process data.
