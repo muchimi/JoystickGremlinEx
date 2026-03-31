@@ -41,6 +41,7 @@ from dinput import DILL, GUID, GUID_Invalid
 
 from gremlin.util import get_guid
 import gremlin.input_types
+import gremlin.remote
 
 
 from . import error
@@ -842,6 +843,7 @@ class CallbackActions():
         el.joystick_event.connect(self._input_event_cb)
         el.keyboard_event.connect(self._input_event_cb)
         el.virtual_event.connect(self._input_event_cb)
+        el.mouse_event.connect(self._input_event_cb)
         #self._current_mode = gremlin.shared_state.runtime_mode
 
         #el.runtime_mode_changed.connect(self._mode_changed_cb)
@@ -927,7 +929,7 @@ class CallbackActions():
                 vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
                 
             if is_remote or force_remote:
-                remote_client.send_button(vjoy_input[0], vjoy_input[1], False, force_remote = force_remote )
+                gremlin.remote.remote_client.send_button(vjoy_input[0], vjoy_input[1], False, force_remote = force_remote )
             
         else:
             syslog.warning(
@@ -962,13 +964,6 @@ class CallbackActions():
             else:
                 # remove the entry from the registry if empty
                 del self._registry[key]
-
-    # def _mode_changed_cb(self, mode):
-    #     """Updates the current mode variable.
-
-    #     :param mode the new mode
-    #     """
-    #     self._current_mode = mode
 
 
 @gremlin.singleton_decorator.SingletonDecorator

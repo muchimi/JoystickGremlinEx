@@ -953,8 +953,8 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                         self._perform_button_motion(event, value)
                 
             case MouseAction.MouseButton:
-                if trigger:
-                    self._perform_mouse_button(event, value, wheel_factor = self.action_data.wheel_factor)
+                # execute on press or release
+                self._perform_mouse_button(event, value, wheel_factor = self.action_data.wheel_factor)    
 
             case MouseAction.MousePosition | MouseAction.MouseSetPrecisionPosition:
                 if trigger:

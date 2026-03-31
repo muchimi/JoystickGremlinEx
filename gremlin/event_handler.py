@@ -201,6 +201,24 @@ class Event:
 		dup._id = gremlin.util.get_guid() # unique ID for this event
 		return dup
 	
+	def release_event(self):
+		''' gets a cloned event that is released '''
+		new_event = self.clone()
+		new_event.is_pressed = False
+		return new_event
+	
+	def press_event(self):
+		''' gets a cloned event that is released '''
+		new_event = self.clone()
+		new_event.is_pressed = True
+		return new_event
+	
+	def set_extra_data(self, key : str, value : any):
+		if not self.extra_data:
+			self.extra_data = {}
+		self.extra_data[key] = value
+
+	
 	def __deepcopy__(self, memo):
 		import copy
 		from itertools import chain

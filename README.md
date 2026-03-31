@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC17):
+- Fix: OS Action: handling of persistence for null class names or special characters in class names.
+- Fix: Map to Mouse/Ex: button does not release.  Note: for this action, the execute on release option has no function currently for mouse button presses on this action.  For more advanced uses, use the Map to Keyboard/Mouse Ex action.
+
 ### (m76RC16):
 - Changed: Keyboard Ex and keyboard API: Implemented an experimental alternate method to send keyboard input to a background process.
 

@@ -27,6 +27,7 @@ from lxml import etree as ElementTree
 
 import gremlin.actions
 import gremlin.config
+import html
 import gremlin.base_profile
 import gremlin.event_handler
 from gremlin.input_types import InputType
@@ -387,7 +388,14 @@ class OsAction(gremlin.base_profile.AbstractAction):
         except:
             pass
         if "window-class" in node.attrib:
-            self.window_class = safe_read(node, "window-class", str,'', unescape=True)
+            value = safe_read(node, "window-class", str,'')
+            if value:
+                try:
+                    value = html.unescape(value)
+                except:
+                    syslog.error(f"OSACTION: Unable to convert window class name: [{value}] due to invalid data.")
+                    value = None
+            self.window_class = value
         if "window-title" in node.attrib:
             self.window_title = node.get("window-title")
         if "process-name" in node.attrib:
@@ -405,7 +413,13 @@ class OsAction(gremlin.base_profile.AbstractAction):
         if self.process_name:
             node.set("process-name", self.process_name)
         if self.window_class:
-            node.set("window-class", safe_format(self.window_class, str, escape=True))
+            try:
+                escaped = html.escape(self.window_class)
+                if escaped:
+                    node.set("window-class", safe_format(escaped, str))
+            except:
+                syslog.error(f"OSACTION: Unable to save window class name: [{self.window_class}] due to invalid data.")
+
         if self.window_title:
             node.set("window-title", self.window_title)
         node.set("auto-start",safe_format(self.start_process, bool))
