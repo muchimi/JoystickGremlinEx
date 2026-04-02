@@ -34,9 +34,6 @@ from gremlin.types import MouseButton
 # from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.config
 
-FOCUS_METHOD = True
-
-
 user32 = ctypes.WinDLL("user32")
 syslog = logging.getLogger("system")
 
@@ -596,56 +593,60 @@ def send_key_target(target_hwnd, key, flags):
     current_hwnd = win32gui.GetForegroundWindow()  # current hwnd for the process in focus
     focus_changed = False
     linked = False
-    delay = 0.005
-    if current_hwnd != target_hwnd:
+    delay = 0.01
+    try:
+        if current_hwnd != target_hwnd:
 
-        if _set_focus(target_hwnd):
-            focus_changed = True
-            
-            retry = 10
-            while win32gui.GetForegroundWindow() != target_hwnd and retry:
-                time.sleep(delay)
-                retry -=1
-            
-            if retry == 0:
-                syslog.error("SEND KEY (target): unable to get target window focus")
-                return False
-
-            # link input streams between the current thread and the target remote thread
-            target_tid, _ = win32process.GetWindowThreadProcessId(target_hwnd)  # returns the thread ID and process ID for the target window hwnd
-            current_tid = win32api.GetCurrentThreadId()
-            linked = False
-            if target_tid and target_tid != current_tid:
-                # link input threads
-                ok = win32process.AttachThreadInput(current_tid, target_tid, True)
-                if ok == 0:
-                    code = win32api.GetLastError()
-                    error_message = win32api.FormatMessage(code)
-                    syslog.error(f"SEND KEY: unable to link input threads: error code: [{code}/0x{code:x}]: {error_message}")
+            if _set_focus(target_hwnd):
+                focus_changed = True
+                
+                retry = 10
+                while win32gui.GetForegroundWindow() != target_hwnd and retry:
+                    time.sleep(delay)
+                    retry -=1
+                
+                if retry == 0:
+                    syslog.error("SEND KEY (target): unable to get target window focus")
                     return False
-                linked = True
-        else:
-            return False
-        
-    # send the key
-    gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
-    time.sleep(delay)
-    syslog.info(f"SENDKEY (target hwnd 0x{target_hwnd:x}) vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
 
-    if linked:
-        # remove the link
-        ok = win32process.AttachThreadInput(current_tid, target_tid, False)
-        if ok == 0:
-            code = win32api.GetLastError()
-            error_message = win32api.FormatMessage(code)
-            syslog.error(f"SEND KEY: unable to unlink input threads: error code: [{code}/0x{code:x}]: {error_message}")
+                # link input streams between the current thread and the target remote thread
+                target_tid, _ = win32process.GetWindowThreadProcessId(target_hwnd)  # returns the thread ID and process ID for the target window hwnd
+                current_tid = win32api.GetCurrentThreadId()
+                linked = False
+                if target_tid and target_tid != current_tid:
+                    # link input threads
+                    ok = win32process.AttachThreadInput(current_tid, target_tid, True)
+                    if ok == 0:
+                        code = win32api.GetLastError()
+                        error_message = win32api.FormatMessage(code)
+                        syslog.error(f"SEND KEY: unable to link input threads: error code: [{code}/0x{code:x}]: {error_message}")
+                        return False
+                    linked = True
+            else:
+                return False
+            
+        # send the key
+        gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
+        time.sleep(delay)
+        syslog.info(f"SENDKEY (target hwnd 0x{target_hwnd:x}) vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
+
+     
+
+        # revert focus to the prior window that had the focus
+        if focus_changed:
+            _set_focus(current_hwnd)
+
+        return True
+    finally:
+        if linked:
+            # remove the link
+            ok = win32process.AttachThreadInput(current_tid, target_tid, False)
+            if ok == 0:
+                code = win32api.GetLastError()
+                error_message = win32api.FormatMessage(code)
+                syslog.error(f"SEND KEY: unable to unlink input threads: error code: [{code}/0x{code:x}]: {error_message}")
 
 
-    # revert focus to the prior window that had the focus
-    if focus_changed:
-        _set_focus(current_hwnd)
-
-    return True
     
 
 def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, target_hwnd = 0, extra_data : dict = None):
@@ -669,6 +670,8 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, ta
     config = gremlin.config.Configuration()
     verbose = config.verbose_mode_outputs or config.verbose_mode_keyboard
     verbose_extra = verbose and config.verbose_mode_extra 
+
+    
     
     if is_local:
         if verbose: syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
@@ -676,8 +679,8 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, ta
         if target_hwnd == 0 and process_name:
             target_hwnd = win32gui.FindWindow(process_name) # find the process handle, 0 if not found
         if target_hwnd:
-            
-            if FOCUS_METHOD:
+            focus_method = extra_data["focus_method"] if extra_data and "focus_method" in extra_data else True        
+            if focus_method:
                 if send_key_target(target_hwnd, key, flags):
                     if verbose:
                         syslog.info(f"SENDKEY UP (target hwnd 0x{target_hwnd:x}) vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
@@ -693,6 +696,7 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, ta
                 # hwnd_list.append(hwnd)
                 if verbose:
                     syslog.info(f"\tSENDKEY DN via MESSAGE POST: hwnd: 0x{target_hwnd:x} message: [0x{win32con.WM_KEYUP:x}] vk: [0x{key.virtual_code:x}] lparam: [0x{lparam:x}]")
+                win32gui.PostMessage(target_hwnd, win32con.WM_KEYDOWN, key.virtual_code, lparam)                    
                 for sub_hwnd in hwnd_list:  # must send to specific process subhandles for POST method
                     win32gui.PostMessage(sub_hwnd, win32con.WM_KEYDOWN, key.virtual_code, lparam)
                     if verbose_extra:
@@ -741,7 +745,9 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, targ
             target_hwnd = win32gui.FindWindow(process_name) # find the process handle, 0 if not found
         if target_hwnd:
 
-            if FOCUS_METHOD:
+            focus_method = extra_data["focus_method"] if extra_data and "focus_method" in extra_data else True
+
+            if focus_method:
                 if send_key_target(target_hwnd, key, flags):
                     if verbose:
                         syslog.info(f"SENDKEY DN (target hwnd 0x{target_hwnd:x}) vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
@@ -756,6 +762,7 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, targ
                 # hwnd_list.append(hwnd)
                 if verbose:
                     syslog.info(f"\tSENDKEY UP via MESSAGE POST: hwnd: {target_hwnd:x} message: [{win32con.WM_KEYUP:x}] vk: [{key.virtual_code:x}] lparam: [{lparam:x}]")
+                win32gui.PostMessage(target_hwnd, win32con.WM_KEYUP, key.virtual_code, lparam) 
                 for sub_hwnd in hwnd_list:
                     win32gui.PostMessage(sub_hwnd, win32con.WM_KEYUP, key.virtual_code, lparam)
                     if verbose_extra:

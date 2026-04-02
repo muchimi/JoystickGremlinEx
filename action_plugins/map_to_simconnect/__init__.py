@@ -3005,7 +3005,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         data = [("Block",SimConnectCommandType.SimVar),
                 ("LVAR",SimConnectCommandType.LVar)]
-        self._simvar_mode_container_widget = gremlin.ui.ui_common.getRadioContainer(data, self._command_type_changed, default = self.action_data.command_type,label="Simvar mode:" , widget_only = True)
+        self._simvar_mode_container_widget = gremlin.ui.ui_common.getRadioContainer(data, self._command_type_changed, default = self.action_data.command_type,label="Simvar mode:", widget_only = True)
         
         self._lvar_command_widget = QtWidgets.QLineEdit()
         self._lvar_command_widget.setText(self.action_data.command)
@@ -4319,12 +4319,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         if not self.manager.is_running:
             # sim is not running
-            syslog.warning(f"Simconnect Functor: event ignored, simconnect not connected")
+            if verbose: syslog.warning(f"Simconnect Functor: event ignored, simconnect not connected")
             return False
         
         if not self.manager.is_bridge_alive:
             # sim is not running
-            syslog.warning(f"Simconnect Functor: event ignored, simconnect bridge not connected")
+            if verbose: syslog.warning(f"Simconnect Functor: event ignored, simconnect bridge not connected")
             return False
         
         comment = ""

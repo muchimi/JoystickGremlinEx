@@ -212,6 +212,7 @@ class BasicContainer(AbstractContainer):
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
+        self._basic_container_generating_xml = False
         
     
     def add_action(self, action, index=-1):
@@ -262,19 +263,28 @@ class BasicContainer(AbstractContainer):
         pass
         
 
-    def _generate_xml(self):
+    def to_xml(self):
         """Returns an XML node representing this container's data.
 
         :return XML node representing the data of this container
         """
-        node = ElementTree.Element("container")
-        node.set("type", "basic")
-        if self.action_sets:
-            as_node = ElementTree.Element("action-set")
-            for action in self.action_sets[0]:
-                as_node.append(action.to_xml())
-            node.append(as_node)
-        return node
+        if self._basic_container_generating_xml:
+            syslog.error("BASIC CONTAINER XML: recursion detected")
+            return None
+        self._basic_container_generating_xml = True
+        try:
+
+            node = super().to_xml()
+            node.set("type", "basic")
+            if self.action_sets:
+                as_node = ElementTree.Element("action-set")
+                for action in self.action_sets[0]:
+                    as_node.append(action.to_xml())
+                node.append(as_node)
+            return node
+        finally:
+            self._basic_container_generating_xml = False
+    
 
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.

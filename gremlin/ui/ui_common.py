@@ -10220,7 +10220,7 @@ class QTabHeader(QtWidgets.QTabBar):
             
         return super().eventFilter(widget, event)
     
-def getRadioContainer(label_data_pairs, callback, default = None, horizontal = True, label = None, parent = None):
+def getRadioContainer(label_data_pairs, callback, default = None, horizontal = True, label = None, parent = None, widget_only = False):
     ''' returns an H container for radio buttons 
     :param label_data_pairs: list of tuples of (label, data, [tooltip]) for each radio button to create - tooltip is optional
     :param callback: the callback for each radio button - the data component will indicate which radio button was selected 
@@ -10253,6 +10253,8 @@ def getRadioContainer(label_data_pairs, callback, default = None, horizontal = T
         rb.clicked.connect(callback)
         layout.addWidget(rb)
     layout.addStretch()
+    if widget_only:
+        return widget
     return (widget, layout)
 
 

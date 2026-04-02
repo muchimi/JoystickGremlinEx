@@ -424,6 +424,7 @@ class AbstractContainer(ProfileData, ConditionContainer):
 
         self.parent = parent
 
+        self._abstract_container_generating_xml = False # true if generating
         self._action_sets = []
         self.action_model = None # set at creation by the parent of this container
         self.custom_action_sets = False # true if the container uses custom action sets (need a converter to produce action_sets)
@@ -797,24 +798,35 @@ class AbstractContainer(ProfileData, ConditionContainer):
 
         :return XML node representing the state of this instance
         """
-        node = super().to_xml()
-        node.set("container_id", self.id)
 
-        if self.comment:
-            node.set("comment", self.comment)
+        if self._abstract_container_generating_xml:
+            syslog.error("ABSTRACT CONTAINER XML: recursion detected")
+            return None
+        
+        try:
+            self._abstract_container_generating_xml = True
 
-        node.set("collapsed", safe_format(self._collapsed, bool)) # collapsed state
+            #node = super().to_xml()
+            node = ElementTree.Element("container")
+            node.set("container_id", self.id)
 
-        # Add activation condition if needed
-        if self.virtual_button:
-            node.append(self.virtual_button.to_xml())
+            if self.comment:
+                node.set("comment", self.comment)
 
-        if self.activation_condition:
-            condition_node = self.activation_condition.to_xml()
-            if condition_node is not None:
-                node.append(condition_node)
+            node.set("collapsed", safe_format(self._collapsed, bool)) # collapsed state
 
-        return node
+            # Add activation condition if needed
+            if self.virtual_button:
+                node.append(self.virtual_button.to_xml())
+
+            if self.activation_condition:
+                condition_node = self.activation_condition.to_xml()
+                if condition_node is not None:
+                    node.append(condition_node)
+
+            return node
+        finally:
+            self._abstract_container_generating_xml = False
 
     def resetActionSets(self):
         ''' resets actions sets - override in derived class if the action set default should be different '''
@@ -1103,7 +1115,8 @@ class Device:
         node.set("device-guid", write_guid(self.device_guid))
         device_type = DeviceType.to_string(self.type)
         node.set("type",device_type)
-        for mode in sorted(self.modes.values(), key=lambda x: x.name):
+        mode_list = sorted(self.modes.values(), key=lambda x: x.name)
+        for mode in mode_list:
             mode_node = mode.to_xml()
             if mode_node is not None:
                 node.append(mode_node)
@@ -1134,6 +1147,7 @@ class AbstractAction(ProfileData):
         # assert isinstance(parent, AbstractContainer)
         super().__init__(parent)
 
+        self._abstract_action_generating_xml = False # true if generating XML
         self.activation_condition = None # stores the conditions attached to that action
         self._id = gremlin.util.get_guid()
         self._action_type = None
@@ -1456,30 +1470,42 @@ class AbstractAction(ProfileData):
 
         :return XML node representing the state of this instance
         """
-        node = super().to_xml()
-        if self.has_conditions:
-            # output the conditions
-            node.append(self.activation_condition.to_xml())
 
-        # output the ID
-        node.set("action_id", self.action_id)
+        if self._abstract_action_generating_xml:
+            syslog.error("ACTION XML: Recusion detected:")
+            return None
+        
+        try:
+        
+            self._abstract_action_generating_xml = True
 
-        # send mode
-        if self._send_mode != SendType.Normal:
-            # only save if not default
-            node.set("send-mode", safe_format(self._send_mode.value, int))
+            node = super().to_xml()
+            if self.has_conditions:
+                # output the conditions
+                node.append(self.activation_condition.to_xml())
 
-        # output any notes
-        if self.comment:
-            node.set("comment", self.comment)
+            # output the ID
+            node.set("action_id", self.action_id)
 
-        node.set("priority", safe_format(self._priority, int))
+            # send mode
+            if self._send_mode != SendType.Normal:
+                # only save if not default
+                node.set("send-mode", safe_format(self._send_mode.value, int))
 
-        # remote configuration
-        rc_node = self.remote_config.to_xml()
-        node.append(rc_node)
+            # output any notes
+            if self.comment:
+                node.set("comment", self.comment)
 
-        return node
+            node.set("priority", safe_format(self._priority, int))
+
+            # remote configuration
+            rc_node = self.remote_config.to_xml()
+            node.append(rc_node)
+
+            return node
+        finally:
+            self._abstract_action_generating_xml = False
+            
 
     def requires_virtual_button(self):
         """Returns whether or not the action requires the use of a
@@ -1787,7 +1813,7 @@ class AbstractContainerAction(AbstractAction):
     def __init__(self, parent = None):
 
         super().__init__(parent)
-
+        self._abstract_container_action_generating_xml = False
         self._item_data_map = {}
         self._functors = []
 
@@ -1865,30 +1891,43 @@ class AbstractContainerAction(AbstractAction):
             # setup a new input item for these containers and read from config the defined containers
 
             device_guid = current._device_guid
+            device_type = current._device_type
             input_id = current._input_id
             input_type = current._input_type
-            mode_name = current.profile_mode
 
-            input_item = registry.getInputItem(device_guid, mode_name, input_type, input_id)
+            input_item = InputItem(mode_object)
+            input_item.input_id = input_id
+            input_item.input_type = input_type
+            input_item.device_guid = device_guid
+            input_item.device_type = device_type
+            input_item.is_action = True # indicate this input item is a special action input item
 
             if child is not None:
+                # has a node and the node contains data
                 child.tag = child.get("type")
                 index = safe_read(child,"index",int,0)
                 input_item.from_xml(child, data, extra_data)
-
-            self._item_data_map[index] = input_item
+                self._item_data_map[index] = input_item
 
     def to_xml(self):
         ''' writes node out to XML '''
-        node = super().to_xml()
 
-        for index, item_data in self._item_data_map.items():
-            child = item_data.to_xml()
-            child.set("type", child.tag)
-            child.tag = "action_containers"
-            child.set("index",str(index))
-            node.append(child)
-        return node
+        if self._abstract_container_action_generating_xml:
+            syslog.error("CONTAINER ACTION XML: Recursion detected")
+            return None
+        try:
+            self._abstract_container_action_generating_xml = True
+            node = super().to_xml()
+
+            for index, item_data in self._item_data_map.items():
+                child = item_data.to_xml()
+                child.set("type", child.tag)
+                child.tag = "action_containers"
+                child.set("index",str(index))
+                node.append(child)
+            return node
+        finally:
+            self._abstract_container_action_generating_xml = False
 
     # copy/paste exclusions
     def __getstate__(self):
@@ -2918,7 +2957,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     lockedChanged = Signal(object) # fires when the lock state changes - passes the input item as the parameter
 
-    def __init__(self, mode_parent, custom_name_handler = None, custom_mode_name_handler = None, override_input_type = None):
+    def __init__(self, mode_parent : Mode, custom_name_handler = None, custom_mode_name_handler = None, override_input_type = None):
         """Creates a new InputItem instance.
         :param mode_parent: the parent mode object of this input item (gremlin.base_profile.Mode) - required
         :param custom_name_handler: handler() returns a string, whenever the input name is needed
@@ -2927,10 +2966,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         """
         super().__init__()
 
-        assert isinstance(mode_parent, gremlin.base_profile.Mode), "Parent parameter must be a mode object"
+        assert isinstance(mode_parent, Mode), "Parent parameter must be a mode object"
 
 
         self.parent = mode_parent # mode object
+        self._input_item_generating_xml = False # xml nesting level
         self._input_type = None
         self._override_input_type = override_input_type # override input type for some types that are different
         self._device_guid = None # hardware input ID
@@ -2953,12 +2993,12 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._calibration = None # calibration data if the item is an input axis
         self._curve_data = None # true if the item has its input curved
         self._locked = False # true if the input is locked (cannot make mapping changes)
+        
 
         # self._profile_mode = None
         self._enabled = True # enabled flag
         if mode_parent is not None:
             # find the missing properties from the parenting hierarchy
-            self._is_action = isinstance(mode_parent, AbstractAction)
             item = mode_parent
             while True:
                 # if isinstance(item, Mode):
@@ -2977,6 +3017,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
         el.reload_axis_state.connect(self._handle_axis_state_request)
+
+    @property
+    def is_action(self) -> bool:
+        return self._is_action
+    @is_action.setter
+    def is_action(self, value : bool):
+        self._is_action = value
 
     def _handle_axis_state_request(self):
         ''' request to reload axis state with this input item '''
@@ -3640,67 +3687,75 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         :return XML node representing this object
         """
         from gremlin.keyboard import Key
-        if parent_node is None:
-            node = etree.Element(InputType.to_string(self.input_type))
 
-            container_node = node # default container node to the input node
-            if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
-                if isinstance(self.input_id, Key):
-                    # keyboard key item
-                    key : Key
-                    key = self.input_id
-                    node.set("id", safe_format(key.scan_code, int))
-                    node.set("extended", safe_format(key.is_extended, bool))
-                    for latched_key in key.latched_keys:
-                        # latched keys
-                        child = etree.Element("latched")
-                        child.set("id", safe_format(latched_key.scan_code, int))
-                        child.set("extended", safe_format(latched_key.is_extended, bool))
+        if self._input_item_generating_xml:
+            syslog.error("INPUT ITEM XML: recursion detected")
+        try:
+            self._input_item_generating_xml = True
+
+            if parent_node is None:
+                node = etree.Element(InputType.to_string(self.input_type))
+
+                container_node = node # default container node to the input node
+                if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
+                    if isinstance(self.input_id, Key):
+                        # keyboard key item
+                        key : Key
+                        key = self.input_id
+                        node.set("id", safe_format(key.scan_code, int))
+                        node.set("extended", safe_format(key.is_extended, bool))
+                        for latched_key in key.latched_keys:
+                            # latched keys
+                            child = etree.Element("latched")
+                            child.set("id", safe_format(latched_key.scan_code, int))
+                            child.set("extended", safe_format(latched_key.is_extended, bool))
+                            node.append(child)
+                    elif hasattr(self.input_id,"to_xml"):
+                        child = self.input_id.to_xml()
                         node.append(child)
-                elif hasattr(self.input_id,"to_xml"):
+                    else:
+                        node.set("id", safe_format(self.input_id[0], int))
+                        node.set("extended", safe_format(self.input_id[1], bool))
+                elif self.input_type in (InputType.Midi, InputType.OpenSoundControl):
+                    # write midi or OSC nodes
                     child = self.input_id.to_xml()
-                    node.append(child)
+                    if child is not None:
+                        node.append(child)
                 else:
-                    node.set("id", safe_format(self.input_id[0], int))
-                    node.set("extended", safe_format(self.input_id[1], bool))
-            elif self.input_type in (InputType.Midi, InputType.OpenSoundControl):
-                # write midi or OSC nodes
-                child = self.input_id.to_xml()
-                if child is not None:
-                    node.append(child)
+                    node.set("id", safe_format(self.input_id, int))
             else:
-                node.set("id", safe_format(self.input_id, int))
-        else:
-            node = parent_node
-            container_node = node
+                node = parent_node
+                container_node = node
 
-        if self.curve_data is not None:
-            curve_node = self.curve_data._generate_xml()
-            node.append(curve_node)
+            if self.curve_data is not None:
+                curve_node = self.curve_data._generate_xml()
+                node.append(curve_node)
 
 
-        if self.always_execute:
-            node.set("always-execute", "True")
+            if self.always_execute:
+                node.set("always-execute", "True")
 
-        if self._description:
-            node.set("description", html.escape(self._description))
+            if self._description:
+                node.set("description", html.escape(self._description))
 
 
-        # lock state
-        if self._locked:
-            # only save if the flag is set
-            node.set("locked", safe_format(self._locked, bool))
+            # lock state
+            if self._locked:
+                # only save if the flag is set
+                node.set("locked", safe_format(self._locked, bool))
 
-        for entry in self.containers:
-            # gremlinex change: containers can still be saved if they are invalid if they are still being configured:
-            # valid = entry.is_valid_for_save()
-            # if valid:
-            container_node.append(entry.to_xml())
-            # else:
-            #     if gremlin.config.Configuration().verbose:
-            #         syslog.info(f"SaveProfile: input: {self.input_type} {InputType.to_display_name(self.input_type)} input id: {self.input_id} container has no data - won't save {entry.name}")
+            for entry in self.containers:
+                # gremlinex change: containers can still be saved if they are invalid if they are still being configured:
+                # valid = entry.is_valid_for_save()
+                # if valid:
+                container_node.append(entry.to_xml())
+                # else:
+                #     if gremlin.config.Configuration().verbose:
+                #         syslog.info(f"SaveProfile: input: {self.input_type} {InputType.to_display_name(self.input_type)} input id: {self.input_id} container has no data - won't save {entry.name}")
 
-        return node
+            return node
+        finally:
+            self._input_item_generating_xml = False
 
 
 

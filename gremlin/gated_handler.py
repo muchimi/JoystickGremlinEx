@@ -1116,7 +1116,7 @@ class RangeTracking():
             
             config = gremlin.config.Configuration()
             verbose_extra = config.verbose_mode_gate and config.verbose_mode_extra
-            verbose_extra = True
+            # verbose_extra = True
             if verbose_extra:
                 syslog.info(f"RANGE SET STATE: [{mode.name}] for range [{range.to_display()}]")
 
