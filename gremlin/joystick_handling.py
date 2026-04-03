@@ -896,7 +896,7 @@ def joystick_devices_initialization():
 
     _joystick_initialized = False
     config = gremlin.config.Configuration()
-    verbose = config.verbose_mode_inputs
+    verbose = config.verbose_mode_inputs or config.verbose_mode_vjoy
     verbose_detailed = verbose and config.verbose_mode_extra
     
     with _joystick_init_lock:
@@ -1049,7 +1049,8 @@ def joystick_devices_initialization():
                 _all_vjoy_devices_map[vjoy_index] = device
                 _joystick_device_guid_map[device.device_guid] = device # key by GUID
                 _joystick_device_guid_map[device.device_id] = device # key by string ID  
-                syslog.warning(f"VJOY device [{vjoy_index}] is not detected or not enabled in the VJOY API. This VJOY will be disabled.")
+                if verbose: 
+                    syslog.warning(f"VJOY device [{vjoy_index}] is not detected or not enabled in the VJOY API. This VJOY will be disabled.")
 
         # add missing vjoy devices that are disconnected or not configured so they are still available and marked disconnected
         for vjoy_index in disconnected_list:

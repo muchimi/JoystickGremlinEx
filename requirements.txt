@@ -9,6 +9,7 @@ reportlab==4.1.0
 pyttsx3 >= 2.98
 QtAwesome >= 1.4.0
 pyside6 >= 6.10
+twisted # for pyside6
 anytree >=2.12.1
 
 # requires visual studio community edition and the c++ compiler installed to compile the required components when installing via pip
@@ -27,4 +28,5 @@ numpy
 scipy
 psutil
 pyrubberband
+
 

@@ -9,7 +9,8 @@ md gremlinEx
 cd ..
 
 @echo "Building executable ..."
-c:\python\python313\python -m PyInstaller -y --log-level INFO --clean gremlinEx.spec
+c:\python\python314\python -m PyInstaller -y --log-level WARN --clean gremlinEx.spec
+REM c:\python\python313\python -m PyInstaller -y --log-level INFO --clean gremlinEx.spec
 cd dist
 
 
