@@ -1133,6 +1133,9 @@ class SimConnectMonitor():
         el.shutdown.connect(self._shutdown) # trap application shutdown
         el.simconnect_show_options.connect(self.showOptionsDialog)
 
+        eh = gremlin.event_handler.EventHandler()
+        eh.registerModeChangeCallback(self._validate_mode_change)
+
         #el.runtime_mode_changed.connect(self._mode_changed) # trap runtime mode changes - these occur post validation
         self._last_loaded_aircraft = None # last aicraft loaded
         self._auto_reconnect_event = threading.Event() # controls reconnect thread exit
@@ -1213,7 +1216,7 @@ class SimConnectMonitor():
         if not self._request_running:
 
             if not self._manager.connected:
-                self._manager.connect
+                self._manager.connect()
                 if not self._manager.connected:
                     syslog.warning("SCMONITOR: warning - unable to get current aircraft - not connected")
                     return None
@@ -1356,6 +1359,19 @@ class SimConnectMonitor():
         else:
             self.stop() # stop monitoring if it was
             syslog.info(f"SCMONITOR: no simconnect mappings found - start skipped")
+
+
+    def _validate_mode_change(self, new_mode: str, current_mode: str) -> bool:
+        ''' called on mode change - returns False if mode should not be changed '''
+        if not self._started:
+            return True
+        if self._enabled:
+            success = self._last_mode == new_mode
+            if success:
+                return True
+            syslog.info(f"SCMONITOR: simconnect mode change validation failed for mode [{new_mode}] - required aircraft mode: [{self._last_mode}]")
+        return False
+    
 
         
     def _handle_aircraft_changed(self, title : str):
@@ -4533,6 +4549,8 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                         request.value = output_value
                         request.transmit()
                     else:
+                        if output_value == -9800:
+                            pass
                         if verbose: syslog.info(f"SIMCONNECT: {comment} send block: {block.command} fixed value: {output_value:0.3f}")
                         block.execute(output_value)   
                 else:
@@ -4545,6 +4563,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 max_range = self.action_data.command_max_range
                 value = gate_trigger.value if gate_trigger else action_value.current
                 output_value = gremlin.util.scale_to_range(value, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
+        
                 if verbose: syslog.info(f"SIMCONNECT: {comment} send block trigger: {block.command} input: {value:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
                 block.execute(output_value)
 

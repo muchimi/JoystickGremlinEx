@@ -29,6 +29,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m76RC20):
+- Fix: Gated Axis Action: Range list could clip in some layouts.
+- Fix: Simconnect Action: Could revert to default mode on profile start.
+- Fix: VJoy Remap Action: Reverse could be applied twice (thus voiding the effect).
+
+
 ### (m76RC19):
 - Major change: Bump in the core platform from Python 3.13 to Python 3.14.3 and compatible dependencies including QT 6.11 now that QT officially supports Python 3.14.  The update is in line with the goal to run recent versions of the platform to take advantage of new features. In this case, Python 3.14 provides some performance improvements over 3.13 for runtime execution (7% to 15% documented, perhaps more in some situations), improved memory management and I/O performance.  Note that many dependency libraries do not yet support the more advanced features in 3.14 such as free threading and tail calling specific to CLANG 19.  GremlinEx will not use these features until the ecosystem matures a bit and supports these more advanced features.
 

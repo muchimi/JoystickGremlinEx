@@ -5379,11 +5379,13 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
     def _set_axis(self, vid : int, axis_id : int , value : float):
         ''' sets the axis value using the inversion factor '''
 
-        inverted = self.usage_data.is_inverted(vid, axis_id)
-        if inverted:
-            # invert the value
-            value = -value
+        # fix: RC20 double inversion
+        # inverted = self.usage_data.is_inverted(vid, axis_id)
+        # if inverted:
+        #     # invert the value
+        #     value = -value
 
+        
         is_local, is_remote = self.action_data.sendFlags()
         if is_local:
             if self.verbose: syslog.info(f"VJOY: send local axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}")

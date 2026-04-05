@@ -2104,6 +2104,7 @@ class EventHandler(QtCore.QObject):
 		self._change_mode_queue = collections.deque() 
 		self._mode_queue_enabled = not gremlin.config.Configuration().mode_change_aborts_sequence
 
+		self._mode_change_callbacks = [] # holds callbacks to validate if mode changes should occur
 
 
 		self.reset()
@@ -2749,6 +2750,22 @@ class EventHandler(QtCore.QObject):
 			self._change_mode(new_mode, args)
 
 
+	def registerModeChangeCallback(self, callback : Callable[[str, str],bool]):
+		''' registers a mode change callback'''
+		if not callback in self._mode_change_callbacks:
+			self._mode_change_callbacks.append(callback)
+
+	def unregisterModeChangeCallback(self, callback : Callable[[str, str],bool]):
+		''' removes a registered mode change callback '''
+		if callback in self._mode_change_callbacks:
+			self._mode_change_callbacks.remove(callback)
+
+
+	def clearModeChangeCallbacks(self):
+		''' clears all mode change callbacks'''
+		self._mode_change_callbacks.clear()
+
+
 	def _change_mode(self, new_mode : str, args : tuple = None):
 		"""Changes the GremlinEx currently active mode.
 
@@ -2783,6 +2800,14 @@ class EventHandler(QtCore.QObject):
 		if new_mode == self.current_mode and not force_update:
 			# already in this mode
 			return
+		
+		# run through mode change callbacks
+		if is_running and self._mode_change_callbacks:
+			for callback in  self._mode_change_callbacks:
+				if not callback(new_mode, self.current_mode):
+					if verbose:
+						syslog.info(f"CHANGE MODE: (runtime): ignore request to change to mode [{new_mode}]: validation callback failed")
+					return
 			
 		try:
 			el = EventListener()

@@ -283,6 +283,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self.range_flow_widget, self.range_flow_layout = gremlin.ui.ui_common.getFlowContainer()
         self.container_range_widget, self.container_range_layout = gremlin.ui.ui_common.getVContainer()
         self.container_range_layout.setContentsMargins(6,6,6,6)
+        self.range_flow_layout.lineCountChanged.connect(self._handle_range_line_count_changed)
 
 
         self.range_count_widget = QtWidgets.QLabel()
@@ -378,6 +379,10 @@ making changes that impact the order of gates or ranges."""
         self._update_filter() # update filters based on current selection
         self._update_event_ui()
 
+
+    def _handle_range_line_count_changed(self, count : int):
+        min_height = 24 * count
+        self.range_flow_widget.setMinimumHeight(min_height)
  
     @QtCore.Slot(bool)
     def _handle_display_event_changed(self, checked : bool):

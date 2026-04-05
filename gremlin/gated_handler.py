@@ -3433,11 +3433,10 @@ class GateData():
         current : ElementTree.Element = node
         while current is not None:
             current = current.getparent()
-            if current is None or current.tag == 'mode':
-                break
         if current is not None:
             mode = safe_read(current, "name", str,"")
-        return mode
+            return mode
+        return None
 
 
     

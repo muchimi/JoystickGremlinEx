@@ -9012,6 +9012,9 @@ class QCustomFlowLayout(QtWidgets.QLayout):
 
 class QFlowLayout(QtWidgets.QLayout):
     ''' flow layout '''
+
+    lineCountChanged = QtCore.Signal(int) # fires when line count changes
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -9019,6 +9022,7 @@ class QFlowLayout(QtWidgets.QLayout):
             self.setContentsMargins(QMargins(0, 0, 0, 0))
 
         self._item_list = []
+        self._line_count = 0 # number of lines in the layout
 
     def __del__(self):
         self.clear()
@@ -9080,10 +9084,15 @@ class QFlowLayout(QtWidgets.QLayout):
         size += QSize(2 * self.contentsMargins().top(), 2 * self.contentsMargins().top() + lineHeight / 2)
         return size
 
+    @property
+    def lineCount(self):
+        return self._line_count
+
     def _do_layout(self, rect, test_only):
         x = rect.x()
         y = rect.y()
         line_height = 0
+        line_count = 1
         spacing = self.spacing()
 
         for item in self._item_list:
@@ -9104,6 +9113,7 @@ class QFlowLayout(QtWidgets.QLayout):
                 y = y + line_height + space_y
                 next_x = x + item.sizeHint().width() + space_x
                 line_height = 0
+                line_count += 1
 
             if not test_only:
                 item.setGeometry(QRect(QPoint(x, y), item.sizeHint()))
@@ -9111,6 +9121,8 @@ class QFlowLayout(QtWidgets.QLayout):
             x = next_x
             line_height = max(line_height, item.sizeHint().height())
 
+        self._line_count = line_count
+        self.lineCountChanged.emit(line_count)
         return y + line_height - rect.y()
 
 
