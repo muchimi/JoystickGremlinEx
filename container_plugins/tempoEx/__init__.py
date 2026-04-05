@@ -1265,8 +1265,6 @@ More than one action per short press or long press can be added.'''
                 self.double_action_sets.append(action_set)
                 self.action_sets.append(action_set)     
 
-               
-
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.

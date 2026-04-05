@@ -474,6 +474,7 @@ Look at Tempo Ex for a container that allows more than one action per short or l
         self.autorelease_delay = float(node.get("autorelease-delay", 0.25))
         self.activate_on = node.get("activate-on", "release")
         
+     
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.

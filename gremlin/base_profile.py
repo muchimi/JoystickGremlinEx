@@ -799,6 +799,9 @@ class AbstractContainer(ProfileData, ConditionContainer):
         :return XML node representing the state of this instance
         """
 
+
+        
+
         if self._abstract_container_generating_xml:
             syslog.error("ABSTRACT CONTAINER XML: recursion detected")
             return None
@@ -806,8 +809,11 @@ class AbstractContainer(ProfileData, ConditionContainer):
         try:
             self._abstract_container_generating_xml = True
 
-            #node = super().to_xml()
-            node = ElementTree.Element("container")
+            node = self._generate_xml()
+            if node is None:
+                # not implemented by the derived class - create our own
+                node = ElementTree.Element("container")
+
             node.set("container_id", self.id)
 
             if self.comment:
@@ -827,6 +833,10 @@ class AbstractContainer(ProfileData, ConditionContainer):
             return node
         finally:
             self._abstract_container_generating_xml = False
+
+    def _generate_xml(self):
+        ''' this should be overriden in derived containers '''
+        return None
 
     def resetActionSets(self):
         ''' resets actions sets - override in derived class if the action set default should be different '''
@@ -3748,7 +3758,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 # gremlinex change: containers can still be saved if they are invalid if they are still being configured:
                 # valid = entry.is_valid_for_save()
                 # if valid:
-                container_node.append(entry.to_xml())
+                child = entry.to_xml()
+                if child is None:
+                    child = entry.to_xml()
+                    pass
+                if child is not None:
+                    container_node.append(entry.to_xml())
+
                 # else:
                 #     if gremlin.config.Configuration().verbose:
                 #         syslog.info(f"SaveProfile: input: {self.input_type} {InputType.to_display_name(self.input_type)} input id: {self.input_id} container has no data - won't save {entry.name}")
