@@ -10668,6 +10668,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
                  show_inverted = True, 
                  show_command = True,
                  inverted = False,
+                 step = 0.1,
                  parent = None):
         '''
         :param data: the data object if any
@@ -10694,6 +10695,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._is_range = is_range
         self._inverted = inverted
         self._verbose = gremlin.config.Configuration().verbose_mode_ui
+        self._step = step
 
         min_cmd = gremlin.util.clamp(min_cmd, min_range, max_range)
         max_cmd = gremlin.util.clamp(max_cmd, min_range, max_range)
@@ -10722,12 +10724,12 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
             '''
         self._command_min_widget = QFloatLineEdit()
         self._command_min_widget.setRange(min_range, max_range)
+        self._command_min_widget.setStep(step)
         self._command_min_widget.setStyleSheet(css)
-
-
         self._command_min_widget.setValue(min_cmd)
         self._command_min_widget.valueChanged.connect(self._update_command_min_range)
         self._command_min_widget.setMinimumWidth(w)
+        
 
         # output value
         min_output = gremlin.util.scale_to_range(min_norm, target_min = min_cmd, target_max = max_cmd)
@@ -10741,6 +10743,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._command_max_widget = QFloatLineEdit()
         self._command_max_widget.setRange(min_range, max_range)
         self._command_max_widget.setValue(max_cmd)
+        self._command_max_widget.setStep(step)
         self._command_max_widget.setMinimumWidth(w)
         self._command_max_widget.valueChanged.connect(self._update_command_max_range)
         self._command_max_widget.setStyleSheet(css)
@@ -11247,20 +11250,20 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
 
     def setRange(self, value : float, max_value : float):
         ''' updates the overall command range min and max values '''
-        
+
         with QtCore.QSignalBlocker(self._command_min_widget):
-            self._command_min_widget.setRange(value, max_value)
+            # self._command_min_widget.setRange(value, max_value)
             self._command_min_widget.setValue(value)
         
-        with QtCore.QSignalBlocker(self._data_min_widget):
-            self._data_min_widget.setRange(value, max_value)
+        # with QtCore.QSignalBlocker(self._data_min_widget):
+        #     self._data_min_widget.setRange(value, max_value)
         
         with QtCore.QSignalBlocker(self._command_max_widget):
-            self._command_max_widget.setRange(value, max_value)
+            # self._command_max_widget.setRange(value, max_value)
             self._command_max_widget.setValue(max_value)
     
-        with QtCore.QSignalBlocker(self._data_max_widget):
-            self._data_max_widget.setRange(value, max_value)
+        # with QtCore.QSignalBlocker(self._data_max_widget):
+        #     self._data_max_widget.setRange(value, max_value)
 
         self._update_from_command(None, False)
 
@@ -12673,7 +12676,7 @@ class QInputLockWidget(QtWidgets.QWidget):
 
         unlock_widget = QtWidgets.QPushButton()
         unlock_widget.setIcon(Icons.unlockIcon())
-        lock_widget.setToolTip("Unlock all inputs")
+        unlock_widget.setToolTip("Unlock all inputs")
         unlock_widget.clicked.connect(self._handle_unlock)
 
         widgets = [

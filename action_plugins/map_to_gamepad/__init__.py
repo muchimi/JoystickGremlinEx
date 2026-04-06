@@ -96,6 +96,8 @@ class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _populate_ui(self):
         """Populates the UI components."""
+        if not Shiboken.isValid(self.output_widget):
+            return
         devices = gremlin.gamepad_handling.gamepadDevices()
         is_enabled = len(devices) > 0
         self.setEnabled(is_enabled)

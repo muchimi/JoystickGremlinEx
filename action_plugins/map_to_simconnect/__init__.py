@@ -3219,6 +3219,7 @@ class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
                                                                        max_cmd= self.action_data.command_max_range,
                                                                        min_range=-16383,
                                                                        max_range=16384,
+                                                                       step = 1.0,
                                                                        inverted=self.action_data.inverted,
                                                                        parent = self)
         self._value_widget.valueChanged.connect(self._value_changed)

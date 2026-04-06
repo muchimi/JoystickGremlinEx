@@ -29,10 +29,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC21):
+- Fix: Tooltips on lock/unlock toolbar (left input panel).
+- Fix: Map to Gamepad Action: guard against QT garbage collection sync error.
+- Fix: SimConnect Action: incorrect mouse wheel step interval for numeric input boxes.
+
 
 ### (m76RC20A):
 - Fix: Gated Axis Action: Range list could clip in some layouts.
-- Fix: Simconnect Action: Could revert to default mode on profile start.
+- Fix: SimConnect Action: Could revert to default mode on profile start.
 - Fix: VJoy Remap Action: Reverse could be applied twice (thus voiding the effect).
 - Fix: profile saving bug linked to fix introduced in m76RC18.
 
