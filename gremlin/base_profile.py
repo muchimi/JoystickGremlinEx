@@ -4923,6 +4923,20 @@ class Profile():
             default_node.parent = self._mode_tree
 
         return modes  # unduplicated
+    
+    def get_xml_modes(self, node, casefold = False) -> list[str]:
+        ''' reads profile modes from an XML mode '''
+        root = node.getroottree().getroot()
+        mode_nodes = root.xpath("./modes/mode")
+        if mode_nodes is not None:
+            if casefold:
+                mode_list = [gremlin.shared_state.translateMode(child.get("name")).casefold() for child in mode_nodes if child is not None]    
+            else:
+                mode_list = [gremlin.shared_state.translateMode(child.get("name")) for child in mode_nodes if child is not None]
+            return mode_list
+        return []
+
+
 
 
     def get_mode_objects(self, mode_name = None) -> list[Mode]:

@@ -4625,8 +4625,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _pulse_off(self, data):
         ''' called when pulse is off '''
-        if self.action_data._target_step_linear_mode:
-            return # nothing to do if in PID mode
+        # if self.action_data._target_step_linear_mode:
+        #     return # nothing to do if in PID mode
        
 
     

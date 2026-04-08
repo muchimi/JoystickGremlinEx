@@ -336,10 +336,16 @@ on a round robin sequence.'''
         ]
 
     def _parse_xml(self, node, data = None, extra_data = None):
-        # get the list of current modes
+        ''' reads action XML data '''
         self.mode_list.clear()
-        mode_list = gremlin.ui.ui_common.get_mode_list(gremlin.shared_state.current_profile)
-        for child in node:
+
+        # get defined profile modes in the xml
+        profile = gremlin.shared_state.current_profile
+        mode_list = profile.get_xml_modes(node)
+
+        # get modes in the action
+        mode_nodes = node.xpath("./mode")
+        for child in mode_nodes:
             mode = child.get("name")
             if not mode:
                 syslog.error(f"CYCLE MODE: null mode in profile XML -  offending line: {child.sourceline}")

@@ -4419,6 +4419,13 @@ class InputItemMappingWidget(QtWidgets.QFrame):
             if item_data is not None and hasattr(item_data,"input_type"):
                 self._input_type = item_data.input_type
 
+        self.action_model = ActionContainerModel(self.item_data.containers, self.item_data, self._input_type)
+        self.container_view = ActionContainerView(self)
+        self.container_view.input_item = self.item_data
+        self.container_view.setContentsMargins(0,0,0,0)
+        self.container_view.setModel(self.action_model)
+
+
         self.setItemData(item_data)
 
         el = gremlin.event_handler.EventListener()

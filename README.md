@@ -29,6 +29,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC22):
+- Fix: Cycle Mode Action: fails to load saved profile mode list.
+- Fix: Invalid property on keyboard input in some situations.
+- Fix: VJoy Remap: button pulse mode not pulsing off in some situations.r
+- Fix: exception in keyboard / mouse input UI in some situations.
+
 ### (m76RC21):
 - Fix: Tooltips on lock/unlock toolbar (left input panel).
 - Fix: Map to Gamepad Action: guard against QT garbage collection sync error.
