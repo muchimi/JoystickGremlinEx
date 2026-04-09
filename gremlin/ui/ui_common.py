@@ -514,7 +514,9 @@ class Color():
                 margin-top: 27px;
             }}
          
-
+            QStackedWidget[class="hack"] {{
+                margin-top: -30px;
+            }}
 
             '''
         # print (css)
@@ -9515,7 +9517,17 @@ class QSplitTabWidget(QDataWidget):
 
         # input configuration content - new in m76 - have QT track the widgets itself to avoid reference problems in pyside
         self._config_widget = QtWidgets.QStackedWidget()
+        self._config_widget.setProperty("class","hack")
+
+        # cw_name = f"CW_{gremlin.util.get_guid()}"
+        # self._config_widget.setObjectName(cw_name)
+        # hack - hide the top box that appears in the current version of QT stacked widget
+        # css = f"#{cw_name} {{margin-top: -30px;}}"
+        #self._config_widget.setStyleSheet(css)
+        # self.setStyleSheet(css)
+        #self._right_container_layout.addWidget(QtWidgets.QLabel("stack start"))
         self._right_container_layout.addWidget(self._config_widget)
+        # self._right_container_layout.addWidget(QtWidgets.QLabel("stack end"))
         self._widget_config_index_map = {} # map of input id to widget index
         self._widget_config_device_map = {} # map of widget index to input id
 
@@ -9624,6 +9636,7 @@ class QSplitTabWidget(QDataWidget):
         index = self._config_widget.indexOf(widget)
         self._widget_config_index_map[key] = index
         self._widget_config_device_map[index] = key
+        
 
         return index
     
@@ -9799,6 +9812,7 @@ class QSplitTabWidget(QDataWidget):
                 widget = label
 
             contents, _ = getVContainer(widget)
+            contents.setObjectName(f"Blank Input for [{self.objectName()}]")
 
             self.registerWidget(self._blank_input_id, contents)
 
@@ -14564,3 +14578,5 @@ class TargetProcessWidget(QtWidgets.QWidget):
             self.group_widget.setVisible(False)
             return
         self.group_widget.setVisible(True)
+
+

@@ -1947,12 +1947,15 @@ class GateData():
                     extra_data["condition_type"] = trigger.condition
                     extra_data["trigger"] = trigger
                     extra_data["source"] = "Gate Condition"
+
+                    if trigger.condition == GateConditionType.EnterRange:
+                        pass
+
                     if trigger.condition in (GateConditionType.EnterRange, GateConditionType.ExitRange, GateConditionType.InRange, GateConditionType.OutsideRange):
                         # range condition
-                       
-                        # state was not already processed = fire it
                         if verbose: syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f} range: [{trigger.range.to_display()}]")
                         action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
+                        syslog.info(f"trigger node: {self._action_data.id}")
                         self._ec.execute_functor_id(self._action_data.id, trigger_event, action_value, extra_data, True)
                         
                             
@@ -3476,7 +3479,8 @@ class GateData():
         ''' export this configuration to XML '''
         node = ElementTree.Element("gate")
 
-        verbose = gremlin.config.Configuration().verbose_mode_gate
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_gate and config.verbose_mode_extra
         
         node.set("show_mode", DisplayMode.to_string(self.display_mode))
 
@@ -4467,6 +4471,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self._id = gremlin.util.get_guid()
 
+
         self._range_info : RangeInfo = None
         self._gate_info : GateInfo = None
         is_range = isinstance(info_object, RangeInfo)
@@ -4867,17 +4872,26 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             conditions = (GateConditionType.OnCross, GateConditionType.OnCrossIncrease, GateConditionType.OnCrossDecrease)            
 
 
+
+
         with QtCore.QSignalBlocker(self._condition_tab):     
+
+        
             
             self._condition_tab.clear()
+            
             for condition in conditions:
                 condition_container_widget = gremlin.ui.ui_common.QDataWidget()
                 condition_container_widget.data = condition # store the condition as the data 
                 condition_container_layout = QtWidgets.QVBoxLayout(condition_container_widget)
+
+            
                 self._condition_pages[condition] = condition_container_widget
                 self._condition_tab.addTab(condition_container_widget, f"Condition: {GateConditionType.to_display_name(condition)}")
                 description_widget = QtWidgets.QLabel(GateConditionType.to_description(condition))
                 condition_container_layout.addWidget(description_widget)
+
+                
                 
                 
         
@@ -4895,8 +4909,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
                     condition_container_layout.addWidget(autorelease_widget)
                     autorelease_widget.clicked.connect(self._autorelease_changed)
                     
-                
-
+                # condition_container_layout.addWidget(QtWidgets.QLabel("TEST 1"))
                 # all conditions are button type conditions except the in-range which is an axis
                 input_type = InputType.JoystickButton 
                 # condition specific widgets
@@ -4904,14 +4917,29 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
                     condition_container_layout.addWidget(self.output_container_widget)
                     condition_container_layout.addWidget(self.container_range_data_widget)
                     input_type = InputType.JoystickAxis
+                # condition_container_layout.addWidget(QtWidgets.QLabel("TEST 2"))
+              
 
                 item_data = self._range_info.itemData(condition) if self._is_range else self._gate_info.itemData(condition)
                 container_widget = self._cache.retrieve_by_data(item_data)        
-                if not container_widget:
+
+                stack_widget = QtWidgets.QStackedWidget()
+                stack_widget.setProperty("class","hack")
+
+                #if not container_widget:
                     # create the container, cache it
-                    container_widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}")
-                    self._cache.register(item_data, container_widget)
-                condition_container_layout.addWidget(container_widget)
+                    
+                
+                container_widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}", spacer_height = 4)
+
+                    
+
+                    # self._cache.register(item_data, container_widget)
+
+                stack_widget.addWidget(container_widget)
+                condition_container_layout.addWidget(stack_widget)
+
+                
                 
 
             # pick the last used condition and set the tab to that

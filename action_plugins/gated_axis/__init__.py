@@ -619,7 +619,9 @@ making changes that impact the order of gates or ranges."""
             return
 
         self._hooked = True
-        verbose = gremlin.config.Configuration().verbose_mode_gate
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_gate and config.verbose_mode_extra
+        
         if verbose:
             syslog.info(f"gate axis widget: hook {self.id} {self.action_data.input_display_name}")
 
@@ -634,7 +636,8 @@ making changes that impact the order of gates or ranges."""
     def unhook(self):
         # unhook connections
         if self._hooked:
-            verbose = gremlin.config.Configuration().verbose_mode_gate
+            config = gremlin.config.Configuration()
+            verbose = config.verbose_mode_gate and config.verbose_mode_extra
             if verbose:
                 syslog.info(f"gate axis widget: unhook {self.id} {self.action_data.input_display_name}")
 
@@ -713,6 +716,11 @@ making changes that impact the order of gates or ranges."""
         
 
     def _reload_gates(self):
+        # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._reload_gates_ui)
+        
+
+    def _reload_gates_ui(self):
         gremlin.util.assert_ui_thread()
         # sort the gates and update the display
         self._sort_gate_layout()

@@ -2109,10 +2109,29 @@ class ExecutionContext():
         result = True # assume pass
         functor_map = self._functor_map
 
+        if extra_data and 'trigger' in extra_data:
+            trigger = extra_data['trigger']
+            if trigger.condition == gremlin.gated_handler.GateConditionType.EnterRange:
+                syslog.info(id)
+                pass
+
+        # if id in self._exec_map:
+        #     root : ExecutionGraphNode = self._exec_map[id]
+        #     result = self.execute_node(root, event, value, extra_data, manual)
+        #     return result
+
+
         if id in functor_map:
             # cache hit
             root : ExecutionGraphNode = self._exec_map[id]
-            result = self.execute_node(root, event, value, extra_data, manual)
+            parent = root.parent
+            if isinstance(parent, ExecutionGraphGroupNode):
+                # action groups
+                action_nodes = [node for node in parent.children if isinstance(node, ExecutionGraphActionNode)]
+                for node in action_nodes:
+                    result = result and self.execute_node(node, event, value, extra_data, manual)
+            else:
+                result = result and self.execute_node(root, event, value, extra_data, manual)
         return result
     
     def isConditionNode(self, node : ExecutionGraphNode):

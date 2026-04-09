@@ -4937,7 +4937,13 @@ class Profile():
         return []
 
 
-
+    def get_mode_object(self, mode_name):
+        ''' gets the mode object for the specified mode '''
+        if mode_name:
+            o_list = self.get_mode_objects(mode_name)
+            if o_list:
+                return o_list.pop()
+        return None
 
     def get_mode_objects(self, mode_name = None) -> list[Mode]:
         ''' gets the mode objects in the device list '''

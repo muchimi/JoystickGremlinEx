@@ -1275,8 +1275,10 @@ class ActionSetModel(ui_common.AbstractModel):
         container : gremlin.base_profile.AbstractContainer = action.get_container()
         container.mapping_changed() # tell the UI about the change
 
-        
-        self.data_changed.emit()
+        try:
+            self.data_changed.emit()
+        except:
+            pass # ignore signal issues
         
 
 
@@ -4381,7 +4383,227 @@ class ConditionActionWrapper(AbstractActionWrapper):
 
 
 
-class InputItemMappingWidget(QtWidgets.QFrame):
+class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
+
+    """Stores action containers for display using the corresponding view."""
+
+    def __init__(self, containers, item_data : InputItemMappingWidget = None, input_type: InputType = None, parent=None):
+        """Creates a new instance.
+
+        :param containers: the container instances of this model
+        :param item_data: the input mapping data (InputItemMappingWidget)
+        :param input_type: the override input type if different from the input item configuration
+        :param parent: the parent of this widget
+        """
+        super().__init__(parent)
+        self._containers = containers
+        self._item_data = item_data
+        self._input_type = input_type if input_type is not None else item_data._input_type
+
+    @property
+    def item_data(self) -> InputItemMappingWidget:
+        ''' get the item data associated with this action container '''
+        return self._item_data
+    
+    @property
+    def input_type(self) -> InputType:
+        return self._input_type
+    
+    def rows(self):
+        """Returns the number of rows in the model.
+
+        :return number of rows in the model
+        """
+        return len(self._containers)
+
+    def data(self, index):
+        """Returns the data stored at the given location.
+
+        :param index the location for which to return data
+        :return the data stored at the requested location
+        """
+        assert len(self._containers) > index
+        return self._containers[index]
+
+    def add_container(self, container):
+        """Adds a container to the model.
+
+        :param container the container instance to be added
+        """
+        self._containers.append(container)
+        self.data_changed.emit()
+
+    def remove_container(self, container):
+        """Removes an existing container from the model.
+
+        :param container the container instance to remove
+        """
+        el = gremlin.event_handler.EventListener()
+        if container in self._containers:
+            # notify actions that the container is closing
+            for action_set in container.action_sets:
+                if action_set:
+                    for action in action_set:
+                        if hasattr(action,"actionDeleted"):
+                            action.actionDeleted()
+                        el.action_delete.emit(self._item_data, container, action)
+
+
+            self._containers.remove(container)
+
+            # self._item_data.remove_container(container)
+            
+            self.data_changed.emit()
+            el.container_delete.emit(self.item_data, container)
+            el.mapping_changed.emit(self.item_data)
+
+
+    def remove_all_containers(self):
+        """Removes an existing container from the model.
+
+        :param container the container instance to remove
+        """
+        el = gremlin.event_handler.EventListener()
+        container_list = [container for container in self._containers]
+        for container in container_list:
+            # notify actions that the container is closing
+            for action_set in container.action_sets:
+                for action in action_set:
+                    # if hasattr(action, "_cleanup"):
+                    #     action._cleanup()
+                    el.action_delete.emit(self._item_data, container, action)
+
+            el.container_delete.emit(self.item_data, container)
+            del self._containers[self._containers.index(container)]
+
+        self.data_changed.emit()
+        el.mapping_changed.emit(self.item_data)
+        
+
+
+class ActionContainerView(gremlin.ui.ui_common.AbstractView):
+
+    """View class used to display ActionContainerModel contents."""
+
+    def __init__(self, parent=None):
+        """Creates a new view instance.
+
+        :param parent the parent of the widget
+        """
+        super().__init__(parent)
+
+        # Create required UI items
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0,0,0,0)
+        self._redraw_lock = False
+        self._deleted = False
+
+        self.input_item = None
+
+        self.scroll_area = QtWidgets.QScrollArea()
+
+        # Configure the widget holding the layout with all the buttons
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        # Configure the scroll area
+        #self.scroll_area.setMinimumWidth(300)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_widget = None
+        self.scroll_layout = None
+
+        # Add the scroll area to the main layout
+        self.main_layout.addWidget(self.scroll_area)
+
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose: syslog.info(f"create actioncontainerview [{parent.item_data.debug_display}]")
+
+        self._widgets = []
+
+    def _cleanup_ui(self):
+        ''' widget cleanup '''
+        self._deleted = True
+        self._clear_widgets()
+
+    def _clear_widgets(self):
+        ''' clears the widgets '''
+        widgets = gremlin.util.get_layout_widgets(self.scroll_layout)
+        if widgets:
+            for widget in widgets:
+                if hasattr(widget,"_cleanup_ui"):
+                    widget._cleanup_ui()
+                widget.hide()
+                widget.setParent(None)
+                widget.deleteLater()
+            self._widgets.clear()
+
+        if self.scroll_widget:
+            self.scroll_widget.hide()
+            self.scroll_widget.deleteLater()
+
+        self.scroll_widget, self.scroll_layout = gremlin.ui.ui_common.getVContainer()
+        self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.scroll_area.setWidget(self.scroll_widget)
+
+
+
+    def redraw(self):
+        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
+
+    def _redraw_ui(self):
+        """Redraws the entire view.  must be on UI thread"""
+        import gremlin.util
+        import gremlin.ui.ui_common
+
+        if not Shiboken.isValid(self):
+            return
+
+        if not Shiboken.isValid(self.scroll_area):
+            return
+        
+        if self._redraw_lock:
+            return
+        
+        self._redraw_lock = True
+        try:
+            with self.model.data_changed.blocked():
+                self._clear_widgets()
+                container_count = self.model.rows()    
+                if container_count:
+                    for index in range(container_count):
+                        widget = self.model.data(index).widget(self.model.data(index))
+                        widget.closed.connect(self._create_closed_cb(widget))
+                        widget.container_modified.connect(self.model.data_changed.emit)
+                        self.scroll_layout.addWidget(widget)
+                        self._widgets.append(widget)
+                        
+                else:
+                    # input_type = self.model.input_type # InputType.JoystickAxis
+                    label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name}") # ({InputType.to_display_name(input_type)})")
+                    
+                    widget = gremlin.ui.ui_common.getVContainer(label, widget_only = True)
+                    widget.setContentsMargins(4,4,4,4)
+                    #widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+                    self.scroll_layout.addWidget(widget)
+                self.scroll_layout.addStretch()
+        finally:
+            self._redraw_lock = False
+
+        # gremlin.util.singleShot(lambda: self.doLayout())
+
+    def _create_closed_cb(self, widget):
+        """Create callbacks to remove individual containers from the model.
+
+        :param widget the container widget to be removed
+        :return callback function to remove the provided widget from the
+            model
+        """
+
+        return lambda: self.model.remove_container(widget.profile_data)
+    
+
+
+class InputItemMappingWidget(QtWidgets.QWidget):
 
     """ mapping viewer for a selected input item (this is the right side of the device tab) - right panel widgets """
 
@@ -4389,24 +4611,48 @@ class InputItemMappingWidget(QtWidgets.QFrame):
     description_changed = Signal(str) # indicates the description was changed
     description_clear = Signal() # clear the description field
 
-    def __init__(self, item_data, input_type = None, object_name : str = None, parent=None):
+    def __init__(self, item_data, input_type = None, object_name : str = None, spacer_height = 32, parent=None):
         """Creates a new object instance.
 
         :params:
          
         item_data =profile data associated with the item, can be none to display an empty box
         input_type = override input type if the input type is not that of the item_data (InputItem) - controls what containers/actions are available
+        spacer_height = hack margin at top
         parent = the parent of this widget
 
         """
         super().__init__(parent)
 
         assert item_data is not None,"Item Data must be provided"
-
-        self.setObjectName(object_name if object_name else "(object name not provided)")
+        
+        # self.setObjectName(object_name if object_name else "(object name not provided)")
         self.id = gremlin.util.get_guid()
+        self.setObjectName(object_name if object_name else f"InputItemMappingWidget#{item_data.display_name}")
+        
         self.item_data : gremlin.base_profile.InputItem = item_data
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.container_widget = None
+
+        self._spacer_height = spacer_height
+
+
+        # widget = QtWidgets.QWidget()
+        # self.main_layout = QtWidgets.QVBoxLayout(widget)
+        # obj_name = f"C_{self.id}"
+        # widget.setObjectName(obj_name)
+        
+        #main_layout.addWidget(widget)
+
+        
+
+        # self.container_widget = None
+        #css = f"QWidget#{obj_name} {{background: #050505; border-color:red; border: 5px;}}"
+        # css = "border: none;"
+        # css = "border: 5px;"
+        # syslog.info(css)
+        # self.setStyleSheet(css)
+
 
         self.container_view = None
         self.profile_mode = self.item_data.profile_mode
@@ -4433,15 +4679,8 @@ class InputItemMappingWidget(QtWidgets.QFrame):
      
         self._deleted = False
 
-    def _handle_ui_ready(self):
-        gremlin.util.InvokeUiMethod(self._handle_ui_ready_ui)
+      
 
-    def _handle_ui_ready_ui(self):
-        syslog.info("invalidate Ui")
-        layout = self.layout()
-        layout.invalidate()
-        layout.activate()
-        
 
     def _mapping_changed(self, item_data):
         ''' occurs when a device mapping changed through user interaction with the UI '''
@@ -4495,9 +4734,27 @@ class InputItemMappingWidget(QtWidgets.QFrame):
             assert self.item_data, "Device data must be provided"
             item_data = self.item_data
         
-        self.setUpdatesEnabled(False)
+        #self.setUpdatesEnabled(False)
         try:
-            gremlin.util.clear_layout(self.main_layout)
+
+            if self.container_widget:
+                self.container_widget.setParent(None) # remove from container
+                self.main_layout.removeWidget(self.container_widget)
+                
+            self.container_widget = QtWidgets.QWidget()
+            self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
+            self.main_layout.addWidget(self.container_widget)
+            self.container_widget.setContentsMargins(0,0,0,0)
+            self.container_layout.setContentsMargins(0,0,0,0)
+
+
+            spacer = QtWidgets.QLabel(" ")
+            spacer.setFixedHeight(self._spacer_height)
+            self.container_layout.addWidget(spacer)
+
+            # self.container_layout.addWidget(QtWidgets.QLabel("C0"))
+
+            
 
             self.item_data : gremlin.base_profile.InputItem = item_data
 
@@ -4558,7 +4815,9 @@ class InputItemMappingWidget(QtWidgets.QFrame):
                 
                 widget, layout = gremlin.ui.ui_common.getHContainer(widgets)
 
-                self.main_layout.addWidget(widget)
+                # self.container_layout.addWidget(QtWidgets.QLabel("C1"))
+                self.container_layout.addWidget(widget)
+                # self.container_layout.addWidget(QtWidgets.QLabel("C2"))
 
             if item_data is None:
                 parent = self.parent()
@@ -4591,28 +4850,23 @@ class InputItemMappingWidget(QtWidgets.QFrame):
             self.container_view.input_item = self.item_data
             self.container_view.setContentsMargins(0,0,0,0)
             self.container_view.setModel(self.action_model)
-            self.main_layout.addWidget(self.container_view)
-
 
             
+            self.container_layout.addWidget(self.container_view)
 
             # setup the container widget reference
             plugin_manager = gremlin.plugin_manager.ContainerPlugins()
             plugin_manager.set_widget(self.item_data, self)
 
-      
-            
-
-            
 
         finally:
-            self.setUpdatesEnabled(True)
+            pass
+            # self.setUpdatesEnabled(True)
             self.container_view.redraw()
-            self.update()
+            # self.update()
 
 
-            #gremlin.util.singleShot(lambda: self.container_view.redraw())
-            #
+        # self.container_layout.addWidget(QtWidgets.QLabel("C11"))
 
 
     def _add_action(self, action_name):
@@ -5008,7 +5262,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         """Creates the description input for the input item."""
         self.description_layout = QtWidgets.QHBoxLayout()
         self.description_layout.addWidget(
-            QtWidgets.QLabel("<b>Mapping Description:</b>")
+            QtWidgets.QLabel("Mapping Description:")
         )
         self.description_field = QtWidgets.QLineEdit()
         self.description_field.setText(self.item_data.description)
@@ -5018,7 +5272,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         self.description_clear_button = gremlin.ui.ui_common.Buttons.getEraserWidget(callback = self._delete_description_cb, tooltip="Reset description to default", width = 20, height = 20)
         self.description_layout.addWidget(self.description_clear_button)
 
-        self.main_layout.addLayout(self.description_layout)
+        self.container_layout.addLayout(self.description_layout)
 
 
     def _create_mapping_toolbar(self):
@@ -5069,7 +5323,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
                    ]
 
         self.dropdown_widget, self.dropdown_layout = gremlin.ui.ui_common.getHContainer(widgets)
-        self.main_layout.addWidget(self.dropdown_widget)
+        self.container_layout.addWidget(self.dropdown_widget)
         desired_width = self.dropdown_widget.sizeHint().width()
         self.dropdown_widget.setMinimumWidth(desired_width)
         
@@ -5108,7 +5362,7 @@ class InputItemMappingWidget(QtWidgets.QFrame):
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.action_paste.connect(self._paste_action)
         self.action_selector_layout.addWidget(self.action_selector)
-        self.main_layout.addWidget(self.action_selector_widget)
+        self.container_layout.addWidget(self.action_selector_widget)
 
     @QtCore.Slot()
     def _edit_description_cb(self, text):
@@ -5167,223 +5421,3 @@ class InputItemMappingWidget(QtWidgets.QFrame):
             if self.item_data and other.item_data:
                 return self.item_data.callbackKey() == other.item_data.callbackKey()
         return self.id == other.id
-
-class ActionContainerModel(gremlin.ui.ui_common.AbstractModel):
-
-    """Stores action containers for display using the corresponding view."""
-
-    def __init__(self, containers, item_data : InputItemMappingWidget = None, input_type: InputType = None, parent=None):
-        """Creates a new instance.
-
-        :param containers: the container instances of this model
-        :param item_data: the input mapping data (InputItemMappingWidget)
-        :param input_type: the override input type if different from the input item configuration
-        :param parent: the parent of this widget
-        """
-        super().__init__(parent)
-        self._containers = containers
-        self._item_data = item_data
-        self._input_type = input_type if input_type is not None else item_data._input_type
-
-    @property
-    def item_data(self) -> InputItemMappingWidget:
-        ''' get the item data associated with this action container '''
-        return self._item_data
-    
-    @property
-    def input_type(self) -> InputType:
-        return self._input_type
-    
-    def rows(self):
-        """Returns the number of rows in the model.
-
-        :return number of rows in the model
-        """
-        return len(self._containers)
-
-    def data(self, index):
-        """Returns the data stored at the given location.
-
-        :param index the location for which to return data
-        :return the data stored at the requested location
-        """
-        assert len(self._containers) > index
-        return self._containers[index]
-
-    def add_container(self, container):
-        """Adds a container to the model.
-
-        :param container the container instance to be added
-        """
-        self._containers.append(container)
-        self.data_changed.emit()
-
-    def remove_container(self, container):
-        """Removes an existing container from the model.
-
-        :param container the container instance to remove
-        """
-        el = gremlin.event_handler.EventListener()
-        if container in self._containers:
-            # notify actions that the container is closing
-            for action_set in container.action_sets:
-                if action_set:
-                    for action in action_set:
-                        if hasattr(action,"actionDeleted"):
-                            action.actionDeleted()
-                        el.action_delete.emit(self._item_data, container, action)
-
-
-            self._containers.remove(container)
-
-            # self._item_data.remove_container(container)
-            
-            self.data_changed.emit()
-            el.container_delete.emit(self.item_data, container)
-            el.mapping_changed.emit(self.item_data)
-
-
-    def remove_all_containers(self):
-        """Removes an existing container from the model.
-
-        :param container the container instance to remove
-        """
-        el = gremlin.event_handler.EventListener()
-        container_list = [container for container in self._containers]
-        for container in container_list:
-            # notify actions that the container is closing
-            for action_set in container.action_sets:
-                for action in action_set:
-                    # if hasattr(action, "_cleanup"):
-                    #     action._cleanup()
-                    el.action_delete.emit(self._item_data, container, action)
-
-            el.container_delete.emit(self.item_data, container)
-            del self._containers[self._containers.index(container)]
-
-        self.data_changed.emit()
-        el.mapping_changed.emit(self.item_data)
-        
-
-
-class ActionContainerView(gremlin.ui.ui_common.AbstractView):
-
-    """View class used to display ActionContainerModel contents."""
-
-    def __init__(self, parent=None):
-        """Creates a new view instance.
-
-        :param parent the parent of the widget
-        """
-        super().__init__(parent)
-
-        # Create required UI items
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.main_layout.setContentsMargins(0,0,0,0)
-        self._redraw_lock = False
-        self._deleted = False
-
-        self.input_item = None
-
-        self.scroll_area = QtWidgets.QScrollArea()
-
-        # Configure the widget holding the layout with all the buttons
-        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        # Configure the scroll area
-        #self.scroll_area.setMinimumWidth(300)
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_widget = None
-        self.scroll_layout = None
-
-        # Add the scroll area to the main layout
-        self.main_layout.addWidget(self.scroll_area)
-
-        verbose = gremlin.config.Configuration().verbose_mode_ui
-        if verbose: syslog.info(f"create actioncontainerview [{parent.item_data.debug_display}]")
-
-        self._widgets = []
-
-    def _cleanup_ui(self):
-        ''' widget cleanup '''
-        self._deleted = True
-        self._clear_widgets()
-
-    def _clear_widgets(self):
-        ''' clears the widgets '''
-        widgets = gremlin.util.get_layout_widgets(self.scroll_layout)
-        if widgets:
-            for widget in widgets:
-                if hasattr(widget,"_cleanup_ui"):
-                    widget._cleanup_ui()
-                widget.hide()
-                widget.setParent(None)
-                widget.deleteLater()
-            self._widgets.clear()
-
-        if self.scroll_widget:
-            self.scroll_widget.hide()
-            self.scroll_widget.deleteLater()
-
-        self.scroll_widget, self.scroll_layout = gremlin.ui.ui_common.getVContainer()
-        self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        self.scroll_area.setWidget(self.scroll_widget)
-
-
-
-    def redraw(self):
-        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
-
-    def _redraw_ui(self):
-        """Redraws the entire view.  must be on UI thread"""
-        import gremlin.util
-        import gremlin.ui.ui_common
-
-        if not Shiboken.isValid(self):
-            return
-
-        if not Shiboken.isValid(self.scroll_area):
-            return
-        
-        if self._redraw_lock:
-            return
-        
-        self._redraw_lock = True
-        try:
-            with self.model.data_changed.blocked():
-                self._clear_widgets()
-                container_count = self.model.rows()    
-                if container_count:
-                    for index in range(container_count):
-                        widget = self.model.data(index).widget(self.model.data(index))
-                        widget.closed.connect(self._create_closed_cb(widget))
-                        widget.container_modified.connect(self.model.data_changed.emit)
-                        self.scroll_layout.addWidget(widget)
-                        self._widgets.append(widget)
-                        
-                else:
-                    # input_type = self.model.input_type # InputType.JoystickAxis
-                    label = QtWidgets.QLabel(f"Please add an action or container for {self.model.item_data.display_name}") # ({InputType.to_display_name(input_type)})")
-                    
-                    widget = gremlin.ui.ui_common.getVContainer(label, widget_only = True)
-                    widget.setContentsMargins(4,4,4,4)
-                    #widget.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
-                    self.scroll_layout.addWidget(widget)
-                self.scroll_layout.addStretch()
-        finally:
-            self._redraw_lock = False
-
-        # gremlin.util.singleShot(lambda: self.doLayout())
-
-    def _create_closed_cb(self, widget):
-        """Create callbacks to remove individual containers from the model.
-
-        :param widget the container widget to be removed
-        :return callback function to remove the provided widget from the
-            model
-        """
-
-        return lambda: self.model.remove_container(widget.profile_data)
-    
-

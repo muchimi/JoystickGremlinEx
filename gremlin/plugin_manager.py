@@ -332,7 +332,7 @@ class ActionPlugins:
             log_sys_error(f"{error_count} plugin(s) failed to load")
 
 
-    def duplicate(self, action, container, input_item = None):
+    def duplicate(self, action, container, input_item = None, extra_data : dict = None):
         ''' duplicates an action and gives it a unique ID '''
         from gremlin.util import get_guid
 
@@ -342,7 +342,10 @@ class ActionPlugins:
         action_tag = node.tag
         action_tag_map = self.tag_map
         new_action = action_tag_map[action_tag](container)
-        new_action.from_xml(node, input_item)
+        if not extra_data:
+            mode_object = gremlin.shared_state.current_profile.get_mode_object(gremlin.shared_state.edit_mode)             
+            extra_data = {'mode_object' : mode_object}
+        new_action.from_xml(node, input_item, extra_data)
         new_action.setId(get_guid())
 
         return new_action
@@ -353,6 +356,7 @@ class ActionPlugins:
         from gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
         import gremlin.plugin_manager
         import gremlin.base_profile
+        import gremlin.shared_state
         clipboard = Clipboard()
         action_list = []
         if container is None and input_item is None or input_item.parent is None:
@@ -370,7 +374,9 @@ class ActionPlugins:
                 if container is not None:
                     node = etree.fromstring(xml)
                     action = self.get_class(item.name)(container)
-                    action._parse_xml(node)
+                    mode_object = gremlin.shared_state.current_profile.get_mode_object(gremlin.shared_state.edit_mode)             
+                    extra_data = {'mode_object' : mode_object}
+                    action._parse_xml(node, extra_data = extra_data)
                 action_list.append(action)
             elif item.encoder_type in (EncoderType.Container, EncoderType.MultiContainer):
                 # extract actions from the data

@@ -758,6 +758,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     widget.action_model.data_changed.connect(self._create_change_cb(index))
                     widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
                     widget.description_clear.connect(lambda: self._description_clear_cb(index,widget))
+                    
                    
 
 
