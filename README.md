@@ -33,6 +33,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: UI: added QT 6.11 workaround for a random box appearing on the UI.
 - Fix: API: paste exception in some situations for mappings that contain nested containers/actions.
 - Fix: Gated Axis: multiple instances mapped to the same input / mode could stop processing after profile start for the second and subsequent instances.
+- Changed: minor UI tweaks.
 
 ### (m76RC22):
 - Fix: Cycle Mode Action: fails to load saved profile mode list.
