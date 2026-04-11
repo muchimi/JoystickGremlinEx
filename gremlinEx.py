@@ -305,7 +305,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self.tab_guids = []
 
-        self.mode_selector = gremlin.ui.ui_common.ModeWidget()
+        self.mode_selector = gremlin.ui.ui_common.ModeWidget() # main UI mode selector
         self.mode_selector.edit_mode_changed.connect(self._edit_mode_selector_changed)
         self.mode_selector.setRuntimeDisabled(True)
 

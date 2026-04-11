@@ -40,6 +40,9 @@ from gremlin.util import safe_format, safe_read
 import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
+import threading
+import gremlin.config
+from gremlin.types import SyncMode
 
 syslog = logging.getLogger("system")
 
@@ -105,34 +108,11 @@ class SwitchWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
+
         self.data = data
         self.profile_data = profile_data
         self.container = container
 
-        device_widget = QtWidgets.QWidget()
-        device_layout = QtWidgets.QHBoxLayout(device_widget)
-
-        device_layout.addWidget(QtWidgets.QLabel(f"<b>Switch position [{data.index+1}]</b>"))
-
-        self.selector_device_widget = gremlin.ui.ui_common.QDataComboBox()
-        self.selector_input_widget = gremlin.ui.ui_common.QDataComboBox()
-
-        device_layout.addWidget(QtWidgets.QLabel("Device:"))
-        device_layout.addWidget(self.selector_device_widget)
-        device_layout.addWidget(QtWidgets.QLabel("Button:"))
-        device_layout.addWidget(self.selector_input_widget)
-
-        self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._listen_cb)
-        self.listen_widget.data = data
-        device_layout.addWidget(self.listen_widget)
-
-        
-
-        self.main_layout.addWidget(device_widget)
-
-
-        # populate the selector with hardware inputs
-        self._selector_enabled = True
 
         # figure out the default device to use
         devices = list(self.profile_data.device_map.values())
@@ -166,9 +146,82 @@ class SwitchWidget(QtWidgets.QWidget):
                         selected_input_id = input_id + 1
                     elif input_id > 1:
                         # pick one below if next not available
-                        selected_input_id = input_id - 1
+                        selected_input_id = input_id - 1        
+
+        # allow buttons or hats as inputs to the switch
+        input_types = [InputType.JoystickButton, InputType.JoystickHat]
+        self.selector_widget = gremlin.ui.ui_common.QJoystickSelectorWidget(input_types,
+                                                                            default_device,
+                                                                            InputType.JoystickButton,
+                                                                            selected_input_id,
+                                                                            show_listen = True,
+                                                                            callback = self._handle_input_changed
+                                                                            )
+
+        self.delete_button = gremlin.ui.ui_common.Buttons.getDeleteWidget(
+            f"Delete position {data.index+1}",
+            callback = self._delete_cb,
+            tooltip = "Deletes this switch position"
+            )
+
+       
+        widgets = []
+
+
+        # switch mode selection widget
+        mode_widgets = []
+
+        for switch_type in SwitchModeType:
+            if switch_type != SwitchModeType.NotSet:
+                rb = gremlin.ui.ui_common.QDataRadioButton(
+                    label = SwitchModeType.to_display_name(switch_type),\
+                    data = switch_type,
+                    value = data.mode == switch_type,
+                    callbackEx = self._handle_switch_mode_changed)
+                mode_widgets.append(rb)
+
+        widget = gremlin.ui.ui_common.getHContainer(mode_widgets, widget_only = True)
+        mode_widget = gremlin.ui.ui_common.getVContainer(
+            [
+                "Switch Execution Options:",
+                widget
+            ],
+            widget_only = True)
+
+        # header widget
+        widget = gremlin.ui.ui_common.getHContainer(
+            [
+                gremlin.ui.ui_common.QFrameBox(f"<b>Position [{data.index+1}]</b>"),
+                self.selector_widget,
+                mode_widget,
+                self.delete_button,
+            ],
+            use_vcontainers= True,
+            widget_only = True)
+
+        widgets.append(gremlin.ui.ui_common.QHorizontalLine())
+        widgets.append(widget)
         
-        # Insert the action widgets for this switch 
+
+        # release mode options
+        self.autorelease_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Auto Release",
+            value = data.autoRelease,
+             callback = self._handle_autorelease_changed)
+        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(
+            value = data.releaseDelay,
+            callback=self._handle_delay_changed
+        )
+        
+        
+        self.release_option_container = gremlin.ui.ui_common.getHContainer(
+            [self.autorelease_widget, self.delay_widget], widget_only = True)
+        
+        widgets.append(self.release_option_container)
+
+
+  
+        # actions for this switch option
         action_set = next((action_set for i,action_set in enumerate(self.profile_data.action_sets) if i == data.index), None)
         if action_set is None:
             # add the action set
@@ -176,164 +229,91 @@ class SwitchWidget(QtWidgets.QWidget):
             action_set = self.profile_data.action_sets[data.index]
 
         widget = self.container._create_action_set_widget(
-            action_set,
-            f"Action {data.index:d}",
-            gremlin.ui.ui_common.ContainerViewTypes.Action
+            action_set, 
+            view_type= gremlin.ui.ui_common.ContainerViewTypes.Action
         )
-        self.main_layout.addWidget(widget)
+        widgets.append(widget)
         widget.redraw()
         widget.model.data_changed.connect(self._action_changed)
         self.action_widget = widget
-            
-                           
         
-        if not self._selector_enabled:
-            return
 
-        if not default_device:
-            # pick the first one if nothing else got selected
-            default_device = devices[0]
+        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
 
-        selected_device_index = devices.index(default_device)
-        for dev in devices:
-            self.selector_device_widget.addItem(dev.name, dev.device_id)
-
-        self.selector_device_widget.currentIndexChanged.connect(self._device_changed_cb)
-        self.selector_input_widget.currentIndexChanged.connect(self._input_changed_cb)
+        self.main_layout.addWidget(widget)
 
 
-        # populate the buttons
-        self.selector_device_widget.setCurrentIndex(selected_device_index)
-
-        for switch_type in SwitchModeType:
-            if switch_type != SwitchModeType.NotSet:
-                rb = gremlin.ui.ui_common.QDataRadioButton(label = SwitchModeType.to_display_name(switch_type), data = switch_type)
-                rb.data = switch_type
-                device_layout.addWidget(rb)
-                if data.mode == switch_type:
-                    rb.setChecked(True)
-
-                rb.clicked.connect(self._switch_mode_changed)
+        self._update_ui()
 
 
-        # select the default device
-        self.selector_device_widget.setCurrentIndex(selected_device_index)
+    def _update_ui(self):
+        ''' updates the Ui '''
+        visible = self.data.mode == SwitchModeType.OnRelease
+        self.release_option_container.setVisible(visible)
+        delay_enabled = visible and self.data.autoRelease
+        self.delay_widget.setEnabled(delay_enabled)
 
-        selected_input_index = self.selector_input_widget.findData(selected_input_id)
-        if selected_input_index == -1:
-            selected_input_index = 0
-        self.selector_input_widget.setCurrentIndex(selected_input_index)
+    @QtCore.Slot(bool)
+    def _handle_autorelease_changed(self, checked : bool):
+        self.data.autoRelease = checked
+        self._update_ui()
+
+    @QtCore.Slot(int)
+    def _handle_delay_changed(self, value: int):
+        self.data.releaseDelay = value
 
 
-        self.delete_button = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = self._delete_cb)
-        # self.delete_button = QtWidgets.QPushButton(
-        #     gremlin.util.load_icon("gfx/{prefix}button_delete.png"), "")
-        # self.delete_button.setToolTip("Delete this entry")
-        # self.delete_button.clicked.connect(self._delete_cb)
-        device_layout.addStretch()
-        device_layout.addWidget(self.delete_button)
+    def _handle_input_changed(self, device, input_id):
+        ''' occurs when the input is changed '''
+        self.data.device_guid = device.device_guid
+        self.data.input_id = input_id
 
         
     @QtCore.Slot()
     def _delete_cb(self):
-        result = gremlin.ui.ui_common.ConfirmBox(f"Delete switch {self.data.index}?")
-        if result:
-            self.delete_item.emit(self.data)
-
-    def _listen_cb(self):
-        gremlin.util.InvokeUiMethod(self._listen_ui)
-    
-    def _listen_ui(self):
-        ''' listen to an input for a button '''
-        button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            [InputType.JoystickButton],
-            return_kb_event=False
-        )
-
-        button_press_dialog.item_selected.connect(self._update_button)
-
-        # Display the dialog centered in the middle of the UI
-        root = self
-        while root.parent():
-            root = root.parent()
-        geom = root.geometry()
-
-        button_press_dialog.setGeometry(
-            int(geom.x() + geom.width() / 2 - 150),
-            int(geom.y() + geom.height() / 2 - 75),
-            300,
-            150
-        )
-        button_press_dialog.show()
-
-    def _update_button(self, event : gremlin.event_handler.Event):
-        gremlin.util.InvokeUiMethod(self._update_button_ui, event)
-
-    def _update_button_ui(self, event : gremlin.event_handler.Event):
-        ''' called when a button input is selected - runs on UI thread'''
-        hardware_index = self.selector_device_widget.findData(event.device_id)
-        self.selector_device_widget.setCurrentIndex(hardware_index)
-        input_index = self.selector_input_widget.findData(event.identifier)
-        self.selector_input_widget.setCurrentIndex(input_index)
+        if Shiboken.isValid(self):
+            result = gremlin.ui.ui_common.ConfirmBox(f"Delete switch {self.data.index}?")
+            if result:
+                self.delete_item.emit(self.data)
 
 
     @QtCore.Slot()
     def _action_changed(self):
         ''' occurs when the action list changes '''
-        self.action_widget.redraw()
-        self.container.container_modified.emit()
+        if Shiboken.isValid(self):
+            self.action_widget.redraw()
+            self.container.container_modified.emit()
 
-    @QtCore.Slot()
-    def _device_changed_cb(self):
-        ''' merge device changed '''
-        index = self.selector_device_widget.currentIndex()
-        device_id = self.selector_device_widget.itemData(index)
-        dev = self.profile_data.device_map[device_id]
-        with QtCore.QSignalBlocker(self.selector_input_widget):
-            self.selector_input_widget.clear()
-            first_input_id = None
-            for input_id in range(1, dev.button_count+1):
-                self.selector_input_widget.addItem(f"Button {input_id}", input_id)
-                if first_input_id is None:
-                    first_input_id = input_id
-        self.data.device_id = device_id
-        self.data.input_id = first_input_id
-        
-        
-    @QtCore.Slot()
-    def _input_changed_cb(self):
-        ''' merge input changed '''
-        index = self.selector_input_widget.currentIndex()
-        input_id = self.selector_input_widget.itemData(index)
-        self.data.input_id = input_id
 
-    @QtCore.Slot()
-    def _switch_mode_changed(self):
+    @QtCore.Slot(object, bool)
+    def _handle_switch_mode_changed(self, widget, checked : bool):
         ''' mode changed '''
-        widget = self.sender()
-        mode = widget.data
-        self.data.mode = mode
+        if Shiboken.isValid(self):
+            if checked:
+                mode = widget.data
+                self.data.mode = mode
 
 class SwitchContainerWidget(AbstractContainerWidget):
 
     """Container which holds a sequence of actions."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, profile_data : SwitchContainer, parent=None):
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
         :param parent the parent of this widget
         """
         super().__init__(profile_data, parent)
+        self.action_data = profile_data
 
 
 
 
     def _update_ui(self):
         ''' redraws the entire switch content '''
-        self._widget_map.clear()
-        self.action_widgets.clear()
-        gremlin.util.clear_layout(self.action_layout)
+        if not Shiboken.isValid(self):
+            return
+
         self._create_action_ui()
 
     def _create_action_ui(self):
@@ -358,12 +338,22 @@ class SwitchContainerWidget(AbstractContainerWidget):
         self.header_layout.setContentsMargins(0,0,0,0)
 
         # positions
-        self.header_layout.addWidget(QtWidgets.QLabel(f"<b>Switch positions: {self.profile_data.position_count}</b>"))
+        self.header_layout.addWidget(QtWidgets.QLabel(f"<b>Defined Switch Positions: {self.profile_data.position_count}</b>"))
         
         # switch positions
-        self.add_position = QtWidgets.QPushButton("Add Switch Position")
-        self.add_position.clicked.connect(self._add_position)
-        self.header_layout.addWidget(self.add_position)
+        self.add_position_widget = gremlin.ui.ui_common.Buttons.getAddWidget(
+            "Add a new switch position",
+            tooltip="Adds a new switch position to the switch",
+            callback = self._handle_add_position)
+        
+        self.header_layout.addWidget(self.add_position_widget)
+
+        # sync option
+        sync_modes = [SyncMode.Ignore, SyncMode.Input]
+        sync_widget = gremlin.ui.ui_common.QSyncModeWidget(mode = self.profile_data.sync_mode, label = "State on profile start:", callback = self._handle_sync_changed, sync_modes= sync_modes)
+
+        self.header_layout.addWidget(sync_widget)
+
         self.header_layout.addStretch()
 
         self.action_layout.addWidget(self.header_widget)
@@ -373,6 +363,9 @@ class SwitchContainerWidget(AbstractContainerWidget):
         data : SwitchData
         for data in self.profile_data.position_data.values():
             self._create_selector_ui(data)
+
+    def _handle_sync_changed(self, mode):
+        self.profile_data.sync_mode = mode        
 
     def _create_selector_ui(self, data : SwitchData):
         ''' creates the input selector '''
@@ -414,7 +407,10 @@ class SwitchContainerWidget(AbstractContainerWidget):
         finally:
             gremlin.util.popCursor()
 
-    def _add_position(self):
+    def _handle_add_position(self):
+        gremlin.util.InvokeUiMethod(self._handle_add_position_ui)
+
+    def _handle_add_position_ui(self):
         index = len(self.profile_data.position_data)
         used_inputs = [data.input_id for data in self.profile_data.position_data.values()]
         device_id = self.profile_data.hardware_device_id
@@ -428,11 +424,24 @@ class SwitchContainerWidget(AbstractContainerWidget):
 
         self.profile_data.position_data[index] = SwitchData(index,self.profile_data.hardware_device_guid, input_id, SwitchModeType.OnChange)
 
+        self._reload_ui()
+
+
+    def _reload_ui(self):
+        # reload the UI
+        self.action_widgets.clear()
+        syslog.info("reload")
+        
+        # re-create the layout and place it inside the dock widget
+        Shiboken.delete(self.action_layout)
+        self.action_layout = QtWidgets.QVBoxLayout(self.action_tab_widget)
         self._update_ui()
+
 
     def _delete_cb(self, data):
         del self.profile_data.position_data[data.index]
-        self._update_ui()
+        gremlin.util.InvokeUiMethod(self._reload_ui)
+
 
 
     def _paste_action(self, action, container):
@@ -486,9 +495,9 @@ class SwitchContainerWidget(AbstractContainerWidget):
 
 class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
-    def __init__(self, container, parent = None):
+    def __init__(self, container : SwitchContainer, parent = None):
         super().__init__(container, parent)
-        self.profile_data :  SwitchContainer = container
+        self.action_data :  SwitchContainer = container
 
         self.index = 0
         self.last_execution = 0.0
@@ -504,67 +513,247 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     if cond.comparison == "press":
                         self.switch_on_press = True
 
+        self.verbose = False
+        self.timer = None # autorelease timer
+        self._last_data_pressed = None # id of data that was last pressed
+        self._started = False
+
+    def profile_start(self):
+        ''' called on profile start '''
+
+        if self._started:
+            return
+        
+        self._started = True
+        self.verbose = gremlin.config.Configuration().verbose_mode_switch
+
+        data : SwitchData
+
+        # reset the tracking state data
+        for data in self.action_data.position_data.values():
+            data.state = None # reset tracking state
+            data.releaseEvent = None
+            data.releaseValue = None
+            data.releaseExtraData = None
+
+        # check the sync - trigger on the first button pressed
+        if self.action_data.sync_mode == SyncMode.Input:
+            
+            trigger = False
+            # look for pressed input first
+            for data in self.action_data.position_data.values():
+                if not trigger:
+                    if data.mode == SwitchModeType.OnPress:
+                        device_guid = data.device_guid
+                        input_id = data.input_id
+                        input_type = data.input_type
+
+                        match input_type:
+                            case InputType.JoystickHat:
+                                hat_position = gremlin.joystick_handling.get_hat_position(data.device_guid, data.input_id)
+                                if hat_position != (0,0):
+                                    event = gremlin.event_handler.Event(event_type = input_type,
+                                                                    identifier = input_id,
+                                                                    value = hat_position,
+                                                                    is_pressed = True,
+                                                                    device_guid = device_guid,
+                                                                )
+                                    if self.verbose: syslog.info(f"SWITCH: auto trigger due to input sync: pressed: [{is_pressed}]")
+                                    self.process_event(event, is_pressed)
+                                    trigger = True
+                            case InputType.JoystickButton:
+                                # sync and invert as needed
+                                is_pressed = gremlin.joystick_handling.get_button(data.device_guid, data.input_id)
+                                if is_pressed:
+                                    event = gremlin.event_handler.Event(event_type = input_type,
+                                                                    identifier = input_id,
+                                                                    value = is_pressed,
+                                                                    is_pressed = is_pressed,
+                                                                    device_guid = device_guid,
+                                                                )
+                                    if self.verbose: syslog.info(f"SWITCH: auto trigger due to input sync: pressed: [{is_pressed}]")
+                                    self.process_event(event, is_pressed)
+                                    trigger = True
+
+            if not trigger:
+                # not triggered - look for the first released input as the sync position
+                for data in self.action_data.position_data.values():
+                    if not trigger:
+                        if data.mode == SwitchModeType.OnRelease:
+                            device_guid = data.device_guid
+                            input_id = data.input_id
+                            input_type = data.input_type
+
+                            match input_type:
+                                case InputType.JoystickHat:
+                                    hat_position = gremlin.joystick_handling.get_hat_position(data.device_guid, data.input_id)
+                                    if hat_position == (0,0):
+                                        event = gremlin.event_handler.Event(event_type = input_type,
+                                                                        identifier = input_id,
+                                                                        value = hat_position,
+                                                                        is_pressed = False,
+                                                                        device_guid = device_guid,
+                                                                    )
+                                        if self.verbose: syslog.info(f"SWITCH: auto trigger due to input sync: pressed: [{is_pressed}]")
+                                        self.process_event(event, is_pressed)
+                                        trigger = True
+                                case InputType.JoystickButton:
+                                    # sync and invert as needed
+                                    is_pressed = gremlin.joystick_handling.get_button(data.device_guid, data.input_id)
+                                    if not is_pressed:
+                                        event = gremlin.event_handler.Event(event_type = input_type,
+                                                                        identifier = input_id,
+                                                                        value = is_pressed,
+                                                                        is_pressed = is_pressed,
+                                                                        device_guid = device_guid,
+                                                                    )
+                                        if self.verbose: syslog.info(f"SWITCH: auto trigger due to input sync: pressed: [{is_pressed}]")
+                                        self.process_event(event, is_pressed)
+                                        trigger = True
+
+
+
+
+    def profile_stop(self):
+        ''' called on profile stop '''
+        if self.timer:
+            self.timer.cancel()
+            self.timer = None
+
+        self._started = False
+
 
     def latch_extra_inputs(self, container_condition_functors = None, action_condition_functors = None):
         ''' returns the list of extra devices to latch to this functor (device_guid, input_type, input_id) '''
         latch_list = []
         data : SwitchData
-        for data in self.profile_data.position_data.values():
+        for data in self.action_data.position_data.values():
             latch_list.append((data.device_guid, InputType.JoystickButton, data.input_id))
         return latch_list
 
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
         if event.is_axis:
+            # not a switch
             return True
-        if event.event_type == InputType.JoystickHat:
+        elif event.event_type == InputType.JoystickHat:
             is_hat = True
             is_pressed = value.current != (0,0)
-        elif not isinstance(value.current, bool):
-            syslog.warning(
-                f"Invalid data type received in Switch container: {type(event.value)}"
-            )
-            return False
         else:
+            is_pressed = event.is_pressed
             is_hat = False
-            is_pressed = value.current
         
         data : SwitchData
         
-        for data in self.profile_data.position_data.values():
+        # process each switch option
+        for data in self.action_data.position_data.values():
             if data.device_guid != event.device_guid:
                 continue
             if data.input_id != event.identifier:
                 continue
+
+            if self.verbose: syslog.info(f"SWITCH: position [{data.index + 1}] mode: [{data.mode.name}]")
             match data.mode:
                 case SwitchModeType.OnChange:
-                    pass
+                    # trigger on input change
+                    if self.verbose: syslog.info(f"\tinput changed - pressed: [{is_pressed}]")
+                    self._trigger(data.index, event, value, extra_data)
+                    
                 case SwitchModeType.OnPress:
-                    if not is_pressed:
+                    # position triggers on press
+                    
+                    if is_pressed and data.state:
+                        # already pressed
+                        if self.verbose: syslog.info("\tskip: already pressed")
                         continue
-                case SwitchModeType.OnRelease:
+
+  
                     if is_pressed:
-                        continue
+                        if self.verbose: syslog.info("\ttrigger input press")
+                        self._trigger_press(data, event.press_event(), value, extra_data)
+                        break
+                        
+                    
+                case SwitchModeType.OnRelease:
+                    # position triggers on release
+                    if is_pressed:
+                        # not a release event
+                        continue 
+                    
+                    if self.verbose: syslog.info("\ttrigger input release [press event]")
+                    # trigger the press for the position
+                    self._trigger_press(data, event.press_event(), value, extra_data)
 
-            if value.current is None:
-                value.current = (0,0) if is_hat else is_pressed
+                    # schedule a release if there's a delay
+                    if data.autoRelease:
+                        if self.verbose: syslog.info("\tschedule autorelease")
+                        if self.timer:
+                            self.timer.cancel()
+                        self.timer = threading.Timer(interval = data.releaseDelay/1000,
+                                                function = lambda : self._trigger_autorelease(data))
+                        # trigger the release
+                        self.timer.start()
 
-            self._trigger(data.index, event, value, extra_data)
-
-            #self.action_sets[data.index].process_event(event, value)
-
+                    
+            
         
         return False # stop execution past this container
+    
+    def _trigger_press(self, data, event, value, extra_data):
+        ''' triggers the press trigger - this clears the other inputs '''
+        if not data.state:
+            self._trigger(data.index, event.press_event(), value, extra_data)
+            data.state = True
+            data.releaseEvent = event.release_event()
+            data.releaseValue = value
+            data.releaseExtraData = extra_data
+
+            # release all the other positions
+            data_list = [d for d in self.action_data.position_data.values() if d != data and d.state]
+            for d in data_list:
+                if self.verbose: syslog.info(f"\ttrigger input release for position [{data.index+1}]")
+                self._trigger(d.index,
+                                d.releaseEvent, 
+                                d.releaseValue,
+                                d.releaseExtraData
+                                )
+                d.state = False
+        
+
+    def _trigger_autorelease(self, data):
+        if self.verbose: syslog.info("\tskip: trigger input release [autorelease event]")
+        data.state = False # indicate released
+        self._trigger(data.index,
+                      data.releaseEvent,
+                      data.releaseValue,
+                      data.releaseExtraData)
+        self.timer = None
+
 
 
 class SwitchData():
     ''' data block for each switch position '''
-    def __init__(self, index = -1, device_guid = None, input_id = None, mode : SwitchModeType = SwitchModeType.NotSet):
+    def __init__(self, index = -1, device_guid = None, input_type = None, input_id = None, mode : SwitchModeType = SwitchModeType.NotSet):
         self.index = index # sequence
         self.device_guid = device_guid
         self.input_id = input_id
+        self.input_type = input_type
         self.mode = mode
         self.device_id = gremlin.util.normalize_guid(device_guid)
         self.action_set = None # data associated with this set
+        self.state = None # true if the switch position was triggered (not persisted), None = no state
+        self.autoRelease = True # autorelease the switch position if in release mode (this will automatically trigger a press/release after the delay)
+        self.releaseDelay = 250 # release delay in milliseconds if the switch is setup for a release
+
+        self.releaseEvent = None # event data for the release
+        self.releaseValue = None # value for the release
+        self.releaseExtraData = None # extra data for the release
+
+    @property
+    def device(self) -> gremlin.ui.ui_common.DeviceSummary | None:
+        ''' gets the device associated with this entry '''
+        if self.device_guid:
+            return gremlin.joystick_handling.getDevice(self.device_guid)
+        return None
 
     def _generate_xml(self):
         ''' create xml data '''
@@ -573,7 +762,9 @@ class SwitchData():
         node.set("mode", SwitchModeType.to_string(self.mode))
         node.set("input_id", str(self.input_id))
         node.set("device_id", self.device_id)
-
+        node.set("input-type", InputType.to_string(self.input_type))
+        node.set("release-delay", safe_format(self.releaseDelay, int))
+        node.set("auto-release", safe_format(self.autoRelease, bool))
         return node
     
     def _parse_xml(self, node, data = None, extra_data = None):
@@ -584,10 +775,29 @@ class SwitchData():
             if "mode" in node.attrib:
                 self.mode = SwitchModeType.to_enum(node.get("mode"))
             if "input_id" in node.attrib:
+                # old style
                 self.input_id = safe_read(node, "input_id", int, 0)
+           
             if "device_id" in node.attrib:
                 self.device_id = node.get("device_id")
                 self.device_guid = gremlin.util.parse_guid(self.device_id)
+
+            if "input-type" in node.attrib:
+                self.input_type = InputType.to_enum(safe_read(node, "input-type", str, ""))
+            else:
+                # get a default
+                device = gremlin.joystick_handling.getDevice(self.device_guid)
+                # default to a button
+                self.input_type = InputType.JoystickButton
+                if device is not None:
+                    if self.input_id < device.button_count:
+                        self.input_type = InputType.JoystickButton
+                    elif self.input_id < device.hat_count:
+                        self.input_type = InputType.JoystickHat
+                
+            # release delay
+            self.releaseDelay = safe_read(node,"release-delay", int, 250)
+            self.autoRelease = safe_read(node,"auto-release", bool, True)
         
     
 
@@ -629,15 +839,16 @@ an input toggle, press or release.  Multiple inputs can be specified for latchin
         """
         super().__init__(parent, node)
         self.timeout = 0.0
+        self.sync_mode = SyncMode.Ignore # default sync mode on profile start
 
         self.position_data = {}  # data block indexed by position index
-        self.position_data[0] = SwitchData(0, self.hardware_device_guid, self.hardware_input_id, SwitchModeType.OnPress)
-        self.position_data[1] = SwitchData(1, self.hardware_device_guid, self.hardware_input_id, SwitchModeType.OnRelease)
+        self.position_data[0] = SwitchData(0, self.hardware_device_guid, self.hardware_input_type, self.hardware_input_id, SwitchModeType.OnPress)
+        self.position_data[1] = SwitchData(1, self.hardware_device_guid,  self.hardware_input_type, self.hardware_input_id, SwitchModeType.OnRelease)
 
         self.device_map = {}  # device list and buttons keyed by device_id(str)
         self.device_button_map = {} 
         devices = sorted(gremlin.joystick_handling.button_input_devices(), key=lambda x: x.name)
-        
+    
         for dev in devices:
             self.device_map[dev.device_id] = dev
 
@@ -650,9 +861,14 @@ an input toggle, press or release.  Multiple inputs can be specified for latchin
 
         :param node the XML node with which to populate the container
         """
+
+        if "sync-mode" in node.attrib:
+            self.sync_mode = SyncMode(safe_read(node,"sync-mode", int, 0))
         
         # get the switch nodes
         switch_nodes = gremlin.util.get_xml_child(node, "switch",True)
+        
+        
 
         for child in switch_nodes:
             data = SwitchData()
@@ -668,7 +884,7 @@ an input toggle, press or release.  Multiple inputs can be specified for latchin
         """
         node = ElementTree.Element("container")
         node.set("type", SwitchContainer.tag)
-        
+        node.set("sync-mode", safe_format(self.sync_mode, int))
 
         data : SwitchData
         for data in self.position_data.values():

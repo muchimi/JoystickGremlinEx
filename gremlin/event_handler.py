@@ -2796,6 +2796,10 @@ class EventHandler(QtCore.QObject):
 				syslog.info(f"CHANGE MODE: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
 		
 
+		if not is_running:
+			# check edit mode
+			el = EventListener()
+			el.edit_mode_changed.emit(new_mode)		
 
 		if new_mode == self.current_mode and not force_update:
 			# already in this mode

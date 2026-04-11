@@ -1597,6 +1597,11 @@ class Configuration(QtCore.QObject):
         return self.verbose and VerboseMode.Sequence in self.verbose_mode
     
     @property
+    def verbose_mode_switch(self):
+        ''' true if verbose mode is in switch mode '''
+        return self.verbose and VerboseMode.Switch in self.verbose_mode
+    
+    @property
     def verbose_mode_dev(self):
         return self.verbose and __debug__
     

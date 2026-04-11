@@ -1376,6 +1376,8 @@ class ActionSetView(ui_common.AbstractView):
         self.view_type = view_type
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
+        self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine(color = gremlin.ui.ui_common.Color.grayColor()))
+
         self.profile_data = profile_data
         self.allowed_interactions = profile_data.interaction_types
         self.label = label
@@ -1518,7 +1520,6 @@ class ActionSetView(ui_common.AbstractView):
                 if verbose_ui: syslog.info(f"ActionSet: redraw cleanup complete: {object_name}")
 
 
-            #ui_common.clear_layout(self.action_layout)
             self.left_layout.removeWidget(self.action_widget)
             self.action_widget.hide()
             self.action_widget.deleteLater()
@@ -4734,7 +4735,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             assert self.item_data, "Device data must be provided"
             item_data = self.item_data
         
-        #self.setUpdatesEnabled(False)
+        self.setUpdatesEnabled(False)
         try:
 
             if self.container_widget:
@@ -4861,9 +4862,9 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         finally:
             pass
-            # self.setUpdatesEnabled(True)
+            self.setUpdatesEnabled(True)
             self.container_view.redraw()
-            # self.update()
+            self.update()
 
 
         # self.container_layout.addWidget(QtWidgets.QLabel("C11"))

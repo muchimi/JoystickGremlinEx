@@ -29,6 +29,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC24):
+- Change: Switch container: update to current UI API
+- Change: Switch container: added input sync and auto-release release mode switch positions.
+- Fix: Switch container: release actions not executed in some situations.
+- Fix: Switch container: add new switch position could crash QT
+- Fix: Design time mode selector not always reflecting the current mode in the mode dropdown.
+
+
 ### (m76RC23):
 - Fix: UI: added QT 6.11 workaround for a random box appearing on the UI.
 - Fix: API: paste exception in some situations for mappings that contain nested containers/actions.

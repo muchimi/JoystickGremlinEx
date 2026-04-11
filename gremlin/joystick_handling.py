@@ -328,7 +328,7 @@ def get_hat_position(guid, index) -> tuple:
     direction = get_hat(guid, index)
     if direction in vjoy.Hat.to_continuous_position:
         return vjoy.Hat.to_continuous_position[direction]
-    return (0,0)
+    return (0,0) # centered
 
 def get_button(guid, input_id) -> bool:
     ''' gets the button pressed state if the button and device exists - defaults to FALSE if not found'''

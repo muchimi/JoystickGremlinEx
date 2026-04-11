@@ -10291,9 +10291,11 @@ class QHorizontalSeparator(QtWidgets.QLabel):
         self.setPixmap(Pixmaps().horizontalSeparatorPixmap)
 
 class QHorizontalLine(QtWidgets.QFrame):
-    def __init__(self, size = 1, parent = None):
+    def __init__(self, size = 1, color = None, parent = None):
         super().__init__(parent)
         self.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        if color is not None:
+            self.setStyleSheet(f"color: {color};")
         self.setLineWidth(size)
 
 def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
@@ -13343,6 +13345,8 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
                     default_input_type = None,
                     default_input_id = None,
                     virtual_only = False,
+                    show_listen = False, # true if show a listen button 
+                    callback = None,
                     parent = None):
         ''' 
         :param input_types: list of selectable inputs 
@@ -13360,6 +13364,8 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
         self._key_map = {} # map of input keys to input index
         self._virtual_only = virtual_only
 
+        self._show_listen = show_listen
+
         self._devices = sorted(gremlin.joystick_handling.filtered_input_devices(self._input_types, virtual_only),key=lambda x: x.name)
 
         container_selector_widget = QtWidgets.QWidget()
@@ -13375,6 +13381,9 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
         self.device_selector_widget = QDataComboBox()
         grid.addWidget(self.device_selector_widget,row,1)
 
+        if show_listen:
+            listen_widget = Buttons.getListenWidget(callback = self._handle_listen_request)
+            grid.addWidget(listen_widget, row, 2)
 
 
         row += 1
@@ -13387,12 +13396,12 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
         self._update_devices()
         self._update_inputs(self.device_selector_widget.currentData())
 
+        self._callback = callback
         
-
         self.device_selector_widget.currentIndexChanged.connect(self._handle_device_changed)
         self.input_selector_widget.currentIndexChanged.connect(self._handle_input_changed)
 
-    def select(self, device, input_type, input_id):
+    def select(self, device, input_type, input_id, emit = False):
         ''' selects the specified entries if they exist  '''
         with QtCore.QSignalBlocker(self.device_selector_widget):
             index = self.device_selector_widget.findData(self._selected_device)
@@ -13417,6 +13426,13 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
                 self._selected_device = self.device_selector_widget.currentData()
                 self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
         
+        if emit:
+            new_key = (self._selected_device, self._selected_input_type, self._selected_input_id)
+            if self._last_key != new_key:
+                # data changed
+                if self._callback:
+                    self._callback(self._selected_device, self._selected_input_id)
+                self._emit()
 
 
     def _update_devices(self):
@@ -13508,12 +13524,16 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
         else:
             self._selected_device = None
 
+        if self._callback:
+            self._callback(self._selected_device, self._selected_input_id)
         self._emit()
 
     @QtCore.Slot()
     def _handle_input_changed(self):
         if self.input_selector_widget.count:
             self._selected_input_type, self._selected_input_id = self.input_selector_widget.currentData()
+            if self._callback:
+                self._callback(self._selected_device, self._selected_input_id)
             self._emit()
 
     def _emit(self):
@@ -13522,6 +13542,46 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
         if new_key != self._last_key and None not in new_key:
             self.selectionChanged.emit(new_key)
             self._last_key = new_key
+
+    def _handle_listen_request(self):
+        ''' calls up a listen box to select the input '''
+        dialog = InputListenerWidget(
+                event_types = self._input_types,
+                return_kb_event=True,
+                callback = self._handle_listen_selection,
+                virtual_only = self._virtual_only
+            )
+        
+        root = self
+        while root.parent():
+            root = root.parent()
+        geom = root.geometry()
+    
+        dialog.setGeometry(
+                int(geom.x() + geom.width() / 2 - 150),
+                int(geom.y() + geom.height() / 2 - 75),
+                300,
+                150
+            )
+        
+        dialog.show()
+
+    def _handle_listen_selection(self, event):
+        gremlin.util.InvokeUiMethod(self._handle_listen_selection_ui, event)
+
+    def _handle_listen_selection_ui(self, event):
+        dev = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+        if self._virtual_only and not dev.is_virtual:
+            return
+        if event.event_type:
+            selected_device =  dev
+            selected_input_type = event.event_type
+            selected_input_id = event.identifier
+            self.select(selected_device, selected_input_type, selected_input_id, emit = True)
+
+        else:
+            syslog.warning(f"INPUT SELECTION: received an invalid event with no input type: {str(event)}")
+
 
 
 class QJoystickSelectorDialog(QShowAtCursorDialog):
