@@ -1476,7 +1476,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.sync_on_start_widget)
 
     def _default_value_changed(self, value):
-        if isinstance(value, bool):
+        if value is None or isinstance(value, bool):
             # update button value
             self.action_data.button_start_value = value
         else:
@@ -2141,6 +2141,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         self.button_rb_release.setToolTip("Output will be turned off (released) and stay off is the range is entered.")
         self.button_rb_release.data = ButtonOutputMode.Release
         self.button_rb_release.setChecked(self.action_data.button_mode == ButtonOutputMode.Release)
+
+        
 
         self.button_rb_noop = gremlin.ui.ui_common.QDataRadioButton("NoOp")
         self.button_rb_noop.setToolTip("No output.")
@@ -4303,7 +4305,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         if self.input_type in VJoyRemapWidget.input_type_buttons:
             # set start button state
-            if gremlin.joystick_handling.is_vjoy_connected(self.action_data.vjoy_id):
+            if self.action_data.button_start_value is not None and gremlin.joystick_handling.is_vjoy_connected(self.action_data.vjoy_id):
                 if verbose: syslog.info(f"VJOY REMAP: startup vjoy: [{self.action_data.vjoy_id}] button [{self.action_data.vjoy_button_id}] set to {'pressed' if self.action_data.button_start_value else 'released'}")
                 joystick_handling.VJoyProxy()[self.action_data.vjoy_id].button(self.action_data.vjoy_button_id).is_pressed = self.action_data.button_start_value
         if self.input_type == InputType.JoystickAxis:
@@ -5123,7 +5125,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
 
             if self.action_mode in (VjoyAction.VJoyButton, VjoyAction.VJoyButtonInverted):
-                # normal default behavior
+                # normal default button output behavior
 
                 match self.action_mode:
                     case VjoyAction.VJoyButton:
@@ -5133,6 +5135,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                 if not is_pressed and self.action_data.exec_on_release:
                     pressed_value = not pressed_value
+
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
                             if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [True]")
@@ -5169,7 +5172,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     trigger = True
 
                 if trigger:
-
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
                             if verbose: syslog.info(f"\tTrigger vjoy [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [{is_pressed}]")
@@ -5665,7 +5667,7 @@ Supports axis merging, curved output, command, hat and button mappings.
      
         self.curve_data = None # present if curve data is needed
 
-        self.button_start_value : bool = False # start button value if output to button is selected (if sync mode is set to default)
+        self.button_start_value : bool = False # start button value if output to button is selected (if sync mode is set to default) - default is TURN OFF
         self.button_last_value : bool = None # last button sent
 
         config = gremlin.config.Configuration()
@@ -6541,7 +6543,11 @@ Supports axis merging, curved output, command, hat and button mappings.
                 value = safe_read(node,"pulse_delay", int, 250)
                 self.pulse_delay = value
             if "start_pressed" in node.attrib:
-                self.button_start_value = safe_read(node,"start_pressed", bool, False)
+                value = node.get("start_pressed")
+                if value == "none":
+                    self.button_start_value = None
+                else:
+                    self.button_start_value = safe_read(node,"start_pressed", bool, False)
 
 
             if "target_value" in node.attrib:
@@ -6808,7 +6814,11 @@ Supports axis merging, curved output, command, hat and button mappings.
 
             case VjoyAction.VJoyButtonPress:
                 # button, command or
-                node.set("start_pressed", safe_format(self.button_start_value, bool))
+                if self.button_start_value is None:
+                    node.set("start_pressed","none")
+                else:
+                    node.set("start_pressed", safe_format(self.button_start_value, bool))
+
                 node.set("paired", safe_format(self.paired, bool))
 
             case VjoyAction.VJoySetAxis:

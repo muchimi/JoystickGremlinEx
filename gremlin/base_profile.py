@@ -1195,7 +1195,7 @@ class AbstractAction(ProfileData):
             el.profile_start.connect(self.profile_start)
             el.profile_started.connect(self.profile_started)
             el.profile_stop.connect(self.profile_stop)
-
+            el.profile_after_start.connect(self.profile_post_start)
 
     def unhook(self):
         if not self._hooked:
@@ -1203,6 +1203,7 @@ class AbstractAction(ProfileData):
             el.profile_start.disconnect(self.profile_start)
             el.profile_started.disconnect(self.profile_started)
             el.profile_stop.disconnect(self.profile_stop)
+            el.profile_after_start.disconnect(self.profile_post_start)
             self._hooked = False
 
     @property
@@ -1243,6 +1244,10 @@ class AbstractAction(ProfileData):
 
     def profile_stop(self):
         ''' stop event - override in subclass as needed '''
+        pass
+
+    def profile_post_start(self):
+        ''' post start event - occurs after profile started '''
         pass
 
     def profile_started(self):
@@ -1591,6 +1596,7 @@ class AbstractFunctor(QtCore.QObject):
             el.profile_stop.connect(self.profile_stop)
             el.profile_stopping.connect(self.profile_stopping)
             el.profile_started.connect(self.profile_started)
+            el.profile_after_start.connect(self.profile_after_start)
             el.abort.connect(self.profile_stop) # abort also stops the profile
             el.runtime_mode_changed.connect(self.profile_mode_changed)
 
@@ -1603,6 +1609,7 @@ class AbstractFunctor(QtCore.QObject):
             el.profile_stopping.disconnect(self.profile_stopping)
             el.profile_started.disconnect(self.profile_started)
             el.runtime_mode_changed.disconnect(self.profile_mode_changed)
+            el.profile_after_start.disconnect(self.profile_after_start)
             el.abort.disconnect(self.profile_stop) # abort also stops the profile
             self._hooked = False
 
@@ -1634,6 +1641,11 @@ class AbstractFunctor(QtCore.QObject):
     def profile_started(self):
         ''' called when the profile started (all other items completed) '''
         pass
+    
+    def profile_after_start(self):
+        ''' called when the profile started (all other items completed) '''
+        pass
+
 
     def profile_stop(self):
         ''' called when the profile stops '''

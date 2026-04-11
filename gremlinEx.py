@@ -301,6 +301,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         el.runtime_mode_changed.connect(self._runtime_mode_changed)
         el.edit_mode_changed.connect(self._edit_mode_changed)
+        el.edit_mode_ui_update.connect(self._edit_mode_update)
         
 
         self.tab_guids = []
@@ -3358,7 +3359,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if self._change_input_lock.locked():
             return
         
-        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        verbose = gremlin.config.Configuration().verbose_mode_select
         
         widget = None
         
@@ -3581,7 +3582,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             item : gremlin.base_profile.InputItem = widget.input_item_list_view.select_item(index, emit = False)
                             if not item:
                                 item = widget.input_item_list_view.selected_item()
-                            
+
 
                             #widget.select_item(index)
                             widget.setContentWidget(input_type, input_id)
@@ -3589,8 +3590,18 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             # syslog.info("sync input requested")
                             el.sync_input.emit(item)
 
+
+                            input_widget = widget.input_item_list_view.getWidgetAt(index)
+                            if input_widget:
+                                if not input_widget.selected:
+                                    input_widget.setSelected(True, emit = False)
+                                
+                                #input_widget.ensureStyle()
             
-                        if verbose: syslog.info(f"SELECT INPUT: selected widget {input_type.name} {input_id}")
+                            if verbose: syslog.info(f"SELECT INPUT: selected widget {input_type.name} {input_id}")
+
+                            # ensure the input is highlighted
+
 
                     # remember the last input id
                     self._current_tab_input_id = input_id
@@ -5129,6 +5140,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             gremlin.event_handler.EventHandler().set_edit_mode(mode)
         
         self.setTabsDirty(True)
+
+    def _edit_mode_update(self, mode : str):
+        gremlin.util.InvokeUiMethod(self._edit_mode_update_ui, mode)    # ensure on UI thread
+
+    def _edit_mode_update_ui(self, mode : str):
+        if mode and self.mode_selector.currentModeName() != mode:
+            self.mode_selector.select_mode(mode)
+        
+
+
 
 
     def _runtime_mode_changed(self, mode : str):

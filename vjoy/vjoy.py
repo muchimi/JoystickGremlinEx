@@ -349,6 +349,8 @@ class Button:
         :param is_pressed True if the button is pressed, False otherwise
         """
         assert(isinstance(is_pressed, bool))
+        # if self.button_id == 2 and not is_pressed:
+        #     pass
 
         import gremlin.event_handler
         from gremlin.input_types import InputType

@@ -1755,6 +1755,7 @@ class ExecutionContext():
             
         
         if verbose:
+            # output the execution tree to the log
             self.dump()
             pass
         

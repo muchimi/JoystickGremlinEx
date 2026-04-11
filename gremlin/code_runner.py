@@ -658,7 +658,7 @@ class CodeRunner:
             load_state = gremlin.shared_state.profile_state
             if load_state:
                 # profile state ok = profile started correctly
-                el.profile_started.emit() # start event
+                el.profile_started.emit() # started event
 
                 # multimode functor started call
                 for functor in self._multimode_functors:

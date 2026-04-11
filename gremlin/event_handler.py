@@ -671,6 +671,7 @@ class EventListener:
 	profile_start = Signal() # profile start signal (when a profile starts)
 	profile_started = Signal() # profile started signal (after a profile starts and all process start functions are completed)
 	profile_after_start = Signal() # occurs after the profile started signal
+
 	profile_stop = Signal() # profile stop signal (when a profile stops)
 	profile_stopping = Signal() # profile is about to stop (before a profile stops)
 	profile_stopped = Signal() # profile stopped (after a profile stopped)
@@ -706,6 +707,7 @@ class EventListener:
 
 	# occurs on mode edit/update/delete of modes (edit time only)
 	edit_mode_changed = Signal(str) # param: the mode that was changed to
+	edit_mode_ui_update = Signal(str) # param: the mode to update the UI to (note: this only updates the UI visually to ensure inputs are in sync)
 
 	mode_name_changed = Signal(str, str) # runs when a mode name change occurs for the UI to update - param (old name, new name)
 	mode_list_update = Signal() # runs when mode lists changes
@@ -2799,7 +2801,7 @@ class EventHandler(QtCore.QObject):
 		if not is_running:
 			# check edit mode
 			el = EventListener()
-			el.edit_mode_changed.emit(new_mode)		
+			el.edit_mode_ui_update.emit(new_mode)		
 
 		if new_mode == self.current_mode and not force_update:
 			# already in this mode

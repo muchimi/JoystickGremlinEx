@@ -1034,12 +1034,14 @@ class VerboseMode(IntFlag):
     Mode = auto()
     InputItems = auto()
     Switch = auto()
+    Select = auto()
     All = Keyboard | Joystick | Inputs | Mouse | MouseInput | Details | \
           SimConnect | Condition | Process | Exec | Midi | \
           Device | Macro | Gate | Outputs | UI | ExecDetails |\
           VJoy | State | Extra | Remote | Container | Octavi |\
           dinput | Curve | TTS | Sound | Filter | Perf | Events |\
-          Calib | Hooks | Merge | Sequence | Mode | InputItems | Switch
+          Calib | Hooks | Merge | Sequence | Mode | InputItems | Switch |\
+          Select
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value
@@ -1196,6 +1198,7 @@ class ButtonOutputMode (IntEnum):
     Release = 3 # release / off
     NoOp = 4 # do nothing
     Latch = 5 # latch mode (triggers on, sets a timer, an ignores ON retriggers until OFF or until timer lapses)
+    
 
 
 

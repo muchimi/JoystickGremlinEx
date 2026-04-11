@@ -13086,9 +13086,14 @@ class QSyncModeWidget(QtWidgets.QWidget):
                 # button
                 self.rb_start_released = QtWidgets.QRadioButton("Released")
                 self.rb_start_pressed = QtWidgets.QRadioButton("Pressed")
+                self.rb_start_ignored = QtWidgets.QRadioButton("Ignore")
                 default_widgets.append(self.rb_start_pressed)
                 default_widgets.append(self.rb_start_released)
-                if default_value == True:
+                default_widgets.append(self.rb_start_ignored)
+                if default_value is None:
+                    self._value = None
+                    self.rb_start_ignored.setChecked(True)
+                elif default_value:
                     self._value = True
                     self.rb_start_pressed.setChecked(True)
                 else:
@@ -13096,6 +13101,7 @@ class QSyncModeWidget(QtWidgets.QWidget):
                     self.rb_start_released.setChecked(True)
                 self.rb_start_pressed.clicked.connect(self._pressed_changed)
                 self.rb_start_released.clicked.connect(self._released_changed)
+                self.rb_start_ignored.clicked.connect(self._ignore_changed)
                
         if default_widgets:
             self._default_container_widget, _ = getHContainer(default_widgets)
@@ -13124,6 +13130,10 @@ class QSyncModeWidget(QtWidgets.QWidget):
 
     def _released_changed(self):
         self._value = False
+        self.valueChanged.emit(self._value)        
+
+    def _ignore_changed(self):
+        self._value = None
         self.valueChanged.emit(self._value)        
 
     def _axis_value_changed(self):

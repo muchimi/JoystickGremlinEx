@@ -30,11 +30,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m76RC24):
-- Change: Switch container: update to current UI API
+- New: Vjoy Remap action: added ignore option for startup button value (in this mode, the action will not set a state on profile start)
+- Change: Switch container: updated UI
 - Change: Switch container: added input sync and auto-release release mode switch positions.
 - Fix: Switch container: release actions not executed in some situations.
-- Fix: Switch container: add new switch position could crash QT
-- Fix: Design time mode selector not always reflecting the current mode in the mode dropdown.
+- Fix: Switch container: resolved an issue with the add position button could crash QT
+- Fix: UI: mode selector not always reflecting the current mode.
+- Fix: UI: active input may not always show selected on refresh/load/device change
+
+Switch Container: this container latches multiple buttons and can only have one position active at any time.  This container has existed for a while but had a few issues. It is meant to map physical hardware switches with multiple positions, including positions that do not trigger an input.
 
 
 ### (m76RC23):

@@ -952,6 +952,11 @@ class InputItemListView(ui_common.AbstractView):
             self.setUpdatesEnabled(True)
             self.update()
 
+        # reselect input
+        input_widget = self.getWidgetAt(self.current_index)
+        if input_widget:
+            input_widget.setSelected(True, emit = False)
+
     def redraw_index(self, index : int):
         if not gremlin.shared_state.is_running:
             gremlin.util.InvokeUiMethod(self._redraw_index_ui, index) # ensure on UI thread
@@ -2028,6 +2033,8 @@ class InputItemWidget(QBoxFrame):
         self._update_selected_ui()
         self._update_display_ui()
 
+        self.ensureStyle()
+
     
     def resizeEvent(self, event):
         size = self.size()
@@ -2634,12 +2641,16 @@ class InputItemWidget(QBoxFrame):
                 if not value:
                     self.unselected.emit(self)
 
-            self._update_selected() # uptate widget style
             if emit:
                 self.selected_changed.emit(self)
 
+        # ensure the widget has the correct visual selection state
+        self._update_selected() # uptate widget style
+  
         
-        
+    def ensureStyle(self):
+        ''' updates the visual selection '''
+        self._update_selected()
 
     def _update_selected(self):
         ''' updates the widget style based on selection '''

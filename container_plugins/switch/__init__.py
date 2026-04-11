@@ -306,9 +306,6 @@ class SwitchContainerWidget(AbstractContainerWidget):
         super().__init__(profile_data, parent)
         self.action_data = profile_data
 
-
-
-
     def _update_ui(self):
         ''' redraws the entire switch content '''
         if not Shiboken.isValid(self):
@@ -536,6 +533,10 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             data.releaseValue = None
             data.releaseExtraData = None
 
+
+    def profile_after_start(self):
+        ''' occurs after the start is completed '''
+
         # check the sync - trigger on the first button pressed
         if self.action_data.sync_mode == SyncMode.Input:
             
@@ -559,7 +560,7 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                                                                     device_guid = device_guid,
                                                                 )
                                     if self.verbose: syslog.info(f"SWITCH: auto trigger due to input sync: pressed: [{is_pressed}]")
-                                    self.process_event(event, is_pressed)
+                                    self.process_event(event, event.value)
                                     trigger = True
                             case InputType.JoystickButton:
                                 # sync and invert as needed
@@ -572,7 +573,7 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                                                                     device_guid = device_guid,
                                                                 )
                                     if self.verbose: syslog.info(f"SWITCH: auto trigger due to input sync: pressed: [{is_pressed}]")
-                                    self.process_event(event, is_pressed)
+                                    self.process_event(event, event.value)
                                     trigger = True
 
             if not trigger:
@@ -591,12 +592,13 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                                         event = gremlin.event_handler.Event(event_type = input_type,
                                                                         identifier = input_id,
                                                                         value = hat_position,
-                                                                        is_pressed = False,
+                                                                        is_pressed = is_pressed,
                                                                         device_guid = device_guid,
                                                                     )
                                         if self.verbose: syslog.info(f"SWITCH: auto trigger due to input sync: pressed: [{is_pressed}]")
-                                        self.process_event(event, is_pressed)
+                                        self.process_event(event, event.value)
                                         trigger = True
+                                        
                                 case InputType.JoystickButton:
                                     # sync and invert as needed
                                     is_pressed = gremlin.joystick_handling.get_button(data.device_guid, data.input_id)
@@ -608,7 +610,7 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                                                                         device_guid = device_guid,
                                                                     )
                                         if self.verbose: syslog.info(f"SWITCH: auto trigger due to input sync: pressed: [{is_pressed}]")
-                                        self.process_event(event, is_pressed)
+                                        self.process_event(event, event.value)
                                         trigger = True
 
 
@@ -698,7 +700,7 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         
         return False # stop execution past this container
     
-    def _trigger_press(self, data, event, value, extra_data):
+    def _trigger_press(self, data, event, value, extra_data : dict = None):
         ''' triggers the press trigger - this clears the other inputs '''
         if not data.state:
             self._trigger(data.index, event.press_event(), value, extra_data)
@@ -741,7 +743,7 @@ class SwitchData():
         self.device_id = gremlin.util.normalize_guid(device_guid)
         self.action_set = None # data associated with this set
         self.state = None # true if the switch position was triggered (not persisted), None = no state
-        self.autoRelease = True # autorelease the switch position if in release mode (this will automatically trigger a press/release after the delay)
+        self.autoRelease = False # autorelease the switch position if in release mode (this will automatically trigger a press/release after the delay) - default = do not autorelease
         self.releaseDelay = 250 # release delay in milliseconds if the switch is setup for a release
 
         self.releaseEvent = None # event data for the release
