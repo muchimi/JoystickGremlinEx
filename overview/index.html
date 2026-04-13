@@ -1102,9 +1102,18 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#typical-issues" class="md-nav__link">
+  <a href="#log-file-and-verbose-modes" class="md-nav__link">
     <span class="md-ellipsis">
-      Typical issues
+      Log file and verbose modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-is-the-log-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where is the log file?
     </span>
   </a>
   
@@ -1975,9 +1984,18 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#typical-issues" class="md-nav__link">
+  <a href="#log-file-and-verbose-modes" class="md-nav__link">
     <span class="md-ellipsis">
-      Typical issues
+      Log file and verbose modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-is-the-log-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where is the log file?
     </span>
   </a>
   
@@ -2699,7 +2717,11 @@ The other is the sequential container which allows for actions that are not dire
 </table>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <p>The <a href="https://discord.com/channels/1279461873317707827/1341211588404842547">GremlinEx Discord community</a> is a great place to ask for help, report issues and get how-to answers.</p>
-<h3 id="typical-issues">Typical issues<a class="headerlink" href="#typical-issues" title="Permanent link">&para;</a></h3>
+<h3 id="log-file-and-verbose-modes">Log file and verbose modes<a class="headerlink" href="#log-file-and-verbose-modes" title="Permanent link">&para;</a></h3>
+<p>The log file contains helpful information about devices and any errors encountered.  The GremlinEx options dialog contains a verbose tab that controls the level of logging that occurs and it can be very granular.  In most situations, the base verbose mode is sufficient, but there may be times where additional runtime data is needed to chase down a specific issue.</p>
+<p><a class="glightbox" href="../assets/verbosity_options.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="verbosity options" src="../assets/verbosity_options.png" /></a></p>
+<h3 id="where-is-the-log-file">Where is the log file?<a class="headerlink" href="#where-is-the-log-file" title="Permanent link">&para;</a></h3>
+<p>The log file is called system.log and will be located in your profile folder.  That default location  is  <code>%userprofile%\joystick gremlin ex\system.log</code> and is also visible via the <strong>actions/open log</strong> file in editor menu.</p>
 <h3 id="gremlinex-warns-me-this-is-an-unknown-publisher">GremlinEx warns me this is an unknown publisher<a class="headerlink" href="#gremlinex-warns-me-this-is-an-unknown-publisher" title="Permanent link">&para;</a></h3>
 <p>Windows will generate this warning the first time you run the packaged GremlinEx.  This is because the packaged application is not signed.  If you are concerned by this, you can always run this Python application from the source code and create a package for yourself.  GremlinEx comes pre-packaged as a convenience as it's not expected that everyone will setup a development environment and dependencies on their system.  However it is definitely an option if this warning box is a concern.
 GremlinEx is an open source project and all sources are available as an alternative.</p>
