@@ -1102,9 +1102,18 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#typical-issues" class="md-nav__link">
+  <a href="#log-file-and-verbose-modes" class="md-nav__link">
     <span class="md-ellipsis">
-      Typical issues
+      Log file and verbose modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-is-the-log-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where is the log file?
     </span>
   </a>
   
@@ -1975,9 +1984,18 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#typical-issues" class="md-nav__link">
+  <a href="#log-file-and-verbose-modes" class="md-nav__link">
     <span class="md-ellipsis">
-      Typical issues
+      Log file and verbose modes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-is-the-log-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Where is the log file?
     </span>
   </a>
   
@@ -2699,13 +2717,19 @@ The other is the sequential container which allows for actions that are not dire
 </table>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <p>The <a href="https://discord.com/channels/1279461873317707827/1341211588404842547">GremlinEx Discord community</a> is a great place to ask for help, report issues and get how-to answers.</p>
-<h3 id="typical-issues">Typical issues<a class="headerlink" href="#typical-issues" title="Permanent link">&para;</a></h3>
+<h3 id="log-file-and-verbose-modes">Log file and verbose modes<a class="headerlink" href="#log-file-and-verbose-modes" title="Permanent link">&para;</a></h3>
+<p>The log file contains helpful information about devices and any errors encountered.  The GremlinEx options dialog contains a verbose tab that controls the level of logging that occurs and it can be very granular.  In most situations, the base verbose mode is sufficient, but there may be times where additional runtime data is needed to chase down a specific issue.</p>
+<p><a class="glightbox" href="../assets/verbosity_options.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="verbosity options" src="../assets/verbosity_options.png" /></a></p>
+<h3 id="where-is-the-log-file">Where is the log file?<a class="headerlink" href="#where-is-the-log-file" title="Permanent link">&para;</a></h3>
+<p>The log file is called system.log and will be located in your profile folder.  That default location  is  <code>%userprofile%\joystick gremlin ex\system.log</code> and is also visible via the <strong>actions/open log</strong> file in editor menu.</p>
 <h3 id="gremlinex-warns-me-this-is-an-unknown-publisher">GremlinEx warns me this is an unknown publisher<a class="headerlink" href="#gremlinex-warns-me-this-is-an-unknown-publisher" title="Permanent link">&para;</a></h3>
 <p>Windows will generate this warning the first time you run the packaged GremlinEx.  This is because the packaged application is not signed.  If you are concerned by this, you can always run this Python application from the source code and create a package for yourself.  GremlinEx comes pre-packaged as a convenience as it's not expected that everyone will setup a development environment and dependencies on their system.  However it is definitely an option if this warning box is a concern.
 GremlinEx is an open source project and all sources are available as an alternative.</p>
 <h3 id="gremlinex-gives-a-startup-error">GremlinEx gives a startup error<a class="headerlink" href="#gremlinex-gives-a-startup-error" title="Permanent link">&para;</a></h3>
 <p>Startup errors usually are due to missing components or incompatible components.  GremlinEx includes all it needs in the distribution package (zip), including the correct version of the Python runtime needed and any support DLLs needed.  To this end, when installing a new version, make sure you delete any prior files (if installing in the same folder).  The log file  <code>%userprofile%\joystick gremlin ex\system.log</code> will contain any critical errors.  GremlinEx includes all it needs and is self contained.</p>
-<p>Another cause of a startup error may be security related, specifically, insufficient permissions on the account to run.  This is rare. </p>
+<p>Another cause of a startup error may be security related, specifically, insufficient permissions on the account to run.  This is rare.</p>
+<p><a class="glightbox" href="../assets/warning.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png" /></a> Make sure you have at least one VJOY device configured.  GremlinEx currently requires one VJOY device to be configured, even if it is not used.  This is because GremlinEx started as a VJOY programming utility, and this requirement has not yet been removed from the application, but it is planned in the future.</p>
+<p><a class="glightbox" href="../assets/warning.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png" /></a> Make sure that HIDHide whitelists the GremlinEx.exe process, especially if you have multiple versions in different folders.  If the process is not whitelisted, it will not see any devices.</p>
 <h3 id="gremlinex-is-unable-to-communicate-with-clients-on-the-network">GremlinEx is unable to communicate with clients on the network<a class="headerlink" href="#gremlinex-is-unable-to-communicate-with-clients-on-the-network" title="Permanent link">&para;</a></h3>
 <p>Make sure that the port is configured the same for all clients (6012 is the default).  When GremlinEx first runs and remote communication is enabled (either to send/broadcast or receive), you will get a Windows prompt to authorize this in the firewall.  If you denied the request, you will need to manually enable the port in the Windows Firewall settings.</p>
 <h3 id="my-devices-show-all-disconnected-or-do-not-show-at-all">My devices show all disconnected (or do not show at all)<a class="headerlink" href="#my-devices-show-all-disconnected-or-do-not-show-at-all" title="Permanent link">&para;</a></h3>

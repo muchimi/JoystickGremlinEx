@@ -30,6 +30,8 @@ import gremlin.execution_graph
 import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.keyboard
+import gremlin.ui.ui_common
+import gremlin.util
 import gremlin.repeater
 import gremlin.remote
 import gremlin.singleton_decorator
@@ -3156,17 +3158,19 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             elif self.action_data.input_is_button() or input_type == InputType.JoystickButton:
                 # various button modes
                 actions = (
-                            VjoyAction.VJoyButton,
-                            VjoyAction.VJoyButtonInverted,
-                            VjoyAction.VJoyButtonPress,
-                            VjoyAction.VJoyButtonRelease,
-                            VjoyAction.VJoyPulse,
-                            VjoyAction.VJoyToggle,
-                            VjoyAction.VJoyInvertAxis,
-                            VjoyAction.VJoySetAxis,
-                            VjoyAction.VJoySetAxisStepped,
-                            VjoyAction.VJoyRangeAxis,
-                            VjoyAction.VJoyMergeAxis,
+                            VjoyAction.VJoyButton, # hold button
+                            VjoyAction.VJoyButtonInverted, # invert button
+                            VjoyAction.VJoyButtonPress, # press button
+                            VjoyAction.VJoyButtonRelease, # release button
+                            VjoyAction.VJoyPulse, # pulse button
+                            VjoyAction.VJoyToggle, # toggle button
+                            VjoyAction.VJoyHat, # hold hat
+                            VjoyAction.VJoyHatPress, # press hat
+                            VjoyAction.VJoyInvertAxis, # invert axis
+                            VjoyAction.VJoySetAxis, # set axis
+                            VjoyAction.VJoySetAxisStepped,# stepped axis
+                            VjoyAction.VJoyRangeAxis, # range axis
+                            VjoyAction.VJoyMergeAxis, # merge axis
                             VjoyAction.VJoyEnableLocalOnly,
                             VjoyAction.VJoyEnableRemoteOnly,
                             VjoyAction.VJoyEnableLocal,
@@ -3208,15 +3212,23 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _vjoy_input_id_changed(self, index):
         ''' occurs when the vjoy output input ID is changed '''
-        with QtCore.QSignalBlocker(self.cb_vjoy_output_selector):
-            input_id = self.cb_vjoy_output_selector.itemData(index)
-            self.action_data.set_input_id(input_id)
+        if self.cb_vjoy_output_selector.count():
+            # ignore if there are no outputs
+            with QtCore.QSignalBlocker(self.cb_vjoy_output_selector):
+                if self.action_data.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress) and self.action_data.input_type == InputType.JoystickButton:
+                    # hat output
+                    id, position = self.cb_vjoy_output_selector.itemData(index)
+                    self.action_data.vjoy_hat_id = id
+                    self.action_data.vjoy_hat_position = position
+                else:
+                    input_id = self.cb_vjoy_output_selector.itemData(index)
+                    self.action_data.set_input_id(input_id)
 
-            if self.is_button_mode:
-                self.select_button(self.action_data.vjoy_id, input_id)
+                if self.is_button_mode:
+                    self.select_button(self.action_data.vjoy_id, input_id)
 
-            #self._populate_grid(self.action_data.vjoy_id, input_id)
-            self.notify_device_changed()
+                #self._populate_grid(self.action_data.vjoy_id, input_id)
+                self.notify_device_changed()
 
     def refresh_grid(self):
         ''' refreshes the grid '''
@@ -3253,7 +3265,9 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             self.cb_vjoy_output_selector.clear()
             input_type = self._get_selector_input_type()
-            action_mode = self._get_action_mode()
+            action_mode = self.action_data.action_mode
+          
+
             self.setWarning(None) # clear any warnings
 
             if not self.action_data.vjoy_id in self.action_data.vjoy_map:
@@ -3272,14 +3286,49 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 for id in range(1, count+1):
                     axis_name = dev.axis_names[id-1]
                     self.cb_vjoy_output_selector.addItem(f"Axis {axis_name}",id)
-            elif input_type in VJoyRemapWidget.input_type_buttons or action_mode in (VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease, VjoyAction.VJoyPulse, VjoyAction.VJoyToggle, VjoyAction.VJoyAxisToButton, VjoyAction.VJoyHatToButton):
-                count = dev.button_count
-                for id in range(1, count+1):
-                    self.cb_vjoy_output_selector.addItem(f"Button {id}",id)
-                input_id = self.action_data.vjoy_input_id
-                if input_id < 1 or input_id > count:
-                    self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy button # {input_id}")
-                    return
+            elif input_type in VJoyRemapWidget.input_type_buttons:
+                if action_mode in (VjoyAction.VJoyButton, VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease, VjoyAction.VJoyPulse, VjoyAction.VJoyToggle, VjoyAction.VJoyAxisToButton, VjoyAction.VJoyHatToButton):
+                    count = dev.button_count
+                    for id in range(1, count+1):
+                        self.cb_vjoy_output_selector.addItem(f"Button {id}",id)
+                    input_id = self.action_data.vjoy_input_id
+
+                    
+                    index = self._get_output_index()
+                    if index != -1:
+                        with QtCore.QSignalBlocker(self.cb_vjoy_output_selector):
+                            self.cb_vjoy_output_selector.setCurrentIndex(index)
+
+                    if input_id < 1 or input_id > count:
+                        self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy button # {input_id}")
+                        return
+                elif action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress):
+                    # map to hat
+                    count = dev.hat_count
+                    icon_map = vjoy.vjoy.Hat.getEightDirectionsIconMap()
+                    name_map = vjoy.vjoy.Hat.getEightDirectionsNameMap()
+
+                    for id in range(1, count+1):
+                        # each position of the hat
+                        for position in name_map:
+                            icon_name = icon_map[position]
+                            icon = gremlin.ui.ui_common.load_icon(icon_name)
+                            key = (id, position, )
+                            self.cb_vjoy_output_selector.addItem(icon, f"Hat {id} {name_map[position]}", key)
+                            
+
+                    # hat key
+                    index = self._get_output_index()
+                    if index != -1:
+                        with QtCore.QSignalBlocker(self.cb_vjoy_output_selector):
+                            self.cb_vjoy_output_selector.setCurrentIndex(index)
+                    
+                        
+                    input_id = self.action_data.vjoy_input_id
+                    if input_id < 1 or input_id > count:
+                        self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy hat # {input_id}")
+                        return
+
             elif input_type == InputType.JoystickHat:
                 count = dev.hat_count
                 for id in range(1, count+1):
@@ -3288,14 +3337,25 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 if input_id < 1 or input_id > count:
                     self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy hat # {input_id}")
                     return
-            else:
-                # keyboard, latched keyboard, midi and OSC
-                pass
+                
 
+
+    def _get_output_index(self):
+        if self.action_data.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress) and self.action_data.input_type == InputType.JoystickButton:
+            key = (self.action_data.vjoy_hat_id, self.action_data.vjoy_hat_position)
+            index = self.cb_vjoy_output_selector.findData(key)
+            if index == -1:
+                # finddata doesn't work here in QT 6.11
+                count = self.cb_vjoy_output_selector.count()
+                for i in range(count):
+                    data = self.cb_vjoy_output_selector.itemData(i)
+                    if key == data:
+                        index = i
+                        break
+        else:
             index = self.cb_vjoy_output_selector.findData(self.action_data.vjoy_input_id)
-            if index != -1:
-                self.cb_vjoy_output_selector.setCurrentIndex(index)
 
+        return index or -1
 
 
     @QtCore.Slot(float)
@@ -3413,6 +3473,10 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             paired_visible = action == VjoyAction.VJoyButtonPress
             exec_on_release_visible =  action_data.input_type in VJoyRemapWidget.input_type_buttons
             options_visible = True
+
+            # if action == VjoyAction.VJoyHat:
+            #     # show hat options
+            #     hat_visible = True
 
         elif input_type == InputType.JoystickHat:
             if action == VjoyAction.VJoyHatToButton:
@@ -3560,6 +3624,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             action : VjoyAction = self.cb_action_list.itemData(index)
             self.action_data.action_mode = action
             self.action_data.input_id = self.action_data.get_input_id()
+            self.cb_vjoy_output_selector.clear() # ensure output is refreshed
             self._update_ui()
             self._update_vjoy_device_input_list()
             self._update_merge_data()
@@ -3815,14 +3880,16 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         is_button_mode = False
 
         try:
-            with QtCore.QSignalBlocker(self.cb_vjoy_device_selector):
-                index = self.cb_vjoy_device_selector.findData(vjoy_dev_id)
-                if index != -1:
-                    self.cb_vjoy_device_selector.setCurrentIndex(index)
-            with QtCore.QSignalBlocker(self.cb_vjoy_output_selector):
-                index = self.cb_vjoy_output_selector.findData(vjoy_input_id)
-                if index != -1:
-                    self.cb_vjoy_output_selector.setCurrentIndex(index)
+            # with QtCore.QSignalBlocker(self.cb_vjoy_device_selector):
+            #     index = self.cb_vjoy_device_selector.findData(vjoy_dev_id)
+
+            #     if index != -1:
+            #         self.cb_vjoy_device_selector.setCurrentIndex(index)
+
+            # with QtCore.QSignalBlocker(self.cb_vjoy_output_selector):
+            #     index = self._get_output_index()
+            #     if index != -1:
+            #         self.cb_vjoy_output_selector.setCurrentIndex(index)
 
 
             index = self.cb_action_list.findData(self.action_data.action_mode)
@@ -3890,8 +3957,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._update_vjoy_device_input_list()
 
 
-            if is_button_mode:
-                self.select_button(vjoy_dev_id, vjoy_input_id, emit = False)
+            # if is_button_mode:
+            #     self.select_button(vjoy_dev_id, vjoy_input_id, emit = False)
 
             self._update_ui()
 
@@ -5183,8 +5250,30 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     result = False
 
 
+            elif self.action_mode == VjoyAction.VJoyHat:
+                # hat output when mapped to a button (hold mode)
+                if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] hat {self.vjoy_input_id} position: {self.action_data.vjoy_hat_position}")
+                if is_pressed:
+                    direction = self.action_data.vjoy_hat_position
+                else:
+                    direction = (0,0) # center
+                if is_local:
+                    if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                            
+                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = direction
+                    if is_remote or is_paired:
+                        self.remote_client.send_hat(self.vjoy_id, self.vjoy_input_id, direction, client_list = self.client_list, force_remote = is_paired )
 
-
+            elif self.action_mode == VjoyAction.VJoyHatPress:
+                # hat ouput when mapped to a button (press only)
+                if verbose: syslog.info(f"VJOY: set device [{self.vjoy_id}] hat {self.vjoy_input_id} position: {self.action_data.vjoy_hat_position}")
+                direction = self.action_data.vjoy_hat_position
+                if is_local:
+                    if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                            
+                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = direction
+                    if is_remote or is_paired:
+                        self.remote_client.send_hat(self.vjoy_id, self.vjoy_input_id, direction, client_list = self.client_list, force_remote = is_paired )
 
 
             elif self.action_mode == VjoyAction.VJoyButtonPress:
@@ -5654,6 +5743,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.vjoy_axis_id = 1
         self._vjoy_button_id = 1
         self.vjoy_hat_id = 1
+        self.vjoy_hat_position = (0,0) # hat position as a tuple
         self.vjoy_device_guid = None
 
         self.sync_on_start = True # true if the value should sync on profile start to synchronize with input (on by default as it's generally a desired behavior)
@@ -6369,8 +6459,8 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         if self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis, VjoyAction.VJoyMergeAxis, VjoyAction.VJoySetAxisStepped):
             input_type = InputType.JoystickAxis
-        elif self.action_mode == VjoyAction.VJoyHat:
-            input_type = InputType.JoystickHat
+        elif self.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress):
+            input_type = self.input_type
         elif self.action_mode in (VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease,  VjoyAction.VJoyButton, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton,VjoyAction.VJoyAxisToButton):
             input_type = InputType.JoystickButton
         else:
@@ -6384,8 +6474,12 @@ Supports axis merging, curved output, command, hat and button mappings.
                 else:
                     input_string = "axis"
             case InputType.JoystickButton:
-                input_string = "button"
-                fallback = "mdi.gesture-tap-button"
+                if self.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress):
+                    position = (0,0)
+                    return gremlin.util.load_icon(vjoy.vjoy.Hat.getEightDirectionsIconMap()[position])
+                else:
+                    input_string = "button"
+                    fallback = "mdi.gesture-tap-button"
             case InputType.JoystickHat:
                 if self._vjoy_input_id > 4:
                     input_string = "button"
@@ -6436,7 +6530,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         if self.action_mode in (VjoyAction.VJoyAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoySetAxis):
             if self.vjoy_axis_id != index:
                 self.vjoy_axis_id = index
-        elif self.action_mode == VjoyAction.VJoyHat:
+        elif self.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress):
             if self.vjoy_hat_id != index:
                 self.vjoy_hat_id = index
         else:
@@ -6452,7 +6546,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         ''' returns input id based on the action mode '''
         if self.action_mode in (VjoyAction.VJoyAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoySetAxis):
             return self.vjoy_axis_id
-        elif self.action_mode == VjoyAction.VJoyHat:
+        elif self.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress):
             return self.vjoy_hat_id
         else:
             return self.vjoy_button_id
@@ -6478,30 +6572,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                 self.vjoy_button_id = 1
                 self.vjoy_hat_id = 1
                 return
-
+            
 
             self.vjoy_id = vjoy_id
-
-            if "input" in node.attrib:
-                index = safe_read(node,"input", int, 1)
-                self.set_input_id(index)
-
-
-            #valid = False
-            for input_type in InputType.to_list():
-                attrib_name = InputType.to_string(input_type)
-                if attrib_name in node.attrib:
-                    self.input_type = input_type
-                    self.vjoy_input_id = safe_read(node, attrib_name, int, 1)
-                    self.vjoy_axis_id = self.vjoy_input_id
-                    self.vjoy_button_id = self.vjoy_input_id
-                    #valid = True
-                    break
-
-
-            self.pulse_delay = 250
-            self.merge_input_id = None
-            self.merge_device_id = None
 
             if "mode" in node.attrib:
                 value = node.attrib['mode']
@@ -6514,6 +6587,33 @@ Supports axis merging, curved output, command, hat and button mappings.
                 elif self.input_type == InputType.JoystickAxis:
                     default_action_mode = VjoyAction.VJoyAxis
                 self.action_mode = default_action_mode
+
+            self.vjoy_hat_position = (0,0) 
+            if self.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress):
+                if "position" in node.attrib:
+                    self.vjoy_hat_position = vjoy.vjoy.Hat.getDirection(node.get("position"))
+
+            if "input" in node.attrib:
+                index = safe_read(node,"input", int, 1)
+                self.set_input_id(index)
+
+            for input_type in InputType.to_list():
+                attrib_name = InputType.to_string(input_type)
+                if attrib_name in node.attrib:
+                    self.input_type = input_type
+                    self.vjoy_input_id = safe_read(node, attrib_name, int, 1)
+                    self.vjoy_axis_id = self.vjoy_input_id
+                    self.vjoy_button_id = self.vjoy_input_id
+                    break
+
+            
+
+
+            self.pulse_delay = 250
+            self.merge_input_id = None
+            self.merge_device_id = None
+
+           
 
 
             if "grid-visible" in node.attrib:
@@ -6780,10 +6880,17 @@ Supports axis merging, curved output, command, hat and button mappings.
                                                     VjoyAction.VJoySetAxis,
                                                     VjoyAction.VJoyPulse)
 
-        node.set(
-            InputType.to_string(self.input_type),
-            str(self.vjoy_input_id)
-        )
+        
+
+        if self.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress):
+            position_name = vjoy.vjoy.Hat.getName(self.vjoy_hat_position)
+            if position_name:
+                node.set("position", position_name)
+        else:
+            node.set(
+                InputType.to_string(self.input_type),
+                str(self.vjoy_input_id)
+            )
 
         node.set("mode", safe_format(VjoyAction.to_string(self.action_mode), str))
 
@@ -6939,7 +7046,7 @@ Supports axis merging, curved output, command, hat and button mappings.
     def _get_output_name(self) -> str:
         if self.action_mode == VjoyAction.VJoyAxis:
             return "Axis"
-        elif self.action_mode == VjoyAction.VJoyHat:
+        elif self.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress):
             return "Hat"
         elif self.action_mode in (VjoyAction.VJoyButton,
                                   VjoyAction.VJoyButtonPress,
@@ -7080,7 +7187,7 @@ Supports axis merging, curved output, command, hat and button mappings.
     def __str__(self):
         if self.action_mode in (VjoyAction.VJoySetAxis, VjoyAction.VJoyInvertAxis, VjoyAction.VJoyAxis):
             input_string = "axis"
-        elif self.action_mode == VjoyAction.VJoyHat:
+        elif self.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatPress):
             input_string = "hat"
         elif self.action_mode in (VjoyAction.VJoyButtonPress, VjoyAction.VJoyButtonRelease, VjoyAction.VJoyPulse, VjoyAction.VJoyHatToButton, VjoyAction.VJoyButton):
             input_string = "button"

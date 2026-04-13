@@ -1234,7 +1234,7 @@ class VjoyAction(enum.Enum):
     VJoyInvertAxis = 3 # invert axis function
     VJoySetAxis = 4 # set axis value
     VJoyAxis = 5 # normal map to axis
-    VJoyHat = 6 #  normal map to hat
+    VJoyHat = 6 #  normal map to hat (hold mode)
     VJoyRangeAxis = 7 # scale axis
     VJoyAxisToButton = 8 # axis to button mapping
     VJoyToggleRemote = 9 # toggle remote control
@@ -1253,6 +1253,7 @@ class VjoyAction(enum.Enum):
     VJoySetAxisStepped = 22 # like VjoySetAxis but uses a list of values to bump the index
     VJoyButtonPress = 23 # action on button press
     VJoyButtonInverted = 24 # hold state (inverted = off means pressed, on means released)
+    VJoyHatPress = 25 # hat press mode
     
     @staticmethod
     def is_button_action(mode):
@@ -1305,7 +1306,9 @@ class VjoyAction(enum.Enum):
             case VjoyAction.VJoyButtonPress:
                 return "Press a vjoy button"
             case VjoyAction.VJoyHat:
-                return "Maps to a vjoy hat"
+                return "Maps to a vjoy hat (hold)"
+            case VjoyAction.VJoyHatPress:
+                return "Maps to a Vjoy hat (press)"
             case VjoyAction.VJoyHatToButton:
                 return "Maps a hat position to a vjoy button"
             case VjoyAction.VJoyInvertAxis:
@@ -1367,7 +1370,9 @@ class VjoyAction(enum.Enum):
             case  VjoyAction.VJoyButtonPress:
                 return "Button (Press)"
             case  VjoyAction.VJoyHat:
-                return "Hat"
+                return "Hat (Hold)"
+            case  VjoyAction.VJoyHatPress:
+                return "Hat (Press)"
             case  VjoyAction.VJoyHatToButton:
                 return "Hat to Button"
             case  VjoyAction.VJoyInvertAxis:

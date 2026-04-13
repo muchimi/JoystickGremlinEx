@@ -29,8 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m76RC24):
+### (m76RC25):
 - Change: slight rework of mode selectors
+- New: Vjoy Remap: Added hat hold and hat press action modes.  Previously hats could only be output via the legacy remap action.
 
 ### (m76RC24):
 - New: Vjoy Remap action: added ignore option for startup button value (in this mode, the action will not set a state on profile start)

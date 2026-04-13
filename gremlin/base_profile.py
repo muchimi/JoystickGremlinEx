@@ -4466,7 +4466,8 @@ class Profile():
         ''' dumps the current mode tree '''
         syslog.info("PROFILE MODES:")
         for pre, _, node in anytree.RenderTree(self._mode_tree, style=anytree.AsciiStyle()):
-            syslog.info(f"{tabs}{pre}{node.name if node.name else "[Profile Root]"}")
+
+            syslog.info(f"{tabs}{pre}{gremlin.shared_state.translateMode(node.name) if node.name else "[Profile Root]"}")
 
 
     def build_inheritance_tree(self, as_tree = False):

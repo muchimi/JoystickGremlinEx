@@ -611,8 +611,6 @@ When GremlinEx attempts to open a port, Windows will prompt the first time to al
 | How do I map X? | You'll find that in GremlinEx there are multiple ways to do a mapping ranging from simple to more advanced and conditional.  Usually it's very straightforward and simple. This documentation has a list of the building blocks that can be found [here for containers](#available-containers), and [here for actions](#available-actions).  Each is also described individualy [the usage section](usage.md) of this documentation. |
 | Why GremlinEx? |  GremlinEx is an integrator and stand-in for multiple solutions.  It's designed to be a one stop shop for all hardware and software controller needs.  It has a swiss-army knife of options when it comes to various ways to take inputs, manipulate that input, and create meaningful outputs for simple games to very complicated simulators with lots of controls.  GremlinEx is for single joystick scenarios to full hardware network enabled cockpit setups. |
 
-
-
 ## Troubleshooting
 
 The [GremlinEx Discord community](https://discord.com/channels/1279461873317707827/1341211588404842547) is a great place to ask for help, report issues and get how-to answers.
@@ -636,7 +634,11 @@ GremlinEx is an open source project and all sources are available as an alternat
 
 Startup errors usually are due to missing components or incompatible components.  GremlinEx includes all it needs in the distribution package (zip), including the correct version of the Python runtime needed and any support DLLs needed.  To this end, when installing a new version, make sure you delete any prior files (if installing in the same folder).  The log file  ```%userprofile%\joystick gremlin ex\system.log``` will contain any critical errors.  GremlinEx includes all it needs and is self contained.
 
-Another cause of a startup error may be security related, specifically, insufficient permissions on the account to run.  This is rare. 
+Another cause of a startup error may be security related, specifically, insufficient permissions on the account to run.  This is rare.
+
+![warning](assets/warning.png) Make sure you have at least one VJOY device configured.  GremlinEx currently requires one VJOY device to be configured, even if it is not used.  This is because GremlinEx started as a VJOY programming utility, and this requirement has not yet been removed from the application, but it is planned in the future.
+
+![warning](assets/warning.png) Make sure that HIDHide whitelists the GremlinEx.exe process, especially if you have multiple versions in different folders.  If the process is not whitelisted, it will not see any devices.
 
 ### GremlinEx is unable to communicate with clients on the network
 

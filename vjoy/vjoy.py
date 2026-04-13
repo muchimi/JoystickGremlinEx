@@ -486,6 +486,13 @@ class Hat:
     def getEightDirections():
         ''' gets the positions for all hat positions '''
         return [p for p in Hat.direction_to_name]
+    
+    @staticmethod
+    def getEightDirectionsNameMap():
+        ''' gets the positions for all hat positions '''
+        return Hat.direction_to_name
+    
+    
 
     direction_to_icon = {
         ( 0,  0): "mdi.image-filter-center-focus-strong", #"Center",
@@ -499,7 +506,22 @@ class Hat:
         (-1,  1): "mdi.arrow-top-left-thin-circle-outline", #"North-west"
     }
 
-    
+    @staticmethod
+    def getEightDirectionsIconMap() -> dict:
+        ''' gets the positions for all hat positions '''
+        return Hat.direction_to_icon
+
+    direction_to_icon = {
+        ( 0,  0): "mdi.image-filter-center-focus-strong", #"Center",
+        ( 0,  1): "mdi.arrow-up-thin-circle-outline", #"North",
+        ( 1,  1): "mdi.arrow-top-right-thin-circle-outline", #"North-east",
+        ( 1,  0): "mdi.arrow-right-thin-circle-outline", #"East",
+        ( 1, -1): "mdi.arrow-bottom-right-thin-circle-outline", #"South-east",
+        ( 0, -1): "mdi.arrow-down-thin-circle-outline", #"South",
+        (-1, -1): "mdi.arrow-bottom-left-thin-circle-outline", #"South-west",
+        (-1,  0): "mdi.arrow-left-thin-circle-outline", # "West", 
+        (-1,  1): "mdi.arrow-top-left-thin-circle-outline", #"North-west"
+    }
     
 
 
