@@ -309,6 +309,25 @@
   
   
     <li class="md-tabs__item">
+      <a href="../mapping/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Mapping Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
       <a href="../resources/" class="md-tabs__link">
         
   
@@ -1224,6 +1243,28 @@
   
   <span class="md-ellipsis">
     Actions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mapping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Mapping Guide
     
   </span>
   
@@ -2470,6 +2511,9 @@ The other is the sequential container which allows for actions that are not dire
 <p>GremlinEx was tested with VJOY 2.1.9.1 64bit.  There are several releases of VJOY however however 2.1.9.1 is the one tested and verified to function with Windows 11.  Please see the <a href="../resources/">resource section</a>.</p>
 <p>GremlinEx does not currently support force feedback inputs, nor output via VJOY.</p>
 <p>GremlinEx supports up to 8 axes, 128 buttons and four 8-way hats on each VJOY devices.</p>
+<p>Each VJOY device defined must be different from the other in terms of total axis, button and hat count.</p>
+<p>VJOY devices should be configured with consecutive axes, and axes should not be duplicated.  It is highly recommended to setup the VJOY devices to use regular DINPUT axes such as X, Y, Z, RX, RY, RZ, S1, S2.</p>
+<p>At least one VJOY device must be setup for GremlinEx to load, and this limitation has to do with the current architecture as Gremlin started as its primary purpose to program VJOY devices.  This requirement will be evaluated down the road to be removed.</p>
 <p>It is recommended to have no more than three or four output VJOY devices, the primary reason being that many games only understand the first three HID devices.</p>
 <p><a class="glightbox" href="../assets/warning.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="warning" src="../assets/warning.png" /></a>All defined VJOY devices must have a unique combination of axis, button or hat counts.  This is how these devices are differentiated as different devices as they all have the same name as currently defined in the device driver.  GremlinEx will throw an error if two VJOY devices have identical numbers of axis, buttons and hats.   The suggested method is to remove a button, so the first can be setup with 128 buttons, the second 127, and the third 126, etc...   Another popular method is to change the number of hats per device.</p>
 <h2 id="general-structure-of-gremlinex">General structure of GremlinEx<a class="headerlink" href="#general-structure-of-gremlinex" title="Permanent link">&para;</a></h2>

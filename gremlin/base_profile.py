@@ -4039,6 +4039,8 @@ class Profile():
         self.initialize_regular_devices() # non joystick devices
 
 
+
+
     def __getstate__(self):
         ''' serialization override '''
         state = {}
@@ -4060,6 +4062,10 @@ class Profile():
         os.unlink(tmp)
 
 
+    def sync(self):
+        ''' sync the profile with the profile registry '''
+        registry = ProfileRegistry()
+        registry.sync(self)
 
 
     def unload(self):

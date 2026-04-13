@@ -4122,6 +4122,10 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
 
         # grab all defined modes in the current profile
         mode_list = set()
+
+        # sync the profile with the profile registy to ensure we have the full device list
+        self.profile.sync()
+
         for device in self.profile.devices.values():
             for mode in device.modes.values():
                 if mode.name is None:
@@ -4131,14 +4135,14 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
         mode_list = list(mode_list)
         mode_list.sort()
 
-        for i, entry in enumerate(self.devices):
-            if entry.is_virtual:
+        for device in self.devices:
+            if device.is_virtual:
                 # skip virtual devices
                 continue
-            var_name = re.sub('[^0-9a-zA-Z]+', '_', entry.name) # cleanup non alphanumeric in the name for clean variable names
-            s_list.append(f"\n# device {entry.name} - axis count: {entry.axis_count}  hat count: {entry.hat_count}  button count: {entry.button_count}")
-            s_list.append(f"{var_name}_NAME = \"{entry.name}\"")
-            s_list.append(f"{var_name}_GUID = \"{entry.device_guid}\"")
+            var_name = re.sub('[^0-9a-zA-Z]+', '_', device.name) # cleanup non alphanumeric in the name for clean variable names
+            s_list.append(f"\n# device {device.name} - axis count: {device.axis_count}  hat count: {device.hat_count}  button count: {device.button_count}")
+            s_list.append(f"{var_name}_NAME = \"{device.name}\"")
+            s_list.append(f"{var_name}_GUID = \"{device.device_guid}\"")
             for mode_name in mode_list:
                 mode_suffix = mode_name.replace(" ","_")
                 if not mode_name in a_map.keys():

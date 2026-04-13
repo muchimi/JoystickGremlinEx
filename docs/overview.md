@@ -412,6 +412,12 @@ GremlinEx does not currently support force feedback inputs, nor output via VJOY.
 
 GremlinEx supports up to 8 axes, 128 buttons and four 8-way hats on each VJOY devices.
 
+Each VJOY device defined must be different from the other in terms of total axis, button and hat count.
+
+VJOY devices should be configured with consecutive axes, and axes should not be duplicated.  It is highly recommended to setup the VJOY devices to use regular DINPUT axes such as X, Y, Z, RX, RY, RZ, S1, S2.
+
+At least one VJOY device must be setup for GremlinEx to load, and this limitation has to do with the current architecture as Gremlin started as its primary purpose to program VJOY devices.  This requirement will be evaluated down the road to be removed.
+
 It is recommended to have no more than three or four output VJOY devices, the primary reason being that many games only understand the first three HID devices.
 
 ![warning](assets/warning.png)All defined VJOY devices must have a unique combination of axis, button or hat counts.  This is how these devices are differentiated as different devices as they all have the same name as currently defined in the device driver.  GremlinEx will throw an error if two VJOY devices have identical numbers of axis, buttons and hats.   The suggested method is to remove a button, so the first can be setup with 128 buttons, the second 127, and the third 126, etc...   Another popular method is to change the number of hats per device.
@@ -611,7 +617,15 @@ When GremlinEx attempts to open a port, Windows will prompt the first time to al
 
 The [GremlinEx Discord community](https://discord.com/channels/1279461873317707827/1341211588404842547) is a great place to ask for help, report issues and get how-to answers.
 
-### Typical issues
+### Log file and verbose modes
+
+The log file contains helpful information about devices and any errors encountered.  The GremlinEx options dialog contains a verbose tab that controls the level of logging that occurs and it can be very granular.  In most situations, the base verbose mode is sufficient, but there may be times where additional runtime data is needed to chase down a specific issue.
+
+![verbosity options](assets/verbosity_options.png)
+
+### Where is the log file?
+
+The log file is called system.log and will be located in your profile folder.  That default location  is  ```%userprofile%\joystick gremlin ex\system.log``` and is also visible via the **actions/open log** file in editor menu.
 
 ### GremlinEx warns me this is an unknown publisher
 

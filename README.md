@@ -30,6 +30,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m76RC24):
+- Change: slight rework of mode selectors
+
+### (m76RC24):
 - New: Vjoy Remap action: added ignore option for startup button value (in this mode, the action will not set a state on profile start)
 - Change: Switch container: updated UI
 - Change: Switch container: added input sync and auto-release release mode switch positions.

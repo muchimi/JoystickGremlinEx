@@ -2768,6 +2768,15 @@ class EventHandler(QtCore.QObject):
 		self._mode_change_callbacks.clear()
 
 
+	def _update_mode_selectors(self, mode : str):
+		''' updates UI drop downs'''
+
+			#if not is_running:
+		# check the UI is updated to the correct mode
+		el = EventListener()
+		el.edit_mode_ui_update.emit(mode)
+
+
 	def _change_mode(self, new_mode : str, args : tuple = None):
 		"""Changes the GremlinEx currently active mode.
 
@@ -2796,181 +2805,183 @@ class EventHandler(QtCore.QObject):
 				syslog.info(f"CHANGE MODE: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")	
 			else:
 				syslog.info(f"CHANGE MODE: (edit time) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
-		
 
-		if not is_running:
-			# check edit mode
-			el = EventListener()
-			el.edit_mode_ui_update.emit(new_mode)		
-
-		if new_mode == self.current_mode and not force_update:
-			# already in this mode
-			return
-		
-		# run through mode change callbacks
-		if is_running and self._mode_change_callbacks:
-			for callback in  self._mode_change_callbacks:
-				if not callback(new_mode, self.current_mode):
-					if verbose:
-						syslog.info(f"CHANGE MODE: (runtime): ignore request to change to mode [{new_mode}]: validation callback failed")
-					return
-			
 		try:
-			el = EventListener()
-			el.push_input_selection()
-			if not is_running:
-				gremlin.util.pushCursor()
+		
+		
 
-			# find the mode in the profile 
-			mode_exists = current_profile.modeExists(new_mode)
-
-			if not mode_exists:
-				for device in self.callbacks.values():
-					if new_mode in device:
-						mode_exists = True
-						
-
-			if not mode_exists:
-				for device in self.osc_callbacks.values():
-					if new_mode in device:
-						mode_exists = True
-						
-
-			if not mode_exists:
-				for device in self.midi_callbacks.values():
-					if new_mode in device:
-						mode_exists = True
-						
-
-			if not mode_exists:
-				for device in self.latched_callbacks.values():
-					if new_mode in device:
-						mode_exists = True
-						
-				
-			if not mode_exists:
-				# import gremlin.config
-				# verbose = gremlin.config.Configuration().verbose
-				# if verbose:
-				syslog.warning(
-					f"CHANGE MODE: Mode Change Error: The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
-				)
-				syslog.warning("\tValid profile modes:")
-				current_profile.dumpModeTree("\t\t")
+			if new_mode == self.current_mode and not force_update:
+				# already in this mode
 				return
-
-			if is_running:
-				# runtime event (prevents UI from reloading)
-				# if verbose:
-				# 	syslog.info(f"EVENT: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
-
-
-				if self.runtime_mode != new_mode or force_update:
-					import gremlin.shared_state
-					device_guid = gremlin.shared_state.mode_tab_guid
-					mode_enter = gremlin.ui.mode_device.ModeInputModeType.ModeEnter
-					mode_exit = gremlin.ui.mode_device.ModeInputModeType.ModeExit
-					delay = 0.250 # delay in seconds between press/release events for mode control change
-
-					# fire off any mode changes
-					event_old_mode_exit_pressed = Event(InputType.ModeControl, 
-								identifier = mode_exit,
-								device_guid= device_guid,
-								is_pressed=True,
-								mode = self.runtime_mode,
-								override_input_type=InputType.JoystickButton)
-					event_old_mode_exit_released = Event(InputType.ModeControl, 
-								identifier = mode_exit,
-								device_guid= device_guid,
-								is_pressed=False,
-								mode = self.runtime_mode,
-								override_input_type=InputType.JoystickButton)
-					
-					event_new_mode_enter_pressed = Event(InputType.ModeControl, 
-								identifier = mode_enter,
-								device_guid= device_guid,
-								is_pressed=True,
-								mode = new_mode,
-								override_input_type=InputType.JoystickButton)
-					event_new_mode_enter_released = Event(InputType.ModeControl, 
-								identifier = mode_enter,
-								device_guid= device_guid,
-								is_pressed=False,
-								mode = new_mode,
-								override_input_type=InputType.JoystickButton)
-					
-					# fire mode change control for mode exit (press + release)
-					m1_list, f1_list = self.execute_event(event_old_mode_exit_pressed)
-					if m1_list or f1_list:
-						# callback = self._create_change_mode_callback(event_old_mode_exit_pressed, m1_list, f1_list)
-						# mode_exit_press = Timer(delay, callback)
-						# mode_exit_press.start()
-
-						callback = self._create_change_mode_callback(event_old_mode_exit_released, m1_list, f1_list)
-						mode_exit_release = Timer(delay, callback)
-						mode_exit_release.start()
-					
-					# CHANGE THE MODE
-					
-					if validate:
-						result = self.runModeValidator(new_mode)
-						if not result:
-							syslog.warning(f"CHANGE MODE: {current_profile.name} - mode change request to {new_mode} not authorized by a module - request ignored")
-							return
-
-
-					self.previous_runtime_mode = self.runtime_mode
-					gremlin.shared_state.runtime_mode = new_mode
-					# remember the last mode for this profile
-					
-					self.previous_runtime_mode = self.runtime_mode
-					self.runtime_mode = new_mode
-					if verbose: syslog.info(f"CHANGE MODE: [{current_profile.name}] - Runtime Mode switch to: {new_mode}")
-					if emit:
-						el.runtime_mode_changed.emit(new_mode)
-						el.update_mode_status_bar.emit(new_mode)
-
-
-					# fire mode change for mode enter (press + release)
-					m2_list, f2_list = self.execute_event(event_new_mode_enter_pressed)
-					if m2_list or f2_list:
-						# callback = self._create_change_mode_callback(event_new_mode_enter_pressed, m2_list, f2_list)
-						# mode_enter_press = Timer(delay, callback)
-						# mode_enter_press.start()
-
-						callback = self._create_change_mode_callback(event_new_mode_enter_released, m2_list, f2_list)
-						mode_enter_release = Timer(delay, callback)
-						mode_enter_release.start()
-
-			else:
-				# non-runtime
-				assert new_mode,"new mode cannot be blank"
-				if self.edit_mode != new_mode or force_update:
-					gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
-					gremlin.shared_state.edit_mode = new_mode
-					self.edit_mode = new_mode
-					if verbose: syslog.info(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
-					if emit:
-						el.edit_mode_changed.emit(self.edit_mode)
-						
-						
 			
+			# run through mode change callbacks
+			if is_running and self._mode_change_callbacks:
+				for callback in  self._mode_change_callbacks:
+					if not callback(new_mode, self.current_mode):
+						if verbose:
+							syslog.info(f"CHANGE MODE: (runtime): ignore request to change to mode [{new_mode}]: validation callback failed")
+						return
+				
+			try:
+				el = EventListener()
+				el.push_input_selection()
+				if not is_running:
+					gremlin.util.pushCursor()
 
-			# update the status bar
-			self.mode_status_update.emit()
+				# find the mode in the profile 
+				mode_exists = current_profile.modeExists(new_mode)
 
-			# update the selection
-			device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
-			if input_type and input_id:
-				el.select_input.emit(device_guid, input_type, input_id, False, True, False)
+				if not mode_exists:
+					for device in self.callbacks.values():
+						if new_mode in device:
+							mode_exists = True
+							
 
-			# fire the UI update on change mode      
-			el.update_input_state.emit(device_guid)  # force a UI widget status update	
-		finally:	
-			el.pop_input_selection()
-			if not is_running:
-				gremlin.util.popCursor()
+				if not mode_exists:
+					for device in self.osc_callbacks.values():
+						if new_mode in device:
+							mode_exists = True
+							
 
+				if not mode_exists:
+					for device in self.midi_callbacks.values():
+						if new_mode in device:
+							mode_exists = True
+							
+
+				if not mode_exists:
+					for device in self.latched_callbacks.values():
+						if new_mode in device:
+							mode_exists = True
+							
+					
+				if not mode_exists:
+					# import gremlin.config
+					# verbose = gremlin.config.Configuration().verbose
+					# if verbose:
+					syslog.warning(
+						f"CHANGE MODE: Mode Change Error: The mode \"{new_mode}\" does not exist or has no associated callbacks - profile '{current_profile.name}'"
+					)
+					syslog.warning("\tValid profile modes:")
+					current_profile.dumpModeTree("\t\t")
+					return
+
+				if is_running:
+					# runtime event (prevents UI from reloading)
+					# if verbose:
+					# 	syslog.info(f"EVENT: (runtime) change mode to [{new_mode}] requested - active mode: [{gremlin.shared_state.runtime_mode}]  current mode: [{gremlin.shared_state.current_mode}] profile '{current_profile.name}'")
+
+
+					if self.runtime_mode != new_mode or force_update:
+						import gremlin.shared_state
+						device_guid = gremlin.shared_state.mode_tab_guid
+						mode_enter = gremlin.ui.mode_device.ModeInputModeType.ModeEnter
+						mode_exit = gremlin.ui.mode_device.ModeInputModeType.ModeExit
+						delay = 0.250 # delay in seconds between press/release events for mode control change
+
+						# fire off any mode changes
+						event_old_mode_exit_pressed = Event(InputType.ModeControl, 
+									identifier = mode_exit,
+									device_guid= device_guid,
+									is_pressed=True,
+									mode = self.runtime_mode,
+									override_input_type=InputType.JoystickButton)
+						event_old_mode_exit_released = Event(InputType.ModeControl, 
+									identifier = mode_exit,
+									device_guid= device_guid,
+									is_pressed=False,
+									mode = self.runtime_mode,
+									override_input_type=InputType.JoystickButton)
+						
+						event_new_mode_enter_pressed = Event(InputType.ModeControl, 
+									identifier = mode_enter,
+									device_guid= device_guid,
+									is_pressed=True,
+									mode = new_mode,
+									override_input_type=InputType.JoystickButton)
+						event_new_mode_enter_released = Event(InputType.ModeControl, 
+									identifier = mode_enter,
+									device_guid= device_guid,
+									is_pressed=False,
+									mode = new_mode,
+									override_input_type=InputType.JoystickButton)
+						
+						# fire mode change control for mode exit (press + release)
+						m1_list, f1_list = self.execute_event(event_old_mode_exit_pressed)
+						if m1_list or f1_list:
+							# callback = self._create_change_mode_callback(event_old_mode_exit_pressed, m1_list, f1_list)
+							# mode_exit_press = Timer(delay, callback)
+							# mode_exit_press.start()
+
+							callback = self._create_change_mode_callback(event_old_mode_exit_released, m1_list, f1_list)
+							mode_exit_release = Timer(delay, callback)
+							mode_exit_release.start()
+						
+						# CHANGE THE MODE
+						
+						if validate:
+							result = self.runModeValidator(new_mode)
+							if not result:
+								syslog.warning(f"CHANGE MODE: {current_profile.name} - mode change request to {new_mode} not authorized by a module - request ignored")
+								return
+
+
+						self.previous_runtime_mode = self.runtime_mode
+						gremlin.shared_state.runtime_mode = new_mode
+						# remember the last mode for this profile
+						
+						self.previous_runtime_mode = self.runtime_mode
+						self.runtime_mode = new_mode
+						if verbose: syslog.info(f"CHANGE MODE: [{current_profile.name}] - Runtime Mode switch to: {new_mode}")
+						if emit:
+							el.runtime_mode_changed.emit(new_mode)
+							el.update_mode_status_bar.emit(new_mode)
+
+
+						# fire mode change for mode enter (press + release)
+						m2_list, f2_list = self.execute_event(event_new_mode_enter_pressed)
+						if m2_list or f2_list:
+							# callback = self._create_change_mode_callback(event_new_mode_enter_pressed, m2_list, f2_list)
+							# mode_enter_press = Timer(delay, callback)
+							# mode_enter_press.start()
+
+							callback = self._create_change_mode_callback(event_new_mode_enter_released, m2_list, f2_list)
+							mode_enter_release = Timer(delay, callback)
+							mode_enter_release.start()
+
+				else:
+					# non-runtime
+					assert new_mode,"new mode cannot be blank"
+					if self.edit_mode != new_mode or force_update:
+						gremlin.config.Configuration().set_profile_last_edit_mode(new_mode)
+						gremlin.shared_state.edit_mode = new_mode
+						self.edit_mode = new_mode
+						if verbose: syslog.info(f"Profile: {current_profile.name} - Design time Mode switch to: {new_mode}")
+						if emit:
+							el.edit_mode_changed.emit(self.edit_mode)
+							
+							
+				
+
+				# update the status bar
+				self.mode_status_update.emit()
+
+				# update the selection
+				device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
+				if input_type and input_id:
+					el.select_input.emit(device_guid, input_type, input_id, False, True, False)
+
+				# fire the UI update on change mode      
+				el.update_input_state.emit(device_guid)  # force a UI widget status update	
+			finally:	
+				el.pop_input_selection()
+				if not is_running:
+					gremlin.util.popCursor()
+
+		finally:
+			# sync visual selectors
+			self._update_mode_selectors(self.current_mode) 
+		
 		
 	
 

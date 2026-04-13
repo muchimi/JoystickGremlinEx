@@ -155,7 +155,7 @@ _simconnect_command_mode_to_display = {
 _simconnect_command_mode_to_description = {
     SimConnectCommandMode.Simvar : "Regular simVar",
     SimConnectCommandMode.Calculator : "Evaluated RPN expression and calculator code",
-    SimConnectCommandMode.CalculatorParam : "Evaluated RPN expression and calculator code with axis parameter",
+    SimConnectCommandMode.CalculatorParam : "Evaluated RPN expression and calculator code with axis parameter - use {#} to specify where the value is substituted.\nIf not using {#}, the value is prepended to the output expression.",
 }
 
 _simconnect_command_mode_to_string = {

@@ -31,6 +31,7 @@ nav:
   - Usage: usage.md
   - Containers : containers.md
   - Actions : actions.md
+  - Mapping Guide: mapping.md
   - Resources: resources.md
   - Scripting: scripting.md
   - AI and DevOps: ktts.md
