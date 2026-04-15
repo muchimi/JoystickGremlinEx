@@ -796,15 +796,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vjoy-remap" class="md-nav__link">
-    <span class="md-ellipsis">
-      Vjoy Remap
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#gated-axis" class="md-nav__link">
     <span class="md-ellipsis">
       Gated Axis
@@ -1450,15 +1441,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vjoy-remap" class="md-nav__link">
-    <span class="md-ellipsis">
-      Vjoy Remap
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#gated-axis" class="md-nav__link">
     <span class="md-ellipsis">
       Gated Axis
@@ -1945,6 +1927,26 @@
 <h2 id="implementation">Implementation<a class="headerlink" href="#implementation" title="Permanent link">&para;</a></h2>
 <p>All actions in GremlinEx are plugins written in Python.</p>
 <h2 id="vjoy-remap-map-to-vjoy-action">VJoy Remap (map to vjoy) Action<a class="headerlink" href="#vjoy-remap-map-to-vjoy-action" title="Permanent link">&para;</a></h2>
+<p><a class="glightbox" href="../assets/action_vjoy_remap.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="vjoy remap action" src="../assets/action_vjoy_remap.png" /></a></p>
+<p>This is probably the most common action in GremlinEx used to program VJOY devices.  The action supports mapping of linear (axis) or momentary (button/hat) inputs to a VJOY device.</p>
+<p>This action replaces the legacy remap option.</p>
+<p>Some of the features of vjoy remap:</p>
+<ul>
+<li>map an input axis to a vjoy axis</li>
+<li>apply an output curve to the vjoy axis based on input</li>
+<li>scale or apply a range to the vjoy axis based on input</li>
+<li>merge the output axis value with one or more input axes using add, substract, multiply, average.</li>
+<li>map an input button to a vjoy button</li>
+<li>map an input hat to a button or a hat</li>
+<li>synchonize the input value to the output on profile start or pick a default value.</li>
+<li>force a button pressed</li>
+<li>force a button release</li>
+<li>toggle or pulse a button</li>
+<li>set a hat position, or pulse a hat</li>
+<li>increase and decrease an output vjoy axis using two momentary inputs using a table of values</li>
+<li>convert an axis value to a button</li>
+<li>view which buttons are in-use profile wise</li>
+</ul>
 <p>This action is takes a linear or momentary input and maps it to a VJOY virtual joystick device.  It replaces the legacy "remap" action from the original Joystick Gremlin.</p>
 <h3 id="vjoy-remap-modes">Vjoy Remap modes<a class="headerlink" href="#vjoy-remap-modes" title="Permanent link">&para;</a></h3>
 <table>
@@ -1957,7 +1959,7 @@
 </thead>
 <tbody>
 <tr>
-<td>Button</td>
+<td>Button (hold)</td>
 <td>Maps to a VJoy button.  The button's state matches the input state, so pressed if the input is pressed, released if the input is released.</td>
 <td>This is the most commmon mapping of a button input to a VJoy button.</td>
 </tr>
@@ -1967,24 +1969,39 @@
 <td>This is used to invert the output button and used typically in physical three way hardware switch scenarios.</td>
 </tr>
 <tr>
-<td>Button Press</td>
+<td>Button (Press)</td>
 <td>Maps to a VJoy button.  The button is pressed when the input is triggered.</td>
 <td>This is used to set a vjoy button to on, and to stay on.</td>
 </tr>
 <tr>
-<td>Button Release</td>
+<td>Button (Release)</td>
 <td>Maps to a VJoy button.  The button is released when the input is triggered.</td>
 <td>This is used to set a vjoy button to off, and to stay off.</td>
 </tr>
 <tr>
-<td>Pulse Button</td>
+<td>Button (Pulse)</td>
 <td>Maps to a VJoy button.  The button is pulsed on/off with an optional repeat function.</td>
-<td>This is used to pulse a button on/off either once, or at regular intervals while the input is held pressed.</td>
+<td>This is used to pulse a button on/off either once, or at regular intervals while the input is held pressed.  When repeating, the second interval determines the time between pulses.</td>
 </tr>
 <tr>
-<td>Toggle Button</td>
+<td>Button (Toggle)</td>
 <td>Maps to a VJoy button.  This button is toggled, so if it was off, will be on, and if it was on, it will be be off.</td>
 <td>This is used in toggle scenarios.</td>
+</tr>
+<tr>
+<td>Hat (hold)</td>
+<td>Maps to a VJoy hat.  The mapping has two positions - the position to set the hat to when the input is pressed, and the return position when the input is released.</td>
+<td>Sets a hat position while the input is held, and return the hat to a set position when the input is released, noting the return position does not have to be the center position.</td>
+</tr>
+<tr>
+<td>Hat (press)</td>
+<td>Maps to a VJoy hat.  The mapping sets the hat to the desired position.  This mode does not have a return position.</td>
+<td>Used to set a single hat position.</td>
+</tr>
+<tr>
+<td>Hat (Pulse)</td>
+<td>Maps to a VJoy hat.  The mapping has two positions - the position to set the hat to when the input is pressed, and the return position when the input is released. Pulse timings control how long the hat stays in the pressed position before being released.  A pulse repeat option causes the pulse to repeat while the input is held.  A second interval delay determines the time between pulses.</td>
+<td>Use to pulse a hat between two positions.</td>
 </tr>
 <tr>
 <td>Invert Axis</td>
@@ -1999,7 +2016,7 @@
 <tr>
 <td>Set Axis Range</td>
 <td>Maps to a VJoy axis.  This changes the output scale of a Vjoy axis and impacts subsequent output.</td>
-<td></td>
+<td>Used in some scenarios to change axis scaling on the fly.</td>
 </tr>
 <tr>
 <td>Merge Axis</td>
@@ -2009,7 +2026,7 @@
 <tr>
 <td>Control modes (multiple)</td>
 <td>This is a legacy feature of an earlier version of GremlinEx, and is used to manage GremlineEx various remote control modes.</td>
-<td></td>
+<td>Legacy feature for compatibility with older releases of GEX.  Use the control action instead.</td>
 </tr>
 <tr>
 <td>Axis to Button</td>
@@ -2282,26 +2299,6 @@ The offset applied is scaled based on the deviation, so maximum deviation of the
 <p>Examples for gates include triggering a mode or setting up a state based on how a gate is crossed (directional) as well as bi-directional.</p>
 <h3 id="action-priority">Action priority<a class="headerlink" href="#action-priority" title="Permanent link">&para;</a></h3>
 <p>Certain actions execute last (such as a mode change).  Actions have an internal priority that determines when an action runs.  In most cases, actions are executed top down (in the order they appear), however some actions like a mode change are executed last, and actions that change the input value like applying a curve will execute first.</p>
-<h3 id="vjoy-remap">Vjoy Remap<a class="headerlink" href="#vjoy-remap" title="Permanent link">&para;</a></h3>
-<p><a class="glightbox" href="../assets/action_vjoy_remap.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="vjoy remap action" src="../assets/action_vjoy_remap.png" /></a></p>
-<p>This is the most common action in GremlinEx and lets you map an input (linear or momentary) to a VJOY device.</p>
-<p>This action replaces the legacy remap option.  In GremlinEx, this action is the main way to send output to a VJOY device. </p>
-<p>Some of the features of vjoy remap:</p>
-<ul>
-<li>map an input axis to a vjoy axis</li>
-<li>apply an output curve to the vjoy axis based on input</li>
-<li>scale or apply a range to the vjoy axis based on input</li>
-<li>merge the output axis value with one or more input axes using add, substract, multiply, average.</li>
-<li>map an input button to a vjoy button</li>
-<li>map an input hat to a button or a hat</li>
-<li>synchonize the input value to the output on profile start or pick a default value.</li>
-<li>force a button pressed</li>
-<li>force a button release</li>
-<li>toggle a button</li>
-<li>increase and decrease an output vjoy axis using two momentary inputs using a table of values</li>
-<li>convert an axis value to a button</li>
-<li>view which buttons are in-use profile wise</li>
-</ul>
 <h3 id="gated-axis">Gated Axis<a class="headerlink" href="#gated-axis" title="Permanent link">&para;</a></h3>
 <p><a class="glightbox" href="../assets/action_gated_axis.png" data-type="image" data-width="auto" data-height="auto" data-desc-position="bottom"><img alt="gated axis" src="../assets/action_gated_axis.png" /></a></p>
 <p>This action lets you split an input axis and define what should happen when</p>

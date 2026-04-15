@@ -50,23 +50,50 @@ All actions in GremlinEx are plugins written in Python.
 
 ## VJoy Remap (map to vjoy) Action
 
+![vjoy remap action](assets/action_vjoy_remap.png)
+
+This is probably the most common action in GremlinEx used to program VJOY devices.  The action supports mapping of linear (axis) or momentary (button/hat) inputs to a VJOY device.
+
+This action replaces the legacy remap option.
+
+Some of the features of vjoy remap:
+
+- map an input axis to a vjoy axis
+- apply an output curve to the vjoy axis based on input
+- scale or apply a range to the vjoy axis based on input
+- merge the output axis value with one or more input axes using add, substract, multiply, average.
+- map an input button to a vjoy button
+- map an input hat to a button or a hat
+- synchonize the input value to the output on profile start or pick a default value.
+- force a button pressed
+- force a button release
+- toggle or pulse a button
+- set a hat position, or pulse a hat
+- increase and decrease an output vjoy axis using two momentary inputs using a table of values
+- convert an axis value to a button
+- view which buttons are in-use profile wise
+
+
 This action is takes a linear or momentary input and maps it to a VJOY virtual joystick device.  It replaces the legacy "remap" action from the original Joystick Gremlin.
 
 ### Vjoy Remap modes
 
 | Mode | Description | Typical Use-Case |
 | ----------- | ----------- | ----------- |
-| Button | Maps to a VJoy button.  The button's state matches the input state, so pressed if the input is pressed, released if the input is released. | This is the most commmon mapping of a button input to a VJoy button. |
+| Button (hold) | Maps to a VJoy button.  The button's state matches the input state, so pressed if the input is pressed, released if the input is released. | This is the most commmon mapping of a button input to a VJoy button. |
 | Button (inverted) | Maps to a VJoy button.  The button's state inverts the input state, so the output button is released when the button is pressed, and pressed when the input is released.  | This is used to invert the output button and used typically in physical three way hardware switch scenarios. |
-| Button Press | Maps to a VJoy button.  The button is pressed when the input is triggered. | This is used to set a vjoy button to on, and to stay on. |
-| Button Release | Maps to a VJoy button.  The button is released when the input is triggered. | This is used to set a vjoy button to off, and to stay off. |
-| Pulse Button | Maps to a VJoy button.  The button is pulsed on/off with an optional repeat function. | This is used to pulse a button on/off either once, or at regular intervals while the input is held pressed. |
-| Toggle Button | Maps to a VJoy button.  This button is toggled, so if it was off, will be on, and if it was on, it will be be off. | This is used in toggle scenarios. |
+| Button (Press) | Maps to a VJoy button.  The button is pressed when the input is triggered. | This is used to set a vjoy button to on, and to stay on. |
+| Button (Release) | Maps to a VJoy button.  The button is released when the input is triggered. | This is used to set a vjoy button to off, and to stay off. |
+| Button (Pulse) | Maps to a VJoy button.  The button is pulsed on/off with an optional repeat function. | This is used to pulse a button on/off either once, or at regular intervals while the input is held pressed.  When repeating, the second interval determines the time between pulses.  |
+| Button (Toggle) | Maps to a VJoy button.  This button is toggled, so if it was off, will be on, and if it was on, it will be be off. | This is used in toggle scenarios. |
+| Hat (hold) | Maps to a VJoy hat.  The mapping has two positions - the position to set the hat to when the input is pressed, and the return position when the input is released. | Sets a hat position while the input is held, and return the hat to a set position when the input is released, noting the return position does not have to be the center position. |
+| Hat (press) | Maps to a VJoy hat.  The mapping sets the hat to the desired position.  This mode does not have a return position. |  Used to set a single hat position. |
+| Hat (Pulse) | Maps to a VJoy hat.  The mapping has two positions - the position to set the hat to when the input is pressed, and the return position when the input is released. Pulse timings control how long the hat stays in the pressed position before being released.  A pulse repeat option causes the pulse to repeat while the input is held.  A second interval delay determines the time between pulses. | Use to pulse a hat between two positions. |
 | Invert Axis | Maps to a VJoy axis.  This will invert the input axis. | This is used to easily invert an input axis and map it to the output VJoy axis. |
 | Set Axis Value | Maps to a VJoy axis.  This mode sets the output VJoy axis to a fixed floating point value. | Use this to set a specific value on an output axis. |
-| Set Axis Range | Maps to a VJoy axis.  This changes the output scale of a Vjoy axis and impacts subsequent output. |
+| Set Axis Range | Maps to a VJoy axis.  This changes the output scale of a Vjoy axis and impacts subsequent output. | Used in some scenarios to change axis scaling on the fly. |
 | Merge Axis | Maps to a VJoy axis.  Combines the input with one ore more other axis inputs (could be from different devices), applying a numberic transformation to the prior step.  Each merge step is cummulative to the prior step, and the merge is applied to the prior merge value.  The output can be curved if needed. | This replaces the legacy Joystick Gremlin merge feature.  Use this to combine multiple axes into one.  This mode can be used to merge toe-brakes on rudder pedals to a single linear axis, to scale one axis with another, or to use an axis to trim another axis in a flight simulation setting. |
-| Control modes (multiple) | This is a legacy feature of an earlier version of GremlinEx, and is used to manage GremlineEx various remote control modes.|
+| Control modes (multiple) | This is a legacy feature of an earlier version of GremlinEx, and is used to manage GremlineEx various remote control modes. | Legacy feature for compatibility with older releases of GEX.  Use the control action instead. |
 | Axis to Button | Maps an input axis range to output buttons. | This is used to set an output button based on the position on an axis. This is largely replaced by the more capable Gated Axis Action but is simpler to setup/use for simple range setups. |
 | Axis | Maps to a VJoy axis. | This is the basic map to axis functionality.  The output can be curved as an option. |
 | Stepped/Linear Axis Value | Maps a VJoy axis to at least one, optionally two, inputs to increase or decrease (by fixed step or over time if in linear mode) the VJoy axis value.  The stepping is based on a user entered value table called "ticks" when in stepped mode.  In linear mode, velocity (rate of axis change) and acceleration (rate of velocity change) change the value of the output axis based on how long the input has been pressed.  In linear mode, there is no set value as it depends on time pressed, and the velocity and acceleration values.  In stepped (tick) mode,  the step table can be prepopulated using shortcut buttons to set the number of ticks, normalize spacing, use a geometric progression, or manual enter step data. | This mode is typically attached to the increase input button, and latches the optional decrease button so stepping can occur up and down.  This is used with a momentary input for stepped increases/decreases of an output axis based on a value table, also known as a bump table. |
@@ -244,30 +271,6 @@ Examples for gates include triggering a mode or setting up a state based on how 
 ### Action priority
 
 Certain actions execute last (such as a mode change).  Actions have an internal priority that determines when an action runs.  In most cases, actions are executed top down (in the order they appear), however some actions like a mode change are executed last, and actions that change the input value like applying a curve will execute first.
-
-### Vjoy Remap
-
-![vjoy remap action](assets/action_vjoy_remap.png)
-
-This is the most common action in GremlinEx and lets you map an input (linear or momentary) to a VJOY device.
-
-This action replaces the legacy remap option.  In GremlinEx, this action is the main way to send output to a VJOY device. 
-
-Some of the features of vjoy remap:
-
-- map an input axis to a vjoy axis
-- apply an output curve to the vjoy axis based on input
-- scale or apply a range to the vjoy axis based on input
-- merge the output axis value with one or more input axes using add, substract, multiply, average.
-- map an input button to a vjoy button
-- map an input hat to a button or a hat
-- synchonize the input value to the output on profile start or pick a default value.
-- force a button pressed
-- force a button release
-- toggle a button
-- increase and decrease an output vjoy axis using two momentary inputs using a table of values
-- convert an axis value to a button
-- view which buttons are in-use profile wise
 
 
 ### Gated Axis

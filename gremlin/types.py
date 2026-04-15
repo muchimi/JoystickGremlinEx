@@ -1254,6 +1254,7 @@ class VjoyAction(enum.Enum):
     VJoyButtonPress = 23 # action on button press
     VJoyButtonInverted = 24 # hold state (inverted = off means pressed, on means released)
     VJoyHatPress = 25 # hat press mode
+    VJoyHatPulse = 26 # hat pulse mode
     
     @staticmethod
     def is_button_action(mode):
@@ -1309,6 +1310,8 @@ class VjoyAction(enum.Enum):
                 return "Maps to a vjoy hat (hold)"
             case VjoyAction.VJoyHatPress:
                 return "Maps to a Vjoy hat (press)"
+            case VjoyAction.VJoyHatPulse:
+                return "Maps to a Vjoy hat (pulse)"
             case VjoyAction.VJoyHatToButton:
                 return "Maps a hat position to a vjoy button"
             case VjoyAction.VJoyInvertAxis:
@@ -1373,6 +1376,8 @@ class VjoyAction(enum.Enum):
                 return "Hat (Hold)"
             case  VjoyAction.VJoyHatPress:
                 return "Hat (Press)"
+            case  VjoyAction.VJoyHatPulse:
+                return "Hat (Pulse)"
             case  VjoyAction.VJoyHatToButton:
                 return "Hat to Button"
             case  VjoyAction.VJoyInvertAxis:

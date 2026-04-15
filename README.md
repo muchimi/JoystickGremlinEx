@@ -29,6 +29,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC27):
+- Change: Vjoy Remap: added input synchronization support for hat output modes on profile start.
+- New: Vjoy Remap: added button reset on profile stop (this will return hats to the center position and buttons to the non-pressed state for hold/pulse options).
+
+### (m76RC26):
+- New: Vjoy Remap: Add hat pulse action mode.  This will pulse the hat between the specified position and the return position (configurable).  This mode completes the hat options for vjoy remap intended in this release.
+- New: Vjoy Remap: Add a return position for hats when the input is released.  Defaults to center.  This allows for a return position different from the hat center which can be helpful in some profile scenarios.
+
 ### (m76RC25):
 - Change: slight rework of mode selectors
 - New: Vjoy Remap: Added hat hold and hat press action modes.  Previously hats could only be output via the legacy remap action.
