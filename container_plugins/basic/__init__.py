@@ -130,6 +130,8 @@ class BasicContainerWidget(AbstractContainerWidget):
                     action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
 
             self.profile_data.add_action(action_item)
+
+            # blows up in QT 6.11
             self.container_modified.emit()
         finally:
             gremlin.util.popCursor()

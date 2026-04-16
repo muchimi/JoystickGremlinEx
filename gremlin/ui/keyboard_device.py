@@ -665,6 +665,11 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if item_data:
             
+
+            profile = gremlin.shared_state.current_profile
+            if profile:
+                profile.setLastInput(device_guid, input_type, input_id)
+                
             config = gremlin.config.Configuration()
             config.set_last_input(device_guid, input_type, input_id)
 

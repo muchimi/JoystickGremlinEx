@@ -217,7 +217,8 @@ class StateContainerWidget(AbstractContainerWidget):
                     action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
 
             self.profile_data.add_action(action_item)
-            self.container_modified.emit()
+            # blows up in QT 6.11
+            # self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 
@@ -393,8 +394,9 @@ class StateContainer(AbstractContainer):
         node.set("value", safe_format(self.required_value, bool))
 
         as_node = ElementTree.Element("action-set")
-        for action in self.action_sets[0]:
-            as_node.append(action.to_xml())
+        if self.action_sets:
+            for action in self.action_sets[0]:
+                as_node.append(action.to_xml())
         node.append(as_node)
         return node
 

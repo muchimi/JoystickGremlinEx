@@ -29,6 +29,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC28):
+Change: UI: improve last input re-selection on profile reload
+Fix: input calibration: resolved various issues related to calibration UI behavior and persistence and inability to close the calibration dialog in some situations.
+Fix: UI: workaround for a behavior change in QT 6.11 causing exceptions when removing mappings.
+
 ### (m76RC27):
 - Change: Vjoy Remap: added input synchronization support for hat output modes on profile start.
 - New: Vjoy Remap: added button reset on profile stop (this will return hats to the center position and buttons to the non-pressed state for hold/pulse options).

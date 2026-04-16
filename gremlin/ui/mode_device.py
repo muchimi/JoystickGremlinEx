@@ -197,6 +197,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         selected_index = self.input_item_list_view.current_index
         if selected_index is None:
             selected_index = -1
+        
         self._select_item_cb(selected_index)
 
     @property
@@ -430,6 +431,11 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """
         if not Shiboken.isValid(self.input_item_list_view):
             return
+        
+        if index == -1:
+            # nothing to select
+            return 
+        
 
         self.ensureInputItems(True) # ensure the control inputs exist for this mode
 
@@ -467,7 +473,9 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_type = InputType.ModeControl
         input_id = item_data.input_id if item_data else None
         
-
+        profile = gremlin.shared_state.current_profile
+        if profile:
+            profile.setLastInput(device_guid, input_type, input_id)
         config.set_last_input(device_guid, input_type, input_id)
 
         if item_data:

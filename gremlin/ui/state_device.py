@@ -3316,7 +3316,9 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_type = InputType.State
         input_id = item_data.input_id if item_data else None
         
-
+        profile = gremlin.shared_state.current_profile
+        if profile:
+            profile.setLastInput(device_guid, input_type, input_id)
         config.set_last_input(device_guid, input_type, input_id)
 
         # Create new configuration widget

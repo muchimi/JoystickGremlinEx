@@ -869,6 +869,10 @@ class EventListener:
 	remote_control_socket_timeout = Signal() # emits when the socket times out
 	remote_control_socket_error = Signal() # emits when the socket has an error
 
+
+	# container_modified = Signal(object) # indicates a container was modified
+	# data_changed = Signal(object) # indicates a model was changed
+
 	def __init__(self):
 		"""Creates a new instance."""
 		import gremlin.windows_event_hook

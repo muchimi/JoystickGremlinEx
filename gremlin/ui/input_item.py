@@ -1280,10 +1280,11 @@ class ActionSetModel(ui_common.AbstractModel):
         container : gremlin.base_profile.AbstractContainer = action.get_container()
         container.mapping_changed() # tell the UI about the change
 
-        try:
-            self.data_changed.emit()
-        except:
-            pass # ignore signal issues
+        # blows up in QT 6.11
+        # try:
+        #     self.data_changed.emit()
+        # except:
+        #     pass # ignore signal issues
         
 
 
@@ -1314,8 +1315,10 @@ class ActionSetModel(ui_common.AbstractModel):
                 container.mapping_changed() # tell the UI about the change
                 
                 
-                
-            self.data_changed.emit()
+            # try:
+            #     self.data_changed.emit()
+            # except:
+            #     pass
         finally:
             gremlin.util.popCursor()
         
@@ -1640,7 +1643,15 @@ class ActionSetView(ui_common.AbstractView):
         :return callback function to remove the provided widget from the
             model
         """
-        return lambda: self.model.remove_action(widget.action_data)
+        #return lambda: self.model.remove_action(widget.action_data)
+        return lambda: self._remove_model_action_data(widget.action_data)
+
+    def _remove_model_action_data(self, action_data):
+        try:
+            self.model.remove_action(action_data)
+        except:
+            pass
+
 
 
     def _create_edit_controls(self):
@@ -2027,11 +2038,17 @@ class InputItemWidget(QBoxFrame):
         el.calibration_added.connect(self._calibration_changed_cb)
         el.calibration_deleted.connect(self._calibration_changed_cb)
         el.icon_changed.connect(self._icon_changed_cb)
+        el.update_input_icons.connect(self._update_axis_icons)
+        el.profile_loaded.connect(self._update_axis_icons) # update icons after profile load as calibration data load order is not guaranteed
 
         # update mapping action icons
         self._update_repeater() # create the correct repeater widget
         self._update_selected_ui()
         self._update_display_ui()
+
+        if self.is_axis:
+            # update axis input icons
+            self._update_axis_icons_ui()
 
         self.ensureStyle()
 
@@ -2168,6 +2185,7 @@ class InputItemWidget(QBoxFrame):
         el.mapping_changed.disconnect(self._mapping_changed_cb)
         el.update_input_icons.disconnect(self._update_axis_icons)
         el.input_enabled_changed.disconnect(self._update_enabled_state)
+        el.profile_loaded.disconnect(self._update_axis_icons)
         gremlin.util.clear_layout(self.main_layout)
         self._deleted = True
     
@@ -2336,12 +2354,14 @@ class InputItemWidget(QBoxFrame):
                 self._input_button_widget.setIcon(self._input_icon_inactive)
 
 
-    @QtCore.Slot()
     def _update_axis_icons(self):
-        ''' update titlebar icons '''
         if not self._ui_loaded or not self.is_axis:
             return
-        
+        gremlin.util.InvokeUiMethod(self._update_axis_icons_ui)
+
+    
+    def _update_axis_icons_ui(self):
+        ''' update titlebar icons - UI thread'''
         is_curve = self.data.is_curve
         if Shiboken.isValid(self._curve_button_widget):
             if is_curve:
@@ -2368,9 +2388,12 @@ class InputItemWidget(QBoxFrame):
         # update mapping icons 
         self.create_action_icons(self.data)
 
-    @QtCore.Slot(object)
+
     def _icon_changed_cb(self, event : gremlin.event_handler.DeviceChangeEvent):
-        ''' updates the input item icons based on the actions it contains '''
+        gremlin.util.InvokeUiMethod(self._icon_changed_cb_ui, event)
+    
+    def _icon_changed_cb_ui(self, event : gremlin.event_handler.DeviceChangeEvent):
+        ''' updates the input item icons based on the actions it contains - UI thread '''
         if isinstance(event.source, gremlin.base_profile.AbstractAction):
             action = event.source
             if self.findAction(action):
@@ -4578,7 +4601,8 @@ class ActionContainerView(gremlin.ui.ui_common.AbstractView):
         
         self._redraw_lock = True
         try:
-            with self.model.data_changed.blocked():
+            #with self.model.data_changed.blocked():
+            with QtCore.QSignalBlocker(self.model):
                 self._clear_widgets()
                 container_count = self.model.rows()    
                 if container_count:

@@ -436,6 +436,9 @@ def set_last_input_id(device_guid, input_type, input_id):
         import gremlin.config
         config = gremlin.config.Configuration()
         config.set_last_input(device_guid, input_type, input_id)
+        
+        if current_profile:
+            current_profile.setLastInput(device_guid, input_type, input_id)
 
 def get_last_input_id():
     import gremlin.config

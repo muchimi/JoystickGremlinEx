@@ -260,6 +260,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.update_mode_status_bar.connect(self._update_mode_status_bar)
         el.request_ui_refresh.connect(self.refresh)
         el.shutdown.connect(self.handle_shutdown)
+     
  
 
         # highlighing options
@@ -431,6 +432,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # cleanup on shutdown
         if os.path.isfile(self._comparative_file):
             os.unlink(self._comparative_file)
+
+    def handle_tab_selected(self, device_guid):
+        ''' persists the last selected device for the profile '''
+        if self.profile:
+            self.profile.saveLastDevice(device_guid)
 
     def _update_start_tab(self):
         ''' forces a tab index reload on init '''
@@ -3255,8 +3261,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         :returns: (input_type, Input_id)
 
         '''
-        
-        _, input_type, input_id = gremlin.config.Configuration().get_last_input(device_guid)
+
+        device_guid, input_type, input_id = gremlin.shared_state.current_profile.getLastInput(device_guid)
+
+        # _, input_type, input_id = gremlin.config.Configuration().get_last_input(device_guid)
         if not input_type:
             # pick the first input for that tab
             widget = self._get_tab_widget_guid(device_guid)
@@ -4863,13 +4871,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._update_window_title()
 
             el.pop_input_selection(True) # restore input selection and reset
-            #self._select_input(last_device_guid, last_input_type, last_input_id, True)
 
             syslog.info("Profile: load completed.")
 
             # mode to restore post-load if possible
-            last_device_guid, last_input_type, last_input_id = self.config.get_last_input()
-            self._select_input(last_device_guid, last_input_type, last_input_id)
+            
+
+            last_device_guid, last_input_type, last_input_id = new_profile.getLastInput() #self.config.get_last_input()
+
+            # enable saving the configuration
+            new_profile.saveConfigEnabled = True
+            self._select_input(last_device_guid, last_input_type, last_input_id, force_switch = True, force_update=True)
 
 
         finally:

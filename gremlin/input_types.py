@@ -113,8 +113,8 @@ class InputType(enum.IntEnum):
             if isinstance(value, int):
                 input_type = InputType(value)
                 return input_type
-            if value in _InputType_to_string_lookup.keys():
-                input_type = InputType(value)
+            if value in _InputType_to_enum_lookup:
+                input_type = _InputType_to_enum_lookup[value]
                 return input_type
                 
         except:

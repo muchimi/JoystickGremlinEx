@@ -1527,7 +1527,7 @@ class AbstractModel(QtCore.QAbstractItemModel):
 
     """Base class for MVC models."""
 
-    data_changed = Signal()
+    data_changed = QtCore.Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

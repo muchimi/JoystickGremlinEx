@@ -25,6 +25,7 @@ import copy
 import logging
 import time
 import traceback
+import json
 #import gremlin.base_classes
 
 import gremlin.keyboard
@@ -3139,6 +3140,12 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     @property
     def hasCalibration(self):
         ''' for axis input devices, returns True if the device has an active calibration '''
+        if not self._calibration:
+            import gremlin.ui.axis_calibration
+            cm = gremlin.ui.axis_calibration.CalibrationManager()
+            calibration = cm.getCalibration(self._device_guid, self._input_id)
+            self._calibration = calibration
+
         return self._calibration is not None and self._calibration.hasData
 
     @property
@@ -3462,9 +3469,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                         self._input_name = f"Axis {input_id}"
 
 
-                    mgr = gremlin.ui.axis_calibration.CalibrationManager()
-                    self._calibration = mgr.getCalibration(self._device_guid, self._input_id)
-
                     el = gremlin.event_handler.EventListener()
                     el.update_input_icons.emit()
                 elif self._input_type == InputType.JoystickButton:
@@ -3656,9 +3660,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 # ignore extra data
                 continue
             if not "type" in child.attrib:
-                syslog.error(
-                    f"XML {child.tag} is missing container 'type' attribute"
-                )
+                # could be a blank container
+                action_set_nodes = child.xpath("./action-set")
+                if action_set_nodes:
+                    # this is an error
+                    syslog.error(f"XML {child.tag} is missing container 'type' attribute.  Offending line [{child.sourceline}]")
                 continue
             container_type = child.get("type")
 
@@ -4011,7 +4017,8 @@ class Profile():
         self.plugins = []
         self.settings = Settings(self)
         self.parent = parent
-        self._profile_fname = None # the file name of this profile
+        self._profile_fname = None # the file name of this profile (xml)
+        self._profile_config_fname = None # the configuration file name of this profile (json)
         self._profile_name = None # the friendly name of this profile
         self._start_mode = "Default" # startup mode for this profile (this will be either the default mode, or the last used mode)
         self._default_start_mode = "Default"  # default startup mode for this profile
@@ -4030,6 +4037,7 @@ class Profile():
         self.state.clear()
         self._start_state = {}  # profile startup output state - index by [device_id (str)][buttons/axis (str)][id (int)] = value (float or bool)
         self._removed_devices = [] # list of removed devices from the profile, list of device_id (str)
+        self._save_config_enabled = False # true if profile config saving is enabled
 
 
         self.override_start_mode = None # override mode for profile startup if any (not persisted)
@@ -5320,8 +5328,10 @@ class Profile():
             ''' sets the profile save file xml '''
             if value:
                 self._profile_fname = gremlin.util.fix_path(value)
+                self._profile_config_fname = gremlin.util.swap_ext(self._profile_fname, "json")
             else:
                 self._profile_fname = None
+                self._profile_config_fname = None
 
     def get_default_mode(self):
         ''' gets the default mode for this profile - this is the mode used if the default startup mode is not specified '''
@@ -5531,8 +5541,10 @@ class Profile():
 
         if  fname_is_xml:
             self._profile_fname = None
+            self._profile_config_fname = None
         else:
             self._profile_fname = gremlin.util.fix_path(fname)
+            self._profile_config_fname = gremlin.util.swap_ext(self._profile_fname, "json")
             name, _ = os.path.splitext(os.path.basename(fname))
             self._profile_name = name
 
@@ -6039,6 +6051,142 @@ class Profile():
         else:
             self._profile_fname = None
             self._dirty = False
+
+    def _readConfig(self) -> dict:
+        ''' reads the profile config '''
+        fname = self._profile_config_fname
+        data = {}
+        if fname and os.path.isfile(fname):
+            try:
+                with open(fname, "r") as hdl:
+                    decoder = json.JSONDecoder()
+                    data = decoder.decode(hdl.read())
+            except:
+                # failed to read
+                pass
+                
+
+        return data
+    
+    def _writeConfig(self, data : dict):
+        fname = self._profile_config_fname
+        if fname:
+            try:
+                with open(fname, "w") as hdl:
+                    encoder = json.JSONEncoder(sort_keys=True,indent=4)
+                    hdl.write(encoder.encode(data))
+                    hdl.flush()
+                    hdl.close()   
+            except:
+                pass
+
+    def _setConfig(self, key, value):
+        ''' sets a configuration value and saves to the profile config file '''
+        data = self._readConfig() # get the profile config
+        data[key] = value
+        self._writeConfig(data)
+
+    @property
+    def saveConfigEnabled(self) -> bool:
+        ''' true if the profile can save the configuration '''
+        return self._save_config_enabled
+    
+    @saveConfigEnabled.setter
+    def saveConfigEnabled(self, value : bool):
+        self._save_config_enabled = value
+
+   
+    def setLastInput(self, device_guid, input_type, input_id):
+        ''' sets the last profile input'''
+        if self._save_config_enabled:
+            data = self._readConfig() # get the profile config
+            if device_guid is None:
+                # remove existing device, input and id
+                if "last_device_guid" in data:
+                    del data["last_device_guid"]
+                if "last_input_id" in data:
+                    del data["last_input_id"]        
+                if "last_input_type" in data:
+                    del data["last_input_id"]
+                
+            else:
+                data["last_device_guid"] = gremlin.util.normalize_guid(device_guid)
+                if not "selection_map" in data:
+                    data["selection_map"] = {}
+                data["selection_map"]["device_guid"] = {}
+            
+                if input_id is None:
+                    # remove any existing input_id and input_type
+                    if "last_input_id" in data:
+                        del data["last_input_id"]
+                    if "last_input_type" in data:
+                        del data["last_input_type"]    
+                    if "input_id" in data["selection_map"]["device_guid"]:
+                        del data["selection_map"]["device_guid"]["input_id"]
+                    if "input_type" in data["selection_map"]["device_guid"]:
+                        del data["selection_map"]["device_guid"]["input_type"]
+                else:
+                    # id provided
+                    if not isinstance(input_id, int) or isinstance(input_id, float):
+                        # complex input id like a key, state, osc command
+                        data["last_input_id"] = input_id.message_key
+                    else:
+                        data["last_input_id"] = input_id
+
+                    data["selection_map"]["device_guid"]["input_id"] = data["last_input_id"]
+
+            
+                    if input_type is None:
+                        if "last_input_type" in data:
+                            del data["last_input_type"]
+                        if "input_type" in data["selection_map"]["device_guid"]:
+                            del data["selection_map"]["device_guid"]["input_type"]
+                        
+                    else:
+                        data["last_input_type"] = InputType.to_string(input_type)
+                        data["selection_map"]["device_guid"]["input_type"] = data["last_input_type"]
+
+            self._writeConfig(data)
+
+    def getLastInput(self, device_guid = None) -> tuple: 
+        ''' gets the last input for this profile (device_guid, input_type, input_id)'''
+        data = self._readConfig() # get the profile config
+        input_id = None
+        input_type = None
+        if device_guid is not None and "selection_map" in data:
+            device_guid = gremlin.util.normalize_guid(device_guid)
+            if device_guid in data["selection_map"]:
+                if "input_id" in data["selection_map"]["device_guid"]:
+                    input_id = data["last_input_id"]
+                if "input_type" in data["selection_map"]["device_guid"]:
+                    input_type = InputType.convert(data["last_input_type"])
+
+
+        if device_guid is None:
+
+            
+            if "last_device_guid" in data:
+                device_guid = data["last_device_guid"]
+            if "last_input_type" in data:
+                input_type = InputType.convert(data["last_input_type"])
+            if "last_input_id" in data:
+                input_id = data["last_input_id"]
+
+            if device_guid is None:
+                # not found
+                config = gremlin.config.Configuration()
+                device_guid, input_type, input_id = config.get_last_input()
+
+
+        return (device_guid, input_type, input_id)
+                
+            
+
+
+
+
+                
+
 
     def copy_devices(self, source_guid, target_guid):
         ''' copies data between two devices '''
