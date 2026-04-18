@@ -430,25 +430,51 @@ class InputItemListModel(ui_common.AbstractModel):
 
     def sort(self, sort_callback):
         ''' sorts the data using a sorting callback - the callback takes a list of input items, and returns a list of input items '''
-        
-        item_list = [item for item in self._index_map.values()]
-        item_list = sort_callback(item_list)
-        input_items = self._device_data.modes[self._mode]
-        for input_type in self._allowed_input_types:
-            if input_type in input_items.config.keys():
-                saved_data = {}
-                for key in item_list:
-                    input_id = key.input_id
-                    if input_id in input_items.config[input_type]:
-                        data = input_items.config[input_type][input_id]
-                        saved_data[input_id] = data
-                        del input_items.config[input_type][input_id]
-                        
-                for key in item_list:
-                    input_id = key.input_id
-                    input_items.config[input_type][input_id] = saved_data[input_id]
 
-        self.updateData()
+        syslog.info("Before sort:----------------------------")
+        for index, item in self._source_index_map.items():
+            syslog.info(f"[{index}] = [{item.input_id.display_name}]")
+
+        syslog.info("After sort:----------------------------")
+        
+        item_list = [item for item in self._source_index_map.values()]
+        item_list = sort_callback(item_list)
+        
+        new_index_map = {}
+        new_item_map = {}
+        new_source_index_map = {}
+        new_source_item_map = {}
+
+        for index, item in enumerate(item_list):
+            if item in self._item_map:
+                new_index_map[index] = item
+                new_item_map[item] = index
+            new_source_index_map[index] = item
+            new_source_item_map[item] = index
+            syslog.info(f"[{index}] = [{item.input_id.display_name}]")
+
+        self._index_map = new_index_map if new_index_map else new_source_index_map
+        self._item_map = new_item_map if new_item_map else new_source_item_map
+        self._source_index_map = new_source_index_map
+        self._source_item_map = new_source_item_map
+
+        # input_items = self._device_data.modes[self._mode]
+        # for input_type in self._allowed_input_types:
+        #     if input_type in input_items.config.keys():
+        #         saved_data = {}
+        #         for key in item_list:
+        #             input_id = key.input_id
+        #             if input_id in input_items.config[input_type]:
+        #                 data = input_items.config[input_type][input_id]
+        #                 saved_data[input_id] = data
+        #                 del input_items.config[input_type][input_id]
+                        
+                        
+        #         for key in item_list:
+        #             input_id = key.input_id
+        #             if input_id in saved_data:
+        # self.updateData()
+        self.data_changed.emit()
 
 
     def refresh(self, emit = False):
@@ -487,7 +513,6 @@ class InputItemListModel(ui_common.AbstractModel):
         :param index the index for which to return the data
         :return data stored at the provided index
         """
-
         if not index in self._source_index_map:
             return None
 
@@ -3531,7 +3556,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                                 new_container.from_xml(node, self.profile_data)
                                 new_container.generateGuids()
                                 self.container = new_container
-                                self.container_modified.emit()
+                                if Shiboken.isValid(self):
+                                    self.container_modified.emit()
 
             except:
                 pass

@@ -768,25 +768,24 @@ class CodeRunner:
         if self._startup_profile and gremlin.shared_state.current_profile != self._startup_profile:
             eh.change_profile(self._startup_profile)
         # change back to edit mode
-        eh.change_mode(gremlin.shared_state.edit_mode, emit=True, force_update = False)
+        edit_mode = gremlin.shared_state.edit_mode
+        eh.change_mode(edit_mode, emit=True, force_update = False)
 
         # hook profiles - this tells all functors to unhook runtime events
         el.profile_unhook.emit() 
 
         el.profile_stopped.emit() # stopped
 
-
-      
+     
         # re-enable tabs
         self.enableUI()
 
         # reload UI
         el.request_ui_refresh.emit()
 
-        # # check if devices changed at runtime
-        # if gremlin.shared_state.has_device_changes:
-        #     gremlin.shared_state.has_device_changes = False # mark as changes processed
-        #     gremlin.joystick_handling.reset_devices()
+        # update mode
+        el.edit_mode_ui_update.emit(edit_mode)
+
 
 
     def _reset_state(self):

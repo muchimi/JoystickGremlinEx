@@ -193,7 +193,8 @@ If the timer is set to 0, the actions get executed immediately if the condition 
                     action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
 
             self.profile_data.add_action(action_item)
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 
@@ -205,7 +206,8 @@ If the timer is set to 0, the actions get executed immediately if the condition 
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
             action_item = plugin_manager.duplicate(action, self.profile_data)
             self.profile_data.add_action(action_item)
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 

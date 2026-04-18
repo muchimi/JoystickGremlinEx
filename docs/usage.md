@@ -1458,6 +1458,26 @@ Warnings will be placed in the log file if an OSC message arrives that is not su
 | Button | The input will look like a button to actions and containers.  The first argument (integer or floating point) should be 0 for "released", and non zero for "pressed". |
 | Button (autorelease) | The input will look like a button to actions and containers. GremlinEx will issue a "press" even on message receipt, and generate an automatic "release" when the delay has lapsed. |
 
+### OSC Bulk Import
+
+Starting with GEX m76RC29, it is possible to import multiple OSC message configurations together from a text definitions pasted into GEX.
+
+Each line corresponds to an OSC input in the format  command [mode]
+
+The mode is defined in the table below
+
+| Import Mode | Description |
+| --- | --- |
+| (blank) | imports as a button, with a single parameter.  If the parameter is non-zero, the input will be pressed.  if 0, it will be released. |
+| b | Same as (blank). imports as a button, with a single parameter.  If the parameter is non-zero, the input will be pressed.  if 0, it will be released. |
+| bnp | Autorelease button.  When a message is received, the mapping will be triggered pressed, and after a period of autorelease which defaults to 250ms, it will be released. |
+| a | Axis mode.  The input will look at the input parameter which is expected to be a floating point value between 0.0 and 1.0.  This will map in GEX as a joystick axis -1.0 to +1.0. This is typically used with faders and sliders on the OSC side of things. |
+| e | Encoder mode. |
+| c | Change mode.  A trigger will be issued whenever the message is received. |
+
+![warning](assets/warning.png)  Bulk imports can include duplicated entries.  The last entry found will be imported.
+
+![warning](assets/warning.png) If the input is already defined, the entry will be ignored (log file will list which items are duplicated).
 
 ## States
 

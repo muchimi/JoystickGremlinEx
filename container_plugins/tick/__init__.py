@@ -269,7 +269,8 @@ class TickContainerWidget(AbstractContainerWidget):
                 self.profile_data.action_sets[index] = []
             self.profile_data.action_sets[index].append(action_item)
             self.profile_data.create_or_delete_virtual_button()
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 
@@ -298,7 +299,8 @@ class TickContainerWidget(AbstractContainerWidget):
             if index == 0 and self.profile_data.action_sets[0] is None:
                 index = 1
             self.profile_data.action_sets[index] = None
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
 
     def _get_window_title(self):
         """Returns the title to use for this container.

@@ -113,6 +113,8 @@ class BasicContainerWidget(AbstractContainerWidget):
         from gremlin.clipboard import Clipboard
         if action_data is None:
             return
+        if not Shiboken.isValid(self):
+            return
         
         gremlin.util.pushCursor()
 
@@ -132,7 +134,8 @@ class BasicContainerWidget(AbstractContainerWidget):
             self.profile_data.add_action(action_item)
 
             # blows up in QT 6.11
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 
@@ -144,7 +147,8 @@ class BasicContainerWidget(AbstractContainerWidget):
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
             action_item = plugin_manager.duplicate(action, self.profile_data)
             self.profile_data.add_action(action_item)
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 

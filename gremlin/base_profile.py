@@ -3312,10 +3312,12 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     def getInputType(self):
         ''' gets the input type or the override input type'''
-        if self._override_input_type:
-            return self._override_input_type
-        return self.input_type
-
+        if hasattr(self._input_id, "getOverrideInputType"):
+            override_input_type = self._input_id.getOverrideInputType()    
+        else:
+            override_input_type = self.getOverrideInputType()
+        return override_input_type
+ 
     def getRawInputType(self):
         ''' gets the input type or the override input type'''
         return self.input_type
@@ -3779,7 +3781,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 child = entry.to_xml()
                 if child is None:
                     child = entry.to_xml()
-                    pass
+                    # pass
                 if child is not None:
                     container_node.append(entry.to_xml())
 
@@ -6129,7 +6131,10 @@ class Profile():
                     # id provided
                     if not isinstance(input_id, int) or isinstance(input_id, float):
                         # complex input id like a key, state, osc command
-                        data["last_input_id"] = input_id.message_key
+                        if hasattr(input_id, "message_key"):
+                            data["last_input_id"] = input_id.message_key
+                        else:
+                            data["last_input_id"] = input_id
                     else:
                         data["last_input_id"] = input_id
 

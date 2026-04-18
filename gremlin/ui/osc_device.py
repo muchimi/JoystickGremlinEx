@@ -2324,7 +2324,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
 
     def getOverrideInputType(self):
         match self._mode:
-            case OscInputItem.InputMode.Button:
+            case OscInputItem.InputMode.Button | None:
                 return InputType.JoystickButton
             case OscInputItem.InputMode.Axis:
                 return InputType.JoystickAxis
@@ -2580,7 +2580,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
         if command_mode == OscInputItem.CommandMode.Data:
             return f"{message} {OscInputItem.data_to_string(args)}"
         elif command_mode == OscInputItem.CommandMode.Message:
-            if args is not None:
+            if args:
                 return f"{message} {args}"
             return f"{message}"
         else:
@@ -3284,8 +3284,9 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         if not Shiboken.isValid(self):
             return
         self._clear_parameters()
-        for index, value in enumerate(self._command_data):
-            self._set_parameter(index, value)
+        if self._command_data:
+            for index, value in enumerate(self._command_data):
+                self._set_parameter(index, value)
 
     def _command_parameters(self) -> list:
         index_list = [index for index in self._data_widgets.keys()]
@@ -3295,6 +3296,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
     def _update_display(self):
         ''' loads message data into the UI '''
+        if not Shiboken.isValid(self):
+            return
         # mode radio buttons
         autorelease_visible = False
         parameters_visible = True
@@ -3304,7 +3307,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         if self._mode == OscInputItem.InputMode.Button:
             if self.input_item._trigger_autorelease:
-                msg = f"The input will trigger a press action when a message is received, followed by a release when the delay has lapsed.<br>Use This mode to trigger a button press/release when an OSC message arrives."    
+                msg = f"Autorelease mode.<br>The input will trigger a press action when a message is received, followed by a release when the delay has lapsed.<br>Use this mode to trigger a button press/release when an OSC message arrives."    
                 delay_enabled = True
             else:
                 msg = f"The input will trigger a press action when the first parameter value is not zero (0).<br>A value of zero (0) will trigger a release action.<br>Use this to mode to trigger button presses from OSC messages."
@@ -3542,7 +3545,7 @@ class  OscFilterWidget(QtWidgets.QWidget):
             input_item : OscInputItem
             new_term = gremlin.util.decorate_filter(new_term)
             data = self._model.dataModel()
-            matches = [(index, item) for index, item in data.items() if fnmatch.fnmatch(item.input_id.message, new_term)]
+            matches = [(index, item) for index, item in data.items() if item.input_id.message and fnmatch.fnmatch(item.input_id.message, new_term)]
             if matches:
                 index_list = [i for (i, item) in matches]
                 index_list.sort()
@@ -3606,6 +3609,59 @@ class  OscFilterWidget(QtWidgets.QWidget):
     #         # else:
     #         #     gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
     #         pass
+
+
+class OscBulkLoadDialog(gremlin.ui.ui_common.QRememberDialog):
+    ''' dialog showing a virtual keyboard in which to select key combinations with the keyboard or mouse '''
+    
+    closed = QtCore.Signal() # sent when the dialog closes
+
+    def __init__(self, parent = None):
+        '''
+        :param sequence - input keys to use
+        :param select_single - if set, only can select a single key
+        :param allow_modifiers - if set - modifier keys along with regular keys are allowed
+        '''
+        super().__init__(self.__class__.__name__, parent = parent)
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+
+        main_layout.addWidget(QtWidgets.QLabel("New OSC messages:"))
+        
+        self.text_widget = QtWidgets.QPlainTextEdit()
+
+        main_layout.addWidget(self.text_widget)
+
+        msg = '''Enter new OSC messages one per line.  Messages must start with a forward slash (/). Entries may be given a suffix to set the type automatically. The default is a button.  If you are importing an axis message, add the suffix A after the message such as /osc_msg A or /osc_msg, A
+Valid suffixes are A for axis, BNP for a no paramater (auto-release) button, B for a parameter button (0 = released, not 0 = pressed), C for change, E for encoder.
+Existing entries will be ignored.
+'''
+
+        info_box = gremlin.ui.ui_common.QInfoBox(msg)
+        main_layout.addWidget(info_box)
+
+
+        cancel_button_widget = QtWidgets.QPushButton("Cancel")
+        cancel_button_widget.clicked.connect(self._cancel_cb)
+
+        ok_button_widget = QtWidgets.QPushButton("Ok")
+        ok_button_widget.clicked.connect(self._close_cb)
+
+        widget = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only = True)
+        button_container_widget = widget
+        
+        main_layout.addWidget(button_container_widget)
+        self.setModal(True)
+
+    def _close_cb(self):
+        self.accept()
+        self.close()
+
+    def _cancel_cb(self):
+        self.close()
+
+    def text(self):
+        return self.text_widget.toPlainText()
 
 
 class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
@@ -3719,7 +3775,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # key clear button
         
-        clear_button = ui_common.ConfirmPushButton("Clear OSC Inputs", show_callback = self._show_clear_cb)
+        clear_button = ui_common.ConfirmPushButton("Clear", show_callback = self._show_clear_cb)
         icon = gremlin.ui.ui_common.Icons.trashIcon()
         clear_button.setIcon(icon)
         clear_button.setToolTip("Deletes all OSC inputs")
@@ -3737,7 +3793,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         button_container_layout.addWidget(sort_button)
 
         # Key add button
-        add_button = QtWidgets.QPushButton("Add OSC Input")
+        add_button = QtWidgets.QPushButton("Add")
         add_button.setToolTip("Adds a new OSC message input to the profile")
         icon = gremlin.ui.ui_common.Icons.addIcon()
         add_button.setIcon(icon)
@@ -3745,7 +3801,16 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         button_container_layout.addWidget(add_button)
 
+        # load from list button - load / edit from list
+        load_button = QtWidgets.QPushButton("Import")
+        load_button.setToolTip("Adds multiple OSC message inputs to the profile from a list.")
+        icon = gremlin.ui.ui_common.Icons.addIcon(gremlin.ui.ui_common.Color.yellowColor())
+        load_button.setIcon(icon)
+        load_button.clicked.connect(self._handle_bulk_load)
+        button_container_layout.addWidget(load_button)
+
         self.addLeftPanelWidget(button_container_widget)
+
 
         el = gremlin.event_handler.EventListener()
         # update on an edit mode change so we update the display
@@ -3829,10 +3894,20 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         model = self.input_item_list_model.dataModel()
         for index, osc in model.items():
             if osc.message == input_id:
-
                 return osc
-            
-        return None
+        return None # not found
+    
+    def find_item_by_message(self, mode : str,  msg : str) -> tuple[int, OscInputItem]:
+        ''' looks for OSC input messages to see if there's a match '''
+        msg = msg.strip().casefold()
+        model = self.input_item_list_model.dataModel()
+        
+        for index, input_item in model.items():
+            osc: OscInputItem = input_item.input_id
+            if osc.mode_string == mode and osc.message == msg:
+                return (index, osc)
+        
+        return (-1, None)
     
     def _handle_edit_mode_changed(self, mode : str):
         ''' occurs when a new mode is selected '''
@@ -3879,11 +3954,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_id = OscInputItem(parent = mode_object)
         input_id.input_type_changed.connect(self._refresh_mappings)
 
-        self.device_profile.modes[self.current_mode].get_data(input_type, input_id)
+        self.device_profile.modes[self.current_mode].get_data(input_type, input_id) # adds the item
         self.input_item_list_model.refresh()
         self.input_item_list_view.redraw()
         index = self.input_item_list_model.indexOf(input_id)
-        #index = self._index_for_key(input_id)
+        
         self.input_item_list_view.select_item(index, False)
         
         # index = self.input_item_list_view.current_index
@@ -3898,6 +3973,117 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # auto edit new input
         self._edit_item_cb(None, index, input_id)
+
+
+    @QtCore.Slot()
+    def _handle_bulk_load(self):
+        ''' loads bulk inputs ''' 
+
+        self.bulk_dialog = OscBulkLoadDialog()
+        self.bulk_dialog.showNormal()
+        self.bulk_dialog.accepted.connect(self._handle_bulk_accepted)
+
+    def _handle_bulk_accepted(self):
+
+        text = self.bulk_dialog.text()
+        self.bulk_dialog = None 
+
+        # parse the data
+        if not text:
+            return # nothing to do
+        
+
+        # new input list
+        new_messages = {}
+        
+        # parse the data
+        for line in text.splitlines():
+            line = line.replace(","," ") # remove commas
+            tokens = line.split()
+            
+            if tokens:
+                count = len(tokens)
+                match count:
+                    case 2:
+                        # msg and param
+                        msg = tokens[0]
+                        msg_mode = tokens[1].casefold()
+                    case 1:
+                        msg = tokens[0]
+                        msg_mode = "b"
+                    case _:
+                        syslog.info(f"OSC: bulk load skip: unable to parse: [{line}]")
+                        continue
+                
+
+                new_messages[msg] = msg_mode
+
+        if new_messages:
+
+            profile = gremlin.shared_state.current_profile
+            profile.sync()
+            device_modes =  profile.get_device_modes(self._device_guid, DeviceType.to_string(DeviceType.Osc))
+            mode = gremlin.shared_state.current_mode
+            mode_object = device_modes.ensure_mode_exists(mode)
+            input_type = InputType.OpenSoundControl
+
+            imported_list = []
+
+            for msg, msg_mode in new_messages.items():
+                
+                _ , osc = self.find_item_by_message(mode, msg)
+                if osc:
+                    # already in the list, skip
+                    syslog.info(f"OSC: bulk load skip: [{msg}] is already defined for mode [{mode}]")
+                    continue
+
+                input_id = OscInputItem(parent = mode_object)
+                input_id.message = msg
+                mode = OscInputItem.InputMode.Button
+                auto_release = False
+                match msg_mode:
+                    case "b":
+                        # button mode
+                        pass
+                        
+                    case "bnp":
+                        # button mode, autorelease, no param
+                        auto_release = True
+
+                    case "c":
+                        # button mode, on change
+                        mode = OscInputItem.InputMode.OnChange
+                    case "a":
+                        # axis mode
+                        mode = OscInputItem.InputMode.Axis
+                        
+                    case "e":
+                        # encoder mode
+                        mode = OscInputItem.InputMode.Encoder
+
+                    case _:
+                        syslog.info(f"OSC: bulk load skip: [{msg}] unknown option: [{mode}]")
+
+                # add the new input item
+                input_id.setMode(mode)
+                input_id.autoRelease = auto_release
+                self.device_profile.modes[self.current_mode].get_data(input_type, input_id)
+                imported_list.append(input_id)
+
+
+            if imported_list:
+                # reload list
+                self.input_item_list_model.refresh()
+                self.input_item_list_view.redraw()
+
+            # show results
+            gremlin.ui.ui_common.MessageBox(prompt = f"Imported {len(imported_list):,} entries.", is_warning = False)
+
+
+        
+
+
+        
 
     @QtCore.Slot()
     def _sort_input_cb(self):
@@ -4232,7 +4418,7 @@ class InputOscClient(QtCore.QObject):
 
         self._event_handler = gremlin.event_handler.EventHandler()
         self._event_listener = gremlin.event_handler.EventListener()
-        # self._event_listener.osc_message.connect(self._osc_message_cb)
+        
         self._event_listener.request_osc.connect(self._request_osc_state)
         self._event_listener.profile_start.connect(self._profile_start)
         self._event_listener.options_changed.connect(self._options_changed)
@@ -4247,12 +4433,15 @@ class InputOscClient(QtCore.QObject):
     @QtCore.Slot()            
     def _options_changed(self):
         
-        # config = gremlin.config.Configuration()
-        # osc_enabled = config.osc_enabled
+        config = gremlin.config.Configuration()
+        osc_enabled = config.osc_enabled
         # if osc_enabled:
         #     self.start()
         # else:
         self.stop() # force a restart if it was running
+        if osc_enabled:
+            # restart
+            self.start()
 
     @QtCore.Slot()
     def _profile_start(self):
@@ -4420,7 +4609,8 @@ class InputOscClient(QtCore.QObject):
         verbose = gremlin.config.Configuration().verbose_mode_osc
 
         normalized_args = [gremlin.util.scale_to_range(value, source_min = 0, source_max = 1.0) for value in args] if args else []
-        hits = [key for key in self._osc_map if key.startswith(message)]
+        #primary_message = message.split()[0]
+        hits = [key for key in self._osc_map if key == message_key]
         for hit_key in hits:
             if message != hit_key:
                 # params
@@ -4499,16 +4689,17 @@ class InputOscClient(QtCore.QObject):
                     # trigger a button press event
                     autorelease = input_item.autoRelease
                     
-                    if len(args) == 0 and not autorelease:
-                        if config.osc_no_arg_autorelease:
-                            # automatic autorelease mode for buttons on input with no args
-                            autorelease = True
-                            is_pressed = True
-
-                        else:
-                            syslog.warning(f"Autorelease not set on OSC no param button.  Thay may cause no trigger.  Check mode for [{input_item.message}]")
-                            autorelease = False
-                            is_pressed = True
+                    if len(args) == 0:
+                        is_pressed = True
+                        if not autorelease:
+                            if config.osc_no_arg_autorelease:
+                                # automatic autorelease mode for buttons on input with no args
+                                autorelease = True
+                                
+                            else:
+                                syslog.warning(f"Autorelease not set on OSC no param button.  Thay may cause no trigger.  Check mode for [{input_item.message}]")
+                                autorelease = False
+                        
                     else:
                         # first argument is pressed if non zero
                         is_pressed = raw_value != 0.0   #for OSC pressed is any value except 0

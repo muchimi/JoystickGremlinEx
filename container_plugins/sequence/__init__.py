@@ -932,7 +932,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
             action_item = plugin_manager.get_class(action_name)(self.action_data)
             self.action_data.add_action(action_item)
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 
@@ -943,7 +944,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
             action_item = plugin_manager.duplicate(action, self.action_data)
             self.action_data.add_action(action_item)
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 
@@ -984,8 +986,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
                 del self.action_data.action_sets[index]
             case _:
                 return
-            
-        self.container_modified.emit()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
         self._update_steps()
 
     def _get_window_title(self):

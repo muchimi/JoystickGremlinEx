@@ -189,7 +189,8 @@ class RepeatContainerWidget(AbstractContainerWidget):
                 self.profile_data.action_sets[0] = []
             self.profile_data.action_sets[0].append(action_item)
             self.profile_data.create_or_delete_virtual_button()
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 
@@ -206,7 +207,8 @@ class RepeatContainerWidget(AbstractContainerWidget):
                 self.profile_data.action_sets[0] = []
             self.profile_data.action_sets[0].append(action_item)
             self.profile_data.create_or_delete_virtual_button()
-            self.container_modified.emit()        
+            if Shiboken.isValid(self):
+                self.container_modified.emit()        
         finally:
             gremlin.util.popCursor()
 

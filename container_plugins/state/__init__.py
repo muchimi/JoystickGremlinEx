@@ -218,7 +218,8 @@ class StateContainerWidget(AbstractContainerWidget):
 
             self.profile_data.add_action(action_item)
             # blows up in QT 6.11
-            # self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 
@@ -230,7 +231,8 @@ class StateContainerWidget(AbstractContainerWidget):
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
             action_item = plugin_manager.duplicate(action, self.profile_data)
             self.profile_data.add_action(action_item)
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 

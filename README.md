@@ -29,6 +29,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC29):
+New: OSC: bulk import of OSC inputs to simplify the workflow. Multiple OSC messages can be imported this way as a text input, one per line, setting defaults for each, and GEX will auto-create the entries so they don't need to be done one at a time. Existing entries will be ignored.
+Fix: UI: incomplete action list for certain non joystick inputs depending how they were created.
+Fix: UI: edit mode selector may not display current edit mode on profile stop.
+Fix: UI: possible exception on input sorting (if the device supports input sorting).
+Fix: OSC: matching OSC messages received with no parameters when the autorelease mode is enabled not always triggering.
+Fix: OSC: message processing could trigger multiple inputs if the message was a partial match for multiple commands (such as /test could match /test_this).
+
+
 ### (m76RC28):
 Change: UI: improve last input re-selection on profile reload
 Fix: input calibration: resolved various issues related to calibration UI behavior and persistence and inability to close the calibration dialog in some situations.

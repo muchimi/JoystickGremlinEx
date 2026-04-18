@@ -328,7 +328,8 @@ class RangeContainerWidget(AbstractContainerWidget):
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
             action_item = plugin_manager.get_class(action_name)(self.profile_data)
             self.profile_data.add_action(action_item)
-            self.container_modified.emit()      
+            if Shiboken.isValid(self):
+                self.container_modified.emit()      
         finally:
             gremlin.util.popCursor()
 
@@ -339,7 +340,8 @@ class RangeContainerWidget(AbstractContainerWidget):
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
             action_item = plugin_manager.duplicate(action, self.profile_data)
             self.profile_data.add_action(action_item)
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 
@@ -375,7 +377,8 @@ class RangeContainerWidget(AbstractContainerWidget):
         if action == gremlin.ui.input_item.ActionSetView.Interactions.Delete:
             del self.profile_data.action_sets[index]
 
-        self.container_modified.emit()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
 
     def _get_window_title(self):
         """Returns the title to use for this container.

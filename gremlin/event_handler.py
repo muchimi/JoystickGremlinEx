@@ -2778,6 +2778,7 @@ class EventHandler(QtCore.QObject):
 			#if not is_running:
 		# check the UI is updated to the correct mode
 		el = EventListener()
+		syslog.info(f"Mode: update selector to: [{mode}]")
 		el.edit_mode_ui_update.emit(mode)
 
 

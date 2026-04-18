@@ -216,8 +216,8 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
                     action_item = plugin_manager.duplicate(action.data, self.profile_data)
 
             self.profile_data.add_action(action_item, index)
-            
-            #self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
         finally:
             gremlin.util.popCursor()
 

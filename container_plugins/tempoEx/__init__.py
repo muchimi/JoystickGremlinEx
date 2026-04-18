@@ -374,7 +374,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "short"
         self.profile_data.short_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()     
+        if Shiboken.isValid(self):
+            self.container_modified.emit()     
 
         action_sets = [action_set for action_set in self.profile_data.short_action_sets if action_set]
         self._create_widgets(action_sets,"Chain Short Action", self.short_layout, self.short_layout_widget_list)
@@ -388,7 +389,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "short"
         self.profile_data.short_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()       
+        if Shiboken.isValid(self):
+            self.container_modified.emit()       
 
         action_sets = [action_set for action_set in self.profile_data.short_action_sets if action_set]
         self._create_widgets(action_sets,"Chain Short Action", self.short_layout, self.short_layout_widget_list)
@@ -403,7 +405,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "long"
         self.profile_data.long_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()     
+        if Shiboken.isValid(self):
+            self.container_modified.emit()     
 
         action_sets = [action_set for action_set in self.profile_data.long_action_sets if action_set]   
         self._create_widgets(action_sets,"Chain Long Action", self.long_layout, self.long_layout_widget_list)
@@ -418,7 +421,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "long"
         self.profile_data.long_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()    
+        if Shiboken.isValid(self):
+            self.container_modified.emit()    
 
         action_sets = [action_set for action_set in self.profile_data.long_action_sets if action_set]   
         self._create_widgets(action_sets,"Chain Long Action", self.long_layout, self.long_layout_widget_list)              
@@ -434,7 +438,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "double"
         self.profile_data.double_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()     
+        if Shiboken.isValid(self):
+            self.container_modified.emit()     
 
         action_sets = [action_set for action_set in self.profile_data.double_action_sets if action_set]   
         self._create_widgets(action_sets,"Chain Double Action", self.double_layout, self.double_layout_widget_list)
@@ -447,7 +452,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_item.data = "double"
         self.profile_data.double_action_sets.append([action_item])
         self.profile_data.create_or_delete_virtual_button()
-        self.container_modified.emit()     
+        if Shiboken.isValid(self):
+            self.container_modified.emit()     
         for widget in self.double_layout_widget_list:
             widget.redraw()
 
@@ -590,8 +596,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
             elif action ==  gremlin.ui.input_item.ActionSetView.Interactions.Down:
                 if index < len(action_sets) - 1:
                     action_sets[index], action_sets[index + 1] = action_sets[index + 1], action_sets[index]
-
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
 
     def _get_window_title(self):
         """Returns the title to use for this container.

@@ -199,8 +199,9 @@ class ButtonContainerWidget(AbstractContainerWidget):
 
 
     def _handle_container_changed(self):
-        self.container_modified.emit()
-        self.redrawActionSets()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+            self.redrawActionSets()
 
     def _add_action(self, index, action_name):
         """Adds a new action to the container.
@@ -216,7 +217,8 @@ class ButtonContainerWidget(AbstractContainerWidget):
                 self.profile_data.action_sets[index] = []
             self.profile_data.action_sets[index].append(action_item)
             self.profile_data.create_or_delete_virtual_button()
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
             self._update_actions()
         finally:
             gremlin.util.popCursor()
@@ -249,7 +251,8 @@ class ButtonContainerWidget(AbstractContainerWidget):
             if index == 0 and self.profile_data.action_sets[0] is None:
                 index = 1
             self.profile_data.action_sets[index] = None
-            self.container_modified.emit()
+            if Shiboken.isValid(self):
+                self.container_modified.emit()
             self._update_actions()
             self._update_container_ui()
 

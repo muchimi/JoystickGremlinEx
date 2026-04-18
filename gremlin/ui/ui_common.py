@@ -2818,9 +2818,11 @@ class ActionSelector(QtWidgets.QWidget):
         #     pass
 
         assert isinstance(input_item, gremlin.base_profile.InputItem), "expected an input item, wrong type passed"
+        
         self._input_item = input_item
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
-        self._input_type = input_type if input_type else self._input_item.getInputType()
+        #self._input_type = input_type if input_type else self._input_item.getInputType()
+        self._input_type = self._input_item.getInputType()
 
         self.action_dropdown = QDataComboBox()
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
@@ -2929,7 +2931,7 @@ class ActionSelector(QtWidgets.QWidget):
 
     def _valid_action_list(self, input_type: InputType):
         """Returns a list of valid actions for this InputItemWidget.
-
+           Get a list of valid actions for the input.
         :return list of valid action names
         """
         action_list = []
@@ -3010,7 +3012,7 @@ class ActionSelector(QtWidgets.QWidget):
         if not action_list:
             return
         
-
+        
         valid_actions = self._valid_action_list(self._input_type)
         warning = False
         for action in action_list:
