@@ -5458,7 +5458,7 @@ class Profile():
         if node_list:
             mode_nodes = node_list[0]
             for mode_node in mode_nodes:
-                mode_name = mode_node.get("name")
+                mode_name = html.unescape(mode_node.get("name"))
                 #if verbose: syslog.info(f"PROFILE MODE: [{mode_name}] ")
                 if mode_name in mode_node_map:
                     continue # already known
@@ -5469,7 +5469,7 @@ class Profile():
                 mode_node_map[mode_name] = mode_node
 
                 if "inherit" in mode_node.attrib:
-                    parent_mode_name = mode_node.get("inherit")
+                    parent_mode_name = html.unescape(mode_node.get("inherit"))
                     if not parent_mode_name in mode_node_map:
                         tree_parent_mode = ModeNode(parent_mode_name)
                         mode_tree_nodes[parent_mode_name] = tree_parent_mode
@@ -5647,11 +5647,11 @@ class Profile():
             if not mode:
                 continue # root node
             node = etree.Element("mode") # new xml child
-            node.set("name",mode) # set mode value
+            node.set("name",html.escape(mode)) # set mode value
             if tree_node.parent:
                 parent_mode = tree_node.parent.name
                 if parent_mode:
-                    node.set("inherit", parent_mode)
+                    node.set("inherit", html.escape(parent_mode))
 
             nodes[mode] = node # track it
             parent_mode = tree_node.parent.name if tree_node.parent else None
@@ -6533,7 +6533,7 @@ class Mode:
         :param node XML node to parse
         """
         from gremlin.base_profile import InputItem
-        mode_name = safe_read(node, "name", str, "")
+        mode_name = html.unescape(safe_read(node, "name", str, ""))
         if "system" in node.attrib:
             self.isSystem = safe_read(node,"system", bool, False)
         else:
@@ -6593,7 +6593,7 @@ class Mode:
         :return XML node representing this object's data
         """
         node = etree.Element("mode")
-        node.set("name", safe_format(self.name, str))
+        node.set("name", safe_format(html.escape(self.name), str))
         if self.isSystem:
             node.set("system", safe_format(True, bool))
 

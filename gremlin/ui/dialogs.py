@@ -3485,6 +3485,7 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
 
     @QtCore.Slot()
     def _close_cb(self):
+        # validate the mode name
         self.accept()
         self.close()
 

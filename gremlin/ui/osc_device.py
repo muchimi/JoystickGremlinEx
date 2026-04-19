@@ -3545,13 +3545,14 @@ class  OscFilterWidget(QtWidgets.QWidget):
             input_item : OscInputItem
             new_term = gremlin.util.decorate_filter(new_term)
             data = self._model.dataModel()
-            matches = [(index, item) for index, item in data.items() if item.input_id.message and fnmatch.fnmatch(item.input_id.message, new_term)]
+            matches = [(index, item) for index, item in data.items() if item.input_id.message and (fnmatch.fnmatch(item.input_id.message, new_term) or new_term in item.input_id.message)]
             if matches:
                 index_list = [i for (i, item) in matches]
                 index_list.sort()
                 index = index_list[0]
                 input_item = data[index]
                 self.select.emit(input_item)
+                
 
        
     def _update_count(self):
@@ -4119,6 +4120,8 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if index != -1:
             self._select_item_cb(index)
 
+                
+
 
     def clearFilter(self):
         ''' clears the current data filter '''
@@ -4175,7 +4178,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             widget.description_changed.connect(change_cb)
 
             self.selectRegisteredWidget(key)
+
+            QtWidgets.QApplication.processEvents()
+            # scroll to that item
             self.input_item_list_view.scrollToIndex(index)
+            
         else:
             profile = gremlin.shared_state.current_profile
             device_guid = gremlin.shared_state.osc_tab_guid

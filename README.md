@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC30):
+Fix: OSC: search function.
+Fix: Profile: handle special characters in mode names
+
 ### (m76RC29):
 New: OSC: bulk import of OSC inputs to simplify the workflow. Multiple OSC messages can be imported this way as a text input, one per line, setting defaults for each, and GEX will auto-create the entries so they don't need to be done one at a time. Existing entries will be ignored.
 Fix: UI: incomplete action list for certain non joystick inputs depending how they were created.
