@@ -3409,6 +3409,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         )
         self.listener_dialog.show()               
 
+
     def _capture_message(self, command, data) :
         ''' called when an OSC message is captured '''
         gremlin.util.assert_ui_thread()
@@ -3421,8 +3422,9 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         if not data and command:
             # no args - enable auto release
             self._trigger_autorelease = True
-            with QtCore.QSignalBlocker(self._trigger_on_message_widget):
-                self._trigger_on_message_widget.setChecked(True)
+            if Shiboken.isValid(self):
+                with QtCore.QSignalBlocker(self._trigger_on_message_widget):
+                    self._trigger_on_message_widget.setChecked(True)
 
 
 
@@ -4616,8 +4618,9 @@ class InputOscClient(QtCore.QObject):
         verbose = gremlin.config.Configuration().verbose_mode_osc
 
         normalized_args = [gremlin.util.scale_to_range(value, source_min = 0, source_max = 1.0) for value in args] if args else []
-        #primary_message = message.split()[0]
-        hits = [key for key in self._osc_map if key == message_key]
+        tokens = message.split(maxsplit = 1)
+        primary_message = tokens[0]
+        hits = [key for key in self._osc_map if key == primary_message]
         for hit_key in hits:
             if message != hit_key:
                 # params
