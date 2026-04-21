@@ -3016,6 +3016,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._calibration = None # calibration data if the item is an input axis
         self._curve_data = None # true if the item has its input curved
         self._locked = False # true if the input is locked (cannot make mapping changes)
+        self._sort_index = None # sorting index (int)
         
 
         # self._profile_mode = None
@@ -3047,6 +3048,21 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     @is_action.setter
     def is_action(self, value : bool):
         self._is_action = value
+
+    @property
+    def index(self) -> int:
+        ''' input index within the mode and input type '''
+        if self._sort_index is None:
+            # index not set
+            if isinstance(self._input_id, int):
+                # use input ID if the index is numeric
+                return self._input_id
+            return -1 # not set
+        return self._sort_index
+    
+    @index.setter
+    def index(self, value : int):
+        self._sort_index = value
 
     def _handle_axis_state_request(self):
         ''' request to reload axis state with this input item '''
@@ -3760,7 +3776,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             if self.curve_data is not None:
                 curve_node = self.curve_data._generate_xml()
                 node.append(curve_node)
-
 
             if self.always_execute:
                 node.set("always-execute", "True")
@@ -5203,6 +5218,23 @@ class Profile():
                             return input_item
 
         return None
+    
+    def find_inputs_by_type(self, device_guid, input_type : InputType):
+        ''' gets inputs by type '''
+        device_guid = gremlin.util.normalize_guid(device_guid)
+        input_list = []
+        for dev_guid in self.devices:
+            id = gremlin.util.normalize_guid(dev_guid)
+            if id != device_guid:
+                continue
+            dev = self.devices[dev_guid]
+            for mode_name in dev.modes:
+                mode = dev.modes[mode_name]
+                for _input_type in mode.config:
+                    if _input_type == input_type:
+                        return list[mode.config[input_type].values()]
+
+        return None
 
     def first_input(self, device_guid):
         ''' finds the first input item for the give device_guid'''
@@ -6546,6 +6578,7 @@ class Mode:
 
         self.inherit = node.get("inherit", None)
         child: lxml.etree.Element
+        index = 0 # sorting index - order read in from the profile
         for child in node:
             item = InputItem(mode_parent = self)
             item.from_xml(child, item, extra_data) # send owner item to sub components as the data member
@@ -6558,6 +6591,8 @@ class Mode:
                 item.input_id,
                 autocreate = False
                 )
+            
+            
             
             if not input_item:
                 # did not exist, create
@@ -6585,6 +6620,12 @@ class Mode:
                 # existed, update containers only
                 input_item.setContainers(item.containers)
 
+            # sorting index
+            input_item.index = index
+            # syslog.info(f"xml load [{index}] = [{input_item.input_id.display_name if hasattr(input_item.input_id, "display_name") else input_item.input_id}]")
+            index += 1
+
+
 
 
     def to_xml(self):
@@ -6602,22 +6643,26 @@ class Mode:
         input_types = Mode.SaveInputTypes
         include = False
         for input_type in input_types:
-            item_list = self.config[input_type].values()
+            item_list = list(self.config[input_type].values())
             if item_list:
-                item_list = sorted(item_list, key=lambda x: str(x.input_id))
+                item_list.sort(key=lambda item: item.index)  # sort by index
                 # item_list = [item for item in item_list if item.description or item.containers]
-            for item in item_list:
+            if item_list and input_type == InputType.OpenSoundControl:
+                pass
+            for input_item in item_list:
                 #if item.is_valid_for_save():
-                item_node = item.to_xml()
+                item_node = input_item.to_xml()
+                index = input_item.index
+                # syslog.info(f"xml write [{index}] = [{input_item.input_id.display_name if hasattr(input_item.input_id, "display_name") else input_item.input_id}]")
 
                 # include the item in the xml if it has attributes we need to save to the profile
                 do_include = False
-                if item.locked:
+                if input_item.locked:
                     do_include = True
                 depth = gremlin.util.xmlNodeDepth(item_node)
-                match item.device_type:
+                match input_item.device_type:
                     case DeviceType.Joystick:
-                        if item.description or depth > 1:
+                        if input_item.description or depth > 1:
                             do_include = True
                     case DeviceType.OctaviIFR1:
                         do_include = depth > 1

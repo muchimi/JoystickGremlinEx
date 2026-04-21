@@ -3544,7 +3544,7 @@ class InputListenerWidget(QBoxFrame):
         label.setText(msg)
 
         gremlin.shared_state.push_suspend_highlighting()
-        gremlin.shared_state.push_suspend_ui_keyinput()
+        gremlin.shared_state.push_suspend_ui_keyinput() # prevent UI hotkeys from working
 
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)

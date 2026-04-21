@@ -176,7 +176,9 @@ class KeyboardInputItem(AbstractInputItem):
 
             for child in node:
                 # ready key nodes
-                if child.tag in ("key"):
+                if child.tag is etree.Comment:
+                    continue # skip comments
+                if child.tag == "key":
                     virtual_code = safe_read(child,"virtual-code", int, 0)
                     scan_code = safe_read(child, "scan-code", int, 0)
                     is_extended = safe_read(child, "extended", bool, False)
@@ -218,6 +220,14 @@ class KeyboardInputItem(AbstractInputItem):
         # saves itself to xml
         node = etree.Element("input")
         node.set("guid", str(self.id))
+
+
+        # comment 
+        comment = "".join(name for name in self.keynames)
+        node_comment = etree.Comment(comment)
+        node.append(node_comment)
+
+        # key entry
         child = etree.Element("key")
         root_key = self._key
         child.set("virtual-code", str(root_key.virtual_code))
@@ -226,6 +236,9 @@ class KeyboardInputItem(AbstractInputItem):
         child.set("mouse", str(root_key.is_mouse))
         child.set("description", root_key.lookup_name)
         node.append(child)
+
+
+        
         for key in root_key.latched_keys:
             comment = f"virtual: 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
             latched_child = etree.Element("latched")
@@ -412,20 +425,31 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # key clear button
         
-        clear_keyboard_button = ui_common.ConfirmPushButton("Clear Keys", show_callback = self._show_clear_cb)
+        clear_keyboard_button = ui_common.ConfirmPushButton("Clear", show_callback = self._show_clear_cb)
         icon = gremlin.ui.ui_common.Icons.trashIcon()
         clear_keyboard_button.setIcon(icon)
         clear_keyboard_button.confirmed.connect(self._clear_keys_cb)
         button_container_layout.addWidget(clear_keyboard_button)
         button_container_layout.addStretch(1)
 
-        virtual_keyboard_button = QtWidgets.QPushButton("Add Key")
+               # sort keyboard input
+        sort_button = QtWidgets.QPushButton("Sort")
+        icon = gremlin.ui.ui_common.Icons.sortIcon()
+        sort_button.setIcon(icon)
+        sort_button.clicked.connect(self._sort_input_cb)
+        button_container_layout.addWidget(sort_button)
+        
+        self.addLeftPanelWidget(button_container_widget)
+
+        virtual_keyboard_button = QtWidgets.QPushButton("Add")
+        virtual_keyboard_button.setToolTip("Adds a new key/mouse input to the profile")
         icon = gremlin.ui.ui_common.Icons.keyboardIcon() 
         virtual_keyboard_button.setIcon(icon)
         virtual_keyboard_button.clicked.connect(self._add_key_dialog_cb)
         button_container_layout.addWidget(virtual_keyboard_button)
+
         
-        self.addLeftPanelWidget(button_container_widget)
+ 
         
         # Select default entry
         self.input_item_list_view.redraw()
@@ -445,6 +469,32 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         selected_index = self.input_item_list_view.current_index
         if selected_index is not None and selected_index != -1:
             self._select_item_cb(selected_index)
+
+    def _sort_input_cb(self):
+        ''' sorts the inputs by VK '''
+
+        if not self.input_item_list_model.rows():
+            # nothing to sort
+            return 
+
+        # current selection (so we can select the item that was selected if the order changes)
+        index = self._last_selected_index
+        current_selection = None
+        if index != -1:
+            current_selection = self.input_item_list_model.data(index)
+
+        self.input_item_list_model.sort(self._sort_callback)
+
+        if current_selection:
+            # reselect the saved item
+            # so we need to find the matching data packet
+            self._select_item_cb(current_selection.index)
+                
+    def _sort_callback(self, items : list):
+        ''' callback for sorting inputs in this device '''
+        # sort alpha by keynames for now
+        items.sort(key = lambda x: x.input_id.keynames)
+        return items
 
     @property
     def inputCount(self) -> int:
@@ -699,7 +749,8 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if emit:
             el = gremlin.event_handler.EventListener()
-            el.input_selection_changed.emit(device_guid, input_type, input_id)
+            el.select_input.emit(device_guid, input_type, input_id, False, True, False)
+            # el.input_selection_changed.emit(device_guid, input_type, input_id)
 
 
     def _index_for_key(self, key_or_index):

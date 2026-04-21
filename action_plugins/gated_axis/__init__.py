@@ -395,6 +395,8 @@ making changes that impact the order of gates or ranges."""
             self.container_options_widget.setVisible(visible)
             self.container_output_widget.setVisible(visible)
 
+            
+
     def _options_changed(self):
         ''' options were changed '''
         config = gremlin.config.Configuration()

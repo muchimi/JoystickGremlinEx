@@ -238,8 +238,8 @@ class Key():
             return 8000
         
         return 1000 - self.virtual_code # no sorting
-
     
+   
     def index_tuple(self):
         ''' returns the gremlin index key for this key '''
         return  (self._scan_code, self._is_extended)
@@ -1386,7 +1386,7 @@ class KeyMap:
         ''' derives a single latched key from a set of keys'''
 
         modifier_map = {}
-        modifiers = gremlin.keyboard.KeyMap._keyboard_modifiers # ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt","leftwin","rightwin"]
+        modifiers = KeyMap._keyboard_modifiers # ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt","leftwin","rightwin"]
         for key_name in modifiers:
             modifier_map[key_name] = []
 

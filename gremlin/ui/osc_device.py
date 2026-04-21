@@ -3490,7 +3490,8 @@ class  OscFilterWidget(QtWidgets.QWidget):
         current_filter = self._config.osc_filter
        
         self._filter_widget = gremlin.ui.ui_common.QDataLineEdit(text = current_filter)
-        self._find_widget = gremlin.ui.ui_common.Buttons.getSearchWidget(callback = self._find_entry)
+        self._find_widget = gremlin.ui.ui_common.Buttons.getSearchWidget(callback = self._find_entry,
+                                                                         tooltip = "Search (F3)")
 
 
         self._apply_widget = QtWidgets.QPushButton("Apply")
@@ -3520,6 +3521,8 @@ class  OscFilterWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(widget)
         self.main_layout.setSpacing(2)
         
+        self._last_search_index = -1 # last search index for a successful search
+        self._last_search_term = None # last search term for a succesful search
         
         self._update_count()
 
@@ -3539,23 +3542,46 @@ class  OscFilterWidget(QtWidgets.QWidget):
         self._dialog.show()
 
     def _find_entry_accept(self):
-        
-        config = gremlin.config.Configuration()
         new_term = self._dialog.text()
-        if new_term:
-            config.osc_last_search_term = new_term
+        self.find_next(new_term)
+                        
+    def find_next(self, search_term : str):
+        ''' finds the next entry '''
+        config = gremlin.config.Configuration()
+        
+        if search_term:
+            config.osc_last_search_term = search_term
             input_item : OscInputItem
-            new_term = gremlin.util.decorate_filter(new_term)
+            decorated_search_term = gremlin.util.decorate_filter(search_term)
             data = self._model.dataModel()
-            matches = [(index, item) for index, item in data.items() if item.input_id.message and (fnmatch.fnmatch(item.input_id.message, new_term) or new_term in item.input_id.message)]
+            matches = [(index, item) for index, item in data.items() if item.input_id.message and (fnmatch.fnmatch(item.input_id.message, decorated_search_term) or search_term in item.input_id.message)]
             if matches:
                 index_list = [i for (i, item) in matches]
                 index_list.sort()
-                index = index_list[0]
-                input_item = data[index]
-                self.select.emit(input_item)
-                
+                last_index = -1
+                if self._last_search_term == search_term:
+                    # same index
+                    last_index = self._last_search_index
 
+                    # syslog.info(f"last search index: {last_index}")
+
+                if last_index < 0 or last_index >= len(index_list):
+                    last_index = 0 # round robin to first index
+                
+                # syslog.info(f"search index: {last_index}")
+                index = index_list[last_index]
+                input_item = data[index]
+                #self.select.emit(input_item)
+
+                self._last_search_term = search_term
+                self._last_search_index = last_index+1 # next search index
+
+                el = gremlin.event_handler.EventListener()
+                el.select_input.emit(input_item.device_guid, input_item.input_type, input_item.input_id, False, True, False)
+            else:
+                gremlin.ui.ui_common.MessageBox(prompt = "Term not found")
+                self._last_search_term = search_term
+                self._last_search_index = -1
        
     def _update_count(self):
         ''' updates the count of defined inputs '''
@@ -3822,6 +3848,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # lock all inputs
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
+        el.find_next.connect(self._handle_find_next)
 
 
         # Select default entry
@@ -3862,6 +3889,14 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             for input_item in self.input_item_list_model.getFilteredItems():
                 input_item.locked = False
             self.setUpdatesEnabled(True)
+
+    def _handle_find_next(self):
+        ''' finds the next item '''
+        if gremlin.shared_state.current_tab_device_guid == gremlin.shared_state.osc_tab_id:
+            term = gremlin.config.Configuration().osc_last_search_term # last search term
+            if term:
+                gremlin.util.InvokeUiMethod(self._filter_widget.find_next, term)
+            
 
 
     def _filter_data(self, input_item) -> bool:
@@ -4090,11 +4125,27 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     @QtCore.Slot()
     def _sort_input_cb(self):
-        self.input_item_list_model.sort(self._sort_items)
-        self.input_item_list_view.redraw()
 
-    def _sort_items(self, item_list : list )-> list:
-        item_list.sort(key = lambda x: x.input_id.message.casefold())
+        if not self.input_item_list_model.rows():
+            # nothing to sort
+            return
+        index = self._last_selected_index
+        current_selection = None
+        if index != -1:
+            current_selection = self.input_item_list_model.data(index)
+
+        self.input_item_list_model.sort(self._sort_callback)
+        # self.input_item_list_view.redraw()
+
+        if current_selection:
+            # reselect the saved item - because the inputs were likely recreated - we can't compare the old with the new
+            # so we need to find the matching data packet
+            self._select_item_cb(current_selection.index)
+
+
+    def _sort_callback(self, item_list : list )-> list:
+        ''' callback for sorting inputs in this device '''
+        item_list.sort(key = lambda x: x.input_id.message.casefold()) # sort alpha no case
         return item_list
         
 
@@ -4181,10 +4232,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             self.selectRegisteredWidget(key)
 
-            QtWidgets.QApplication.processEvents()
-            # scroll to that item
-            self.input_item_list_view.scrollToIndex(index)
-            
+  
         else:
             profile = gremlin.shared_state.current_profile
             device_guid = gremlin.shared_state.osc_tab_guid
@@ -4205,7 +4253,11 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if emit:
             el = gremlin.event_handler.EventListener()
-            el.input_selection_changed.emit(device_guid, input_type, input_id)
+            el.select_input.emit(device_guid, input_type, input_id, False, True, False)
+            # el.input_selection_changed.emit(device_guid, input_type, input_id)
+
+        
+        
     
 
     def _close_item_cb(self, widget, index, data):

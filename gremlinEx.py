@@ -3192,8 +3192,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         ''' restore the last selected tab '''
         # print (f"select last tab: {self.config.last_tab_guid}")
         device_guid, input_type, input_id = self.config.get_last_input()
-        eh = gremlin.event_handler.EventListener()
-        eh.select_input.emit(device_guid, input_type, input_id, False, True, False)
+        el = gremlin.event_handler.EventListener()
+        el.select_input.emit(device_guid, input_type, input_id, False, True, False)
 
     @QtCore.Slot()
     def _ui_ready(self):
@@ -4524,16 +4524,26 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _kb_event_cb(self, event):
         ''' listen for keyboard modifiers and keyboard events at runtime '''
 
-        key = gremlin.keyboard.KeyMap.from_event(event)
+        if event.is_pressed:
+            key = gremlin.keyboard.KeyMap.from_event(event)
 
-        # ignore if we're running
-        if key is None or self.runner.is_running() or gremlin.shared_state.ui_keyinput_suspended():
-            return
+            # ignore if we're running
+            if key is None or self.runner.is_running() or gremlin.shared_state.ui_keyinput_suspended():
+                return
 
-        if key.lookup_name == "f5":
-            # activate mode on F5
-            if not self.config.is_debug and self.config.start_on_f5 and not gremlin.shared_state.ui_keyinput_suspended():
-               self.ui.actionActivate.trigger()
+            if not gremlin.shared_state.ui_keyinput_suspended():
+                match key.lookup_name:
+                    case "f5":
+                        # activate mode on F5
+                        if not self.config.is_debug and self.config.start_on_f5:
+                            self.ui.actionActivate.trigger()
+                    case "f3":
+                        # search again 
+                        el = gremlin.event_handler.EventListener()
+                        el.find_next.emit()
+
+
+        
 
     @property
     def input_axis_override(self):

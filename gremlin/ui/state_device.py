@@ -2569,13 +2569,17 @@ class  StateFilterWidget(QtWidgets.QWidget):
         current_filter = self._config.iv_state_filter if is_iv else self._config.state_filter
         self._filter_widget = gremlin.ui.ui_common.QDataLineEdit(text = current_filter)
         
-        self._find_widget = gremlin.ui.ui_common.Buttons.getSearchWidget(callback = self._find_entry)
+        self._find_widget = gremlin.ui.ui_common.Buttons.getSearchWidget(callback = self._find_entry, tooltip = "Search (F3)")
         self._apply_widget = QtWidgets.QPushButton("Apply")
         self._apply_widget.setToolTip("Apply current filter")
         self._apply_widget.clicked.connect(self._apply_filter)
 
         self._clear_filter_widget = gremlin.ui.ui_common.Buttons.getClearWidget(callback = self._clear_filter,label=None)
         self._clear_filter_widget.setMaximumWidth(24)
+
+        self._last_search_index = -1 # last search index for a successful search
+        self._last_search_term = None # last search term for a succesful search
+    
 
         # text filter
         widget = gremlin.ui.ui_common.getHContainer([self._find_widget,
@@ -2604,7 +2608,9 @@ class  StateFilterWidget(QtWidgets.QWidget):
         widget = gremlin.ui.ui_common.getHContainer(self._count_widget, widget_only = True)
         self.main_layout.addWidget(widget)
         self.main_layout.setSpacing(2)
-        self._update_count()        
+        self._update_count()      
+
+    
 
     @QtCore.Slot(bool)
     def _filter_enabled_changed(self, is_filter):
@@ -2696,22 +2702,50 @@ class  StateFilterWidget(QtWidgets.QWidget):
         self._dialog.show()
 
     def _find_entry_accept(self):
+        search_term = self._dialog.text()
+        if search_term:
+            self.find_next(search_term)
+
+
+
+    def find_next(self, search_term : str):
         ''' finds the first entry matching the specified search term'''
         config = gremlin.config.Configuration()
-        current_term = config.state_last_search_term
-        new_term = self._dialog.text()
-        if new_term:
+        # current_term = config.state_last_search_term
+        
+        if search_term:
             input_item : StateInputItem
-            config.state_last_search_term = new_term
-            new_term = gremlin.util.decorate_filter(new_term)
+            config.state_last_search_term = search_term
             data = self._model.dataModel()
-            matches = [(index, item) for index, item in data.items() if fnmatch.fnmatch(item.input_id.key, new_term)]
+            #matches = [(index, item) for index, item in data.items() if fnmatch.fnmatch(item.input_id.key, search_term)]
+            decorated_search_term = gremlin.util.decorate_filter(search_term)
+            matches = [(index, item) for index, item in data.items() if item.input_id.key and (fnmatch.fnmatch(item.input_id.key, decorated_search_term) or search_term in item.input_id.key)]
+           
             if matches:
                 index_list = [i for (i, item) in matches]
                 index_list.sort()
-                index = index_list[0]
+
+                last_index = -1
+                if self._last_search_term == search_term:
+                    # same index
+                    last_index = self._last_search_index
+
+                    # syslog.info(f"last search index: {last_index}")
+
+                if last_index < 0 or last_index >= len(index_list):
+                    last_index = 0 # round robin to first index
+                
+                # syslog.info(f"search index: {last_index}")
+                index = index_list[last_index]
                 input_item = data[index]
-                self.select.emit(input_item)
+
+
+                self._last_search_term = search_term
+                self._last_search_index = last_index+1 # next search index
+
+
+                el = gremlin.event_handler.EventListener()
+                el.select_input.emit(input_item.device_guid, input_item.input_type, input_item.input_id, False, True, False)
         
 class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
@@ -2798,7 +2832,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.addLeftPanelWidget(self._filter_widget)
 
         # clear and add buttons to add/clear all states
-        clear_button = ui_common.ConfirmPushButton("Clear States", show_callback = self._show_clear_cb)
+        clear_button = ui_common.ConfirmPushButton("Clear", show_callback = self._show_clear_cb)
         icon = gremlin.ui.ui_common.Icons.trashIcon()
         clear_button.setIcon(icon)
         clear_button.setToolTip("Deletes all states")
@@ -2817,7 +2851,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # button_container_layout.addWidget(find_button)
 
         # sort states
-        sort_button = QtWidgets.QPushButton("Sort State")
+        sort_button = QtWidgets.QPushButton("Sort")
         icon = gremlin.ui.ui_common.Icons.sortIcon()
         sort_button.setIcon(icon)
         sort_button.clicked.connect(self._sort_input_cb)
@@ -2825,7 +2859,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         # Key add button
-        add_button = QtWidgets.QPushButton("Add State")
+        add_button = QtWidgets.QPushButton("Add")
         add_button.setToolTip("Adds a new state to the profile")
         icon = gremlin.ui.ui_common.Icons.addIcon()
         add_button.setIcon(icon)
@@ -2863,6 +2897,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # lock all inputs
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
+        el.find_next.connect(self._handle_find_next)
 
         # last index selected, -1 means none
         self._last_selected_index = -1 
@@ -2890,6 +2925,15 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _handle_unlock_inputs(self, data):
         gremlin.util.InvokeUiMethod(self._handle_unlock_inputs_ui, data)  # ensure on UI thread
+
+    def _handle_find_next(self):
+        ''' finds the next item '''
+        if gremlin.shared_state.current_tab_device_guid == gremlin.shared_state.state_tab_id:
+            term = gremlin.config.Configuration().state_last_search_term # last search term
+            if term:
+                gremlin.util.InvokeUiMethod(self._filter_widget.find_next, term)
+            
+
             
 
     def _handle_lock_inputs_ui(self, data):
@@ -3024,17 +3068,19 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if current_selection:
             # reselect the saved item - because the inputs were likely recreated - we can't compare the old with the new
             # so we need to find the matching data packet
-            items = self.input_item_list_model.getItems()
-            state = current_selection.input_id
-            for index, item in enumerate(items):
-                if item.input_id == state:
-                    self._select_item_cb(index)
-                    return
+            self._select_item_cb(current_selection.index)
+
+            # items = self.input_item_list_model.getItems()
+            # state = current_selection.input_id
+            # for index, item in enumerate(items):
+            #     if item.input_id == state:
+            #         self._select_item_cb(index)
+            #         return
 
 
     def _sort_callback(self, items : list):
-        ''' callback for sorting '''
-        items.sort(key = lambda x: x.input_id.key)
+        ''' callback for sorting inputs in this device '''
+        items.sort(key = lambda x: x.input_id.key.casefold() if x.input_id.key else "")
         return items
 
     def _close_item_cb(self, widget, index, data):
@@ -3332,9 +3378,12 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self._last_selected_index = index
         self.selectRegisteredWidget(key)
-        self.input_item_list_view.scrollToIndex(index)
+        # QtWidgets.QApplication.processEvents() # needed or scroll doesn't work
+        # self.input_item_list_view.scrollToIndex(index)
         
-        # el = gremlin.event_handler.EventListener()
+        if emit:
+            el = gremlin.event_handler.EventListener()
+            el.select_input.emit(device_guid, input_type, input_id, False, True, False)
         # el.input_selection_changed.emit(device_guid, input_type, input_id)
 
     def _custom_filter_handler(self, data) -> bool:

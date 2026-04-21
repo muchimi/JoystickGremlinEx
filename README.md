@@ -29,6 +29,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m76RC31):
+Change: enabled sorting keyboard/mouse device inputs. The sort is alphabetical for now by key name.
+Change: plain English comment added to the XML keyboard/mouse inputs to increase readability.
+Change: OSC and State devices: Search feature hotkey added (F3).  Repeated presses will also cycle through matching inputs.  Note: hotkey is only enabled in edit mode and when not listening to inputs.
+Fix: The order of inputs is persisted on profile save for inputs that support sorting.
+
 ### (m76RC30A):
 Fix: OSC: search function.
 Fix: Profile: handle special characters in mode names

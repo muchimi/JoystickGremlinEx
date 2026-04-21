@@ -438,27 +438,32 @@ class InputItemListModel(ui_common.AbstractModel):
         syslog.info("After sort:----------------------------")
         
         item_list = [item for item in self._source_index_map.values()]
-        item_list = sort_callback(item_list)
+        item_list = sort_callback(item_list) # returns a sorted list specific to the device
         
         new_index_map = {}
         new_item_map = {}
         new_source_index_map = {}
         new_source_item_map = {}
 
+        # item : gremlin.base_profile.InputItem
         for index, item in enumerate(item_list):
             if item in self._item_map:
                 new_index_map[index] = item
                 new_item_map[item] = index
             new_source_index_map[index] = item
             new_source_item_map[item] = index
-            syslog.info(f"[{index}] = [{item.input_id.display_name}]")
+            item.index = index # update the sorting index 
+            syslog.info(f"sorted [{index}] = [{item.input_id.display_name}]")
 
         self._index_map = new_index_map if new_index_map else new_source_index_map
         self._item_map = new_item_map if new_item_map else new_source_item_map
         self._source_index_map = new_source_index_map
         self._source_item_map = new_source_item_map
 
-        # input_items = self._device_data.modes[self._mode]
+        # update the sort order in the profile sequence
+        
+
+        #input_items = self._device_data.modes[self._mode]
         # for input_type in self._allowed_input_types:
         #     if input_type in input_items.config.keys():
         #         saved_data = {}
