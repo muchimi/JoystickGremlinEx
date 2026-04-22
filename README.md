@@ -29,6 +29,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC32):
+Change: bump to Python 3.14.4 maintenance release.
+Fix: UI: Code review pass on QT (UI) object destruction to further eliminate potential de-sync issues between Python memory management and the underlying C++ memory management in the QT for Python library. This can cause random exceptions or memory leaks in Python due to inherently conflicting object management models.  A significant amount of code in GEX is dedicated to work around these behaviors unique to this platform.
+Fix: Sequence Container: resolved a profile visualization regression exception due to recent container code changes.
+
+
 
 ### (m76RC31):
 Change: enabled sorting keyboard/mouse device inputs. The sort is alphabetical for now by key name.

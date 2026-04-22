@@ -26,16 +26,16 @@ def gamepadAvailable():
     try:
         pad = vg.VX360Gamepad()
         _gamepad_available = vc.initalized and pad.valid
-        
+
         if _gamepad_available:
-            syslog.info(f"gamepad: enabled")
+            syslog.info(f"Gamepad (VIGEM): enabled")
         else:
-            syslog.info(f"gamepad: not found")
+            syslog.info(f"Gamepad (VIGEM): not found or disabled")
     except:
         syslog.info("VIGEM not found or did not load correctly.  If you have VIGEM installed, check the version and ensure it is the 64 bit version.  This message is normal if VIGEM is not installed.")
 
 
-   
+
     return _gamepad_available
 
 
@@ -57,7 +57,7 @@ def gamepad_reset():
                 del _gamepad_devices[keys.pop()]
                 keys = list(_gamepad_devices.keys())
         else:
-            
+
             if current_count > device_count:
                 # remove devices
                 while len(_gamepad_devices) > device_count:
@@ -68,12 +68,12 @@ def gamepad_reset():
                     pad = vg.VX360Gamepad()
                     _gamepad_devices[pad.get_index()-1] = pad
 
-                
+
     if count_changed:
         # let items in the Ui know the device count changed
         el = gremlin.event_handler.EventListener()
         el.gamepad_change_event.emit()
-    
+
 
 
 def getGamepad(index):

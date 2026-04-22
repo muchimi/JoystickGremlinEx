@@ -1249,8 +1249,6 @@ class InputItemListView(ui_common.AbstractView):
                     data = self.model.data(index)
                     syslog.info(f"\tselected: {data.debug_display}")
 
-            # if the list is long - bring the selected widget into view
-            #gremlin.util.singleShot(lambda: self._scroll_to_item(widget))
 
         if emit and index != -1:
             self.item_selected.emit(index, force_update) # load the mapped content for the given index
@@ -1673,7 +1671,6 @@ class ActionSetView(ui_common.AbstractView):
         :return callback function to remove the provided widget from the
             model
         """
-        #return lambda: self.model.remove_action(widget.action_data)
         return lambda: self._remove_model_action_data(widget.action_data)
 
     def _remove_model_action_data(self, action_data):
@@ -4806,6 +4803,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
             if self.container_widget:
                 self.container_widget.setParent(None) # remove from container
+                self.container_widget.deleteLater()
                 self.main_layout.removeWidget(self.container_widget)
                 
             self.container_widget = QtWidgets.QWidget()

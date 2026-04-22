@@ -898,6 +898,8 @@ class VJoy:
         return index in self._hat
     
     def keep_awake(self):
+        ''' perform keep awake tasks '''
+
         if self.vjoy_id is not None:
             import gremlin.config
             verbose = gremlin.config.Configuration().verbose
@@ -914,6 +916,8 @@ class VJoy:
             #awake = device_available(self.vjoy_id)
             
             syslog.warning(f"VJOY AWAKE: vjoy [{self.vjoy_id}] is reporting no longer available. code: {status}")
+
+
             
 
 
@@ -977,6 +981,7 @@ class VJoy:
             verbose = gremlin.config.Configuration().verbose_mode_vjoy
             if verbose: syslog.info("VJOY: keep alive reset initiated")
             self.keep_awake()
+
             #self.reset()
         self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout,self._keep_alive)
         self._keep_alive_timer.daemon = True

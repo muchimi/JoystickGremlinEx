@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -47,13 +47,13 @@ class CellInfo():
         self.padding = padding
         self.valign = valign
         self.align = align
-        
+
 
     def toCell(self) -> ReportCell:
         cell = ReportCell(self.text, self.border, self.padding, self.valign, self.align)
         return cell
 
-         
+
 
 class ReportNodeType(enum.Enum):
     Root = 0
@@ -65,7 +65,7 @@ class ReportNodeType(enum.Enum):
     GateDataGate = 7,
     GateDataRange = 8,
     GateDataCondition = 9, # gate or range condition container
-    
+
 class ReportOptions():
     ''' reporting options '''
     def __init__(self):
@@ -73,7 +73,7 @@ class ReportOptions():
         self.export_svg = True
         self.open_files = True
         self.show_folder = False
-    
+
 
 class ReportCell():
     def __init__(self, index, value : str | CellInfo , border : int = None, valign : int = None, align = "LEFT", port = None):
@@ -85,7 +85,7 @@ class ReportCell():
             self.align = value.align
             self.port = port
             return
-        
+
         self.value = value
         self.border = border
         self.align = align
@@ -97,7 +97,7 @@ class ReportCell():
         align_stub =  f' ALIGN="{self.align}"' if self.align is not None else ""
         valign_stub = f' VALIGN="{self.valign}"' if self.valign is not None else ""
         port_stub = f' PORT="{self.port}"' if self.port is not None else "" # graphviz port
-        
+
         # render to HTML if needed
         if hasattr(self.value,"to_html"):
             text = f"\n{self.value.to_html()}\n"
@@ -136,13 +136,13 @@ class ReportRow():
         else:
             return "" # "<TR><TD> </TD></TR>\n"
         return tr
-    
+
     def addCell(self, index : int, value : str | CellInfo, border : int = None, padding : int = None, valign : str =None):
         if not hasattr(value, "__iter__"):
             values = [value]
         else:
             values = value
-      
+
         insert_index = index
         for value in values:
             cell = ReportCell(insert_index, value, border, padding, valign)
@@ -156,12 +156,12 @@ class ReportRow():
         else:
             cell = ReportCell(index, value, border = border, valign = valign, port = port)
             self.cells[index] = cell
-                
+
 
     def clear(self):
         ''' removes cells '''
         self.cells.clear()
-    
+
 class ReportTable():
     def __init__(self, border : int = 0, cellpadding : int = 0, cellborder : int = 1, cellspacing = 0, bgcolor = None):
         self.rows = {}
@@ -178,12 +178,12 @@ class ReportTable():
         cellspacing_stub = f' CELLSPACING="{self.cellspacing}"' if self.cellspacing is not None else ""
         bgcolor_stub = f' BGCOLOR="{self.bgcolor}"' if self.bgcolor is not None else ""
         tb = f"<TABLE{border_stub}{cellborder_stub}{cellpadding_stub}{cellspacing_stub}{bgcolor_stub}>\n"
-        
+
 
         # assume a sparse matrix of rows if they are not continuous
         row_order = [index for index in self.rows]
         row_order.sort()
-        
+
         for row_index in row_order:
             # while row_index > current_index:
             #     # pad rows
@@ -193,7 +193,7 @@ class ReportTable():
             tb += row.to_html()
         tb+= "</TABLE>\n"
         return tb
-    
+
     def addRow(self, index : int,  data : list[object | list[CellInfo] | list[object]] = None,  border : int = None, padding : int = None, valign : str =None):
         if hasattr(data,"__iter__"):
             # rows and cells
@@ -209,11 +209,11 @@ class ReportTable():
             current_index += 1
 
     def addField(self, field_name  : str, value : str, border = 1, valign = "TOP", port = None):
-        ''' adds a field - two cells - in a row 
+        ''' adds a field - two cells - in a row
         :param field_name : first cell name
         :param value : second cell
         :param index : optional, index - if not provided, automatic
-        
+
         '''
         if self.rows:
             index = len(self.rows)
@@ -224,7 +224,7 @@ class ReportTable():
         cell2 = ReportCell(1,value, border = border, valign = valign)
         row.setCell(0,cell1)
         row.setCell(1,cell2)
-      
+
         self.rows[index] = row
 
     def setCell(self, row : int, col : int, cell, border = 1, valign = "TOP", port = None):
@@ -238,9 +238,9 @@ class ReportTable():
 
         row_object.setCell(col, cell, border, valign, port)
 
-        
 
-        
+
+
     def clear(self):
         ''' removes rows'''
         self.rows.clear()
@@ -252,7 +252,7 @@ class ReportNode(anytree.NodeMixin):
         self.node_type = node_type
         self.data = data
         self.table = ReportTable() # HTML representation of the node
-        
+
 
     def addRow(self, index, data : list[str | list[CellInfo] | list[str]] = None,  border : int = None, padding : int = None, valign : str =None):
         ''' adds a data row - row data is a list of cells'''
@@ -261,7 +261,7 @@ class ReportNode(anytree.NodeMixin):
     def clear(self):
         ''' removes all rows '''
         self.table.clear()
-       
+
 
 
 
@@ -273,9 +273,9 @@ class ReportEngine():
     def __init__(self):
         # ensure installed
 
-        # locate the graphwiz application 
-        # default path: 
-        
+        # locate the graphwiz application
+        # default path:
+
         self._graphVizInstalled = self._locate_graphviz()
         syslog.info(f"REPORT: GraphViz {'installed' if self._graphVizInstalled else 'not configured or detected'}")
 
@@ -288,7 +288,7 @@ class ReportEngine():
         gp_exe = config.graphviz_executable
         if gp_exe and os.path.isfile(gp_exe):
             return True
-        
+
 
         program_files = os.environ["ProgramFiles"]
         gp = os.path.join(program_files,"Graphviz","bin")
@@ -297,7 +297,7 @@ class ReportEngine():
             if os.path.isfile(gp_exe):
                 config.graphviz_executable = gp_exe
                 return True
-            
+
         # not found
         return False
 
@@ -309,7 +309,7 @@ class ReportEngine():
             initial_dir = os.path.dirname(gp_exe)
         else:
             initial_dir = os.environ["ProgramFiles"]
-        
+
         dir = QtWidgets.QFileDialog.getExistingDirectory(
             None,
             "Select GraphViz Folder",
@@ -328,7 +328,7 @@ class ReportEngine():
         gp_exe = config.graphviz_executable
         if not os.path.isfile(gp_exe):
             return False
-        
+
         gp = os.path.dirname(gp_exe)
 
         path = os.environ["PATH"]
@@ -340,7 +340,7 @@ class ReportEngine():
         return True
 
     def _find_parent(self, node):
-        ''' gets a parent node that is displayed '''   
+        ''' gets a parent node that is displayed '''
         parent = node.parent
         while parent:
             if parent.nodeType in (eg.ExecutionGraphNodeType.Group,
@@ -359,10 +359,10 @@ class ReportEngine():
         ''' true if the node has an action defined in a descendant '''
         container_node = next((n for n in node.descendants if node.nodeType == eg.ExecutionGraphNodeType.Container), None)
         return container_node is not None
-    
+
         # action_node = next((n for n in node.descendants if node.nodeType == eg.ExecutionGraphNodeType.Action), None)
         # return action_node is not None
-    
+
     def _duplicate_node(self, node):
         nt = type(node)
         new_node = nt()
@@ -377,16 +377,16 @@ class ReportEngine():
         # duplicate node and writeeable properties
         new_node = self._duplicate_node(node)
         new_node.parent = new_parent
-        
+
         for child in node.children:
             self._duplicate_tree(child, new_node)
 
         return new_node
 
-    
+
     def _convert_tree(self, node):
         ''' converts a graph tree to a report tree '''
-        
+
         if isinstance(node, eg.ExecutionGraphGroupNode): # or isinstance(node, eg.ExecutionGraphActionSetNode):
             # remove group, action set nodes from the tree
             parent = node.parent
@@ -401,7 +401,7 @@ class ReportEngine():
         ''' gets an HTML representation of the node for display purposes, returns shape, label, fillcolor '''
 
         rows = None
-        
+
         match node.node_type:
             case ReportNodeType.Device:
                 # device node
@@ -414,23 +414,23 @@ class ReportEngine():
                 device_table.addField("Name", html.escape(device.name))
                 device_table.addField("Type", device.device_type.name)
 
-                syslog.info("DEVICE TABLE:")
-                syslog.info(device_table.to_html())
+                # syslog.info("DEVICE TABLE:")
+                # syslog.info(device_table.to_html())
 
-                
+
                 info_table.addField("ID", device.device_id)
                 info_table.addField("Mappings", f"{len(node.children):,}")
 
 
                 table.setCell(0,0, device_table)
                 table.setCell(0,1, info_table)
-                
+
                 label = f"<{table.to_html()}>"
                 #syslog.info(label)
                 return "none", label
-                
-                
-            
+
+
+
             case ReportNodeType.Mode:
                 # mode node
                 mode_object : gremlin.base_profile.Mode = node.data
@@ -447,15 +447,15 @@ class ReportEngine():
 
                 label = f"<{table.to_html()}>"
                 return "none", label
-            
+
             case ReportNodeType.InputItem:
                 input_item : gremlin.base_profile.InputItem = node.data
 
-     
+
                 table = ReportTable(cellpadding=4)
                 table.addField("Input", str(input_item.input_id))
                 table.addField("Name", html.escape(input_item.display_name))
-                
+
                 if input_item.input_description:
                     table.addField("Description", html.escape(input_item.input_description))
 
@@ -466,19 +466,19 @@ class ReportEngine():
                 if hasattr(input_item.input_id,"to_html"):
                     text = input_item.input_id.to_html()
                     table.addField(" ", text)
-                
 
-                label = f"<{table.to_html()}>"                    
+
+                label = f"<{table.to_html()}>"
                 return "none", label
 
             case ReportNodeType.Container:
                 # container node
                 container : gremlin.base_profile.AbstractContainer = node.data
 
-                
+
                 table = ReportTable(cellpadding=4)
                 table.addField("Container", container.name)
-                
+
                 if container.comment:
                     table.addField("Description", html.escape(container.comment))
 
@@ -487,8 +487,8 @@ class ReportEngine():
                     ct.addField("Count", f"{len(container.activation_condition.conditions)}")
                     for index, condition in enumerate(container.activation_condition.conditions):
                         if hasattr(condition,"to_html"):
-                            ct.addField(f"C{index}", condition.to_html())      
-                    table.addField("Conditions", ct.to_html())               
+                            ct.addField(f"C{index}", condition.to_html())
+                    table.addField("Conditions", ct.to_html())
 
                 if hasattr(container,"to_html"):
                     text = container.to_html()
@@ -499,7 +499,7 @@ class ReportEngine():
 
             case ReportNodeType.Action:
 
-                # action 
+                # action
                 action : gremlin.base_profile.AbstractAction = node.data
 
 
@@ -517,8 +517,8 @@ class ReportEngine():
                     for index, condition in enumerate(action.activation_condition.conditions):
                         if hasattr(condition,"to_html"):
                             ct.addField(f"C{index}", condition.to_html())
-                            
-                    table.addField("Conditions", ct.to_html())                    
+
+                    table.addField("Conditions", ct.to_html())
 
                 if hasattr(action, "to_html"):
                     text = action.to_html()
@@ -527,7 +527,7 @@ class ReportEngine():
 
                 label = f"<{table.to_html()}>"
                 return "none", label
-                
+
             case ReportNodeType.GateDataGate:
                 # gate node for gated axis
                 gate : gremlin.gated_handler.GateInfo = node.data
@@ -545,7 +545,7 @@ class ReportEngine():
 
                 label = f"<{table.to_html()}>"
                 return "none", label
-            
+
             case ReportNodeType.GateDataCondition:
                 # gate crossing condition
                 table = ReportTable(cellpadding=4)
@@ -555,20 +555,20 @@ class ReportEngine():
 
 
 
-                    
+
 
         if rows:
             text = self._generate_table(rows)
             return "box", text
         return None
 
-                
+
     def generate_input_item(self, input_item, parent):
         input_node = ReportNode(ReportNodeType.InputItem, data = input_item)
         input_node.parent = parent
         if input_item.containers:
             # mapping exists, link to the tree
-           
+
             for container in input_item.containers:
                 container_node = ReportNode(ReportNodeType.Container, data = container)
                 container_node.parent = input_node
@@ -601,26 +601,26 @@ class ReportEngine():
                                     condition_node = ReportNode(ReportNodeType.GateDataCondition, data = condition.name)
                                     condition_node.parent = range_node
                                     self.generate_input_item(item, condition_node)
-                                
+
 
     def generate(self, options : ReportOptions):
         ''' generate a map of the current profile '''
         if not self._ensure_path():
             gremlin.ui.ui_common.MessageBox(prompt ="This feature requires GraphViz.\nGraphViz could not be located.")
-            return 
-        
+            return
+
         # current profile
         profile = gremlin.shared_state.current_profile
 
-        
+
 
         root = ReportNode(ReportNodeType.Root)
 
 
-        
+
         for device in profile.devices.values():
             device_node = ReportNode(ReportNodeType.Device, data = device)
-            
+
 
             # special handling of state device
             if device.device_type == gremlin.types.DeviceType.State:
@@ -635,8 +635,8 @@ class ReportEngine():
                     mode_node.parent = device_node
                 for input_item in input_items:
                     self.generate_input_item(input_item, mode_node)
-              
-             
+
+
             else:
                 # non state device
                 for mode_object in device.modes.values():
@@ -649,18 +649,18 @@ class ReportEngine():
                                 if not mode_node.parent:
                                     mode_node.parent = device_node
                                 self.generate_input_item(input_item, mode_node)
-                                           
-        
 
-    
+
+
+
         cluster_entries = {} # clusters keyed by cluster index
         node_entries = {} # nodes keyed by cluster index
         edge_entries = {} # edges keyed by cluster index
-        
-        cluster_index = 0 # cluster number - one cluster per device 
+
+        cluster_index = 0 # cluster number - one cluster per device
         current_cluster = 0
-       
-        
+
+
         #report_root = self._duplicate_tree(root)
         if root:
             # self._convert_tree(root)
@@ -697,7 +697,7 @@ class ReportEngine():
                     case ReportNodeType.InputItem:
                         fillcolor = "#B1C07D"
                         shape, label = self._get_shape_label(node)
-                    
+
                     case ReportNodeType.Action:
                         shape, label = self._get_shape_label(node)
 
@@ -715,7 +715,7 @@ class ReportEngine():
 
                     case ReportNodeType.GateDataCondition:
                         fillcolor = "#ABC6D3"
-                        shape, label = self._get_shape_label(node)                        
+                        shape, label = self._get_shape_label(node)
 
                     case ReportNodeType.Root:
                         continue
@@ -726,11 +726,11 @@ class ReportEngine():
 
                 node_entry = f'"{node.id}" [label = {label}, shape= "{shape}", fillcolor = "{fillcolor}"];\n'
                 node_entries[current_cluster].append(node_entry)
-                
+
                 if node.parent and node.parent != root:
                     edge_entry = f'"{node.parent.id}" -> "{node.id}";\n'
                     edge_entries[current_cluster].append(edge_entry)
-            
+
 
         #raw_file = gremlin.util.getTemporaryFile("raw")
         dot_file = gremlin.util.getTemporaryFile("dot")
@@ -748,7 +748,7 @@ class ReportEngine():
             f.write("newrank = true\n")
             f.write("]\n")
             f.write('page="8.5, 11";\n')
-            f.write('size="36,36!";\n') 
+            f.write('size="36,36!";\n')
             f.write("rankdir=LR;\n")
             f.write("nodesep=0.8;\n")
             f.write("ranksep=1.5;\n" )
@@ -761,14 +761,14 @@ class ReportEngine():
                 f.writelines(node_entries[index])
                 # write edges
                 f.writelines(edge_entries[index])
-                
+
                 f.write("\n}\n")
-                
+
             # close digraph
             f.write("\n}\n")
 
             f.flush()
-            f.close()  
+            f.close()
 
         # # filter out any offending character as the DOT file has to be in UTF-8 format
         # with open(raw_file,'r', encoding='utf-8', errors='xmlcharrefreplace') as fin:
@@ -788,10 +788,10 @@ class ReportEngine():
 
 
         try:
-            
+
             # get a report file matching the profile
             file_base, _ = os.path.splitext(profile.profile_file)
-            
+
             if options.export_pdf:
                 pdf_file = gremlin.util.next_file(file_base + ".pdf", False)
                 s = graphviz.Source.from_file(dot_file)

@@ -2905,9 +2905,11 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         for widget in self._profile_map_exe_widgets.values():
             if widget:
                 widget.setParent(None)
+                widget.deleteLater()
         for widget in self._profile_map_xml_widgets.values():
             if widget:
                 widget.setParent(None)
+                widget.deleteLater()
 
         self._profile_map_exe_widgets = {}
         self._profile_map_xml_widgets = {}

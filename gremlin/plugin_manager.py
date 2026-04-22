@@ -1,4 +1,4 @@
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ class ContainerPlugins:
     def __init__(self):
         """Initializes the container plugin manager."""
         self.reset()
-        
+
 
     def reset(self):
         ''' resets the plugins '''
@@ -135,6 +135,7 @@ class ContainerPlugins:
         if not os.path.isdir(walk_path):
             raise error(f"Unable to find container plugins: {walk_path}")
 
+        loaded_count = 0
         for root, dirs, files in os.walk(walk_path):
 
             for fname in [v for v in files if v == "__init__.py"]:
@@ -153,6 +154,7 @@ class ContainerPlugins:
                         self._plugins[plugin.name] = plugin.create
                         log_sys(f"\tLoaded container plugin: {plugin.name}"
                         )
+                        loaded_count+=1
                     else:
                         del plugin
                 except Exception as e:
@@ -161,6 +163,8 @@ class ContainerPlugins:
                     syslog.warning(
                         f"\tLoading container_plugins '{fname}' failed due to: {e}"
                     )
+
+        syslog.info(f"Found {loaded_count} container plugins")
 
     def _create_maps(self):
         """Creates a lookup table from container tag to container object."""
@@ -317,7 +321,7 @@ class ActionPlugins:
                         log_sys(f"\tLoaded action plugin: {plugin.name}")
                         plugin_count += 1
 
-                    
+
                     else:
                         del plugin
                 except Exception as e:
@@ -327,7 +331,7 @@ class ActionPlugins:
                     syslog.error(e)
                     error_count += 1
 
-        log_sys(f"Found {plugin_count} plugins")
+        log_sys(f"Found {plugin_count} action plugins")
         if error_count > 0:
             log_sys_error(f"{error_count} plugin(s) failed to load")
 
@@ -343,7 +347,7 @@ class ActionPlugins:
         action_tag_map = self.tag_map
         new_action = action_tag_map[action_tag](container)
         if not extra_data:
-            mode_object = gremlin.shared_state.current_profile.get_mode_object(gremlin.shared_state.edit_mode)             
+            mode_object = gremlin.shared_state.current_profile.get_mode_object(gremlin.shared_state.edit_mode)
             extra_data = {'mode_object' : mode_object}
         new_action.from_xml(node, input_item, extra_data)
         new_action.setId(get_guid())
@@ -374,7 +378,7 @@ class ActionPlugins:
                 if container is not None:
                     node = etree.fromstring(xml)
                     action = self.get_class(item.name)(container)
-                    mode_object = gremlin.shared_state.current_profile.get_mode_object(gremlin.shared_state.edit_mode)             
+                    mode_object = gremlin.shared_state.current_profile.get_mode_object(gremlin.shared_state.edit_mode)
                     extra_data = {'mode_object' : mode_object}
                     action._parse_xml(node, extra_data = extra_data)
                 action_list.append(action)
@@ -403,7 +407,7 @@ class ActionPlugins:
                         for action_set in new_container.action_sets:
                             for action in action_set:
                                 action_list.append(action)
-        
+
         return action_list
 
 

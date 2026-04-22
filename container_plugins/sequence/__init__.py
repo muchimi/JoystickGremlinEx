@@ -1681,7 +1681,20 @@ Unlike a macro, any action suitable for the input can be used.'''
 
         table.addField("Steps", f"{count}" )
 
-        if self.wiggle_mode:
+        match self.mode:
+            case "normal": 
+                mode_name = "Run Once"
+            case "toggle":
+                mode_name = "Toggle"
+            case "loop":
+                mode_name = "Loop (while pressed)"
+            case "wiggle":
+                mode_name = "Wiggle"
+            case _:
+                mode_name = f"unknown: {self.mode}"
+
+        table.addField("Mode:", f"{mode_name}" )
+        if self.mode == "wiggle":
             table.addField("Wiggle Mode", "Enabled")
             if self.wiggle_random:
                 table.addField("Wiggle Random", "Enabled")

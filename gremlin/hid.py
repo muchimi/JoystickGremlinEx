@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ if not os.path.isfile(dll_path):
         syslog.critical(msg)
         os._exit(1)
     dll_folder = parent
-    
+
 
 ctypes.CDLL(dll_path)
 
@@ -59,10 +59,10 @@ class HidDevice():
         self.ReleaseNumber = None
         self.Usage = None
         self.UsagePage = None
-        
+
     def isJoystick(self):
         return self.Usage is not None and self.Usage == 4 # game controllers report as HD usage 4
-    
+
 
 @SingletonDecorator
 class Hid():
@@ -103,7 +103,7 @@ class Hid():
                             device.Usage = data
                         case "usage_page":
                             device.UsagePage = data
-                            
+
                 if device.Usage in (4, 5) and device.UsagePage == 1:
                     # devices 4,5 are controllers, require usage page 1
                     syslog.info(f"HID device: [{index}] Manufacturer: {device.Manufacturer} Product: {device.ProductString} VendorID: 0x{device.VendorId:X}({device.VendorId}) ProductID: 0x{device.ProductId:X}({device.ProductId}) Usage: {device.Usage} Page: {device.UsagePage} Interface: {device.InterfaceNumber}")
@@ -111,7 +111,7 @@ class Hid():
                     self._devices.append(device)
                 self._all_devices.append(device)
         else:
-            syslog.info("HID: device check disabled.")
+            syslog.info("HID: device check disabled in options")
 
     def get_controller_count(self):
         ''' returns the number of visible controllers (HID device type 4) '''

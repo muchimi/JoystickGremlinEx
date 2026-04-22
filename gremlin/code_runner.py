@@ -22,6 +22,8 @@ import random
 import string
 import sys
 import time
+import threading
+import gc
 
 
 import dinput
@@ -70,6 +72,9 @@ class CodeRunner:
         self.event_handler.add_plugin(gremlin.input_devices.JoystickPlugin())
         self.event_handler.add_plugin(gremlin.input_devices.VJoyPlugin())
         self.event_handler.add_plugin(gremlin.input_devices.KeyboardPlugin())
+
+        # self._sentry_timer = None
+        # self._sentry_tick = 10 # tick timer in seconds
 
         eh = gremlin.event_handler.EventListener()
         eh.action_created.connect(self._action_created_cb)
@@ -620,12 +625,16 @@ class CodeRunner:
                 mode = profile.get_default_mode() # start the default mode instead
 
 
+            # # memory garbage collection
+            # self._sentry_timer = threading.Timer(self._sentry_tick, self._handle_sentry)
+            # self._sentry_timer.start()
+
+
             # tell listener profiles are starting
             # start listen
             evt_listener.start()
 
             
-            #print ("resume!")
             self.event_handler.resume()
 
 
@@ -690,6 +699,10 @@ class CodeRunner:
 
     def stop(self):
         """Stops listening to events and unloads all callbacks."""
+
+        # if self._sentry_timer is not None:
+        #     self._sentry_timer.cancel()
+        #     self._sentry_timer = None
 
         if not gremlin.shared_state.is_running:
             return # not running - nothing to do
@@ -786,6 +799,13 @@ class CodeRunner:
         # update mode
         el.edit_mode_ui_update.emit(edit_mode)
 
+    # def _handle_sentry(self):
+    #     ''' sentry event '''
+
+    #     syslog.info("Sentry event")
+    #     gc.collect()
+    #     self._sentry_timer = threading.Timer(self._sentry_tick, self._handle_sentry)
+    #     self._sentry_timer.start()
 
 
     def _reset_state(self):

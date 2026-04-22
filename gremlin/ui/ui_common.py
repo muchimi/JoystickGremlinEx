@@ -1110,6 +1110,7 @@ class WidgetTracker():
                 widget._cleanup_ui()
             del self._widget_cache[widget]
             widget.setParent(None)
+            widget.deleteLater()
 
     def clearRegisteredWidgets(self):
         ''' cleanup all widgets '''
@@ -1117,6 +1118,7 @@ class WidgetTracker():
             if hasattr(widget, "_cleanup_ui"):
                 widget._cleanup_ui()
             widget.setParent(None)
+            widget.deleteLater()
         self._widget_cache = {}
         verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose: syslog.info("TRACKER: clear()")

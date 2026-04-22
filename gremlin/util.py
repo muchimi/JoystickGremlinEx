@@ -1935,6 +1935,7 @@ class InvokeUiMethod(QtCore.QObject):
         # trigger garbage collector
         self._called.disconnect(self._execute)
         self.setParent(None)
+        self.deleteLater()
 
 
 def is_ui_thread():

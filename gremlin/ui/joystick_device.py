@@ -481,6 +481,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.input_item_list_view.item_delete_curve.disconnect(self._delete_curve_item_cb)
             self.input_item_list_view.item_selected.disconnect(self._select_item_cb)
             self.input_item_list_view.setParent(None)
+            self.input_item_list_view.deleteLater()
 
             el = gremlin.event_handler.EventListener()
             
