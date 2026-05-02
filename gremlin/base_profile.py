@@ -477,8 +477,8 @@ class AbstractContainer(ProfileData, ConditionContainer):
     @action_sets.setter
     def action_sets(self, value):
         pass
-    
-    
+
+
     def setActionSets(self, data):
         self._action_sets = data
 
@@ -551,12 +551,20 @@ class AbstractContainer(ProfileData, ConditionContainer):
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.emit(self._input_item)
 
-    def getActions(self) -> list:
-        ''' gets a list of all the actions in this container '''
+    def getActions(self, action_type_or_list : AbstractAction | list | Tuple = None) -> list:
+        ''' gets a list of all the actions in this container, of a particualr type if needed '''
         action_list = []
+        action_type_list = []
+        if not action_type_or_list is None:
+            if hasattr(action_type_or_list,"__iter__"):
+                action_type_list = action_type_or_list
+            else:
+                action_type_list = [action_type_or_list]
         for action_set in self.get_action_sets():
             for action in action_set:
                 if action:
+                    if action_type_list and not type(action) in action_type_list:
+                        continue
                     action_list.append(action)
 
         return action_list
@@ -801,12 +809,12 @@ class AbstractContainer(ProfileData, ConditionContainer):
         """
 
 
-        
+
 
         if self._abstract_container_generating_xml:
             syslog.error("ABSTRACT CONTAINER XML: recursion detected")
             return None
-        
+
         try:
             self._abstract_container_generating_xml = True
 
@@ -844,7 +852,7 @@ class AbstractContainer(ProfileData, ConditionContainer):
         if self.action_sets:
             for action_set in self.action_sets:
                 action_set.clear()
-        
+
 
 
     def _parse_action_set_xml(self, node, data = None, extra_data = None):
@@ -858,7 +866,7 @@ class AbstractContainer(ProfileData, ConditionContainer):
             self.actionsetCustomParseCallback(node, data, extra_data)
             return
 
-        
+
         as_nodes = node.xpath("./action-set")
         index = 0
         for child in as_nodes:
@@ -875,7 +883,7 @@ class AbstractContainer(ProfileData, ConditionContainer):
                 self.action_sets[index] = action_set
             index += 1
 
-        
+
 
 
 
@@ -1031,7 +1039,7 @@ class Device:
     def device_id(self) -> str:
         ''' device ID a a string '''
         return str(self.device_guid)
-    
+
 
     @property
     def device_type(self) -> DeviceType:
@@ -1149,6 +1157,7 @@ class AbstractAction(ProfileData):
 
     # allow all input types by default
     input_types = InputType.to_list()
+    # data_changed = QtCore.Signal() # indicates the action data changed
 
     def __init__(self, parent):
         """Creates a new instance.
@@ -1228,12 +1237,12 @@ class AbstractAction(ProfileData):
                 return (True, False)
             case SendType.RemoteOnly:
                 return (False, True)
-        
+
         syslog.warning(f"Don't know how to handle sendmode: [{self._send_mode}]")
         return self.remote_config.state
         # return gremlin.remote.remote_control.state
-            
-            
+
+
 
     def isMultiMode(self) -> bool:
         ''' true if the action is a multimode action'''
@@ -1446,7 +1455,7 @@ class AbstractAction(ProfileData):
             mode_int = safe_read(node, "send-mode", int, 0)
             mode = SendType(mode_int)
             self._send_mode = mode
-        
+
 
         comment = None
         if "comment" in node.attrib:
@@ -1460,7 +1469,7 @@ class AbstractAction(ProfileData):
             priority = gremlin.util.clamp(priority,0, 1000)
             self._priority = priority
 
-            
+
         nodes = node.xpath(".//remote-config")
         if nodes:
             self.remote_config.from_xml(nodes[0])
@@ -1490,9 +1499,9 @@ class AbstractAction(ProfileData):
         if self._abstract_action_generating_xml:
             syslog.error("ACTION XML: Recusion detected:")
             return None
-        
+
         try:
-        
+
             self._abstract_action_generating_xml = True
 
             node = super().to_xml()
@@ -1521,7 +1530,7 @@ class AbstractAction(ProfileData):
             return node
         finally:
             self._abstract_action_generating_xml = False
-            
+
 
     def requires_virtual_button(self):
         """Returns whether or not the action requires the use of a
@@ -1587,7 +1596,7 @@ class AbstractFunctor(QtCore.QObject):
         el.profile_hook.connect(self.hook)
         el.profile_unhook.connect(self.unhook)
 
-        
+
     def hook(self):
         ''' called by the execution context before profile_start, profile_started gets called '''
         if not self._hooked:
@@ -1615,7 +1624,7 @@ class AbstractFunctor(QtCore.QObject):
             self._hooked = False
 
 
-    
+
     @property
     def id(self) -> str:
         return self._id
@@ -1623,7 +1632,7 @@ class AbstractFunctor(QtCore.QObject):
     def setId(self, value : str):
         ''' sets the ID '''
         self._id = value
-    
+
     def process_event(self, event, value, extra_data = None) -> bool:
         """Processes the functor using the provided event and value data.
 
@@ -1642,7 +1651,7 @@ class AbstractFunctor(QtCore.QObject):
     def profile_started(self):
         ''' called when the profile started (all other items completed) '''
         pass
-    
+
     def profile_after_start(self):
         ''' called when the profile started (all other items completed) '''
         pass
@@ -1660,26 +1669,26 @@ class AbstractFunctor(QtCore.QObject):
         ''' called when the runtime mode changes '''
         pass
 
-    
-    @property 
+
+    @property
     def profile_mode(self) -> str:
         ''' gets the mode of this action '''
         return self.action_data.get_mode()
-    
+
     @property
     def hardware_device_guid(self) -> dinput.GUID:
         ''' gets the currently attached hardware GUID '''
         return self.action_data.hardware_device_guid
-        
+
     @property
     def hardware_device_id(self) -> str:
         ''' gets the currently attached hardware GUID '''
         return self.action_data.hardware_device_id
-    
-    @property 
+
+    @property
     def hardware_input_id(self):
         return self.action_data.hardware_input_id
-    
+
     @property
     def hardware_input_type(self) -> InputType:
         return self.action_data.hardware_input_type
@@ -1687,7 +1696,7 @@ class AbstractFunctor(QtCore.QObject):
     def latch_extra_inputs(self, container_condition_functors = None, action_condition_functors = None):
         ''' returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change) '''
         return []
-    
+
     def getContainerNode(self):
         ''' gets the container node the action belongs to '''
         import gremlin.execution_graph
@@ -1696,7 +1705,7 @@ class AbstractFunctor(QtCore.QObject):
                 if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container:
                     return node
         return None
-    
+
     def getSiblings(self) -> list:
         ''' gets action node siblings'''
         import gremlin.execution_graph
@@ -1730,12 +1739,12 @@ class AbstractFunctor(QtCore.QObject):
                         needs_auto_release = False
 
         return needs_auto_release
-    
+
     def __str__(self):
         if self.action_data:
             return str(self.action_data)
         return "Plugin Functor"
-    
+
 
 class AbstractTriggerFunctor(AbstractFunctor):
     ''' functors that derive from this have the execution graph stop at that functor without processing downstream nodes further '''
@@ -1763,13 +1772,13 @@ class AbstractSelfTriggerFunctor(AbstractTriggerFunctor):
             syslog.error(f"Unable to find this action in the execution tree: {str(self.action_data)}")
             self._valid = False
             return
-        
+
         if self.container_node.nodeType != gremlin.execution_graph.ExecutionGraphNodeType.Container:
             syslog.error(f"Invalid container node type: [{self.container_node.nodeType.name}] found.  Expected [Container]")
             self._valid = False
             return
 
-        
+
         if not self.container_node.children:
             syslog.error("Unable to find container group node for action in execution context.")
             self.action_set_nodes = []
@@ -1782,8 +1791,8 @@ class AbstractSelfTriggerFunctor(AbstractTriggerFunctor):
         self._valid = True
 
     def _trigger(self, index : int, event, value, extra_data : dict = None) -> bool:
-        ''' executes an action set node 
-        
+        ''' executes an action set node
+
         :param index: the index of the action set, use None to execute all action sets, 0 based so index = 0 is the first action set of the container
         :param event: the event
         :param value: the action value
@@ -1792,13 +1801,13 @@ class AbstractSelfTriggerFunctor(AbstractTriggerFunctor):
         if self.valid:
             return self._ec.execute_node(self.action_set_nodes[index], event, value, extra_data)
         return False
-    
-    
-        
+
+
+
 
     def _execute(self, event, value, extra_data, verbose = None) -> bool:
         ''' executes all action set nodes
-        
+
         :param event: the event
         :param value: the action value
         :param extra_data : extra data dictionary, optional
@@ -1812,7 +1821,7 @@ class AbstractSelfTriggerFunctor(AbstractTriggerFunctor):
                 result = result and self._ec.execute_node(node, event, value, extra_data)
             return result
         return False
-        
+
 
 class AbstractContainerActionFunctor(AbstractFunctor):
     ''' used by action functors for actions that have containers '''
@@ -1828,7 +1837,7 @@ class AbstractContainerActionFunctor(AbstractFunctor):
                     break
 
         return result
-    
+
 
 
 class AbstractContainerAction(AbstractAction):
@@ -2011,7 +2020,7 @@ class JoystickInputStats:
             self.updateFilters(input_filter)
             self.updateMappings()
 
-        
+
 
     @property
     def isFiltered(self) -> bool:
@@ -2046,7 +2055,7 @@ class JoystickInputStats:
 
         '''
         profile = gremlin.shared_state.current_profile
-        
+
         registry = ProfileRegistry()
         registry.sync(profile)
 
@@ -2710,7 +2719,7 @@ class ProfileRegistry():
         if device_guid in self._device_registry:
             return self._device_registry[device_guid]
         return None
-    
+
     def getInputIdKey(self, input_id):
         if input_id is not None and hasattr(input_id,"message_key"):
             return input_id.message_key
@@ -2749,11 +2758,11 @@ class ProfileRegistry():
         input_id_key = self.getInputIdKey(input_id) # unique key for the input
         key = (device_guid, mode_name, input_type, input_id_key)
 
-        
+
         if key in self._input_item_registry:
             # if verbose: syslog.info(f"REGISTRY GET INPUT ITEM [{key}]:  returning existing input item")
             return self._input_item_registry[key]
-        
+
         if not autocreate:
             return None
 
@@ -2779,12 +2788,12 @@ class ProfileRegistry():
                 override_input_type = override_input_type,
                 custom_name_handler = custom_name_handler,
                 custom_mode_name_handler = custom_mode_name_handler)
-        
+
         input_item.input_type = input_type
-        
+
         input_item.input_id = input_id
 
-        
+
         if verbose:
             syslog.info(f"REGISTRY GET INPUT ITEM [{key}]: register new input item:")
             syslog.info(f"\tid: {input_item.id}")
@@ -2796,8 +2805,8 @@ class ProfileRegistry():
         self._input_item_registry[key] = input_item
 
         return input_item
-    
-        
+
+
     def removeInputItem(self, input_item : InputItem):
         ''' removes a given input item from the registry '''
         device_guid = input_item.device_guid
@@ -2835,7 +2844,7 @@ class ProfileRegistry():
             syslog.info(f"Unknown device: {gremlin.util.normalize_guid(device_guid)}")
             return None
 
-        
+
 
         if key in self._input_item_registry and not overwrite:
             syslog.error("Item is already registered.  Registration can only occur once.")
@@ -2844,7 +2853,7 @@ class ProfileRegistry():
             syslog.error(f"\tinput type: {input_item.input_type.name}")
             syslog.error(f"\tinput id: {str(input_item.input_id)}")
             syslog.error(f"\thas containers: {input_item.hasContainers}")
-        
+
             return None
 
         verbose = gremlin.config.Configuration().verbose_mode_inputitems
@@ -3017,7 +3026,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._curve_data = None # true if the item has its input curved
         self._locked = False # true if the input is locked (cannot make mapping changes)
         self._sort_index = None # sorting index (int)
-        
+
 
         # self._profile_mode = None
         self._enabled = True # enabled flag
@@ -3059,7 +3068,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 return self._input_id
             return -1 # not set
         return self._sort_index
-    
+
     @index.setter
     def index(self, value : int):
         self._sort_index = value
@@ -3131,7 +3140,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def callbackKey(self):
         ''' callback key unique to the input type, input id '''
         return (self._device_guid, self._input_type, self._input_id)
-    
+
     @property
     def sortKey(self):
         ''' gets the sorting key for the particular input '''
@@ -3305,7 +3314,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     @property
     def containers(self):
         return self._containers
-    
+
     def setContainers(self, containers):
         self._containers = containers
 
@@ -3329,11 +3338,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def getInputType(self):
         ''' gets the input type or the override input type'''
         if hasattr(self._input_id, "getOverrideInputType"):
-            override_input_type = self._input_id.getOverrideInputType()    
+            override_input_type = self._input_id.getOverrideInputType()
         else:
             override_input_type = self.getOverrideInputType()
         return override_input_type
- 
+
     def getRawInputType(self):
         ''' gets the input type or the override input type'''
         return self.input_type
@@ -4967,14 +4976,14 @@ class Profile():
             default_node.parent = self._mode_tree
 
         return modes  # unduplicated
-    
+
     def get_xml_modes(self, node, casefold = False) -> list[str]:
         ''' reads profile modes from an XML mode '''
         root = node.getroottree().getroot()
         mode_nodes = root.xpath("./modes/mode")
         if mode_nodes is not None:
             if casefold:
-                mode_list = [gremlin.shared_state.translateMode(child.get("name")).casefold() for child in mode_nodes if child is not None]    
+                mode_list = [gremlin.shared_state.translateMode(child.get("name")).casefold() for child in mode_nodes if child is not None]
             else:
                 mode_list = [gremlin.shared_state.translateMode(child.get("name")) for child in mode_nodes if child is not None]
             return mode_list
@@ -5218,7 +5227,7 @@ class Profile():
                             return input_item
 
         return None
-    
+
     def find_inputs_by_type(self, device_guid, input_type : InputType):
         ''' gets inputs by type '''
         device_guid = gremlin.util.normalize_guid(device_guid)
@@ -5292,7 +5301,7 @@ class Profile():
 
         registry = ProfileRegistry()
         registry.sync(self)
-        
+
         remap_actions = []
         for dev_guid in self.devices:
             dev = self.devices[dev_guid]
@@ -6098,10 +6107,10 @@ class Profile():
             except:
                 # failed to read
                 pass
-                
+
 
         return data
-    
+
     def _writeConfig(self, data : dict):
         fname = self._profile_config_fname
         if fname:
@@ -6110,7 +6119,7 @@ class Profile():
                     encoder = json.JSONEncoder(sort_keys=True,indent=4)
                     hdl.write(encoder.encode(data))
                     hdl.flush()
-                    hdl.close()   
+                    hdl.close()
             except:
                 pass
 
@@ -6124,12 +6133,12 @@ class Profile():
     def saveConfigEnabled(self) -> bool:
         ''' true if the profile can save the configuration '''
         return self._save_config_enabled
-    
+
     @saveConfigEnabled.setter
     def saveConfigEnabled(self, value : bool):
         self._save_config_enabled = value
 
-   
+
     def setLastInput(self, device_guid, input_type, input_id):
         ''' sets the last profile input'''
         if self._save_config_enabled:
@@ -6139,22 +6148,22 @@ class Profile():
                 if "last_device_guid" in data:
                     del data["last_device_guid"]
                 if "last_input_id" in data:
-                    del data["last_input_id"]        
+                    del data["last_input_id"]
                 if "last_input_type" in data:
                     del data["last_input_id"]
-                
+
             else:
                 data["last_device_guid"] = gremlin.util.normalize_guid(device_guid)
                 if not "selection_map" in data:
                     data["selection_map"] = {}
                 data["selection_map"]["device_guid"] = {}
-            
+
                 if input_id is None:
                     # remove any existing input_id and input_type
                     if "last_input_id" in data:
                         del data["last_input_id"]
                     if "last_input_type" in data:
-                        del data["last_input_type"]    
+                        del data["last_input_type"]
                     if "input_id" in data["selection_map"]["device_guid"]:
                         del data["selection_map"]["device_guid"]["input_id"]
                     if "input_type" in data["selection_map"]["device_guid"]:
@@ -6172,20 +6181,20 @@ class Profile():
 
                     data["selection_map"]["device_guid"]["input_id"] = data["last_input_id"]
 
-            
+
                     if input_type is None:
                         if "last_input_type" in data:
                             del data["last_input_type"]
                         if "input_type" in data["selection_map"]["device_guid"]:
                             del data["selection_map"]["device_guid"]["input_type"]
-                        
+
                     else:
                         data["last_input_type"] = InputType.to_string(input_type)
                         data["selection_map"]["device_guid"]["input_type"] = data["last_input_type"]
 
             self._writeConfig(data)
 
-    def getLastInput(self, device_guid = None) -> tuple: 
+    def getLastInput(self, device_guid = None) -> tuple:
         ''' gets the last input for this profile (device_guid, input_type, input_id)'''
         data = self._readConfig() # get the profile config
         input_id = None
@@ -6201,7 +6210,7 @@ class Profile():
 
         if device_guid is None:
 
-            
+
             if "last_device_guid" in data:
                 device_guid = data["last_device_guid"]
             if "last_input_type" in data:
@@ -6216,13 +6225,13 @@ class Profile():
 
 
         return (device_guid, input_type, input_id)
-                
-            
 
 
 
 
-                
+
+
+
 
 
     def copy_devices(self, source_guid, target_guid):
@@ -6277,8 +6286,13 @@ class Profile():
             el = gremlin.event_handler.EventListener()
             el.request_reload.emit()
 
-    def _filter_actions_input_item(self, input_item, tag, callback, extra_data : dict = None) -> bool:
-        ''' '''
+    def _filter_actions_input_item(self, input_item, tag_or_list : str | list[str], callback, extra_data : dict = None) -> bool:
+        ''' intermediate call for every input item in the profile with a mapping '''
+        if hasattr(tag_or_list, "__iter__"):
+            tag_list = tag_or_list
+        else:
+            tag_list = [tag_or_list]
+
         for container in input_item.containers:
             for action_set in container.action_sets:
                 for action in action_set:
@@ -6290,7 +6304,7 @@ class Profile():
 
                             # gate containers
                             for condition, item in gate.item_data_map.items():
-                                result = self._filter_actions_input_item(item, tag, callback, extra_data)
+                                result = self._filter_actions_input_item(item, tag_or_list, callback, extra_data)
                                 if not result:
                                     return False
 
@@ -6298,18 +6312,19 @@ class Profile():
                         for rng in gate_data.getRanges():
                             # gate containers
                             for condition, item in rng.item_data_map.items():
-                                result = self._filter_actions_input_item(item, tag, callback, extra_data)
+                                result = self._filter_actions_input_item(item, tag_or_list, callback, extra_data)
                                 if not result:
                                     return False
 
-                    if action.tag == tag:
+                    if action.tag in tag_list:
                         result = callback(action, extra_data)
                         if not result:
                             return False
         return True
 
-    def filter_actions(self, tag, callback, extra_data : dict = None):
+    def filter_actions(self, tag_or_list : str | list[str], callback, extra_data : dict = None):
         ''' issues a callback for every matching action tag found in the profile callback(action)'''
+        self.sync()
         for dev_guid in self.devices:
             dev = self.devices[dev_guid]
             if dev.device_type == gremlin.types.DeviceType.State:
@@ -6317,7 +6332,7 @@ class Profile():
                 state_data = gremlin.shared_state.current_profile.state
                 input_items = [state_data[key].input_item for key in state_data]
                 for item in input_items:
-                    result = self._filter_actions_input_item(item, tag, callback, extra_data)
+                    result = self._filter_actions_input_item(item, tag_or_list, callback, extra_data)
                     if not result:
                         return
             else:
@@ -6325,7 +6340,7 @@ class Profile():
                     mode_object = dev.modes[mode_name]
                     for input_type in mode_object.config:
                         for item in mode_object.config[input_type].values():
-                            result = self._filter_actions_input_item(item, tag, callback, extra_data)
+                            result = self._filter_actions_input_item(item, tag_or_list, callback, extra_data)
                             if not result:
                                 return
 
@@ -6591,9 +6606,9 @@ class Mode:
                 item.input_id,
                 autocreate = False
                 )
-            
-            
-            
+
+
+
             if not input_item:
                 # did not exist, create
                 input_item = registry.registerInputItem(item)
@@ -6606,7 +6621,7 @@ class Mode:
                         item.input_id,
                         autocreate = True
                         )
-                    
+
                 if input_item:
                     if not input_item.input_type in self.config:
                         self.config[input_item.input_type] = {}
@@ -7389,7 +7404,7 @@ class ProfileMap():
     @property
     def valid(self):
         return self._valid
-    
+
 
 
 

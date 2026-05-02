@@ -1542,6 +1542,7 @@ class VJoyUsageState():
         return used_list
 
 
+
     @property
     def device_list(self):
         return self._device_list

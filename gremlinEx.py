@@ -2277,6 +2277,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 widget.deleteLater()
             del self._widget_device_index_map[device_guid]
             del self._widget_index_device_map[index]
+            gc.collect()
 
     def getCurrentRegisteredWidgetDevice(self):
         ''' gets the device ID for the currently selected device widget '''
@@ -2301,11 +2302,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._widget_index_device_map.clear()
 
         # manual QT cleanup
-        while self.ui.device_widget.count():
-            widget = self.ui.device_widget.widget(0)
-            self.ui.device_widget.removeWidget(widget)
-            gremlin.util.delete_widget(widget)
+        stacked_widget = self.ui.device_widget
 
+        while stacked_widget.count():
+            widget = stacked_widget.widget(0)
+            stacked_widget.removeWidget(widget)
+            gremlin.util.delete_widget(widget)
 
 
     def getRegisteredWidget(self, device_guid) -> QtWidgets.QWidget:

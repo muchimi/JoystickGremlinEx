@@ -29,6 +29,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC33):
+New: Tested with Wooting keyboard in gamepad mode.
+New: DINPUT: added spam filter on DINPUT buttons for devices that spam button data.
+New: Vjoy Remap action: added "next unused" button to select the next available unused vjoy input of that type.  This performs a profile lookup to see what is currently mapped to vjoy in the profile, and picks the next one available if one is available.  Does nothing if a suitable entry is not found.
+Fix: Vjoy Remap action: initial axis selector and icon.
+Fix: Vjoy Remap action: mapping information text does not always update on output change.
+Fix: missing icons in distribution packaging.
+
+
 ### (m76RC32):
 Change: bump to Python 3.14.4 maintenance release.
 Fix: UI: Code review pass on QT (UI) object destruction to further eliminate potential de-sync issues between Python memory management and the underlying C++ memory management in the QT for Python library. This can cause random exceptions or memory leaks in Python due to inherently conflicting object management models.  A significant amount of code in GEX is dedicated to work around these behaviors unique to this platform.

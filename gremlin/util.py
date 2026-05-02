@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@ import importlib
 import logging
 import math
 import os
+import gc
 import re
 import sys
 import threading
@@ -126,12 +127,12 @@ def axis_calibration(value, minimum, center, maximum):
     if center is None:
         # if no center provided, use the slider function with no center
         return slider_calibration(value, minimum, maximum)
-    
-    
 
-    
+
+
+
     if value < center:
-        div = float(center - minimum) 
+        div = float(center - minimum)
         if div == 0.0:
             return 0.0
         return (value - center) / div + 0.0
@@ -215,18 +216,18 @@ def userprofile_path():
                 os.mkdir(path)
             except Exception as error:
                 syslog.error(f"Unable to create profile folder for Joystick Gremlin Ex:\n{error}")
-                
+
         if not os.path.isdir(path):
                 from gremlin.error import GremlinError
                 raise GremlinError(f"Critical error: Unable to create profile folder: {path}")
-            
+
 
     return os.path.normcase(path)
 
 
 
 def copy_tree_if_newer(src, dst):
-    """Copies a directory tree from src to dst, only if the source files 
+    """Copies a directory tree from src to dst, only if the source files
     are newer than the destination files or if the destination file does not exist.
     """
     if os.path.exists(dst):
@@ -456,37 +457,54 @@ def hat_direction_to_tuple(value):
 _logtabs = ""
 _cleaned_widgets = []
 
-def clear_layout(layout: QtWidgets.QLayout):
-    """Removes all widgets from the given layout.
 
-    :param layout: the layout from which to remove all items
-    """
- 
-    if not Shiboken.isValid(layout):
-        return
-    if layout is None:
-        return    
-    if isinstance(layout, QtWidgets.QWidget):
-        widget = layout
-        layout = widget.layout()
-    while layout.count() > 0:
-        child = layout.takeAt(0)
-        if child.layout():
-            clear_layout(child.layout())
-        elif child.widget():
-            widget = child.widget()
-            if hasattr(widget,"unhook"):
-                # call unhook on destruction if defined
-                widget.unhook()
-            if hasattr(widget,"_cleanup_ui"):
-                widget._cleanup_ui()
-            if Shiboken.isValid(widget):
-                if hasattr(widget, "layout"):
-                    clear_layout(widget.layout())
-                widget.hide()
-                widget.setParent(None)
-                widget.deleteLater()
-        layout.removeItem(child)
+def clear_layout(layout):
+    ''' removes all widgets and layouts from the given layout '''
+    _clear_layout(layout)
+    # gc.collect()
+
+def _clear_layout(layout):
+    for index in reversed(range(layout.count())):
+        item = layout.takeAt(index)
+        widget = item.widget()
+        if widget is not None:
+            widget.hide()
+            widget.setParent(None)
+            widget.deleteLater()
+        elif item.layout():
+            _clear_layout(item.layout())
+
+# def clear_layout(layout: QtWidgets.QLayout):
+#     """Removes all widgets from the given layout.
+
+#     :param layout: the layout from which to remove all items
+#     """
+
+#     if not Shiboken.isValid(layout):
+#         return
+#     if layout is None:
+#         return
+#     if isinstance(layout, QtWidgets.QWidget):
+#         widget = layout
+#         layout = widget.layout()
+#     while layout.count() > 0:
+#         item = layout.takeAt(0)
+#         if item.layout():
+#             clear_layout(item.layout())
+#         if item.widget():
+#             widget = item.widget()
+#             if hasattr(widget,"unhook"):
+#                 # call unhook on destruction if defined
+#                 widget.unhook()
+#             if hasattr(widget,"_cleanup_ui"):
+#                 widget._cleanup_ui()
+#             # if Shiboken.isValid(widget):
+#             #     if hasattr(widget, "layout"):
+#             #         clear_layout(widget.layout())
+#                 # widget.hide()
+#                 widget.setParent(None)
+#                 widget.deleteLater()
+#         layout.removeItem(item)
 
 def delete_widget(widget : QtWidgets.QWidget):
     ''' removes a widget from memory '''
@@ -527,7 +545,7 @@ def dumpWidgets(widget, title = None):
         if layout:
             widgets = get_layout_widgets(layout)
             if title:
-                syslog.info(f"---------------- widget dump for {title}--------------------")    
+                syslog.info(f"---------------- widget dump for {title}--------------------")
             else:
                 syslog.info("---------------- widget dump --------------------")
             if widgets:
@@ -538,7 +556,7 @@ def dumpWidgets(widget, title = None):
                     syslog.info(f"\tWidget: [{type(widget)}] name: [{w_name}] text: [{w_text}] value: [{w_value}]")
             else:
                 syslog.info("\tNo widgets.")
-            
+
 def get_layout_horizontal_size(layout : QtWidgets.QLayout) -> QtCore.QSize:
     ''' gets the desired size of a layout '''
     widgets = get_layout_widgets(layout)
@@ -629,7 +647,7 @@ def rad2deg(angle):
 
 def get_dll_version(path, as_string = True):
     ''' gets the dll file version number
-    
+
     :param path - the full path to the file
     :returns file major, file minor, product version major, product version minor as integers
     '''
@@ -637,7 +655,7 @@ def get_dll_version(path, as_string = True):
         if as_string:
             return None
         return (0,0,0,0)
-   
+
     try:
         info = GetFileVersionInfo (path, "\\")
         ms = info['FileVersionMS']
@@ -647,7 +665,7 @@ def get_dll_version(path, as_string = True):
         f_minor = LOWORD (ms)
         p_major = HIWORD (ls)
         p_minor = LOWORD (ls)
-        
+
         if as_string:
             return f"{f_major}.{f_minor}.{p_major}.{p_minor}"
         return (f_major, f_minor, p_major, p_minor)
@@ -661,10 +679,10 @@ def get_dll_version(path, as_string = True):
 
 def version_valid(v, v_req):
     ''' compares two versions
-    
+
     :param v - version as string in x.x.x.x format
     :param r - version required as string in x.x.x.x format
-    
+
     '''
     def compare_version(version1, version2):
         def parse_version(version):
@@ -696,13 +714,13 @@ def get_dinput_guid():
 
 
 
-   
+
 def find_files(root_folder, source_pattern = "*") -> list:
     ''' runs native file search to find files without blowing up on borked sym links in windows unlike rglob - returns full paths to the found file pattern '''
     import subprocess
     if not os.path.isdir(root_folder):
         return []
-    
+
     wd = os.getcwd()
     os.chdir(root_folder)
     process = subprocess.Popen(
@@ -730,10 +748,10 @@ def find_folders(root_folder, source_pattern = "*") -> list:
     ''' looks for a subfolder off the root folder '''
     if not os.path.isdir(root_folder):
         return []
-    
+
     folders = os.listdir(root_folder)
     return [os.path.join(root_folder, folder) for folder in folders]
-    
+
 import gremlin.singleton_decorator
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -749,7 +767,7 @@ class SearchCache():
                 self.cache[file_path] = item
             return item
         return self.cache[file_path]
-            
+
 def find_file(file_path, root_folder = None):
     cache = SearchCache()
     return cache.find_file(file_path, root_folder)
@@ -765,7 +783,7 @@ def find_package_file(file_path):
         root_folder = app.applicationDirPath()
     elif __file__:
         root_folder = os.path.dirname(__file__)
-    
+
     syslog.info(f"Application Execution folder: {root_folder}")
     return find_file(file_path, root_folder)
 
@@ -802,7 +820,7 @@ def _find_file(file_path, root_folder = None):
             extensions = [ext]
         else:
             extensions = [".svg",".png"]
-        
+
         for dirpath, _, filenames in os.walk(root_folder):
             if any([part.startswith('.') for part in Path(dirpath).relative_to(root_folder).parts]):
                 # ignore hidden folders, anywhere between the search root and the current file
@@ -819,17 +837,17 @@ def _find_file(file_path, root_folder = None):
                 for ext in extensions:
                     if filename.endswith(ext) and filename.startswith(file_root):
                         files.append(os.path.join(dirpath, filename))
-                    
+
     if files:
         files.sort(key = lambda x: len(x)) # shortest to largest
         found_path = files.pop(0) # grab the first one
         if verbose:
             syslog.info(f"Find_files() - found : {found_path} for {file_path}")
         return found_path
-    
+
     if circuit_breaker == 0:
         syslog.error(f"Find_files() - search exceeded maximum when searching for: {file_path}")
-    
+
     if verbose or circuit_breaker == 0:
         syslog.error(f"Find_files() failed for: {file_path}")
     return None
@@ -840,12 +858,12 @@ def _find_file(file_path, root_folder = None):
 def get_icon_path(path):
         '''
         gets an icon path
-           
+
         '''
 
         from gremlin.config import Configuration
         verbose = Configuration().verbose_mode_details
-        
+
         import gremlin.shared_state
 
         # be aware of runtime environment
@@ -854,12 +872,12 @@ def get_icon_path(path):
         else:
             # no path provided
             return None
-        
+
         root_path = gremlin.shared_state.root_path
-        
+
         if the_path in gremlin.shared_state._icon_path_cache.keys():
             return gremlin.shared_state._icon_path_cache[the_path]
-        
+
         # find the file
         if not "/" in the_path and not os.sep in the_path:
             # raw find fine
@@ -873,7 +891,7 @@ def get_icon_path(path):
         else:
             search_path = [the_path, os.path.normpath(os.path.join("gfx",the_path))]
         for stub_path in search_path:
-   
+
             # syslog.info(f"icon path: {the_path}  root: {root_path}")
             icon_file = os.path.join(root_path, stub_path)
             icon_file = icon_file.replace("/",os.sep).lower()
@@ -901,30 +919,30 @@ def get_icon_path(path):
                 if brute_force and os.path.isfile(brute_force):
                     gremlin.shared_state._icon_path_cache[the_path] = brute_force
                     return brute_force
-        
+
         syslog.error(f"Icon file not found: {icon_file}")
 
         # cache it to avoid the search next time
         gremlin.shared_state._icon_path_cache[the_path] = None
-    
+
         return None
 
 def load_pixmap(path, size = 24, qta_color = None):
     ''' gets a pixmap from the path '''
     import gremlin.ui.ui_common
 
-    
+
     if not path:
         return None
-    
+
 
     desired_size = QtCore.QSize(size, size)
-    
+
     if isinstance(path, QtGui.QIcon):
         return  path.pixmap(desired_size)
     elif isinstance(path, str):
         path = path.casefold()
-    
+
     # see if a built-in icon
     exts = (".png",".svg",".jpg",".ico",".bmp")
     is_image = False
@@ -932,7 +950,7 @@ def load_pixmap(path, size = 24, qta_color = None):
         if ext in path:
             is_image = True
             break
-        
+
     if not is_image:
         if not qta_color:
             qta_color = gremlin.ui.ui_common.Color.normalColor()
@@ -950,7 +968,7 @@ def load_pixmap(path, size = 24, qta_color = None):
             # pixmap = icon.pixmap(actual_size) # original size
             # scaled_pixmap = pixmap.scaled(size, size, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
             # return scaled_pixmap
-    
+
     the_path = get_icon_path(path)
     if the_path:
         #syslog.info(f"load_pixmap(): {the_path}")
@@ -959,7 +977,7 @@ def load_pixmap(path, size = 24, qta_color = None):
             syslog.warning(f"load_pixmap(): pixmap failed: {the_path}")
             return None
         return pixmap
-    
+
     # return a dummy pixmap so the code doesn't blow up
     syslog.error(f"load_pixmap(): invalid path: {the_path} {path}")
     icon : QtGui.QIcon = load_icon("ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor())
@@ -968,7 +986,7 @@ def load_pixmap(path, size = 24, qta_color = None):
 
 def load_icon(*paths, use_qta = False, qta_color = None):
     ''' gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search '''
-    import gremlin.config 
+    import gremlin.config
     import gremlin.shared_state
     import gremlin.ui.ui_common
     verbose = gremlin.config.Configuration().verbose_mode_details
@@ -989,8 +1007,8 @@ def load_icon(*paths, use_qta = False, qta_color = None):
                     create_dark_svg(the_path, dark_path)
                 if os.path.isfile(dark_path):
                     # load the dark equivalent
-                    the_path = dark_path 
-        
+                    the_path = dark_path
+
     icon = None
     if ext == "" or not (ext in (".png",".ico",".svg")) or use_qta:
         # assume a QTA icon if no extension
@@ -1036,12 +1054,12 @@ def create_dark_svg(source_path, dark_path, hexcolor = ""):
             with open(source_path,"r") as fin:
                 with open(dark_path,"w") as fout:
                     for line in fin.readlines():
-                        
+
                         line = line.replace("#ffffff",new_stroke)
                         line = line.replace("#666666",new_gray_color)
                         line = line.replace("#000000",new_color)
                         line = line.replace("#000005;",new_color)
-                        
+
                         fout.write(line)
                     fout.flush()
                     fout.close()
@@ -1051,7 +1069,7 @@ def create_dark_svg(source_path, dark_path, hexcolor = ""):
 
 
 def recolor_icon_pixmap(image_path, color = "red"):
-    ''' recolors non-transparent pixels in an icon image 
+    ''' recolors non-transparent pixels in an icon image
     :Returns: pixmap of the recolored item
     '''
     syslog.info(f"Recolor pixmap: {image_path}")
@@ -1067,16 +1085,16 @@ def recolor_icon_pixmap(image_path, color = "red"):
                         c.setAlpha(tmp.pixelColor(x,y).alpha())
                         tmp.setPixelColor(x,y,color)
 
-                pixmap = QtGui.QPixmap.fromImage(tmp)    
-                syslog.info("Recolor complete")            
+                pixmap = QtGui.QPixmap.fromImage(tmp)
+                syslog.info("Recolor complete")
                 return pixmap
     return None
 
-            
+
 
 def load_image(*paths):
     ''' loads an image '''
-    import gremlin.config 
+    import gremlin.config
     verbose = gremlin.config.Configuration().verbose_mode_details
     the_path = get_icon_path(*paths)
     if the_path:
@@ -1086,9 +1104,9 @@ def load_image(*paths):
     if verbose:
             syslog.info(f"LoadImage() failed to locate: {paths}")
     return None
-        
-    
-        
+
+
+
 
 def get_generic_icon():
     ''' gets a generic icon'''
@@ -1151,7 +1169,7 @@ def safe_read(node, key, type_cast, default_value, unescape : bool = False):
         return default_value
     else:
         value = node.get(key)
-        
+
 
     if type_cast is not None:
         try:
@@ -1171,7 +1189,7 @@ def safe_read(node, key, type_cast, default_value, unescape : bool = False):
                             value = float(value)
                         elif unescape and type_cast == str and isinstance(value, str):
                             value = html.unescape(value)
-                        
+
                         else:
                             value = type_cast(value)
                     except:
@@ -1223,9 +1241,9 @@ def safe_format(value, data_type, formatter=str, escape : bool = False):
 
 def get_xml_child(node, tag : str, multiple = False):
     ''' gets a specific xml child node by tag - None if not found
-    
+
     :param: multiple - if set, returns all matching subnodes as a list, blank list if nothing found - if not set, returns None or the first node found
-    
+
     '''
 
     value = tag.casefold()
@@ -1269,15 +1287,15 @@ def get_xml_mode(node):
         else:
             mode = mode_node.get("name")
         return mode
-    
+
     return None
 
 def get_xml_input_data(node, extra_data = None):
-    ''' for a given XML node, find in the parent hierarchy of a profile the device_guid, mode, input_type and input_id 
-    
+    ''' for a given XML node, find in the parent hierarchy of a profile the device_guid, mode, input_type and input_id
+
     :param node: the child node
     :returns: (device_guid, input_type, input_id, mode)
-    
+
     '''
     from gremlin.input_types import InputType
 
@@ -1328,10 +1346,10 @@ def get_xml_input_data(node, extra_data = None):
                 child = get_xml_child(input_node, "input")
                 input_type = InputType.Midi
                 input_id = str(parse_guid(child.get("guid")))
-            
 
 
-    
+
+
 
 
 
@@ -1421,7 +1439,7 @@ def read_guid(node, key, default_value = None):
         except:
             pass
     return default_value
-    
+
 
 def read_bool(node, key, default_value=False):
     """Attempts to read a boolean value.
@@ -1447,7 +1465,7 @@ def byte_string_to_list(value : str) -> list:
             data.append(value)
         except:
             raise ValueError(f"Unable to convert byte string to list, offending value: {token}")
-    
+
     return data
 
 def byte_list_to_string(data, as_hex = True):
@@ -1465,7 +1483,7 @@ def byte_list_to_string(data, as_hex = True):
 
 def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0, target_max = 1.0, invert = False):
     ''' scales a value on one range to the new range
-    
+
     value: the value to scale
     r_min: the source value's min range
     r_max: the source value's max range
@@ -1475,17 +1493,17 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
     '''
     if value is None:
         return None
-    
+
     if source_min == source_max:
         syslog.warning("SCALE: scaling failed: source range is identical")
         return value
-    
+
     # bracket value to input range if outside that range
-    if value < source_min: 
+    if value < source_min:
         value = source_min
     elif value > source_max:
         value = source_max
-    
+
     if invert:
         result = (((source_max - value) * (target_max - target_min)) / (source_max - source_min)) + target_min
     else:
@@ -1562,7 +1580,7 @@ def pushCursor():
 
 def _pushCursor_ui():
     QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
-    
+
 
 def popCursor(reset = False):
     global _cursor_push
@@ -1586,7 +1604,7 @@ def pushCursorLevel(pop = True):
     _cursor_level.append(_cursor_push)
     if pop:
         popCursor(True)
-    
+
 
 def popCursorLevel():
     ''' restores the last saved cursor level '''
@@ -1595,29 +1613,29 @@ def popCursorLevel():
         _cursor_push = _cursor_level.pop()
         if _cursor_push > 0:
             QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
-    
-        
+
+
 
 def popCursorTemporary(pop = True):
     ''' restore cursor temporarily without changing the stack - use for dialog boxes/prompt
-    
+
     :param pop: when true, restores the arrow, when false, shows the wait cursor if it was displayed
-    
+
     '''
     global _cursor_push
     if _cursor_push > 0:
         if pop:
-            QtWidgets.QApplication.restoreOverrideCursor()  
+            QtWidgets.QApplication.restoreOverrideCursor()
         else:
             QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
-        
+
 
 
 def isCursorActive():
     ''' true if the cursor stack is not empty '''
     global _cursor_push
     return _cursor_push > 0
-    
+
 
 def compare_path(a, b):
     ''' compare two paths '''
@@ -1678,7 +1696,7 @@ def centerDialog(dialog : QtWidgets.QDialog, width : int = None, height : int = 
         height = dialog.height()
 
     if parent:
-        geom = parent.geometry() 
+        geom = parent.geometry()
     else:
         if not root.parent():
             if gremlin.shared_state.ui is not None:
@@ -1747,11 +1765,11 @@ def get_next_file(path : str, max_index = 100, roundrobin : bool = True, delete 
                             syslog.error(f"NEXT: roundrobin: unable to delete file: {blitz}")
                             return None
                     return blitz
-                        
+
                 return None
             current = swap_ext(path, suffix=f".{index:0{width}}")
     else:
-        current = path # no index 
+        current = path # no index
     return current
 
 
@@ -1772,8 +1790,8 @@ def open_folder(path):
         path = os.path.dirname(path)
     if os.path.isdir(path):
         os.startfile(path)
-    
-        
+
+
 def debug_pickle(instance, exception=None, string='', first_only=True):
     """
     Recursively go through all attributes of instance and return a list of whatever
@@ -1817,12 +1835,12 @@ def debug_pickle(instance, exception=None, string='', first_only=True):
                 try:
                     dill.dumps(v)
                 except BaseException as e:
-                    print (k)                    
+                    print (k)
                     problems.extend(debug_pickle(v, e, string + '.' + k))
         except:
             # ignore types that have no attributes
             pass
-        
+
 
     # if we get here, it means pickling instance caused an exception (string is not
     # empty), yet no member was a problem (problems is empty), thus instance itself
@@ -1847,20 +1865,20 @@ class InvokeUiMethod(QtCore.QObject):
     ''' invokes a call on the UI thread as QT is not thread safe '''
     _called = QtCore.Signal(object, object, object, object, object, object, object, object)
     def __init__(self, method: Callable, p0 = None, p1 = None, p2 = None, p3 = None, p4 = None, p5 = None, p6 = None, p7 = None):
-        ''' Invokes a method on the main ui thread. 
-        
+        ''' Invokes a method on the main ui thread.
+
         :params: method: lambda expression
-        
+
         '''
 
         super().__init__()
         assert method is not None,"Method not provided"
         current_thread = QtCore.QThread.currentThread()
         # keep an object reference to the parameters so they don't get garbage collected before the execution is scheduled
-        
-        
+
+
         ui_thread = QtWidgets.QApplication.instance().thread() # QT thread
-        
+
         if current_thread != ui_thread:
             # non on the QT UI thread, move it to the UI thread - because this is an indirect call - make a copy of parameters
             # self._p0 = copy.deepcopy(p0) if p0 is not None else None
@@ -1880,13 +1898,13 @@ class InvokeUiMethod(QtCore.QObject):
             self._p5 = p5
             self._p6 = p6
             self._p7 = p7
-            
+
             self.moveToThread(ui_thread)
             self.setParent(QtWidgets.QApplication.instance())
             self._called.connect(self._execute)
-            self.method = method           
-            self._called.emit(self._p0, self._p1, self._p2, self._p3, self._p4, self._p5, self._p6, self._p7)     
-        else:   
+            self.method = method
+            self._called.emit(self._p0, self._p1, self._p2, self._p3, self._p4, self._p5, self._p6, self._p7)
+        else:
             # direct call
             self._exec(method, p0, p1, p2, p3, p4, p5, p6, p7)
 
@@ -1920,7 +1938,7 @@ class InvokeUiMethod(QtCore.QObject):
 
     @QtCore.Slot(object)
     def _execute(self,
-                 p0 = None, 
+                 p0 = None,
                  p1 = None,
                  p2 = None,
                  p3 = None,
@@ -1929,9 +1947,9 @@ class InvokeUiMethod(QtCore.QObject):
                  p6 = None,
                  p7 = None
                  ):
-       
+
         self._exec(self.method, p0, p1, p2, p3, p4, p5, p6, p7)
-        
+
         # trigger garbage collector
         self._called.disconnect(self._execute)
         self.setParent(None)
@@ -1961,7 +1979,7 @@ def highlight_qcolor(color : QColor, factor : float = 1.1) -> QColor:
     :param color: a QT color
     :param factor: optional, factor
     :returns: the new QColor object
-    
+
     '''
     h,s,v,a = color.getHsv()
     v = clamp(v * factor, 0, 255)
@@ -1976,7 +1994,7 @@ def highlight_color(hex_color:str, factor : float = 1.1):
 
     :param hex_color: a hex color in the format "#aabbcc
     :param factor: optional, factor
-    :returns: the new hex color as a string 
+    :returns: the new hex color as a string
     '''
     import colorsys
     hex_color = hex_color.lstrip('#')
@@ -1990,8 +2008,8 @@ def highlight_color(hex_color:str, factor : float = 1.1):
 a_90 = math.radians(90)
 a_45 = math.radians(45)
 
-def snap_to_grid(x : float, y: float, grid_size : int = 50, 
-                 ref_x : float= None, ref_y : float = None, 
+def snap_to_grid(x : float, y: float, grid_size : int = 50,
+                 ref_x : float= None, ref_y : float = None,
                  ) -> tuple[float, float]:
     ''' snaps a coordinate 0 to 1 to a grid '''
     spacing = 1/grid_size
@@ -2001,7 +2019,7 @@ def snap_to_grid(x : float, y: float, grid_size : int = 50,
     sx = gx
     sy = gy
 
-    # get the rotational snaps 
+    # get the rotational snaps
     if ref_x is not None and ref_y is not None:
         # reference point provided
         dx = x - ref_x
@@ -2011,7 +2029,7 @@ def snap_to_grid(x : float, y: float, grid_size : int = 50,
         a = abs(signed_a)
         factor = 1 if signed_a > 0 else -1
         a_t = math.radians(3)
-        
+
         if a <= a_t:
             # snap horizontal
             sy = ref_y
@@ -2020,9 +2038,9 @@ def snap_to_grid(x : float, y: float, grid_size : int = 50,
             # snap vertical
             sx = ref_x
             sy = y
-            
+
         elif a >= a_45 - a_t and a <= a_45 + a_t:
-            # snap 45 degrees    
+            # snap 45 degrees
             sy = ref_y + d * math.sin(a_45) * factor
             sy = ref_x + d * math.cos(a_45) * factor
 
@@ -2030,7 +2048,7 @@ def snap_to_grid(x : float, y: float, grid_size : int = 50,
     return (sx,sy)
 
 
-            
+
 
 def float_to_xml(value : float, decimals = 5) -> str:
     ''' converts a float to a string for xml saving'''
@@ -2049,7 +2067,7 @@ def getHostIp() -> list:
     import socket
 
     # get the local, non VPN, non loopback address
-    
+
     try:
         # this can blow up on some systems
         hostname = socket.getfqdn()
@@ -2071,7 +2089,7 @@ def getHostIp() -> list:
     return [host_ip]
 
 def getHostIpSingle():
-    import gremlin.config        
+    import gremlin.config
     host = gremlin.config.Configuration().broadcast_host_ip
     if host == "127.0.0.1":
         if host == '127.0.0.1':
@@ -2103,10 +2121,10 @@ def _create_singleshot_callback(callback):
 
 def singleShot(callback):
     ''' fires callback in a thread - returns immediately to caller '''
-    
+
     timer = threading.Timer(0.02, _create_singleshot_callback(callback))
     timer.start()
-    
+
 def cubic_progression(num_points, start, end):
     ''' computes a cubic progression between two numbers'''
     progression = []
@@ -2115,7 +2133,7 @@ def cubic_progression(num_points, start, end):
         value = start + (end - start) * (3 * t**2 - 2 * t**3)
         progression.append(value)
 
-    return progression    
+    return progression
 
 
 class ResetTimer(threading.Thread):
@@ -2130,7 +2148,7 @@ class ResetTimer(threading.Thread):
         self.finished = threading.Event()
         self._is_reset = True
         self._started = False
-        
+
     def cancel(self):
         ''' stops the timer '''
         self.finished.set()
@@ -2182,7 +2200,7 @@ def valueInRange(value : float, r1 : float, r2 : float, exclusive : bool = False
     :param r2: floating point value, second bound
     :param exclusive: include the boundaries in the comparison or not
     :returns: true if in range, false if not
-     
+
     '''
     import gremlin.config
 
@@ -2192,23 +2210,23 @@ def valueInRange(value : float, r1 : float, r2 : float, exclusive : bool = False
     if r1 > r2:
         # swap
         r2, r1 = r1, r2
-    
+
     if exclusive:
         # do not include boundaries in the comparison
         return value > r1 and value < r2
-    
+
     # include boundaries in the comparison
-    
+
     if value > r1 and value < r2:
         # in range
         return True
-    
+
     # handle floating point comparison resolution at boundary conditions
     decimals = gremlin.config.Configuration().range_comparison_decimals
     # floating point evaluation for tolerance at boundary conditions
     if not decimals:
         return False
-    
+
     tolerance = 1/(10**decimals)
     low = math.isclose(value, r1, abs_tol=tolerance)
     if low:
@@ -2225,15 +2243,15 @@ def validateIp(ip_address : str) -> bool:
     except:
         pass
     return False
- 
+
 
 def create_folder(path) -> bool:
     ''' creates a folder if it doesn't exist - returns True on ok'''
-    if not os.path.isdir(path):    
+    if not os.path.isdir(path):
         try:
             os.makedirs(path)
         except OSError as err:
-            syslog.error('Error: Creating directory.' +  path,-1) 
+            syslog.error('Error: Creating directory.' +  path,-1)
             syslog.error(">> {}".format(err))
             return False
     return True
@@ -2254,7 +2272,7 @@ def str_to_bool(str_value) -> bool:
         if str_value.isnumeric():
             return int(str_value) > 0
     return False
-            
+
 
 
 def isNumeric(input_string):
@@ -2274,52 +2292,52 @@ def isNumeric(input_string):
 
     def count_xs(pred, input_string):
         return len(xs_in_string(pred, input_string))
-    
+
     is_digit = str.isdigit
-  
+
     if(input_string is None or len(input_string) == 0):
         return False
-    
+
     for char in input_string:
         if ((char != "-") and (char != ".") and (not char.isdigit())):
             return False
-        
-    
+
+
     if (count_xs(is_hyphen, input_string) > 1):
         return False
-    
-    
+
+
     if ((count_xs(is_hyphen, input_string) == 1) and (input_string[0] != "-")):
         return False
-    
-    
+
+
     if (count_xs(is_digit, input_string) == 0): # post-refactor
         return False
-    
+
 
     if((input_string[0] == ".") or (input_string[-1] == ".")):
         return False
-    
+
     if (count_xs(is_period, input_string) > 1):
         return False
-    
+
     if((input_string[0] == "-") and (input_string[1] == ".")):
         return False
-    
-    if((len(input_string) > 1) and 
+
+    if((len(input_string) > 1) and
         (((input_string[0] == "0") and
         (input_string[1] != ".")) # eg. "05" number starts with a zero and is followed by another digit (i.e. not a period)
-        or (len(input_string) > 2) and 
+        or (len(input_string) > 2) and
         ((input_string[0] == "-") and
-        (input_string[1] == "0") and 
+        (input_string[1] == "0") and
         (input_string[2] != ".")))): # eg. -01 number starts with a hyphen, followed by a zero, followed by another digit (i.e. not a period)
         return False
-    
-    
+
+
     if((input_string[0] == "-") and (count_xs(is_digit, input_string) == count_xs(is_zero, input_string))):
         return False
-    
-    
+
+
     return True
 
 def get_guid(strip=True,no_brackets = False) -> str:
@@ -2334,11 +2352,11 @@ def get_guid(strip=True,no_brackets = False) -> str:
 
 def is_guid(value):
     ''' verifies the quantity is a valid GUID '''
-    
+
 
     if value is None:
         return False
-    
+
     value = normalize_guid(value)
 
     if re.match(value, r'^[0-9a-fA-F]{32}$'):
@@ -2353,7 +2371,7 @@ def idString(value):
     value = value.replace("-",'')
     value = value.replace("{",'').replace("}",'')
     return value
-    
+
 
 def normalize_guid(device_guid) -> str:
     ''' normalizes a device GUID to a string'''
@@ -2427,15 +2445,15 @@ def decorate_filter(filter) -> str:
 def xmlNodeDepth(node):
     ''' gets the depth of a given xml node '''
     return _xml_depth(node, 0)
-    
+
 
 def _xml_depth(node, depth) -> int:
     d = depth
     for child in node:
         d = max(d, _xml_depth(child, depth + 1))
     return d
-    
-    
+
+
 
 def _xml_paste_mode(node, extra_data) -> bool:
     ''' true if the xml should be read in paste mode '''
@@ -2443,8 +2461,8 @@ def _xml_paste_mode(node, extra_data) -> bool:
 
 
 def find_executable(starts_with_name, exe_name):
-    ''' 
-        performs a windows registry search for the published name of an executable and the executable name 
+    '''
+        performs a windows registry search for the published name of an executable and the executable name
         Warning: not exactly fast as every key is searched.
         Useful when app is not in the search path
     '''
@@ -2466,7 +2484,7 @@ def find_executable(starts_with_name, exe_name):
                 asubkey = winreg.OpenKey(aKey, asubkey_name)
                 name = winreg.QueryValueEx(asubkey, "DisplayName")[0]
                 syslog.info(name)
-                
+
                 if name and name.casefold().startswith(starts_with_name):
                     software['name'] = name
                     try:
@@ -2490,14 +2508,14 @@ def find_executable(starts_with_name, exe_name):
 
     if starts_with_name == '' or exe_name == '':
         return None
-    
+
     starts_with_name = starts_with_name.casefold()
     # look in 64 bit stuff
     software_list = find_hive(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY,starts_with_name)
     if not len(software_list):
         # look in 32 bit stuff
         software_list = find_hive(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY, starts_with_name)
-    if not len(software_list):       
+    if not len(software_list):
         software_list = find_hive(winreg.HKEY_CURRENT_USER, 0,starts_with_name)
 
     if len(software_list):
@@ -2511,12 +2529,12 @@ def find_executable(starts_with_name, exe_name):
 
 def next_file(file_base, include_extension = True) -> str:
     ''' gets the next file name
-    
+
     :param file_base: input file with full path and optional extension
     :param include_extension: if true, the new file has an extension, if false, it does not.
     '''
     if not file_base:
-        no_ext_file = getTemporaryFile()  
+        no_ext_file = getTemporaryFile()
         extension = None
     else:
         no_ext_file, extension = os.path.splitext(file_base)
@@ -2535,10 +2553,10 @@ def next_file(file_base, include_extension = True) -> str:
 
 
 def save(file_name, text):
-    ''' 
-    saves text to a file 
+    '''
+    saves text to a file
     - file is overwritten if it exists
-    - placed in the user profile folder if no folder is provided 
+    - placed in the user profile folder if no folder is provided
     '''
     if not text:
         syslog.warning("SAVE: nothing to write")
@@ -2591,7 +2609,7 @@ def ansiText(value, color = None):
 def triplets(items):
     ''' returns triplets'''
     t_list = []
-    # pad to NULL 
+    # pad to NULL
     for t in [items[i:i+3] for i in range(0, len(items), 3)]:
         count = len(t)
         if count == 1:
@@ -2646,7 +2664,7 @@ def getMonitorOrientation(hwnd):
                 2: "Landscape (Flipped/Inverted)",
                 3: "Portrait (270 degrees)"
         }
-    
+
         return orientation, orientations.get(orientation, "Unknown")
     return None, None
 

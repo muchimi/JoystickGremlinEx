@@ -29,6 +29,11 @@ for root, _, files in os.walk(".xml"):
         if fname.endswith(".xml"):
             xml_files.append((os.path.join(root, fname), root))
 
+icon_files = []
+for root, _, files in os.walk("icons"):
+    for fname in files:
+        icon_files.append((os.path.join(root, fname), root))
+
 added_files = [
     ("about", "about"),
     ("doc", "doc"),
@@ -36,6 +41,7 @@ added_files = [
 ]
 
 added_files.extend(action_plugins_files)
+added_files.extend(icon_files)
 added_files.extend(container_plugins_files)
 added_files.extend(doc_files)
 added_files.extend(xml_files)
@@ -45,7 +51,7 @@ added_binaries = [
     ("vigem/ViGEmClient.dll", "."),
     ("SimConnect.dll","."),
     ("hidapi.dll",".")
-	
+
 ]
 
 '''
