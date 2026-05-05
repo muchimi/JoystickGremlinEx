@@ -1084,7 +1084,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         return self.profile
 
 
-    def closeEvent(self, evt):
+    def closeEvent(self, event):
         """Terminate the entire application if the main window is closed.
 
         :param evt the closure event
@@ -1092,7 +1092,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         if self.config.close_to_tray and self.ui.tray_icon.isVisible():
             self.hide()
-            evt.ignore()
+            event.ignore()
         else:
 
             # terminate the idle thread
@@ -2304,10 +2304,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # manual QT cleanup
         stacked_widget = self.ui.device_widget
 
-        while stacked_widget.count():
-            widget = stacked_widget.widget(0)
-            stacked_widget.removeWidget(widget)
-            gremlin.util.delete_widget(widget)
+        gremlin.ui.ui_common.clearStackedWidget(stacked_widget)
 
 
     def getRegisteredWidget(self, device_guid) -> QtWidgets.QWidget:
@@ -2518,6 +2515,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         the different connected devices.
         """
         try:
+
+            gremlin.shared_state.push_redraw()
 
             #sd = gremlin.event_handler.JoystickState()
             ts = gremlin.tabstate.TabState()
@@ -3044,6 +3043,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         finally:
             # select last items
+
+            gremlin.shared_state.pop_redraw()
+
             try:
                 gremlin.shared_state.pop_input_selection(reset = True) # allow selections
                 last_device_guid, last_input_type, last_input_id = config.get_last_input()
@@ -4698,6 +4700,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         try:
 
+            gremlin.shared_state.push_redraw()
+
             gremlin.shared_state.push_suspend_save_input()
             gremlin.shared_state.profile_loading = True
 
@@ -4903,7 +4907,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         finally:
 
-
+            gremlin.shared_state.pop_redraw()
 
             gremlin.shared_state.profile_loading = False # done loading
             gremlin.shared_state.pop_suspend_save_input()
@@ -5635,6 +5639,7 @@ if __name__ == "__main__":
 
     # instance
     _pixmaps = gremlin.ui.ui_common.Pixmaps()
+    # _widget_manager = gremlin.ui.ui_common.WidgetManager()
 
 
     # check for gamepad availability via VIGEM

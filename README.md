@@ -29,6 +29,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC34):
+Change: profile load optimizations
+Change: UI performance improvements
+
+
 ### (m76RC33):
 New: Tested with Wooting keyboard in gamepad mode.
 New: DINPUT: added spam filter on DINPUT buttons for devices that spam button data.

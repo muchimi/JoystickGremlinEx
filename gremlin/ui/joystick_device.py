@@ -233,6 +233,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if config.debug_ui:
             self._debug_widget = QtWidgets.QLabel("Debug widget")
             self._debug_widget.setMaximumHeight(32)
+            self._debug_widget.winId
             self.addRightPanelWidget(self._debug_widget)
 
         el = gremlin.event_handler.EventListener()
@@ -493,7 +494,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             el.input_filtered_change.disconnect(self._handle_input_filter_changed)
 
 
-            
+
 
 
 
@@ -681,14 +682,17 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if not Shiboken.isValid(self) or not Shiboken.isValid(self.input_item_list_view):
             return
 
+        _pop_cursor = False
+
         try:
 
-            self.setUpdatesEnabled(False)
+            # self.setUpdatesEnabled(False)
+
 
             device = gremlin.joystick_handling.getDevice(self.device_guid)
 
             config = gremlin.config.Configuration()
-            verbose = config.verbose_mode_details
+            verbose = config.verbose_mode_ui
 
 
 
@@ -705,6 +709,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             current_mode = gremlin.shared_state.edit_mode
 
 
+            input_item : gremlin.base_profile.InputItem
 
             if index == -1:
                 index = self.last_selected_index
@@ -718,6 +723,11 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     return
             else:
                 input_item = self.input_item_list_model.data(index)
+
+            if input_item is not None and self.last_selected_index == index and not force_update:
+                # already selected and input widget created
+                return
+
 
             # if not input_item:
             #     syslog.warning(f"JoystickDevice: Device [{device.name}] has no inputs for mode {current_mode} - this is not normal.")
@@ -751,8 +761,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 widget = self.getRegisteredWidget(key)
                 if not widget:
 
+                    gremlin.util.pushCursor()
+                    _pop_cursor = True
                     # not in cache, create it and add to cache for this device/input combination
-                    if verbose: syslog.info(f"create and store in cache content widget for index: {index}  device: {self.device_guid}")
                     widget = InputItemMappingWidget(input_item, object_name = f"Joystick [{input_item.display_name}]")
                     device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
                     widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} ")
@@ -761,26 +772,25 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     widget.description_clear.connect(lambda: self._description_clear_cb(index,widget))
 
 
-
-
                     # indicate the input changed
 
-                    self.registerWidget(key, widget)
-                    if emit:
-                        self.inputChanged.emit(device_guid, input_type, input_id)
+                    index = self.registerWidget(key, widget)
 
-                    #self.widget_tracker.registerWidget(widget, self.device_guid, item_data.input_type, item_data.input_id, item_data.id)
+                    if verbose:
+                        device = gremlin.joystick_handling.getDevice(input_item.device_guid)
+                        syslog.info(f"JOYSTICK DEVICE: device: placed mapping for [{device.name}]: input type: [{input_item.input_type.name}] input [{input_item.input_id}] widget index [{index}] ")
+                        pass
 
-                if force_update:
-                    # update the container to reflect the data change
+                else:
                     widget.setItemData(input_item)
 
+
+                # refresh the widget with current data as needed
+                widget.redraw()
+
                 # make the widget visible
-                self.selectRegisteredWidget(key)
+                self.selectRegisteredWidget(widget)
 
-
-                if verbose:
-                    syslog.info(f"Show widget:  {widget.id} {input_item.debug_display}")
 
                 if config.debug_ui:
                     self._debug_widget.setText(f"Contents for : {input_item.debug_display}")
@@ -797,8 +807,17 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 el.input_selection_changed.emit(device_guid, input_type, input_id)
 
         finally:
-            self.setUpdatesEnabled(True)
-            self.update()
+            if _pop_cursor:
+                gremlin.util.popCursor()
+            # self.setUpdatesEnabled(True)
+            # self.update()
+
+
+        if input_item and emit:
+            self.inputChanged.emit(input_item.device_guid,
+                                   input_item.input_type,
+                                   input_item.input_id)
+
 
 
 
@@ -851,6 +870,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _redraw_ui(self):
         ''' updates the list widget '''
+        if gremlin.shared_state.is_redraw_suspended():
+            # syslog.info("skip redraw")
+            return
         self._redraw_inputs()
 
     def refresh(self, emit = True):
@@ -858,7 +880,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _refresh_ui(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization. - ensure on UI thread """
-        if self._refresh_lock:
+
+        if self._refresh_lock or gremlin.shared_state.is_redraw_suspended():
             return
         try:
             self._refresh_lock = True

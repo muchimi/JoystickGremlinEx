@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -88,7 +88,7 @@ ui_ready = False
 profile_state = True
 
 # true if a profile message was issued (used for start errors)
-profile_message_issued = False 
+profile_message_issued = False
 
 # true if profile is loading
 profile_loading = False
@@ -99,7 +99,7 @@ ui = None
 
 
 # width of a single chart (this can be expensive to compute so we store it here once)
-char_width = 10 
+char_width = 10
 
 # true if a profile is running
 is_running = False
@@ -107,7 +107,7 @@ is_running = False
 # stack - if non zero, keyboard input should be ignored (such as, when listening to keys)
 _suspend_ui_keyinput = 0
 
-# stack = if non zero, saving input should be suspended 
+# stack = if non zero, saving input should be suspended
 _suspend_save_input = 0
 
 # list of device names to their GUID
@@ -141,7 +141,7 @@ mode_tab_id = gremlin.util.normalize_guid(mode_tab_guid)
 state_tab_guid = gremlin.util.parse_guid('72bbc0f4-31a8-4a41-b528-868dc7fcedfa')
 state_tab_id = gremlin.util.normalize_guid(state_tab_guid)
 
-# UUID of the octavi device 
+# UUID of the octavi device
 octavi_tab_guid = gremlin.util.parse_guid('e04aaf53-4838-4763-bc60-d5c7f8e653a1')
 octavi_tab_id = gremlin.util.normalize_guid(octavi_tab_guid)
 
@@ -161,9 +161,9 @@ def translateMode(mode: str) -> str:
 current_tab_device_guid = None
 
 def isDeviceTabActive(device_guid):
-    ''' compares the given device and returns True if it's the current selected tab 
+    ''' compares the given device and returns True if it's the current selected tab
     :param device_guid: what to look for, GUID or str
-    
+
     '''
     global current_tab_device_guid
     return gremlin.util.compare_guid(device_guid, current_tab_device_guid)
@@ -195,12 +195,12 @@ def _init_special_device_guids():
     virtual_device_guid = str(dinput.GUID_Virtual).casefold()
     _virtual_device_guid_to_name_map[virtual_device_guid] = "(VirtualButton)"
     _virtual_device_guid_to_name_map[str(dinput.GUID_Invalid).casefold()] = "(Invalid)"
-    
-            
+
+
 
 
 _init_special_device_guids()
-    
+
 
 
 def get_virtual_device_name(device_guid):
@@ -300,7 +300,7 @@ def resetState():
     edit_mode = None
     previous_runtime_mode = None
 
-    
+
 
 # controls repeater updates in the UI
 _repeater_suspended = 0
@@ -322,7 +322,7 @@ def pop_repeater(reset = False):
         _repeater_suspended = 0
 
 
-        
+
 def ui_keyinput_suspended():
     global _suspend_ui_keyinput
     return _suspend_ui_keyinput > 0
@@ -346,7 +346,7 @@ def pop_suspend_save_input(reset = False):
     global _suspend_save_input
     if reset:
        _suspend_save_input = 0
-       return 
+       return
     if _suspend_save_input > 0:
         _suspend_save_input -= 1
 
@@ -354,8 +354,25 @@ def is_save_input_suspended() -> bool:
     global _suspend_save_input
     return _suspend_save_input > 0
 
+_suspend_redraw = 0
+def push_redraw():
+    ''' pushes UI redraw suspend state '''
+    global _suspend_redraw
+    _suspend_redraw += 1
 
-    
+def pop_redraw(reset = False):
+    ''' pops UI redraw state '''
+    global _suspend_redraw
+    if reset:
+        _suspend_redraw = 0
+    if _suspend_redraw > 0:
+        _suspend_redraw -= 1
+
+def is_redraw_suspended() -> bool:
+    ''' true if UI redraw is currently suspended'''
+    global _suspend_redraw
+    return _suspend_redraw > 0
+
 
 def pop_suspend_ui_keyinput():
     ''' restores keyboard input to the UI'''
@@ -396,13 +413,13 @@ def push_suspend_highlighting():
     if _suspend_input_highlighting_enabled == 0:
         _set_input_highlighting_state(False)
     _suspend_input_highlighting_enabled += 1
-    
+
 
 def pop_suspend_highlighting(force = False):
     ''' pops a suspend state
-     
+
     :param: force = forces a reset (enables)
-       
+
     '''
     global _suspend_input_highlighting_enabled
     if _suspend_input_highlighting_enabled > 0:
@@ -411,10 +428,10 @@ def pop_suspend_highlighting(force = False):
         _suspend_input_highlighting_enabled = 0
     if _suspend_input_highlighting_enabled == 0:
         _set_input_highlighting_state(False)
-    
 
 
-    
+
+
 
 def delayed_input_highlighting_suspension():
     """Disables input highlighting with a delay."""
@@ -429,14 +446,14 @@ def delayed_input_highlighting_suspension():
     _suspend_timer.start()
 
 # true if tabs are loading
-is_tab_loading = False 
+is_tab_loading = False
 
 def set_last_input_id(device_guid, input_type, input_id):
     if not is_tab_loading:
         import gremlin.config
         config = gremlin.config.Configuration()
         config.set_last_input(device_guid, input_type, input_id)
-        
+
         if current_profile:
             current_profile.setLastInput(device_guid, input_type, input_id)
 
@@ -535,7 +552,7 @@ class ProfileStateMonitor():
 _log_nesting_level = 0
 
 
-# log nesting level management 
+# log nesting level management
 def pushLog():
     global _log_nesting_level
     _log_nesting_level +=1
@@ -588,7 +605,7 @@ def pop_input_selection(reset : bool = False):
 def _is_joystick_suspended()->bool:
     global _joystick_suspend_count
     return _joystick_suspend_count > 0
-		
+
 @module_property
 def _is_input_selection_suspended()->bool:
     global _input_selection_suspend_count

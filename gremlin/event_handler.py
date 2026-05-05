@@ -3725,7 +3725,9 @@ class DInputState():
 		key = self.getKey(event)
 		# import gremlin.joystick_handling
 		# device_name = gremlin.joystick_handling.getDeviceName(event.device_guid)
-		if key in self._data:
+
+
+		if len(self._data) > 0 and key in self._data:
 			# compare values
 			cevent : dinput.InputEvent = self._data[key]
 			# syslog.info(f"dinput cache: {device_name}  input: {event.input_index} last value: {cevent.value} new: {event.value}  skip: {cevent.value == event.value}")

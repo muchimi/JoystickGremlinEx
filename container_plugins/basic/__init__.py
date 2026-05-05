@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -57,7 +57,7 @@ class BasicContainerWidget(AbstractContainerWidget):
             if action_set:
                 has_actions = True
                 break
-         
+
         if has_actions:
             action_sets = [action_set for action_set in self.profile_data.action_sets if action_set]
             assert len(action_sets) == 1, "invalid action set count - expected a single action set"
@@ -115,7 +115,7 @@ class BasicContainerWidget(AbstractContainerWidget):
             return
         if not Shiboken.isValid(self):
             return
-        
+
         gremlin.util.pushCursor()
 
         try:
@@ -169,7 +169,7 @@ class BasicContainerWidget(AbstractContainerWidget):
         if len(self.profile_data.action_sets) > 0:
             stub =  ", ".join(a.name for a in self.profile_data.action_sets[0])
             title += stub
-        
+
         return title
 
 
@@ -206,7 +206,7 @@ class BasicContainer(AbstractContainer):
     #     InputType.JoystickHat,
     #     InputType.Keyboard
     # ]
-    
+
     interaction_types = []
 
     functor = BasicContainerFunctor
@@ -219,8 +219,8 @@ class BasicContainer(AbstractContainer):
         """
         super().__init__(parent, node)
         self._basic_container_generating_xml = False
-        
-    
+
+
     def add_action(self, action, index=-1):
         assert isinstance(action, gremlin.base_profile.AbstractAction)
 
@@ -232,7 +232,7 @@ class BasicContainer(AbstractContainer):
             for container in self.parent.containers:
                 for action_set in container.action_sets:
                     for t_action in action_set:
-                        if gremlin.base_profile._is_curve_tag(t_action.tag): 
+                        if gremlin.base_profile._is_curve_tag(t_action.tag):
                             curve_sets.append(action_set)
                         elif t_action.tag == "remap":
                             remap_sets.append(action_set)
@@ -259,7 +259,7 @@ class BasicContainer(AbstractContainer):
         self.create_or_delete_virtual_button()
 
         self.mapping_changed() # tell UI of changes
-        
+
 
     def _parse_xml(self, node, data = None, extra_data = None):
         """Populates the container with the XML node's contents.
@@ -267,7 +267,7 @@ class BasicContainer(AbstractContainer):
         :param node the XML node with which to populate the container
         """
         pass
-        
+
 
     def to_xml(self):
         """Returns an XML node representing this container's data.
@@ -290,7 +290,7 @@ class BasicContainer(AbstractContainer):
             return node
         finally:
             self._basic_container_generating_xml = False
-    
+
 
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.

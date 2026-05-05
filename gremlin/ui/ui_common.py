@@ -70,7 +70,16 @@ import gremlin.event_handler
 syslog = logging.getLogger("system")
 
 
-
+def clearStackedWidget(stacked_widget : QtWidgets.QStackedWidget):
+    ''' deletes the contents of a stacked widget '''
+    for i in range(stacked_widget.count() - 1, -1, -1):
+        widget = stacked_widget.widget(i)
+        stacked_widget.removeWidget(widget)
+        if hasattr(widget, "_cleanup_ui"):
+            # tell the widget it's being deleted
+            widget._cleanup_ui()
+        widget.hide()
+        widget.deleteLater()
 
 class Color():
     ''' general UI color and stylesheet handling '''
@@ -9489,7 +9498,6 @@ class QSplitTabWidget(QDataWidget):
         self._device_id = gremlin.util.normalize_guid(device_guid)
         self._filtered = False # filter state for inputs
 
-
         self._lock = False
         self._tab_data = None
 
@@ -9523,14 +9531,8 @@ class QSplitTabWidget(QDataWidget):
         self._config_widget = QtWidgets.QStackedWidget()
         self._config_widget.setProperty("class","hack")
 
-        # cw_name = f"CW_{gremlin.util.get_guid()}"
-        # self._config_widget.setObjectName(cw_name)
-        # hack - hide the top box that appears in the current version of QT stacked widget
-        # css = f"#{cw_name} {{margin-top: -30px;}}"
-        #self._config_widget.setStyleSheet(css)
-        # self.setStyleSheet(css)
-        #self._right_container_layout.addWidget(QtWidgets.QLabel("stack start"))
-        self._right_container_layout.addWidget(self._config_widget)
+        self.addRightPanelWidget(self._config_widget)
+
         # self._right_container_layout.addWidget(QtWidgets.QLabel("stack end"))
         self._widget_config_index_map = {} # map of input id to widget index
         self._widget_config_device_map = {} # map of widget index to input id
@@ -9630,7 +9632,6 @@ class QSplitTabWidget(QDataWidget):
         ''' adds a new config input to the right panel '''
 
         assert widget is not None, "Invalid widget"
-
         index =  self._config_widget.indexOf(widget)
         if index != -1:
             # widget is already in the list
@@ -9641,7 +9642,6 @@ class QSplitTabWidget(QDataWidget):
         self._widget_config_index_map[key] = index
         self._widget_config_device_map[index] = key
 
-
         return index
 
     def unload(self):
@@ -9649,17 +9649,29 @@ class QSplitTabWidget(QDataWidget):
         pass
 
 
-    def selectRegisteredWidget(self, key):
+    def selectRegisteredWidget(self, key_or_widget):
         ''' selects the content for the given device id if the content exists
 
         returns: the widget selected
 
         '''
+        assert key_or_widget is not None,f"Logic error - key is NULL"
 
-        #index = -1
-        widget = self.getRegisteredWidget(key)
-        assert widget is not None,f"Logic error - widget not found for key [{key}]"
-        self._config_widget.setCurrentWidget(widget)
+        if hasattr(key_or_widget,"__iter__"):
+            widget = self.getRegisteredWidget(key_or_widget)
+            assert widget is not None, f"Logic error - widget not found for key [{key_or_widget}]"
+        else:
+            widget = key_or_widget
+
+
+        index = self._config_widget.indexOf(widget)
+        if index != -1:
+            verbose = gremlin.config.Configuration().verbose_mode_ui
+            if verbose:
+                syslog.info(f"RIGHT PANEL: select widget {index}")
+            self._config_widget.setCurrentIndex(index)
+        else:
+            syslog.error("Unable to select widget in right panel: missing")
 
         return widget
 
@@ -9692,13 +9704,12 @@ class QSplitTabWidget(QDataWidget):
 
     def unregisterAllWidgets(self):
         ''' clears all device widgets '''
-        while self._config_widget.count():
-            widget = self._config_widget.widget(0)
-            if hasattr(widget, "_cleanup_ui"):
-                # tell the widget it's being deleted
-                widget._cleanup_ui()
-            self._config_widget.removeWidget(widget)
-            widget.deleteLater()
+
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose:
+            syslog.info("RIGHT PANEL: clear all widgets")
+
+        clearStackedWidget(self._config_widget)
 
         self._widget_config_index_map.clear()
         self._widget_config_device_map.clear()
@@ -9722,7 +9733,6 @@ class QSplitTabWidget(QDataWidget):
         if index < len(keys):
             return keys[index]
         return None
-
 
     def getContentWidget(self):
         ''' returns configuration items currently displayed in the UI '''
@@ -9852,22 +9862,25 @@ class QSplitTabWidget(QDataWidget):
 
     def setRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the right panel widget (only contains a single widget)'''
-        pass
-
-
+        index = self._config_widget.indexOf(widget)
+        if index != -1:
+            self._config_widget.setCurrentWidget(widget)
 
 
     def addRightPanelWidget(self, widget : QtWidgets.QWidget):
-        ''' adds a widget to the top of the right panel '''
-        #print ("add right panel")
+        ''' adds a widget to the top of the right panel, returns the key of the added object '''
         if widget is not None:
             self._right_container_layout.insertWidget(0, widget)
 
+
     def removeRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' removes a widget from the right panel '''
-        widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
-        if widget and widget in widgets:
+        try:
             self._right_container_layout.removeWidget(widget)
+        except:
+            # not found
+            pass
+
 
     def clearLeftPanel(self):
         ''' removes all widgets from the left panel '''
@@ -9875,8 +9888,9 @@ class QSplitTabWidget(QDataWidget):
 
     def clearRightPanel(self):
         ''' removes all widgets from the right panel '''
-        #print ("clear right panel")
         gremlin.util.clear_layout(self._right_container_layout)
+
+
 
     def getRightPanelWidgets(self):
         ''' gets the widgets in the right panel'''
@@ -9886,6 +9900,8 @@ class QSplitTabWidget(QDataWidget):
         ''' true if the widget has contents on the right '''
         widgets = gremlin.util.get_layout_widgets(self._right_container_layout)
         return len(widgets) > 0
+
+
 
 class QRememberMainWindow(QtWidgets.QMainWindow):
 
@@ -14653,5 +14669,91 @@ class TargetProcessWidget(QtWidgets.QWidget):
             self.group_widget.setVisible(False)
             return
         self.group_widget.setVisible(True)
+
+@SingletonDecorator
+class WidgetManager(QtWidgets.QDialog):
+    ''' handles invisible widgets so they are not constantly created/recreated if needed '''
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        layout = QtWidgets.QVBoxLayout(self)
+        self._stacked_widget = QtWidgets.QStackedWidget()
+        layout.addWidget(self._stacked_widget)
+        self.setWindowTitle("Widget Cache")
+
+        self._cache = {} # map of keys to widgets
+
+        self.move_to_top_right()
+        self.show()
+
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self.close)
+
+    def move_to_top_right(self):
+
+        screen = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        window_width = self.frameGeometry().width()
+
+        x = screen.width() - window_width
+        y = screen.y()
+
+        self.move(x, y)
+
+
+
+    def closeEvent(self, event):
+        # autoclear cache on close
+        self.clear()
+
+    def cache(self, widget : QtWidgets.QWidget):
+        ''' transfers a widget to the cache '''
+        parent = widget.parent
+        # ignore if alreayd cached
+        if parent != self._stacked_widget:
+            # remove from its current layout, if any
+            if parent is not None and hasattr(parent, "layout"):
+                parent.layout.removeWidget(widget)
+            # transfer to our new layout - this prevents the widget from being garbage collected
+            self._stacked_widget.addWidget(widget)
+
+    def reparent(self, widget, parent : QtWidgets.QLayout):
+        ''' reparents a widget to a new parent'''
+        self._stacked_widget.removeWidget(widget)
+        parent.addWidget(widget)
+
+    def clear(self):
+        ''' clears the cache '''
+        self._cache.clear()
+        while self._stacked_widget.count() > 0:
+            widget = self._stacked_widget.widget(0)
+            self._stacked_widget.removeWidget(widget)
+            widget.hide()
+            widget.deleteLater()
+
+    def registerWidget(self, key, widget):
+        self._cache[key] = widget
+        # give the widget a QT parent if the widget is not parented to avoid C++ garbage collection
+        if widget.parent is None:
+            self.cache(widget)
+
+    def getWidget(self, key, new_parent : QtWidgets.QLayout = None) -> QtWidgets.QWidget:
+        ''' gets the widget '''
+        if key in self._cache:
+            widget = self._cache[key]
+            if new_parent is not None:
+                self.reparent(widget, new_parent)
+            return widget
+        return None
+
+    def clearWidget(self, widget):
+        ''' deletes the widget '''
+        for key in self._cache:
+            if widget == self._cache[key]:
+                del self._cache[key]
+                if self._stacked_widget.indexOf(widget) != -1:
+                    self._stacked_widget.removeWidget(widget)
+                widget.deleteLater()
+
+
+
 
 

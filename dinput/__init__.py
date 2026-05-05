@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -51,14 +51,14 @@ class _GUID(ctypes.Structure):
         ("Data4", ctypes.c_uint8 * 8)
     ]
 
-      
+
     def toId(self):
         ''' converts to short string lowercase format - no dashes or brackets '''
         s = f"{self.Data1:08x}{self.Data2:04x}{self.Data3:04x}"
         for b in self.Data4:
             s += f"{b:02x}"
         return s
-    
+
 
 
 
@@ -168,7 +168,7 @@ class GUID:
         elif isinstance(guid, uuid.UUID):
             # convert to ctypes structure using the integer value if the class is given a regular python UUID
             guid = _GUID(guid.int)
-        
+
         assert isinstance(guid, _GUID)
         self._ctypes_guid = copy.deepcopy(guid)
         self.guid = (
@@ -181,7 +181,7 @@ class GUID:
             (guid.Data4[6] << 8) + guid.Data4[7]
         )
 
-    
+
     @property
     def valid(self):
         ''' true if the GUID is valid '''
@@ -189,7 +189,7 @@ class GUID:
                self._ctypes_guid.Data2 == 0 and \
                self._ctypes_guid.Data3 == 0 and \
                self._ctypes_guid.Data4 == 0)
-    
+
     @property
     def ctypes(self):
         """Returns the object mapping the C structure.
@@ -200,7 +200,7 @@ class GUID:
             Mapping of a C GUID structure
         """
         return self._ctypes_guid
-    
+
     def toId(self):
         return str(self)
         #return f"{self.guid[0]:08x}{self.guid[1]:04x}{self.guid[2]:04x}{self.guid[3]:04x}{self.guid[4]:012x}"
@@ -292,14 +292,14 @@ class InputType(Enum):
         """
 
         from gremlin.util import log_sys_error
-        
+
         if value == 1:
             return InputType.Axis
         elif value == 2:
             return InputType.Button
         elif value == 3:
             return InputType.Hat
-        
+
         log_sys_error(f"Invalid DLL input type value received: {value:d}")
         return None
 
@@ -350,9 +350,9 @@ class InputEvent:
             The data received from DILL and to be held by this instance
 
         fix: if the type is not recognized, use a 0 Guid and handle nicely instead of throwing an error
-        
+
         """
-        
+
         input_type = InputType.from_ctype(data.input_type)
         if input_type:
             self.device_guid = GUID(data.device_guid)
@@ -392,9 +392,9 @@ class AxisMap:
         if data is not None:
             self.linear_index = data.linear_index
             self.axis_index = data.axis_index
-        
 
-    
+
+
     def getName(self) -> str:
         ''' gets the name of the axis based on its axis index '''
         axis_index = self.axis_index
@@ -403,7 +403,7 @@ class AxisMap:
                 return ""
             case 1:
                 return "(1) X"
-            case 2: 
+            case 2:
                 return "(2) Y"
             case 3:
                 return "(3) Z"
@@ -417,9 +417,9 @@ class AxisMap:
                 return "(7) S1"
             case 8:
                 return "(8) S2"
-            
+
         return f"Invalid: {self.axis_index}"
-            
+
 
 
 class DeviceSummary:
@@ -451,9 +451,9 @@ class DeviceSummary:
         self.axis_names = []
         self.axismap_list = []
         self.axis_id_map = {} # map of axis ID to linear ID
-        self.linear_id_map = {} # map of linear ID to axis ID      
+        self.linear_id_map = {} # map of linear ID to axis ID
         self.input_enabled = False
-        self.vjoy_id = -1  
+        self.vjoy_id = -1
         self.vendor_id = 0
         self.name = None
         self.is_special = False
@@ -463,14 +463,14 @@ class DeviceSummary:
         self._get_axis_callback = None # custom callback to read an axis value from this device if a special device
         self._get_hat_callback = None # custom callback to read a hat value if this device is a special device
 
-        if data is not None:    
+        if data is not None:
             self.device_guid = GUID(data.device_guid)
             self.device_id = gremlin.util.normalize_guid(self.device_guid)
             self._device_type = gremlin.types.DeviceType.Joystick
             self.vendor_id = data.vendor_id
             self.product_id = data.product_id
             self.joystick_id = data.joystick_id
-            
+
             # try various encodings of the byte string as it can be finicky
             encodings = ["utf-8","unicode_escape","latin-1"]
             self.name = ""
@@ -484,14 +484,14 @@ class DeviceSummary:
             if not self.name:
                 syslog.error(f"Unable to decode device name: {data.name} - contains invalid characters.  Defaulting.")
                 self.name = f"Unable to decode {self.device_id} "
-                
-                
+
+
             self.axis_count = data.axis_count
             self.button_count = data.button_count
             self.hat_count = data.hat_count
             self.usage_page = data.usage_page
             self.usage = data.usage
-            
+
             logical_count = 0
             self.input_enabled = True # allow usage as an input device by default for special and physical devices
             index = 0
@@ -500,13 +500,13 @@ class DeviceSummary:
                 if am.axis_index == 0:
                     # no axis
                     continue
-                
+
                 axis_map = AxisMap(am)
                 self.axismap_list.append(axis_map)
                 axis_name = axis_map.getName()
                 self.axis_id_map[am.axis_index] = am.linear_index
                 self.linear_id_map[am.linear_index] = am.axis_index
-                
+
                 if not axis_name:
                     # axis name is not reporting in via directinput
                     axis_name = f"{index}"
@@ -515,12 +515,12 @@ class DeviceSummary:
 
                 # syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
                 self.axis_names.append(axis_name)
-            
+
             self._connected = True # if dinput data is provided, the device is marked as connected
 
 
-        
- 
+
+
 
     def setAxisCallback(self, callback):
         ''' sets a custom axis callback to get an axis value (parameter is the axis number) '''
@@ -541,31 +541,31 @@ class DeviceSummary:
         if self.is_special:
             return False
         return DILL.get_button(self.device_guid, button)
-    
+
     def get_axis(self, axis):
         ''' gets an axis for this device '''
         if self._get_axis_callback:
             return self._get_axis_callback(axis)
         return DILL.get_axis(self.device_guid, axis)
-    
+
     def get_hat(self, hat):
         ''' gets a hat position for this device '''
         if self._get_hat_callback:
             return self._get_hat_callback(hat)
         return DILL.get_hat(self.device_guid, hat)
-    
+
     def linear_index_from_assigned(self, index : int):
         ''' converts an assigned (display) axis index to the linear DINPUT axis '''
         if index in self.axis_id_map:
             index = self.axis_id_map[index]
         return index
-    
+
     def assigned_index_from_linear_(self, index : int):
         ''' converts from a linear DiNPUT axis to the display axis index '''
         if index in self.linear_id_map:
             return self.linear_id_map[index]
         return index
-    
+
     def axis_sequence_to_input_id(self, index : int):
         ''' zero based index to input ID for axes'''
         linear_id = index + 1
@@ -573,10 +573,10 @@ class DeviceSummary:
             return linear_id
         if linear_id in self.linear_id_map:
             return self.linear_id_map[linear_id]
-        
 
 
-        
+
+
 
     @property
     def device_type(self):
@@ -590,13 +590,13 @@ class DeviceSummary:
         ''' true if the device is connected '''
         if self.is_special:
             # special devices are always connected
-            return True 
+            return True
         return self._connected
-    
+
     def setConnected(self, value: bool):
         self._connected = value
-    
-    
+
+
     @property
     def is_virtual(self):
         """ determins if a device is virtual.
@@ -631,13 +631,13 @@ class DeviceSummary:
         ''' gets the axis name based on the input # '''
         if not short_name:
             return f"Axis {self.getAxisName(axis_id, is_linear = not is_axis_id)}"
-        
+
         if is_axis_id:
             input_id = axis_id
         else:
             if axis_id in self.axis_id_map:
                 input_id = self.axis_id_map[axis_id]
-            
+
         if input_id == 1:
             axis_name = "X"
         elif input_id == 2:
@@ -656,14 +656,14 @@ class DeviceSummary:
             axis_name = "S2"
         else:
             axis_name = f"(unknown [{input_id}])"
-        
+
         return axis_name
-        
-    
+
+
 
     def get_button_name(self, input_id):
         return f"Button {input_id}"
-    
+
     def get_hat_name(self, input_id):
         import gremlin.util
         if isinstance(input_id, int):
@@ -671,58 +671,58 @@ class DeviceSummary:
         else:
             data = input_id # tuple
         return gremlin.util.hat_tuple_to_direction(data)
-    
+
     def axis_index_list(self) -> list:
         ''' returns the list of valid axis indices '''
         index_list = [data.axis_index for data in self.axismap_list if data.axis_index > 0]
         return index_list
-    
+
     def getValidLinearIndices(self):
         ''' gets a list of valid linear axis indices for this device '''
         if self.axismap_list:
             return list(range(len(self.axismap_list)))
         return []
-    
+
     def getAxisInputIdList(self):
         ''' gets the list of valid axis inputs '''
         return [input_id for input_id in self.axis_id_map]
-    
+
     def getAxisInputId(self, linear_index : int):
         ''' Gets the input for the linear index
-        :param index: index 0 to axis_count -1 
+        :param index: index 0 to axis_count -1
         '''
         linear_index += 1 # linear index is 1 based
         return next((am.axis_index for am in self.axismap_list if am.linear_index == linear_index), None)
-        
-    
+
+
     def getAxisLinearId(self, axis_id : int):
         ''' gets the linear index for a given ID axis if the axis is skipped '''
         if axis_id in self.axis_id_map:
             return self.axis_id_map[axis_id]
         return None
-        
-   
+
+
 
     def update(self):
         ''' updates device connectivity '''
         if self.is_special:
             # nothing to update on special devices
             return
-        
-        # connection state 
+
+        # connection state
         if self.device_guid is not None:
             self._connected = DILL.device_exists(self.device_guid)
         else:
             self._connected = False
 
 
-    
+
     def getAxisName(self, index : int, is_linear = False):
-        ''' gets the name of the axis for a given axis index 
-        
-        :param index: index 
+        ''' gets the name of the axis for a given axis index
+
+        :param index: index
         :param is_linear: true if the index is the linear axis index (range 0 to axis_count), false if the axis identifier
-        
+
         '''
         try:
             am : AxisMap
@@ -743,10 +743,10 @@ class DeviceSummary:
                             stub = f" L{linear_id}"
                     except:
                         return f"Axis [{index}]"
-                    
+
 
                     for am in self.axismap_list:
-                        
+
                             if not hasattr(am,"axis_index"):
                                 syslog.error(f"Invalid data found for device : {self.name}")
                                 syslog.error(f"axis map contains: {self.axismap_list}")
@@ -759,12 +759,12 @@ class DeviceSummary:
             syslog.error(f"GET AXIS NAME: unable to get axis name for device : {self.name}")
             syslog.error(f"{str(e)}")
             syslog.error(f"{traceback.format_exc()}")
-            
-            
+
+
 
 
         return None
-    
+
     def getAxisData(self):
         ''' gets the axis name pairs (input_id, axis_name, linear_index) for this device'''
         am : AxisMap
@@ -773,13 +773,14 @@ class DeviceSummary:
             pairs.append((am.axis_index, am.getName(), am.linear_index))
             pairs.sort(key = lambda x:x[2]) # sort by linear index
         return pairs
-    
+
     def getValidAxisInputIds(self):
         ''' gets the list of valid axis input IDs for the given device '''
         return [am.axis_index for am in self.axismap_list if am.axis_index > 0]
 
 
-        
+    def __hash__(self):
+        return (self.device_guid, self.self.axis_count, self.self.button_count, self.self.hat_count)
 
     @property
     def hashkey(self):
@@ -809,7 +810,7 @@ class DILL:
 
 
     # true if initialized
-    
+
     initalized = False
 
     # Storage for the callback functions
@@ -872,7 +873,7 @@ class DILL:
 
         syslog = logging.getLogger("system")
 
-        
+
         if DILL._dll is None:
 
             dll_folder = os.path.dirname(__file__)
@@ -893,12 +894,12 @@ class DILL:
             # truncate the debug file (it gets large otherwise)
 
             # blits all files starting with dill_debug
-            
+
 
             debug_file = "dill_debug.txt"
             debug_path = os.path.join(dll_folder, debug_file)
 
-     
+
             # debug_files = [f for f in Path(dll_folder).glob("**/dill_debug*.txt")]
             # index = 1
             # for f in debug_files:
@@ -906,7 +907,7 @@ class DILL:
             #         os.unlink(f)
             #     except:
             #         syslog.error(f"DILL: unable to truncate debug file: {f}")
-                    
+
 
             if os.path.isfile(debug_path):
                 # blitz it
@@ -915,8 +916,8 @@ class DILL:
                 except:
                     syslog.error(f"DILL: unable to truncate debug file: {debug_path}")
                     exit(1)
-                          
-            
+
+
                     # syslog.error(f"DILL: unable to truncate debug file: {debug_path}")
                     # while os.path.isfile(debug_path):
                     #     debug_path = f"dill_debug_{index}.txt"
@@ -967,7 +968,7 @@ class DILL:
 
     @staticmethod
     def getVjoyDeviceMap() -> dict:
-        ''' does a re-read of vjoy devices from the DINPUT api 
+        ''' does a re-read of vjoy devices from the DINPUT api
         returns a dictionary keyed by vjoyid holding the vjoy device detected
         '''
         device_count = DILL.get_device_count()
@@ -1020,7 +1021,7 @@ class DILL:
             DILL.device_change_callback_fn = C_DEVICE_CHANGE_CALLBACK(callback)
             DILL._dll.set_device_change_callback(DILL.device_change_callback_fn)
 
-        
+
 
     @staticmethod
     def get_device_count():
@@ -1068,7 +1069,7 @@ class DILL:
         return DeviceSummary(
             DILL._dll.get_device_information_by_guid(guid.ctypes)
         )
-    
+
 
     @staticmethod
     def get_axis(guid, index):
@@ -1086,7 +1087,7 @@ class DILL:
         float
             Current value of the specific axis for the desired device.
         """
-        
+
         return DILL._dll.get_axis(guid.ctypes, index)
 
     @staticmethod

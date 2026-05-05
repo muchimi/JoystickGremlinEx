@@ -3026,6 +3026,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._curve_data = None # true if the item has its input curved
         self._locked = False # true if the input is locked (cannot make mapping changes)
         self._sort_index = None # sorting index (int)
+        self.mapping_widget_id = None # ID of the mapping widget for this input
 
 
         # self._profile_mode = None
