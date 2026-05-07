@@ -772,6 +772,30 @@ def find_file(file_path, root_folder = None):
     cache = SearchCache()
     return cache.find_file(file_path, root_folder)
 
+def find_icon(icon_file):
+    ''' locates an icon file '''
+    if not os.path.isfile(icon_file):
+        root_folder = get_root_folder()
+        new_icon_file = os.path.join(root_folder,"icons",icon_file)
+        if os.path.isfile(new_icon_file):
+            return new_icon_file
+    return None
+
+
+
+def get_root_folder() -> str:
+    ''' gets the root folder '''
+    import sys
+    import pathlib
+    import os
+
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # as exe via pyinstallaler
+        application_path = sys._MEIPASS
+    else:
+        application_path = pathlib.Path(os.path.dirname(__file__)).parent
+    return application_path
+
 
 def find_package_file(file_path):
     ''' find a package file '''
@@ -873,15 +897,25 @@ def get_icon_path(path):
             # no path provided
             return None
 
-        root_path = gremlin.shared_state.root_path
+        if os.path.isfile(path):
+            return path
+
+
+
 
         if the_path in gremlin.shared_state._icon_path_cache.keys():
             return gremlin.shared_state._icon_path_cache[the_path]
 
+        # root folder
+        root_path = get_root_folder()
+
         # find the file
         if not "/" in the_path and not os.sep in the_path:
             # raw find fine
-            icon_file = _find_file(the_path, root_path)
+            icon_file = find_icon(path)
+            if not icon_file:
+                icon_file = _find_file(the_path, root_path)
+
             if icon_file and os.path.isfile(icon_file):
                 gremlin.shared_state._icon_path_cache[the_path] = icon_file
                 return icon_file
@@ -994,11 +1028,18 @@ def load_icon(*paths, use_qta = False, qta_color = None):
     is_dark = gremlin.shared_state.is_dark_theme
 
     the_path = paths[0]
+    if not the_path:
+        return get_generic_icon()
+
     _ , ext = os.path.splitext(the_path.casefold())
 
     if ext == ".svg":
         if not os.path.isfile(the_path):
-            the_path = find_file(the_path)
+            new_path = find_icon(the_path)
+            if not new_path:
+                return get_generic_icon()
+            the_path = new_path
+
         if os.path.isfile(the_path):
             if is_dark:
                 dark_path = dark_file(the_path)
@@ -1112,7 +1153,7 @@ def get_generic_icon():
     ''' gets a generic icon'''
     import gremlin.shared_state
     root_path = gremlin.shared_state.root_path
-    generic_icon = os.path.join(root_path, "gfx/generic.png")
+    generic_icon = os.path.join(root_path, "generic.png")
     if generic_icon and os.path.isfile(generic_icon):
         pixmap = QtGui.QPixmap(generic_icon)
         if pixmap.isNull():

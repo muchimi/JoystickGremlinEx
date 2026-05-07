@@ -2,7 +2,7 @@
 
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -76,16 +76,16 @@ class ModeInputModeType(enum.IntEnum):
                 return "Profile start"
             case ModeInputModeType.ModeProfileStop:
                 return "Profile stop"
-        
+
         return f"Unknown mode: {value}"
 
-      
+
 
 
 class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     """Widget used to configure mode change actions """
-    
+
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
     device_guid = gremlin.shared_state.mode_tab_guid
 
@@ -130,7 +130,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.ensureInputItems()
 
 
-        # update the display names 
+        # update the display names
 
         self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, device_id = self._device_id)
         self.input_item_list_view.setMinimumWidth(350)
@@ -142,7 +142,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
 
-        
+
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
         widget = gremlin.ui.ui_common.getHContainer(lock_widget, left_stretch=True, widget_only = True)
@@ -169,42 +169,42 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.addLeftPanelWidget(widget)
             w2 = widget
 
-            gremlin.ui.ui_common.synchronize_grids([w1, w2])        
+            gremlin.ui.ui_common.synchronize_grids([w1, w2])
 
         self.addLeftPanelWidget(self.input_item_list_view)
 
-        
+
         self.input_item_list_model.refresh()
         self.input_item_list_view.redraw()
 
-        
+
 
         el = gremlin.event_handler.EventListener()
         el.mode_name_changed.connect(self._mode_name_changed)
-        
+
         # lock all inputs
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
-        
+
 
         # last index selected, -1 means none
-        self._last_selected_index = -1 
+        self._last_selected_index = -1
 
 
-        
+
         # Select default entry
         selected_index = self.input_item_list_view.current_index
         if selected_index is None:
             selected_index = -1
-        
+
         self._select_item_cb(selected_index)
 
     @property
     def inputCount(self) -> int:
         ''' number of inputs in the device '''
         return self.input_item_list_model.rows()
-    
+
     @property
     def inputWidgetCount(self) -> int:
         ''' number of input widgets currently in the device '''
@@ -213,7 +213,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _handle_lock_inputs(self, data):
         gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data) # ensure on UI thread
-        
+
     def _handle_unlock_inputs(self, data):
         gremlin.util.InvokeUiMethod(self._handle_unlock_inputs_ui, data) # ensure on UI thread
 
@@ -225,7 +225,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             for input_item in self.input_item_list_model.getFilteredItems():
                 input_item.locked = len(input_item.containers) > 0 # don't lock if not mapped
             self.setUpdatesEnabled(True)
-    
+
     def _handle_unlock_inputs_ui(self, data):
         ''' unlock all inputs event '''
         if Shiboken.isValid(self) and data == self.device_guid:
@@ -238,7 +238,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _mode_name_changed(self, name):
         gremlin.util.InvokeUiMethod(self._mode_name_changed_ui) # ensure on UI thread
-    
+
     def _mode_name_changed_ui(self, name):
         ''' occurs when there's a mode name change '''
         self.input_item_list_view.redraw()
@@ -246,7 +246,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _config_changed_cb(self):
         ''' called when configuraition has changed '''
-        self.refresh()      
+        self.refresh()
 
 
     def _custom_name_handler(self, input_item):
@@ -269,20 +269,20 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 return "Profile start"
             case ModeInputModeType.ModeProfileStop:
                 return "Profile stop"
-            
+
         return f"Mode [{gremlin.shared_state.edit_mode}] Unknown id: {input_item.input_id}"
-            
-    
+
+
 
     def ensureInputItems(self, refresh = False):
-        ''' ensures we have input items for the current mode 
+        ''' ensures we have input items for the current mode
         :param refresh: True if list view should be updated if changes are made
-        :returns: True if changes were made 
+        :returns: True if changes were made
 
         '''
 
         # mode actions are tied to the individual mode
-        
+
         current_mode = self.current_mode
         # syslog.info(f"ensure: mode: {current_mode}")
         mode_object = self.device_profile.ensure_mode_exists(current_mode)
@@ -291,7 +291,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # mode changes are tied to the master mode - so apply
         master_mode = ModeDeviceTabWidget.master_mode
         master_mode_object = self.device_profile.ensure_mode_exists(master_mode, is_system = True)
-        master_config = self.device_profile.modes[master_mode].config 
+        master_config = self.device_profile.modes[master_mode].config
 
         changed = False
         registry = gremlin.base_profile.ProfileRegistry()
@@ -301,7 +301,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeEnter = registry.getInputItem(
                 device_guid = gremlin.shared_state.mode_tab_guid,
                 device_type = DeviceType.ModeControl,
-                input_type = InputType.ModeControl, 
+                input_type = InputType.ModeControl,
                 input_id = ModeInputModeType.ModeEnter,
                 mode_name = mode_object.name,
                 override_input_type = InputType.JoystickButton,
@@ -319,12 +319,12 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         else:
             modeEnter = config[InputType.ModeControl][ModeInputModeType.ModeEnter]
 
-        
+
         if not ModeInputModeType.ModeExit in config[InputType.ModeControl]:
             modeExit = registry.getInputItem(
                 device_guid = gremlin.shared_state.mode_tab_guid,
                 device_type = DeviceType.ModeControl,
-                input_type = InputType.ModeControl, 
+                input_type = InputType.ModeControl,
                 input_id = ModeInputModeType.ModeExit,
                 mode_name = mode_object.name,
                 override_input_type = InputType.JoystickButton,
@@ -345,13 +345,13 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             modeProfileStart = registry.getInputItem(
                 device_guid = gremlin.shared_state.mode_tab_guid,
                 device_type = DeviceType.ModeControl,
-                input_type = InputType.ModeControl, 
+                input_type = InputType.ModeControl,
                 input_id = ModeInputModeType.ModeProfileStart,
                 mode_name = master_mode_object.name,
                 override_input_type = InputType.JoystickButton,
                 custom_name_handler = self._custom_name_handler,
                 autocreate = True,
-                )     
+                )
 
 
             # modeProfileStart = gremlin.base_profile.InputItem(self._custom_name_handler, mode_parent = master_mode_object)
@@ -360,40 +360,40 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             # modeProfileStart.input_id = ModeInputModeType.ModeProfileStart
             modeProfileStart.description = "Profile Start"
             modeProfileStart.descriptionReadOnly = True
-            
+
             master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStart] = modeProfileStart
             changed = True
         else:
-            modeProfileStart = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStart]                     
+            modeProfileStart = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStart]
 
         if not ModeInputModeType.ModeProfileStop in master_config[InputType.ModeControl]:
             modeProfileStop = registry.getInputItem(
                 device_guid = gremlin.shared_state.mode_tab_guid,
                 device_type = DeviceType.ModeControl,
-                input_type = InputType.ModeControl, 
+                input_type = InputType.ModeControl,
                 input_id = ModeInputModeType.ModeProfileStop,
                 mode_name = master_mode_object.name,
                 override_input_type = InputType.JoystickButton,
                 custom_name_handler = self._custom_name_handler,
                 autocreate = True,
-                )     
+                )
             # modeProfileStop = gremlin.base_profile.InputItem(self._custom_name_handler, mode_parent = master_mode_object)
             # modeProfileStop.input_type = InputType.ModeControl
             # modeProfileStop.setOverrideInputType(InputType.JoystickButton)
             # modeProfileStop.input_id = ModeInputModeType.ModeProfileStop
             modeProfileStop.description = "Profile Stop"
             modeProfileStop.descriptionReadOnly = True
-            
+
             master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStop] = modeProfileStop
             changed = True
         else:
-            modeProfileStop = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStop]                        
+            modeProfileStop = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStop]
 
         if changed or refresh:
             self.refreshInputItems()
 
-        return changed 
-    
+        return changed
+
     def refreshInputItems(self):
         ''' refreshes input list'''
         import gremlin.ui.input_item as input_item
@@ -416,8 +416,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         mode = self.device_profile.modes[current_mode]
         sorted_keys = list(mode.config[InputType.ModeControl].keys())
         return sorted_keys.index(input_id)
-    
-         
+
+
     def getWidgetKey(self, input_type, input_id):
         ''' gets the content widget compound key for the item / input combination'''
         mode = gremlin.shared_state.edit_mode
@@ -431,11 +431,11 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """
         if not Shiboken.isValid(self.input_item_list_view):
             return
-        
+
         if index == -1:
             # nothing to select
-            return 
-        
+            return
+
 
         self.ensureInputItems(True) # ensure the control inputs exist for this mode
 
@@ -448,12 +448,12 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 index = 0
             else:
                 self._blank_input()
-                return 
-        
+                return
+
         with QtCore.QSignalBlocker(self.input_item_list_view):
             self.input_item_list_view.select_item(index, False)
-        
-        
+
+
         item_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
         input_type = InputType.ModeControl
 
@@ -462,6 +462,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if not widget:
             widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name = f"Mode  [{item_data.display_name}]")
             self.registerWidget(key, widget)
+            widget.redraw() # load the data
 
         self._item_data = item_data
 
@@ -472,14 +473,14 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         device_guid = self.device_guid
         input_type = InputType.ModeControl
         input_id = item_data.input_id if item_data else None
-        
+
         profile = gremlin.shared_state.current_profile
         if profile:
             profile.setLastInput(device_guid, input_type, input_id)
         config.set_last_input(device_guid, input_type, input_id)
 
         if item_data:
-            
+
             # Create new configuration widget
             item_data.is_axis = False
             change_cb = self._create_change_cb(index)
@@ -488,21 +489,21 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             self.input_item_list_view.select_item(index,False)
 
-        
+
 
         self._last_selected_index = index
         el = gremlin.event_handler.EventListener()
         el.input_selection_changed.emit(device_guid, input_type, input_id )
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
-        ''' creates a widget for the input 
-        
+        ''' creates a widget for the input
+
         the widget must have a selected property
         :param list_view The list view control the widget to create belongs to
         :param index The index in the list starting at 0 being the top item
         :param identifier the InpuIdentifier for the input list
         :param data the data associated with this input item
-        
+
         '''
         import gremlin.ui.input_item
 
@@ -521,8 +522,8 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.index = index
         return widget
 
-   
-    
+
+
     def _set_status(self, widget, icon = None, status = None, use_qta = True, color = None):
         ''' sets the status of an input widget '''
         status_widget = widget.findChild(gremlin.ui.ui_common.QIconLabel, "status")
@@ -530,18 +531,18 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             status_widget.setIcon(icon, use_qta = use_qta, color = color)
         else:
             status_widget.setIcon(icon, use_qta = use_qta)
-        
+
         status_widget.setText(status)
-        status_widget.setVisible(status is not None)    
+        status_widget.setVisible(status is not None)
 
 
-    
+
 
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the widget has to update itself on a data change '''
         pass
- 
+
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data):
         ''' called when a button is created for custom content '''
@@ -560,7 +561,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         mode = self.device_profile.modes[self.current_mode]
         sorted_keys = list(mode.config[InputType.ModeControl].keys())
         return sorted_keys.index(input_id)
-        
+
 
     def _create_change_cb(self, index):
         """Creates a callback handling content changes.
@@ -571,19 +572,19 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return lambda: self.input_item_list_view.redraw_index(index)
 
     def set_mode(self, mode):
-        ''' changes the mode of the tab '''        
+        ''' changes the mode of the tab '''
         self.current_mode = mode
         self.ensureInputItems()
         self.input_item_list_model.mode = mode
         self.input_item_list_model.refresh()
-        self.input_item_list_view.redraw(force=True)        
+        self.input_item_list_view.redraw(force=True)
         self._select_item_cb(self._last_selected_index)
 
- 
+
 
     def refresh(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization."""
         self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
-        
+
 
 

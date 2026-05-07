@@ -2,7 +2,7 @@
 
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -49,7 +49,7 @@ class KeyboardInputItem(AbstractInputItem):
         super().__init__()
         self._key = None # associated primary key (containing latched items)
         self._title_name = "Keyboard input (not configured)"
-        
+
         self._display_tooltip = None
         self._input_type = InputType.Keyboard
         self._suspend_update = False
@@ -59,7 +59,7 @@ class KeyboardInputItem(AbstractInputItem):
     def getOverrideInputType(self):
         ''' override type '''
         return InputType.JoystickButton
-        
+
     @property
     def title_name(self):
         ''' title for this input '''
@@ -69,15 +69,15 @@ class KeyboardInputItem(AbstractInputItem):
     def input_id(self):
         ''' input id for this key '''
         return self._key
-    
+
     @property
     def display_tooltip(self):
         return self._display_tooltip
-    
+
     @property
     def key(self):
         return self._key
-    
+
     @key.setter
     def key(self, value):
         assert isinstance(value, Key), f"Invalid type for key property: expected Key - got {value.type()}"
@@ -89,7 +89,7 @@ class KeyboardInputItem(AbstractInputItem):
         if self._key:
             return (self._key.scan_code, self._key.is_extended)
         return None
-            
+
 
     @property
     def sequence(self):
@@ -97,7 +97,7 @@ class KeyboardInputItem(AbstractInputItem):
         if self._key:
             return self._key.sequence
         return []
-    
+
     def _latched_key_update(self, source, action, index, value):
         self._update()
 
@@ -106,7 +106,7 @@ class KeyboardInputItem(AbstractInputItem):
         if self._key:
             return self._key.index_tuple
         return None
-    
+
     @property
     def latched(self):
         ''' true if all the keys in this input are latched '''
@@ -119,33 +119,33 @@ class KeyboardInputItem(AbstractInputItem):
         if self._key:
             return self._key.is_latched
         return False
-    
+
     @property
     def latched_keys(self) -> list:
         if self._key:
             return self._key.latched_keys
         return []
-        
+
     @property
     def keynames(self) -> list:
         key_list = [self._key.name]
         key_list.extend([key.name for key in self.latched_keys])
         return key_list
-    
+
     def getKeyList(self) -> list:
         ''' gets keys as a list, including any latched keys '''
         key_list = [self._key]
         key_list.extend([key for key in self.latched_keys])
         return key_list
 
-        
-            
+
+
 
     @property
     def message_key(self):
         ''' returns the sorting key for this message '''
         return self._message_key
-    
+
     @property
     def latched_keys(self):
         ''' returns a list of latched keys'''
@@ -163,14 +163,14 @@ class KeyboardInputItem(AbstractInputItem):
             for key in keys:
                 if key._is_mouse:
                     return True
-                
+
         return False
 
     def parse_xml(self, node, data = None, extra_data : dict = None):
         ''' loads itself from xml '''
         from gremlin.keyboard import key_from_code
         self._suspend_update = True
-        
+
         if node.tag == "input":
             self.id = read_guid(node, "guid", default_value=uuid.uuid4())
 
@@ -188,10 +188,10 @@ class KeyboardInputItem(AbstractInputItem):
                     # if virtual_code > 0:
                     #     key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
                     # else:
-                    
+
                     (scan_code, is_extended), _= gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
                     key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
-                    
+
                     self._key = key
                     for latched_child in child:
                         if latched_child.tag == "latched":
@@ -200,7 +200,7 @@ class KeyboardInputItem(AbstractInputItem):
                             is_extended = safe_read(latched_child, "extended", bool, False)
                             is_mouse = safe_read(latched_child, "mouse", bool, False)
                             if is_mouse:
-                                
+
                                 key = Key(scan_code = scan_code, is_mouse=True)
                             else:
                                 # if virtual_code > 0:
@@ -214,7 +214,7 @@ class KeyboardInputItem(AbstractInputItem):
                     self._key._update()
         self._suspend_update = False
         self._update()
-                    
+
 
     def to_xml(self):
         # saves itself to xml
@@ -222,7 +222,7 @@ class KeyboardInputItem(AbstractInputItem):
         node.set("guid", str(self.id))
 
 
-        # comment 
+        # comment
         comment = "".join(name for name in self.keynames)
         node_comment = etree.Comment(comment)
         node.append(node_comment)
@@ -238,7 +238,7 @@ class KeyboardInputItem(AbstractInputItem):
         node.append(child)
 
 
-        
+
         for key in root_key.latched_keys:
             comment = f"virtual: 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
             latched_child = etree.Element("latched")
@@ -250,10 +250,10 @@ class KeyboardInputItem(AbstractInputItem):
             node_comment = etree.Comment(comment)
             child.append(node_comment)
             child.append(latched_child)
-            
+
         return node
 
-    
+
     def _update(self):
         # updates the message key and display
         if self._suspend_update:
@@ -266,17 +266,17 @@ class KeyboardInputItem(AbstractInputItem):
             self._description = ""
             self._display_tooltip = ""
             return
-        
+
         extended_key = '0x0E ' if self._key._is_extended else ''
         message_key = f"| {extended_key}0x{self._key._scan_code:02X}"
-        
+
         key : Key
         for key in self._key._latched_keys:
             extended_key = '0x0E ' if key._is_extended else ''
             message_key += f"|{extended_key}0x{key._scan_code:02X}"
-        
+
         self._message_key = message_key
-    
+
         is_latched = self._key.is_latched
         self._title_name = f"Key/Mouse input {'(latched)'if is_latched else ''}"
 
@@ -294,15 +294,15 @@ class KeyboardInputItem(AbstractInputItem):
     def name(self):
         ''' display name - can be a compound key '''
         return self._display_name
-    
+
     @property
     def display_name_scan(self) -> str:
         return f"{self._display_name} {self.message_key}"
-    
+
     @property
     def display_name(self) -> str:
         return f"{self._display_name} {self.message_key}"
-    
+
     def duplicate(self) -> KeyboardInputItem:
         ''' duplicates this object '''
         import copy
@@ -326,18 +326,18 @@ class KeyboardInputItem(AbstractInputItem):
 
     def __ne__(self, other):
         return not (self == other)
-    
+
     def __hash__(self):
         return str(self._message_key).__hash__()
-    
+
     def __lt__(self, other):
         ''' used for sorting purposes '''
         # keep as is (don't sort this input entry)
         return False
-    
+
     def __str__(self):
         return self.to_string()
-    
+
 
 
 
@@ -363,7 +363,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param parent the parent of this widget
         """
         super().__init__(object_name, gremlin.shared_state.keyboard_tab_guid, parent)
-        
+
 
         # Store parameters
         self.device_profile = device_profile
@@ -376,7 +376,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         # last index selected, -1 means none
-        self._last_selected_index = -1 
+        self._last_selected_index = -1
 
         self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, parent=self, device_id = self._device_id)
         self.input_item_list_view.setMinimumWidth(350)
@@ -424,7 +424,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         # key clear button
-        
+
         clear_keyboard_button = ui_common.ConfirmPushButton("Clear", show_callback = self._show_clear_cb)
         icon = gremlin.ui.ui_common.Icons.trashIcon()
         clear_keyboard_button.setIcon(icon)
@@ -438,19 +438,19 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         sort_button.setIcon(icon)
         sort_button.clicked.connect(self._sort_input_cb)
         button_container_layout.addWidget(sort_button)
-        
+
         self.addLeftPanelWidget(button_container_widget)
 
         virtual_keyboard_button = QtWidgets.QPushButton("Add")
         virtual_keyboard_button.setToolTip("Adds a new key/mouse input to the profile")
-        icon = gremlin.ui.ui_common.Icons.keyboardIcon() 
+        icon = gremlin.ui.ui_common.Icons.keyboardIcon()
         virtual_keyboard_button.setIcon(icon)
         virtual_keyboard_button.clicked.connect(self._add_key_dialog_cb)
         button_container_layout.addWidget(virtual_keyboard_button)
 
-        
- 
-        
+
+
+
         # Select default entry
         self.input_item_list_view.redraw()
 
@@ -475,7 +475,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if not self.input_item_list_model.rows():
             # nothing to sort
-            return 
+            return
 
         # current selection (so we can select the item that was selected if the order changes)
         index = self._last_selected_index
@@ -489,7 +489,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             # reselect the saved item
             # so we need to find the matching data packet
             self._select_item_cb(current_selection.index)
-                
+
     def _sort_callback(self, items : list):
         ''' callback for sorting inputs in this device '''
         # sort alpha by keynames for now
@@ -500,15 +500,15 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def inputCount(self) -> int:
         ''' number of inputs in the device '''
         return self.input_item_list_model.rows()
-    
+
     @property
     def inputWidgetCount(self) -> int:
         ''' number of input widgets currently in the device '''
-        return self.input_item_list_view.count()        
-    
+        return self.input_item_list_view.count()
+
     def _handle_lock_inputs(self, data):
         gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data) # ensure on UI thread
-        
+
     def _handle_unlock_inputs(self, data):
         gremlin.util.InvokeUiMethod(self._handle_unlock_inputs_ui, data) # ensure on UI thread
 
@@ -520,7 +520,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             for input_item in self.input_item_list_model.getFilteredItems():
                 input_item.locked = True
             self.setUpdatesEnabled(True)
-    
+
     def _handle_unlock_inputs_ui(self, data):
         ''' unlock all inputs event '''
         if Shiboken.isValid(self) and data == self.device_guid:
@@ -544,13 +544,13 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.setModel(self.input_item_list_model)
         self.input_item_list_view.redraw()
         self._select_item_cb(self._last_selected_index)
-        
+
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
 
 
-    
+
     def _handle_edit_mode_changed(self, mode : str):
         gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode) # ensure on UI thread
 
@@ -565,10 +565,10 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' gets the input widget as the given index'''
         item =  self.input_item_list_view.itemAt(index)
         return item
-    
+
     def itemFromId(self, id):
         self.input_item_list_view
-        
+
 
     @property
     def model(self):
@@ -603,7 +603,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._keyboard_dialog.setModal(True)
         gremlin.util.centerDialog(self._keyboard_dialog)
         self._keyboard_dialog.showNormal()
-        
+
 
     def _dialog_close_cb(self):
         gremlin.shared_state.pop_suspend_ui_keyinput()
@@ -622,7 +622,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _process_input_keys(self, keys, index, root_key = None):
         ''' processes input keys
-         
+
         index of -1 indicates a new item
         reload: if set, updates the whole model
 
@@ -677,8 +677,8 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         verbose = gremlin.config.Configuration().verbose
         if verbose:
             syslog.info(f"Final item index {index} {input_id.display_name}")
-        
- 
+
+
     # def getWidgetKey(self, input_id):
     #     ''' gets the content widget compound key for the item / input combination'''
     #     return (self.device_guid, input_id)
@@ -714,12 +714,12 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         input_id = item_data.input_id if item_data else None
 
         if item_data:
-            
+
 
             profile = gremlin.shared_state.current_profile
             if profile:
                 profile.setLastInput(device_guid, input_type, input_id)
-                
+
             config = gremlin.config.Configuration()
             config.set_last_input(device_guid, input_type, input_id)
 
@@ -728,9 +728,10 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             if not widget:
                 widget = InputItemMappingWidget(item_data, object_name = f"Keyboard InputItemConfig for: {item_data.display_name}")
                 self.registerWidget(key, widget)
-            
+                widget.redraw() # load the data
+
             # Create new configuration widget
-            
+
             change_cb = self._create_change_cb(index)
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
@@ -743,9 +744,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self._blank_input()
             # widget = InputItemWidget(object_name = "Blank inputitemconfig for keyhboard device (select item cb - no item data)")
             # self.setRightPanelWidget(widget)
-            
 
-        self._last_selected_index = index           
+
+        self._last_selected_index = index
 
         if emit:
             el = gremlin.event_handler.EventListener()
@@ -768,7 +769,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 return sorted_keys.index(key)
         sorted_keys = list(mode.config[InputType.Keyboard])
         return sorted_keys.index(key_or_index)
-        
+
 
     def _create_change_cb(self, index):
         """Creates a callback handling content changes.
@@ -779,16 +780,16 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return lambda: self.input_item_list_view.redraw_index(index)
 
     def set_mode(self, mode):
-        ''' changes the mode of the tab '''        
+        ''' changes the mode of the tab '''
         self.current_mode = mode
         #self._reload_model(mode)
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.input_item_list_model.mode = mode
-        
+
         #self.input_item_list_view.select_item(-1)
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
             self.input_item_list_model.refresh()
-            self.input_item_list_view.redraw()        
+            self.input_item_list_view.redraw()
             self._select_item_cb(self._last_selected_index)
 
 
@@ -800,13 +801,13 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _custom_widget_handler(self, list_view : InputItemListView, index : int, identifier : InputIdentifier, data, parent = None):
         ''' creates a widget for the input
-        
+
         the widget must have a selected property
         :param list_view The list view control the widget to create belongs to
         :param index The index in the list starting at 0 being the top item
         :param identifier the InpuIdentifier for the input list
         :param data the data associated with this input item
-        
+
         '''
 
         widget = InputItemWidget(identifier = identifier, populate_ui_callback=self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent=parent, data=data)
@@ -817,17 +818,17 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.enable_edit()
 
         self._update_input_widget(widget, widget.parent)
-        
+
 
         return widget
-    
+
     def _set_custom_content(self, input_widget, values : list[gremlin.keyboard.Key]):
         ''' sets custom content '''
         if not values:
             # clear content
             input_widget.setCustomContent(None)
-            return 
-        
+            return
+
         widgets = []
         if len(values) < 8:
             key : gremlin.keyboard.Key
@@ -846,7 +847,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 widget.keySize = 2
                 widget.autoSize = True
                 widget.setFixedHeight(28)
-                
+
                 widget.setReadOnly(True)
                 widgets.append(widget)
         else:
@@ -855,7 +856,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             lbl = QtWidgets.QLabel(keys)
             lbl.setWordWrap(True)
             widgets = [lbl]
-        
+
 
         # update
         container_widget, container_layout = gremlin.ui.ui_common.getHContainer(widgets)
@@ -868,10 +869,10 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # input_widget.setInputDescription(data.description)
         values = data.getKeyList()
         self._set_custom_content(input_widget, values)
-        
+
         #input_widget.setInputDescription(data.display_name_scan)
         input_widget.display_name = data.display_name_scan
-        
+
         input_widget.setToolTip(data.display_tooltip)
         if data.has_mouse:
             input_widget.setInputDescriptionIcon("mdi.mouse")
@@ -891,23 +892,23 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             warning_color = gremlin.ui.ui_common.Color.warningColor()
             icon_color= QtGui.QColor(warning_color)
             icon = gremlin.util.load_icon("ph.shield-warning-fill", use_qta=True, qta_color=QtGui.QColor(warning_color))
-                
-        input_widget.setStatus(status_text, icon)
-        
 
- 
-   
+        input_widget.setStatus(status_text, icon)
+
+
+
+
 
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data):
         ''' called when a button is created for custom content '''
 
-        
-        
+
+
         self._update_input_widget(input_widget, container_widget)
-                
-  
-    
+
+
+
     def _edit_item_cb(self, widget, index, data):
         ''' called when the edit button is clicked  '''
         from gremlin.keyboard import Key
@@ -915,7 +916,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         data = self.model.data(index)
         sequence = data.input_id.sequence
-            
+
         syslog.info(f"Editing index {index} {data.input_id.display_name}")
         gremlin.shared_state.push_suspend_ui_keyinput()
         self._keyboard_dialog = InputKeyboardDialog(sequence, parent = self, select_single = False, index = index)
@@ -923,7 +924,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._keyboard_dialog.closed.connect(self._dialog_close_cb)
         self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.showNormal()
-        
+
 
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''

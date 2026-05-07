@@ -3852,7 +3852,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         ''' gets a display name for this input '''
         if self._input_type == InputType.JoystickAxis:
             device = gremlin.joystick_handling.getDevice(self.device_guid)
-            return f"Axis {device.get_axis_name(self._input_id)}"
+            return f"{device.get_axis_name(self._input_id)}"
         elif self._input_type == InputType.JoystickButton:
             return f"Button {self._input_id}"
         elif self._input_type == InputType.JoystickHat:

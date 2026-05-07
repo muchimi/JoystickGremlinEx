@@ -6760,7 +6760,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         if input_string:
             if suffix:
                 icon_path = f"{prefix}icon_{input_string}_{suffix}.png" if suffix else fallback
-                icon_file = get_icon_path(icon_path)
+                icon_file = gremlin.util.find_icon(icon_path)
                 if icon_file and os.path.isfile(icon_file):
                     return icon_file
             else:

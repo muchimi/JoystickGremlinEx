@@ -74,7 +74,7 @@ syslog = logging.getLogger("system")
 ''' device input for Octavi IFR1 device '''
 
 
-    
+
 class OctaviButton(enum.IntEnum):
     MODEAP = 1 # bottom AP button
     MODEHDG = 2
@@ -98,7 +98,7 @@ class OctaviButton(enum.IntEnum):
     PRESS = 20 # knob press
     INNER = 21 # inner knob value
     OUTER = 22 # outer knob value
-    INNER_DEC = 23 # inner knob decrement 
+    INNER_DEC = 23 # inner knob decrement
     INNER_INC = 24 # inner knob increment
     OUTER_DEC = 25 # outer knob decrement
     OUTER_INC = 26 # outer knob increment
@@ -154,14 +154,14 @@ class OctaviButton(enum.IntEnum):
                 return "Inner knob rotate left (counterclockwise)"
             case OctaviButton.INNER_INC:
                 return "Inner knob rotate right (clockwise)"
-            case OctaviButton.OUTER_DEC: 
+            case OctaviButton.OUTER_DEC:
                 return "Outer knob rotate left (counterclockwise)"
             case OctaviButton.OUTER_INC:
                 return "Outer knob rotate right (clockwise)"
-            
+
         return f"Don't know how to handle: {button}"
-    
-    @staticmethod 
+
+    @staticmethod
     def to_display_name(button: OctaviButton):
         match button:
             case OctaviButton.MODEAP:
@@ -212,15 +212,15 @@ class OctaviButton(enum.IntEnum):
                 return "Inner knob"
             case OctaviButton.INNER_INC:
                 return "Inner knob"
-            case OctaviButton.OUTER_DEC: 
+            case OctaviButton.OUTER_DEC:
                 return "Outer knob"
             case OctaviButton.OUTER_INC:
                 return "Outer knob"
             case _:
                 return "N/A"
-    @staticmethod     
+    @staticmethod
     def get_icon(button : OctaviButton):
-        
+
         match button:
             case OctaviButton.MODEAP:
                 return "fa5s.minus-square"
@@ -270,14 +270,14 @@ class OctaviButton(enum.IntEnum):
                 return "fa6s.arrow-rotate-left"
             case OctaviButton.INNER_INC:
                 return "fa6s.arrow-rotate-right"
-            case OctaviButton.OUTER_DEC: 
+            case OctaviButton.OUTER_DEC:
                 return "fa6s.arrow-rotate-left"
             case OctaviButton.OUTER_INC:
                 return "fa6s.arrow-rotate-right"
             case _:
                 return "mdi.help-rhombus"
-        
-    
+
+
 @SingletonDecorator
 class OctaviInterface():
 
@@ -287,7 +287,7 @@ class OctaviInterface():
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._stop)
         self._running = False
-        self._buttons = {} # map of [OctaviButton] to bool 
+        self._buttons = {} # map of [OctaviButton] to bool
         self._last_buttons = {} # last buttons
         self._core_buttons = [button for button in OctaviButton if button < OctaviButton.INNER]
         self._timers = {}
@@ -296,8 +296,8 @@ class OctaviInterface():
         for button in OctaviButton:
             self._buttons[button] = False
             self._last_buttons[button] = False
-        
-        
+
+
         self._autorelease_delay = 0.25 # delay for autorelease
         if self.deviceFound():
             self._start()
@@ -312,7 +312,7 @@ class OctaviInterface():
     def delay(self) -> float:
         ''' autorelease delay in seconds '''
         return self._autorelease_delay
-    
+
     @delay.setter
     def delay(self, value : float):
         ''' autorelease delay in seconds '''
@@ -325,7 +325,7 @@ class OctaviInterface():
             return False
         if self._running:
             return True
-        
+
         verbose = gremlin.config.Configuration().verbose_mode_octavi
         if verbose: syslog.info("IFR1: start")
 
@@ -333,23 +333,23 @@ class OctaviInterface():
         self._thread = threading.Thread(target = self._run)
         self._thread.name = "IFR1 Poll"
         self._thread.start()
-        
+
 
         return True
-    
-   
-    
+
+
+
     def _run(self):
         ''' data poll '''
         while self._running:
             data = list(self._device.read(8)) # returns an array of 8 bytes
-            
+
             if data:
                 changed_data = {}
-                
+
 
                 # 0 byte0, 1 buttons0, 2 buttons1, 3 buttons2, 4 byte5, 5 knob0, 6 knob1, 7 mode_val
-                b0 = data[1] 
+                b0 = data[1]
                 b1 = data[2]
                 b2 = data[3]
                 k1 = data[5]
@@ -363,7 +363,7 @@ class OctaviInterface():
                         stub += f"0x{item:x} ({item}), "
                     syslog.info(stub)
 
-                
+
 
                 # byte 1 buttons
                 self._buttons[OctaviButton.DIRECT] = (b0 & 0x10) > 0
@@ -434,14 +434,14 @@ class OctaviInterface():
                 self._buttons[OctaviButton.FMS2] = mode == 5
                 self._buttons[OctaviButton.AP] = mode == 6
                 self._buttons[OctaviButton.XPDR] = mode == 7
-                
-                
-                
 
-                
+
+
+
+
                 if self._last_buttons:
                     # prior data set = do a diffential of what's changed
-                    
+
                     for button in self._core_buttons:
                         if not button in self._buttons:
                             continue
@@ -455,8 +455,8 @@ class OctaviInterface():
 
                     for timer in timers:
                         timer.start()
-                        
-                        
+
+
                 else:
                     self._process_input(self._buttons)
 
@@ -464,11 +464,11 @@ class OctaviInterface():
                     for button in self._buttons:
                         self._last_buttons[button] = self._buttons[button]
 
-                
-                
-               
+
+
+
             time.sleep(0.2)
-        
+
         # done running
 
     def _autorelease_inner_dec(self):
@@ -488,15 +488,15 @@ class OctaviInterface():
         self._buttons[button] = False
         changed_data[button] = False
         self._process_input(changed_data)
-        
-            
+
+
 
     def _process_input(self, data):
         ''' handles octavi input events and convert them to joystick events '''
         verbose = gremlin.config.Configuration().verbose_mode_octavi
         if verbose: self._dump(data)
         el = gremlin.event_handler.EventListener()
-        
+
         is_running = gremlin.shared_state.is_running
         for button in data:
             is_pressed = data[button]
@@ -508,13 +508,13 @@ class OctaviInterface():
                 gremlin.util.singleShot(self._create_execute_callback(event))
 
 
-            
+
     def _create_execute_callback(self, event):
         return lambda: self._execute_event(event)
-    
+
     def _create_button_change_callback(self, event):
         return lambda: self._button_change(event)
-    
+
     def _execute_event(self, event):
         eh = gremlin.event_handler.EventHandler()
         eh.execute_event(event)
@@ -578,13 +578,13 @@ class OctaviInterface():
                 led = led & mask
             case "toggle":
                 # toggle bit
-                led = led ^ mask 
+                led = led ^ mask
 
         if led != self._last_led:
             # report number 11, LED value
             self._device.write(bytes([11, led]))
             self._last_led = led
-        
+
 
     def deviceFound(self, refresh = False) -> bool:
         ''' scans the HID devices to see if the device is found '''
@@ -598,7 +598,7 @@ class OctaviInterface():
                 self._device_found = True
                 self._device = hid.Device(vid, pid)
                 self._device.nonblocking = 1
-                syslog.info("IFR1: detected")    
+                syslog.info("IFR1: detected")
                 return True
         except:
             pass
@@ -613,7 +613,7 @@ class OctaviInterface():
         #     self._device.nonblocking = 1
         #     syslog.info("IFR1: detected")
         #     return True
-                
+
         self._device_found = False
         self._device = None
         syslog.info("IFR1: not detected")
@@ -621,13 +621,13 @@ class OctaviInterface():
 
 
 # main instance
-_octavi_device = OctaviInterface() 
+_octavi_device = OctaviInterface()
 
 
 class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
-    
+
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
     device_guid = gremlin.shared_state.octavi_tab_guid
 
@@ -637,8 +637,8 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             current_mode,
             object_name = "Octavi IFR1",
             parent=None
-            ):          
-        
+            ):
+
         super().__init__(object_name, gremlin.shared_state.octavi_tab_guid, parent)
 
         import gremlin.ui.ui_common as ui_common
@@ -660,7 +660,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.ensureInputItems()
 
-        # update the display names 
+        # update the display names
 
         self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, device_id = self._device_id)
         self.input_item_list_view.setMinimumWidth(350)
@@ -672,7 +672,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
 
-        
+
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
         widget = gremlin.ui.ui_common.getHContainer(lock_widget, left_stretch=True, widget_only = True)
@@ -699,11 +699,11 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.addLeftPanelWidget(widget)
             w2 = widget
 
-            gremlin.ui.ui_common.synchronize_grids([w1, w2])        
+            gremlin.ui.ui_common.synchronize_grids([w1, w2])
 
         self.addLeftPanelWidget(self.input_item_list_view)
 
-        
+
         self.input_item_list_model.refresh()
         self.input_item_list_view.redraw()
 
@@ -712,8 +712,8 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
         # last index selected, -1 means none
-        self._last_selected_index = -1 
-        
+        self._last_selected_index = -1
+
         # Select default entry
         selected_index = self.input_item_list_view.current_index
         if selected_index is None:
@@ -724,15 +724,15 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def inputCount(self) -> int:
         ''' number of inputs in the device '''
         return self.input_item_list_model.rows()
-    
+
     @property
     def inputWidgetCount(self) -> int:
         ''' number of input widgets currently in the device '''
-        return self.input_item_list_view.count()        
-    
+        return self.input_item_list_view.count()
+
     def _handle_lock_inputs(self, data):
         gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data) # ensure on UI thread
-        
+
     def _handle_unlock_inputs(self, data):
         gremlin.util.InvokeUiMethod(self._handle_unlock_inputs_ui, data) # ensure on UI thread
 
@@ -744,7 +744,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             for input_item in self.input_item_list_model.getFilteredItems():
                 input_item.locked = True
             self.setUpdatesEnabled(True)
-    
+
     def _handle_unlock_inputs_ui(self, data):
         ''' unlock all inputs event '''
         if Shiboken.isValid(self) and data == self.device_guid:
@@ -770,10 +770,10 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' occurs when a new mode is selected '''
         self.set_mode(mode)
 
-    
+
     def _mode_name_changed(self, name):
         gremlin.util.InvokeUiMethod(self._mode_name_changed_ui) # ensure on UI thread
-    
+
     def _mode_name_changed_ui(self, name):
         ''' occurs when there's a mode name change '''
         self.input_item_list_view.redraw()
@@ -781,18 +781,18 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _config_changed_cb(self):
         ''' called when configuraition has changed '''
-        self.refresh()      
+        self.refresh()
 
     def ensureInputItems(self, refresh = False):
-        ''' ensures we have input items for the current mode 
+        ''' ensures we have input items for the current mode
         :param refresh: True if list view should be updated if changes are made
-        :returns: True if changes were made 
+        :returns: True if changes were made
 
         '''
         current_mode = gremlin.shared_state.edit_mode
         mode_object = self.device_profile.ensure_mode_exists(current_mode)
         config = mode_object.config
-        
+
         changed = False
         input_type = InputType.OctaviIfr1
 
@@ -811,21 +811,21 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 input_item = config[input_type][button]
 
             input_item.setOverrideInputType(InputType.JoystickButton)
-             
-        if changed or refresh:
-            self.input_item_list_model.refresh()    
 
-        return changed 
-    
+        if changed or refresh:
+            self.input_item_list_model.refresh()
+
+        return changed
+
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
-        ''' creates a widget for the input 
-        
+        ''' creates a widget for the input
+
         the widget must have a selected property
         :param list_view The list view control the widget to create belongs to
         :param index The index in the list starting at 0 being the top item
         :param identifier the InpuIdentifier for the input list
         :param data the data associated with this input item
-        
+
         '''
         import gremlin.ui.input_item
 
@@ -834,7 +834,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.create_action_icons(data)
         icon_name = OctaviButton.get_icon(data.input_id)
         widget.setIcon(icon_name)
-        
+
 
         # remember what widget is at what index
         widget.index = index
@@ -843,7 +843,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the widget has to update itself on a data change '''
-        data : gremlin.base_profile.InputItem = input_widget.identifier 
+        data : gremlin.base_profile.InputItem = input_widget.identifier
         button = data.input_id
         name = OctaviButton.to_display_name(button)
         tooltip = OctaviButton.to_tooltip(button)
@@ -868,7 +868,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.clearFilter()
             index = self.input_item_list_model.indexOf(input_id)
         if index != -1:
-            self._select_item_cb(index)        
+            self._select_item_cb(index)
 
     def _select_item_cb(self, index, emit = True):
         """Handles the selection of an input item.
@@ -890,11 +890,11 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if index == -1:
             # select the first item
             if self.input_item_list_model.rows():
-                item_data = self.input_item_list_model.data(0)    
+                item_data = self.input_item_list_model.data(0)
                 index = 0
             else:
                 self._blank_input()
-                return 
+                return
         else:
             item_data = self.input_item_list_model.data(index)
 
@@ -902,7 +902,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         device_guid = self.device_guid
         input_id = item_data.input_id if item_data else None
         input_type = InputType.OctaviIfr1
-        
+
         if item_data:
             device_guid = self.device_guid
             key = self.getWidgetKey(input_type, input_id)
@@ -910,9 +910,10 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             if not widget:
                 widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name=f"IFR1: {item_data.display_name}")
                 self.registerWidget(key, widget)
-            
+                widget.redraw() # load the data
+
             # Create new configuration widget
-            
+
             change_cb = self._create_change_cb(index)
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
@@ -925,11 +926,12 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Joystick))
             mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
             item_data = gremlin.base_profile.InputItem(mode_object)
-            widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="IFR1 Blank InputConfigItem (no item data)")     
+            widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="IFR1 Blank InputConfigItem (no item data)")
+            widget.redraw() # load the data
 
         #self.setRightPanelWidget(widget)
 
-        self._last_selected_index = index 
+        self._last_selected_index = index
         self._item_data = widget
         self._last_selected_input_item = item_data
 
@@ -940,7 +942,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if emit:
             el = gremlin.event_handler.EventListener()
             el.input_selection_changed.emit(device_guid, input_type, input_id)
-    
+
     def _create_change_cb(self, index):
         """Creates a callback handling content changes.
 
@@ -948,17 +950,17 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :return callback function redrawing changed content
         """
         return lambda: self.input_item_list_view.redraw_index(index)
-    
+
     def set_mode(self, mode):
-        ''' changes the mode of the tab '''        
+        ''' changes the mode of the tab '''
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode)
         self.input_item_list_model.mode = mode
-        
+
         #self.input_item_list_view.select_item(-1)
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
             self.input_item_list_model.refresh()
-            self.input_item_list_view.redraw()        
+            self.input_item_list_view.redraw()
             self._select_item_cb(self._last_selected_index)
 
 

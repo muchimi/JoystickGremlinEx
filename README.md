@@ -31,7 +31,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 ### (m76RC34):
 Change: profile load optimizations
-Change: UI performance improvements
+Change: UI: general performance improvements
+Change: UI: just-in-time input mapping loading to reduce memory usage.  UI will only update when a new input is selected and no longer load all inputs (this could be hundreds on some devices).
+Change: UI: consolidated all icons to icons folder
+Fix: long load times for icons
 
 
 ### (m76RC33):

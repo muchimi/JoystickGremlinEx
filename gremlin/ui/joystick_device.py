@@ -682,7 +682,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if not Shiboken.isValid(self) or not Shiboken.isValid(self.input_item_list_view):
             return
 
-        _pop_cursor = False
+        pop_cursor = False
 
         try:
 
@@ -761,8 +761,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 widget = self.getRegisteredWidget(key)
                 if not widget:
 
-                    gremlin.util.pushCursor()
-                    _pop_cursor = True
+                    if not pop_cursor:
+                        gremlin.util.pushCursor()
+                        pop_cursor = True
                     # not in cache, create it and add to cache for this device/input combination
                     widget = InputItemMappingWidget(input_item, object_name = f"Joystick [{input_item.display_name}]")
                     device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
@@ -807,7 +808,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 el.input_selection_changed.emit(device_guid, input_type, input_id)
 
         finally:
-            if _pop_cursor:
+            if pop_cursor:
                 gremlin.util.popCursor()
             # self.setUpdatesEnabled(True)
             # self.update()

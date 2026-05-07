@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -111,13 +111,13 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         }
         input_type = self.action_data.get_input_type()
-        
+
         self.vjoy_selector = ui_common.VJoySelector(
             lambda x: self.save_changes(),  # handler when selection changes
             input_types[input_type],
             self.action_data.get_settings().vjoy_as_input
         )
-        
+
         self.vjoy_selector.input_changed.connect(self._input_changed)
 
         self.main_layout.addWidget(self.vjoy_selector)
@@ -155,7 +155,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>VJoy Remap</i> for additional functionality", use_wrap=False)
         warning_layout.addWidget(warning_widget)
         warning_layout.addStretch()
-        self.main_layout.addWidget(warning_container)            
+        self.main_layout.addWidget(warning_container)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
 
@@ -165,7 +165,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         vjoy_data = self.vjoy_selector.get_selection()
         input_type = vjoy_data["input_type"]
         if input_type != self._last_input_type:
-            
+
             self._last_input_type = input_type
             self.action_data.vjoy_id = vjoy_data["device_id"]
             self.action_data.vjoy_input_id = vjoy_data["input_id"]
@@ -174,7 +174,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
            # Signal changes
             self._notify_button_changed()
 
-        
+
 
     def _populate_ui(self):
         """Populates the UI components."""
@@ -185,8 +185,8 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
         # Get the input type which can change depending on the container used
         input_type = self.action_data.input_type
-        
-        
+
+
         if self.action_data.parent.tag == "hat_buttons":
             input_type = InputType.JoystickButton
 
@@ -270,8 +270,6 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
             # Signal changes
             self._notify_button_changed()
-          
-            #self.action_modified.emit()
             self.notify_device_changed(emit_profile_changed=False)
 
         except gremlin.error.GremlinError as e:
@@ -285,7 +283,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 button_id =self.action_data.vjoy_input_id
                 vjoy_id = self.action_data.vjoy_id
                 el = gremlin.event_handler.EventListener()
-            
+
                 if self._last_button_id != -1 and self._last_button_id != button_id:
                     # clear the old button if it was previously selected
                     if verbose: syslog.info(f"LEGACY MAP: send button clear {vjoy_id} {self._last_button_id} {self.action_data.id}")
@@ -310,7 +308,7 @@ class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
         if emit_profile_changed:
             el.profile_device_changed.emit(event)
         if emit_icon:
-            el.icon_changed.emit(event)            
+            el.icon_changed.emit(event)
 
 
 class RemapFunctor(gremlin.base_profile.AbstractFunctor):
@@ -344,7 +342,7 @@ class RemapFunctor(gremlin.base_profile.AbstractFunctor):
                 value = action_value.current
             if event.is_repeater:
                 value = event.value
-            
+
             if self.axis_mode == "absolute":
                 if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
                     joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
@@ -367,8 +365,8 @@ class RemapFunctor(gremlin.base_profile.AbstractFunctor):
                         and self.needs_auto_release:
                     input_devices.CallbackActions().register_button_release((self.vjoy_id, self.vjoy_input_id),event)
                     joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = event.is_pressed
-                
-            
+
+
 
         elif input_type == InputType.JoystickHat:
             if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
@@ -404,7 +402,7 @@ class RemapFunctor(gremlin.base_profile.AbstractFunctor):
                 except gremlin.error.VJoyError:
                     self.thread_running = False
 
-    
+
 
 
 class Remap(gremlin.base_profile.AbstractAction):
@@ -445,7 +443,7 @@ Use Vjoy Remap instead.'''
         self._vjoy_input_id = None
         input_type = self.get_input_type()
         self._input_type = input_type
-        
+
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
 
@@ -504,7 +502,7 @@ Use Vjoy Remap instead.'''
             if self._input_type == InputType.JoystickButton:
                 el = gremlin.event_handler.EventListener()
                 el.vjoy_button_usage.emit(self.vjoy_id,  self._vjoy_input_id, True, self.id)
-            
+
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
@@ -523,28 +521,57 @@ Use Vjoy Remap instead.'''
         import gremlin.shared_state
         is_dark = gremlin.shared_state.is_dark_theme
         # Do not return a valid icon if the input id itself is invalid
+
+
+
         if self.vjoy_input_id is None:
             input_string = None
         else:
-            input_string = "axis"
-            if self.input_type == InputType.JoystickButton:
-                input_string = "button"
-            elif self.input_type == InputType.JoystickHat:
-                input_string = "hat"
+            input_string = None
+            dark_stub = "dark_" if is_dark else ""
+            match self.input_type:
+                case InputType.JoystickButton:
+                    input_string = "button"
+                    suffix = f"{self.vjoy_input_id:03d}.png"
+                    fallback = "mdi.gesture-tap-button"
 
-        dark_stub = "dark_" if is_dark else ""
-        if input_string:
-            
-            icon_file = f"{dark_stub}icon_{input_string}_{self.vjoy_input_id:03d}.png"
-            icon_path = gremlin.util.find_file(icon_file)
-            if os.path.isfile(icon_path):
-                return icon_file
-            
+                case InputType.JoystickHat:
+                    input_string = "hat"
+                    input_string = "mdi.axis-arrow"
+                    fallback = "mdi.axis-arrow"
+
+                case InputType.JoystickAxis:
+                    input_string = "axis"
+                    match self._vjoy_input_id:
+                        case 1:
+                            suffix = "x"
+                        case 2:
+                            suffix = "y"
+                        case 3:
+                            suffix = "z"
+                        case 4:
+                            suffix = "rx"
+                        case 5:
+                            suffix = "ry"
+                        case 6:
+                            suffix = "rz"
+                        case 7:
+                            suffix = "s1"
+                        case 8:
+                            suffix = "s2"
+
+            if input_string:
+                icon_file = f"{dark_stub}icon_{input_string}_{suffix}.png"
+                icon_path = gremlin.util.find_icon(icon_file)
+                if os.path.isfile(icon_path):
+                    return icon_file
+
             log_sys_warn(f"Icon file: {icon_file}")
             log_sys_warn(f"Warning: unable to determine icon type: {self.input_type} for id {self.vjoy_input_id}")
+            return fallback
         return None
-        
-        
+
+
 
     def requires_virtual_button(self):
         """Returns whether or not the action requires an activation condition.
@@ -575,16 +602,16 @@ Use Vjoy Remap instead.'''
         :param node XML node with which to populate the storage
         """
         try:
-            
+
             self._vjoy_id = safe_read(node, "vjoy", int, 1)
-            
+
             if "axis" in node.attrib:
                 self.input_type = InputType.JoystickAxis
                 self.vjoy_input_id = safe_read(node, "axis", int, 1)
             elif "button" in node.attrib:
                 self.input_type = InputType.JoystickButton
                 self.vjoy_input_id = safe_read(node, "button", int, 1)
-                
+
             elif "hat" in node.attrib:
                 self.input_type = InputType.JoystickHat
                 self.vjoy_input_id = safe_read(node, "hat", int, 1)
@@ -635,11 +662,11 @@ Use Vjoy Remap instead.'''
         :return True if the action is configured correctly, False otherwise
         """
         return not(self.vjoy_id is None or self.vjoy_input_id is None)
-    
+
     def _get_output_name(self) -> str:
         return InputType.to_display_name(self._input_type)
 
-    
+
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
         from gremlin.reporting import ReportTable, ReportRow, ReportCell
@@ -650,7 +677,7 @@ Use Vjoy Remap instead.'''
         table.addField("Output ID", self.vjoy_input_id)
 
 
-        return table.to_html()    
+        return table.to_html()
 
 
 version = 1

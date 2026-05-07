@@ -453,7 +453,7 @@ class Color():
         foreground_color = Color.normalColor
         selected_background_color = Color.selectedBackgroundColor()
         if gremlin.config.Configuration().is_debug:
-            relative_path = "gfx/"
+            relative_path = ""
         else:
             relative_path = "_internal/gfx/"
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
@@ -1550,6 +1550,9 @@ class AbstractModel(QtCore.QAbstractItemModel):
         """
         pass
 
+    def count(self):
+        return self.rows()
+
     def data(self, index):
         """Returns the data entry stored at the provided index.
 
@@ -1578,6 +1581,7 @@ class AbstractView(QtWidgets.QWidget):
         super().__init__(parent)
         self._model = None
         self._container = None
+        self._model_dirty = False
 
     @property
     def model(self):
@@ -1585,18 +1589,28 @@ class AbstractView(QtWidgets.QWidget):
     @model.setter
     def model(self, value):
         if value != self._model:
+            # hook model change events when an item is added or removed
             if self._model is not None:
-                self._model.data_changed.disconnect(self.redraw)
+                self._model.data_changed.disconnect(self._model_changed)
             self._model = value
             if value:
                 self._model.data_changed.connect(self._model_changed)
 
+            # indicate the model changed
             self._model_changed()
 
-    def _model_changed(self):
-        syslog.info("model changed")
-        self.redraw()
+    @property
+    def model_dirty(self) -> bool:
+        ''' true if the data model has changed - used to determine the UI should update or not '''
+        return self._model_dirty
 
+    def resetDirty(self):
+        ''' resets the dirty flag on the model '''
+        self._model_dirty = False
+
+    def _model_changed(self):
+        ''' indicates the data model has changed and the UI should be refreshed '''
+        self._model_dirty = True
 
     def setModel(self, model):
         """Sets the model to display with this view.
@@ -3326,7 +3340,7 @@ class ModeWidget(QtWidgets.QWidget):
         # add the mode change button
         self.mode_change = QtWidgets.QPushButton()
         is_dark = gremlin.shared_state.is_dark_theme
-        manage_modes_icon = "gfx/dark_manage_modes.svg" if is_dark else "gfx/manage_modes.svg"
+        manage_modes_icon = "dark_manage_modes.svg" if is_dark else "manage_modes.svg"
         self.mode_change.setIcon(load_icon(manage_modes_icon))
         self.mode_change.setToolTip("Manage Profile Modes")
         self.mode_change.clicked.connect(self._manage_modes_cb)

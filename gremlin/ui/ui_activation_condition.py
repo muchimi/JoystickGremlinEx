@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -76,7 +76,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.connect(self._update_ui)
 
-        
+
 
     def _create_ui(self):
         """Creates the configuration UI."""
@@ -90,40 +90,40 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         self.controls_layout.addWidget(self.help_button)
         self.controls_layout.addStretch()
 
-      
+
 
         self.main_layout.addLayout(self.controls_layout)
 
         # conditions for the container
 
-        
+
         self.container_condition_frame_widget = gremlin.ui.ui_common.QBoxFrame()
         self.container_condition_frame_widget.setContentsMargins(0,0,0,0)
         self.container_condition_frame_layout = QtWidgets.QVBoxLayout(self.container_condition_frame_widget)
-        
+
 
         self.activation_count_widget = QtWidgets.QLabel()
         self.container_condition_frame_layout.addWidget(self.activation_count_widget)
         self.container_condition_model = ConditionModel(self.profile_data, self.profile_data.activation_condition)
-        
-       
+
+
         self.container_condition_view = ConditionView()
         self.container_condition_view.setContainer(self.profile_data)
         self.container_condition_view.setModel(self.container_condition_model)
-        
+
         self.container_condition_frame_layout.addWidget(self.container_condition_view)
         #self.container_condition_frame_layout.addStretch()
 
-        
+
         self.main_layout.addWidget(self.container_condition_frame_widget)
 
         self.container_condition_view.redraw()
 
         self._update_counts()
-        
+
     def _update_condition(self):
         gremlin.util.InvokeUiMethod(self._update_conditions_ui)
-    
+
     @QtCore.Slot()
     def _update_conditions_ui(self):
         ''' updates the condition UI for this container '''
@@ -140,14 +140,14 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
 
     def _update_counts(self):
-        ''' refreshes counts '''   
+        ''' refreshes counts '''
         if not Shiboken.isValid(self.activation_count_widget):
             return
         if self.container:
             self.activation_count_widget.setText(f"Container action conditions ({self.container.condition_count} found):")
         else:
             # not a container
-            self.activation_count_widget.setText(f"Conditions:")  
+            self.activation_count_widget.setText(f"Conditions:")
 
 
     def _show_hint(self, state):
@@ -180,7 +180,7 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        
+
         self._create_ui()
 
     def _create_ui(self):
@@ -233,11 +233,11 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
         self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback = self._copy_condition)
         self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback = self._paste_condition)
-        
+
         self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label = "Listen", callback = self._request_user_input)
         self.select_button_widget = gremlin.ui.ui_common.Buttons.getKeyboardWidget(label = "Select Keys", callback = self._select_user_input)
-        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
-        
+        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition), tooltip = "Delete condition")
+
 
         widgets,layout = gremlin.ui.ui_common.getHContainer([self.copy_widget,
                                                              self.paste_widget,
@@ -245,7 +245,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
                                                              self.select_button_widget,
                                                              self.delete_button_widget,
                                                              ])
-        
+
 
         self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.comparison_dropdown.addItem("Pressed")
@@ -326,10 +326,10 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
         :param event the input event to process
         """
-        
+
         self.condition.comparison = "pressed"
 
-        self._key_pressed_cb(key)   
+        self._key_pressed_cb(key)
 
 
     @QtCore.Slot()
@@ -344,7 +344,7 @@ class KeyboardConditionWidget(AbstractConditionWidget):
         self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
         gremlin.util.centerDialog(self._keyboard_dialog)
-        self._keyboard_dialog.showNormal()  
+        self._keyboard_dialog.showNormal()
 
     @QtCore.Slot()
     def _dialog_ok_cb(self):
@@ -362,9 +362,9 @@ class ModeConditionWidget(AbstractConditionWidget):
 
     def _create_ui(self):
         if not Shiboken.isValid(self):
-            return        
-        
-        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
+            return
+
+        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition), tooltip = "Delete condition")
         widget = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True, widget_only = True)
         self.main_layout.addWidget(widget)
 
@@ -372,7 +372,7 @@ class ModeConditionWidget(AbstractConditionWidget):
         if not self.condition.mode:
             self.condition.mode = gremlin.shared_state.edit_mode
         self.mode_selector.setMode(self.condition.mode)
-             
+
         self.mode_selector.modeChanged.connect(self._handle_mode_changed)
 
         self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
@@ -382,7 +382,7 @@ class ModeConditionWidget(AbstractConditionWidget):
             index = self.comparison_dropdown.findData(self.condition.comparison)
             if index != -1:
                 self.comparison_dropdown.setCurrentIndex(index)
-        
+
         #if self.condition.comparison: self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
         self.comparison_dropdown.currentIndexChanged.connect(self._comparison_changed_cb)
 
@@ -410,14 +410,14 @@ class ModeConditionWidget(AbstractConditionWidget):
         self.description_widget = QtWidgets.QLabel()
         widget = gremlin.ui.ui_common.getHContainer(["Description:", self.description_widget], widget_only = True)
         self.main_layout.addWidget(widget)
-          
-    def _handle_mode_changed(self, mode):          
+
+    def _handle_mode_changed(self, mode):
         self.condition.mode = mode
 
     @QtCore.Slot(bool)
     def _ignore_release_cb(self, checked : bool):
         self.condition.ignore_release = checked
-        
+
     def setDescription(self, value):
         self.description_widget.setText(value if value else "n/a")
 
@@ -437,7 +437,7 @@ class StateConditionWidget(AbstractConditionWidget):
     def _create_ui(self):
         if not Shiboken.isValid(self):
             return
-        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
+        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition), tooltip = "Delete condition")
         widget = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True, widget_only = True)
         self.main_layout.addWidget(widget)
 
@@ -447,7 +447,7 @@ class StateConditionWidget(AbstractConditionWidget):
         widget = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector], widget_only = True)
         self.main_layout.addWidget(widget)
 
-        
+
 
 
         widget = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget], widget_only = True)
@@ -474,18 +474,18 @@ class StateConditionWidget(AbstractConditionWidget):
         self.ignore_release_widget.setChecked(self.condition.ignore_release)
         self.ignore_release_widget.clicked.connect(self._ignore_release_cb)
 
-        self.grid_layout.addWidget(self.ignore_release_widget, 0, 5)        
-        
+        self.grid_layout.addWidget(self.ignore_release_widget, 0, 5)
+
         self.grid_layout.setColumnStretch(5,2)
 
         self.main_layout.addWidget(self.grid_widget)
 
         self.populate_selector()
-        
+
     @QtCore.Slot(bool)
     def _ignore_release_cb(self, checked : bool):
         self.condition.ignore_release = checked
-        
+
     def setDescription(self, value):
         self.state_description_widget.setText(value if value else "n/a")
 
@@ -523,11 +523,11 @@ class StateConditionWidget(AbstractConditionWidget):
             else:
                 # pick the first as the default
                 self.condition.key = self.state_selector.currentText()
-            
+
             if self.state_selector.count():
                 data = self.state_selector.currentData()
                 description = data.description
-                self.setDescription(description)        
+                self.setDescription(description)
                 self.condition.description = description
 
 class JoystickConditionWidget(AbstractConditionWidget):
@@ -553,10 +553,10 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
         self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback = self._copy_condition)
         self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback = self._paste_condition)
-   
+
 
         self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label = "Listen", callback = self._request_user_input)
-        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
+        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition), tooltip = "Delete condition")
 
 
         widgets,layout = gremlin.ui.ui_common.getHContainer([self.copy_widget,
@@ -587,14 +587,14 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.selector_container_widget = QtWidgets.QWidget()
         self.selector_container_layout = QtWidgets.QGridLayout(self.selector_container_widget)
         self.selector_container_layout.addWidget(QtWidgets.QLabel("Device:"), 0, 0)
-        self.selector_container_layout.addWidget(self.device_selector_widget, 0, 1) 
+        self.selector_container_layout.addWidget(self.device_selector_widget, 0, 1)
         self.selector_container_layout.addWidget(QtWidgets.QLabel("Input:"), 1, 0)
-        self.selector_container_layout.addWidget(self.input_selector_widget, 1, 1) 
+        self.selector_container_layout.addWidget(self.input_selector_widget, 1, 1)
         self.selector_container_layout.addWidget(self.axis_repeater_widget, 2, 1)
 
         self.selector_container_layout.addWidget(QtWidgets.QWidget(), 0, 2) # spacer column
-        
-        self.selector_container_layout.addWidget(widgets, 0, 4) 
+
+        self.selector_container_layout.addWidget(widgets, 0, 4)
         self.selector_container_layout.setColumnStretch(2,2)
 
         self.range_status_widget = None
@@ -635,7 +635,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.condition.input_type = input_type
         self.condition.input_id =  input_id
         self.condition.device_name = device.name
-        
+
         self._init_ui()
 
 
@@ -658,18 +658,18 @@ class JoystickConditionWidget(AbstractConditionWidget):
         # update condition for the selected device
         device : gremlin.joystick_handling.DeviceSummary = self.device_selector_widget.currentData()
         self.condition.device_guid = device.device_guid
-    
+
     def _populate_input_selector(self):
         import gremlin.util
         input_id = self.condition.input_id
         input_type = self.condition.input_type
         device : gremlin.joystick_handling.DeviceSummary = self.device_selector_widget.currentData()
-        
 
-        
+
+
         with QtCore.QSignalBlocker(self.input_selector_widget):
             self.input_selector_widget.clear()
-            
+
 
             index = 0 # index of the entry
             current_index = None # index of the input to select
@@ -682,7 +682,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
                     current_index = index
                 index += 1
 
-            
+
 
             # buttons
             for i in range(device.button_count):
@@ -693,7 +693,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
                 index += 1
 
 
-          
+
             # hats
             for i in range(device.hat_count):
                 hat_name = f"Hat {i+1}"
@@ -712,8 +712,8 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
             # update the other UI based on input type
             self._init_ui()
-            
-        
+
+
 
     def _init_ui(self):
         input_type = self.condition.input_type
@@ -726,20 +726,20 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
             case InputType.JoystickButton:
                 self._button_ui()
-        
+
             case InputType.JoystickHat:
                 self._hat_ui()
 
         self._update_ui()
-            
+
 
 
     def _update_ui(self):
         ''' updates UI based on input type'''
         gremlin.util.assert_ui_thread()
         visible = False
-      
-        
+
+
         self.axis_repeater_widget.setVisible(visible)
 
         if self.delay_widget:
@@ -750,7 +750,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
-        
+
         gremlin.util.clear_layout(self.ui_container_layout)
         self.lower_widget = ui_common.QFloatLineEdit()
         self.lower_widget.setMinimum(-1.0)
@@ -762,7 +762,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.grab_low_widget.clicked.connect(self._grab_low)
         self.grab_low_widget.setToolTip("Grab axis value")
 
-        
+
         self.lower_widget.setValue(self.condition.range[0])
         self.lower_widget.valueChanged.connect(self._range_lower_changed_cb)
 
@@ -770,8 +770,8 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.upper_widget = ui_common.QFloatLineEdit()
         self.upper_widget.setMinimum(-1.0)
         self.upper_widget.setMaximum(1.0)
-        
-        
+
+
         self.upper_widget.setValue(self.condition.range[1])
         self.upper_widget.valueChanged.connect(self._range_upper_changed_cb)
 
@@ -780,20 +780,20 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.grab_high_widget.setMaximumWidth(20)
         self.grab_high_widget.clicked.connect(self._grab_high)
         self.grab_high_widget.setToolTip("Grab axis value")
-        
+
 
         self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.comparison_dropdown.addItem("Inside")
         self.comparison_dropdown.addItem("Outside")
         if not self.condition.comparison in ("inside","outside"):
             self.condition.comparison = "inside"
-            
+
         self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
         self.comparison_dropdown.setCallback(self._comparison_changed_cb)
 
         self.range_status_widget = ui_common.QIconLabel()
         self.range_status_widget.setIcon("mdi.checkbox-marked-outline", color = gremlin.ui.ui_common.Color.activeColor())
-        
+
 
         range_layout = QtWidgets.QHBoxLayout()
         range_layout.addWidget(self.comparison_dropdown)
@@ -818,7 +818,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
             # update the comparison
             self.condition.comparison = self.comparison_dropdown.currentText()
 
-        
+
         self._update_range_state(self._axis_value())
 
     def _axis_value(self):
@@ -896,14 +896,14 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
         self.comparison_dropdown.setValue(self.condition.comparison)
         self.comparison_dropdown.valueChanged.connect(self._comparison_changed_cb)
-        
+
         input_name = f"<b>{self.condition.device_name} Hat {self.condition.input_id}</b>"
 
         self.ui_container_layout.addWidget(QtWidgets.QLabel(input_name),0,1)
         self.ui_container_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
         self.ui_container_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
         self.ui_container_layout.addWidget(QtWidgets.QWidget(), 0, 4)
-        
+
 
 
 
@@ -989,7 +989,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
     @QtCore.Slot()
     def _grab_low(self):
         self.lower_widget.setValue(self._axis_value()) # also updates condition_data
-        
+
 
     @QtCore.Slot()
     def _grab_high(self):
@@ -1013,7 +1013,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
             return
         if self.range_status_widget:
             visible = False
-            
+
             v1, v2 = self.condition.range
             in_range = gremlin.util.valueInRange(value, v1, v2)
             match self.condition.comparison:
@@ -1021,7 +1021,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
                     if in_range:
                         self.range_status_widget.setText("in range")
                         visible = True
-                    
+
                 case "outside":
                     if not in_range:
                         self.range_status_widget.setText("outside of range")
@@ -1048,7 +1048,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
                 syslog.warning(
                     f"Invalid input type encountered: {self.condition.input_type}"
                 )
-            
+
 
             self._update_ui()
 
@@ -1105,12 +1105,12 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
         self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback = self._copy_condition)
         self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback = self._paste_condition)
- 
+
         self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label = "Listen", callback = self._request_user_input)
-        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition))
+        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.deleted.emit(self.condition), tooltip="Delete condition")
 
         widget,layout = gremlin.ui.ui_common.getHContainer([self.copy_widget,
-                                                            self.paste_widget, 
+                                                            self.paste_widget,
                                                             self.record_button_widget,
                                                             self.delete_button_widget])
 
@@ -1142,7 +1142,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
             self.ignore_release_widget.setChecked(self.condition.ignore_release)
             self.ignore_release_widget.clicked.connect(self._ignore_release_cb)
 
-        
+
 
         self.main_layout.addWidget(label)
         self.main_layout.addWidget(self.grid_widget)
@@ -1164,9 +1164,9 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
     @QtCore.Slot(bool)
     def _ignore_release_cb(self, checked : bool):
-        self.condition.ignore_release = checked                
+        self.condition.ignore_release = checked
 
-  		
+
     @QtCore.Slot()
     def _request_user_input(self):
         self.input_dialog = ui_common.InputListenerWidget(
@@ -1198,7 +1198,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
     def _filter_input(self, event) -> bool:
         # only accept virtual events
         return event.is_virtual
-    
+
     def _input_pressed_cb(self, event):
         """Processes input events to update the UI and model.
 
@@ -1215,16 +1215,16 @@ class VJoyConditionWidget(AbstractConditionWidget):
             self.condition.comparison = "pressed"
         elif event.event_type == InputType.JoystickHat:
             self.condition.comparison =  util.hat_tuple_to_direction(event.value)
-        self._create_ui()    
-                    
+        self._create_ui()
+
 
     def _axis_ui(self):
         """Creates the UI needed to configure an axis based condition."""
         self.lower_widget = ui_common.QFloatLineEdit()
         self.lower_widget.setMinimum(-1.0)
         self.lower_widget.setMaximum(1.0)
-        
-        
+
+
         self.lower_widget.setValue(self.condition.range[0])
         self.lower_widget.valueChanged.connect(self._range_lower_changed_cb)
         self.upper_widget = ui_common.QFloatLineEdit()
@@ -1258,8 +1258,8 @@ class VJoyConditionWidget(AbstractConditionWidget):
         layout.addLayout(range_layout)
         layout.addStretch()
         self.ui_container_layout.addLayout(layout, 0, 1)
-        
-        
+
+
 
     def _button_ui(self):
         """Creates the UI needed to configure a button based condition."""
@@ -1278,7 +1278,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         layout.addStretch()
 
         self.ui_container_layout.addLayout(layout, 0, 1)
-        
+
 
     def _hat_ui(self):
         """Creates the UI needed to configure a hat based condition."""
@@ -1291,7 +1291,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
             self.condition.comparison = "center"
         self.comparison_widget.setValue(self.condition.comparison)
         self.comparison_widget.valueChanged.connect(self._comparison_changed_cb)
-        
+
         layout = QtWidgets.QHBoxLayout()
 
         layout.addWidget(QtWidgets.QLabel(f"<b>vJoy {self.condition.vjoy_id:d} Hat {self.condition.input_id:d}</b>"))
@@ -1318,7 +1318,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
             if not self.condition.comparison in directions:
                 self.condition.comparison = "center"
         self._create_ui()
-        
+
 
     def _range_lower_changed_cb(self, value):
         """Updates the lower part of an axis range.
@@ -1374,7 +1374,7 @@ class InputActionConditionWidget(AbstractConditionWidget):
 
         self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback = self._copy_condition)
         self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback = self._paste_condition)
-   
+
 
         self.state_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.state_dropdown.addItem("Pressed")
@@ -1429,9 +1429,9 @@ class ConditionModel(ui_common.AbstractModel):
         self.container = None
         if isinstance(action_data, gremlin.base_profile.AbstractContainer):
             self.container = action_data
-            self.input_item = action_data.input_item 
+            self.input_item = action_data.input_item
         elif isinstance(action_data, gremlin.base_profile.AbstractAction):
-            # find the container for the given action 
+            # find the container for the given action
             self.container = action_data.get_container()
         elif isinstance(action_data, gremlin.base_profile.ConditionContainer):
             self.container = action_data.get_container()
@@ -1469,7 +1469,7 @@ class ConditionModel(ui_common.AbstractModel):
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.emit(container)
 
-        
+
 
     def delete_condition(self, condition):
         """Deletes a condition from the model.
@@ -1487,7 +1487,7 @@ class ConditionModel(ui_common.AbstractModel):
             tracker.unregisterCondition(condition)
 
         container = self.container
-        
+
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.emit(container)
         self.data_changed.emit()
@@ -1514,8 +1514,8 @@ class ConditionView(ui_common.AbstractView):
     """Widget visualizing a condition model instance."""
 
     # Mapping between data and ui classes
-    
-    
+
+
     condition_map = {
         "Keyboard":
             [KeyboardCondition, KeyboardConditionWidget],
@@ -1581,7 +1581,7 @@ class ConditionView(ui_common.AbstractView):
         self.condition_selector.addItem("Action Condition")
         self.condition_selector.addItem("State Condition")
         self.condition_selector.addItem("Mode Condition")
-        
+
         config = gremlin.config.Configuration()
         last_selector = config.condition_selector
         index = self.condition_selector.findText(last_selector)
@@ -1589,10 +1589,10 @@ class ConditionView(ui_common.AbstractView):
             self.condition_selector.setCurrentIndex(index)
         self.condition_selector.currentIndexChanged.connect(self._change_condition_selector)
         self.condition_add_button = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip = "Adds a condition", callback = self._add_condition)
-        
+
         self.controls_layout.addWidget(self.condition_selector)
         self.controls_layout.addWidget(self.condition_add_button)
-        
+
         self.help_button = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint)
         self.controls_layout.addWidget(self.help_button)
 
@@ -1601,7 +1601,7 @@ class ConditionView(ui_common.AbstractView):
 
         self.controls_layout.addWidget(copy_widget)
         self.controls_layout.addWidget(paste_widget)
-        
+
 
 
 
@@ -1609,7 +1609,7 @@ class ConditionView(ui_common.AbstractView):
         ''' sets the container '''
         self._container = container
 
-  		
+
     @QtCore.Slot()
     def _copy_condition(self):
         helper = ConditionHelper()
@@ -1619,8 +1619,8 @@ class ConditionView(ui_common.AbstractView):
     def _paste_condition(self):
         clipboard = gremlin.clipboard.Clipboard()
         helper = ConditionHelper()
-        helper.paste_condition(self._container, clipboard.data)        
-              
+        helper.paste_condition(self._container, clipboard.data)
+
 
     @QtCore.Slot()
     def _change_condition_selector(self):
@@ -1637,11 +1637,11 @@ class ConditionView(ui_common.AbstractView):
             return
         if self._redraw_lock:
             return
-        
+
         try:
             self._redraw_lock = True
-        
-        
+
+
             gremlin.util.clear_layout(self.conditions_layout)
 
             # create a widget for each condition
@@ -1660,14 +1660,14 @@ class ConditionView(ui_common.AbstractView):
 
         finally:
             self._redraw_lock = False
-            
 
-        
+
+
 
 
     def _add_condition(self, condition = None):
         """Adds a condition to the view's model."""
-        
+
         if not condition:
             data_type = ConditionView.condition_map[self.condition_selector.currentText().split()[0]][0]
             self.model.add_condition(data_type())
@@ -1675,7 +1675,7 @@ class ConditionView(ui_common.AbstractView):
             self.model.add_condition(condition)
 
 
-        
+
 
     def _rule_changed_cb(self, text):
         """Updates the rule of the model.
@@ -1691,7 +1691,7 @@ class ConditionView(ui_common.AbstractView):
         )
         self.redraw()
 
-        
+
 
 
     def _show_hint(self, state):

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@ class AbstractVirtualButtonWidget(QtWidgets.QGroupBox):
     """Base class for activation condition widgets."""
 
     virtual_button_modified = Signal()
-    
+
 
     def __init__(self, condition_data, parent=None, layout_direction="vertical"):
         """Creates a new activation condition widget.
@@ -133,7 +133,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.range_layout.addStretch()
 
 
-        self.help_button_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint) # QtWidgets.QPushButton(load_icon("gfx/help.png"), "")
+        self.help_button_widget = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint) # QtWidgets.QPushButton(load_icon("help.png"), "")
         self.help_button_widget.clicked.connect(self._show_hint)
         self.range_layout.addWidget(self.help_button_widget)
 
@@ -159,39 +159,39 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
     def _grab_low(self):
         value = self.axis_repeater_widget.value()
         self.lower_limit_widget.setValue(value) # also updates condition_data
-        
+
 
     @QtCore.Slot()
     def _grab_high(self):
         value = self.axis_repeater_widget.value()
-        self.upper_limit_widget.setValue(value) # also updates condition_data            
+        self.upper_limit_widget.setValue(value) # also updates condition_data
 
     @QtCore.Slot(float, float)
     def _axis_value_changed(self, value : float, curved_value : float):
-        self._update_range_state(value)            
+        self._update_range_state(value)
 
     def _update_range_state(self, value):
         import gremlin.util
         if self.range_status_widget:
             visible = False
-            
+
             v1, v2 = self.condition_data.range
             if self.last_value is None:
                 self.last_value = value
-            
+
             match self.condition_data.direction:
                 case gremlin.types.AxisButtonDirection.Anywhere:
                     in_range = gremlin.util.valueInRange(value, v1, v2)
-                    if in_range:  
+                    if in_range:
                         self.range_status_widget.setText("(in range)")
                         visible = True
 
                 case gremlin.types.AxisButtonDirection.Below:
-                    if value < self.last_value:   
+                    if value < self.last_value:
                         self.range_status_widget.setText(f"(below)")
                         visible = True
                 case gremlin.types.AxisButtonDirection.Above:
-                    if value > self.last_value:   
+                    if value > self.last_value:
                         self.range_status_widget.setText(f"(below)")
                         visible = True
 
@@ -216,8 +216,8 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
 
     def unhook(self):
         self.axis_repeater_widget.unhookDevice(self.condition_data.hook_id)
-        
-        
+
+
 
     def _lower_limit_cb(self, value):
         """Updates the lower limit value.
@@ -268,7 +268,7 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
 
         if VirtualHatButtonWidget.locked:
             return
-        
+
         try:
 
             VirtualHatButtonWidget.locked = True
@@ -284,7 +284,7 @@ class VirtualHatButtonWidget(AbstractVirtualButtonWidget):
                 self.main_layout.addWidget(self._widgets[direction])
 
             self.main_layout.addStretch()
-            
+
             self.help_button = gremlin.ui.ui_common.Buttons.getHelpWidget(callback = self._show_hint)
             self.main_layout.addWidget(self.help_button)
         finally:

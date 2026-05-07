@@ -1752,6 +1752,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             if not widget:
                 widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name=f"MIDI: {item_data.display_name}")
                 self.registerWidget(key, widget)
+                widget.redraw() # load the data
 
             change_cb = self._create_change_cb(index)
             widget.action_model.data_changed.connect(change_cb)
@@ -1762,6 +1763,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         else:
             item_data = MidiInputItem()
             widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="MIDI Blank InputConfigItem (no item data)")
+            widget.redraw() # load the data
 
 
         self._last_selected_index = index

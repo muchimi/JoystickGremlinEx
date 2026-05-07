@@ -4182,20 +4182,28 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.redraw()
 
 
+    def _redraw_inputs(self, force = False):
+        gremlin.util.InvokeUiMethod(self._redraw_inputs_ui, force)
 
-    def _select_item_cb(self, index, emit = True):
+    def _redraw_inputs_ui(self, force = False):
+        self.input_item_list_view.redraw(force)
+
+
+    def _select_item_cb(self, index, force_update = False, emit = True):
         """Handles the selection of an input item.
 
         :param index the index of the selected item
         """
         import gremlin.ui.input_item
         import gremlin.shared_state
+        import gremlin.util
 
         if not Shiboken.isValid(self.input_item_list_view):
             return
 
         # self._last_selected_index = index
         item_data = None
+
 
         if index == -1:
             index = self._last_selected_index
@@ -4212,44 +4220,59 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             item_data = self.input_item_list_model.data(index)
 
 
-        device_guid = self.device_guid
-        input_id = item_data.input_id if item_data else None
-        input_type = InputType.OpenSoundControl
+        pop_cursor = False
+        try:
 
-        if item_data:
+            if force_update or self.inputCount > 0 and self.inputWidgetCount == 0:
+                if not pop_cursor:
+                    gremlin.util.pushCursor()
+                    pop_cursor = True
+                self._redraw_inputs(force=True)
+
             device_guid = self.device_guid
-            key = self.getWidgetKey(input_type, input_id)
-            widget = self.getRegisteredWidget(key)
-            if not widget:
-                widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name=f"OSC: {item_data.display_name}")
-                self.registerWidget(key, widget)
+            input_id = item_data.input_id if item_data else None
+            input_type = InputType.OpenSoundControl
 
-            # Create new configuration widget
+            if item_data:
 
-            change_cb = self._create_change_cb(index)
-            widget.action_model.data_changed.connect(change_cb)
-            widget.description_changed.connect(change_cb)
+                device_guid = self.device_guid
+                key = self.getWidgetKey(input_type, input_id)
+                widget = self.getRegisteredWidget(key)
+                if not widget:
+                    if not pop_cursor:
+                        gremlin.util.pushCursor()
+                        pop_cursor = True
+                    widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name=f"OSC: {item_data.display_name}")
+                    self.registerWidget(key, widget)
+                    change_cb = self._create_change_cb(index)
+                    widget.action_model.data_changed.connect(change_cb)
+                    widget.description_changed.connect(change_cb)
+                    widget.redraw() # update the mapping
 
-            self.selectRegisteredWidget(key)
-
-
-        else:
-            profile = gremlin.shared_state.current_profile
-            device_guid = gremlin.shared_state.osc_tab_guid
-            device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Osc))
-            mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
-            item_data = OscInputItem(mode_object)
-            widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="OSC Blank InputConfigItem (no item data)")
-
-        #self.setRightPanelWidget(widget)
-
-        self._last_selected_index = index
-        self._item_data = widget
-        self._last_selected_input_item = item_data
+                self.selectRegisteredWidget(key)
 
 
-        # ensure visible
+            else:
+                profile = gremlin.shared_state.current_profile
+                device_guid = gremlin.shared_state.osc_tab_guid
+                device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Osc))
+                mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
+                item_data = OscInputItem(mode_object)
+                widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="OSC Blank InputConfigItem (no item data)")
+                widget.redraw() # load the data
 
+            #self.setRightPanelWidget(widget)
+
+            self._last_selected_index = index
+            self._item_data = widget
+            self._last_selected_input_item = item_data
+
+
+            # ensure visible
+
+        finally:
+            if pop_cursor:
+                gremlin.util.popCursor()
 
         if emit:
             el = gremlin.event_handler.EventListener()
