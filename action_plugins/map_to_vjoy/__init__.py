@@ -875,9 +875,6 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             self._create_info()
 
             self._create_input_grid()
-
-
-
             self._update_axis_widget()
 
 
@@ -3220,7 +3217,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                 actions = [VjoyAction.VJoyHat, VjoyAction.VJoyHatToButton]
 
             else:
-                syslog.warning(f"VJOYREMAP: don't know what actions to load for input type: {input_type}")
+                syslog.warning(f"VJOYREMAP: don't know what actions to load for input type: {input_type} {input_type.name}")
 
             for action in actions:
                 self.cb_action_list.addItem(VjoyAction.to_name(action), action)

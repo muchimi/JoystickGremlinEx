@@ -35,7 +35,6 @@ from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.util import parse_guid, byte_list_to_string
 import gremlin.event_handler
 import gremlin.config
-from gremlin.base_classes import AbstractInputItem
 import gremlin.ui.ui_common
 import gremlin.ui.joystick_device
 import gremlin.base_profile
@@ -195,6 +194,8 @@ class MidiInputItem(gremlin.base_profile.InputItem):
 
             return "Button"
 
+
+
     def getOverrideInputType(self):
         ''' override type '''
         if self._mode == MidiInputItem.InputMode.Axis:
@@ -219,6 +220,11 @@ class MidiInputItem(gremlin.base_profile.InputItem):
         tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self._message_key, self._guid)
 
 
+
+    @property
+    def device_guid(self):
+        ''' device ID '''
+        return self._device_guid
 
     @property
     def is_valid(self) -> bool:
@@ -1571,7 +1577,11 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         )
 
         # create a list view with custom input widgets
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, device_id = self._device_id)
+        self.input_item_list_view = input_item.InputItemListView(
+            custom_widget_handler = self._custom_widget_handler,
+            device_id = self._device_id,
+            parent = self,
+            blank_message = "Please add a MIDI input.")
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -1733,24 +1743,24 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if index == -1:
             if self.input_item_list_model.rows() > 0:
-                item_data = self.input_item_list_model.data(0)
+                input_item = self.input_item_list_model.data(0)
                 index = 0
             else:
                 self._blank_input()
                 return
         else:
-            item_data = self.input_item_list_model.data(index)
+            input_item = self.input_item_list_model.data(index)
 
         device_guid = self.device_guid
-        input_id = item_data.input_id if item_data else None
+        input_id = input_item.input_id if input_item else None
         input_type = InputType.Midi
 
-        if item_data:
+        if input_item:
             device_guid = self.device_guid
             key = self.getWidgetKey(input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
-                widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name=f"MIDI: {item_data.display_name}")
+                widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name=f"MIDI: {input_item.display_name}")
                 self.registerWidget(key, widget)
                 widget.redraw() # load the data
 
@@ -1761,10 +1771,13 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.selectRegisteredWidget(key)
 
         else:
-            item_data = MidiInputItem()
-            widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="MIDI Blank InputConfigItem (no item data)")
+            input_item = MidiInputItem()
+            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name="MIDI Blank InputConfigItem (no item data)")
             widget.redraw() # load the data
 
+
+        # update container display if blank
+        self.updateContainerViewBlankMessage(input_item, " MIDI ")
 
         self._last_selected_index = index
         self._item_data = widget
@@ -1906,6 +1919,10 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         self.input_item_list_view.update_item(index)
+
+
+        # update container display if blank
+        self.updateContainerViewBlankMessage(input_item, " MIDI ")
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)

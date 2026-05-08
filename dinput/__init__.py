@@ -780,7 +780,7 @@ class DeviceSummary:
 
 
     def __hash__(self):
-        return (self.device_guid, self.self.axis_count, self.self.button_count, self.self.hat_count)
+        return hash((self.device_guid, self.axis_count, self.button_count, self.hat_count))
 
     @property
     def hashkey(self):

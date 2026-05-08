@@ -454,17 +454,17 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.input_item_list_view.select_item(index, False)
 
 
-        item_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+        input_item : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
         input_type = InputType.ModeControl
 
         key = self.getWidgetKey(input_type, index)
         widget = self.getRegisteredWidget(key)
         if not widget:
-            widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name = f"Mode  [{item_data.display_name}]")
+            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name = f"Mode  [{input_item.display_name}]")
             self.registerWidget(key, widget)
             widget.redraw() # load the data
 
-        self._item_data = item_data
+        self._item_data = input_item
 
         widget = self.selectRegisteredWidget(key)
 
@@ -472,23 +472,25 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         config = gremlin.config.Configuration()
         device_guid = self.device_guid
         input_type = InputType.ModeControl
-        input_id = item_data.input_id if item_data else None
+        input_id = input_item.input_id if input_item else None
 
         profile = gremlin.shared_state.current_profile
         if profile:
             profile.setLastInput(device_guid, input_type, input_id)
         config.set_last_input(device_guid, input_type, input_id)
 
-        if item_data:
+        if input_item:
 
             # Create new configuration widget
-            item_data.is_axis = False
+            input_item.is_axis = False
             change_cb = self._create_change_cb(index)
             widget.action_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
             self.input_item_list_view.select_item(index,False)
 
+            # update container display if blank
+            self.updateContainerViewBlankMessage(input_item)
 
 
         self._last_selected_index = index

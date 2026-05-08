@@ -25,6 +25,7 @@ import os
 import gc
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
+import collections
 
 
 import gremlin.config
@@ -106,6 +107,9 @@ class Color():
     @staticmethod
     def selectedDockTabBackgroundColor():
         return "#303030" if gremlin.shared_state.is_dark_theme else "#DDDDDD"
+    @staticmethod
+    def textHighlightColor():
+        return "#AFC757" if gremlin.shared_state.is_dark_theme else "#A5B855"
     @staticmethod
     def normalLightColor():
         return "#111111"
@@ -453,9 +457,9 @@ class Color():
         foreground_color = Color.normalColor
         selected_background_color = Color.selectedBackgroundColor()
         if gremlin.config.Configuration().is_debug:
-            relative_path = ""
+            relative_path = "icons/"
         else:
-            relative_path = "_internal/gfx/"
+            relative_path = "_internal/icons/"
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
         checkbox_unchecked = f"{prefix}checkbox_blank_outline.png"
@@ -1605,8 +1609,12 @@ class AbstractView(QtWidgets.QWidget):
         return self._model_dirty
 
     def resetDirty(self):
-        ''' resets the dirty flag on the model '''
+        ''' resets the dirty/changed flag on the model '''
         self._model_dirty = False
+
+    def markDirty(self):
+        ''' marks the model as changed '''
+        self._model_dirty = True
 
     def _model_changed(self):
         ''' indicates the data model has changed and the UI should be refreshed '''
@@ -1624,6 +1632,7 @@ class AbstractView(QtWidgets.QWidget):
 
 
 
+
     def select_item(self, index):
         """Selects the item at the provided index
 
@@ -1635,9 +1644,6 @@ class AbstractView(QtWidgets.QWidget):
         """Redraws the view."""
         pass
 
-    def _model_changed(self):
-        """Called when a model is added or updated to allow user code to run."""
-        pass
 
 
 class LeftRightPushButton(QtWidgets.QPushButton):
@@ -9490,6 +9496,168 @@ class QVContentWidget(QContentWidget):
     def getLayout(self):
         return self.main_layout
 
+@gremlin.singleton_decorator.SingletonDecorator
+class WidgetCacheTracker():
+    ''' tracks mapping widgets to stay within QT memory budget '''
+    def __init__(self):
+        config = gremlin.config.Configuration()
+        self._enabled = config.ui_max_input_enabled
+        self._max_widgets = config.ui_max_input_maps # -1 if disabled
+        self._widget_map = {} # list of widgets
+        self._param_map = {} # list of paramaters to recreate the widget if needed
+        self._widget_queue = collections.deque()
+
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self.clear) # cleanup on shutdown
+        el.config_option_changed.connect(self._handle_config_changed)
+
+
+    def _handle_config_changed(self):
+        ''' update when configuraiton changes '''
+        config = gremlin.config.Configuration()
+        self._enabled = config.ui_max_input_enabled
+        max_widgets = config.ui_max_input_maps
+        if max_widgets != self._max_widgets:
+            # change in cached queue size
+            self._max_widgets = max_widgets
+            if max_widgets > 0:
+                # remove excess items from the queu
+                while len(self._widget_queue) > max_widgets:
+                    key = self._widget_queue.pop()
+                    self._remove(key)
+            else:
+                # unlimited
+                self._widget_queue.clear()
+
+
+    def addWidget(self, key, widget):
+        ''' adds a widget to the cache and drops the oldest one in round robin style if a cache size is specified
+            if a replacement, the widget is added to the back of the queue
+
+            :param key: unique key for the widget
+            :param widget: widget to cache
+        '''
+
+
+        assert hasattr(widget, "fromParams") and hasattr(widget,"params") and hasattr(widget,"expired"), "Invalid widget for cache purposes - requires fromParams() and params methods and expired event"
+        params = widget.params
+        # store the type name
+        instance_type = type(widget)
+        data = (instance_type, key, params)  # store params to recreate the widget if needed
+
+        self._param_map[key] = data
+        max_widgets = self._max_widgets
+
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if self._enabled and max_widgets > 0:
+            # queue check
+
+            if len(self._widget_queue) >= self._max_widgets:
+                while len(self._widget_queue) > max_widgets:
+                    remove_key = self._widget_queue.pop() # remove the oldest
+                    if verbose: syslog.info(f"WidgetCache: pop oldest widget key: [{remove_key}] ")
+                    self._remove(remove_key)
+            # add to the queue
+            self._widget_queue.append(key)
+        else:
+            # cache disabled
+            if len(self._widget_queue):
+                self._widget_queue.clear()
+
+        # add to the cache (could also replace)
+        self._widget_map[key] = widget
+
+        if verbose: syslog.info(f"WidgetCache: added new widget - cache size: {len(self._widget_queue)}  known widgets to the cache: [{len(self._param_map)}]")
+
+
+    @property
+    def cacheEnabled(self) -> bool:
+        # true if cache is enabled
+        return self._max_widgets >= 0
+
+    def _remove(self, key):
+        ''' removes a mapping and notifies the owner '''
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if not self._enabled:
+            # caching disabled - never remove
+            return
+        if key in self._widget_map:
+            widget = self._widget_map[key]
+
+            # remove from the queue
+            if key in self._widget_queue:
+                self._widget_queue.remove(key)
+            del self._widget_map[key] # remove from the active widget list
+
+            if verbose: syslog.info(f"Trigger widget expiration: [{key}]")
+            widget.expired.emit(key, widget)
+
+            if verbose: syslog.info(f"Delete widget: [{key}]")
+            # delete the widget proper
+            widget.hide()
+            if hasattr(widget,"_cleanup_ui"):
+                widget._cleanup_ui()
+            widget.deleteLater()
+
+
+
+
+    def contains(self, key) -> bool:
+        ''' true if the key is in the cache for a valid widget  '''
+        return key in self._widget_map
+
+    def removed(self, key) -> bool:
+        ''' true if the key was in the cache but no longer a valid widget '''
+        return key in self._param_map and key not in self._widget_map
+
+    def getParams(self, key) -> tuple[type, tuple]:
+        ''' gets the data from the registered item '''
+        if key in self._param_map:
+            return self._param_map[key]
+        return None
+
+    def getWidget(self, key) -> tuple[QtWidgets.QWidget, bool]:
+        ''' gets an item from the cache and re-cache it '''
+        created = False
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if key in self._param_map:
+            if not key in self._widget_map:
+                # recreate the widget using the original data
+                instance_type, params = self.getParams(key)
+                if verbose: syslog.info(f"WidgetCache: create instance from parameter for key [{key}] [{instance_type.__name__}]")
+                widget = instance_type.fromParams(params)
+                self.addWidget(key, widget) # update the cache
+                created = True
+            else:
+                # existing widget in the cache
+                widget = self._widget_map[key]
+                if verbose: syslog.info(f"WidgetCache: using cached widget [{type(widget).__name__}]")
+
+            return(widget, created)
+        # not in the cache and not able to re-create it
+        return (None, created)
+
+
+    def removeWidget(self, key, keep_params = True):
+        ''' removes a widget from the cache, keeping the parameters optionally '''
+
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if key in self._param_map:
+            self._remove(key)
+            if verbose: syslog.info(f"WidgetCache: remove cached widget [{key}]")
+            if not keep_params:
+                if verbose: syslog.info(f"\tremove params")
+                del self._param_map[key]
+            else:
+                if verbose: syslog.info(f"\tkeep params")
+
+
+
+    def clear(self):
+        ''' resets the cache - does not delete widgets from memory  '''
+        self._widget_map.clear()
+        self._widget_queue.clear()
+        self._param_map.clear()
 
 
 class QSplitTabWidget(QDataWidget):
@@ -9542,10 +9710,10 @@ class QSplitTabWidget(QDataWidget):
         self._right_container_widget, self._right_container_layout = getVContainer()
 
         # input configuration content - new in m76 - have QT track the widgets itself to avoid reference problems in pyside
-        self._config_widget = QtWidgets.QStackedWidget()
-        self._config_widget.setProperty("class","hack")
+        self._right_panel_stacked_widget = QtWidgets.QStackedWidget()
+        self._right_panel_stacked_widget.setProperty("class","hack")
 
-        self.addRightPanelWidget(self._config_widget)
+        self.addRightPanelWidget(self._right_panel_stacked_widget)
 
         # self._right_container_layout.addWidget(QtWidgets.QLabel("stack end"))
         self._widget_config_index_map = {} # map of input id to widget index
@@ -9568,6 +9736,16 @@ class QSplitTabWidget(QDataWidget):
         if self._device_id == device_id and self._filtered != value:
             self._filtered = value
             self.update_used_filter(value)
+
+
+    def updateContainerViewBlankMessage(self, input_item, suffix : str = '',):
+        ''' updates blank message for container '''
+        widget = self.getContentWidget()
+        if widget:
+            container_view = widget.getContainerView()
+            msg = f"Please add a container or action for{suffix} <span style ='color: {gremlin.ui.ui_common.Color.textHighlightColor()}; font-weight: bold;'>{input_item.display_name}</span>"
+            container_view.setBlankMessage(msg)
+
 
 
     @property
@@ -9644,19 +9822,48 @@ class QSplitTabWidget(QDataWidget):
 
     def registerWidget(self, key, widget) -> int:
         ''' adds a new config input to the right panel '''
+        import gremlin.ui.input_item
 
         assert widget is not None, "Invalid widget"
-        index =  self._config_widget.indexOf(widget)
+        index =  self._right_panel_stacked_widget.indexOf(widget)
         if index != -1:
             # widget is already in the list
             return index
 
-        self._config_widget.addWidget(widget)
-        index = self._config_widget.indexOf(widget)
+        self._right_panel_stacked_widget.addWidget(widget)
+        index = self._right_panel_stacked_widget.indexOf(widget)
         self._widget_config_index_map[key] = index
         self._widget_config_device_map[index] = key
 
+        if hasattr(widget,"params"):
+            # add to the cache and bounce the oldest iteration if a cache limit is set
+            iim = WidgetCacheTracker()
+            iim.addWidget(key, widget)
+            widget.expired.connect(self._handle_expired_widget)
+
         return index
+
+    def _handle_expired_widget(self, key, widget):
+        gremlin.util.InvokeUiMethod(self._handle_expired_widget_ui, key)
+
+    def _handle_expired_widget_ui(self, key, widget):
+        ''' called by the widget cache when a widget is being removed from the cache '''
+        if key in self._widget_config_index_map:
+            # one of ours - unregister it
+            syslog.info(f" QtSplitTabWidget: Expired widget: [{key}]")
+            index = self._right_panel_stacked_widget.indexOf(widget)
+            if index != -1:
+                # one of ours
+                syslog.info(f"\tremoving widget from stacked widget")
+                widget.expired.disconnect(self._handle_expired_widget)
+                self._right_panel_stacked_widget.removeWidget(widget)
+
+            index = self._widget_config_index_map[key]
+            syslog.info(f"\tremoving index [{index}] from tracking data")
+            del self._widget_config_device_map[index]
+            del self._widget_config_index_map[key]
+
+
 
     def unload(self):
         ''' unloads UI resources used by a particular tab widget '''
@@ -9669,7 +9876,7 @@ class QSplitTabWidget(QDataWidget):
         returns: the widget selected
 
         '''
-        assert key_or_widget is not None,f"Logic error - key is NULL"
+        assert key_or_widget is not None,f"QSplitTabWidget: selectRegisteredWidget() key/widget cannot be NULL"
 
         if hasattr(key_or_widget,"__iter__"):
             widget = self.getRegisteredWidget(key_or_widget)
@@ -9678,12 +9885,12 @@ class QSplitTabWidget(QDataWidget):
             widget = key_or_widget
 
 
-        index = self._config_widget.indexOf(widget)
+        index = self._right_panel_stacked_widget.indexOf(widget)
         if index != -1:
             verbose = gremlin.config.Configuration().verbose_mode_ui
             if verbose:
                 syslog.info(f"RIGHT PANEL: select widget {index}")
-            self._config_widget.setCurrentIndex(index)
+            self._right_panel_stacked_widget.setCurrentIndex(index)
         else:
             syslog.error("Unable to select widget in right panel: missing")
 
@@ -9696,20 +9903,28 @@ class QSplitTabWidget(QDataWidget):
         ''' removes a widget from the cleanup list'''
 
         if key in self._widget_config_index_map:
-            index = self._widget_config_index_map[key]
-            if index != -1:
-                widget = self._config_widget.widget(index)
-                if hasattr(widget, "_cleanup_ui"):
-                    widget._cleanup_ui()
-                widget.hide()
-                self._config_widget.removeWidget(widget)
-                widget.deleteLater()
+            iis = gremlin.ui.ui_common.WidgetCacheTracker()
+            if iis.contains(key):
+                # this will trigger the expired event that will remove the widget
+                iis.removeWidget(key)
+            else:
+                index = self._widget_config_index_map[key]
+                if index != -1:
+                    # this will trigger the expired event on the widget
+                    widget = self._right_panel_stacked_widget.widget(index)
+                    self._right_panel_stacked_widget.removeWidget(widget)
+                    # not in the cache - straight up delete
+                    if hasattr(widget, "_cleanup_ui"):
+                        widget._cleanup_ui()
+                    widget.hide()
+                    widget.deleteLater()
+
             del self._widget_config_index_map[key]
             del self._widget_config_device_map[index]
 
     def getCurrentRegisteredWidgetDevice(self):
         ''' gets the device ID for the currently selected device widget '''
-        index = self._config_widget.currentIndex()
+        index = self._right_panel_stacked_widget.currentIndex()
         if index != -1:
             input_id = self._widget_config_device_map[index]
             return input_id
@@ -9723,7 +9938,14 @@ class QSplitTabWidget(QDataWidget):
         if verbose:
             syslog.info("RIGHT PANEL: clear all widgets")
 
-        clearStackedWidget(self._config_widget)
+        clearStackedWidget(self._right_panel_stacked_widget)
+
+        # remove cached widgets
+        iis = gremlin.ui.ui_common.WidgetCacheTracker()
+        keys = list(self._widget_config_index_map.keys())
+        for key in keys:
+            if iis.contains(key):
+                iis.removeWidget(key)
 
         self._widget_config_index_map.clear()
         self._widget_config_device_map.clear()
@@ -9732,8 +9954,30 @@ class QSplitTabWidget(QDataWidget):
     def getRegisteredWidget(self, key) -> QtWidgets.QWidget:
         ''' gets the widget for the given device id, None if not found'''
         if key in self._widget_config_index_map:
+
+            # see if widget needs to be recreated
+            iim = WidgetCacheTracker()
+            if iim.removed(key):
+                # widget was cached but removed - recache it
+                widget, recreated = iim.getWidget(key)
+                if widget:
+                    # widget in the cach or recreated
+                    if recreated:
+                        # register the widget if recreated
+                        self.registerWidget(key, widget)
+
+                else:
+                    # widget removed from cache - sync up if needed
+                    if key in self._widget_config_index_map:
+                        index = self._widget_config_index_map[key]
+                        del self._widget_config_index_map[index]
+                        del self._widget_config_device_map[key]
+                        widget = self._right_panel_stacked_widget.widget(index)
+                        self._right_panel_stacked_widget.removeWidget(widget)
+                    return None
+
             index = self._widget_config_index_map[key]
-            return self._config_widget.widget(index)
+            return self._right_panel_stacked_widget.widget(index)
         return None
 
     def getRegisteredWidgetIndex(self, key) -> int:
@@ -9751,7 +9995,7 @@ class QSplitTabWidget(QDataWidget):
     def getContentWidget(self):
         ''' returns configuration items currently displayed in the UI '''
         import gremlin.ui.input_item
-        widget =  self._config_widget.currentWidget()
+        widget =  self._right_panel_stacked_widget.currentWidget()
         if isinstance(widget, gremlin.ui.input_item.InputItemMappingWidget):
             return widget
         return None
@@ -9759,6 +10003,13 @@ class QSplitTabWidget(QDataWidget):
     def getWidgetKey(self, input_type, input_id):
         ''' gets the content widget compound key for the item / input combination'''
         return (gremlin.shared_state.edit_mode, self._device_id, input_type, input_id)
+
+    def getWidgetKeyForWidget(self, widget):
+        ''' gets the content widget compound key for the given widget '''
+        input_item = widget.getItemData()
+        input_type = input_item.input_type
+        input_id = input_item.input_id
+        return self.getWidgetKey(input_type, input_id)
 
     def getContentInputId(self):
         ''' gets the input id currently displayed '''
@@ -9789,7 +10040,7 @@ class QSplitTabWidget(QDataWidget):
             widget = self.getRegisteredWidget(key)
 
         if widget:
-            self._config_widget.setCurrentWidget(widget)
+            self._right_panel_stacked_widget.setCurrentWidget(widget)
 
         return widget
 
@@ -9876,9 +10127,9 @@ class QSplitTabWidget(QDataWidget):
 
     def setRightPanelWidget(self, widget : QtWidgets.QWidget):
         ''' sets the right panel widget (only contains a single widget)'''
-        index = self._config_widget.indexOf(widget)
+        index = self._right_panel_stacked_widget.indexOf(widget)
         if index != -1:
-            self._config_widget.setCurrentWidget(widget)
+            self._right_panel_stacked_widget.setCurrentWidget(widget)
 
 
     def addRightPanelWidget(self, widget : QtWidgets.QWidget):

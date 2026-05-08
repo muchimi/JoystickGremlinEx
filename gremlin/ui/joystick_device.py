@@ -108,7 +108,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         #self.widget_tracker = gremlin.ui.ui_common.DeviceWidgetTracker() # caches the  InputConfigurationItem for this item
         self.last_item_data_key = None
-        self.last_selected_index = index = 0
+        self._last_selected_index = index = 0
+        self._last_selected_input_item = None
         self.device_guid = device.device_guid
         self.device_name = device.name
         self._debug_widget = None
@@ -265,6 +266,20 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # update filtered status box
         self.update_stats_display()
+
+    @property
+    def last_selected_index(self) -> int:
+        return self._last_selected_index
+
+    @property
+    def last_selected_input_item(self) -> gremlin.base_profile.InputItem:
+        return self._last_selected_input_item
+
+    def setLastSelectedIndex(self, value : int):
+        self._last_selected_index = value
+
+    def setLastSelectedInputItem(self, input_item: gremlin.base_profile.InputItem):
+        self._last_selected_input_item = input_item
 
     def getInputFilter(self):
         profile = gremlin.shared_state.current_profile
@@ -702,9 +717,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
 
-
-            #verbose = True
-            # syslog = logging.getLogger("system")
             widget = None
             current_mode = gremlin.shared_state.edit_mode
 
@@ -724,7 +736,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             else:
                 input_item = self.input_item_list_model.data(index)
 
-            if input_item is not None and self.last_selected_index == index and not force_update:
+            if input_item is not None and input_item == self._last_selected_input_item and not force_update:
                 # already selected and input widget created
                 return
 
@@ -746,13 +758,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             if input_item is not None:
 
-                # # ensure the LEFT panel widget is selected
-                # self.input_item_list_view.clearSelection(emit = False)
-                # widget = self.input_item_list_view.getWidgetForInputItem(input_item)
-                # widget.setSelected(True, emit = False)
-
-
-                # select the RIGHT panel item
+                # select the RIGHT panel item for the input
                 device_guid = self.device_guid
                 input_type = input_item.input_type
                 input_id = input_item.input_id
@@ -780,39 +786,42 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     if verbose:
                         device = gremlin.joystick_handling.getDevice(input_item.device_guid)
                         syslog.info(f"JOYSTICK DEVICE: device: placed mapping for [{device.name}]: input type: [{input_item.input_type.name}] input [{input_item.input_id}] widget index [{index}] ")
-                        pass
 
                 else:
                     widget.setItemData(input_item)
+
+                # update container display if blank
+                self.updateContainerViewBlankMessage(input_item)
 
 
                 # refresh the widget with current data as needed
                 widget.redraw()
 
                 # make the widget visible
-                self.selectRegisteredWidget(widget)
+                if input_item != self._last_selected_input_item:
+                    key = self.getWidgetKeyForWidget(widget)
+                    if verbose: syslog.info(f"JoystickDevice: select right content widget: [{index}] input [{input_item.display_name}] key: [{key}]")
+                    self.selectRegisteredWidget(widget)
+                    self.setLastSelectedInputItem(input_item)
 
 
                 if config.debug_ui:
                     self._debug_widget.setText(f"Contents for : {input_item.debug_display}")
 
+                self.setLastSelectedIndex(index)
 
 
-            self.last_selected_index = index
 
-            # # ensure input is visible
-            # self.input_item_list_view.scrollToInput(item_data)
+                # # ensure input is visible
+                # self.input_item_list_view.scrollToInput(item_data)
 
-            if input_item and emit:
-                el = gremlin.event_handler.EventListener()
-                el.input_selection_changed.emit(device_guid, input_type, input_id)
+                if input_item and emit:
+                    el = gremlin.event_handler.EventListener()
+                    el.input_selection_changed.emit(device_guid, input_type, input_id)
 
         finally:
             if pop_cursor:
                 gremlin.util.popCursor()
-            # self.setUpdatesEnabled(True)
-            # self.update()
-
 
         if input_item and emit:
             self.inputChanged.emit(input_item.device_guid,

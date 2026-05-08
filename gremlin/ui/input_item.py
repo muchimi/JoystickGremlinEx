@@ -20,6 +20,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 from lxml import etree
 import lxml.etree
 import gc
+import collections
 import gremlin
 import gremlin.config
 import gremlin.event_handler
@@ -49,6 +50,7 @@ import psygnal
 from psygnal import Signal
 import copy
 import gremlin.tabstate
+import gremlin.singleton_decorator
 
 
 
@@ -175,7 +177,8 @@ class InputItemListModel(ui_common.AbstractModel):
                  custom_filter_handler = None,
                  custom_delete_confirm_handler = None,
                  show_master_mode : bool = False,
-                 show_filtered_only : bool = False):
+                 show_filtered_only : bool = False,
+                 ):
         """Creates a new instance.
 
         :param device_data the profile data managed by this model
@@ -208,6 +211,7 @@ class InputItemListModel(ui_common.AbstractModel):
         self._custom_delete_confirm_handler = custom_delete_confirm_handler # return true if the input can be deleted
 
         self.updateData()
+
 
     @property
     def show_filtered(self) -> bool:
@@ -398,7 +402,6 @@ class InputItemListModel(ui_common.AbstractModel):
 
 
         self._update_source()
-        #if apply_filter: self._filter_data()
 
         if emit_change:
             self.data_changed.emit()
@@ -481,8 +484,7 @@ class InputItemListModel(ui_common.AbstractModel):
         # self.updateData()
         self.data_changed.emit()
 
-
-    def refresh(self, emit = False):
+    def refresh(self, emit = True):
         ''' refreshes the mode data without data reload '''
         self.updateData(emit_change = emit)
 
@@ -497,7 +499,6 @@ class InputItemListModel(ui_common.AbstractModel):
     def rows(self) -> int:
         ''' number of rows in the model '''
         return len(self._source_index_map)
-
 
     def filteredRows(self) -> int:
         ''' number of filtered rows '''
@@ -667,16 +668,21 @@ class InputItemListModel(ui_common.AbstractModel):
             return offset_map[event.event_type] + event.identifier - 1
 
     def clear(self, input_types):
-        ''' removes all inputs of the specififed type '''
+        ''' removes all inputs of the specified type '''
+        import gremlin.base_profile
         if self._custom_clear_handler:
             self._custom_clear_handler(self)
         else:
-            input_items = self._device_data.modes[self._mode]
-            for input_type in input_types:
-                if input_type in input_items.config:
-                    input_items.config[input_type] = {}
+            registry = gremlin.base_profile.ProfileRegistry()
+            for input_item in self._item_map:
+                if not input_types or input_item.input_type in input_types:
+                    registry.removeInputItem(input_item)
+
+            # sync with registry
+            registry.sync()
 
         self.reset()
+        self.data_changed.emit()
 
     def reset(self):
         ''' clears all data '''
@@ -704,12 +710,18 @@ class InputItemListView(ui_common.AbstractView):
         InputType.Midi: "Midi"
     }
 
-    def __init__(self, parent=None, name = "Not set", custom_widget_handler = None, device_id : str = None):
+    def __init__(self, parent=None,
+                 name = "Not set",
+                 custom_widget_handler = None,
+                 device_id : str = None,
+                 blank_message : str = None):
         """Creates a new input item view instance
 
         :param parent: the parent of the widget
         :param name: name of the list
         :param custom_widget_handler: (list_view : InputItemListView, index : int, identifier : InputIdentifier, data, parent = None)
+        :param device_id: id of the device the list applies to (optional)
+        :param blank_message: text to display if there are no rows in the list
 
         """
         super().__init__(parent)
@@ -729,7 +741,7 @@ class InputItemListView(ui_common.AbstractView):
         self._current_index = -1 # nothing selected
         self.custom_widget_handler = custom_widget_handler
         self._deleted = False
-
+        self._blank_message = blank_message
 
 
         # Create required UI items
@@ -757,12 +769,28 @@ class InputItemListView(ui_common.AbstractView):
         self._redraw_lock = False
 
         self._widget_map = {} # map of input item ID to input widget
+        self._blank_message_widget = None
+
+
+
+    def setBlankMessage(self, message : str = None):
+        ''' sets the blank message, set to None to disable'''
+        gremlin.util.InvokeUiMethod(self._setblankMessage_ui, message)
+
+    def _setBlankMessage_ui(self, message : str):
+        self._blank_message = message
+        self._blank_message_widget.setText(message or "")
+        self._blank_message_widget.setVisible(message is not None)
+
+
 
 
     def _model_changed(self):
         # indicate selection is invalid
         super()._model_changed()
         self._current_index = -1
+        self.markDirty()
+
 
     def _sync_input(self, input_item):
         gremlin.util.InvokeUiMethod(self._sync_input_ui, input_item)
@@ -771,26 +799,34 @@ class InputItemListView(ui_common.AbstractView):
         if not Shiboken.isValid(self) or not Shiboken.isValid(self._scroll_layout):
             return
 
+
+
         if self.model.hasInputItem(input_item):
+
+
             index = self.model.indexOfInputItem(input_item)
+
             self.scrollToIndex(index)
-            widgets = gremlin.util.get_layout_widgets(self._scroll_layout)
+
             # shenanigans to have the selected input visible in the scroll area of inputs
             # the size() on the widget returns the wrong size so each widget has an "actual size" function trapping the event
             # so we get the correct height as rendered
             # then we compute the pixel offset and tell the scroll area to scroll to that pixel height
+            if self._widget_map:
 
-            if widgets and widgets[0].widget_height is not None:
-
-                h = 0
-                for i, widget in enumerate(widgets):
-                    h += widget.widget_height
-                    if i == index:
-                        break
-                self._scroll_area.ensureVisible(0,h)
-
-            # target_widget = widgets[index]
-            # self.scroll_area.ensureWidgetVisible(target_widget)
+                key = next(iter(self._widget_map)) # first widget
+                widget = self._widget_map[key] #gremlin.util.get_layout_widgets(self._scroll_layout)
+                if hasattr(widget,"widget_height"):
+                    # not in label mode
+                    if widget.widget_height is not None:
+                        h = 0
+                        for i, widget in enumerate(self._widget_map.values()):
+                            h += widget.widget_height
+                            if i == index:
+                                target_widget = widget
+                                break
+                        self._scroll_area.ensureVisible(0,h)
+                        self._scroll_area.ensureWidgetVisible(target_widget)
 
     def scrollToInput(self, input_item):
         self._sync_input(input_item)
@@ -903,6 +939,10 @@ class InputItemListView(ui_common.AbstractView):
             widget.deleteLater()
         self._widget_map.clear()
 
+        # remove spacers
+        gremlin.util.clear_layout(self._scroll_layout)
+
+
     def create_ui(self):
         ''' creates or recreates the contents of the input list view (left side input selector) '''
 
@@ -979,11 +1019,12 @@ class InputItemListView(ui_common.AbstractView):
                             if verbose:
                                 syslog.info(f"\t added input for: [{model_index:02d}] type: {InputType.to_string(data.input_type)} input id: [{data.input_id}] id: {data.id}")
                     else:
-                        widget = QtWidgets.QLabel("Please add an input.")
+                        widget = QtWidgets.QLabel(self._blank_message)
                         self._scroll_layout.addWidget(widget)
                         self._widget_map["blank"] = widget
                         if verbose:
                             syslog.info("\tNo inputs found")
+                        self._blank_message_widget = widget
 
                 self._scroll_layout.addStretch(10) # stretch at the bottom in case we have fewer items
 
@@ -1242,8 +1283,8 @@ class InputItemListView(ui_common.AbstractView):
             emitted when the item is being selected
         """
 
-
-        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_inputs or config.verbose_mode_ui
         if verbose: syslog.info(f"InputItem: select input: {index}")
         if not Shiboken.isValid(self._scroll_area):
             if verbose: syslog.warning("\tshiboken invalid")
@@ -1300,8 +1341,9 @@ class InputItemListView(ui_common.AbstractView):
                     syslog.info(f"\tselected: {data.debug_display}")
 
 
-            if emit and index != -1:
-                self.item_selected.emit(index, force_update) # load the mapped content for the given index
+        if emit and index != -1:
+            if verbose: syslog.info(f"InputItemListView: trigger selection for index [{index}]")
+            self.item_selected.emit(index, force_update) # load the mapped content for the given index
 
         # return the currently selected widget
         return widget
@@ -1610,9 +1652,7 @@ class ActionSetView(ui_common.AbstractView):
                         case ui_common.ContainerViewTypes.Action:
 
                             # create the action widget from the plugin
-                            syslog.info("creating plugin starting...")
                             widget = data.widget(data)
-                            syslog.info("creating plugin completed...")
 
                             widget.action_modified.connect(self.model.data_changed.emit)
                             wrapped_widget = BasicActionWrapper(widget)
@@ -4684,6 +4724,7 @@ class ContainerView(gremlin.ui.ui_common.AbstractView):
         self._redraw_lock = False
         self._deleted = False
 
+
         assert input_item is not None,"input item must be provided"
         assert action_model is not None, "action model must be provided"
 
@@ -4725,10 +4766,6 @@ class ContainerView(gremlin.ui.ui_common.AbstractView):
         if verbose:
             syslog.info(f"create ContainerView [{input_item.debug_display if input_item else 'no input'}]")
 
-        self._input_item = input_item
-
-
-
         self._widget_map = {} # map of container ID to container widget
 
         self._show_blank()
@@ -4736,16 +4773,11 @@ class ContainerView(gremlin.ui.ui_common.AbstractView):
         self._drawn_once = False # draw on demand only on first redraw
 
 
-
-
-
     @property
     def input_item(self):
+        ''' gets the associated input item for the container view '''
         return self._input_item
-    @input_item.setter
-    def input_item(self, item):
-        if self._input_item != item:
-            self._input_item = item
+
 
     def _cleanup_ui(self):
         ''' widget cleanup '''
@@ -4817,6 +4849,12 @@ class ContainerView(gremlin.ui.ui_common.AbstractView):
             self.resetDirty() # indicate model was redrawn
             if push_cursor:
                 gremlin.util.popCursor()
+
+    def setBlankMessage(self, message : str = None):
+        ''' updates the blank message '''
+        if self._blank_widget:
+            self._blank_widget.setText(message or '')
+            self._blank_widget.setVisible(message is not None)
 
     def _show_blank(self):
         if self._stacked_widget.currentIndex() != 0:
@@ -4947,6 +4985,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
     # Signal emitted when the description changes
     description_changed = Signal(str) # indicates the description was changed
     description_clear = Signal() # clear the description field
+    expired = Signal(object, QtWidgets.QWidget) # (key, widget) fires when the input mapping expires to notify the owner
 
     def __init__(self, item_data, input_type = None, object_name : str = None, spacer_height = 32, parent=None):
         """Creates a new object instance.
@@ -4960,6 +4999,9 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         """
         super().__init__(parent)
+
+        # remember the params for re-creation if needed
+        self.params = (item_data, input_type, object_name, spacer_height, parent)
 
         assert item_data is not None,"Item Data must be provided"
         self.action_model = ActionContainerModel(item_data.containers, item_data, input_type)
@@ -5007,6 +5049,12 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self._show_blank()
 
 
+    def fromParams(self, params) -> InputItemMappingWidget:
+        ''' recreates the widget from self '''
+        item_data, input_type, object_name, spacer_height, parent = params
+        return InputItemMappingWidget(item_data, input_type, object_name, spacer_height, parent)
+
+
 
     def _mapping_changed(self, item_data):
         ''' occurs when a device mapping changed through user interaction with the UI '''
@@ -5047,7 +5095,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
     # def _refresh_ui(self):
     #     self._redraw_ui()
 
-    def getItemData(self):
+    def getItemData(self): # gremlin.base_profile.InputItem:
         ''' gets the associated item data '''
         return self._item_data
 
@@ -5072,6 +5120,11 @@ class InputItemMappingWidget(QtWidgets.QWidget):
                 if hasattr(item_data,"input_type"):
                     self._input_type = item_data.input_type
                 self.action_model = ActionContainerModel(self._item_data.containers, self._item_data, self._input_type)
+
+            else:
+                # no item selected
+                self.action_model = None
+                self._show_blank()
 
 
     def _show_blank(self):
@@ -5210,6 +5263,10 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         # redraw the container view
         container_view.redraw()
+
+    def getContainerView(self) -> ContainerView:
+        ''' gets the container view '''
+        return self._container_view
 
 
     def redraw(self):

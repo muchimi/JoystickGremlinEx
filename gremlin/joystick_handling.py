@@ -971,6 +971,9 @@ def joystick_devices_initialization():
                 # IFR1 device, disable
                 syslog.warning("\t\tOctavi IFR1 is disabled in GremlinEx as a regular joystick as it's handled at the HID level.")
                 dev.disabled = True
+            if dev.vendor_id == 0x31e3 and dev.axis_count == 0: # handle wooting no axis/no button devices
+                continue # ignore the devices that report as no axis in game mode
+
 
             if dev.axis_count:
                 syslog.info(f"\t\tAxis definitions: {dev.axis_count} found")

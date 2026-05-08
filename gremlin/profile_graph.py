@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 
 
 
-''' profile tree module 
+''' profile tree module
 
 Implements the various tree functions to manipulate a profile using a graph data structure
 
@@ -64,7 +64,7 @@ from gremlin.util import safe_read
 from gremlin.ui import ui_common
 from gremlin.clipboard import Clipboard
 # from gremlin.input_types import InputType
-import dinput 
+import dinput
 import uuid
 import copy
 
@@ -131,7 +131,7 @@ class ProfileRootNode(ProfileBaseNode):
     def __init__(self, source_xml : str = None):
         super().__init__(ProfileNodeType.Profile)
         self.start_mode = None # profile start mode
-        self.default_start_mode = None # profile default start mode 
+        self.default_start_mode = None # profile default start mode
         self.restore_last_mode = False # true if last mode is restored
         self.force_numlock_off = True # true if numlock should be forced off on profile start
         self.devices = {} # map of device to device node, keyed by device_guid
@@ -139,7 +139,7 @@ class ProfileRootNode(ProfileBaseNode):
         self.source_xml = source_xml # source file
         self._graph_modes = {} # list of mode definitions in the graph
         self._load_default_devices()
-        
+
 
 
 
@@ -179,8 +179,8 @@ class ProfileRootNode(ProfileBaseNode):
                 profile_mode_node.parent = parent_mode_node
 
 
-        # Parse each device 
-        self.devices = {} 
+        # Parse each device
+        self.devices = {}
         for child in node.iter("device"):
             if not "type" in child.attrib:
                 # not a device node we are looking for
@@ -196,7 +196,7 @@ class ProfileRootNode(ProfileBaseNode):
         for child in node.iter("vjoy-device"):
             device_node = ProfileDeviceNode(parent = self)
             device_node.from_xml(child, data)
-            self.vjoy_devices[device_node.device_guid] = device_node    
+            self.vjoy_devices[device_node.device_guid] = device_node
 
         for child in node.iter("simconnect"):
             key_cp = safe_read(child,"key_cp", str, "")
@@ -288,7 +288,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
         cancel_button_widget = QtWidgets.QPushButton("Cancel")
         cancel_button_widget.clicked.connect(self._close_cb)
         button_container_widget = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only = True)
-        
+
         self.main_layout.addWidget(button_container_widget)
 
     @QtCore.Slot()
@@ -300,7 +300,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
     def _execute_cb(self):
         self.setResult(QtWidgets.QDialog.DialogCode.Accepted)
         self.close()
-        
+
 
 
     @QtCore.Slot()
@@ -341,7 +341,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 
         self.map_widget = QtWidgets.QWidget()
         self.map_layout = QtWidgets.QGridLayout(self.map_widget)
-        
+
         self.scroll_layout.addWidget(self.map_widget)
         self.scroll_layout.addStretch()
 
@@ -392,10 +392,10 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
     def _derive_source_device_data(self, profile_node : ProfileRootNode, device_guid = None):
         ''' looks at the profile tree to grab capabilities of the mapped input devices
         :param profile_node: root profile node
-        :param device_guid: optional if limits the list to that specific device 
+        :param device_guid: optional if limits the list to that specific device
 
         :returns (node_list, source_map[device_guid] = DeviceSummary of the source )
-          
+
             '''
         self._source_map = {} # map of source devices keyed by device_guid -> DeviceSummary object
         device_node : ProfileDeviceNode
@@ -405,7 +405,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         device_nodes = [node for node in profile_node.children if node.nodeType == ProfileNodeType.Device]
 
         if device_guid:
-            # remap a single device 
+            # remap a single device
             device_id = gremlin.util.normalize_guid(device_guid) if not isinstance(device_guid, str) else device_guid
             device_nodes = [node for node in device_nodes if node.device_id == device_id]
         else:
@@ -464,12 +464,12 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         map_layout.addWidget(widget, row, 0, 1 , 2, alignment = QtCore.Qt.AlignmentFlag.AlignLeft)
         map_layout.addWidget(QtWidgets.QLabel(""),row,2)
         row+=1
-        
+
 
         for device_node in device_nodes:
             if device_node.device_type in (DeviceType.Joystick, DeviceType.VJoy):
 
-                source_device : DeviceSummary = self._source_map[device_node.device_guid]  
+                source_device : DeviceSummary = self._source_map[device_node.device_guid]
 
                 enable_widget = ui_common.QDataCheckbox("Enable", data = device_node)
                 enable_widget.setToolTip("Enables remap")
@@ -500,7 +500,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
                 target_device_guid_widget.setReadOnly(True)
 
                 self._target_device_guid_map[device_node.id] = target_device_guid_widget
-                
+
 
                 target_device_type_widget = ui_common.QDataLineEdit(target_device.device_type.name)
                 target_device_type_widget.setReadOnly(True)
@@ -518,7 +518,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
                 map_layout.addWidget(QtWidgets.QLabel("Target Device:"), row, col)
                 col+=1
                 map_layout.addWidget(target_device_list_widget, row, col)
-                
+
                 row +=1
                 col = 0
                 map_layout.addWidget(QtWidgets.QLabel("Source GUID:"), row, col)
@@ -530,7 +530,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
                 col+=1
                 map_layout.addWidget(target_device_guid_widget, row, col)
 
-                
+
                 row +=1
                 col = 0
                 map_layout.addWidget(QtWidgets.QLabel("Source Type:"), row, col)
@@ -544,10 +544,10 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 
                 # row separator
                 row+=1
-                map_layout.addWidget(QtWidgets.QLabel(" "), row, 0) 
+                map_layout.addWidget(QtWidgets.QLabel(" "), row, 0)
 
                 row+=1
-                
+
 
     @QtCore.Slot()
     def _select_all(self):
@@ -620,8 +620,8 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         self._target_device_guid_map[node_id].setText(target_id)
         self._target_device_type_map[node_id].setText(target_device.device_type.name)
 
-    
-    
+
+
     def _merge_node(self, parent_node, node):
         ''' adds or merges a node recursively '''
         merge_node = None
@@ -630,7 +630,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
                 merge_node = next((n for n in parent_node.children if n.nodeType == ProfileNodeType.Mode and n.name == node.name),None)
             case ProfileNodeType.Input:
                 merge_node = next((n for n in parent_node.children if n.nodeType == ProfileNodeType.Input and n.name == node.name),None)
-        
+
         if merge_node:
             # merge node exists, re-use
             for child in node.children:
@@ -672,7 +672,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 
                 # remove the source node
                 source_node.parent = None
-                    
+
                 # device_node = data.device_node
                 # device_node.device_name = data.target_device.name
                 # device_node.device_id = data.target_device.device_id
@@ -718,18 +718,18 @@ class ProfileDeviceNode(ProfileBaseNode):
             if self.enable_changed_callback:
                 self.enable_changed_callback(self)
 
-    @property 
+    @property
     def device_name(self) -> str:
         if self._device:
             return self._device.name
         return None
-        
+
     @device_name.setter
     def device_name(self, value : str):
         if self._device:
             self._device.name = value
 
-    @property 
+    @property
     def device_id(self) -> str:
         if self._device:
             return self._device.device_id
@@ -739,7 +739,7 @@ class ProfileDeviceNode(ProfileBaseNode):
         if self._device:
             self._device.device_id = value
             self._device.device_guid = gremlin.util.parse_guid(value)
-    
+
     @property
     def device_guid(self) -> dinput.GUID:
         if self._device:
@@ -774,18 +774,18 @@ class ProfileDeviceNode(ProfileBaseNode):
     def connected(self) -> bool:
         ''' true if the device is connected '''
         return self._device.connected
-    
+
 
 
     def remap(self, device : DeviceSummary):
         ''' changes the device to another device '''
         self._device = device
-        
+
 
     def isDevice(self, device : DeviceSummary) -> bool:
         ''' returns true if the device is the same '''
         return self.device_guid == device.device_guid
-    
+
 
 
 
@@ -800,22 +800,22 @@ class ProfileDeviceNode(ProfileBaseNode):
         device_guid_str = node.get("device-guid")
         device_guid = parse_guid(device_guid_str)
         #device_id = str(self.device_guid)
-        
+
         dt = safe_read(node, "type", str, "")
         if not dt:
             dt = DeviceType.NotSet
         device_type = DeviceType.to_enum(dt)
         self._device = self._get_device(device_name, device_guid, device_type)
-        
+
         if "label" in node.attrib:
             self.label = safe_read(node, "label", str, "")
         else:
             self.label = None
         #self.connected = gremlin.joystick_handling.is_device_connected(self.device_guid)
-            
+
         self.modes = []
- 
-        
+
+
         # load modes
         child : Element
         for child in node:
@@ -841,13 +841,13 @@ class ProfileDeviceNode(ProfileBaseNode):
             node.set("label", self.label)
         node.set("device-guid", write_guid(self.device_guid))
         device_type = DeviceType.to_string(device_type)
- 
+
         node.set("type",device_type)
 
         for mode_node in self.children:
             node.append(mode_node.to_xml())
         return node
-    
+
     def _get_device(self, device_name : str, device_guid : dinput.GUID, device_type : DeviceType = DeviceType.Joystick):
         ''' gets an existing device or creates a new device '''
         device = gremlin.joystick_handling.device_info_from_guid(device_guid) if device_guid else None
@@ -860,7 +860,7 @@ class ProfileDeviceNode(ProfileBaseNode):
             assert device_type is not None,"Invalid device type provided"
             device.device_type = device_type
             # default to max DInput as we don't know the capabilities
-            device.axis_count = 8 
+            device.axis_count = 8
             device.axis_names = gremlin.joystick_handling.AxisNames.joystick_linear_axis_names
             device.axismap_list = {}
             for i in range(device.axis_count):
@@ -876,21 +876,21 @@ class ProfileDeviceNode(ProfileBaseNode):
             device.device_type = DeviceType.Joystick
         assert device.device_type is not None
         return device
-        
 
-    
+
+
     @property
     def device(self) -> DeviceSummary:
         return self._device
-    
+
     @device.setter
     def device(self, value : DeviceSummary):
         assert value is not None and value.device_type is not None,"Invalid device"
         self._device = value
-    
+
     def __str__(self):
         return f"{self.nodeType.name}: device: {self.device_name} id: {self.device_id} virtual: {self.virtual} remap enabled: {self.enabled}"
-    
+
 
 
 
@@ -912,7 +912,7 @@ class ProfileModeNode(ProfileBaseNode):
         name = name.strip()
         self.name = name
         self.inherit = safe_read(node, "inherit", str, "")
-        
+
         if self.parent:
             child : Element
             for child in node:
@@ -935,11 +935,11 @@ class ProfileModeNode(ProfileBaseNode):
             node.append(child_node)
 
         return node
-    
+
     def __str__(self):
         return f"{self.nodeType.name}: mode: {self.name}  parent: {self.inherit}"
-    
-    
+
+
 
 
 class ProfileInputNode(ProfileBaseNode):
@@ -948,7 +948,7 @@ class ProfileInputNode(ProfileBaseNode):
         super().__init__(ProfileNodeType.Input)
         assert device_node is not None,"device node must be provided"
         self.device_node  = device_node # link to the device node this input belongs to
-        
+
         self.input_type : InputType = InputType.NotSet # input type
         self.input_id = None # input id, numeric for a joystick or button, or an object for a keyboard, MIDI, OSC item
         self._calibration = None # calibration data if the input has calibration data
@@ -983,10 +983,10 @@ class ProfileInputNode(ProfileBaseNode):
             registry = gremlin.base_profile.ProfileRegistry()
             self._input_item = registry.getInputItem(self.device_guid, self.input_type, self.input_id)
         return self._input_item
-    
+
     @input_item.setter
     def input_item(self, value: gremlin.base_profile.InputItem):
-        
+
         self._input_item = value
 
     @property
@@ -995,21 +995,21 @@ class ProfileInputNode(ProfileBaseNode):
         if self.device_node:
             return self.device_node.device_guid
         return None
-        
+
     @property
     def message_key(self):
         # joystick inputs only - returns id of axis or button
         return self._input_id
-    
+
     def callbackKey(self):
         ''' callback key unique to the input type, input id '''
         return (self.device_guid, self.input_type, self.input_id)
-    
+
     @property
     def hasCalibration(self):
         ''' for axis input devices, returns True if the device has an active calibration '''
         return self._calibration is not None and self._calibration.hasData
-    
+
     @property
     def calibration(self):
         ''' for axis input devices, returns the calibration data '''
@@ -1028,13 +1028,14 @@ class ProfileInputNode(ProfileBaseNode):
 
         mode_object = gremlin.base_profile.get_mode_object(node, extra_data)
         assert mode_object is not None,"Unable to derive mode object"
-        
+
 
         input_entry = None
         if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
             from gremlin.ui.keyboard_device import KeyboardInputItem
             from gremlin.keyboard import Key
             input_entry = KeyboardInputItem()
+            input_entry.profile_mode = mode_object.name
 
             if "id" in node.attrib and node.tag == "key":
                 # legacy format
@@ -1062,7 +1063,7 @@ class ProfileInputNode(ProfileBaseNode):
                             break
             self.input_type = InputType.KeyboardLatched # force new input type
             #syslog.info(f"Loaded key input: {input_item.display_name}")
-                
+
             self.input_id = input_entry
 
 
@@ -1075,7 +1076,7 @@ class ProfileInputNode(ProfileBaseNode):
                 if child.tag == "input":
                     midi_input_item.parse_xml(child, midi_input_item)
             self.input_id = midi_input_item
-                
+
 
         elif self.input_type == InputType.OpenSoundControl:
             # OSC data
@@ -1085,14 +1086,14 @@ class ProfileInputNode(ProfileBaseNode):
                 if child.tag == "input":
                     osc_input_item.parse_xml(child, osc_input_item)
             self.input_id = osc_input_item
-            
+
 
         elif self.input_type == InputType.ModeControl:
             # mode control entries - input id is the only item we need
             self.is_axis = False
             self.input_id = safe_read(node,"id",int,0)
-            
-            
+
+
 
 
         elif self.input_type == InputType.JoystickAxis:
@@ -1127,7 +1128,7 @@ class ProfileInputNode(ProfileBaseNode):
                 button = safe_read(node,"id", int, 0)
                 button = gremlin.ui.octavi_device.OctaviButton(button)
                 self.input_id = button
-        
+
         registry = gremlin.base_profile.ProfileRegistry()
         if not self.input_item:
             input_item = registry.getInputItem(self.device_guid, self.input_type, self.input_id)
@@ -1135,7 +1136,7 @@ class ProfileInputNode(ProfileBaseNode):
         else:
             input_item = self.input_item
 
-  
+
 
         # add container nodes to the input node
         child: Element
@@ -1150,11 +1151,11 @@ class ProfileInputNode(ProfileBaseNode):
             if container_type not in container_tag_map:
                 syslog.warning(f"Unknown container type used: {container_type}")
                 continue
-                    
+
             container_node = ProfileContainerNode(parent = self)
             container_node.from_xml(child, input_item)
 
-          
+
 
 
     def to_xml(self):
@@ -1164,7 +1165,7 @@ class ProfileInputNode(ProfileBaseNode):
         """
         from gremlin.keyboard import Key
         node = etree.Element(InputType.to_string(self.input_type))
-        
+
         if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
             if isinstance(self.input_id, Key):
                 # keyboard key item
@@ -1209,19 +1210,19 @@ class ProfileInputNode(ProfileBaseNode):
             child_node = child.to_xml()
             node.append(child_node)
         return node
-    
+
     def __str__(self):
         container_nodes = [node for node in self.children if node.nodeType == ProfileNodeType.Container]
         container_stub = f"{len(container_nodes)}"
-        return f"{self.nodeType.name}: input type: {self.input_type.name} input id: {self.input_id} containers: {container_stub} "    
-    
+        return f"{self.nodeType.name}: input type: {self.input_type.name} input id: {self.input_id} containers: {container_stub} "
+
 class ProfileContainerNode(ProfileBaseNode):
     ''' input node - represents a container for an input '''
     def __init__(self, parent = None):
         super().__init__(ProfileNodeType.Container)
-        self.container = None 
+        self.container = None
         self.parent = parent
-        
+
 
 
     def from_xml(self, node : Element, data = None, extra_data = None):
@@ -1230,12 +1231,12 @@ class ProfileContainerNode(ProfileBaseNode):
 
 
         input_node : ProfileInputNode = self.parent
-        
+
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         entry = container_tag_map[container_type](self)
         entry.from_xml(node, data)
-        
+
         if hasattr(entry, "action_model"):
             entry.action_model = input_node.input_item.containers
         container_plugins.set_container_data(self, entry)
@@ -1244,16 +1245,16 @@ class ProfileContainerNode(ProfileBaseNode):
     def to_xml(self) -> Element:
         if self.container:
             return self.container.to_xml()
-        
+
     def __str__(self):
         return f"{self.nodeType.name}: {str(self.container)}"
-    
+
 
 
 class ProfileMergedAxisNode(ProfileBaseNode):
     ''' device node '''
     def __init__(self, parent = None):
-        super().__init__(ProfileNodeType.MergedAxis)        
+        super().__init__(ProfileNodeType.MergedAxis)
         self.entry = None
         self.parent = parent
 
@@ -1298,28 +1299,28 @@ class ProfileMergedAxisNode(ProfileBaseNode):
                 node.append(sub_node)
 
         return node
-    
+
     def __str__(self):
         return f"{self.nodeType.name}"
-    
 
 
-    
+
+
 
 class ProfileGraph():
     ''' holds the profile graph '''
 
     def __init__(self):
         self._root = ProfileRootNode()
-        self._source_xml = None # source XML loaded 
+        self._source_xml = None # source XML loaded
         self._remap_prompt_issued = False
-        
 
-        
+
+
     def getModeList(self) -> list[str]:
         ''' gets the list of defined modes in the profile '''
         return list(self._root._graph_modes.keys())
-    
+
     def getModeNode(self, mode_name) -> ProfileModeNode:
         ''' gets the profile graph mode for the specific mode ='''
         if mode_name in self._root._graph_modes:
@@ -1330,9 +1331,9 @@ class ProfileGraph():
         ''' gets the profile device node for the given device_guid, None if not found '''
         device_id = gremlin.util.normalize_guid(device_guid) if not isinstance(device_guid, str) else device_guid
         return next((node for node in self._root.children if node.nodeType == ProfileNodeType.Device and node.device_id == device_id),None)
-    
-    
-    
+
+
+
     def _dump(self):
         ''' dumps the graph '''
         syslog.info(f"Profile Graph Tree:")
@@ -1371,7 +1372,7 @@ class ProfileGraph():
 
         config = gremlin.config.Configuration()
 
-        
+
     def to_xml(self, target_xml : str) -> bool:
         ''' writes the profile graph to XML'''
         root = self._root.to_xml()
@@ -1407,18 +1408,18 @@ class ProfileGraph():
             if not info:
                 return True
         return False
-    
+
     def joystick_devices(self) -> list[DeviceSummary]:
         ''' gets a list of joystick devices defined in the profile '''
         device_nodes = [node for node in self._root.children if node.nodeType == ProfileNodeType.Device]
         device_list = [node.device for node in device_nodes if node.device_type in (DeviceType.Joystick, DeviceType.VJoy) and not node.device.disabled]
         return device_list
-        
-            
 
 
 
-    
+
+
+
     def remap(self):
         ''' show the remap dialog '''
         dialog = DeviceRemapDialogUI(self)

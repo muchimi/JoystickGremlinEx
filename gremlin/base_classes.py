@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@ class TraceableList(MutableSequence):
 
     def __init__(self, initlist=None, callback = None):
         MutableSequence.__init__(self)
-        
+
         self.data = []
         self._callbacks = []
         if callback:
@@ -98,10 +98,10 @@ class TraceableList(MutableSequence):
         if isinstance(idx, slice):
             return self.__class__(self.data[idx])
         return self.data[idx]
-        
+
     def __iter__(self):
         return self.data.__iter__()
-    
+
     def __next__(self):
         return self.data.__next__()
 
@@ -166,7 +166,7 @@ class TraceableList(MutableSequence):
         self.data.append(value)
         if self._callbacks:
             self._trigger("append",value)
-        
+
 
     def insert(self, idx, value):
         if self._callbacks:
@@ -210,13 +210,13 @@ class TraceableList(MutableSequence):
 
     def to_list(self):
         return self.data
-    
+
 def empty_copy(obj):
     class Empty(obj.__class__):
         def __init__(self): pass
     newcopy = Empty(  )
     newcopy.__class__ = obj.__class__
-    return newcopy      
+    return newcopy
 
 class DataList(list):
     ''' a list if a data member to track information about the list '''
@@ -236,12 +236,13 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     input_type_change = Signal(object) # fires when an input item needs to refresh the output mapping due to input type changed
 
-    def __init__(self):
-        
+    def __init__(self, mode : str, device_guid):
+
         super().__init__()
         import uuid
         self._id =  uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-","")
+        self._device_guid = device_guid
         self._display_name = None
         self._description = None
         self._input_description = None
@@ -251,13 +252,14 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self._is_axis = False
         self._is_button = True
         self._input_type = None
+        self._profile_mode = mode # profile mode
 
 
     @property
     def descriptionReadOnly(self) -> bool:
         ''' true if description is readonly'''
         return self._description_readonly
-    
+
     @descriptionReadOnly.setter
     def descriptionReadOnly(self, value: bool):
         self._description_readonly = value
@@ -266,11 +268,11 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     def guid(self):
         ''' id in string format '''
         return self._guid
-    
+
     @property
     def id(self):
         return self._id
-    
+
     @id.setter
     def id(self, value):
         self._id = value
@@ -280,18 +282,18 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     def display_name(self):
         ''' display name for this input '''
         return self._display_name
-    
+
     def setDisplayName(self, value : str):
         self._display_name = value
-    
+
     @property
     def description(self) -> str:
         return self._description
-    
+
     @description.setter
     def description(self, value) -> str:
         self._description = value
-    
+
     def setDescription(self, value : str):
         if value != self._description:
             self._description = value
@@ -299,40 +301,40 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     @property
     def input_description(self) -> str:
         return self._input_description
-    
+
     def setInputDescription(self, value : str):
         self._input_description = value
 
-            
+
     @property
     def axis_value(self) -> float:
         ''' gets the current axis value '''
         return self.getAxisValue()
-    
+
     def getAxisValue(self):
         if self._axis_value is None:
             return 0.0
         return self._axis_value
-    
+
     def setAxisValue(self, value : float):
-        ''' sets the axis value and triggers a joystick input event 
-        
+        ''' sets the axis value and triggers a joystick input event
+
         :param value: the floating point value to set (-1 to +1)
         :param emit: flag to trigger a joystick event if the value is set
-        
+
         '''
         if self.axis_value is None or value != self._axis_value:
             self._axis_value = value
 
 
     def getOverrideInputType(self):
-        # override input type            
+        # override input type
         return None
 
     @property
     def button_value(self) -> bool:
         return self._button_value
-    
+
     def setButtonValue(self, value: bool):
         self._button_value = value
 
@@ -355,7 +357,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     @property
     def is_button(self) -> bool:
         ''' true if this item is setup as an axis input (momentary) '''
-        return not self.is_axis        
+        return not self.is_axis
 
 
     @property
@@ -365,6 +367,23 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     @property
     def input_id(self):
         assert False,"input id property must be implemented by subclasses"
+
+    @property
+    def input_type(self) -> InputType:
+        ''' input type '''
+        return self._input_type
+
+    @property
+    def device_guid(self):
+        ''' device guid '''
+        return self._device_guid
+
+    @property
+    def profile_mode(self) -> str:
+        return self._profile_mode
+    @profile_mode.setter
+    def profile_mode(self, mode : str):
+        self._profile_mode = mode
 
 
     @abstractmethod
@@ -380,7 +399,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     def __getstate__(self):
         ''' manual pickle to XML '''
         return self.to_xml()
-    
+
     def __setstate__(self, data):
         ''' manual unpickle '''
         self.parse_xml(data)
@@ -396,16 +415,16 @@ class SpecialInputItem(AbstractInputItem):
     @property
     def message_key(self):
         return self.display_name
-    
+
     def __str__(self):
         return "special"
-    
+
 
 pickle_targets = {}
 
 class PickleTarget():
     ''' helper class to pickle objects that don't want to be pickled
-     
+
     The way this works is we store the object to pickle in a local cache, give it a unique ID, and use that as the pickled value because the ID does pickle.
     When the object is unpickled, we retrieve the object from the cache, remove it from the cache and return the original.
 
@@ -424,7 +443,7 @@ class PickleTarget():
         self.id = id
         #print (f"pickled to id: {id}")
         return self.id
-    
+
     def __setstate__(self, id):
         ''' unpickle '''
         #print (f"pickled from id: {id}")
@@ -433,11 +452,11 @@ class PickleTarget():
             self.item = pickle_targets[id]
             del pickle_targets[id]
         return self
-    
+
     @property
     def item(self):
         return self._item
-    
+
     @item.setter
     def item(self, value):
         self._item = value
@@ -446,7 +465,7 @@ class PickleTarget():
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
 import gremlin.event_handler
-    
+
 
 class BaseCallbacks(QtCore.QObject):
     ''' base class implementing callback functionality'''
@@ -469,4 +488,4 @@ class BaseCallbacks(QtCore.QObject):
     def DoCallbacks(self):
         ''' runs the callbacks '''
         for callback in self._callbacks:
-            callback(self)                
+            callback(self)

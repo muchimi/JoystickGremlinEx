@@ -108,12 +108,12 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.start_mode_selector.setMinimumContentsLength(20)
         self.start_mode_selector.setToolTip("Selects the startup mode when the profile is activated and the restore last mode option is not set")
         self.start_mode_selector.currentIndexChanged.connect(self._start_mode_changed_cb)
-        
-        
+
+
         widgets = [
             self.start_mode_selector,
         ]
-        
+
         self.container_start_mode_widget = gremlin.ui.ui_common.getHContainer(widgets,"Start Mode:", widget_only = True)
 
         # Restore last mode on profile activate
@@ -178,7 +178,7 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot(bool)
     def _numlock_force_on_cb(self, checked : bool):
         self.profile.set_force_numlock_on(checked)
-        
+
 
     def _update_ui(self):
         enabled = not self.numlock_off_widget.isChecked()
@@ -202,15 +202,15 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
 class HostIpDialog(ui_common.BaseDialogUi):
-    ''' dialog to display and have the user select an IP address for the current host 
-    
+    ''' dialog to display and have the user select an IP address for the current host
+
         hosts may have multiple IP addresses
         a manual entry can aslo be entered
-    
+
     '''
 
     def __init__(self, host_ip : str = None, parent=None):
-        ''' 
+        '''
         :param host_ip: current host IP to display (optional) '''
         super().__init__(self.__class__.__name__, parent)
 
@@ -227,7 +227,7 @@ class HostIpDialog(ui_common.BaseDialogUi):
         w = gremlin.ui.ui_common.get_text_width("888.888.888.888 ")
         self._ip_list_widget.setMinimumWidth(w)
         self._ip_list_widget.currentIndexChanged.connect(self._ip_selection_changed)
-        
+
 
         self._host_ip_widget = gremlin.ui.ui_common.QDataLineEdit()
         self._host_ip_widget.setMinimumWidth(w)
@@ -242,7 +242,7 @@ class HostIpDialog(ui_common.BaseDialogUi):
         icon = gremlin.util.load_icon("ei.refresh")
         refresh_widget.setIcon(icon)
         refresh_widget.setMaximumWidth(24)
-        
+
         row = 0
 
         grid_layout.addWidget(self._instruction_widget, row, 0, 1, -1)
@@ -253,12 +253,12 @@ class HostIpDialog(ui_common.BaseDialogUi):
         grid_layout.addWidget(refresh_widget, row, 2)
         grid_layout.addWidget(QtWidgets.QLabel(""), row, 3)
         row+=1
-        
+
         grid_layout.addWidget(QtWidgets.QLabel("Host Ip:"), row, 0)
         grid_layout.addWidget(self._host_ip_widget, row, 1)
 
-        
-        
+
+
 
         grid_layout.setColumnStretch(3,2)
         self.main_layout.addLayout(grid_layout)
@@ -290,10 +290,10 @@ class HostIpDialog(ui_common.BaseDialogUi):
             self._ip_list_widget.addItems(self._ip_list)
             if self._host_ip in self._ip_list:
                 self._ip_list_widget.setCurrentText(self._host_ip)
-        
+
     def _update_ui(self):
         self._host_ip_widget.setReadOnly(self._existing_only)
-        
+
         msg = "Select an existing IP address from the drop down list:" if self._existing_only else "Select an IP address:"
         self._instruction_widget.setText(msg)
 
@@ -348,7 +348,7 @@ class RemovedDeviceUi(ui_common.BaseDialogUi):
 
         profile = gremlin.shared_state.current_profile
         removed_map = profile.removedDeviceMap()
-        
+
         # list all devices that can be removed from the profile
         devices = gremlin.joystick_handling.getDevices()
         devices.sort(key = lambda x: x.name)
@@ -361,12 +361,12 @@ class RemovedDeviceUi(ui_common.BaseDialogUi):
             # filter devices that cannot be removed
             if device.device_id in always_on_devices or device.disabled or device.is_virtual:
                 continue
-            
+
             widget = gremlin.ui.ui_common.QDataCheckbox(device.name, data = device, value = not device.device_id in removed_map)
             self.device_widgets.append(widget)
 
         widget = gremlin.ui.ui_common.getVContainer(self.device_widgets, widget_only = True)
-        
+
         self.scroll_layout.addWidget(widget)
         self.scroll_layout.addStretch()
 
@@ -384,7 +384,7 @@ class RemovedDeviceUi(ui_common.BaseDialogUi):
         mapped_widget = QtWidgets.QPushButton("Mapped")
         mapped_widget.setToolTip("Selects only mapped devices")
         mapped_widget.clicked.connect(self._select_mapped)
-        
+
 
         ok_button_widget = QtWidgets.QPushButton("Ok")
         ok_button_widget.clicked.connect(self._ok_cb)
@@ -400,7 +400,7 @@ class RemovedDeviceUi(ui_common.BaseDialogUi):
             ], widget_only = True
             )
         button_container_widget = widget
-        
+
         self.main_layout.addWidget(self.scroll_area)
 
         info_widget = gremlin.ui.ui_common.QInfoBox("Unselected devices will not show on the available device list for this profile.<br>You can re-enable them later if needed.")
@@ -438,7 +438,7 @@ class RemovedDeviceUi(ui_common.BaseDialogUi):
 
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(True) # reset and rebuild data around the profile
-        
+
         el = gremlin.event_handler.EventListener()
         el.request_reload.emit()
 
@@ -446,7 +446,7 @@ class RemovedDeviceUi(ui_common.BaseDialogUi):
 
     @QtCore.Slot()
     def _cancel_cb(self):
-        self.close()       
+        self.close()
 
 
 
@@ -468,8 +468,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.config = gremlin.config.Configuration()
         self.setMinimumWidth(400)
         self._max_content_width = 800
-        
-        self._custom_host_name = self.config.custom_host_name # to detect changes 
+
+        self._custom_host_name = self.config.custom_host_name # to detect changes
 
         self.setWindowTitle("Options")
 
@@ -478,7 +478,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.main_layout.addLayout(self.dialog_layout)
         self.tab_container = QtWidgets.QTabWidget()
         self.main_layout.addWidget(self.tab_container)
-        
+
 
 
         self.closed.connect(self._save_on_close_cb)
@@ -528,7 +528,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.tab_container.currentChanged.connect(self._tab_changed_cb)
         #self.setMinimumWidth(self._max_content_width)
 
-        
+
 
     @property
     def reload_profile(self) -> bool:
@@ -628,7 +628,7 @@ class OptionsUi(ui_common.BaseDialogUi):
 
 
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Options", transparent = True)
-        
+
         box.addWidget(self.vjoy_use_time_widget)
         box.addWidget(self.vjoy_loopback_delay_widget)
 
@@ -650,7 +650,7 @@ class OptionsUi(ui_common.BaseDialogUi):
     def _create_general_page(self):
         """Creates the general options page."""
 
-        
+
 
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
 
@@ -683,15 +683,15 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.close_to_systray = QtWidgets.QCheckBox("Closing minimizes to system tray")
         self.close_to_systray.setChecked(self.config.close_to_tray)
         self.close_to_systray.clicked.connect(self._close_to_systray)
-        
-        
+
+
 
         # show import dialog on missing devices
         self.import_prompt_widget = QtWidgets.QCheckBox("Import prompt on missing devices")
         self.import_prompt_widget.setChecked(self.config.import_prompt_enabled)
         self.import_prompt_widget.clicked.connect(self._import_prompt)
         self.import_prompt_widget.setToolTip("When enabled, GremlinEx will prompt for profile import if a profile references a disconnected device")
-        
+
 
         # synchronize action/container drop downs
         self.sync_last_selection = QtWidgets.QCheckBox("Sync action and container selections")
@@ -744,7 +744,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.allow_invalid_container_build.setChecked(self.config.allow_exec_tree_container_validation_fail)
         self.allow_invalid_container_build.clicked.connect(self._allow_invalid_container_build)
 
-        
+
         # allow partial plugin configurations
         self.partial_plugin_save = QtWidgets.QCheckBox("Save partial user plugin data")
         self.partial_plugin_save.setToolTip("When enabled, user-plugin configuration will be saved even if one or more input variable reports not-configured.<br>This feature allows saving of the configuration to date.<br>Incomplete configurations will not be activated at runtime even if this feature is used.")
@@ -778,18 +778,18 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_mode_change_message.clicked.connect(self._show_mode_change_message)
         self.show_mode_change_message.setChecked(self.config.mode_change_message)
 
-    
+
 
 
         # Default action selection
 
 
 
-        
+
         self.default_action_dropdown = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
         self.default_action_widget, self.default_action_layout = gremlin.ui.ui_common.getHContainer(self.default_action_dropdown, "Default Action:")
         self._init_action_dropdown()
-        
+
 
         # Macro axis polling rate
         self.macro_axis_polling_widget = QtWidgets.QWidget()
@@ -837,7 +837,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.filter_axis_widget.setChecked(self.config.filter_axis_events)
         self.filter_axis_widget.clicked.connect(self._filter_axis_event_update)
         self.filter_axis_widget.setToolTip("If enabled, axis inputs will be filtered and require a minimum deviation before being processed by GremlinEx")
-        self.filter_axis_threshold_widget = ui_common.QFloatLineEdit(min_range = 0.0, max_range = 1.0, step = 0.001)       
+        self.filter_axis_threshold_widget = ui_common.QFloatLineEdit(min_range = 0.0, max_range = 1.0, step = 0.001)
         self.filter_axis_threshold_widget.setValue(self.config.filter_axis_threshold)
         self.filter_axis_threshold_widget.valueChanged.connect(self._filter_axis_threshold_update)
 
@@ -851,15 +851,15 @@ class OptionsUi(ui_common.BaseDialogUi):
 
 
         # column 1
-        
+
         col1_layout.addWidget(self.sync_last_selection)
         col1_layout.addWidget(self.close_to_systray)
         col1_layout.addWidget(self.start_minimized)
         col1_layout.addWidget(self.start_with_windows)
         col1_layout.addWidget(self.numlock_enabled)
-        
-        
-        
+
+
+
 
 
         # column 2
@@ -877,7 +877,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         col3_layout.addWidget(self.import_prompt_widget)
         col3_layout.addWidget(self.show_mode_change_message)
         col3_layout.addWidget(self.allow_invalid_container_build)
-        
+
 
         # bottom layout
 
@@ -887,7 +887,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         widget = gremlin.ui.ui_common.getHContainer(self.range_precision_widget,"Range comparison decimals:", widget_only = True)
         bottom_layout.addWidget(widget)
 
-        
+
         bottom_layout.addWidget(self.default_action_widget)
         bottom_layout.addWidget(self.macro_axis_minimum_change_widget)
 
@@ -899,7 +899,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
 
         self.tab_container.addTab(content_widget, "General")
-        
+
     # --------------------------------------------------------------------------------------------------------------------
     def _create_ui_options_page(self):
         ''' ui related options '''
@@ -937,7 +937,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         box.addWidget(self.theme_widget)
 
         col1_layout.addWidget(box)
-        
+
         # Switch to highlighted device (master switch)
         self.highlight_enabled = QtWidgets.QCheckBox("Enable Input Highlighting")
         self.highlight_enabled.clicked.connect(self._highlight_enabled_cb)
@@ -964,14 +964,14 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.highlight_input_axis.clicked.connect(self._highlight_input_axis)
         self.highlight_input_axis.setChecked(self.config.highlight_input_axis)
         self.highlight_input_axis.setToolTip("This otion will enable automatic selection and highlighting of detected axis input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a control key while moving an input.")
-        
+
 
         # Highlight input option buttons
         self.highlight_input_buttons = QtWidgets.QCheckBox("Highlight currently triggered button")
         self.highlight_input_buttons.setChecked(self.config.highlight_input_buttons)
         self.highlight_input_buttons.clicked.connect(self._highlight_input_buttons)
         self.highlight_input_buttons.setToolTip("This otion will enable automatic selection and highlighting of detected button input (physical hardware only).<br>To switch devices automatically, also enable the device switch option.<br>This can also be enabled temporarily while holding a shift key while pressing a button.")
-        
+
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Highlight Options", transparent = True)
         box.addWidget(self.highlight_enabled)
         box.addWidget(self.highlight_hotkey_autoswitch)
@@ -1004,12 +1004,12 @@ class OptionsUi(ui_common.BaseDialogUi):
                                                                                  value = self.config.splitJoystickRepeater,
                                                                                  callback = self._split_joystick_repeater_cb,
                                                                                  tooltip = "When enabled, repeaters for axes that have calibration data will show the raw input and the calibrated input in the repeater.")
-        
+
         self.split_joystick_repeater_tooltip_widget = gremlin.ui.ui_common.QDataCheckbox("Show tooltips in repeaters",
                                                                                  value = self.config.showJoystickRepeaterTooltip,
                                                                                  callback = self._show_joystick_repeater_tooltip_cb,
                                                                                  tooltip = "When enabled, repeaters for axes that have calibration data will show the raw input and the calibrated input in the repeater.")
-        
+
         # self.split_joystick_repeater_widget = QtWidgets.QCheckBox("Show Raw/Calibrated in repeaters")
         # self.split_joystick_repeater_widget.setToolTip("When enabled, repeaters for axes that have calibration data will show the raw input and the calibrated input in the repeater.")
         # self.split_joystick_repeater_widget.setChecked(self.config.splitJoystickRepeater)
@@ -1020,7 +1020,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.show_parent_mode_widget.setToolTip("When enabled, shows the parent mode name in the mode drop downs")
         self.show_parent_mode_widget.setChecked(self.config.show_parent_mode)
         self.show_parent_mode_widget.clicked.connect(self._show_parent_mode_widget_cb)
-        
+
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Repeaters", transparent = True)
         box.addWidget(self.show_joystick_input_widget)
         #box.addWidget(self.disable_joystick_input_widget)
@@ -1061,9 +1061,9 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.runtime_ui_update.clicked.connect(self._runtime_ui_update)
         self.runtime_ui_update.setToolTip("When set, Joystick Gremlin Ex will update the UI on profile or mode changes at runtime - this can be turned off to enhance performance at runtime")
         self.runtime_ui_update.setEnabled(False)
-        
 
-        
+
+
         self.show_id_widget = ui_common.QDataCheckbox("Show container/action IDs")
         self.show_id_widget.setChecked(self.config.show_container_id)
         self.show_id_widget.clicked.connect(self._show_id_changed)
@@ -1081,8 +1081,8 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         col2_layout.addWidget(box)
 
-        
-        
+
+
 
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Options", transparent = True)
 
@@ -1090,8 +1090,20 @@ class OptionsUi(ui_common.BaseDialogUi):
                                                     value = self.config.dropdown_use_mouse_wheel,
                                                     callback= self._handle_dropdown_wheel_changed,
                                                     tooltip = "When set, dropdown selection can be changed using the mouse wheel.  This option may sometimes interfere with vertical scrolling if the mouse is hovering above a drop down.")
-        
+
         box.addWidget(widget)
+
+
+        # cache widgets
+        cache_enabled = self.config.ui_max_input_maps >= 0
+        cache_count_enable_widget = gremlin.ui.ui_common.QDataCheckbox("Enable widget cache", callback = self._handle_cache_count_enable_changed, value = cache_enabled,
+                                                                       tooltip = "Enables or disables the use of mapping widget cache. ")
+
+        self._cache_count_widget = gremlin.ui.ui_common.QIntLineEdit(value = self.config.ui_max_input_maps, callback = self._handle_cache_count_changed)
+        self._cache_container_widget = gremlin.ui.ui_common.getHContainer(["Widgets to cache:", self._cache_count_widget], widget_only = True, tooltip = "Number of mappings widget to cache, 0 for unlimited.  Warning: high settings can significantly impact memory usage.")
+        box.addWidget(cache_count_enable_widget)
+        box.addWidget(self._cache_container_widget)
+        self._cache_count_widget.setEnabled(cache_enabled)
 
 
         hide_default_mode_widget = QtWidgets.QCheckBox("Hide default mode")
@@ -1101,7 +1113,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         box.addWidget(hide_default_mode_widget)
 
         # reset hidden info boxes
-        widget = gremlin.ui.ui_common.QDataPushButton("Reset hidden UI elements", 
+        widget = gremlin.ui.ui_common.QDataPushButton("Reset hidden UI elements",
                                                       callback = self._handle_reset_hidden,
                                                       tooltip="Reset previously hidden UI elements like information boxes")
         container = gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
@@ -1150,7 +1162,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.enable_remote_broadcast_widget.clicked.connect(self._enable_remote_broadcast)
         self.enable_remote_broadcast_widget.setToolTip("When set, this instance is a master control instance and sends data to local network clients")
 
-        
+
 
         page_layout.addWidget(self.enable_remote_control_widget)
         page_layout.addWidget(self.enable_remote_broadcast_widget)
@@ -1180,7 +1192,7 @@ class OptionsUi(ui_common.BaseDialogUi):
             callback = self._handle_master_changed,
             tooltip = "Enable to make this the GremlinEx server on the network.\nClients should point to this machine as the broadcast host.\nOnly one machine should act as the server."
             )
-        
+
 
         self.remote_control_select_ip_widget = QtWidgets.QPushButton("Select")
         self.remote_control_select_ip_widget.setToolTip("Selects a different IP address for the GremlinEx Broadcast server if the host has more than one IP address.")
@@ -1192,7 +1204,7 @@ class OptionsUi(ui_common.BaseDialogUi):
             min_range = 4096,
             max_range = 65535,
             tooltip = "This specifies the UDP port used to communicate with other Joystick Gremlin Ex instances on the network.  The local firewall must allow the ports to broadcast.  The +1 port is used to receive messages.")
-        
+
         # QtWidgets.QDoubleSpinBox()
         # self.remote_control_port_widget.setRange(4096,65535)
         # self.remote_control_port_widget.setDecimals(0)
@@ -1210,14 +1222,14 @@ class OptionsUi(ui_common.BaseDialogUi):
 
         widget, _ = ui_common.getHContainer(self.remote_control_port_widget, "Broadcast Port:")
         page_layout.addWidget(widget)
-        
+
 
         msg = '''GremlinEx broadcasts command packets via UDP unicast on the specified port.
 The default port is 6012.  Please ensure the firewall rules enable this traffic on both server and client.
 Control packets are non routable unicast (will not cross routers unless forwarded).
 Client GremlinEx machines on the local subnet must match the server port number.
 Only enable the client remote control on a client.
-Only enable the server control on the master GremlinEx machine. 
+Only enable the server control on the master GremlinEx machine.
 There should only be one GremlinEx master server on the subnet.
 '''
 
@@ -1233,6 +1245,14 @@ There should only be one GremlinEx master server on the subnet.
         self.remote_control_select_ip_widget.setEnabled(enabled)
         self.remote_control_server_widget.setEnabled(enabled)
 
+
+    def _handle_cache_count_enable_changed(self, checked : bool):
+        self.config.ui_max_input_enabled = checked
+        self._cache_container_widget.setEnabled(checked)
+
+    def _handle_cache_count_changed(self, value : int):
+        self.config.ui_max_input_maps = value
+
     def _handle_custom_host_changed(self, value : str):
         self.config.custom_host_name = value
 
@@ -1244,7 +1264,7 @@ There should only be one GremlinEx master server on the subnet.
 
     def _create_reporting_page(self):
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
-        
+
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Reporting Options")
 
@@ -1253,7 +1273,7 @@ There should only be one GremlinEx master server on the subnet.
         self.graphviz_path_widget = gremlin.ui.ui_common.QPathLineItem(header = "GraphViz Folder",
                                                                        text = gp, dir_mode=True)
         self.graphviz_path_widget.pathChanged.connect(self._graphviz_path_changed)
-        
+
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "GraphViz options", transparent = True)
         box.addWidget(self.graphviz_path_widget)
         page_layout.addWidget(box)
@@ -1269,7 +1289,7 @@ There should only be one GremlinEx master server on the subnet.
 
         box1 = gremlin.ui.ui_common.QBoxFrameLayout(title = "Joystick Input Filter Options", transparent = True)
         margin = 12
-        
+
         axis_widget = gremlin.ui.ui_common.QIntLineEdit(
             value = self.config.device_filter_max_axis,
             min_range = 0,
@@ -1304,10 +1324,10 @@ There should only be one GremlinEx master server on the subnet.
         ]
         for widget in widgets:
             box1.addWidget(widget)
-        
+
         gremlin.ui.ui_common.synchronize_grids(widgets)
 
-             
+
 
         box2 = gremlin.ui.ui_common.QBoxFrameLayout(title = "Joystick Axis Filter", transparent = True)
         delay_widget = gremlin.ui.ui_common.QDelayWidget(show_shortcuts=False,
@@ -1320,7 +1340,7 @@ There should only be one GremlinEx master server on the subnet.
                                                            step = 0.001,
                                                            tooltip = "Minimum axis movement required to trigger.\n0 to disable. 0.001 default recommended.\nSmaller values mean the input is more sensitive.",
                                                            callback = self._handle_spam_delta)
-        
+
         widgets = [
             gremlin.ui.ui_common.getGridContainer(delay_widget,"Delay (ms):", widget_only=True, left_margin=margin),
             gremlin.ui.ui_common.getGridContainer(delta_widget,"Threshold:", widget_only=True, left_margin=margin),
@@ -1328,7 +1348,7 @@ There should only be one GremlinEx master server on the subnet.
         for widget in widgets:
             box2.addWidget(widget)
         gremlin.ui.ui_common.synchronize_grids(widgets)
-        
+
         box_container = gremlin.ui.ui_common.getHContainer([box1, box2], widget_only=True, align_top = True)
         page_layout.addWidget(box_container)
 
@@ -1339,12 +1359,12 @@ There should only be one GremlinEx master server on the subnet.
         widgets.append(widget)
         widget = gremlin.ui.ui_common.QDataPushButton("Hide All", callback = self._handle_filter, tooltip = "Set filter for all joystick devices to mapped (used)", data = "hide_all")
         widgets.append(widget)
-        
+
         widget = gremlin.ui.ui_common.getFlowContainer(widgets, widget_only=True)
         page_layout.addWidget(widget)
 
 
-        
+
 
 
 
@@ -1365,11 +1385,11 @@ There should only be one GremlinEx master server on the subnet.
                 return
 
         gremlin.ui.ui_common.MessageBoxYesNo(prompt = stub, callback = self._create_exec_callback(mode))
-            
+
 
     def _create_exec_callback(self, mode : str):
         return lambda result: self._handle_callback_exec(result, mode)
-    
+
     def _handle_callback_exec(self, result, mode : str):
         if result == QtWidgets.QMessageBox.Yes:
             profile = gremlin.shared_state.current_profile
@@ -1387,7 +1407,7 @@ There should only be one GremlinEx master server on the subnet.
 
     def _handle_spam_delay(self, value):
         self.config.axis_spam_delay = value/1000
-    
+
     def _handle_spam_delta(self, value):
         self.config.axis_spam_delta = value
 
@@ -1400,9 +1420,9 @@ There should only be one GremlinEx master server on the subnet.
                 callback = self._handle_macro_mode_affinity_changed,
                 tooltip = "When set, sequences and macros can only run in the mode they are defined in. If the profile mode changes, running sequences or macros defined in another mode will terminate. Previously scheduled sequences or macros for another mode will not executed."
                 )
-        
-        
-        
+
+
+
 
         concurrent_macro_widget = gremlin.ui.ui_common.QIntLineEdit(
             max_range = 10,
@@ -1415,7 +1435,7 @@ There should only be one GremlinEx master server on the subnet.
             value = self.config.max_concurrent_sequence,
             callback = self._handle_sequence_concurrent_count_changed
         )
-        
+
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Runtime Options:", transparent = True)
         box.addWidget(affinity_widget)
 
@@ -1433,7 +1453,7 @@ There should only be one GremlinEx master server on the subnet.
             concurrent_macro_widget],
             tooltip = "Maximum number of concurrent macros the profile can execute at a time.  Set to 0 for no limit.",
             widget_only=True)
-        
+
         box.addWidget(widget)
 
         widget = gremlin.ui.ui_common.getHContainer([
@@ -1441,9 +1461,9 @@ There should only be one GremlinEx master server on the subnet.
             concurrent_sequence_widget],
             tooltip = "Maximum number of concurrent sequences the profile can execute at a time.  Set to 0 for no limit.",
             widget_only=True)
-        
+
         box.addWidget(widget)
-        
+
 
         page_layout.addWidget(box)
 
@@ -1455,20 +1475,20 @@ There should only be one GremlinEx master server on the subnet.
 
     def _handle_macro_abort_changed(self, checked : bool):
         self.config.mode_change_aborts_sequence = checked
-            
+
     def _handle_macro_concurrent_count_changed(self, value):
         self.config.max_concurrent_macro = value
 
     def _handle_sequence_concurrent_count_changed(self, value):
         self.config.max_concurrent_sequence = value
 
-        
-        
+
+
 
     # --------------------------------------------------------------------------------------------------------------------
     def _create_tts_page(self):
         page_widget, page_layout = gremlin.ui.ui_common.getVContainer()
-        
+
 
         self.enable_broadcast_speech_widget = gremlin.ui.ui_common.QDataCheckbox(
                 "Enable TTS mode change cue on remote clients",
@@ -1490,7 +1510,7 @@ There should only be one GremlinEx master server on the subnet.
                 value = self.config.tts_mode_switch_enabled,
                 callback = self._tts_mode_switch_changed,
                 tooltip = "Enables or disables the audible mode cue when a profile mode is changed at runtime."
-                )        
+                )
 
         self.initial_load_mode_tts_widget = gremlin.ui.ui_common.QDataCheckbox(
                 "Say active mode on auto-load mode changes activation via TTS",
@@ -1499,17 +1519,17 @@ There should only be one GremlinEx master server on the subnet.
                 tooltip = "When set, GremlinEx will say that text-to-speech the profile mode whenever a profile is first loaded"
                 )
 
-        
+
 
         self.suppress_duplicate_widget = gremlin.ui.ui_common.QDataCheckbox(
-                "Suppress duplicate TTS speech", 
+                "Suppress duplicate TTS speech",
                 value = self.config.tts_suppress_duplicate,
                 callback = self._tts_suppress_changed,
-                tooltip = "When enabled, TTS will ignore duplicate sequential messages." 
+                tooltip = "When enabled, TTS will ignore duplicate sequential messages."
                 )
 
 
-        
+
 
 
         box = gremlin.ui.ui_common.QBoxFrameLayout(title = "Voice options", transparent = True)
@@ -1548,17 +1568,17 @@ There should only be one GremlinEx master server on the subnet.
         self.tts_rate_widget.setRange(tts.rate_offset_min, tts.rate_offset_max)
         self.tts_rate_widget.setValue(self.config.initial_load_rate_tts)
         self.tts_rate_widget.valueChanged.connect(self._rate_changed_cb)
-        self.tts_rate_widget.doubleClick.connect(self._rate_reset_cb)        
+        self.tts_rate_widget.doubleClick.connect(self._rate_reset_cb)
         self.tts_rate_widget.setToolTip(f"Default playback rate in words per minute WPM ({tts.rate_offset_min}..{tts.rate_offset_max}")
 
         self.tts_volume_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.tts_volume_widget.setRange(0, 100)
         self.tts_volume_widget.setValue(self.config.initial_volume_tts)
         self.tts_volume_widget.valueChanged.connect(self._volume_changed_cb)
-        self.tts_volume_widget.doubleClick.connect(self._volume_reset_cb)        
+        self.tts_volume_widget.doubleClick.connect(self._volume_reset_cb)
         self.tts_volume_widget.setToolTip("Default volume percent (0..100)")
 
-        
+
         widget, _ = ui_common.getHContainer([self.voice_widget, self.apply_voice_index_widget], "  TTS Default Voice:")
         box.addWidget(widget)
 
@@ -1571,7 +1591,7 @@ There should only be one GremlinEx master server on the subnet.
         info_box = ui_common.QInfoBox("Normal playback speed is 100 words per minute (WPM).")
         box.addWidget(info_box)
 
-        
+
 
 
         page_layout.addWidget(box)
@@ -1615,7 +1635,7 @@ There should only be one GremlinEx master server on the subnet.
         ''' applies the default voice to all TTS speech in the profile '''
         profile = gremlin.shared_state.current_profile
         if profile:
-            
+
             gremlin.util.pushCursor()
             count = profile.apply_voice(voice_rate = self.config.initial_load_rate_tts)
             gremlin.util.popCursor()
@@ -1636,8 +1656,8 @@ There should only be one GremlinEx master server on the subnet.
         color = gremlin.ui.ui_common.Color.tabBackgroundColor()
         css = f"background: {color};"
         page_widget.setStyleSheet(css)
-  
-        
+
+
         # holds the mapping of a process (.exe) to a profile (.xml)
         self._profile_mapper = gremlin.base_profile.ProfileMap()
         self._profile_map_exe_widgets = {}
@@ -1699,7 +1719,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.convert_response_curve_widget.setChecked(self.config.convert_response_curve)
         self.convert_response_curve_widget.setToolTip("When set, Response Curve actions will conver to the EX version when GremlinEx starts.")
 
-        
+
         page_layout.addWidget(self.autoload_profile_widget)
         widget, _ = ui_common.getHContainer(self.keep_active_on_focus_lost_widget, "  ")
         page_layout.addWidget(widget)
@@ -1710,12 +1730,12 @@ This setting is also available on a profile by profile basis on the profile tab,
         widget, _ = ui_common.getHContainer(self.reset_mode_on_process_activate_widget, "  ")
         page_layout.addWidget(widget)
 
-        
+
         page_layout.addWidget(self.activate_on_launch_widget)
-        
+
         page_layout.addWidget(self.convert_vjoy_remap_widget)
         page_layout.addWidget(self.convert_response_curve_widget)
-        
+
 
         # profile map widgets
 
@@ -1761,7 +1781,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         add_map_widget.clicked.connect(self._add_profile_map_cb)
         add_map_widget.setToolTip("Adds a new application (process) to profile mapping entry")
 
-      
+
         self.backup_count_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.backup_count_widget.setRange(0, 50)
         count = self.config.backup_count
@@ -1782,7 +1802,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         ]
         backup_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         page_layout.addWidget(backup_container)
-        
+
 
         widgets = [
             "Process/Profile map:",
@@ -1793,7 +1813,7 @@ This setting is also available on a profile by profile basis on the profile tab,
         ]
 
         container_bar_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True, left_margin=6, right_margin=6)
-  
+
 
         # force a data reload
         self._profile_mapper.load_profile_map()
@@ -1867,27 +1887,27 @@ This setting is also available on a profile by profile basis on the profile tab,
                                                     callback = self._handle_hid_list_enabled_changed,
                                                     tooltip = "Enables HID list enumeration on GremlinEx start (this can increase application load time as checks are performed)."
                                                     )
-        
+
         page_layout.addWidget(widget)
 
 
-        # info box        
+        # info box
 
         text = '''Warning: these options can significantly degrade performance due to the amount of log data generated.
 Log file size can grow quickly in the megabyte range. Please only use these modes to diagnose a specific subsystem.
 Avoid detailed/extra mode unless directed to as these are very verbose.
 '''
         box = gremlin.ui.ui_common.QInfoBox(text)
-        
+
         #warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor("orange"),text= text, use_wrap=True)
-        
+
         page_layout.addWidget(box)
 
-   
+
 
         page_layout.addStretch()
-       
-       
+
+
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Verbosity")
 
@@ -1920,7 +1940,7 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
 
         page_layout.addWidget(column_widget)
 
-        
+
         self.osc_enabled = QtWidgets.QCheckBox("Enable OSC")
         self.osc_enabled.clicked.connect(self._osc_enabled)
         self.osc_enabled.setChecked(self.config.osc_enabled)
@@ -2047,24 +2067,24 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         col+=1
         layout.addWidget(self.osc_output_port, row, col)
 
-        row +=1 
+        row +=1
         col = 0
         layout.addWidget(self.osc_pad_arg_widget, row, col, 1, -1)
-        row +=1 
+        row +=1
         col = 0
         layout.addWidget(self.osc_no_args_autorelease_widget, row, col, 1, -1)
-        row +=1 
+        row +=1
         col = 0
         layout.addWidget(self.osc_autorelease_delay_widget, row, col, 1, -1)
 
-        
+
         layout.setColumnStretch(stretch_col,2)
 
-        
+
 
         page_layout.addWidget(container)
 
-        
+
 
         msg =  '''Please configure the network information used for the OSC components in GremlinEx:
 
@@ -2074,7 +2094,7 @@ This IP address is selected from a drop down listing all known IP addresses for 
 The host port number defaults to 8000, and is the UDP port GremlinEx will listen on for OSC packets.
 This can be changed to any valid UDP port but cannot be the same as the send port below.
 
-The second IP is where GremlinEx sends OSC data.  
+The second IP is where GremlinEx sends OSC data.
 This entry is a manual entry for the IP of the client GremlinEx will send OSC data to.
 The client port number defaults to 8001.  This can be changed to any valid UDP port and cannot be
 the same as the host port.
@@ -2085,9 +2105,9 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
 
             '''
-        
+
         info_box = gremlin.ui.ui_common.QInfoBox(msg)
-        
+
         page_layout.addWidget(info_box)
 
 
@@ -2124,7 +2144,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
        self._host_dialog.accepted.connect(self._broadcast_host_ip_selected)
        self._host_dialog.setExistingOnly(True)
        self._host_dialog.exec()
-       self._host_dialog = None        
+       self._host_dialog = None
 
 
     @QtCore.Slot()
@@ -2156,7 +2176,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         page_layout = QtWidgets.QVBoxLayout(page_widget)
 
         page_layout.addWidget(QtWidgets.QLabel("MSFS SimConnect options:"))
-        
+
 
         enabled = gremlin.config.Configuration().simconnect_enabled
         widget = QtWidgets.QCheckBox("Enable SimConnect")
@@ -2192,7 +2212,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         page_layout.addWidget(widget)
 
-        
+
         page_layout.addStretch()
 
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
@@ -2224,7 +2244,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def _show_simconnect_options_on_toolbar(self, checked : bool):
         self.config.show_simconnect_options_on_toolbar = checked
         el = gremlin.event_handler.EventListener()
-        el.toolbar_changed.emit() # tell the Ui to change the toolbar 
+        el.toolbar_changed.emit() # tell the Ui to change the toolbar
 
 
 
@@ -2237,7 +2257,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         page_layout.addWidget(QtWidgets.QLabel("VIGEM (Virtual Gamepad Emulator) options:"))
 
-        
+
 
 
 
@@ -2275,7 +2295,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "VIGEM")
 
-  
+
     def closeEvent(self, event):
         """Closes the calibration window.
 
@@ -2285,7 +2305,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         # forcibly garbage collect dialog widgets
         gremlin.util.clear_layout(self.main_layout)
-        
+
         super().closeEvent(event)
 
     def _update_highlight_options(self):
@@ -2328,7 +2348,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def _volume_reset_cb(self):
         self.tts_rate_widget.setValue(80)
 
-        
+
 
 
     @QtCore.Slot(bool)
@@ -2469,7 +2489,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         # tell UI options changed
         el = gremlin.event_handler.EventListener()
         el.calibration_options_changed.emit()
-        
+
 
     @QtCore.Slot(bool)
     def _show_parent_mode_widget_cb(self, checked : bool):
@@ -2548,7 +2568,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def is_admin(self):
         ''' check to see if the user is an administrator '''
         return gremlin.util.is_user_admin()
-        
+
 
     def _schedule_login_task(self):
         ''' schedule the program to run as a login task via Task Scheduler '''
@@ -2578,7 +2598,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
             if result.stdout:
                 syslog.info(f"AUTOSTART: {result.stdout}")
             return True
-    
+
     def _unschedule_login_task(self):
         ''' removes a scheduled taxk '''
 
@@ -2606,7 +2626,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
     def _is_scheduled_task(self) -> bool:
         ''' true if the task is scheduled '''
-        
+
         # subprocess.run('reg delete "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /F /V "Joystick Gremlin"')
 
         result = subprocess.run(
@@ -2630,13 +2650,13 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         else:
             is_error = not self._unschedule_login_task()
-    
-    
+
+
         if is_error:
             # undo box change
             with QtCore.QSignalBlocker(self.start_with_windows):
                 self.start_with_windows.setChecked(self._is_scheduled_task())
-        
+
         self.activateWindow()
 
     def _start_windows_enabled(self):
@@ -2645,7 +2665,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         :return True if Gremlin launches on login, False otherwise
         """
         return self._is_scheduled_task()
-    
+
         # key_handle = winreg.OpenKey(
         #         winreg.HKEY_CURRENT_USER,
         #         "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
@@ -2833,7 +2853,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     @QtCore.Slot(bool)
     def _tts_mode_switch_changed(self, checked : bool):
         self.config.tts_mode_switch_enabled = checked
-    
+
     @QtCore.Slot(float)
     def _filter_axis_threshold_update(self, value : float):
         self.config.filter_axis_threshold = value
@@ -2959,7 +2979,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                 container_layout.addWidget(xml_widget,row,0,1,2)
                 row+=1
 
-     
+
 
 
                 restore_widget = ui_common.QDataCheckbox("Restore last mode on start", item)
@@ -2993,7 +3013,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
                     restore_widget
                 ]
                 options_line = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
-                
+
 
                 container_layout.addWidget(options_line,row,0,1,-1)
                 row+=1
@@ -3322,7 +3342,7 @@ class LogWindowUi(ui_common.BaseDialogUi):
         self._create_log_display(log_path,"System")
         user_path = gremlin.shared_state.user_log
         self._create_log_display(user_path, "User")
-        self.watcher = gremlin.util.FileWatcher([log_path, user_path])    
+        self.watcher = gremlin.util.FileWatcher([log_path, user_path])
         self.watcher.file_changed.connect(self._reload)
 
     def closeEvent(self, event):
@@ -3367,7 +3387,7 @@ class LogWindowUi(ui_common.BaseDialogUi):
         :param fname path to the file to clear
         """
         open(fname, "w").close()
-        
+
 
     def _reload(self, fname):
         gremlin.util.InvokeUiMethod(self._reload_ui, fname)
@@ -3400,7 +3420,7 @@ class AboutUi(ui_common.BaseDialogUi):
         self.ui = ui_about.Ui_About()
         self.ui.setupUi(self)
 
- 
+
 
         self.ui.jg_license.setHtml(
             open(gremlin.util.resource_path("about/joystick_gremlin.html")).read()
@@ -3447,17 +3467,17 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
 
         gremlin.ui.ui_common.synchronize_grids(widgets)
 
-        
-        
+
+
         mode_list : list = self._profile.get_modes()
         self._parent_widget.addItem("")
         for name in sorted(mode_list):
             self._parent_widget.addItem(name)
 
-        
 
 
-        
+
+
 
         self.main_layout.addWidget(widget)
 
@@ -3469,14 +3489,14 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
 
         widget = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only = True)
         button_container_widget = widget
-        
+
         self.main_layout.addWidget(button_container_widget)
         self.setModal(True)
 
     @property
     def added_mode(self) -> str:
         return self._edit_widget.text()
-    
+
     @property
     def added_parent(self) -> str:
         name = self._parent_widget.currentText()
@@ -3494,7 +3514,7 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
     @QtCore.Slot()
     def _cancel_cb(self):
         self.reject()
-        self.close()       
+        self.close()
 
     def closeEvent(self, event):
         name = self._edit_widget.text()
@@ -3933,7 +3953,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
         self.show_disconnected_widget = gremlin.ui.ui_common.QDataCheckbox("Show disconnected devices", callback = self._handle_disconnected_changed, value = config.show_disconnected)
         self.refresh_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget("Refresh", callback = self._update_data)
 
-        
+
 
         self.scroll_area = QtWidgets.QScrollArea()
         self.scroll_widget = QtWidgets.QWidget()
@@ -3988,11 +4008,11 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
 
         self.script_copy_button = QtWidgets.QPushButton("Generate plugin script header")
         self.script_copy_button.clicked.connect(self._copy_to_script)
-        
+
 
         self.close_button = QtWidgets.QPushButton("Close")
         self.close_button.clicked.connect(lambda: self.close())
-        
+
 
         widgets = [
             self.show_disconnected_widget,
@@ -4001,7 +4021,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
             self.script_copy_button,
             self.close_button
             ]
-        
+
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
         self.main_layout.addWidget(widget)
 
@@ -4022,10 +4042,10 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
         show_disconnected = config.show_disconnected
 
         devices = gremlin.joystick_handling.all_joystick_devices()
-        
+
         connected_devices = [d for d in devices if d.connected and not d.is_virtual] # list of connected hardware devices
         connected_vjoy_devices = [d for d in devices if d.connected and d.is_virtual] # list of connected vjoy devices
-        
+
         connected_devices.sort(key = lambda d: (d.device_type, d.vendor_id, d.name))
         connected_vjoy_devices.sort(key = lambda d: d.vjoy_id)
 
@@ -4035,8 +4055,8 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
         else:
             disconnected_devices = []
 
-        
-        
+
+
 
         self.devices = connected_devices + connected_vjoy_devices + disconnected_devices
 
@@ -4054,7 +4074,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
             self.table.setItem(i, 8, QtWidgets.QTableWidgetItem(f"{"Y" if entry.connected else "N"}"))
 
             # row color
-            is_dark = gremlin.shared_state.is_dark_theme    
+            is_dark = gremlin.shared_state.is_dark_theme
 
             if entry.is_virtual:
                 if is_dark:
@@ -4162,7 +4182,7 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
             for line in a_map[mode_name]:
                 script += line + "\n"
 
-        
+
 
         # set the clipboard data
         clipboard = Clipboard()
@@ -4540,22 +4560,22 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
 
         label = QtWidgets.QLabel("Profile Report Options:")
 
-        self.pdf_widget = gremlin.ui.ui_common.QDataCheckbox("PDF", 
-                                                             tooltip = "Portable Document Format", 
-                                                             callback = self._handle_pdf_changed, 
+        self.pdf_widget = gremlin.ui.ui_common.QDataCheckbox("PDF",
+                                                             tooltip = "Portable Document Format",
+                                                             callback = self._handle_pdf_changed,
                                                              value = self.config.ReportPdfEnabled)
         self.svg_widget = gremlin.ui.ui_common.QDataCheckbox("SVG",
-                                                             tooltip = "Scalable Vector Graphics format", 
+                                                             tooltip = "Scalable Vector Graphics format",
                                                              callback = self._handle_svg_changed,
                                                              value = self.config.ReportSvgEnabled)
         self.open_files_widget = gremlin.ui.ui_common.QDataCheckbox("View output",
                                                                     tooltip = "Opens the report after viewing using the system default viewer",
-                                                                    callback = self._handle_open_files_changed, 
+                                                                    callback = self._handle_open_files_changed,
                                                                     value = self.config.ReportOpenFilesEnabled)
-        
+
         self.show_files_widget = gremlin.ui.ui_common.QDataCheckbox("Open Folder",
                                                                     tooltip = "Opens the report folder",
-                                                                    callback = self._handle_show_folder_changed, 
+                                                                    callback = self._handle_show_folder_changed,
                                                                     value = self.config.ReportShowFolder)
 
         self.main_layout.addWidget(label)
@@ -4584,7 +4604,7 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot(bool)
     def _handle_pdf_changed(self, checked : bool):
          self.config.ReportPdfEnabled = checked
-        
+
     @QtCore.Slot(bool)
     def _handle_svg_changed(self, checked : bool):
          self.config.ReportSvgEnabled = checked
@@ -4593,11 +4613,11 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
     def _handle_open_files_changed(self, checked : bool):
          self.config.ReportOpenFilesEnabled = checked
 
-    
+
     @QtCore.Slot(bool)
     def _handle_show_folder_changed(self, checked : bool):
          self.config.ReportShowFolder = checked
-    
+
 
     @QtCore.Slot()
     def _ok_button_cb(self):

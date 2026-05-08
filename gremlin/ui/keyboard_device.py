@@ -45,16 +45,18 @@ syslog = logging.getLogger("system")
 
 class KeyboardInputItem(AbstractInputItem):
     ''' holds a keyboard input item '''
-    def __init__(self):
-        super().__init__()
+    def __init__(self, mode : str):
+        ''' Keyboard input id
+            :param mode: the profile mode for this input
+        '''
+        super().__init__(mode, KeyboardDeviceTabWidget.device_guid)
         self._key = None # associated primary key (containing latched items)
         self._title_name = "Keyboard input (not configured)"
 
         self._display_tooltip = None
-        self._input_type = InputType.Keyboard
+        self._input_type = InputType.KeyboardLatched
         self._suspend_update = False
         self._update()
-
 
     def getOverrideInputType(self):
         ''' override type '''
@@ -378,7 +380,11 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # last index selected, -1 means none
         self._last_selected_index = -1
 
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, parent=self, device_id = self._device_id)
+        self.input_item_list_view = input_item.InputItemListView(
+            custom_widget_handler = self._custom_widget_handler,
+            parent=self,
+            device_id = self._device_id,
+            blank_message = "Please add a keyboard or mouse input.")
         self.input_item_list_view.setMinimumWidth(350)
 
         self._reload_model()
@@ -583,14 +589,19 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' clears keyboard input keys '''
 
         self.input_item_list_model.clear(input_types=[InputType.Keyboard, InputType.KeyboardLatched])
-        self.input_item_list_view.redraw()
+        assert self.input_item_list_model.rows() == 0,"Unexpected entries in model - should be 0"
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
 
-        self._blank_input()
+        self.input_item_list_view.redraw() # redraw the list with the new input
+
+        # blank the container view
+        widget = self.getContentWidget()
+        widget.setItemData(None)
+
 
     def _add_key_dialog_cb(self):
         ''' display the keyboard input dialog '''
@@ -609,7 +620,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         gremlin.shared_state.pop_suspend_ui_keyinput()
 
     def _dialog_ok_cb(self):
-        ''' callled when the dialog completes '''
+        ''' called when the add/edit key dialog completes '''
 
         # grab a new data index as this is a new entry
         index = self._keyboard_dialog.index
@@ -619,6 +630,8 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
+
+
 
     def _process_input_keys(self, keys, index, root_key = None):
         ''' processes input keys
@@ -648,16 +661,19 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             #syslog.info(f"Editing index {index} {input_id.display_name}")
         else:
             input_id = KeyboardInputItem()
+
             index = self.input_item_list_model.rows() # new index
             #syslog.info(f"Adding new kbd input index {index} ")
         input_id.key = root_key
         input_type = InputType.KeyboardLatched # always use latched type starting with 13.40.14ex if root_key.is_latched else InputType.Keyboard
+        input_id.profile_mode = current_mode
 
 
         # creates the item in the profile if needed
-        item_data = self.device_profile.modes[current_mode].get_data(input_type,input_id)
+        input_item = self.device_profile.modes[current_mode].get_data(input_type,input_id)
         # ensure override type for keyboard input is a joystick button
-        item_data.setOverrideInputType(InputType.JoystickButton)
+        input_item.setOverrideInputType(InputType.JoystickButton)
+
 
         if reload:
             # refreshes the model from the profile
@@ -674,14 +690,11 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # select the item
         self.input_item_list_view.select_item(index, force_update = True)
 
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_keyboard
         if verbose:
             syslog.info(f"Final item index {index} {input_id.display_name}")
 
 
-    # def getWidgetKey(self, input_id):
-    #     ''' gets the content widget compound key for the item / input combination'''
-    #     return (self.device_guid, input_id)
 
     def getSelectedItem(self):
         index = self._last_selected_index

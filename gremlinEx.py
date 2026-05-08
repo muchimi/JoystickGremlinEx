@@ -81,6 +81,7 @@ import gremlin.ui.osc_device
 import gremlin.ui.mode_device
 import gremlin.ui.state_device
 import gremlin.ui.theme
+import gremlin.ui.input_item
 
 import gremlin.plugin_manager
 import gremlin.process
@@ -93,6 +94,7 @@ import gremlin.ui.octavi_device
 import gremlin.ui.virpil_device
 import gremlin.sound
 import gremlin.ktts
+
 
 
 
@@ -3447,32 +3449,33 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                     if index is None:
                         device = gremlin.joystick_handling.device_info_from_guid(device_guid)
-                        if device.is_virtual:
-                            # use the current tab if the VJOY device is not visible
-                            last_device_guid, last_input_type, input_id = self.config.get_last_input(device_guid)
-                            index = self._find_tab_index(device_guid)
+                        if device:
+                            if device.is_virtual:
+                                # use the current tab if the VJOY device is not visible
+                                last_device_guid, last_input_type, input_id = self.config.get_last_input(device_guid)
+                                index = self._find_tab_index(device_guid)
 
-                        else:
-                            # not virtual
-                            syslog.warning(f"SELECT INPUT: tab not found for device {gremlin.util.normalize_guid(device_guid)} - device does not exist - selecting default")
-                            # change to the first
-                            device : DeviceSummary = gremlin.joystick_handling.default_device()
-                            if not device:
-                                syslog.warning(f"SELECT INPUT: no default device to select found - aborting selection")
-                                return
-                            device_guid = device.device_guid
-                            # get a default input for that device (first axis or first button)
-                            if device.axis_count:
-                                input_id = device.getAxisInputId(0)
-                            elif device.button_count:
-                                input_item = self._get_input_item(device_guid, 0)
                             else:
-                                syslog.warning(f"SELECT INPUT: default device has no default input - aborting selection")
-                                return
+                                # not virtual
+                                syslog.warning(f"SELECT INPUT: tab not found for device {gremlin.util.normalize_guid(device_guid)} - device does not exist - selecting default")
+                                # change to the first
+                                device : DeviceSummary = gremlin.joystick_handling.default_device()
+                                if not device:
+                                    syslog.warning(f"SELECT INPUT: no default device to select found - aborting selection")
+                                    return
+                                device_guid = device.device_guid
+                                # get a default input for that device (first axis or first button)
+                                if device.axis_count:
+                                    input_id = device.getAxisInputId(0)
+                                elif device.button_count:
+                                    input_item = self._get_input_item(device_guid, 0)
+                                else:
+                                    syslog.warning(f"SELECT INPUT: default device has no default input - aborting selection")
+                                    return
 
-                            switch_input = True
+                                switch_input = True
 
-                            index = self._find_tab_index(device_guid)
+                                index = self._find_tab_index(device_guid)
 
                     if index is None:
                         syslog.warning(f"SELECT INPUT: default device not found in device tabs: {str(device)} - aborting selection")
@@ -5691,6 +5694,9 @@ if __name__ == "__main__":
     syslog.info("Initializing plugins")
     gremlin.plugin_manager.ActionPlugins()
     gremlin.plugin_manager.ContainerPlugins()
+
+    # input map tracking instance
+    iim_tracker = gremlin.ui.ui_common.WidgetCacheTracker()
 
     # Create Gremlin UI
     ui = GremlinUi()

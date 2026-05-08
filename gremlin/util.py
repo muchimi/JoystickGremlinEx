@@ -776,9 +776,12 @@ def find_icon(icon_file):
     ''' locates an icon file '''
     if not os.path.isfile(icon_file):
         root_folder = get_root_folder()
-        new_icon_file = os.path.join(root_folder,"icons",icon_file)
-        if os.path.isfile(new_icon_file):
-            return new_icon_file
+        # usual locations for images
+        folder_list = ["icons", "gfx"]
+        for folder in folder_list:
+            new_icon_file = os.path.join(root_folder,folder,icon_file)
+            if os.path.isfile(new_icon_file):
+                return new_icon_file
     return None
 
 
@@ -1610,28 +1613,40 @@ def waitCursor():
     pushCursor()
 
 _cursor_push = 0
+_cursor_timer = None # timer to display hourglass
 _cursor_level = []
 
 
 def pushCursor():
-    global _cursor_push
+    global _cursor_push, _cursor_timer
     if _cursor_push == 0:
-        InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
+        _cursor_timer = threading.Timer(1, _cursor_show_hourglass)
+        _cursor_timer.start()
     _cursor_push += 1
 
+def _cursor_show_hourglass():
+    InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
+
 def _pushCursor_ui():
-    QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
+    global _cursor_push, _cursor_timer
+    _cursor_timer = None
+    if _cursor_push > 0:
+        # still active?
+        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
 
 
 def popCursor(reset = False):
-    global _cursor_push
+    global _cursor_push, _cursor_timer
     if _cursor_push > 0:
         _cursor_push -= 1
     if _cursor_push == 0 or reset:
+        if _cursor_timer is not None:
+            _cursor_timer.cancel()
+            _cursor_timer = None
         InvokeUiMethod(_popCursor_ui, reset)
 
 def _popCursor_ui(reset = False):
-    ''' restores form wait cusor '''
+    ''' restores the normal cursor '''
     QtWidgets.QApplication.restoreOverrideCursor()
 
 def isWaitCursor() -> bool:

@@ -50,7 +50,6 @@ from lxml import etree as ElementTree
 import enum
 import gremlin.util
 import gremlin.base_profile
-from gremlin.base_classes import AbstractInputItem
 import psygnal
 from psygnal import Signal
 
@@ -438,12 +437,17 @@ class StateInputItem(gremlin.base_profile.InputItem):
         item.input_type = InputType.State
         item.device_name = "State"
         item.device_type = DeviceType.State
-        item.device_guid = gremlin.shared_state.state_tab_guid
+        item._device_guid = StateDeviceTabWidget.device_guid
         item.setOverrideInputType(InputType.JoystickButton)
         self._input_item = item
         self._emit = True # enable events
         self._hooked = False
         self.hook() # hook on creation
+        self._profile_mode = gremlin.shared_state.master_mode_name # states all belong to the master mode
+
+    @property
+    def device_guid(self):
+        return self._device_guid
 
     def suppressEvents(self):
         ''' disable events '''
@@ -1258,7 +1262,10 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
 
     def __str__(self):
-        return f"State: [{self._key}] id: [{self._id}] Current value: [{self._value}]"
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose:
+            return f"State: [{self._key}] id: [{self._id}] Current value: [{self._value}]"
+        return self._key if self._key else 'n/a'
 
     def __eq__(self, other):
         if other is None:
@@ -2871,7 +2878,11 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         # update the display names
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, device_id = self._device_id)
+        self.input_item_list_view = input_item.InputItemListView(
+            custom_widget_handler = self._custom_widget_handler,
+            device_id = self._device_id,
+            parent = self,
+            blank_message = "Please add a state.")
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -3169,9 +3180,14 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
 
+        # update container display if blank
+        self.updateContainerViewBlankMessage(self.input_item)
+
         # redraw for any updates
         self.input_item_list_view.redraw()
         self._select_item_cb(index)
+
+
 
 
     def _clear_inputs_cb(self):
@@ -3340,28 +3356,28 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.input_item_list_view.select_item(index, False)
 
 
-        item_data : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
-        if not item_data:
+        input_item : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+        if not input_item:
             # not in the model yet
             return
 
         input_type = InputType.State
-        input_id = item_data.input_id
+        input_id = input_item.input_id
         key = self.getWidgetKey(input_type, input_id)
         widget = self.getRegisteredWidget(key)
         if not widget:
-            widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name=f"STATE: {item_data.input_id.key}")
+            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name=f"STATE: {input_item.input_id.key}")
             self.registerWidget(key, widget)
             widget.redraw() # load the data
 
-        self._item_data = item_data
+        self._item_data = input_item
 
 
         # remember the last input
         config = gremlin.config.Configuration()
         device_guid = self.device_guid
         input_type = InputType.State
-        input_id = item_data.input_id if item_data else None
+        input_id = input_item.input_id if input_item else None
 
         profile = gremlin.shared_state.current_profile
         if profile:
@@ -3369,13 +3385,16 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         config.set_last_input(device_guid, input_type, input_id)
 
         # Create new configuration widget
-        item_data.is_axis = False
+        input_item.is_axis = False
         change_cb = self._create_change_cb(index)
         widget.action_model.data_changed.connect(change_cb)
         widget.description_changed.connect(change_cb)
 
         self.input_item_list_view.select_item(index,False)
 
+
+        # update container display if blank
+        self.updateContainerViewBlankMessage(input_item)
 
         self._last_selected_index = index
         self.selectRegisteredWidget(key)

@@ -2747,10 +2747,10 @@ class ProfileRegistry():
         :param custom_mode_name_handler: optional handler for new inputs
         '''
 
-        import gremlin.ui.osc_device
-        import gremlin.ui.state_device
-        import gremlin.ui.midi_device
-        import gremlin.ui.mode_device
+        # import gremlin.ui.osc_device
+        # import gremlin.ui.state_device
+        # import gremlin.ui.midi_device
+        # import gremlin.ui.mode_device
 
         verbose = gremlin.config.Configuration().verbose_mode_inputitems
 
@@ -2821,6 +2821,8 @@ class ProfileRegistry():
 
 
 
+
+
     def registerInputItem(self, input_item : InputItem, overwrite = False):
         ''' registers an input item in the profile registry '''
         import gremlin.joystick_handling
@@ -2878,8 +2880,10 @@ class ProfileRegistry():
         return [item for key,item in self._input_item_registry.items() if key[0] == device_guid and key[1] == mode_name]
 
 
-    def sync(self, profile : Profile):
+    def sync(self, profile : Profile = None):
         ''' synchronizes the input items in this registry with the profile devices '''
+        if profile is None:
+            profile = gremlin.shared_state.current_profile # default to current profile
         devices = profile.devices
         verbose = gremlin.config.Configuration().verbose
         for key in self._input_item_registry:
@@ -2917,7 +2921,7 @@ class ProfileRegistry():
 
 
 
-def get_mode_object(node, extra_data = None):
+def get_mode_object(node, extra_data = None) -> Mode:
     ''' gets the mde object corresponding to a profile XML node
 
     :param node: lxml element to scan ancestors for, or a dictionary of parameters used to derive the mode object
@@ -2987,7 +2991,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     """Represents a single input item such as a button or axis, containers and parameters/options associated with that input mapping """
 
-    lockedChanged = Signal(object) # fires when the lock state changes - passes the input item as the parameter
+    lockedChanged = Signal(object) # (input_item) fires when the lock state changes - passes the input item as the parameter
 
     def __init__(self, mode_parent : Mode, custom_name_handler = None, custom_mode_name_handler = None, override_input_type = None):
         """Creates a new InputItem instance.
@@ -2996,7 +3000,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         :param custom_mode_name_handler: handler() returns a string, optional, to override the default mode for special inputs that use special modes
 
         """
-        super().__init__()
+        super().__init__(mode_parent.name, None)
 
         assert isinstance(mode_parent, Mode), "Parent parameter must be a mode object"
 
@@ -3572,7 +3576,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
                 from gremlin.ui.keyboard_device import KeyboardInputItem
                 from gremlin.keyboard import Key
-                input_item = KeyboardInputItem()
+                input_item = KeyboardInputItem(mode_object.name)
 
                 if "id" in node.attrib and node.tag == "key":
                     # legacy format
@@ -3860,7 +3864,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
             return f"Key {self._input_id.display_name}"
         elif self._input_type == InputType.OpenSoundControl:
-            return f"OSC {self._input_id.message if self._input_id.message else '(undefined)'}"
+            return f"OSC {self._input_id.display_name}"
         elif self._input_type == InputType.Midi:
             return f"Midi {self._input_id.display_name}"
         elif self._input_type == InputType.ModeControl:
