@@ -309,7 +309,7 @@ class KeyboardInputItem(AbstractInputItem):
         ''' duplicates this object '''
         import copy
         source = self
-        target = KeyboardInputItem()
+        target = KeyboardInputItem(source.profile_mode)
         target.id = uuid.uuid4()
         target._key = copy.deepcopy(source._key)
         target._title_name = source._title_name
@@ -660,7 +660,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             input_id = identifier.input_id
             #syslog.info(f"Editing index {index} {input_id.display_name}")
         else:
-            input_id = KeyboardInputItem()
+            input_id = KeyboardInputItem(current_mode)
 
             index = self.input_item_list_model.rows() # new index
             #syslog.info(f"Adding new kbd input index {index} ")

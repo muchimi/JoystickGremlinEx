@@ -2917,6 +2917,26 @@ class ProfileRegistry():
             else:
                 syslog.warning(f"SYNC: device [{str(device_guid)}] not found in profile device list nor in connected devices (this can happen when importing an older profile or a profile referencing defunct device GUIDs)")
 
+        # ensure profile items not in registry are also removed
+        for device_guid in devices:
+            device = devices[device_guid]
+            for mode_name in device.modes:
+                mode_object = device.modes[mode_name]
+                for input_type in mode_object.config:
+                     input_id_list = list(mode_object.config[input_type])
+                     for input_id in input_id_list:
+                         input_id_key = self.getInputIdKey(input_id)
+                         match = next((item for key,item in self._input_item_registry.items() if key == (device_guid, mode_name, input_type, input_id_key)), None)
+                         if not match:
+                             # not in registry - delete from profile
+                             del mode_object.config[input_type][input_id]
+
+
+
+
+
+
+
 
 
 
