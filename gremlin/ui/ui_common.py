@@ -9743,8 +9743,9 @@ class QSplitTabWidget(QDataWidget):
         widget = self.getContentWidget()
         if widget:
             container_view = widget.getContainerView()
-            msg = f"Please add a container or action for{suffix} <span style ='color: {gremlin.ui.ui_common.Color.textHighlightColor()}; font-weight: bold;'>{input_item.display_name}</span>"
-            container_view.setBlankMessage(msg)
+            if container_view:
+                msg = f"Please add a container or action for{suffix} <span style ='color: {gremlin.ui.ui_common.Color.textHighlightColor()}; font-weight: bold;'>{input_item.display_name}</span>"
+                container_view.setBlankMessage(msg)
 
 
 
@@ -9883,7 +9884,6 @@ class QSplitTabWidget(QDataWidget):
             assert widget is not None, f"Logic error - widget not found for key [{key_or_widget}]"
         else:
             widget = key_or_widget
-
 
         index = self._right_panel_stacked_widget.indexOf(widget)
         if index != -1:

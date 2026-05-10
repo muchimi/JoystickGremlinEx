@@ -29,18 +29,11 @@ from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.shared_state
 from gremlin.keyboard import Key
-import gremlin.ui.joystick_device
-import uuid
+
 from gremlin.singleton_decorator import SingletonDecorator
-import collections
 import logging
 import re
-import time
 import logging
-from typing import Any, Iterator, List, Union
-import gremlin.ui.input_item
-import os
-import gremlin.ui.input_item
 import gremlin.ui.ui_common
 import gremlin.ui.ui_common
 import gremlin.ui.ui_common
@@ -52,10 +45,13 @@ import gremlin.util
 import gremlin.base_profile
 import psygnal
 from psygnal import Signal
+import gremlin.base_classes
 
+
+syslog = logging.getLogger("system")
 class StateCategory():
     ''' holds a state category '''
-    def __init__(self, name : str, id = None):
+    def __init__(self, name : str, id : str = None):
         assert id is None or isinstance(id, str)
         self._id = gremlin.util.get_guid() if id is None  else id
         self._name = name.casefold().strip() if name else None
@@ -409,8 +405,8 @@ class StateInputItem(gremlin.base_profile.InputItem):
         mode_object = device_modes.ensure_mode_exists(master_mode)
 
         super().__init__(mode_parent = mode_object)
-        self._id = gremlin.util.get_guid() # unique ID of this state
         self._key = key
+        self._input_type = InputType.State
         self._category = category # category (StateCategory)
         self._default_value = default_value
         self._last_value = None
@@ -433,7 +429,6 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
 
         item = gremlin.base_profile.InputItem(mode_parent = mode_object) #self._custom_name_handler)
-        item.input_id = self
         item.input_type = InputType.State
         item.device_name = "State"
         item.device_type = DeviceType.State
@@ -444,10 +439,18 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._hooked = False
         self.hook() # hook on creation
         self._profile_mode = gremlin.shared_state.master_mode_name # states all belong to the master mode
+        self.setInputIdCallback(self._handle_input_id_callback)
 
     @property
     def device_guid(self):
         return self._device_guid
+
+    def _handle_input_id_callback(self):
+        return self._key
+
+    @gremlin.base_classes.AbstractInputItem.input_id.setter
+    def input_id(self, value):
+        assert False, "Input id cannot be set for a state"
 
     def suppressEvents(self):
         ''' disable events '''
@@ -488,7 +491,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
             el.state_category_name_change.connect(self._state_category_name_change)
             el.profile_unloaded.connect(self._handle_profile_unload)
             verbose = gremlin.config.Configuration().verbose_mode_state
-            if verbose: syslog.info(f"STATE: hook [{self._key}] id: [{self._id}]")
+            if verbose: syslog.info(f"STATE: hook [{self._key}] id: [{self._guid}]")
 
     def unhook(self):
         ''' called when the state should unhook itself because it is being discarded '''
@@ -508,7 +511,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
             el.profile_unloaded.disconnect(self._handle_profile_unload)
             self._hooked = False
             verbose = gremlin.config.Configuration().verbose_mode_state
-            if verbose: syslog.info(f"STATE: unhook [{self._key}]  id: [{self._id}]")
+            if verbose: syslog.info(f"STATE: unhook [{self._key}]  id: [{self._guid}]")
 
     def getDependencies(self) -> list:
         ''' gets a list of state dependencies if the state is an expression '''
@@ -520,16 +523,6 @@ class StateInputItem(gremlin.base_profile.InputItem):
     def _handle_profile_unload(self):
         ''' occurs on profile unload before a new profile is loaded  '''
         self.unhook()
-
-
-
-    @property
-    def id(self) -> str:
-        return self._id
-    @id.setter
-    def id(self, value : str):
-        self._id = value
-
 
 
     @property
@@ -739,10 +732,6 @@ class StateInputItem(gremlin.base_profile.InputItem):
                 sd = StateData()
                 sd.update_key(self, old_name, value)
 
-    @property
-    def input_id(self):
-        ''' input id for this key '''
-        return self._key
 
     @property
     def type_cast(self):
@@ -830,10 +819,12 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
     def to_xml(self) -> ElementTree.Element:
         ''' write XML state node '''
-        node = ElementTree.Element("state", id = self._id, key = self._key)
+
+        node = ElementTree.Element("state", id = write_guid(self._id), key = self._key)
         value = self._default_value
         description = self.description
-        node.set("id", self._id)
+
+        node.set("id", write_guid(self._id))
 
         if description:
             node.set("description", html.escape(description))
@@ -867,16 +858,19 @@ class StateInputItem(gremlin.base_profile.InputItem):
         node.set("autorelease-trigger", safe_format(self._autorelease_trigger_mode, str))
 
         # write container data
-        self._input_item.to_xml(node)
+        super().to_xml(node)
 
 
         return node
 
     def from_xml(self, node, data = None, extra_data = None):
         ''' read XML state node '''
+
+
+
         self._key = node.get("key")
         if "id" in node.attrib:
-            self._id = node.get("id")
+            self.setId(read_guid(node, "id"))
         node_type = node.get("type")
 
         description = None
@@ -918,9 +912,12 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self.autorelease_trigger_mode = safe_read(node,"autorelease-trigger", str, "on")
 
 
+        super().from_xml(node, data, extra_data)
+
+
         self._default_value = value
         self._value = value
-        self._input_item.from_xml(node, data, skip_root=True)
+
 
 
     def evaluate(self, as_tuple = False, force = False) -> bool | tuple:
@@ -1279,7 +1276,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
         return hash(self._id)
 
     def __setstate__(self, data):
-        self._id = data["id"]
+        self.setId(data["id"])
         self._autorelease = data["autorelease"]
         self._autorelease_delay = data["autorelease_delay"]
         self._key = data["key"]
@@ -1293,7 +1290,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
     def __getstate__(self):
         data = {}
-        data["id"] = self._id
+        data["id"] = self.id
         data["autorelease"] = self._autorelease
         data["autorelease_delay"] = self._autorelease_delay
         data["key"] = self._key
@@ -2153,7 +2150,7 @@ class StateCategoryConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     ''' dialog showing the state input configuration options '''
 
-    def __init__(self, state : StateInputItem, ref_state : StateInputItem, parent = None):
+    def __init__(self, state : StateInputItem, ref_state : StateInputItem, edit_mode : bool, parent = None):
         '''
         :param index - the input item index zero based
         :param identifier - the input item identifier
@@ -2167,7 +2164,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.setWindowTitle("State Editor")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent # list view
-        self._is_edit = state is not None
+        self._is_edit = edit_mode # edit mode vs new mode
 
 
         el = gremlin.event_handler.EventListener()
@@ -2358,6 +2355,11 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         main_layout.addWidget(widget)
         self._update_ui()
 
+    @property
+    def editMode(self) -> bool:
+        ''' true if the dialog was called in edit mode '''
+        return self._is_edit
+
     @QtCore.Slot(bool)
     def _handle_autorelease_changed(self, checked : bool):
         self.data.autorelease = checked
@@ -2391,6 +2393,7 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     def _category_config_cb(self):
         self._category_dialog = StateCategoryConfigDialog()
         self._category_dialog.accepted.connect(self._category_dialog_ok)
+        self._category_dialog.rejected.connect(self._handle_category_dialog_rejected)
         self._category_dialog.show()
 
     def _category_dialog_ok(self):
@@ -2401,6 +2404,13 @@ class StateInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             index = self._category_selector_widget.findData(selected_category)
             if index != -1:
                 self._category_selector_widget.setCurrentIndex(index)
+
+        self._category_dialog.deleteLater()
+        self._category_dialog = None
+
+    def _handle_category_dialog_rejected(self):
+        self._category_dialog.deleteLater()
+        self._category_dialog = None
 
 
     def _category_change_cb(self, category):
@@ -2824,7 +2834,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_model = input_item.InputItemListModel(
             device_data,
             current_mode,
-            [InputType.State], # only allow Mode inputs for this widget,
+            [InputType.State], # only allow state inputs for this widget,
             custom_update_handler= self._update_handler,
             custom_remove_handler = self._remove_handler,
             custom_filter_handler = self._filter_data
@@ -3036,30 +3046,136 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     @QtCore.Slot()
     def _add_input_cb(self):
         """Adds a new state to the inputs list ADD STATE """
-        input_id = StateInputItem()
-        input_id.suppressEvents()
-        index = self.input_item_list_model.add(input_id)
-        self._edit_dialog = StateInputConfigDialog(input_id, None, self)
-        self._edit_dialog.accepted.connect(self._dialog_ok_new_cb)
-        gremlin.util.centerDialog(self._edit_dialog)
-        self._edit_dialog.showNormal()
-        self._edit_item = input_id
-        self._edit_item_index = index
-        self._is_edit = True
-        self._index = index
+        input_item = StateInputItem()
+        input_item.suppressEvents()
 
-    def _edit_item_cb(self, widget, index, input_id):
-        ''' edit the state  '''
-        tmp_input_id = input_id.clone()
-        tmp_input_id.suppressEvents()
-        self._edit_dialog = StateInputConfigDialog(tmp_input_id, input_id, self)
-        self._edit_dialog.accepted.connect(self._dialog_ok_edit_cb)
+        self._edit_dialog = StateInputConfigDialog(input_item, None, edit_mode = False, parent = self)
+        self._edit_dialog.accepted.connect(self._dialog_ok_confirm_cb)
+        self._edit_dialog.rejected.connect(self._handle_edit_dialog_rejected)
         gremlin.util.centerDialog(self._edit_dialog)
         self._edit_dialog.showNormal()
-        self._edit_item = input_id
-        self._edit_item_index = index
-        self._is_edit = True
-        self._index = index
+
+
+    def _edit_item_cb(self, widget, index, input_item):
+        ''' edit the state  '''
+        tmp_input_item = input_item.clone()
+        tmp_input_item.suppressEvents()
+        self._edit_dialog = StateInputConfigDialog(tmp_input_item, input_item, edit_mode = True, parent = self)
+        self._edit_dialog.accepted.connect(self._dialog_ok_confirm_cb)
+        self._edit_dialog.rejected.connect(self._dialog_cancel_cb)
+        gremlin.util.centerDialog(self._edit_dialog)
+        self._edit_dialog.showNormal()
+
+
+    def _dialog_cancel_cb(self):
+        self._edit_dialog.deleteLater()
+        self._edit_dialog = None
+
+
+    def _dialog_ok_confirm_cb(self):
+        ''' called when edit dialog closes with ok on a new state '''
+        try:
+            verbose = gremlin.config.Configuration().verbose_mode_state
+            edit_mode = self._edit_dialog.editMode
+
+            edited_input_item = self._edit_dialog.data
+            input_item = self._edit_dialog.ref_data if edit_mode else edited_input_item
+
+
+            sd = StateData()
+
+
+            if not edit_mode:
+                # add the new state
+                index = self.input_item_list_model.add(input_item)
+                if verbose: syslog.info(f"adding id: [{input_item.id}]  key: [{input_item.key}] at index [{index}]")
+
+                # change the state
+                sd.add(edited_input_item)
+
+            else:
+
+                # edit an existing state
+
+                index = self.input_item_list_model.indexOf(input_item)
+                assert index != -1, "Reference input is missing from model"
+                if verbose: syslog.info(f"modifying id: [{input_item.id}]  key: [{edited_input_item.key}] at index [{index}]")
+
+                # copy changed data
+                input_item.enableEvents()
+                category = self._edit_dialog.category()
+                input_item.setCategory(category)
+                input_item.key = edited_input_item.key
+                input_item.setDescription(edited_input_item.description)
+                input_item.default_value = edited_input_item.default_value
+                input_item.isExpression = edited_input_item.isExpression
+                input_item.expression = edited_input_item.expression
+
+                input_item.autorelease = edited_input_item.autorelease
+                input_item.autorelease_delay = edited_input_item.autorelease_delay
+                input_item.autorelease_mode = edited_input_item.autorelease_mode
+                input_item.autorelease_trigger_mode = edited_input_item.autorelease_trigger_mode
+
+                self.input_item_list_model.refresh()
+                self._filter_widget.updateCounts()
+
+            self.input_item_list_view.redraw()
+            index = self.input_item_list_view.indexOf(input_item)
+            syslog.info(f"selecting state index: [{index}] for [{input_item.input_id}]")
+            self._select_item_cb(index)
+
+            el = gremlin.event_handler.EventListener()
+            el.device_mapping_changed.emit(self._device_id)
+        finally:
+            self._edit_dialog.deleteLater()
+            self._edit_dialog = None
+
+
+
+
+    # def _dialog_ok_new_cb(self):
+    #     ''' called when edit dialog closes with ok on an edited state '''
+    #     assert not self._edit_dialog.editMode,"expected dialog to be in non-edit mode"
+    #     data = self._edit_dialog.data
+    #     sd = StateData()
+    #     trigger = False
+    #     if self._edit_item._key != data.key:
+    #         # name change?
+    #         old_name = self._edit_item._key
+    #         new_name = data.key
+    #         self._edit_item._key = data.key # change the key and don't fire the event
+    #         trigger = True
+
+    #     self._edit_item.enableEvents()
+
+
+    #     self._edit_item.description = data.description
+    #     self._edit_item.setCategory(data.category)
+    #     self._edit_item.default_value = data.default_value
+    #     self._edit_item.isExpression = data.isExpression
+    #     self._edit_item.expression = data.expression
+
+    #     self._edit_item.autorelease = data.autorelease
+    #     self._edit_item.autorelease_delay = data.autorelease_delay
+    #     self._edit_item.autorelease_mode = data.autorelease_mode
+    #     self._edit_item.autorelease_trigger_mode = data.autorelease_trigger_mode
+
+    #     self.input_item_list_model.refresh()
+    #     index = sd.index(self._edit_item)
+    #     self.refresh()
+
+    #     if trigger:
+    #         sd.update_key(self._edit_item, old_name, new_name)
+
+    #     el = gremlin.event_handler.EventListener()
+    #     el.device_mapping_changed.emit(self._device_id)
+
+    #     # update container display if blank
+    #     self.updateContainerViewBlankMessage(self.input_item)
+
+    #     # redraw for any updates
+    #     self.input_item_list_view.redraw()
+    #     self._select_item_cb(index)
 
     def _sort_input_cb(self):
         ''' sorts states by key name '''
@@ -3102,93 +3218,6 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             # display blank page if no item left
             self._blank_input()
 
-    def _dialog_ok_new_cb(self):
-        ''' called when edit dialog closes with ok on a new state '''
-        data = self._edit_dialog.data
-        sd = StateData()
-        if sd.exists(data.key):
-            syslog.warning(f"STATE: [{data.key}] already exists, ignoring edit")
-            return
-
-
-        sd.add(data)
-        self.input_item_list_model.refresh()
-        self._filter_widget.updateCounts()
-        index = self.input_item_list_model.indexOf(data)
-
-        syslog.info(f"adding id: [{data.id}]  key: [{data.key}] at index [{index}]")
-
-
-        identifier = self.input_item_list_model.data(index)
-        input_item : StateInputItem = identifier.input_id
-        input_item.enableEvents()
-        category = self._edit_dialog.category()
-        input_item.setCategory(category)
-        input_item.key = data.key
-        input_item.setDescription(data.description)
-        input_item.default_value = data.default_value
-        input_item.isExpression = data.isExpression
-        input_item.expression = data.expression
-
-        input_item.autorelease = data.autorelease
-        input_item.autorelease_delay = data.autorelease_delay
-        input_item.autorelease_mode = data.autorelease_mode
-        input_item.autorelease_trigger_mode = data.autorelease_trigger_mode
-
-
-
-
-        self.input_item_list_view.redraw()
-        self._select_item_cb(index)
-
-        el = gremlin.event_handler.EventListener()
-        el.device_mapping_changed.emit(self._device_id)
-
-    def _dialog_ok_edit_cb(self):
-        ''' called when edit dialog closes with ok on an edited state '''
-        data = self._edit_dialog.data
-        sd = StateData()
-        trigger = False
-        if self._edit_item._key != data.key:
-            # name change?
-            old_name = self._edit_item._key
-            new_name = data.key
-            self._edit_item._key = data.key # change the key and don't fire the event
-            trigger = True
-
-        self._edit_item.enableEvents()
-
-
-        self._edit_item.description = data.description
-        self._edit_item.setCategory(data.category)
-        self._edit_item.default_value = data.default_value
-        self._edit_item.isExpression = data.isExpression
-        self._edit_item.expression = data.expression
-
-        self._edit_item.autorelease = data.autorelease
-        self._edit_item.autorelease_delay = data.autorelease_delay
-        self._edit_item.autorelease_mode = data.autorelease_mode
-        self._edit_item.autorelease_trigger_mode = data.autorelease_trigger_mode
-
-        self.input_item_list_model.refresh()
-        index = sd.index(self._edit_item)
-        self.refresh()
-
-        if trigger:
-            sd.update_key(self._edit_item, old_name, new_name)
-
-        el = gremlin.event_handler.EventListener()
-        el.device_mapping_changed.emit(self._device_id)
-
-        # update container display if blank
-        self.updateContainerViewBlankMessage(self.input_item)
-
-        # redraw for any updates
-        self.input_item_list_view.redraw()
-        self._select_item_cb(index)
-
-
-
 
     def _clear_inputs_cb(self):
         ''' clears all input keys '''
@@ -3196,9 +3225,17 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         sd.clear()
         profile = gremlin.shared_state.current_profile
         profile.state.clear()
+
+        input_items = list(self.input_item_list_model.getItems())
         self.input_item_list_model.reset()
         self.input_item_list_view.redraw()
         self._filter_widget.updateCounts()
+
+        # update registry
+        registry = gremlin.base_profile.ProfileRegistry()
+        for input_item in input_items:
+            registry.removeInputItem(input_item)
+        registry.sync(profile)
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
@@ -3214,10 +3251,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         keys = [key for key in state]
         keys.sort()
 
-        model._index_map = {}
-        model._item_map = {}
-        model._source_item_map = {}
-        model._source_index_map = {}
+        model.reset()
 
         config = gremlin.config.Configuration()
         is_filter = config.state_filter_enabled
@@ -3243,17 +3277,13 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 if item_category != category:
                     continue # filter out
 
-            item = data.input_item
-            self._input_items[key] = item
+            input_item = data
+            self._input_items[key] = input_item
             changed = True
-            model._index_map[index] = item
-            model._item_map[key] = index
-
-            model._source_index_map[index] = item
-            model._source_item_map[item] = index
+            model.setData(index, input_item)
             index += 1
 
-        model._update_filter()
+        model.updateFilter() # update model filters
 
 
         if changed and emit_change:
@@ -3352,23 +3382,28 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             else:
                 return
 
-        with QtCore.QSignalBlocker(self.input_item_list_view):
-            self.input_item_list_view.select_item(index, False)
+        if self.input_item_list_view.current_index != index:
+            # select the input in the input view
+            with QtCore.QSignalBlocker(self.input_item_list_view):
+                self.input_item_list_view.select_item(index, False)
 
-
-        input_item : gremlin.base_profile.InputItem = self.input_item_list_model.data(index)
+        input_item : StateInputItem = self.input_item_list_model.data(index)
         if not input_item:
             # not in the model yet
             return
 
         input_type = InputType.State
         input_id = input_item.input_id
+        assert input_id is not None,"Invalid state input item configuration"
         key = self.getWidgetKey(input_type, input_id)
         widget = self.getRegisteredWidget(key)
         if not widget:
-            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name=f"STATE: {input_item.input_id.key}")
+            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name=f"STATE: {input_item.key}")
             self.registerWidget(key, widget)
             widget.redraw() # load the data
+
+        # ensure the mapping widget is visible
+        self.selectRegisteredWidget(widget)
 
         self._item_data = input_item
 
@@ -3390,7 +3425,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.action_model.data_changed.connect(change_cb)
         widget.description_changed.connect(change_cb)
 
-        self.input_item_list_view.select_item(index,False)
+
 
 
         # update container display if blank
@@ -3422,6 +3457,8 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         '''
         import gremlin.ui.input_item
 
+        assert isinstance(data, StateInputItem),f"Unexpected type in widget handler - expected StateInputItem and got [{type(data).__name__}]"
+
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier,
                                                        populate_ui_callback = self._populate_input_widget_ui,
                                                        update_callback = self._update_input_widget,
@@ -3429,32 +3466,32 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                                                        config_external=True, parent = parent, data = data)
         widget.data = data
         widget.create_action_icons(data)
-        input_id : StateInputItem = data.input_id
+        input_item : StateInputItem = data
 
         sd = StateData()
 
 
-        title = f"State: [{input_id.key}] [{input_id.id}]" if gremlin.config.Configuration().show_container_id else f"State: [{input_id.key}]"
+        title = f"State: [{input_item.key}] [{input_item.id}]" if gremlin.config.Configuration().show_container_id else f"State: [{input_item.key}]"
         widget.setTitle(title)
         widget.enable_edit()
         widget.enable_close()
         widget.clearWidgets()
 
-        if input_id.description:
-            widget.addWidget(QtWidgets.QLabel(f"{input_id.description}"))
+        if input_item.description:
+            widget.addWidget(QtWidgets.QLabel(f"{input_item.description}"))
 
-        category_name =input_id.category_name
+        category_name =input_item.category_name
         if category_name:
             widget.addWidget(QtWidgets.QLabel(f"Category: [{category_name}]"))
 
-        if input_id.expression:
+        if input_item.expression:
             icon = gremlin.ui.ui_common.Icons.calculateIcon(gremlin.ui.ui_common.Color.expressionColor())
-            expression_widget = gremlin.ui.ui_common.QIconLabel(icon, input_id.expression, data = data)
+            expression_widget = gremlin.ui.ui_common.QIconLabel(icon, input_item.expression, data = data)
             widget.addWidget(expression_widget)
             # cause the widget to update if the state expression changes
-            sd.expression_changed.connect(self._create_expression_update_callback(input_id, expression_widget))
+            sd.expression_changed.connect(self._create_expression_update_callback(input_item, expression_widget))
         else:
-            widget.addWidget(QtWidgets.QLabel(f"Default: {input_id.display_value}"))
+            widget.addWidget(QtWidgets.QLabel(f"Default: {input_item.display_value}"))
 
         widget.setIcon("mdi.state-machine")
 

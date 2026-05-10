@@ -4642,7 +4642,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
 
                 case InputType.OpenSoundControl:
-                    message = self.action_data.input_item.input_id.message_key
+                    message = self.action_data.input_item.message_key
                     match self.action_mode:
                         case VjoyAction.VJoyButton:
                             is_pressed = gremlin.ui.osc_device.osc_client.getData(message)
@@ -4652,7 +4652,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             trigger = True
                             is_pressed = False
                 case InputType.Midi:
-                    message = self.action_data.input_item.input_id.message_key
+                    message = self.action_data.input_item.message_key
                     match self.action_mode:
                         case VjoyAction.VJoyButton:
                             is_pressed = gremlin.ui.midi_device.midi_client.getData(message)
@@ -6740,7 +6740,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     return gremlin.util.load_icon(vjoy.vjoy.Hat.getEightDirectionsIconMap()[position])
                 else:
                     input_string = "button"
-                    suffix = f"{self.vjoy_input_id:03d}.png"
+                    suffix = f"{self.vjoy_input_id:03d}"
                     fallback = "mdi.gesture-tap-button"
             case InputType.JoystickHat:
                 if self._vjoy_input_id > 4:

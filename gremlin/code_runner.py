@@ -348,7 +348,7 @@ class CodeRunner:
                             event = gremlin.event_handler.Event(
                                 event_type=input_item.input_type,
                                 device_guid=device.device_guid,
-                                identifier=input_item.input_id
+                                identifier=input_item
                             )
 
 

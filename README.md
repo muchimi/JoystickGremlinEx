@@ -30,58 +30,60 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m76RC34):
-New: UI: Caching of certain graphical elements to enhance responsiveness to avoid having to reload them at runtime.  This new global UI option controls how many potentially complex mapping UI widgets should be in memory at any time.  The larger the cache, the more memory GEX uses but the more responsive.  This can be set to unlimited (uses as much memory as needed), or no caching (recreate each time - uses the least runtime memory). The default is 20 entries.  Each input counts as a single entry when selected.  The cache operates in round robin fashion.
-Change: profile load optimizations.
-Change: UI: general optimizations of input list, container and action mappings and on-demand loading of mapping UI elements aimed at reducing memory and load times.
-Change: UI: consolidated all icons to icons folder
-Changed: UI: improved hourglass cursor behavior.
-Fix: long load times for icons causing extreme UI lag
-Fix: UI: checkbox visuals
-Fix: DINPUT: invalid derived device hash value.
-Fix: Wooting devices: ignore game controller mode that report no axis.
+- New: UI: General rework of the user interface components and logic to improve performance and reduce memory utilization.  Adds caching of certain graphical elements. New global UI option controls how many mapping widgets should stay in memory at a time.  The larger the cache, the more memory GEX (QT) uses but the more responsive by avoiding a reload.  This can be set to unlimited (uses as much memory as needed), or no caching (recreate each time - uses the least runtime memory). The default is 20 entries.  Each input counts as a single entry when selected.  The cache operates in round robin fashion.
+- Change: profile load optimizations.
+- Change: UI: general optimizations of input list, container and action mappings and on-demand loading of mapping UI elements aimed at reducing memory and load times.
+- Change: UI: consolidated all icons to icons folder
+- Changed: UI: improved hourglass cursor behavior.
+- Changed: Removed GFX folder from some plugins and consolidated to icons folder to further reduce package size.
+- Fix: long load times for icons causing extreme UI lag
+- Fix: UI: checkbox visuals
+- Fix: UI: various fixes
+- Fix: DINPUT: invalid derived device hash value.
+- Fix: Wooting devices: ignore game controller mode that report no axis.
 
 
 ### (m76RC33):
-New: Tested with Wooting keyboard in gamepad mode.
-New: DINPUT: added spam filter on DINPUT buttons for devices that spam button data.
-New: Vjoy Remap action: added "next unused" button to select the next available unused vjoy input of that type.  This performs a profile lookup to see what is currently mapped to vjoy in the profile, and picks the next one available if one is available.  Does nothing if a suitable entry is not found.
-Fix: Vjoy Remap action: initial axis selector and icon.
-Fix: Vjoy Remap action: mapping information text does not always update on output change.
-Fix: missing icons in distribution packaging.
+- New: Tested with Wooting keyboard in gamepad mode.
+- New: DINPUT: added spam filter on DINPUT buttons for devices that spam button data.
+- New: Vjoy Remap action: added "next unused" button to select the next available unused vjoy input of that type.  This performs a profile lookup to see what is currently mapped to vjoy in the profile, and picks the next one available if one is available.  Does nothing if a suitable entry is not found.
+- Fix: Vjoy Remap action: initial axis selector and icon.
+- Fix: Vjoy Remap action: mapping information text does not always update on output change.
+- Fix: missing icons in distribution packaging.
 
 
 ### (m76RC32):
-Change: bump to Python 3.14.4 maintenance release.
-Fix: UI: Code review pass on QT (UI) object destruction to further eliminate potential de-sync issues between Python memory management and the underlying C++ memory management in the QT for Python library. This can cause random exceptions or memory leaks in Python due to inherently conflicting object management models.  A significant amount of code in GEX is dedicated to work around these behaviors unique to this platform.
-Fix: Sequence Container: resolved a profile visualization regression exception due to recent container code changes.
+- Change: bump to Python 3.14.4 maintenance release.
+- Fix: UI: Code review pass on QT (UI) object destruction to further eliminate potential de-sync issues between Python memory management and the underlying C++ memory management in the QT for Python library. This can cause random exceptions or memory leaks in Python due to inherently conflicting object management models.  A significant amount of code in GEX is dedicated to work around these behaviors unique to this platform.
+- Fix: Sequence Container: resolved a profile visualization regression exception due to recent container code changes.
 
 
 
 ### (m76RC31):
-Change: enabled sorting keyboard/mouse device inputs. The sort is alphabetical for now by key name.
-Change: plain English comment added to the XML keyboard/mouse inputs to increase readability.
-Change: OSC and State devices: Search feature hotkey added (F3).  Repeated presses will also cycle through matching inputs.  Note: hotkey is only enabled in edit mode and when not listening to inputs.
-Fix: The order of inputs is persisted on profile save for inputs that support sorting.
+- Change: enabled sorting keyboard/mouse device inputs. The sort is alphabetical for now by key name.
+- Change: plain English comment added to the XML keyboard/mouse inputs to increase readability.
+- Change: OSC and State devices: Search feature hotkey added (F3).  Repeated presses will also cycle through matching inputs.  Note: hotkey is only enabled in edit mode and when not listening to inputs.
+- Fix: The order of inputs is persisted on profile save for inputs that support sorting.
 
 ### (m76RC30A):
-Fix: OSC: search function.
-Fix: Profile: handle special characters in mode names
-Fix: OSC: some messages could be ignored
-Fix: OSC: QT exception in some situations on UI update
+- Fix: OSC: search function.
+- Fix: Profile: handle special characters in mode names
+- Fix: OSC: some messages could be ignored
+- Fix: OSC: QT exception in some situations on UI update
 
 ### (m76RC29):
-New: OSC: bulk import of OSC inputs to simplify the workflow. Multiple OSC messages can be imported this way as a text input, one per line, setting defaults for each, and GEX will auto-create the entries so they don't need to be done one at a time. Existing entries will be ignored.
-Fix: UI: incomplete action list for certain non joystick inputs depending how they were created.
-Fix: UI: edit mode selector may not display current edit mode on profile stop.
-Fix: UI: possible exception on input sorting (if the device supports input sorting).
-Fix: OSC: matching OSC messages received with no parameters when the autorelease mode is enabled not always triggering.
-Fix: OSC: message processing could trigger multiple inputs if the message was a partial match for multiple commands (such as /test could match /test_this).
+- New: OSC: bulk import of OSC inputs to simplify the workflow. Multiple OSC messages can be imported this way as a text input, one per line, setting defaults for each, and GEX will auto-create the entries so they don't need to be done one at a time. Existing entries will be ignored.
+- Fix: UI: incomplete action list for certain non joystick inputs depending how they were created.
+- Fix: UI: edit mode selector may not display current edit mode on profile stop.
+- Fix: UI: possible exception on input sorting (if the device supports input sorting).
+- Fix: OSC: matching OSC messages received with no parameters when the autorelease mode is enabled not always triggering.
+- Fix: OSC: message processing could trigger multiple inputs if the message was a partial match for multiple commands (such as /test could match /test_this).
 
 
 ### (m76RC28):
-Change: UI: improve last input re-selection on profile reload
-Fix: input calibration: resolved various issues related to calibration UI behavior and persistence and inability to close the calibration dialog in some situations.
-Fix: UI: workaround for a behavior change in QT 6.11 causing exceptions when removing mappings.
+- Change: UI: improve last input re-selection on profile reload
+- Fix: input calibration: resolved various issues related to calibration UI behavior and persistence and inability to close the calibration dialog in some situations.
+- Fix: UI: workaround for a behavior change in QT 6.11 causing exceptions when removing mappings.
 
 ### (m76RC27):
 - Change: Vjoy Remap: added input synchronization support for hat output modes on profile start.

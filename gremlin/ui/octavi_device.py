@@ -802,7 +802,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             if not button in config[input_type]:
                 input_item = gremlin.base_profile.InputItem(mode_parent = mode_object)
-                input_item.input_id = button
+                input_item.setInputId(button)
                 input_item.input_type = input_type
                 input_item.description = OctaviButton.to_display_name(button)
                 config[input_type][button] = input_item

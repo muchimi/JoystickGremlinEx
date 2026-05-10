@@ -39,17 +39,17 @@ import gremlin.base_classes
 from lxml import etree as ElementTree
 from lxml import etree
 import gremlin.ui.ui_common
-from gremlin.base_classes import AbstractInputItem
+
 
 syslog = logging.getLogger("system")
 
-class KeyboardInputItem(AbstractInputItem):
+class KeyboardInputItem(gremlin.base_profile.InputItem):
     ''' holds a keyboard input item '''
-    def __init__(self, mode : str):
+    def __init__(self, mode_object : gremlin.base_profile.Mode  ):
         ''' Keyboard input id
             :param mode: the profile mode for this input
         '''
-        super().__init__(mode, KeyboardDeviceTabWidget.device_guid)
+        super().__init__(mode_object, KeyboardDeviceTabWidget.device_guid)
         self._key = None # associated primary key (containing latched items)
         self._title_name = "Keyboard input (not configured)"
 
@@ -167,6 +167,11 @@ class KeyboardInputItem(AbstractInputItem):
                     return True
 
         return False
+
+    def from_xml(self, node, data = None, extra_data : dict = None):
+        super().from_xml(node, data, extra_data)
+        self.parse_xml(node, data, extra_data)
+
 
     def parse_xml(self, node, data = None, extra_data : dict = None):
         ''' loads itself from xml '''
@@ -618,6 +623,8 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _dialog_close_cb(self):
         gremlin.shared_state.pop_suspend_ui_keyinput()
+        self._keyboard_dialog.deleteLater()
+        self._keyboard_dialog = None
 
     def _dialog_ok_cb(self):
         ''' called when the add/edit key dialog completes '''
@@ -627,6 +634,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         keys = self._keyboard_dialog.keys
         latched_key = self._keyboard_dialog.latched_key
         self._process_input_keys(keys, index, latched_key)
+
+        self._keyboard_dialog.deleteLater()
+        self._keyboard_dialog = None
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)

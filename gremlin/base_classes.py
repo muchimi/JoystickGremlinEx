@@ -21,9 +21,8 @@ from abc import abstractmethod, ABCMeta
 from PySide6 import QtCore
 
 from psygnal import Signal
-import gremlin.config
-import gremlin.shared_state
 import logging
+import uuid
 
 syslog = logging.getLogger("system")
 
@@ -236,23 +235,35 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     input_type_change = Signal(object) # fires when an input item needs to refresh the output mapping due to input type changed
 
-    def __init__(self, mode : str, device_guid):
+    def __init__(self, mode : str | object, device_guid):
 
         super().__init__()
-        import uuid
         self._id =  uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-","")
         self._device_guid = device_guid
-        self._display_name = None
-        self._description = None
-        self._input_description = None
-        self._axis_value = None
-        self._button_value = False # true if the equivalent of "pressed"
-        self._is_action = False
-        self._is_axis = False
-        self._is_button = True
-        self._input_type = None
-        self._profile_mode = mode # profile mode
+        self._input_id : int | any = None # input Id on the hardware (can be a int or a class)
+        self._input_type : InputType = InputType.NotSet
+        self._display_name : str = None
+        self._description : str = None
+        self._input_description : str = None
+        self._axis_value : float = None
+        self._button_value : bool = False # true if the equivalent of "pressed"
+        self._is_action : bool = False
+        self._is_axis : bool = False
+        self._is_button : bool = True
+        self._input_type : InputType = None
+        if isinstance(mode, str):
+            self._profile_mode : str = mode # profile mode
+        else:
+            # using Mode object
+            self._profile_mode = mode.name
+        self._sort_index : int = None # sorting index (int)
+        self._input_id_callback = None # optional callback
+
+
+    def setInputIdCallback(self, callback):
+        ''' callback to use (optional) to get the input id '''
+        self._input_id_callback = callback
 
 
     @property
@@ -272,9 +283,10 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     @property
     def id(self):
         return self._id
+    # has no setter by design
 
-    @id.setter
-    def id(self, value):
+    def setId(self, value):
+        assert isinstance(value, uuid.UUID),"Invalid ID - must be a UUID"
         self._id = value
         self._guid = str(value).replace("-","")
 
@@ -362,16 +374,32 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     @property
     def message_key(self):
-        assert False,"message_key property must be implemented by subclasses"
+        assert False,"message_key property must be implemented by subclass"
 
     @property
     def input_id(self):
-        assert False,"input id property must be implemented by subclasses"
+        if self._input_id_callback:
+            return self._input_id_callback()
+        return self._input_id
+
+    @input_id.setter
+    def input_id(self, value):
+        self.setInputId(value)
+
+    def setInputId(self, value):
+        if value != self._input_id:
+            assert isinstance(value, int) or isinstance(value, AbstractInputItem),f"Invalid input id: {value}"
+            self._input_id = value
+
 
     @property
     def input_type(self) -> InputType:
         ''' input type '''
         return self._input_type
+
+    @input_type.setter
+    def input_type(self, value : InputType):
+        self._input_type = value
 
     @property
     def device_guid(self):
@@ -384,6 +412,21 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     @profile_mode.setter
     def profile_mode(self, mode : str):
         self._profile_mode = mode
+
+    @property
+    def index(self) -> int:
+        ''' input index within the mode and input type '''
+        if self._sort_index is None:
+            # index not set
+            if isinstance(self._input_id, int):
+                # use input ID if the index is numeric
+                return self._input_id
+            return -1 # not set
+        return self._sort_index
+
+    @index.setter
+    def index(self, value : int):
+        self._sort_index = value
 
 
     @abstractmethod
@@ -403,6 +446,10 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     def __setstate__(self, data):
         ''' manual unpickle '''
         self.parse_xml(data)
+
+    def __hash__(self):
+        # unique ID
+        return hash(self._id)
 
 
 class SpecialInputItem(AbstractInputItem):

@@ -193,7 +193,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui = Ui_Gremlin()
         self.ui.setupUi(self)
         self._is_active = False # status bar active flag
-
+        self._widget_device_index_map = {}
 
 
 
@@ -1007,12 +1007,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         device_guid = data.device_guid
 
         #device_name = self.ui.devices.tabText(self._context_menu_tab_index)
-        dialog = gremlin.profile_graph.DeviceRemapDialogUI(self.current_profile.graph, self, device_guid)
+        self._dialog_substitute = gremlin.profile_graph.DeviceRemapDialogUI(self.current_profile.graph, self, device_guid)
         # dialog = gremlin.ui.dialogs.SubstituteDialog(device_guid=device_guid, device_name=device_name, parent = self)
         # dialog.setModal(True)
-        dialog.accepted.connect(self._substitute_complete_cb)
-        gremlin.util.centerDialog(dialog)
-        dialog.show()
+        self._dialog_substitute.accepted.connect(self._substitute_complete_cb)
+        self._dialog_substitute.rejected.connect(self._handle_substitute_rejected)
+        gremlin.util.centerDialog(self._dialog_substitute)
+        self._dialog_substitute.show()
 
     def _tab_copy_cb(self, pos):
         if self._context_menu_tab_index is None:
@@ -1050,7 +1051,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         ''' substitution complete - reload profile '''
         # profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         # self.load_profile(profile.profile_file)
-        pass
+        self._dialog_substitute.deleteLater()
+        self._dialog_substitute = None
+
+    def _handle_substitute_rejected(self):
+        self._dialog_substitute.deleteLater()
+        self._dialog_substitute = None
 
     def _reload(self):
         ''' reloads the ui '''

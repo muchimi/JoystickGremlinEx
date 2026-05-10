@@ -218,6 +218,10 @@ class MidiInputItem(gremlin.base_profile.InputItem):
         current_mode = gremlin.shared_state.current_mode
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
         tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self._message_key, self._guid)
+        self.setInputIdCallback(self._handle_input_id_callback)
+
+    def _handle_input_id_callback(self):
+        return self
 
 
 
@@ -347,6 +351,23 @@ class MidiInputItem(gremlin.base_profile.InputItem):
         interface = MidiInterface()
         return interface.port_valid(self._port_name)
 
+    def from_xml(self, node, data = None, extra_data : dict = None):
+        # MIDI data
+        super().from_xml(node, data, extra_data)
+        for child in node:
+            if child.tag == "input":
+                self.parse_xml(child, data, extra_data)
+
+        self.input_id = self
+        if self.is_axis:
+            self.setOverrideInputType(InputType.JoystickAxis)
+        else:
+            self.setOverrideInputType(InputType.JoystickButton)
+
+        if node.tag == "input":
+            self.parse_xml(node, data, extra_data)
+
+
     def parse_xml(self, node, data = None, extra_data : dict = None):
         ''' reads an input item from xml '''
         if node.tag == "input":
@@ -370,6 +391,7 @@ class MidiInputItem(gremlin.base_profile.InputItem):
         node.set("mode", self.mode_string)
         data = [] if self.message is None else self.message.bytes()
         node.set("data", byte_list_to_string(data))
+        super().to_xml(node)
         return node
 
     @property
@@ -1455,8 +1477,8 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             with QtCore.QSignalBlocker(self._midi_data_b_widget):
                     self._midi_data_b_widget.setValue(v2)
 
-
-
+        self.listener_dialog.deleteLater()
+        self.listener_dialog = None
 
         self._port_name = port_name
         self._port = port_number

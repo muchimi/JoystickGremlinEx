@@ -532,7 +532,7 @@ Use Vjoy Remap instead.'''
             match self.input_type:
                 case InputType.JoystickButton:
                     input_string = "button"
-                    suffix = f"{self.vjoy_input_id:03d}.png"
+                    suffix = f"{self.vjoy_input_id:03d}"
                     fallback = "mdi.gesture-tap-button"
 
                 case InputType.JoystickHat:

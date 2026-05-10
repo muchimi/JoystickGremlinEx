@@ -2005,14 +2005,14 @@ class Configuration(QtCore.QObject):
                     save_input_id = input_id
                     items = list(widget.input_item_list_model.getItems())
                     for item in items:
-                        if item.input_id.guid == input_id:
-                            input_id = item.input_id
+                        if item.guid == input_id:
+                            input_id = item
                             save_input_id = input_id.guid
                             found = True
                             break
                     if not found and count > 0:
                         item = items[0]
-                        input_id = item.input_id
+                        input_id = item
                         save_input_id = input_id.guid
         elif device_type == gremlin.types.DeviceType.ModeControl:
             save_input_id = input_id

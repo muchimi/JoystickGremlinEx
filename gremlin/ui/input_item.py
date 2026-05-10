@@ -33,7 +33,7 @@ import gremlin.shared_state
 import gremlin.ui.axis_calibration
 import gremlin.ui.ui_common
 import gremlin.ui.eliding
-from gremlin.util import load_icon, load_pixmap, get_guid
+from gremlin.util import load_icon, load_pixmap, get_guid, TriggerDict
 import gremlin.util
 from gremlin.input_types import InputType
 from gremlin.base_buttons import *
@@ -51,6 +51,7 @@ from psygnal import Signal
 import copy
 import gremlin.tabstate
 import gremlin.singleton_decorator
+from gremlin.base_classes import AbstractInputItem
 
 
 
@@ -62,7 +63,7 @@ class InputIdentifier(QtCore.QObject):
 
     """Represents the identifier of a single input item."""
 
-    def __init__(self, input_type, device_guid, input_id, device_type, input_name, is_axis = False, is_button = False):
+    def __init__(self, input_type, device_guid, input_id, device_type, input_name, is_axis = False, is_button = False, input_item = None):
         """Creates a new instance.
 
         :param input_type: the type of input
@@ -80,7 +81,11 @@ class InputIdentifier(QtCore.QObject):
         self._input_guid = get_guid() # unique internal GUID for this entry
         self._input_name = input_name
         self._is_axis = is_axis
+        self._input_item = input_item
 
+    @property
+    def input_item(self):
+        return self._input_item
 
     @property
     def device_guid(self):
@@ -194,9 +199,26 @@ class InputItemListModel(ui_common.AbstractModel):
         self._show_filtered_only = show_filtered_only
 
 
-        self._index_map = {} # map of index to input item
-        self._item_map = {} # map of input_id to index
-        self._source_index_map = {} # map of source states
+
+        if __debug__:
+            self._index_map = TriggerDict() # map of input_id to index
+            self._index_map.addCallback(self._handle_model_changed)
+            self._item_map = TriggerDict() # map of input_id to index
+            self._item_map.addCallback(self._handle_model_changed)
+            self._source_item_map = TriggerDict() # map of source inputs to index
+            self._item_map.addCallback(self._handle_model_changed)
+            self._source_index_map = TriggerDict()
+            self._source_index_map.addCallback(self._handle_model_changed)
+
+        else:
+            self._item_map = {}
+            self._index_map = {}
+            self._source_item_map = {} # map of source inputs to index
+            self._source_index_map = {}
+
+
+
+
         if allowed_types is not None:
             self._allowed_input_types  = gremlin.base_classes.TraceableList(allowed_types, self._filter_change_cb)
         else:
@@ -211,6 +233,28 @@ class InputItemListModel(ui_common.AbstractModel):
         self._custom_delete_confirm_handler = custom_delete_confirm_handler # return true if the input can be deleted
 
         self.updateData()
+
+    def _handle_model_changed(self, source, key, old_value, new_value):
+        if key is not None and not isinstance(key,int):
+            self.validate(key)
+        if old_value is not None and not isinstance(old_value, int):
+            self.validate(old_value)
+        if new_value is not None and not isinstance(new_value, int):
+            self.validate(new_value)
+
+    def validate(self, input_item : AbstractInputItem):
+        ''' validates input items as valid for the model based on options'''
+        if not input_item:
+            assert False,"Input item cannot be NULL"
+        input_type = input_item.input_type
+        if not input_type in self._allowed_input_types:
+            assert False,f"Invalid input item for allowed input types in model.  Got [{input_type.name} - allowed types: [{(it.name for it in self._allowed_input_types)}]"
+        match input_type:
+            case InputType.State:
+                assert isinstance(input_item, gremlin.ui.state_device.StateInputItem), "Invalid type for state input"
+            case InputType.Keyboard | InputType.KeyboardLatched:
+                assert isinstance(input_item, gremlin.ui.keyboard_device.KeyboardInputItem), "Invalid type for keyboard input"
+
 
 
     @property
@@ -256,14 +300,21 @@ class InputItemListModel(ui_common.AbstractModel):
         # filters the input data
         if self._custom_filter_handler:
             # apply filter
-            new_index_map = {} # holds filtered items only
-            new_item_map = {}
+            if __debug__:
+                new_index_map = TriggerDict()
+                new_index_map.addCallback(self._handle_model_changed)
+                new_item_map = TriggerDict()
+                new_item_map.addCallback(self._handle_model_changed)
+            else:
+                new_index_map = {} # holds filtered items only
+                new_item_map = {}
+
             new_index = 0
             for index in self._source_index_map:
-                data = self._source_index_map[index]
-                if self._custom_filter_handler(data):
-                    new_index_map[new_index] = data
-                    new_item_map[data.input_id] = new_index
+                input_item = self._source_index_map[index]
+                if self._custom_filter_handler(input_item):
+                    new_index_map[new_index] = input_item
+                    new_item_map[input_item] = new_index
                     new_index +=1
 
             self._index_map = new_index_map
@@ -286,7 +337,7 @@ class InputItemListModel(ui_common.AbstractModel):
         self._source_index_map = self._index_map.copy()
         self._source_item_map = self._item_map.copy()
 
-    def _update_filter(self, emit = False):
+    def updateFilter(self, emit = False):
         ''' updates the filters only (does not load new data) '''
         self._filter_data()
 
@@ -336,38 +387,36 @@ class InputItemListModel(ui_common.AbstractModel):
         verbose = gremlin.config.Configuration().verbose_mode_filter
 
 
-        self._index_map = {} # map of index to value
-        self._item_map = {}  # map of values to their index
+        self._index_map.clear() # map of index to value
+        self._item_map.clear()  # map of values to their index
 
         device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
 
-        for input_type in self._allowed_input_types:
+        input_items = registry.getInputItems(device_guid, mode, input_type = self._allowed_input_types)
 
-            input_items = registry.getInputItems(device_guid, mode, input_type = input_type)
+        if input_items and device.device_type in (DeviceType.Joystick, DeviceType.VJoy):
+            # sort by axes and buttons
+            input_items.sort(key = lambda x: x.sortKey)
 
+        for input_item in input_items:
+            if self._show_filtered_only or device.device_type in (DeviceType.Joystick, DeviceType.VJoy):
+                filtered = profile.settings.getFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
 
-            if input_items and device.device_type in (DeviceType.Joystick, DeviceType.VJoy):
-                # sort by axes and buttons
-                input_items.sort(key = lambda x: x.sortKey)
+                if filtered:
+                    continue
+                if verbose: syslog.info(f"Input {device.name} : {input_item.input_type.name} {input_item.input_id} visible")
 
-            for input_item in input_items:
-                if self._show_filtered_only or device.device_type in (DeviceType.Joystick, DeviceType.VJoy):
-                    filtered = profile.settings.getFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
+            self._index_map[index] = input_item
+            self._item_map[input_item] = index
+            index += 1
 
-                    if filtered:
-                        continue
-                    if verbose: syslog.info(f"Input {device.name} : {input_item.input_type.name} {input_item.input_id} visible")
-
-                self._index_map[index] = input_item
-                self._item_map[input_item.input_id] = index
-                index += 1
 
 
         if self._show_master_mode:
             master_mode = gremlin.shared_state.master_mode
             if master_mode in self._device_data.modes:
                 # older profile may not have master mode defined until saved
-                input_items = registry.getInputItems(device_guid, master_mode, input_type)
+                input_items = registry.getInputItems(device_guid, master_mode)
                 for input_item in input_items:
 
                         if self._show_filtered_only or device.device_type == DeviceType.Joystick:
@@ -378,30 +427,12 @@ class InputItemListModel(ui_common.AbstractModel):
                             if verbose: syslog.info(f"Input {device.name} : {input_item.input_type.name} {input_item.input_id} visible")
 
                         self._index_map[index] = input_item
-                        self._item_map[input_item.input_id] = index
+                        self._item_map[input_item] = index
                         index += 1
 
-                # mode_object = self._device_data.modes[master_mode]
-                # for input_type in self._allowed_input_types:
-                #     if input_type in mode_object.config.keys():
-                #         sorted_keys = sorted(mode_object.config[input_type].keys())
-                #         for data_key in sorted_keys:
-                #             input_item : gremlin.base_profile.InputItem = mode_object.config[input_type][data_key]
-                #             # add hardware GUID reference to data block so we have an easier reference to it
-
-                #             if self._show_filtered_only:
-                #                 if not input_item.hasContainers:
-                #                     # filter out empty items
-                #                     continue
-                #             input_item.device_guid = self._device_data.device_guid
-                #             self._index_map[index] = input_item
-
-                #             self._item_map[input_item.input_id] = index
-                #             index += 1
-
-
-
         self._update_source()
+
+        assert len(self._index_map) == len(self._item_map),"Invalid mapping detected"
 
         if emit_change:
             self.data_changed.emit()
@@ -435,54 +466,50 @@ class InputItemListModel(ui_common.AbstractModel):
         ''' sorts the data using a sorting callback - the callback takes a list of input items, and returns a list of input items '''
 
         syslog.info("Before sort:----------------------------")
-        for index, item in self._source_index_map.items():
-            syslog.info(f"[{index}] = [{item.input_id.display_name}]")
+        for index, input_item in self._source_index_map.items():
+            syslog.info(f"[{index}] = [{input_item.input_id.display_name}]")
 
         syslog.info("After sort:----------------------------")
 
         item_list = [item for item in self._source_index_map.values()]
         item_list = sort_callback(item_list) # returns a sorted list specific to the device
 
-        new_index_map = {}
-        new_item_map = {}
-        new_source_index_map = {}
-        new_source_item_map = {}
+
+
+
+        if __debug__:
+            new_index_map = TriggerDict()
+            new_index_map.addCallback(self._handle_model_changed)
+            new_item_map = TriggerDict()
+            new_item_map.addCallback(self._handle_model_changed)
+            new_source_item_map = TriggerDict()
+            new_source_item_map.addCallback(self._handle_model_changed)
+            new_source_index_map = TriggerDict()
+            new_source_index_map.addCallback(self._handle_model_changed)
+        else:
+            new_index_map = {}
+            new_item_map = {}
+            new_source_item_map = {}
+            new_source_index_map = {}
 
         # item : gremlin.base_profile.InputItem
-        for index, item in enumerate(item_list):
-            if item in self._item_map:
-                new_index_map[index] = item
-                new_item_map[item] = index
-            new_source_index_map[index] = item
-            new_source_item_map[item] = index
-            item.index = index # update the sorting index
-            syslog.info(f"sorted [{index}] = [{item.input_id.display_name}]")
+        for index, input_item in enumerate(item_list):
+            if input_item in self._item_map:
+                new_index_map[index] = input_item
+                new_item_map[input_item] = index
+            new_source_index_map[index] = input_item
+            new_source_item_map[input_item] = index
+            input_item.index = index # update the sorting index
+            syslog.info(f"sorted [{index}] = [{input_item.input_id.display_name}]")
 
         self._index_map = new_index_map if new_index_map else new_source_index_map
         self._item_map = new_item_map if new_item_map else new_source_item_map
         self._source_index_map = new_source_index_map
         self._source_item_map = new_source_item_map
 
-        # update the sort order in the profile sequence
-
-
-        #input_items = self._device_data.modes[self._mode]
-        # for input_type in self._allowed_input_types:
-        #     if input_type in input_items.config.keys():
-        #         saved_data = {}
-        #         for key in item_list:
-        #             input_id = key.input_id
-        #             if input_id in input_items.config[input_type]:
-        #                 data = input_items.config[input_type][input_id]
-        #                 saved_data[input_id] = data
-        #                 del input_items.config[input_type][input_id]
-
-
-        #         for key in item_list:
-        #             input_id = key.input_id
-        #             if input_id in saved_data:
-        # self.updateData()
         self.data_changed.emit()
+
+        assert len(self._index_map) == len(self._item_map),"Invalid mapping detected"
 
     def refresh(self, emit = True):
         ''' refreshes the mode data without data reload '''
@@ -525,6 +552,16 @@ class InputItemListModel(ui_common.AbstractModel):
 
         return self._source_index_map[index]
 
+    def setData(self, index, value):
+        ''' sets the model data '''
+        if __debug__: self.validate(value)
+
+        self._source_index_map[index] = value
+        self._source_item_map[value] = index
+        self._index_map[index] = value
+        self._item_map[value] = index
+
+
     def filteredData(self, index):
         """Returns the data stored at the provided index.
 
@@ -539,21 +576,36 @@ class InputItemListModel(ui_common.AbstractModel):
 
 
 
-    def add(self, item):
-        ''' adds new item at the new index '''
+    def add(self, input_item : AbstractInputItem):
+        ''' adds a new input item to the model, returns the index it was added to '''
 
-        if not item in self._index_map:
+
+        if not input_item in self._index_map:
             new_index = len(self._index_map)
-            self._item_map[item] = new_index
-            self._index_map[new_index] = item
+
+            # ensure index is unique
+            while new_index in self._index_map.keys():
+                new_index +=1
+
+            self._item_map[input_item] = new_index
+            self._index_map[new_index] = input_item
+
+            # add to the registry
+            registry = gremlin.base_profile.ProfileRegistry()
+            registry.registerInputItem(input_item)
+            registry.sync()
 
             self._update_source()
-            self._update_filter()
+            self.updateFilter()
+
+            input_item.index = new_index
+
+            assert len(self._index_map) == len(self._item_map),"Invalid mapping detected"
 
             return new_index
         else:
             # return the index of the existing item
-            return self._item_map[item]
+            return self._item_map[input_item]
 
 
 
@@ -586,6 +638,8 @@ class InputItemListModel(ui_common.AbstractModel):
                     del input_items.config[input_type][input_id_key]
                 registry.removeInputItem(input_item)
 
+                # sync with profile data
+                registry.sync()
 
 
             return True
@@ -678,7 +732,7 @@ class InputItemListModel(ui_common.AbstractModel):
                 if not input_types or input_item.input_type in input_types:
                     registry.removeInputItem(input_item)
 
-            # sync with registry
+            # sync deletions with the profile
             registry.sync()
 
         self.reset()
@@ -686,9 +740,11 @@ class InputItemListModel(ui_common.AbstractModel):
 
     def reset(self):
         ''' clears all data '''
-        self._index_map = {} # map of filtered index to input item
-        self._item_map = {} # map of filtered input_id to index
-        self._source_index_map = {} # map of source data
+        self._index_map.clear() # map of filtered index to input item
+        self._item_map.clear() # map of filtered input_id to index
+        self._source_index_map.clear() # map of source data
+        self._source_item_map.clear() # map of source items
+
 
 
 
@@ -788,7 +844,6 @@ class InputItemListView(ui_common.AbstractView):
     def _model_changed(self):
         # indicate selection is invalid
         super()._model_changed()
-        self._current_index = -1
         self.markDirty()
 
 
@@ -833,8 +888,7 @@ class InputItemListView(ui_common.AbstractView):
 
     def scrollToWidget(self, widget):
         ''' scrolls the list view to the specified widget '''
-        widgets = [w for w in gremlin.util.get_layout_widgets(self._scroll_layout)]
-        if widget in widgets:
+        if widget in self._widget_map.values():
             self._scroll_area.ensureWidgetVisible(widget)
 
 
@@ -842,9 +896,14 @@ class InputItemListView(ui_common.AbstractView):
     def current_index(self) -> int:
         return self._current_index
 
-    def setCurrentIndex(self, index : int):
+    def setCurrentIndex(self, index : int, emit = True):
         ''' sets the current index '''
-        self._current_index = index
+        widget = self.getWidgetAt(index)
+        if widget:
+            self.select_item(index, emit)
+
+
+
 
     @property
     def current_device(self):
@@ -922,6 +981,10 @@ class InputItemListView(ui_common.AbstractView):
         if widget is not None:
             self._scroll_to_item(widget)
 
+    def indexOf(self, input_item):
+        ''' gets the index of the widget, -1 if not found'''
+        return self.model.indexOfInputItem(input_item)
+
 
     def scrollToIndex(self, index):
         ''' scrolls to a specific index '''
@@ -968,6 +1031,7 @@ class InputItemListView(ui_common.AbstractView):
                         for model_index in range(row_count):
                             data = self.model.data(model_index)
 
+
                             identifier = InputIdentifier(
                                 data.input_type,
                                 data.device_guid,
@@ -975,7 +1039,8 @@ class InputItemListView(ui_common.AbstractView):
                                 data.device_type,
                                 data.input_name,
                                 is_axis = data.is_axis,
-                                is_button = data.is_button
+                                is_button = data.is_button,
+                                input_item = data
                             )
 
 
@@ -1061,14 +1126,18 @@ class InputItemListView(ui_common.AbstractView):
                 # do not populate the list yet
                 return
 
+        model_count = self.model.count()
+        widget_count = len(self._widget_map)
 
-        if not self._drawn_once or self.model_dirty:
+        if not self._drawn_once or self.model_dirty or model_count != widget_count:
             # create if the first time or if the model changed
             self.create_ui()
             self._drawn_once = True
 
-        model_count = self.model.count()
-        widget_count = len(self._widget_map)
+            model_count = self.model.count()
+            widget_count = len(self._widget_map)
+
+
         assert widget_count == model_count or (widget_count == 1 and list(self._widget_map.keys())[0] == "blank"), "InputItemListView model and UI are not synchronized (mismatched items)"
 
 
@@ -1240,7 +1309,7 @@ class InputItemListView(ui_common.AbstractView):
 
     def _edit_item_cb(self, index : int):
         ''' emits the edit event along with the item being edited '''
-        self.item_edit.emit(self, index, self.model.data(index).input_id) # widget, index, data
+        self.item_edit.emit(self, index, self.model.data(index)) # widget, index, data
 
     def _edit_curve_item_cb(self, index : int):
         input_item = self.model.data(index)
@@ -1285,7 +1354,8 @@ class InputItemListView(ui_common.AbstractView):
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_inputs or config.verbose_mode_ui
-        if verbose: syslog.info(f"InputItem: select input: {index}")
+        # verbose = True
+        if verbose: syslog.info(f"InputItem: request to select input index: [{index}]")
         if not Shiboken.isValid(self._scroll_area):
             if verbose: syslog.warning("\tshiboken invalid")
             return
@@ -1296,7 +1366,7 @@ class InputItemListView(ui_common.AbstractView):
             force_update = True
 
         if not force_update and self._current_index == index:
-            if verbose: syslog.warning("\tnothing to do")
+            if verbose: syslog.warning(f"\tindex [{index}] is already selected")
             return # nothing to do if the current index is the same as the new index
 
         # If the index is actually an event we have to correctly translate the
@@ -1325,20 +1395,25 @@ class InputItemListView(ui_common.AbstractView):
             last_widget = self.itemAt(self._current_index)
             if last_widget and hasattr(last_widget,"setSelected"):
                 # deselect prior widget if it can be selected
+                if verbose:
+                    data = self.model.data(self._current_index)
+                    syslog.info(f"deselect index [{self._current_index}]: {data.debug_display}")
                 with (QtCore.QSignalBlocker(last_widget)):
                     last_widget.setSelected(False, False)
 
             self._current_index = index
 
 
-        widget = self.itemAt(index)
+        widget = self.itemAt(self._current_index)
         if widget and hasattr(widget,"setSelected") and not widget.selected:
             # select it if selectable
             with (QtCore.QSignalBlocker(widget)):
+
                 widget.setSelected(True, emit = False)
                 if verbose:
-                    data = self.model.data(index)
-                    syslog.info(f"\tselected: {data.debug_display}")
+                    data = self.model.data(self._current_index)
+                    syslog.info(f"\tselected: index [{self._current_index}]: {data.debug_display}")
+
 
 
         if emit and index != -1:
@@ -5312,7 +5387,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         import gremlin.plugin_manager
         import gremlin.ui.ui_common
 
-        gremlin.util.pushCursor()
+        gremlin.util.pushCursor(True)
 
         assert self._item_data is not None,"InputItemMappingWidget: input id not set while adding action"
 
@@ -5434,7 +5509,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         :param container_name name of the container to be added
         """
 
-        gremlin.util.pushCursor()
+        gremlin.util.pushCursor(True)
         try:
 
             plugin_manager = gremlin.plugin_manager.ContainerPlugins()

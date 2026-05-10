@@ -2226,8 +2226,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
             return self.value < other.value
 
 
-    def __init__(self, parent = None):
-        super().__init__(mode_parent=parent) # parent is the mode object this input belongs to
+    def __init__(self, mode_object : gremlin.base_profile.Mode = None):
+        super().__init__(mode_object) # parent is the mode object this input belongs to
 
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_osc
@@ -2249,7 +2249,6 @@ class OscInputItem(gremlin.base_profile.InputItem):
         self._max_range = 1.0
         self._trigger_autorelease = None # trigger with autorelease when message received
         self._autorelease_delay = int(config.osc_default_autorelease_delay * 1000) # default release delay in milliseconds
-        self._profile_mode = gremlin.shared_state.edit_mode
         self._autorelease_timer = None # autorelease timer for this input
 
 
@@ -2260,6 +2259,10 @@ class OscInputItem(gremlin.base_profile.InputItem):
         tracker.registerWidget(self, self._device_guid, current_mode, self._input_type, self.getCompoundMessageKey(), self._guid)
         client = InputOscClient()
         client.registerInput(self)
+        self.setInputIdCallback(self._handle_input_id_callback)
+
+    def _handle_input_id_callback(self):
+        return self._message # OSC command is the input ID
 
     @property
     def device_guid(self):
@@ -2606,11 +2609,30 @@ class OscInputItem(gremlin.base_profile.InputItem):
 
         self._update_display_name()
 
+
+    def from_xml(self, node, data = None, extra_data : dict = None):
+        # OSC data
+
+        for child in node:
+            if child.tag == "input":
+                self.parse_xml(child, data, extra_data)
+
+        if self.is_axis:
+            self.setOverrideInputType(InputType.JoystickAxis)
+        else:
+            self.setOverrideInputType(InputType.JoystickButton)
+        if node.tag == "input":
+            self.parse_xml(node, data, extra_data)
+
+
+
+        super().from_xml(node, data, extra_data)
+
     def parse_xml(self, node, data = None, extra_data : dict = None):
         ''' reads an input item from xml '''
 
         if node.tag == "input":
-            self.id = read_guid(node, "guid")
+            self.setId(read_guid(node, "guid"))
             self._message = safe_read(node, "cmd", str,"")
             csv = safe_read(node, "data", str,"")
             self._message_data = csv_to_list(csv)
@@ -2648,6 +2670,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
         if self._trigger_autorelease is not None:
             node.set("autorelease", str(self._trigger_autorelease))
         node.set("autorelease_delay", str(self._autorelease_delay))
+
+        super().to_xml(node)
         return node
 
 
@@ -4324,7 +4348,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
         widget.data = data
         widget.create_action_icons(data)
-        widget.setInputDescription(data.input_id.display_name)
+        widget.setInputDescription(data.display_name)
         widget.enable_close()
         widget.enable_edit()
         widget.setIcon("mdi.surround-sound")
@@ -4392,15 +4416,15 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the widget has to update itself on a data change '''
-        data : OscInputItem = input_widget.identifier.input_id
-        data._update_display_name()
-        input_widget.setTitle(data.title_name)
-        input_widget.setInputDescription(data.display_name)
-        input_widget.setToolTip(data.display_tooltip)
+        input_item : OscInputItem = input_widget.identifier.input_item
+        input_item._update_display_name()
+        input_widget.setTitle(input_item.title_name)
+        input_widget.setInputDescription(input_item.display_name)
+        input_widget.setToolTip(input_item.display_tooltip)
 
         status_text = ''
         is_warning = False
-        if not data.message:
+        if not input_item.message:
             is_warning = True
             status_text = "Not configured"
 

@@ -81,7 +81,7 @@ class Backend(QtCore.QObject):
         """Toggles Gremlin between active and inactive."""
         self.activate_gremlin(not self.runner.is_running())
 
-    
+
 
     def activate_gremlin(self, activate: bool):
         """Sets the activity state of Gremlin.
@@ -94,11 +94,11 @@ class Backend(QtCore.QObject):
             # Generate the code for the profile and run it
             # self._profile_auto_activated = False
             self.runner.start(self.profile,"Default")
-            
+
         else:
             # Stop running the code
             self.runner.stop()
-            
+
         self.activityChanged.emit()
 
     @Slot(InputIdentifier, result=int)
@@ -120,7 +120,7 @@ class Backend(QtCore.QObject):
             item = gremlin.base_profile.InputItem()
             item.device_guid = identifier.device_guid
             item.input_type = identifier.input_type
-            item.input_id = identifier.input_id
+            item.setInputId(identifier.input_id)
             return len(item.action_configurations)
         except error.ProfileError as e:
             return 0

@@ -31,6 +31,7 @@ import uuid
 import dinput
 import winreg, win32api, win32con
 from ctypes import Structure, c_long, sizeof
+import collections
 
 import qtawesome as qta
 from lxml import etree as ElementTree
@@ -1617,11 +1618,18 @@ _cursor_timer = None # timer to display hourglass
 _cursor_level = []
 
 
-def pushCursor():
+def pushCursor(immediate = False):
+    ''' displays an hourglass cursor
+    :params immediate: if true, sets the cursor immediately instead of waiting for a short delay
+
+    '''
     global _cursor_push, _cursor_timer
     if _cursor_push == 0:
-        _cursor_timer = threading.Timer(1, _cursor_show_hourglass)
-        _cursor_timer.start()
+        if immediate:
+            _cursor_show_hourglass()
+        else:
+            _cursor_timer = threading.Timer(1, _cursor_show_hourglass)
+            _cursor_timer.start()
     _cursor_push += 1
 
 def _cursor_show_hourglass():
@@ -1633,6 +1641,7 @@ def _pushCursor_ui():
     if _cursor_push > 0:
         # still active?
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
+        time.sleep(0.01)
 
 
 def popCursor(reset = False):
@@ -2724,3 +2733,29 @@ def getMonitorOrientation(hwnd):
         return orientation, orientations.get(orientation, "Unknown")
     return None, None
 
+
+
+class TriggerDict(collections.UserDict):
+    ''' dict that fires callbacks when data is changed '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._on_change_callbacks = []
+
+    def addCallback(self, callback):
+        """Registers a function to run on changes."""
+        self._on_change_callbacks.append(callback)
+
+
+    def __setitem__(self, key, value):
+        old_value = self.data.get(key)
+        super().__setitem__(key, value)
+        # run callbacks
+        for callback in self._on_change_callbacks:
+            callback(self, key, old_value, value)
+
+    def __delitem__(self, key):
+        old_value = self.data.get(key)
+        super().__delitem__(key)
+        # run callbacks
+        for callback in self._on_change_callbacks:
+            callback(self, key, old_value, None)

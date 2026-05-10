@@ -472,6 +472,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     self.input_item_list_view.select_item(index)
 
             finally:
+                dialog.deleteLater()
                 gremlin.util.popCursor()
 
 
