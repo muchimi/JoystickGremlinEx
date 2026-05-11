@@ -29,19 +29,6 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m76RC34):
-- New: UI: General rework of the user interface components and logic to improve performance and reduce memory utilization.  Adds caching of certain graphical elements. New global UI option controls how many mapping widgets should stay in memory at a time.  The larger the cache, the more memory GEX (QT) uses but the more responsive by avoiding a reload.  This can be set to unlimited (uses as much memory as needed), or no caching (recreate each time - uses the least runtime memory). The default is 20 entries.  Each input counts as a single entry when selected.  The cache operates in round robin fashion.
-- Change: profile load optimizations.
-- Change: UI: general optimizations of input list, container and action mappings and on-demand loading of mapping UI elements aimed at reducing memory and load times.
-- Change: UI: consolidated all icons to icons folder
-- Changed: UI: improved hourglass cursor behavior.
-- Changed: Removed GFX folder from some plugins and consolidated to icons folder to further reduce package size.
-- Fix: long load times for icons causing extreme UI lag
-- Fix: UI: checkbox visuals
-- Fix: UI: various fixes
-- Fix: DINPUT: invalid derived device hash value.
-- Fix: Wooting devices: ignore game controller mode that report no axis.
-
 
 ### (m76RC33):
 - New: Tested with Wooting keyboard in gamepad mode.
