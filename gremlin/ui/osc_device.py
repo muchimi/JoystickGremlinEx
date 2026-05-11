@@ -2227,7 +2227,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
 
 
     def __init__(self, mode_object : gremlin.base_profile.Mode = None):
-        super().__init__(mode_object) # parent is the mode object this input belongs to
+        super().__init__(mode_object, device_guid = OscDeviceTabWidget.device_guid) # parent is the mode object this input belongs to
 
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_osc
@@ -2240,7 +2240,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
         self._title_name = "OSC (not configured)"
         self._display_name =  ""
         self._display_tooltip = "Input configuration not set"
-        self._device_guid = OscDeviceTabWidget.device_guid
+
         self._input_type = InputType.OpenSoundControl
         self._message_key = None
         self._source_index = 0 # OSC parameter source index - used for multi-argument data
@@ -2262,7 +2262,8 @@ class OscInputItem(gremlin.base_profile.InputItem):
         self.setInputIdCallback(self._handle_input_id_callback)
 
     def _handle_input_id_callback(self):
-        return self._message # OSC command is the input ID
+        ''' input id is self for OSC'''
+        return self # whole input
 
     @property
     def device_guid(self):
@@ -2375,13 +2376,6 @@ class OscInputItem(gremlin.base_profile.InputItem):
     def message(self, value):
         self._message = value
         self._update()
-
-
-
-    @property
-    def input_id(self):
-        ''' input id for this input item '''
-        return self._message
 
     @property
     def mode(self) -> OscInputItem.InputMode:
@@ -2702,7 +2696,7 @@ class OscInputItem(gremlin.base_profile.InputItem):
         ''' duplicates an input item '''
         import copy
         source = self
-        target= OscInputItem(parent = self.parent)
+        target= OscInputItem()
         target.id = uuid.uuid4()
         target._message = copy.deepcopy(source._message)
         target._message_data = source._message_data
@@ -3111,7 +3105,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                 model = parent_widget.input_item_list_model
                 message = self._command
 
-                input_item = OscInputItem(parent = self._mode_object)
+                input_item = OscInputItem(self._mode_object)
                 input_item._message = message
                 input_item._message_data = self._command_data
                 input_item._command_mode = self._command_mode
@@ -4024,14 +4018,18 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """Adds a new input to the inputs list  """
         input_type = InputType.OpenSoundControl
 
+        registry = gremlin.base_profile.ProfileRegistry()
         profile = gremlin.shared_state.current_profile
         device_modes =  profile.get_device_modes(self._device_guid, DeviceType.to_string(DeviceType.Osc))
         mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
 
-        input_id = OscInputItem(parent = mode_object)
+
+        input_id = OscInputItem(mode_object)
         input_id.input_type_changed.connect(self._refresh_mappings)
 
         self.device_profile.modes[self.current_mode].get_data(input_type, input_id) # adds the item
+        registry.sync()
+
         self.input_item_list_model.refresh()
         self.input_item_list_view.redraw()
         index = self.input_item_list_model.indexOf(input_id)
@@ -4114,7 +4112,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     syslog.info(f"OSC: bulk load skip: [{msg}] is already defined for mode [{mode}]")
                     continue
 
-                input_id = OscInputItem(parent = mode_object)
+                input_id = OscInputItem(mode_object)
                 input_id.message = msg
                 mode = OscInputItem.InputMode.Button
                 auto_release = False

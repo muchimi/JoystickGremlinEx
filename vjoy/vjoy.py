@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -100,7 +100,7 @@ def device_exists(vjoy_id):
 
 def ensure_released(vjoy_id):
     ''' ensures the vjoy device is released '''
-    
+
     if device_exists(vjoy_id):
         VJoyInterface.RelinquishVJD(vjoy_id)
 
@@ -242,7 +242,7 @@ class Axis:
 
         :param value the position of the axis in the range [-1, 1]
         """
-        
+
         # import gremlin.event_handler
         # from gremlin.input_types import InputType
 
@@ -253,7 +253,7 @@ class Axis:
         if p_value is None:
             syslog.warning("Invalid null value provided")
             return
-            
+
         if p_value < -1.0:
             p_value = -1.0
         elif p_value > 1.0:
@@ -265,7 +265,7 @@ class Axis:
             self._deadzone_fn(min(1.0, max(-1.0, p_value)))
         )
 
-        # TEST - disable loopback T139+ 
+        # TEST - disable loopback T139+
         # el = gremlin.event_handler.EventListener()
         # event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, self._value)
         # el.vjoy_event.emit(event) # this is used by external plugins to trigger on vjoy output events
@@ -274,7 +274,7 @@ class Axis:
 
         self.vjoy_dev.ensure_ownership()
 
-      
+
 
         if not VJoyInterface.SetAxis(
                 int(self._half_range + self._half_range * self._value),
@@ -314,7 +314,7 @@ class Axis:
             syslog.error(
                 f"Failed setting axis value - { _error_string(self.vjoy_id, self.axis_id, self._value)}"
             )
-        
+
         self.vjoy_dev.used()
 
 
@@ -355,7 +355,7 @@ class Button:
         import gremlin.event_handler
         from gremlin.input_types import InputType
 
-      # el.vjoy_callback(event) disable 10/8 in m76T23+ 
+      # el.vjoy_callback(event) disable 10/8 in m76T23+
 
 
 
@@ -368,15 +368,15 @@ class Button:
         ):
             syslog.error(f"Failed setting button value - {_error_string(self.vjoy_id, self.button_id, self._is_pressed)}")
             return
-        
+
         self.vjoy_dev.used()
-        
+
         el = gremlin.event_handler.EventListener()
         event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed)
         el.vjoy_output_event.emit(event)
-      
-        
-        
+
+
+
 
 
 class Hat:
@@ -415,7 +415,7 @@ class Hat:
         18000 : (0, -1),
         22500: (-1, -1),
         27000: (-1, 0),
-        31500: (-1, 1), 
+        31500: (-1, 1),
     }
 
     @staticmethod
@@ -424,14 +424,14 @@ class Hat:
         if position in Hat.direction_to_name:
             return Hat.direction_to_name[position]
         return None
-    
+
     @staticmethod
     def getDirection(position) -> tuple:
         ''' gets the hat position as a tuple '''
         if position in Hat.name_to_direction:
             return Hat.name_to_direction[position]
         return None
-    
+
     @staticmethod
     def getIcon(position):
         if isinstance(position, str):
@@ -481,18 +481,18 @@ class Hat:
             ( 0, -1),
             (-1,  0),
         ]
-    
+
     @staticmethod
     def getEightDirections():
         ''' gets the positions for all hat positions '''
         return [p for p in Hat.direction_to_name]
-    
+
     @staticmethod
     def getEightDirectionsNameMap():
         ''' gets the positions for all hat positions '''
         return Hat.direction_to_name
-    
-    
+
+
 
     direction_to_icon = {
         ( 0,  0): "mdi.image-filter-center-focus-strong", #"Center",
@@ -502,7 +502,7 @@ class Hat:
         ( 1, -1): "mdi.arrow-bottom-right-thin-circle-outline", #"South-east",
         ( 0, -1): "mdi.arrow-down-thin-circle-outline", #"South",
         (-1, -1): "mdi.arrow-bottom-left-thin-circle-outline", #"South-west",
-        (-1,  0): "mdi.arrow-left-thin-circle-outline", # "West", 
+        (-1,  0): "mdi.arrow-left-thin-circle-outline", # "West",
         (-1,  1): "mdi.arrow-top-left-thin-circle-outline", #"North-west"
     }
 
@@ -519,10 +519,10 @@ class Hat:
         ( 1, -1): "mdi.arrow-bottom-right-thin-circle-outline", #"South-east",
         ( 0, -1): "mdi.arrow-down-thin-circle-outline", #"South",
         (-1, -1): "mdi.arrow-bottom-left-thin-circle-outline", #"South-west",
-        (-1,  0): "mdi.arrow-left-thin-circle-outline", # "West", 
+        (-1,  0): "mdi.arrow-left-thin-circle-outline", # "West",
         (-1,  1): "mdi.arrow-top-left-thin-circle-outline", #"North-west"
     }
-    
+
 
 
 
@@ -682,7 +682,7 @@ class VJoy:
         self._keep_alive_timer.name = f"VJOY{self.vjoy_id} keepalive"
         self._keep_alive_timer.start()
 
-        
+
 
         # Reset all controls
         self.reset()
@@ -691,7 +691,7 @@ class VJoy:
     def acquired(self) -> bool:
         ''' true if GremlinEx controls the VJOY device '''
         return self._acquired
-    
+
     def ensure_ownership(self):
         # modified T140 based on profiling data - remove flip to UI thread
         # # ensure runs on UI thread
@@ -709,13 +709,13 @@ class VJoy:
         """
         if self.vjoy_id is None:
             return False
-        
+
         # # new T140 - check to see if we alreayd own the vjoy device
         # status : VJoyState = VJoyInterface.GetVJDStatus(self.vjoy_id)
         # if status == VJoyState.Owned:
         #     return True
 
-        
+
         if self.pid != VJoyInterface.GetOwnerPid(self.vjoy_id):
             retry_count = 5
             while retry_count:
@@ -724,21 +724,21 @@ class VJoy:
                     return True
                 retry_count -= 1
                 time.sleep(0.01)
-                    
+
             syslog.error(f"VJOY API: Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
             #raise VJoyError(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
             return False
-        
+
     def ensure_released(self):
         gremlin.util.InvokeUiMethod(self._ensure_released_ui) # ui thread
-        
-            
+
+
     def _ensure_released_ui(self):
         ''' ensures the VJOY device is not acquired '''
         vjoy_id = self.vjoy_id
         if self.vjoy_id is None:
             return
-        
+
 
         if self._keep_alive_timer:
             self._keep_alive_timer.cancel()
@@ -748,7 +748,7 @@ class VJoy:
             VJoyInterface.RelinquishVJD(vjoy_id)
             self.reset()
             self._acquired = False
-            
+
 
     @property
     def axis_count(self):
@@ -896,7 +896,7 @@ class VJoy:
         :return True if the hat is valid, False otherwise
         """
         return index in self._hat
-    
+
     def keep_awake(self):
         ''' perform keep awake tasks '''
 
@@ -912,17 +912,17 @@ class VJoy:
                 awake = self._ensure_ownership_ui()
                 if awake:
                     return
-        
+
             #awake = device_available(self.vjoy_id)
-            
+
             syslog.warning(f"VJOY AWAKE: vjoy [{self.vjoy_id}] is reporting no longer available. code: {status}")
 
 
-            
 
 
 
-    
+
+
     def reset(self):
         gremlin.util.InvokeUiMethod(self._reset_ui) # ui thread
 
@@ -953,7 +953,7 @@ class VJoy:
                 self._button[i].is_pressed = button_states[i]
             for i in self._hat:
                 self._hat[i].direction = hat_states[i]
-        
+
 
     def used(self):
         """Updates the timestamp of the last time the device has been used."""

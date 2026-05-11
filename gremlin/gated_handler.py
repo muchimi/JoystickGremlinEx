@@ -3419,7 +3419,7 @@ class GateData():
     def _new_item_data(self, is_action = True):
         ''' creates a new item data from the existing one '''
         current_item_data = self._find_input_item()
-        item_data = gremlin.base_profile.InputItem(mode_parent = current_item_data.parent)
+        item_data = gremlin.base_profile.InputItem(mode_object = current_item_data.parent)
         item_data._input_type = current_item_data._input_type
         item_data._device_guid = current_item_data._device_guid
         item_data._input_id = current_item_data._input_id

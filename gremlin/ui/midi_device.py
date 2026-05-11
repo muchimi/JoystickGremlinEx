@@ -203,7 +203,7 @@ class MidiInputItem(gremlin.base_profile.InputItem):
         return InputType.JoystickButton
 
     def __init__(self, parent = None):
-        super().__init__(mode_parent=parent) # parent is the mode object this input belongs to
+        super().__init__(mode_object=parent, device_guid = MidiDeviceTabWidget.device_guid) # parent is the mode object this input belongs to
 
         self._port_name = None
         self._message = None # the midi message
@@ -213,7 +213,6 @@ class MidiInputItem(gremlin.base_profile.InputItem):
         self._command = None # decoded command
         self._message_key = self._guid # key for this message category
         self._mode = MidiInputItem.InputMode.Button  # mode is button or axis
-        self._device_guid = MidiDeviceTabWidget.device_guid
         self._input_type = InputType.Midi
         current_mode = gremlin.shared_state.current_mode
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
@@ -221,6 +220,7 @@ class MidiInputItem(gremlin.base_profile.InputItem):
         self.setInputIdCallback(self._handle_input_id_callback)
 
     def _handle_input_id_callback(self):
+        ''' input id is self for MIDI '''
         return self
 
 
@@ -250,12 +250,6 @@ class MidiInputItem(gremlin.base_profile.InputItem):
     def message(self, value):
         self._message = value
         self._update_display_name()
-
-    @property
-    def input_id(self):
-        ''' input id for this key '''
-        return self._message
-
 
     @property
     def message_key(self):
@@ -494,7 +488,7 @@ class MidiInputItem(gremlin.base_profile.InputItem):
         device_guid = gremlin.shared_state.osc_tab_guid
         device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Midi))
         mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
-        input_item = MidiInputItem(parent = mode_object)
+        input_item = MidiInputItem(mode_object)
 
         if mode is None:
             mode = MidiInputItem.InputMode.Button
@@ -562,7 +556,7 @@ class MidiListener(AbortableThread):
                                 syslog.info(f"MIDI: heard message: {message}")
 
                                 self.callback(self.port_name, self.port_number, message)
-                        time.sleep(0.01)
+                        time.sleep(0)
 
             if verbose:
                 syslog.info(f"MIDI: Listener: close port {self.port_number}")
@@ -1818,7 +1812,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         device_modes =  profile.get_device_modes(self._device_guid, DeviceType.to_string(DeviceType.Midi))
         mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
 
-        input_id = MidiInputItem(parent=mode_object)
+        input_id = MidiInputItem(mode_object)
         input_id.id = uuid.uuid4() # unique ID for this new item
         self.device_profile.modes[self.current_mode].get_data(input_type, input_id)
         self.input_item_list_model.refresh()
@@ -2285,11 +2279,12 @@ class MidiClient(QtCore.QObject):
                 gremlin.event_handler.Event(
                     event_type= input_type,
                     device_guid= device_guid,
-                    identifier= input_item,
+                    identifier= input_item.input_id,
                     is_pressed = is_pressed,
                     value = value,
                     raw_value = raw_value,
-                    is_axis = is_axis
+                    is_axis = is_axis,
+                    extra_data={"input_item": input_item}
                     ))
 
                 if input_item.is_axis:
@@ -2302,13 +2297,14 @@ class MidiClient(QtCore.QObject):
                     event = gremlin.event_handler.Event(
                         event_type = input_type,
                         device_guid = device_guid,
-                        identifier = input_item,
+                        identifier = input_item.input_id,
                         is_pressed = False,
                         value = value,
                         raw_value = value,
                         is_virtual = True, # indicate we are not a hardware input
                         is_axis = True,
-                        override_input_type=InputType.JoystickAxis
+                        override_input_type=InputType.JoystickAxis,
+                        extra_data={"input_item": input_item}
                         )
 
                     self._event_listener.joystick_event.emit(event)
@@ -2321,13 +2317,14 @@ class MidiClient(QtCore.QObject):
                     event = gremlin.event_handler.Event(
                         event_type = input_type,
                         device_guid = device_guid,
-                        identifier = input_item,
+                        identifier = input_item.input_id,
                         is_pressed = is_pressed,
                         value = is_pressed,
                         raw_value = is_pressed,
                         is_virtual = True, # indicate we are not a hardware input
                         is_axis = False,
-                        override_input_type=InputType.JoystickButton
+                        override_input_type=InputType.JoystickButton,
+                        extra_data={"input_item": input_item}
                         )
 
                     self._event_listener.joystick_event.emit(event)

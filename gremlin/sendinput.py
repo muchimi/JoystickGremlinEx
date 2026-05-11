@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ import time
 import win32api, win32con
 
 
-import gremlin.util 
+import gremlin.util
 
 from gremlin.singleton_decorator import SingletonDecorator
 
@@ -131,7 +131,7 @@ class MouseMotion:
             tick_value = int(math.copysign(tick_value, delta))
 
         return tick_value, tick_time
- 
+
 
 class FixedMouseMotion(MouseMotion):
 
@@ -150,7 +150,7 @@ class FixedMouseMotion(MouseMotion):
             rate = 0
         self._rate = rate
 
-        
+
 
     def set_dx(self, value):
         """Updates the x velocity.
@@ -174,7 +174,7 @@ class FixedMouseMotion(MouseMotion):
             self._call_time = time_now + self._rate # next call time
             return self.dx, self.dy
         return 0,0 # no movement as time hasn't lapsed
-        
+
 
 
 class AcceleratedMouseMotion(MouseMotion):
@@ -264,11 +264,11 @@ class MouseController:
         self._thread = None
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
-        
+
     def _profile_start(self):
         self._delta_generator = None
         self._accel_generator = None
-        
+
 
     def set_absolute_motion(self, dx=None, dy=None):
         """Configures a motion using absolute velocities.
@@ -282,7 +282,7 @@ class MouseController:
         x = y = None
         if dx is not None:
             # update x is provide
-            x = dx 
+            x = dx
         if dy is not None:
             # update y if provided
             y = dy
@@ -343,7 +343,7 @@ class MouseController:
         """Loop responsible for creating and sending mouse motion events."""
         self._is_running = True
         while self._is_running:
-            
+
             if self._motion_type == MotionType.Fixed and self._delta_generator:
                 # fixed
                 dx, dy = self._delta_generator()
@@ -353,15 +353,15 @@ class MouseController:
                 dx, dy = self._accel_generator()
             else:
                 dx = dy = 0
-            
-            
+
+
             if dx or dy:
                 send_mouse_motion(int(dx), int(dy))
             #     syslog.info(f"controller: send {int(dx)} {int(dy)}")
             # else:
             #     syslog.info("Controller: skip")
 
-            time.sleep(0.01)
+            time.sleep(0)
 
 
 class _MOUSEINPUT(ctypes.Structure):
@@ -515,7 +515,7 @@ def mouse_press_double_click(button, delay = 0.05):
         _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON1))
         time.sleep(delay)
         _send_input(_mouse_input(MOUSEEVENTF_XUP, data=XBUTTON1))
-        
+
     elif button == MouseButton.Forward:
         _send_input(_mouse_input(MOUSEEVENTF_XDOWN, data=XBUTTON2))
         time.sleep(delay)
@@ -542,17 +542,17 @@ def mouse_release(button):
 
 
 def mouse_wheel(factor : int):
-    ''' send vertical mouse wheel 
-    
+    ''' send vertical mouse wheel
+
     :param factor: 1 for up, -1 for down, factor
-    
+
     '''
     _send_input(_mouse_input(MOUSEEVENTF_WHEEL, data = factor*WHEEL_DELTA))
 
 def mouse_h_wheel(factor : int):
-    ''' send horizontal mouse wheel 
+    ''' send horizontal mouse wheel
     :param factor: 1 for up, -1 for down, factor
-    
+
     '''
     _send_input(_mouse_input(MOUSEEVENTF_HWHEEL, data = factor*WHEEL_DELTA))
 

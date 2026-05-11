@@ -4318,7 +4318,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
             time_stop = time.time() + tick
             while self._step_is_running and time.time() < time_stop:
-                time.sleep(0.01)
+                time.sleep(0)
 
         self._step_is_running = False
 
@@ -5747,7 +5747,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     if self.should_stop_thread and \
                             self.thread_last_update + 1.0 < time.time():
                         self.thread_running = False
-                    time.sleep(0.01)
+                    time.sleep(0)
 
                 except gremlin.error.VJoyError:
                     self.thread_running = False

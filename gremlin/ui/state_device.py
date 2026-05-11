@@ -404,7 +404,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
         mode_object = device_modes.ensure_mode_exists(master_mode)
 
-        super().__init__(mode_parent = mode_object)
+        super().__init__(mode_object = mode_object, device_guid = StateDeviceTabWidget.device_guid)
         self._key = key
         self._input_type = InputType.State
         self._category = category # category (StateCategory)
@@ -428,11 +428,10 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._autorelease_trigger_mode = autorelease_trigger_mode # trigger mode required to enable the autorelease timer
 
 
-        item = gremlin.base_profile.InputItem(mode_parent = mode_object) #self._custom_name_handler)
+        item = gremlin.base_profile.InputItem(mode_object = mode_object) #self._custom_name_handler)
         item.input_type = InputType.State
         item.device_name = "State"
         item.device_type = DeviceType.State
-        item._device_guid = StateDeviceTabWidget.device_guid
         item.setOverrideInputType(InputType.JoystickButton)
         self._input_item = item
         self._emit = True # enable events
@@ -446,11 +445,9 @@ class StateInputItem(gremlin.base_profile.InputItem):
         return self._device_guid
 
     def _handle_input_id_callback(self):
-        return self._key
+        ''' input id is self for STATE '''
+        return self
 
-    @gremlin.base_classes.AbstractInputItem.input_id.setter
-    def input_id(self, value):
-        assert False, "Input id cannot be set for a state"
 
     def suppressEvents(self):
         ''' disable events '''
@@ -975,15 +972,16 @@ class StateInputItem(gremlin.base_profile.InputItem):
 
         event = gremlin.event_handler.Event(
             event_type= InputType.State,
-            device_guid= gremlin.shared_state.state_tab_guid,
-            identifier= self,
+            device_guid= StateDeviceTabWidget.device_guid,
+            identifier= self.input_id,
             value = value,
             curved_value = None,
             raw_value= None,
             is_axis = False,
             is_virtual = True,
             is_pressed = value,
-            override_input_type=InputType.JoystickButton # tell actions we're a button
+            override_input_type=InputType.JoystickButton, # tell actions we're a button,
+            extra_data={"input_item": self}
         )
 
         # indicate there was a state change
@@ -1709,23 +1707,24 @@ class StateData():
 
 
     @QtCore.Slot(object)
-    def _state_changed(self, data : StateInputItem):
+    def _state_changed(self, input_item : StateInputItem):
         ''' called when a state changes '''
         if not gremlin.shared_state.is_running:
             return
         verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose: syslog.info(f"STATE CHANGE: [{data.key}] value: {data.value}")
+        if verbose: syslog.info(f"STATE CHANGE: [{input_item.key}] value: {input_item.value}")
         event = gremlin.event_handler.Event(
             event_type= InputType.State,
-            device_guid= gremlin.shared_state.state_tab_guid,
-            identifier= data,
-            value = data.value,
+            device_guid= StateDeviceTabWidget.device_guid,
+            identifier= input_item.input_id,
+            value = input_item.value,
             curved_value = None,
             raw_value= None,
             is_axis = False,
             is_virtual = True,
-            is_pressed = data.value,
-            override_input_type=InputType.JoystickButton # tell actions we're a button
+            is_pressed = input_item.value,
+            override_input_type=InputType.JoystickButton, # tell actions we're a button
+            extra_data={"input_item": input_item}
         )
         eh = gremlin.event_handler.EventHandler()
         eh.execute_event(event)

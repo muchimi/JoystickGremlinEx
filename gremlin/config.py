@@ -1917,6 +1917,8 @@ class Configuration(QtCore.QObject):
                 else:
                     syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
                     input_id = None
+        elif isinstance(input_id, gremlin.keyboard.Key):
+            input_id = input_id.key_id
         else:
             syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
             input_id = None

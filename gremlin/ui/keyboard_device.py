@@ -49,7 +49,8 @@ class KeyboardInputItem(gremlin.base_profile.InputItem):
         ''' Keyboard input id
             :param mode: the profile mode for this input
         '''
-        super().__init__(mode_object, KeyboardDeviceTabWidget.device_guid)
+        super().__init__(mode_object, device_guid = KeyboardDeviceTabWidget.device_guid)
+
         self._key = None # associated primary key (containing latched items)
         self._title_name = "Keyboard input (not configured)"
 
@@ -57,6 +58,11 @@ class KeyboardInputItem(gremlin.base_profile.InputItem):
         self._input_type = InputType.KeyboardLatched
         self._suspend_update = False
         self._update()
+        self.setInputIdCallback(self._handle_input_id_callback)
+
+    def _handle_input_id_callback(self):
+        ''' input id is the key for keyboard '''
+        return self._key
 
     def getOverrideInputType(self):
         ''' override type '''
@@ -66,11 +72,6 @@ class KeyboardInputItem(gremlin.base_profile.InputItem):
     def title_name(self):
         ''' title for this input '''
         return self._title_name
-
-    @property
-    def input_id(self):
-        ''' input id for this key '''
-        return self._key
 
     @property
     def display_tooltip(self):
@@ -88,8 +89,9 @@ class KeyboardInputItem(gremlin.base_profile.InputItem):
 
     @property
     def key_tuple(self):
+        # must be hashable
         if self._key:
-            return (self._key.scan_code, self._key.is_extended)
+            return self._key.scan_code, self._key.is_extended
         return None
 
 
@@ -169,8 +171,8 @@ class KeyboardInputItem(gremlin.base_profile.InputItem):
         return False
 
     def from_xml(self, node, data = None, extra_data : dict = None):
-        super().from_xml(node, data, extra_data)
         self.parse_xml(node, data, extra_data)
+        super().from_xml(node, data, extra_data)
 
 
     def parse_xml(self, node, data = None, extra_data : dict = None):
@@ -179,7 +181,7 @@ class KeyboardInputItem(gremlin.base_profile.InputItem):
         self._suspend_update = True
 
         if node.tag == "input":
-            self.id = read_guid(node, "guid", default_value=uuid.uuid4())
+            self.setId(read_guid(node, "guid", default_value=uuid.uuid4()))
 
             for child in node:
                 # ready key nodes
@@ -257,6 +259,9 @@ class KeyboardInputItem(gremlin.base_profile.InputItem):
             node_comment = etree.Comment(comment)
             child.append(node_comment)
             child.append(latched_child)
+
+        # output containers
+        super().to_xml(node)
 
         return node
 
@@ -553,7 +558,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             [InputType.Keyboard, InputType.KeyboardLatched]
         )
         self.input_item_list_view.setModel(self.input_item_list_model)
-        self.input_item_list_view.redraw()
+        
         self._select_item_cb(self._last_selected_index)
 
 
@@ -651,6 +656,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         '''
 
+
         # reload on new index
         reload = index == -1
         current_mode = gremlin.shared_state.edit_mode
@@ -666,23 +672,22 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # ensure the input item exists in the profile data
         if index >= 0:
 
-            identifier = self.input_item_list_model.data(index)
-            input_id = identifier.input_id
+            input_item = self.input_item_list_model.data(index)
+
             #syslog.info(f"Editing index {index} {input_id.display_name}")
         else:
-            input_id = KeyboardInputItem(current_mode)
-
+            input_item = KeyboardInputItem(current_mode)
             index = self.input_item_list_model.rows() # new index
             #syslog.info(f"Adding new kbd input index {index} ")
-        input_id.key = root_key
-        input_type = InputType.KeyboardLatched # always use latched type starting with 13.40.14ex if root_key.is_latched else InputType.Keyboard
-        input_id.profile_mode = current_mode
 
+        input_item.key = root_key
+        input_item.setOverrideInputType(InputType.JoystickButton)
 
         # creates the item in the profile if needed
-        input_item = self.device_profile.modes[current_mode].get_data(input_type,input_id)
+        registry = gremlin.base_profile.ProfileRegistry()
+        self.device_profile.modes[current_mode].get_data(input_item.input_type, input_item.input_id) # creates the entry in the profile
         # ensure override type for keyboard input is a joystick button
-        input_item.setOverrideInputType(InputType.JoystickButton)
+        registry.sync()
 
 
         if reload:
@@ -691,7 +696,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             # redraw the list to include the new item
             self.input_item_list_view.redraw()
             # select the new item - its index may have changed
-            index = self.input_item_list_model.input_id_index(input_id)
+            index = self.input_item_list_model.input_id_index(input_item)
         else:
             # update the widget for this entry
             self.input_item_list_view.update_item(index)
@@ -702,7 +707,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
         if verbose:
-            syslog.info(f"Final item index {index} {input_id.display_name}")
+            syslog.info(f"Final item index {index} {input_item.display_name}")
 
 
 
@@ -887,28 +892,27 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the keyboard input widget has to update itself on a data change '''
-        data = input_widget.identifier.input_id
-        input_widget.setTitle(data.title_name)
-        # input_widget.setInputDescription(data.description)
-        values = data.getKeyList()
+        input_item = input_widget.identifier.input_item
+        input_widget.setTitle(input_item.title_name)
+        values = input_item.getKeyList()
         self._set_custom_content(input_widget, values)
 
         #input_widget.setInputDescription(data.display_name_scan)
-        input_widget.display_name = data.display_name_scan
+        input_widget.display_name = input_item.display_name_scan
 
-        input_widget.setToolTip(data.display_tooltip)
-        if data.has_mouse:
+        input_widget.setToolTip(input_item.display_tooltip)
+        if input_item.has_mouse:
             input_widget.setInputDescriptionIcon("mdi.mouse")
         else:
             input_widget.setInputDescriptionIcon(None)
 
         is_warning = False
         status_text = ""
-        if data.key is None:
+        if input_item.key is None:
             is_warning = True
             status_text = "Not configured"
         elif gremlin.config.Configuration().show_scancodes:
-            status_text = data.key.latched_code
+            status_text = input_item.key.latched_code
 
         icon = None
         if is_warning:

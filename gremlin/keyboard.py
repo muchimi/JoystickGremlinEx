@@ -103,11 +103,11 @@ _vk_key_scan_ex = _create_function(
 
 class Key():
 
-    """Represents a single key on the keyboard or mouse together with its different representations and latching (multiple keys) 
-     
-    If in mouse mode, the virtual code contains the MouseButton enum value for which mouse button this key corresponds to.  
-       
-        
+    """Represents a single key on the keyboard or mouse together with its different representations and latching (multiple keys)
+
+    If in mouse mode, the virtual code contains the MouseButton enum value for which mouse button this key corresponds to.
+
+
     """
 
     def __init__(self, name = None, scan_code : int = None, is_extended : bool = None, virtual_code : int = None, is_mouse : bool = False):
@@ -132,14 +132,14 @@ class Key():
         if is_mouse is None:
             is_mouse = False
 
-        
+
 
         self._lookup_name = None
         self._latched_code = ""
         self._latched_name = ""
-        
+
         self._latched_keys = [] # TraceableList() #[] # list of keys latched to this keystroke (modifiers)
-        # self._latched_keys.add_callback(self._changed_cb)            
+        # self._latched_keys.add_callback(self._changed_cb)
 
         self._name = None
         self._key_id_translate = None
@@ -148,12 +148,12 @@ class Key():
         if not name:
             self._load(scan_code, is_extended, virtual_code, is_mouse)
             name = self._name
-        
+
         else:
-            self._key_id = (scan_code, is_extended)   
+            self._key_id = (scan_code, is_extended)
             self._scan_code = scan_code
             self._is_extended = is_extended
-            self._virtual_code = virtual_code     
+            self._virtual_code = virtual_code
 
         self._lookup_name = name
 
@@ -173,26 +173,26 @@ class Key():
                         syslog.error(f"Don't know how to handle mouse scan code: 0x{mouse_button:x}")
                         mouse_button = MouseButton.DoubleLeft
 
-                
+
             self._mouse_button = mouse_button
 
 
         self._name = name
         self._is_mouse = is_mouse
-        
-        
+
+
         self._update()
 
     @property
     def key_id(self) -> tuple:
         return self._key_id
-    
+
     @property
     def key_id_translated(self) -> tuple:
         if not self._key_id_translate and self._key_id:
             self._key_id_translate, _ = KeyMap.translate(self._key_id)
         return self._key_id_translate
-        
+
 
     @property
     def virtual_code(self):
@@ -202,16 +202,16 @@ class Key():
     @property
     def scan_code(self):
         return self._scan_code
-    
+
     @property
     def is_extended(self):
         return self._is_extended
-    
+
     @property
     def is_toggle(self) -> bool:
         ''' true if the key is a toggle key (send keydown on keyup) like scroll lock '''
         return self.virtual_code in KeyMap._g_toggle_keys
-    
+
     @property
     def is_shifted_state(self) -> bool:
         ''' true if the key is a shifted state key (ctrl, alt, shft) '''
@@ -224,7 +224,7 @@ class Key():
             win32con.VK_RMENU, # right alt
             win32con.VK_MENU, # left alt (default)
         )
-    
+
     @property
     def weight(self) -> int:
         ''' sorting order weight for keys - the higher the number - the higher the precedence in a sequence '''
@@ -236,14 +236,14 @@ class Key():
             return 1000
         if self._virtual_code == win32con.VK_KANJI:
             return 8000
-        
+
         return 1000 - self.virtual_code # no sorting
-    
-   
+
+
     def index_tuple(self):
         ''' returns the gremlin index key for this key '''
-        return  (self._scan_code, self._is_extended)
-    
+        return  self._scan_code, self._is_extended
+
     @property
     def is_mouse(self):
         return self._is_mouse or MouseButton.is_lookup_valid(self._lookup_name)
@@ -272,7 +272,7 @@ class Key():
 
             is_mouse = True
             self._mouse_button = mouse_button
-            
+
 
         else:
             # regular key
@@ -280,7 +280,7 @@ class Key():
                 scan_code = scan_code & 0xFF
                 is_extended = True
 
-     
+
 
             if virtual_code > 0 and scan_code == 0:
                 # get scan code from VK
@@ -296,7 +296,7 @@ class Key():
         self._scan_code = scan_code
         self._is_extended = is_extended
         self._virtual_code = virtual_code
-        
+
         self._update()
 
 
@@ -320,7 +320,7 @@ class Key():
     def mouse_button(self):
         ''' returns a mouse button if the key is a virtual mouse button or mouse wheel '''
         return self._mouse_button
-    
+
     @mouse_button.setter
     def mouse_button(self, button):
         ''' sets a mouse button '''
@@ -335,11 +335,11 @@ class Key():
     #     self._update()
 
     def _update(self):
-        
+
         if len(self._latched_keys) > 0:
             keys = [self]
             keys.extend(self._latched_keys)
-            # order the key by modifier 
+            # order the key by modifier
             keys = sort_keys(keys)
             result = ""
             code  = ""
@@ -351,21 +351,21 @@ class Key():
                 result += key._name
                 code += f"0x{key._scan_code:X}({key._scan_code:02}){' EX' if key._is_extended else ''}"
             self._latched_name = result
-        else: 
+        else:
             code = f"0x{self._scan_code:02X}({self._scan_code:02}){' EX' if self._is_extended else ''}"
             self._latched_name = ""
         self._latched_code = code
-        
 
 
 
 
-        
+
+
 
     @property
     def name(self):
         return self._name
-    
+
     @property
     def latched_name(self):
         return self._latched_name if self._latched_name else self._name
@@ -397,95 +397,100 @@ class Key():
 
         #syslog.info(f"latch check: key {self.name} latched: {latched}")
         return latched
-    
-    
+
+
 
     @property
     def is_latched(self):
         ''' returns true if the key has latched components '''
         return len(self._latched_keys) > 0
-    
+
     @property
     def state(self):
         ''' returns the pressed state of the current key '''
         from gremlin.event_handler import EventListener
         el = EventListener()
         return el.get_key_state(self)
-        
+
     @property
     def data(self):
         # unique key for this key
         return self.__hash__()
-        
+
     @property
     def message_key(self):
-        return {self._scan_code, self._is_extended}
-    
+        # must be a hashable type
+        return self._scan_code, self._is_extended
+
     @property
     def debug_name(self):
         return f"{self.name} (0x{self._scan_code:02X}/{self._scan_code}{' EX' if self._is_extended else ''}]"
 
 
-    def __eq__(self, other):
-        return hash(self) == hash(other)
+    # def __eq__(self, other):
+    #     return hash(self) == hash(other)
 
-    def __ne__(self, other):
-        return not (self == other)
+    # def __ne__(self, other):
+    #     return hash(self) != hash(other)
 
     def __hash__(self):
         # computes the hash value for this key combination
         #if self._latched_keys:
-        data = f"{self._scan_code:x}{1 if self._is_extended else 0}"
-        for key in self._latched_keys:
-            data += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
-        return data.__hash__()
+        data = (self._scan_code, self._is_extended)
+        for key in self.latched_keys:
+            data.add(key._scan_code, key._is_extended)
+
+        # data = f"{self._scan_code:x}{1 if self._is_extended else 0}"
+        # for key in self._latched_keys:
+        #     data += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
+        return hash(data)
 
         # if self._is_extended:
         #     return (0x0E << 8) + self._scan_code
         # else:
         #     return self._scan_code
-        
+
     def __lt__(self, other):
         return self.name < other.name
-    
+
     def __le__(self, other):
         return self.name <= other.name
-    
+
     def __gt__(self, other):
         return self.name > other.name
-    
+
     def __ge__(self, other):
         return self.name > other.name
-    
+
     def __str__(self):
         if self.name:
             return self.name
         return ""
-    
 
-    
-    
+
+
+
     @property
     def latched_keys(self):
         ''' list of key objects that are latched to this key (modifiers)'''
         return self._latched_keys
-    
+
     @latched_keys.setter
     def latched_keys(self, value):
         self._latched_keys.clear()
         self._latched_keys.extend(value)
         self._update()
-    
+
     @property
     def is_latched(self):
         ''' true if this key is latched '''
         return len(self._latched_keys) > 0
-    
+
     @property
     def is_modifier(self):
         ''' true if the key is a modifier '''
         return self._lookup_name in KeyMap._keyboard_modifiers
-    
+
     def modifier_order(self):
         ''' returns the order of the modifier '''
         lookup_name = self.lookup_name
@@ -493,40 +498,40 @@ class Key():
         if lookup_name in modifiers:
             return modifiers.index(lookup_name)
         return -1 # not found
-    
+
     def key_order(self):
         ''' gets a unique and predictable key index for ordering a key sequence
-         
+
         Modifiers will be a lower index than normal character which will be lower than special keys
-           
+
         '''
-        
+
         lookup_name = self.lookup_name
         if not lookup_name:
             return -1
-        
+
         if lookup_name in KeyMap._keyboard_modifiers:
             return self.modifier_order()
-        
+
         # bump to next index
         start_index = 100
-        
+
         if len(lookup_name) == 1:
             # single keys - use the ascii sequence
             value = ord(lookup_name)
             return start_index + value
-        
+
         start_index = 1000
         # special keys
         special = KeyMap._keyboard_special
         if lookup_name in special:
             value = special.index(lookup_name)
             return start_index + value
-        
+
         # no clue
         return -1
-    
-    
+
+
 
 
 def key_from_mousebutton(button_id):
@@ -537,11 +542,11 @@ def key_from_mousebutton(button_id):
             map_key = "mouse_1"
         case gremlin.types.MouseButton.Right:
             map_key = "mouse_2"
-        case gremlin.types.MouseButton.Middle: 
+        case gremlin.types.MouseButton.Middle:
             map_key = "mouse_3"
-        case gremlin.types.MouseButton.Back: 
+        case gremlin.types.MouseButton.Back:
             map_key = "mouse_5"
-        case gremlin.types.MouseButton.Forward: 
+        case gremlin.types.MouseButton.Forward:
             map_key = "mouse_4"
         case gremlin.types.MouseButton.WheelRight:
             map_key = "wheel_right"
@@ -553,7 +558,7 @@ def key_from_mousebutton(button_id):
             map_key = "wheel_down"
         case _:
             return None # not one we care about
-    
+
     if map_key:
         return key_from_name(map_key)
     return None
@@ -599,12 +604,12 @@ def send_key_target(target_hwnd, key, flags):
 
             if _set_focus(target_hwnd):
                 focus_changed = True
-                
+
                 retry = 10
                 while win32gui.GetForegroundWindow() != target_hwnd and retry:
                     time.sleep(delay)
                     retry -=1
-                
+
                 if retry == 0:
                     syslog.error("SEND KEY (target): unable to get target window focus")
                     return False
@@ -624,13 +629,13 @@ def send_key_target(target_hwnd, key, flags):
                     linked = True
             else:
                 return False
-            
+
         # send the key
         gremlin.sendinput.send_key(key.virtual_code, key.scan_code, flags)
         time.sleep(delay)
         syslog.info(f"SENDKEY (target hwnd 0x{target_hwnd:x}) vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
 
-     
+
 
         # revert focus to the prior window that had the focus
         if focus_changed:
@@ -647,7 +652,7 @@ def send_key_target(target_hwnd, key, flags):
                 syslog.error(f"SEND KEY: unable to unlink input threads: error code: [{code}/0x{code:x}]: {error_message}")
 
 
-    
+
 
 def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, target_hwnd = 0, extra_data : dict = None):
     """Sends the KEYDOWN event for a single key.
@@ -656,9 +661,9 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, ta
     """
     import gremlin.remote
     import gremlin.macro
-    
+
     key: gremlin.keyboard.Key
-  
+
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
         dbl_click = "_d_" in key.lookup_name
@@ -669,17 +674,17 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, ta
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     config = gremlin.config.Configuration()
     verbose = config.verbose_mode_outputs or config.verbose_mode_keyboard
-    verbose_extra = verbose and config.verbose_mode_extra 
+    verbose_extra = verbose and config.verbose_mode_extra
 
-    
-    
+
+
     if is_local:
         if verbose: syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
         process_name = extra_data['process_name'] if extra_data and 'process_name' in extra_data else None
         if target_hwnd == 0 and process_name:
             target_hwnd = win32gui.FindWindow(process_name) # find the process handle, 0 if not found
         if target_hwnd:
-            focus_method = extra_data["focus_method"] if extra_data and "focus_method" in extra_data else True        
+            focus_method = extra_data["focus_method"] if extra_data and "focus_method" in extra_data else True
             if focus_method:
                 if send_key_target(target_hwnd, key, flags):
                     if verbose:
@@ -687,7 +692,7 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, ta
 
             else:
                 # POST method
-                
+
                 # Keyup Bits: (Transition=0, Previous=0, Extended=0, Scancode=0x1E, Repeat=1)
                 lparam = 0x00000001 | key.scan_code << 16 # Scan code, repeat=1
                 if key.is_extended:
@@ -696,11 +701,11 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, ta
                 # hwnd_list.append(hwnd)
                 if verbose:
                     syslog.info(f"\tSENDKEY DN via MESSAGE POST: hwnd: 0x{target_hwnd:x} message: [0x{win32con.WM_KEYUP:x}] vk: [0x{key.virtual_code:x}] lparam: [0x{lparam:x}]")
-                win32gui.PostMessage(target_hwnd, win32con.WM_KEYDOWN, key.virtual_code, lparam)                    
+                win32gui.PostMessage(target_hwnd, win32con.WM_KEYDOWN, key.virtual_code, lparam)
                 for sub_hwnd in hwnd_list:  # must send to specific process subhandles for POST method
                     win32gui.PostMessage(sub_hwnd, win32con.WM_KEYDOWN, key.virtual_code, lparam)
                     if verbose_extra:
-                       syslog.info(f"\t[0x{sub_hwnd:x}]") 
+                       syslog.info(f"\t[0x{sub_hwnd:x}]")
 
         else:
             # direct send
@@ -727,7 +732,7 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, targ
     key: gremlin.keyboard.Key
     config = gremlin.config.Configuration()
     verbose = config.verbose_mode_outputs or config.verbose_mode_keyboard
-    verbose_extra = verbose and config.verbose_mode_extra 
+    verbose_extra = verbose and config.verbose_mode_extra
 
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
@@ -737,7 +742,7 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, targ
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
     flags |= win32con.KEYEVENTF_KEYUP
 
-    
+
     if is_local:
         if verbose: syslog.info(f"OUTPUT: (local) keyup {key.debug_name}")
         process_name = extra_data['process_name'] if extra_data and 'process_name' in extra_data else None
@@ -762,7 +767,7 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, targ
                 # hwnd_list.append(hwnd)
                 if verbose:
                     syslog.info(f"\tSENDKEY UP via MESSAGE POST: hwnd: {target_hwnd:x} message: [{win32con.WM_KEYUP:x}] vk: [{key.virtual_code:x}] lparam: [{lparam:x}]")
-                win32gui.PostMessage(target_hwnd, win32con.WM_KEYUP, key.virtual_code, lparam) 
+                win32gui.PostMessage(target_hwnd, win32con.WM_KEYUP, key.virtual_code, lparam)
                 for sub_hwnd in hwnd_list:
                     win32gui.PostMessage(sub_hwnd, win32con.WM_KEYUP, key.virtual_code, lparam)
                     if verbose_extra:
@@ -782,7 +787,7 @@ def mouse_from_name(name):
     from gremlin.types import MouseButton
     mouse_button = None
     name = name.lower()
-    if name in ("mouse_1", "mouse_left", MouseButton.to_string(MouseButton.Left).lower()): 
+    if name in ("mouse_1", "mouse_left", MouseButton.to_string(MouseButton.Left).lower()):
         mouse_button = MouseButton.Left
     elif name in ("mouse_2", "mouse_right", MouseButton.to_string(MouseButton.Right).lower()):
         mouse_button = MouseButton.Right
@@ -821,12 +826,12 @@ def key_from_name(name, validate = False) -> Key:
         scan_code = 0x1000 + mouse_button.value
         is_extended = False
         key = Key(key_name, scan_code, is_extended, 0, is_mouse=True)
-        return key    
+        return key
 
     # Attempt to located the key in our database and return it if successful
     key_name = name.casefold().replace(" ", "")
 
-       
+
     key = KeyMap.find_by_name(key_name)
     if key is not None:
         return key
@@ -837,7 +842,7 @@ def key_from_name(name, validate = False) -> Key:
         if validate:
             # skip error reporting on validation
             return None
-        
+
         syslog.warning(
             f"Invalid key name specified \"{name}\""
         )
@@ -845,7 +850,7 @@ def key_from_name(name, validate = False) -> Key:
             f"Invalid key specified, {name}"
         )
     else:
-        KeyMap.register(key) 
+        KeyMap.register(key)
         return key
 
 
@@ -856,7 +861,7 @@ def sort_keys(keys):
     for key in keys:
         index = key.key_order()
         sequence.append((key, index))
-    
+
     sequence.sort(key = lambda x: x[1])
     keys_list = [pair[0] for pair in sequence]
     return keys_list
@@ -868,14 +873,14 @@ def key_name_from_code(scan_code, is_extended):
     if scan_code >= 0x1000:
         scan_code -= 0x1000
         return MouseButton.to_string(scan_code)
-    
- 
-    
+
+
+
     # Attempt to located the key in our database and return it if successful
     key = KeyMap.find(scan_code, is_extended)
     if key:
         return key.name
-    
+
     # Attempt to create the key to store and return if successful
 
     virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
@@ -894,24 +899,24 @@ def key_from_code(scan_code, is_extended):
     :param is_extended flag indicating if the key is extended
     :return Key instance or None
     """
-    
+
     import copy
 
     if scan_code >= 0x1000:
         # mouse special code
         key = Key(scan_code = scan_code, is_mouse = True)
         return key
-    
+
     # Attempt to located the key in our database and return it if successful
     key = KeyMap.find(scan_code, is_extended)
     if key is not None:
         return copy.deepcopy(key)
-        
-    
+
+
     # Attempt to create the key to store and return if successful
     virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
     name = KeyMap.virtual_input_to_unicode(virtual_code)
-    
+
     if virtual_code == 0xFF or name is None:
         syslog.warning(
             f"Invalid scan code specified ({scan_code} (0x{scan_code:x}), {is_extended})"
@@ -924,7 +929,7 @@ def key_from_code(scan_code, is_extended):
         key = Key(name, scan_code, is_extended, virtual_code)
         KeyMap.register(key)
         return key
-    
+
 
 
 
@@ -1063,7 +1068,7 @@ class scan_codes(enum.IntEnum):
     # - break: 0xE0B7 0xE0AA
     # - MapVirtualKeyEx( VK_SNAPSHOT MAPVK_VK_TO_VSC_EX 0 ) returns scancode 0x54;
     # - There is no VK_KEYDOWN with VK_SNAPSHOT.
-    
+
     sc_altRight = 0xE038
     sc_cancel = 0xE046 # CTRL + Pause */
     sc_home = 0xE047
@@ -1093,7 +1098,7 @@ class scan_codes(enum.IntEnum):
     sc_launch_media = 0xE06D
 
     sc_pause = 0xE11D45
-    
+
     # sc_pause:
     # - make: 0xE11D 45 0xE19D C5
     # - make in raw input: 0xE11D 0x45
@@ -1101,7 +1106,7 @@ class scan_codes(enum.IntEnum):
     # - No repeat when you hold the key down
     # - There are no break so I don't know how the key down/up is expected to work. Raw input sends "keydown" and "keyup" messages and it appears that the keyup message is sent directly after the keydown message (you can't hold the key down) so depending on when GetMessage or PeekMessage will return messages you may get both a keydown and keyup message "at the same time". If you use VK messages most of the time you only get keydown messages but some times you get keyup messages too.
     # - when pressed at the same time as one or both control keys generates a 0xE046 (sc_cancel) and the string for that scancode is "break".
-    
+
 
 
 
@@ -1111,7 +1116,7 @@ class KeyMap:
     _g_scan_code_to_key = {} # map of (scancode, extended) to the key
     _key_map = {}
 
-   
+
     @staticmethod
     def register(key : Key):
         assert key.lookup_name
@@ -1121,7 +1126,7 @@ class KeyMap:
         if key.virtual_code > 0:
             if not key.virtual_code in KeyMap._g_virtual_code_to_key:
                 KeyMap._g_virtual_code_to_key[key.virtual_code] = key
-        
+
         index = (key.scan_code, key.is_extended)
         if not index in KeyMap._g_scan_code_to_key.keys():
             KeyMap._g_scan_code_to_key[index] = key
@@ -1149,7 +1154,7 @@ class KeyMap:
         if key:
             return key.duplicate()
         return None
-    
+
     @staticmethod
     def icon(key : Key):
         ''' gets an icon for the given key if the key has one'''
@@ -1166,13 +1171,13 @@ class KeyMap:
             icon_name, icon_color = data
             return gremlin.util.load_icon(icon_name, icon_color)
         return None
-    
+
     @staticmethod
     def find_virtual(virtual_code):
         if virtual_code in KeyMap._g_virtual_code_to_key:
             return KeyMap._g_virtual_code_to_key[virtual_code].duplicate()
         return None
-            
+
 
     @staticmethod
     def find_by_name(name):
@@ -1182,7 +1187,7 @@ class KeyMap:
         if name in KeyMap._key_map:
             return KeyMap._key_map[name].duplicate()
         return None
-        
+
     @staticmethod
     def from_event(event):
         ''' returns a key based on a keyboard event '''
@@ -1200,16 +1205,16 @@ class KeyMap:
             syslog.error(f"KEY: error: invalid event: {ex}")
         syslog.error("KEY: invalid event")
         return None
-    
+
     @staticmethod
     def from_message_key(scan_code, is_extended):
         ''' returns a key from the message key (used in pickle ops) '''
-    
+
         key = KeyMap.find(scan_code, is_extended)
         if key is None:
             syslog.error(f"KEY: Don't know how to message_key: 0x{scan_code:02X} ({scan_code}) extended: {extended}")
         return key
-     
+
     @staticmethod
     def scan_code_to_virtual_code(scan_code, is_extended):
         """Returns the virtual code corresponding to the given scan code.
@@ -1222,7 +1227,7 @@ class KeyMap:
 
         """
 
-        if scan_code: 
+        if scan_code:
             value = scan_code
             if is_extended:
                 value = 0xe0 << 8 | scan_code
@@ -1230,7 +1235,7 @@ class KeyMap:
             virtual_code = _map_virtual_key_ex(value, 3, _get_keyboard_layout(0))
             return virtual_code
         return None
-    
+
     @staticmethod
     def virtual_code_to_scan_code(virtual_code):
         scan_code = _map_virtual_key_ex(virtual_code, 4,_get_keyboard_layout(0))
@@ -1246,7 +1251,7 @@ class KeyMap:
 
         if not virtual_code:
             return None
-        
+
 
         keyboard_layout = _get_keyboard_layout(0)
         output_buffer = ctypes.create_unicode_buffer(8)
@@ -1274,12 +1279,12 @@ class KeyMap:
                 if scan_code == p_scan_code and virtual_code == p_virtual_code:
                     name = p_name
                     break
-            
+
             if not name:
                 name = f"Key 0x{scan_code:02X}({scan_code:02}) VK {virtual_code:X}))"
             return name
         return output_buffer.value.upper()
-    
+
     @staticmethod
     def get_key(scan_code, is_extended):
         virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
@@ -1287,7 +1292,7 @@ class KeyMap:
             name = KeyMap.virtual_input_to_unicode(virtual_code, scan_code)
             return Key(name, scan_code, is_extended, virtual_code)
         return None
-        
+
     @staticmethod
     def get_media_keys() -> list:
         ''' gets the media keys '''
@@ -1307,7 +1312,7 @@ class KeyMap:
             key = KeyMap.find_by_name(lookup_name)
             keys.append(key)
         return keys
-    
+
     @staticmethod
     def get_name(key : Key):
         ''' gets a translated or short name for a key '''
@@ -1328,7 +1333,7 @@ class KeyMap:
         if name in KeyMap._key_description_lookup:
             return KeyMap._key_description_lookup[name]
         return key.name
-        
+
 
 
     _key_description_lookup = {
@@ -1354,8 +1359,8 @@ class KeyMap:
 
 
     }
-    
-        
+
+
 
     @staticmethod
     def unicode_to_key(character):
@@ -1376,8 +1381,8 @@ class KeyMap:
         is_extended = False
         if code_value << 8 & 0xE0 or code_value << 8 & 0xE1:
             is_extended = True
-        return Key(character, scan_code, is_extended, virtual_code)    
-    
+        return Key(character, scan_code, is_extended, virtual_code)
+
 
 
 
@@ -1419,12 +1424,12 @@ class KeyMap:
             return_key.latched_keys = latched
 
         return return_key
-    
+
 
     @staticmethod
     def translate(keyid) -> tuple:
         ''' translates a key id and returns a list of equivalent keys
-            this is to map similar keys together 
+            this is to map similar keys together
             :param keyid (scan_code, is_extended)
             :returns ((scan_code, is_extended), virtual_code)
         '''
@@ -1438,11 +1443,11 @@ class KeyMap:
             return result
 
         return (keyid, vk)
-    
+
     @staticmethod
     def translate_lookup(key_tuple) -> tuple:
         ''' translates a key id and returns a list of equivalent keys
-            this is to map similar keys together 
+            this is to map similar keys together
             :param keyid (scan_code, is_extended)
             :returns (scan_code, is_extended)
         '''
@@ -1453,7 +1458,7 @@ class KeyMap:
             key_trans, _ = KeyMap._g_translate_map[key_tuple]
             return key_trans
         return key_tuple
-    
+
     @staticmethod
     def reverse_translate(key_tuple) -> tuple:
          if not KeyMap._g_reverse_translate_map:
@@ -1463,21 +1468,21 @@ class KeyMap:
 
          if key_tuple in KeyMap._g_reverse_translate_map:
              return KeyMap._g_reverse_translate_map[key_tuple]
-         
-         
-         
+
+
+
          return None
-             
-            
-        
+
+
+
     @staticmethod
     def vk_lookup(key_tuple):
         ''' gets a virtual key from (scancode, extended) '''
         scan_code, is_extended = key_tuple
         vk = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
         return vk
-    
-    
+
+
     @staticmethod
     def keyid_tostring(keyid):
         scan_code, is_extended = keyid
@@ -1485,23 +1490,23 @@ class KeyMap:
             # source is (scan_code, extended), virtual_code
             scan_code, is_extended = scan_code
         return f"({scan_code} 0x{scan_code:X}, {is_extended})"
-    
+
     @staticmethod
     def get_vk_keyboard_state(virtual_code):
         ''' get the hardware keyboard state by virtual key '''
         return (user32.GetAsyncKeyState(virtual_code) & 1) != 0 # true if the key is pressed
-    
+
     @staticmethod
     def get_keyboard_state(scan_code, is_extended):
         ''' gets the hardware keyboard state by scan code '''
         virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
         return KeyMap.get_vk_keyboard_state(virtual_code)
-    
+
     @staticmethod
     def numlock_state():
         ''' gets the state of the numlock key '''
         return KeyMap.get_vk_keyboard_state(win32con.VK_NUMLOCK)
-    
+
     @staticmethod
     def set_numlock_state(value):
         state = KeyMap.numlock_state()
@@ -1512,14 +1517,14 @@ class KeyMap:
     def toggle_numlock():
         import gremlin.sendinput
         # key down
-        flags = win32con.KEYEVENTF_EXTENDEDKEY 
+        flags = win32con.KEYEVENTF_EXTENDEDKEY
         gremlin.sendinput.send_key(win32con.VK_NUMLOCK, 0x45, flags)
 
         # key up
         flags |= win32con.KEYEVENTF_KEYUP
         gremlin.sendinput.send_key(win32con.VK_NUMLOCK, 0x45, flags)
 
-    
+
     # holds the number pad scan codes
     _g_numpad_codes = (win32con.VK_NUMPAD0,
                        win32con.VK_NUMPAD1,
@@ -1532,7 +1537,7 @@ class KeyMap:
                        win32con.VK_NUMPAD8,
                        win32con.VK_NUMPAD9,
                        )
-    
+
     _g_translate_map = {
         (0x52,True): ((0x52, False), win32con.VK_NUMPAD0), # make all numpad keys report as numpad
         (0x4F,True): ((0x4F, False), win32con.VK_NUMPAD1),
@@ -1545,7 +1550,7 @@ class KeyMap:
         (0x48,True): ((0x48, True), win32con.VK_UP), # up arrow
         (0x49,True): ((0x49, False), win32con.VK_NUMPAD9),
 
-        (0x52,False): ((0x52, False), win32con.VK_NUMPAD0), 
+        (0x52,False): ((0x52, False), win32con.VK_NUMPAD0),
         (0x4F,False): ((0x4F, False), win32con.VK_NUMPAD1),
         (0x50,False): ((0x50, False), win32con.VK_NUMPAD2),
         (0x51,False): ((0x51, False), win32con.VK_NUMPAD3),
@@ -1586,12 +1591,12 @@ class KeyMap:
         "f16": ("F16", 0x67, False, win32con.VK_F16),
         "f17": ("F17", 0x68, False, win32con.VK_F17),
         "f18": ("F18", 0x69, False, win32con.VK_F18),
-        "f19": ("F19", 0x6a, False, win32con.VK_F19),    
-        "f20": ("F20", 0x6b, False, win32con.VK_F20),    
-        "f21": ("F21", 0x6c, False, win32con.VK_F21),    
-        "f22": ("F22", 0x6d, False, win32con.VK_F22),    
-        "f23": ("F23", 0x6e, False, win32con.VK_F23),    
-        "f24": ("F24", 0x76, False, win32con.VK_F24),   
+        "f19": ("F19", 0x6a, False, win32con.VK_F19),
+        "f20": ("F20", 0x6b, False, win32con.VK_F20),
+        "f21": ("F21", 0x6c, False, win32con.VK_F21),
+        "f22": ("F22", 0x6d, False, win32con.VK_F22),
+        "f23": ("F23", 0x6e, False, win32con.VK_F23),
+        "f24": ("F24", 0x76, False, win32con.VK_F24),
         # Control keys
         "printscreen": ("Print Screen", 0x37, True, win32con.VK_SNAPSHOT),
         "scrolllock": ("Scroll Lock", 0x46, False, win32con.VK_SCROLL),
@@ -1653,7 +1658,7 @@ class KeyMap:
         #"mediaplay": ("Play", 0x22, True, win32con.VK_PLAY),
         "mediapause": ("Play/Pause", 0x22, True, win32con.VK_MEDIA_PLAY_PAUSE),
         "medianexttrack": ("Next Track", 0x21, True, win32con.VK_MEDIA_NEXT_TRACK),
-        
+
         "mediavolmute": ("Mute", 0x20, True, win32con.VK_VOLUME_MUTE),
         "mediavolup": ("Volume Up", 0x30, True, win32con.VK_VOLUME_UP),
         "mediavoldn": ("Volume Down", 0x1e, True, win32con.VK_VOLUME_DOWN),
@@ -1686,12 +1691,12 @@ class KeyMap:
         "wheel_down": "mdi.mouse",
         "wheel_left": "mdi.mouse",
         "wheel_right": "mdi.mouse",
-        
+
 
 
     }
 
-    # list of toggle keys (virtual codes) 
+    # list of toggle keys (virtual codes)
     _g_toggle_keys = [
         win32con.VK_SCROLL
     ]
@@ -1704,7 +1709,7 @@ for mouse_button in MouseButton:
     # double click adds 0x100 to the code
     # mouse codes add 0x1000 to the code
 
-    code = mouse_button.value 
+    code = mouse_button.value
     scan_code = 0x1000 + code # button code
     is_extended = False
     name = MouseButton.to_string(mouse_button)
@@ -1742,5 +1747,5 @@ for enum_code_value in scan_codes:
             name = enum_code_value.name
             key = Key(name, scan_code, is_extended, 0)
             KeyMap.register(key)
-            
+
 

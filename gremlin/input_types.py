@@ -1,7 +1,7 @@
 
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@ class InputType(enum.IntEnum):
                 return _InputType_to_enum_lookup[value]
         except KeyError:
             raise ValueError("Invalid type in lookup")
-        
+
     @staticmethod
     def to_name(value):
         match value:
@@ -88,8 +88,8 @@ class InputType(enum.IntEnum):
                 return "IFR1"
             case _:
                 return f"Don't know how to handle {value}"
-        
-        
+
+
     @staticmethod
     def to_list(include_notset = False, include_mouse = False, include_virtualbutton = False) -> list:
         data = [it for it in InputType]
@@ -100,13 +100,13 @@ class InputType(enum.IntEnum):
         if not include_virtualbutton:
             data.remove(InputType.VirtualButton)
         return data
-    
+
     @staticmethod
     def to_display_name(value) -> str:
         if value in _InputType_to_display_lookup.keys():
             return _InputType_to_string_lookup[value]
         return f"Unknown type: {value}"
-    
+
     @staticmethod
     def convert(value) -> InputType:
         try:
@@ -116,11 +116,11 @@ class InputType(enum.IntEnum):
             if value in _InputType_to_enum_lookup:
                 input_type = _InputType_to_enum_lookup[value]
                 return input_type
-                
+
         except:
             pass
         return None
-    
+
     # JSON serializer
 
 
@@ -161,7 +161,8 @@ _InputType_to_enum_lookup = {
     "mouse" : InputType.Mouse,
     "button": InputType.JoystickButton,
     "hat": InputType.JoystickHat,
-    "key": InputType.Keyboard,
+    "key": InputType.KeyboardLatched,
+    "keyboard": InputType.KeyboardLatched,
     "keylatched": InputType.KeyboardLatched,
     "osc": InputType.OpenSoundControl,
     "midi": InputType.Midi,

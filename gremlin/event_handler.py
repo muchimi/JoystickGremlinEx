@@ -1007,7 +1007,7 @@ class EventListener:
 		#verbose = self._verbose_inputs
 		while not self._event_thread.stopped():
 			if self._event_queue.empty():
-				time.sleep(0.001)
+				time.sleep(0)
 				continue
 
 			event = self._event_queue.get()
@@ -1349,11 +1349,11 @@ class EventListener:
 
 
 			self.keyboard_event.emit(Event(
-				event_type= InputType.Keyboard,
-				device_guid=dinput.GUID_Keyboard,
-				identifier=key_id,
+				event_type = InputType.Keyboard,
+				device_guid = dinput.GUID_Keyboard,
+				identifier = key_id,
 				virtual_code = virtual_code,
-				is_pressed=is_pressed,
+				is_pressed = is_pressed,
 				data = self._keyboard_buffer
 			))
 
@@ -1371,7 +1371,7 @@ class EventListener:
 		threading.current_thread().reset()
 		while not self._keyboard_thread.stopped():
 			if self._keyboard_queue.empty():
-				time.sleep(0.001)
+				time.sleep(0)
 				continue
 			self._process_queue()
 
@@ -1464,7 +1464,7 @@ class EventListener:
 		dinput.DILL.set_input_event_callback(self._dinput_event_handler) # DINPUT event handler
 		while self._running and not self._run_event.is_set():
 			# Keep this thread alive until we are done
-			time.sleep(0.001)
+			time.sleep(0)
 		syslog.info("DILL: shutdown")
 		dinput.DILL.set_device_change_callback(None)
 		dinput.DILL.set_input_event_callback(None)
@@ -1472,12 +1472,13 @@ class EventListener:
 
 	def _keep_alive(self):
 		''' keep alive 30 second hearbeat '''
+		delay = 60*2 # delay in seconds
 		notify_time = time.time()
 		while not self._keep_alive_event.is_set():
 			if time.time() >= notify_time:
 				self.heartbeat.emit()
-				notify_time = time.time() + 60*2 # 2 minutes
-			time.sleep(1)
+				notify_time = time.time() + delay # 2 minutes
+			time.sleep(0) # do other stuff
 
 	def _handle_vjoy_event(self, vjoyevent : VjoyEvent):
 		''' handles internal loopback events
@@ -1974,9 +1975,9 @@ class EventListener:
 
 			mouse_event = Event(
 				event_type= InputType.Mouse,
-				device_guid=dinput.GUID_Keyboard,
-				identifier=event.button_id, # mouse handler is expecting a mouse ID, not a keyboard ID
-				is_pressed=event.is_pressed,
+				device_guid= dinput.GUID_Keyboard,
+				identifier= event.button_id, # mouse handler is expecting a mouse ID, not a keyboard ID
+				is_pressed= event.is_pressed,
 				data = self._keyboard_state
 			)
 
@@ -2161,8 +2162,8 @@ class EventHandler(QtCore.QObject):
 				syslog.info("EXEC: stop")
 
 
-	def registerModeValidator(self, callback):
-		assert callable(callback)
+	def registerModeValidator(self, callback : Callable):
+		assert callback is not None and callable(callback), "Callback must provided and be a callable "
 		self._mode_validator_callbacks[callback] = callback
 
 	def unregisterModeValidator(self, callback):
@@ -2380,7 +2381,7 @@ class EventHandler(QtCore.QObject):
 
 		if input_type == InputType.KeyboardLatched:
 			# use the key sequence as the magic key
-			magic = json.dumps(input_item.input_id.key_tuple)
+			magic = json.dumps(input_item.key_tuple)
 		else:
 			magic = item.input_id
 
@@ -2413,14 +2414,14 @@ class EventHandler(QtCore.QObject):
 		import gremlin.ui.keyboard_device
 		import gremlin.keyboard
 
-		assert callable(callback)
+		assert callback is not None and callable(callback), 'Callback must be provided and be a callable'
 
 		if event:
 			if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
 				verbose = gremlin.config.Configuration().verbose_mode_keyboard
 				# keyboard latched event
-				identifier = event.identifier
-				primary_key = identifier.key
+				identifier = event.identifier # Key()
+				primary_key = identifier
 
 
 
@@ -3104,7 +3105,7 @@ class EventHandler(QtCore.QObject):
 						is_latched = True
 						latch_key = None
 						# print (data)
-						latched_keys = [input_item.key]
+						latched_keys = [input_item]
 						latched_keys.extend(input_item.latched_keys)
 						if verbose: syslog.info(f"KEY: Checking latching: {len(latched_keys)} key(s)")
 						if len(latched_keys) > 1:
@@ -3130,7 +3131,7 @@ class EventHandler(QtCore.QObject):
 						if verbose:	syslog.info(f"\tLatched state: {is_latched}")
 
 						if is_latched:
-							latch_key = input_item.key
+							latch_key = input_item
 
 						if latch_key:
 
@@ -4511,17 +4512,17 @@ class JoystickEventProcessor():
 
 		while not self._event_thread.stopped():
 			if self._event_queue.empty():
-				time.sleep(0.001)
+				time.sleep(0)
 				continue
 
-			is_running = gremlin.shared_state.is_running
+
 			events = []
 			while not self._event_queue.empty():
 				events.append(self._event_queue.get())
 			#events = self._event_queue.getAll()
 
 			# build the event list by ui or non-ui
-
+			is_running = gremlin.shared_state.is_running
 			for event in events:
 				# get axis values
 
@@ -4569,7 +4570,7 @@ class JoystickEventProcessor():
 	def _ui_event_runner(self):
 		while not self._ui_event_thread.stopped():
 			if self._ui_event_queue.empty():
-				time.sleep(0.01) # run the UI queue slower than the main event queue
+				time.sleep(0) # run the UI queue slower than the main event queue
 				continue
 
 			cb_data = self._ui_event_queue.getData()

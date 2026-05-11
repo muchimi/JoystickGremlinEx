@@ -204,7 +204,7 @@ class PeriodicRegistry:
             # our timeout expires
             time.sleep(min(self._queue[0][0] - time.time(), 1.0))
 
-            
+
 
 class SimpleRegistry:
 
@@ -235,13 +235,13 @@ class SimpleRegistry:
         self._running = False
 
 
-    def add(self, callback):
+    def add(self, callback : Callable):
         """Adds a function to execute periodically.
 
         :param callback the function to execute
         :param interval the time between executions
         """
-        assert callable(callback)
+        assert callback is not None and callable(callback), 'Callback must be provided and be a callable'
         self._registry[callback] =  callback
 
 
@@ -280,7 +280,7 @@ class ModeChangeRegistry():
         :param callback the function to execute
         :param interval the time between executions
         """
-        assert callable(callback)
+        assert callback is not None and callable(callback), 'Callback must be provided and be a callable'
         self._registry[callback] = callback
 
 
@@ -296,7 +296,7 @@ class ModeChangeRegistry():
         :return new callback with plugins installed
         """
         signature = inspect.signature(callback).parameters
-        
+
         partial_fn = functools.partial
         if "self" in signature:
             partial_fn = functools.partialmethod
@@ -332,7 +332,7 @@ class StateChangeRegistry():
         :param callback the function to execute
         :param interval the time between executions
         """
-        assert callable(callback)
+        assert callback is not None and callable(callback), 'Callback must be provided and be a callable'
         self._registry[callback] = callback
 
 
@@ -371,7 +371,7 @@ class StateChangeRegistry():
 
 
 
-    
+
 
 
 
@@ -456,7 +456,7 @@ class JoystickWrapper:
         def direction(self):
             import vjoy
             value = gremlin.joystick_handling.get_hat(self._joystick_guid, self._index)
-            if value in vjoy.vjoy.Hat.to_continuous_position: 
+            if value in vjoy.vjoy.Hat.to_continuous_position:
                 position = vjoy.vjoy.Hat.to_continuous_position[value]
             else:
                 position = (0,0)
@@ -642,7 +642,7 @@ class VJoyPlugin:
     """
 
 
-    
+
     vjoy = gremlin.joystick_handling.VJoyProxy()
 
     def __init__(self):
@@ -790,7 +790,7 @@ class OscDecorator:
 
 def _osc(message, mode = "Default", always_execute=False):
     ''' decorator for osc callbacks '''
-    
+
     def wrap(callback):
         import gremlin.ui.osc_device
         import gremlin.input_types
@@ -801,7 +801,8 @@ def _osc(message, mode = "Default", always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        input_item = gremlin.ui.osc_device.OscInputItem()
+        mode_object = gremlin.shared_state.current_profile.getMode(mode)
+        input_item = gremlin.ui.osc_device.OscInputItem(mode_object)
         input_item.message = message
         input_item.command_mode = gremlin.ui.osc_device.OscInputItem.CommandMode.Message
         input_item.source_index = 0
@@ -811,7 +812,7 @@ def _osc(message, mode = "Default", always_execute=False):
             device_guid = gremlin.shared_state.osc_tab_guid,
             identifier = input_item
             )
-        
+
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
         return wrapper_fn
@@ -864,7 +865,7 @@ class CallbackActions():
         release_evt.is_pressed = False
         key = release_evt.callbackKey
 
-        assert callable(callback)
+        assert callback is not None and callable(callback), 'Callback must be provided and be a callable'
 
         if release_evt not in self._registry:
             self._registry[key] = []
@@ -882,7 +883,7 @@ class CallbackActions():
         is_local = True,
         is_remote = False,
         force_remote = False,
-        
+
     ):
         """Registers a physical and vjoy button pair for tracking.
 
@@ -927,10 +928,10 @@ class CallbackActions():
         if vjoy[vjoy_input[0]].is_button_valid(vjoy_input[1]):
             if is_local:
                 vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
-                
+
             if is_remote or force_remote:
                 gremlin.remote.remote_client.send_button(vjoy_input[0], vjoy_input[1], False, force_remote = force_remote )
-            
+
         else:
             syslog.warning(
                 f"Attempted to use non existent button: " +
@@ -943,9 +944,9 @@ class CallbackActions():
         Args:
             event: the event to process
         """
-        
+
         key = event.callbackKey
-        
+
         if key in self._registry:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
             if verbose: syslog.info(f"AUTORELEASE: execute trigger : {key}")
@@ -975,7 +976,7 @@ class JoystickInputSignificant:
         """Initializes the instance."""
         self.reset()
 
-   
+
     def should_process(self, event, deviation = 0.1) -> bool:
         """Returns whether or not a particular event is significant enough to
         process.
@@ -1023,7 +1024,7 @@ class JoystickInputSignificant:
         self._event_registry = {}
         self._mre_registry = {}
         self._time_registry = {}
-        
+
 
     def should_process_axis(self, event, deviation = 0.1) -> bool:
         return self._process_axis(event, deviation)
@@ -1048,7 +1049,7 @@ class JoystickInputSignificant:
             else:
 
                 self._time_registry[key] = time.time() + offset
-                
+
                 if abs(self._event_registry[key].value - event.value) > deviation:
                     self._event_registry[key] = event
                     self._time_registry[key] = time.time()
@@ -1315,7 +1316,7 @@ def deadzone(value, low, low_center, high_center, high):
         high_center = 0.0
     if high is None:
         high = 1.0
-        
+
 
     if value >= 0:
         return min(1, max(0, (value - high_center) / abs(high - high_center)))

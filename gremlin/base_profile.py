@@ -1970,7 +1970,7 @@ class AbstractContainerAction(AbstractAction):
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        input_item = InputItem(mode_parent = self)
+        input_item = InputItem(mode_object = self)
         self.item_data = input_item
         registry = ProfileRegistry()
         registry.registerInputItem(input_item)
@@ -2722,11 +2722,12 @@ class ProfileRegistry():
             return self._device_registry[device_guid]
         return None
 
-    def getInputIdKey(self, input_id):
+    def getInputIdKey(self, input_id) -> list:
         if input_id is not None and hasattr(input_id,"message_key"):
             return input_id.message_key
         return input_id
-
+    
+    
     def getInputItem(self,
                       device_guid : dinput.GUID | str,
                       device_type : DeviceType,
@@ -2749,10 +2750,6 @@ class ProfileRegistry():
         :param custom_mode_name_handler: optional handler for new inputs
         '''
 
-        # import gremlin.ui.osc_device
-        # import gremlin.ui.state_device
-        # import gremlin.ui.midi_device
-        # import gremlin.ui.mode_device
 
         verbose = gremlin.config.Configuration().verbose_mode_inputitems
 
@@ -2779,21 +2776,42 @@ class ProfileRegistry():
             profile.devices[device_guid] = device
 
 
-        mode = device.getMode(mode_name)
-        if not mode:
+        mode_object = device.getMode(mode_name)
+        if not mode_object:
             # create a mode
-            mode = Mode(device)
-            mode.name = mode_name
-            device.modes[mode_name] = mode
+            mode_object = Mode(device)
+            mode_object.name = mode_name
+            device.modes[mode_name] = mode_object
 
-        input_item = InputItem(mode_parent = mode,
-                override_input_type = override_input_type,
-                custom_name_handler = custom_name_handler,
-                custom_mode_name_handler = custom_mode_name_handler)
 
-        input_item.input_type = input_type
+        match input_type:
+            case InputType.State:
+                input_item = gremlin.ui.state_device.StateInputItem(key = input_id)
 
-        input_item.setInputId(input_id)
+            case InputType.Keyboard | InputType.KeyboardLatched:
+                input_item = gremlin.ui.keyboard_device.KeyboardInputItem(mode_object)
+                input_item.key = input_id
+                if custom_name_handler:
+                    input_item.setInputNameHandler(custom_name_handler)
+
+            case InputType.OpenSoundControl:
+                input_item =  gremlin.ui.osc_device.OscInputItem(mode_object)
+                input_item.setInputId(input_id)
+                if override_input_type:
+                    input_item.setOverrideInputType(override_input_type)
+            case InputType.Midi:
+                input_item = gremlin.ui.midi_device.MidiInputItem(mode_object)
+                input_item.setInputId(input_id)
+                if override_input_type:
+                    input_item.setOverrideInputType(override_input_type)
+            case _:
+                input_item = InputItem(mode_object = mode_object,
+                                   override_input_type = override_input_type,
+                                   custom_name_handler = custom_name_handler,
+                                   custom_mode_name_handler = custom_mode_name_handler)
+                input_item.device_guid = device_guid
+                input_item.setInputType(input_type)
+                input_item.setInputId(input_id)
 
 
         if verbose:
@@ -2873,9 +2891,35 @@ class ProfileRegistry():
         self._input_item_registry[key] = input_item
 
         return input_item
+    
+    def loadInputItems(self, device_guid, mode : str):
+        ''' loads the possible input items from the profile data into the registry '''
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device or not device.device_type in (DeviceType.Joystick, DeviceType.VJoy):
+            return
+        
+        # axis inputs
+        for input_id in range(1, device.axis_count + 1):
+            self.getInputItem(device_guid, device.device_type, mode, InputType.JoystickAxis, input_id, autocreate=True)
+
+        for input_id in range(1, device.button_count + 1):
+            self.getInputItem(device_guid, device.device_type, mode, InputType.JoystickButton, input_id, autocreate=True)
+
+        for input_id in range(1, device.hat_count + 1):
+            self.getInputItem(device_guid, device.device_type, mode, InputType.JoystickHat, input_id, autocreate=True)
+
+
+
+
+
+      
 
     def getInputItems(self, device_guid, mode_name, input_type : InputType | list[InputType]= None) -> list:
-        ''' gets a list of input items for a device and mode with optional filter on input type '''
+        ''' gets a list of all input items for a device and mode with optional filter on input type '''
+
+        # update input types for the device
+        self.loadInputItems(device_guid, mode_name)
+
         if input_type is not None:
             if hasattr(input_type,"__iter__"):
                 # list of input types
@@ -3017,30 +3061,39 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     lockedChanged = Signal(object) # (input_item) fires when the lock state changes - passes the input item as the parameter
 
-    def __init__(self, mode_parent : Mode, custom_name_handler = None, custom_mode_name_handler = None, override_input_type = None):
+    def __init__(self, mode_object : str | Mode, custom_name_handler : Callable = None, custom_mode_name_handler : Callable = None, override_input_type = None, device_guid = None):
         """Creates a new InputItem instance.
         :param mode_parent: the parent mode object of this input item (gremlin.base_profile.Mode) - required
         :param custom_name_handler: handler() returns a string, whenever the input name is needed
         :param custom_mode_name_handler: handler() returns a string, optional, to override the default mode for special inputs that use special modes
 
         """
-        super().__init__(mode_parent.name, None)
+        assert isinstance(mode_object, str) or isinstance(mode_object, Mode), "Parent parameter must be a string or mode object"
+        if isinstance(mode_object, str):
+            # convert to a mode object
+            profile : Profile = gremlin.shared_state.current_profile
+            mode_object = profile.get_mode_object(mode_object)
 
-        assert isinstance(mode_parent, Mode), "Parent parameter must be a mode object"
+        super().__init__(mode_object.name, None)
 
 
-        self.parent = mode_parent # mode object
+
+        self.parent = mode_object # mode object
         self._input_item_generating_xml = False # xml nesting level
         self._override_input_type = override_input_type # override input type for some types that are different
-        self._device_guid = None # hardware input ID
+        self._device_guid = device_guid # hardware input ID
         self._device_id = None # hardware input ID as a string
         self._name = None # device name
 
         self._input_name = None # input name of the hardware (axis name if an axis)
+        if custom_name_handler is not None:
+            assert callable(custom_name_handler), "Name handler must be callable "
         self._input_name_handler = custom_name_handler # custom handler
         self.always_execute = False
         self._description = ""
         self._description_readonly = False # true if description is read/only (cannot be changed)
+        if custom_mode_name_handler is not None:
+            assert callable(custom_mode_name_handler), "Mode name handler must be callable "
         self._profile_mode_callback = custom_mode_name_handler # special callback to use to get the profile mode for this item (if special)
         self._containers = []
         self._selected = False # true if the item is selected
@@ -3058,9 +3111,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         # self._profile_mode = None
         self._enabled = True # enabled flag
-        if mode_parent is not None:
+        if mode_object is not None:
             # find the missing properties from the parenting hierarchy
-            item = mode_parent
+            item = mode_object
             while True:
                 # if isinstance(item, Mode):
                 #    self._profile_mode = item.name
@@ -3078,6 +3131,18 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
         el.reload_axis_state.connect(self._handle_axis_state_request)
+
+    def setInputNameHandler(self, callback : Callable):
+        ''' sets the input name handler (optional) '''
+        if callback is not None:
+            assert callable(callback), "Callback must be a callable method"
+        self._input_name_handler = callback
+
+    def setProfileModeHandler(self, callback : Callable):
+        if callback is not None:
+            assert callable(callback), "Callback must be a callable method"
+        self._profile_mode_callback = callback
+
 
     @property
     def is_action(self) -> bool:
@@ -3577,7 +3642,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             # if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard, InputType.State, InputType.OpenSoundControl, InputType.Midi):
             #     assert False,"Incorrect input item class for input type"
 
-
             # if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
             #     # should be handled by KeyboardInputItem
 
@@ -3621,7 +3685,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             # elif self.input_type == InputType.Midi:
             #     # midi data
             #     from gremlin.ui.midi_device import MidiInputItem
-            #     midi_input_item = MidiInputItem(parent = mode_object)
+            #     midi_input_item = MidiInputItem(mode_object)
             #     for child in node:
             #         if child.tag == "input":
             #             midi_input_item.parse_xml(child, data, extra_data = extra_data)
@@ -3635,7 +3699,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             # elif self.input_type == InputType.OpenSoundControl:
             #     # OSC data
             #     from gremlin.ui.osc_device import OscInputItem
-            #     osc_input_item = OscInputItem(parent = mode_object)
+            #     osc_input_item = OscInputItem(mode_object)
             #     for child in node:
             #         if child.tag == "input":
             #             osc_input_item.parse_xml(child, data, extra_data)
@@ -6637,7 +6701,7 @@ class Mode:
                     case InputType.Midi:
                         item = gremlin.ui.midi_device.MidiInputItem(self)
                     case _:
-                        item = InputItem(mode_parent = self)
+                        item = InputItem(mode_object = self)
                         item.device_guid = self.parent.device_guid
 
                 if extra_data is None:

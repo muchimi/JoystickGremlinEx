@@ -1628,7 +1628,9 @@ def pushCursor(immediate = False):
         if immediate:
             _cursor_show_hourglass()
         else:
-            _cursor_timer = threading.Timer(1, _cursor_show_hourglass)
+            if _cursor_timer:
+                _cursor_timer.cancel()
+            _cursor_timer = threading.Timer(2.0, _cursor_show_hourglass)
             _cursor_timer.start()
     _cursor_push += 1
 
@@ -1640,8 +1642,11 @@ def _pushCursor_ui():
     _cursor_timer = None
     if _cursor_push > 0:
         # still active?
-        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
-        time.sleep(0.01)
+        QtGui.QGuiApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
+        QtGui.QGuiApplication.processEvents()
+        # QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
+        # QtWidgets.QApplication.processEvents()
+        # syslog.info("show hourglass")
 
 
 def popCursor(reset = False):
@@ -1652,11 +1657,16 @@ def popCursor(reset = False):
         if _cursor_timer is not None:
             _cursor_timer.cancel()
             _cursor_timer = None
-        InvokeUiMethod(_popCursor_ui, reset)
+        InvokeUiMethod(_popCursor_ui)
 
-def _popCursor_ui(reset = False):
+def _popCursor_ui():
     ''' restores the normal cursor '''
-    QtWidgets.QApplication.restoreOverrideCursor()
+    QtGui.QGuiApplication.restoreOverrideCursor()
+    QtGui.QGuiApplication.processEvents()
+
+    # QtWidgets.QApplication.restoreOverrideCursor()
+    # QtWidgets.QApplication.processEvents()
+    # syslog.info("hide hourglass")
 
 def isWaitCursor() -> bool:
     ''' true if the cursor is an hourglass '''
@@ -2414,6 +2424,10 @@ def get_guid(strip=True,no_brackets = False) -> str:
     if no_brackets:
         guid = guid.replace("{",'').replace("}",'')
     return guid
+
+def get_uuid() -> uuid.UUID:
+    ''' gets a unique ID '''
+    return uuid.uuid4()
 
 def is_guid(value):
     ''' verifies the quantity is a valid GUID '''

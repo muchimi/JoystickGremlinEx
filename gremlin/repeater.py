@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -116,9 +116,9 @@ class Repeater(QtCore.QObject):
             event_list = [event.clone(), event.clone()]
             event_list[0].is_pressed = False
             event_list[1].is_pressed = True
-            event_list[0].value = True 
+            event_list[0].value = True
             event_list[1].value = False
-            
+
         elif event.event_type == common.InputType.JoystickAxis:
             event_list = [
                 event.clone(),
@@ -130,11 +130,11 @@ class Repeater(QtCore.QObject):
             event_list[1].value = 0.0
             event_list[2].value = 0.75
             event_list[3].value = 0.0
-            
+
         elif event.event_type == common.InputType.JoystickHat:
             event_list = [event.clone(), event.clone()]
             event_list[0].value = (0,0)
-            
+
         # mark events as repeater events so actions handle forced values correctly
         for event in event_list:
             event.is_repeater = True
@@ -165,7 +165,7 @@ class Repeater(QtCore.QObject):
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_outputs
 
-        
+
 
         # Repeatedly send events until the thread is interrupted
         while self.is_running:
@@ -222,12 +222,12 @@ class PulseWorker():
         #QtCore.QObject.__init__(self)
         self.is_running = False
         self._pulse_duration = pulse_duration # singleton if none or 0
-        self._repeat_interval = repeat_interval # repeat delay, none 
+        self._repeat_interval = repeat_interval # repeat delay, none
         self._on_callback = on_callback
-        self._off_callback = off_callback 
+        self._off_callback = off_callback
         self._is_pulse = False # true when the signal is active
         self._thread = None # holds the running thread
-        self._data = data # any data 
+        self._data = data # any data
         self._repeat_count = count
 
         el = gremlin.event_handler.EventListener()
@@ -240,7 +240,7 @@ class PulseWorker():
     @data.setter
     def data(self, value):
         self._data = value
-    
+
     def start(self):
         ''' request a start '''
         if self._thread and self._thread.is_alive():
@@ -249,12 +249,12 @@ class PulseWorker():
         self._thread.name = "PulseRepeater"
         self._keep_running = True
         self._thread.start()
-        
-        
+
+
 
     def stop(self):
         ''' request a stop '''
-        
+
         if self._thread:
 
             if self._off_callback:
@@ -263,7 +263,7 @@ class PulseWorker():
                     self._off_callback(self.data)
                 else:
                     self._off_callback()
-            
+
             self._keep_running = False # tell the worker to stop whatever it's doing
             # wait for the thread to terminate
             if self._thread.is_alive():
@@ -298,8 +298,8 @@ class PulseWorker():
             if self._pulse_duration:
                 time_lapsed = time.time() + self._pulse_duration
                 while self._keep_running and time.time() < time_lapsed:
-                    time.sleep(0.01)
-                    
+                    time.sleep(0)
+
             self._is_pulse = False
 
             #if verbose: syslog.info("Stop pulse")
@@ -319,15 +319,15 @@ class PulseWorker():
             if not self._keep_running or self._repeat_interval < 0:
                 if verbose: syslog.info("End pulse worker")
                 return
-            
-            # start the repeat timer 
+
+            # start the repeat timer
             if self._repeat_interval > 0:
                 if verbose: syslog.info("Start wait")
                 time_lapsed = time.time() + self._repeat_interval
                 while self._keep_running and time.time() < time_lapsed:
-                    time.sleep(0.01)
+                    time.sleep(0)
                 if verbose: syslog.info("Stop wait")
-            
+
 
 
         if verbose: syslog.info("End pulse worker")

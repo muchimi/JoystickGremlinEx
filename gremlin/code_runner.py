@@ -165,7 +165,7 @@ class CodeRunner:
 
         self.disableUi()
 
-        gc.collect()
+        # gc.collect()
 
         # update hardware list for any missing devices
         gremlin.joystick_handling._scan_dinput()
@@ -348,7 +348,8 @@ class CodeRunner:
                             event = gremlin.event_handler.Event(
                                 event_type=input_item.input_type,
                                 device_guid=device.device_guid,
-                                identifier=input_item
+                                identifier=input_item.input_id,
+                                extra_data={"input_item": input_item}
                             )
 
 
@@ -457,8 +458,9 @@ class CodeRunner:
                 for cb_data in callbacks:
                     event = gremlin.event_handler.Event(
                         event_type= InputType.State,
-                        device_guid=state_device_guid,
-                        identifier= data,
+                        device_guid= state_device_guid,
+                        identifier= input_item.input_id,
+                        extra_data={"input_item": input_item}
                     )
                     self.event_handler.add_callback(
                                             state_device_guid,
@@ -806,7 +808,7 @@ class CodeRunner:
         ec.clear()
 
 
-        gc.collect()
+        #gc.collect()
 
     # def _handle_sentry(self):
     #     ''' sentry event '''

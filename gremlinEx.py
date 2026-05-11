@@ -20,7 +20,7 @@ Main UI of JoystickGremlin.
 """
 
 from __future__ import annotations
-import qt5reactor
+# import qt5reactor
 import faulthandler
 import argparse
 import ctypes
@@ -2285,7 +2285,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 widget.deleteLater()
             del self._widget_device_index_map[device_guid]
             del self._widget_index_device_map[index]
-            gc.collect()
+            # gc.collect()
 
     def getCurrentRegisteredWidgetDevice(self):
         ''' gets the device ID for the currently selected device widget '''
@@ -2335,7 +2335,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         tracker.clear()
         self.unregisterAllWidgets()
         verbose = gremlin.config.Configuration().verbose_mode_ui
-        gc.collect()
+        # gc.collect()
         if verbose: syslog.info("TABS TRACKER: clear()")
 
 
@@ -5763,8 +5763,6 @@ if __name__ == "__main__":
     # show the window normally
     ui.showMinimized()
     app.processEvents()
-
-    # gremlin.raw_input.Register(ui.winId())
 
     gremlin.shared_state.ui_ready = True
 

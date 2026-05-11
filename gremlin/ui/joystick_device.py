@@ -123,11 +123,15 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_model = gremlin.ui.input_item.InputItemListModel(
             device_profile,
             current_mode,
-            custom_filter_handler= self._handle_custom_filter,
+            custom_filter_handler = self._handle_custom_filter, 
             show_filtered_only=True,
         )
 
-        self.input_item_list_view = gremlin.ui.input_item.InputItemListView(name=device.name, custom_widget_handler = self._custom_widget_handler, device_id = device.device_id)
+
+        self.input_item_list_view = gremlin.ui.input_item.InputItemListView(name=device.name, 
+                                                                            custom_widget_handler = self._custom_widget_handler, 
+                                                                            device_id = device.device_id,
+                                                                            model = self.input_item_list_model)
 
 
         # Handle vJoy as input and vJoy as output devices properly
@@ -148,7 +152,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_delete_curve.connect(self._delete_curve_item_cb)
 
         # load the model
-        self.input_item_list_view.setModel(self.input_item_list_model)
         self._redraw_inputs()
 
 
@@ -353,30 +356,34 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if verbose:
             device = gremlin.joystick_handling.getDevice(device_guid)
             syslog.info(f"FILTER: [{device.name}] inputs marked dirty")
-        self._input_dirty = True # indicate the list should be refreshed because it has changed
+        
+        self.input_item_list_model.refresh() # indicate the list should be refreshed because it has changed
+        #self.input_item_list_view.redraw() # redraw to update the display of filtered items, the actual list will be updated when the tab is selected to avoid doing multiple updates if multiple filters are changed while the tab is not visible
 
     def _handle_tab_changed(self, device_guid):
         ''' occurs when a tab is made visible '''
-        if not gremlin.util.compare_guid(device_guid, self.device_guid):
-            # not ours
-            return
+        pass
+        # if not gremlin.util.compare_guid(device_guid, self.device_guid):
+        #     # not ours
+        #     return
 
-        if self._input_dirty:
-            # update
-            self._input_dirty = False
-            verbose = gremlin.config.Configuration().verbose_mode_filter
-            if verbose:
-                device = gremlin.joystick_handling.getDevice(device_guid)
-                syslog.info(f"FILTER: [{device.name}] - filter dirty - update list")
-            input_item = self.input_item_list_view.selected_item()
-            self.input_item_list_model.updateData() # force a model update for the new filter
-            for input_item in self.input_item_list_model.getFilteredItems():
-                syslog.info(f"\t{input_item.display_name}")
-            index = self.input_item_list_model.indexOfInputItem(input_item)
-            if index == -1 and self.input_item_list_model.rows():
-                # select the first item
-                index = 0
-            self._redraw_inputs()
+
+        # if self._input_dirty:
+        #     # update
+        #     self._input_dirty = False
+        #     verbose = gremlin.config.Configuration().verbose_mode_filter
+        #     if verbose:
+        #         device = gremlin.joystick_handling.getDevice(device_guid)
+        #         syslog.info(f"FILTER: [{device.name}] - filter dirty - update list")
+        #     input_item = self.input_item_list_view.selected_item()
+        #     self.input_item_list_model.updateData() # force a model update for the new filter
+        #     for input_item in self.input_item_list_model.getFilteredItems():
+        #         syslog.info(f"\t{input_item.display_name}")
+        #     index = self.input_item_list_model.indexOfInputItem(input_item)
+        #     if index == -1 and self.input_item_list_model.rows():
+        #         # select the first item
+        #         index = 0
+        #     self._redraw_inputs()
 
 
     def _handle_jump_to_mapped_input_ui(self):
@@ -631,7 +638,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         gremlin.util.InvokeUiMethod(self._redraw_inputs_ui, force)
 
     def _redraw_inputs_ui(self, force = False):
-        self.input_item_list_view.redraw(force)
+        # self.input_item_list_view.beginModelChange() # prevent updates on every model change
+        # self.input_item_list_model.refresh() # indicate the list should be refreshed because it has changed
+        # self.input_item_list_view.endModelChange() # this will fire the view redraw if the model has changed
+        self.input_item_list_view.redraw()
         self.stats.updateFilters(self.getInputFilter())
         self.stats_widget.setStats(self.stats)
 
@@ -886,17 +896,17 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             return
         self._redraw_inputs()
 
-    def refresh(self, emit = True):
+    def refresh(self, emit = False):
         gremlin.util.InvokeUiMethod(self._refresh_ui, emit) # ensure on UI thread
 
-    def _refresh_ui(self, emit = True):
+    def _refresh_ui(self, force_update = False, emit = False):
         """Refreshes the current selection, ensuring proper synchronization. - ensure on UI thread """
 
         if self._refresh_lock or gremlin.shared_state.is_redraw_suspended():
             return
         try:
             self._refresh_lock = True
-            self._select_item_cb(self.input_item_list_view.current_index, force_update = True, emit = emit)
+            self._select_item_cb(self.input_item_list_view.current_index, force_update = force_update, emit = emit)
         finally:
             self._refresh_lock = False
 

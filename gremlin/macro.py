@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -250,12 +250,12 @@ def _send_mouse_button(button_id, is_pressed, is_local = True, is_remote = False
                 if is_local:
                     gremlin.sendinput.mouse_h_wheel(direction)
                 if is_remote:
-                    gremlin.remote.remote_client.send_mouse_h_wheel(direction, client_list, extra_data = extra_data)                    
+                    gremlin.remote.remote_client.send_mouse_h_wheel(direction, client_list, extra_data = extra_data)
         else:
             if is_pressed:
                 if is_local:
                     if dbl_click:
-                        gremlin.sendinput.mouse_press_double_click(button_id)    
+                        gremlin.sendinput.mouse_press_double_click(button_id)
                     else:
                         gremlin.sendinput.mouse_press(button_id)
                 if is_remote:
@@ -291,7 +291,7 @@ def _send_key_down(key, is_local = True, is_remote = False, force_remote = False
         # win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0)
     if is_remote:
         gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, client_list, client_list = client_list, force_remote = force_remote)
-    
+
 
 
 def _send_key_up(key, is_local = True, is_remote = False, force_remote = False, client_list = None):
@@ -350,8 +350,8 @@ class MacroManager(QtCore.QObject):
         self.el.profile_stop.connect(self._profile_stop)
         self.el.profile_start.connect(self._profile_start)
         self.el.runtime_mode_changed.connect(self._handle_mode_changed)
-    
-        
+
+
         config = gremlin.config.Configuration()
         self._max_concurrent = config.max_concurrent_macro
         self._mode_affinity = config.macro_mode_affinity
@@ -381,7 +381,7 @@ class MacroManager(QtCore.QObject):
                 remove_list = [m.macro for m in self._queue if m.mode != mode]
                 run_list = [m for m in self._queue if m.mode == mode]
                 self._queue = collections.deque(run_list)
-                
+
                 for macro in remove_list:
                     if macro.id in self._active:
                         if verbose: syslog.info(f"MACRO: terminating macro: {macro.id}")
@@ -398,7 +398,7 @@ class MacroManager(QtCore.QObject):
 
     def start(self):
         """Starts the scheduler."""
-        
+
         self._active = {}
         self._flags = {}
         config = gremlin.config.Configuration()
@@ -418,7 +418,7 @@ class MacroManager(QtCore.QObject):
             self._run_scheduler_thread.setName("Macro scheduler")
         if not self._run_scheduler_thread.is_alive():
             self._run_scheduler_thread.start()
-        
+
 
 
     def stop(self):
@@ -453,10 +453,10 @@ class MacroManager(QtCore.QObject):
         :param completion_callback: callback to call when the step completes, optional params(id) where ID is the macro step id returned by the call
         :returns id: a unique ID for the macro step
         """
-        
+
         verbose = gremlin.config.Configuration().verbose_mode_macro
         mode = gremlin.shared_state.current_mode # current profile mode
-        
+
 
         if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
             self.terminate_macro(macro)
@@ -465,18 +465,18 @@ class MacroManager(QtCore.QObject):
         if macro.state != MacroState.Idle:
             if verbose: syslog.info(f"MACRO: QUEUE: skipping queuing of macro [{macro.id}] owner: [{macro.ownerId}] because the state [{macro.state.name} is not idle.")
             return
-        
+
         macro.state = MacroState.Scheduled
 
 
         # syslog = logging.getLogger("system")
-        
+
         if verbose:
             syslog.info(f"MACRO: queue macro ID [{macro.id}]")
             action : MacroAbstractAction
             for action in macro.sequence:
                 syslog.info(f"\t{str(action)}")
-                
+
         if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
             self.terminate_macro(macro)
         else:
@@ -502,7 +502,7 @@ class MacroManager(QtCore.QObject):
 
         return macro.id
 
-    
+
     def clear_queue(self):
         ''' clears the current macro queue '''
         # syslog = logging.getLogger("system")
@@ -511,7 +511,7 @@ class MacroManager(QtCore.QObject):
         with self._queue_lock:
             self._queue.clear()
             self._schedule_event.set()
-            
+
 
     def terminate_macro(self, macro : Macro, client_list : list = None):
         """Adds a termination request for a macro to the execution queue.
@@ -521,7 +521,7 @@ class MacroManager(QtCore.QObject):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_macro
         if verbose: syslog.info(f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminate requested.")
-        
+
         with self._queue_lock:
             mode = gremlin.shared_state.current_mode
             self._queue.append(MacroEntry(macro, False, macro.is_local, macro.is_remote,mode, client_list = client_list))
@@ -530,7 +530,7 @@ class MacroManager(QtCore.QObject):
 
         # wait for it to terminate
         while macro.id in self._active:
-            time.sleep(0.01)
+            time.sleep(0)
 
         # mark it terminated
         if verbose: syslog.info(f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminated.")
@@ -555,14 +555,14 @@ class MacroManager(QtCore.QObject):
                 for entry in self._queue:
                     # Terminate macro if needed
                     if entry.state is False:
-                        # entry marked as completed 
+                        # entry marked as completed
                         if entry.macro.id in self._flags and self._flags[entry.macro.id]:
                             # Terminate currently running macro
                             with self._flags_lock:
                                 self._flags[entry.macro.id] = False
-                                
+
                             removal_list = [e for e in self._queue if e.macro.id == e.macro.id]
-             
+
                             for queue_entry in removal_list:
                                 self._queue.remove(queue_entry)
                     elif entry.macro.id in self._active:
@@ -583,7 +583,7 @@ class MacroManager(QtCore.QObject):
                 # Remove all entries we've processed
                 for entry in entries_to_remove:
                     if entry in self._queue:
-                     
+
                         self._queue.remove(entry)
 
     def _dispatch_macro(self, macro : Macro, is_local : bool = None, is_remote : bool = None, client_list : list = None) -> bool:
@@ -598,12 +598,12 @@ class MacroManager(QtCore.QObject):
             if self._mode_affinity:
                 mode = gremlin.shared_state.runtime_mode
                 if macro.mode and macro.mode != mode:
-                    syslog.warning(f"MACRO: affinity: discard macro due to mode change: [{macro.id}] macro mode: [{macro.mode}] current profile mode [{mode}] ")    
+                    syslog.warning(f"MACRO: affinity: discard macro due to mode change: [{macro.id}] macro mode: [{macro.mode}] current profile mode [{mode}] ")
                     macro.state = MacroState.Idle # return to idle
                     return False
 
             # add the macro to the active queue
-            self._active[macro.id] = macro 
+            self._active[macro.id] = macro
             macro.state = MacroState.Running
             Thread(target=functools.partial(self._execute_macro, macro, is_local, is_remote, client_list)).start()
         else:
@@ -630,7 +630,7 @@ class MacroManager(QtCore.QObject):
             is_remote = state_is_remote
         if not is_local:
             is_local = state_is_local
-        
+
         if macro.force_remote:
             is_remote = True
             is_local = False
@@ -666,7 +666,7 @@ class MacroManager(QtCore.QObject):
 
         # Handle simple one shot macros
         else:
-            if verbose: 
+            if verbose:
                 msg = "".join(f"{str(a)} " for a in macro.sequence)
                 syslog.info(f"\tMACRO: single shot: id: [{macro.id} {len(macro.sequence)} {msg}")
             for action in macro.sequence:
@@ -683,7 +683,7 @@ class MacroManager(QtCore.QObject):
             macro.completed_callback()
 
         self.el.macro_step_completed.emit(macro.id) # indicate the macro has been completed
-        
+
 
         # Remove macro from active set, notify manager, and remove any
         # potential callbacks
@@ -731,11 +731,11 @@ class Macro:
 
     def __init__(self, owner_id : str = None, is_local = None, is_remote = None, force_remote = None, mode = None):
         """Creates a new macro instance.
-        
+
         :is_local: if set, sends the macro output to the local client
         :is_remote: if set, sends the macro output to the remote client
         :force_remote: if set, forces the output to remote only
-        
+
         """
         self._sequence = []
         self._owner_id = owner_id # who owns this macro
@@ -746,7 +746,7 @@ class Macro:
         self.completed_callback = None # callback called when macro completes
         self._state = MacroState.Idle
         self.mode = mode
-        
+
 
 
         # flag set if we're forcing remote mode execution
@@ -761,7 +761,7 @@ class Macro:
         else:
             self._is_local = is_local
 
-        # flag if macro runs remotely 
+        # flag if macro runs remotely
         if not is_remote:
             self._is_remote = False
         else:
@@ -771,38 +771,38 @@ class Macro:
     def id(self) -> int:
         ''' unique macro id'''
         return self._id
-    
-    @property 
+
+    @property
     def aborted(self):
         return self._state == MacroState.Abort
-    
+
     def abort(self):
         ''' tell the macro to abort '''
         self._state = MacroState.Abort
-    
+
     @property
     def state(self) -> MacroState:
         return self._state
     @state.setter
     def state(self, value : MacroState):
         self._state = value
-    
+
     @property
     def ownerId(self) -> str:
         return self._owner_id
     @ownerId.setter
     def ownerId(self, value : str):
         self._owner_id = value
-    
+
     @property
     def force_remote(self) -> bool:
         return self._force_remote
-        
+
     @force_remote.setter
     def force_remote(self, value : bool):
         self._force_remote = value
 
-    
+
     @property
     def is_local(self) -> bool:
         ''' local control flag'''
@@ -893,7 +893,7 @@ class MacroAbstractAction(QtCore.QObject):
     idChanged = Signal() # fires if the ID changed
 
     def __init__(self, data = None):
-        super().__init__()    
+        super().__init__()
         self._data = data
         self._id = gremlin.util.get_guid() # unique ID of the macro
 
@@ -905,7 +905,7 @@ class MacroAbstractAction(QtCore.QObject):
         if self._id != value:
             self._id = value
             self.idChanged.emit()
-   
+
 
     @property
     def data(self):
@@ -928,7 +928,7 @@ class MacroAbstractAction(QtCore.QObject):
         raise gremlin.error.MissingImplementationError(
             "AbstractAction.__call__ not implemented in derived class."
         )
-    
+
     def _update_flags(self, is_local = None, is_remote = None, force_remote = None):
         # updates flags based on local/remote overrides
         (state_is_local, state_is_remote) = gremlin.remote.remote_control.state
@@ -938,7 +938,7 @@ class MacroAbstractAction(QtCore.QObject):
             is_remote = state_is_remote
         if force_remote is not None and force_remote:
             is_local = False
-            is_remote = True  
+            is_remote = True
         return (is_local, is_remote)
 
 
@@ -982,14 +982,14 @@ class JoystickAction(MacroAbstractAction):
         self.input_id = state['input_id']
         self.axis_type = state['axis_type']
         self.value = state['value']
-        
+
 
     def __call__(self, is_local = None, is_remote = None, force_remote = None, client_list : list = None):
         """Emits an Event instance through the EventListener system."""
         import gremlin.joystick_handling
         el = gremlin.event_handler.EventListener()
         extra_data = {"macro": True} # indicate the source of the event is a macro
-        
+
         if self.input_type == InputType.JoystickAxis:
             event = gremlin.event_handler.Event(
                 event_type=self.input_type,
@@ -1016,7 +1016,7 @@ class JoystickAction(MacroAbstractAction):
                 case _:
                     syslog.error(f"VJOY MACRO ACTION: don't know how to handle button mode: [{self.value}]")
                     return # nothing to do
-                
+
             event = gremlin.event_handler.Event(
                 event_type=self.input_type,
                 device_guid=self.device_guid,
@@ -1040,7 +1040,7 @@ class JoystickAction(MacroAbstractAction):
             )
 
         event.is_virtual = True
-        
+
         el.joystick_event.emit(event)
 
 
@@ -1068,13 +1068,13 @@ class KeyAction(MacroAbstractAction):
     def __call__(self, is_local = None, is_remote = None, force_remote = None, client_list : list = None):
         # ignore passed local/remote states
         # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_macro        
+        verbose = gremlin.config.Configuration().verbose_mode_macro
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if self.is_pressed:
             if verbose: syslog.info(f"MACRO: send key make: {self.key}")
             if self.key.is_mouse:
                 _send_mouse_button(self.key.mouse_button, True, is_local, is_remote, client_list = client_list, force_remote = force_remote)
-                
+
             else:
                 _send_key_down(self.key, is_local, is_remote, client_list = client_list, force_remote = force_remote)
         else:
@@ -1105,7 +1105,7 @@ class KeyAction(MacroAbstractAction):
         if self.key:
             return f"KeyAction: {self.key.debug_name}"
         return "KeyAction: (no key)"
-        
+
 
 
 class MouseButtonAction(MacroAbstractAction):
@@ -1142,7 +1142,7 @@ class MouseButtonAction(MacroAbstractAction):
     def __call__(self, is_local = None, is_remote = None, force_remote = None, client_list : list = None):
         # ignore passed local/remote states
         # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_macro        
+        verbose = gremlin.config.Configuration().verbose_mode_macro
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if self.button == gremlin.types.MouseButton.WheelDown:
             if is_local:
@@ -1199,7 +1199,7 @@ class MouseMotionAction(MacroAbstractAction):
     def __call__(self, is_local = None, is_remote = None, force_remote = None, client_list : list = None):
         # ignore passed local/remote states
         # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_macro        
+        verbose = gremlin.config.Configuration().verbose_mode_macro
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if is_local:
             if verbose: syslog.info(f"MACRO: mouse motion {self.dx}, {self.dy}")
@@ -1250,7 +1250,7 @@ class PauseAction(MacroAbstractAction):
     def __call__(self, is_local = None, is_remote = None, force_remote = None, client_list : list = None):
         import random
         # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_macro        
+        verbose = gremlin.config.Configuration().verbose_mode_macro
         # is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
         if self.is_random:
             # random pause
@@ -1273,7 +1273,7 @@ class PauseAction(MacroAbstractAction):
 class GraphAction(MacroAbstractAction):
     ''' macro to execute an execution graph - used for sequencing/queuing functors in some containers '''
     def __init__(self, graph, event, value):
-        ''' 
+        '''
         :param graph: the execution graph to run
         :param event: the event to pass to the execution graph (will get cloned and stored)
         :param value: the action value to pass to the execution graph (will get cloned and stored)
@@ -1312,7 +1312,7 @@ class GraphAction(MacroAbstractAction):
             self._graph.process_event(self._event, self._value)
             self._complete_event.wait()
             if verbose: syslog.info(f"GraphAction: completed {self.data}")
-        
+
 
     @QtCore.Slot(object)
     def _graph_completed(self, graph):
@@ -1370,7 +1370,7 @@ class VJoyMacroAction(MacroAbstractAction):
                     syslog.error(f"VJOY MACRO ACTION: don't know how to handle value: [{new_value}]")
         else:
             self._value = new_value
-        
+
     def __getstate__(self):
         ''' serialize '''
         state = super().__getstate__()
@@ -1439,7 +1439,7 @@ class VJoyMacroAction(MacroAbstractAction):
 
 class RemoteControlAction(MacroAbstractAction):
     ''' remote control actions for a macro '''
-    
+
 
     def __init__(self):
         super().__init__()
@@ -1455,8 +1455,8 @@ class RemoteControlAction(MacroAbstractAction):
         ''' deserialize '''
         super().__setstate__(state)
         self.command = state['command']
-        
-    
+
+
 
     def __call__(self, is_local = True, is_remote = False, force_remote= False, client_list : list = None):
         ''' execute the mode change '''
@@ -1491,7 +1491,7 @@ class MacroDescriptionAction(MacroAbstractAction):
         super().__setstate__(state)
         self.description = state['description']
         self.log = state["log"]
-                
+
 
 class StateAction(MacroAbstractAction):
     ''' state action for a macro '''
@@ -1501,7 +1501,7 @@ class StateAction(MacroAbstractAction):
         self._state = None
         self._state_id = None
         self._register_check = True
-        self.action = "press" # action requested 
+        self.action = "press" # action requested
         self.value = True # press by default
         sd = gremlin.ui.state_device.StateData()
         sd.crud.connect(self._data_changed)
@@ -1509,7 +1509,7 @@ class StateAction(MacroAbstractAction):
 
     def __getstate__(self):
         ''' serialize '''
-        
+
         state = super().__getstate__()
         #state['state'] = self._state
         state['state_id'] = self._state_id
@@ -1526,30 +1526,30 @@ class StateAction(MacroAbstractAction):
         self._state_id =  state['state_id']
         self._register_check = state['register_check']
         self.action = state['action']
-        self.value = state['value'] 
+        self.value = state['value']
         sd = gremlin.ui.state_device.StateData()
         self._state = sd.getStateById(self._state_id)
         # sd.crud.connect(self._data_changed)
 
-    
+
 
     @property
     def key(self):
         if self._state:
             return self._state.key
         return None
-    
+
     @key.setter
     def key(self, value):
         if self._state:
             self._state.key = value
-    
+
     @property
     def description(self):
         if self._state:
             return self._state.description
         return None
-    
+
     @property
     def state(self):
         return self._state
@@ -1562,8 +1562,8 @@ class StateAction(MacroAbstractAction):
 
     def _data_changed(self):
         self.changed.emit()
-    
-    
+
+
 
 
     def __call__(self, is_local = True, is_remote = False, force_remote= False, client_list : list = None):
@@ -1577,7 +1577,7 @@ class StateAction(MacroAbstractAction):
             self._register_check = False
 
         verbose = gremlin.config.Configuration().verbose_mode_macro
-        
+
         match self.action:
             case "press":
                 sd.setValue(self.key, True)
@@ -1588,7 +1588,7 @@ class StateAction(MacroAbstractAction):
             case "toggle":
                 sd.toggle(self.key)
                 if verbose: syslog.info(f"MACRO: set state [Toggle] (new state: [{'Pressed' if sd.value(self.key) else 'Released'}])")
-        
+
 
 
 

@@ -19,6 +19,7 @@
 from collections.abc import MutableSequence
 from abc import abstractmethod, ABCMeta
 from PySide6 import QtCore
+from typing import Callable
 
 from psygnal import Signal
 import logging
@@ -47,15 +48,17 @@ class TraceableList(MutableSequence):
             else:
                 self.data = list(initlist)
 
-    def add_callback(self, value):
+    def add_callback(self, callback : Callable):
         ''' adds a callback - signature (action: str, index: int, value [optional object])'''
-        if not value in self._callbacks:
-            self._callbacks.append(value)
+        assert callable(callback), "Callback must be a callable method"
+        if not callback in self._callbacks:
+            self._callbacks.append(callback)
 
-    def remove_callback(self, value):
+    def remove_callback(self, callback : Callable):
         ''' removes a callback '''
-        if value in self._callbacks:
-            self._callbacks.remove(value)
+        assert callable(callback), "Callback must be a callable method"
+        if callback in self._callbacks:
+            self._callbacks.remove(callback)
 
     def clear_callbacks(self):
         ''' removes all callbacks '''
@@ -261,8 +264,10 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self._input_id_callback = None # optional callback
 
 
-    def setInputIdCallback(self, callback):
+    def setInputIdCallback(self, callback : Callable):
         ''' callback to use (optional) to get the input id '''
+        if callback is not None:
+            assert callable(callback), "Callback must be a callable method"
         self._input_id_callback = callback
 
 
@@ -312,7 +317,17 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     @property
     def input_description(self) -> str:
+        ''' gets the description for this input if any '''
         return self._input_description
+
+    @property
+    def input_type(self) -> InputType:
+        ''' gets the type for this input '''
+        return self._input_type
+
+    def setInputType(self, value : InputType):
+        ''' force a different input type '''
+        self._input_type = value
 
     def setInputDescription(self, value : str):
         self._input_description = value

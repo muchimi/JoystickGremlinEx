@@ -59,6 +59,10 @@ class _GUID(ctypes.Structure):
             s += f"{b:02x}"
         return s
 
+    def toInt(self) -> int:
+        guid = uuid.UUID(self.toId())
+        return guid.int
+
 
 
 
@@ -164,12 +168,15 @@ class GUID:
                 syslog.error(f"GUID: Unable to convert ID {guid} to UUID")
                 return None
             guid = _GUID(guid.int) # convert to internal _GUID
+            guid_int = guid.int
 
         elif isinstance(guid, uuid.UUID):
             # convert to ctypes structure using the integer value if the class is given a regular python UUID
             guid = _GUID(guid.int)
-
-        assert isinstance(guid, _GUID)
+            guid_int = guid.int
+        else:
+            assert isinstance(guid, _GUID)
+            guid_int = guid.toInt()
         self._ctypes_guid = copy.deepcopy(guid)
         self.guid = (
             guid.Data1,
@@ -180,6 +187,8 @@ class GUID:
             (guid.Data4[4] << 24) + (guid.Data4[5] << 16) +
             (guid.Data4[6] << 8) + guid.Data4[7]
         )
+
+        self._guid_int : int  = guid_int # for fast hash
 
 
     @property
@@ -210,18 +219,6 @@ class GUID:
         return f"{self.guid[0]:08x}{self.guid[1]:04x}{self.guid[2]:04x}{self.guid[3]:04x}{self.guid[4]:012x}"
 
     def __eq__(self, other):
-        """Returns whether or not two GUID instances are identical.
-
-        Parameters
-        ==========
-        other : GUID
-            Instance with which to perform the equality comparison
-
-        Returns
-        =======
-        bool
-            True if the two GUIDs are equal, False otherwise
-        """
         return hash(self) == hash(other)
 
 
@@ -241,26 +238,21 @@ class GUID:
         return str(self) < str(other)
 
     def __hash__(self):
-        """Returns the hash of this GUID.
-
-        Returns
-        =======
-        int
-            The has computed from this GUID
-        """
-        return hash((
-            self._ctypes_guid.Data1,
-            self._ctypes_guid.Data2,
-            self._ctypes_guid.Data3,
-            self._ctypes_guid.Data4[0],
-            self._ctypes_guid.Data4[1],
-            self._ctypes_guid.Data4[2],
-            self._ctypes_guid.Data4[3],
-            self._ctypes_guid.Data4[4],
-            self._ctypes_guid.Data4[5],
-            self._ctypes_guid.Data4[6],
-            self._ctypes_guid.Data4[7]
-        ))
+        ''' hash value '''
+        return self._guid_int
+        # return hash((
+        #     self._ctypes_guid.Data1,
+        #     self._ctypes_guid.Data2,
+        #     self._ctypes_guid.Data3,
+        #     self._ctypes_guid.Data4[0],
+        #     self._ctypes_guid.Data4[1],
+        #     self._ctypes_guid.Data4[2],
+        #     self._ctypes_guid.Data4[3],
+        #     self._ctypes_guid.Data4[4],
+        #     self._ctypes_guid.Data4[5],
+        #     self._ctypes_guid.Data4[6],
+        #     self._ctypes_guid.Data4[7]
+        # ))
 
 
 GUID_Keyboard = GUID(_GUID_SysKeyboard)

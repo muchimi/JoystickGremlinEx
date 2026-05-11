@@ -26,6 +26,7 @@ import gc
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 import collections
+from typing import Callable
 
 
 import gremlin.config
@@ -1577,49 +1578,73 @@ class AbstractView(QtWidgets.QWidget):
     item_delete_curve = QtCore.Signal(object, int, object) # widget, index , model data object
     item_closed = QtCore.Signal(object, int, object)  # widget, index, model data object
 
-    def __init__(self, parent=None):
+    def __init__(self, model=None, callback : Callable = None, parent=None):
         """Creates a new view instance.
-
-        :param parent the parent of this view widget
+        :param model the model to visualize
+        :param callback an optional callback to be called when the model changes - this is used by the container to trigger updates when the model changes
+        :param parent: the parent of this view widget
         """
         super().__init__(parent)
-        self._model = None
+        self._id = gremlin.util.get_uuid()
+        if model is not None and not isinstance(model, AbstractModel):
+            raise TypeError("Invalid model type")  
+        self._model = model
+        
         self._container = None
-        self._model_dirty = False
+        if __debug__:
+            if callback is not None and not callable(callback):
+                raise TypeError("Callback must be callable")
+        self._model_change_callback : callable= callback
+        self._model_call_stack = 0 # stack to manage when the model change event is fired
+
+    def beginModelChange(self):
+        ''' call this before making a change to the model to prevent multiple change events from firing '''
+        self._model_call_stack += 1
+
+    def endModelChange(self, reset : bool = False):
+        ''' call this after making a change to the model to trigger the change event if needed '''
+        if reset:
+            self._model_call_stack = 0
+
+        if self._model_call_stack > 0:
+            self._model_call_stack -= 1
+
+        if self._model_call_stack == 0 and self._model_changed:
+            self._handle_model_changed()
+
+    @property
+    def id(self):
+        return self._id
 
     @property
     def model(self):
         return self._model
     @model.setter
     def model(self, value):
+        
         if value != self._model:
-            # hook model change events when an item is added or removed
-            if self._model is not None:
+            
+            if self._model:
                 self._model.data_changed.disconnect(self._model_changed)
+            if __debug__ and value is not None and not isinstance(value, AbstractModel):
+                raise TypeError("Invalid model type")
             self._model = value
-            if value:
+            if self._model:
                 self._model.data_changed.connect(self._model_changed)
-
-            # indicate the model changed
             self._model_changed()
 
-    @property
-    def model_dirty(self) -> bool:
-        ''' true if the data model has changed - used to determine the UI should update or not '''
-        return self._model_dirty
-
-    def resetDirty(self):
-        ''' resets the dirty/changed flag on the model '''
-        self._model_dirty = False
-
-    def markDirty(self):
-        ''' marks the model as changed '''
-        self._model_dirty = True
+    def setModelChangeCallback(self, callback : Callable):
+        ''' sets a callback to be called when the model changes - this is used by the container '''
+        if __debug__ and callback is not None and not callable(callback):
+            raise TypeError("Callback must be callable")
+        self._model_change_callback = callback
 
     def _model_changed(self):
-        ''' indicates the data model has changed and the UI should be refreshed '''
-        self._model_dirty = True
+        self._model_changed = True
+        if self._model_call_stack == 0:
+            self._handle_model_changed()
 
+    
     def setModel(self, model):
         """Sets the model to display with this view.
 
@@ -1627,11 +1652,17 @@ class AbstractView(QtWidgets.QWidget):
         """
         self.model = model
 
+    def _handle_model_changed(self):
+        """Handles changes in the model."""
+        if self._model_changed:
+            if self._model_change_callback:
+                self._model_change_callback()
+            self.redraw(force = True)
+            self._model_changed = False
 
-
-
-
-
+    def modelChanged(self) -> bool:
+        ''' returns whether the model has changed and needs to be redrawn '''
+        return self._model_changed
 
     def select_item(self, index):
         """Selects the item at the provided index
@@ -1640,9 +1671,9 @@ class AbstractView(QtWidgets.QWidget):
         """
         pass
 
-    def redraw(self):
+    def redraw(self, force : bool = False):
         """Redraws the view."""
-        pass
+        assert False, "Redraw method not implemented in view subclass"
 
 
 
@@ -9796,7 +9827,6 @@ class QSplitTabWidget(QDataWidget):
     @QtCore.Slot(QtCore.QSize)
     def _content_resized(self, size : QtCore.QSize):
         ''' called when the container object is resized '''
-
         # resize the splitter to the container's size as it doesn't happen by itself for some reason
         width = self._content_widget.frameGeometry().width()
         height = self._content_widget.frameGeometry().height()
@@ -9849,18 +9879,19 @@ class QSplitTabWidget(QDataWidget):
 
     def _handle_expired_widget_ui(self, key, widget):
         ''' called by the widget cache when a widget is being removed from the cache '''
+        verbose = gremlin.config.Configuration().verbose_mode_ui
         if key in self._widget_config_index_map:
             # one of ours - unregister it
-            syslog.info(f" QtSplitTabWidget: Expired widget: [{key}]")
+            if verbose: syslog.info(f" QtSplitTabWidget: Expired widget: [{key}]")
             index = self._right_panel_stacked_widget.indexOf(widget)
             if index != -1:
                 # one of ours
-                syslog.info(f"\tremoving widget from stacked widget")
+                if verbose: syslog.info(f"\tremoving widget from stacked widget")
                 widget.expired.disconnect(self._handle_expired_widget)
                 self._right_panel_stacked_widget.removeWidget(widget)
 
             index = self._widget_config_index_map[key]
-            syslog.info(f"\tremoving index [{index}] from tracking data")
+            # syslog.info(f"\tremoving index [{index}] from tracking data")
             del self._widget_config_device_map[index]
             del self._widget_config_index_map[key]
 
@@ -9949,7 +9980,7 @@ class QSplitTabWidget(QDataWidget):
 
         self._widget_config_index_map.clear()
         self._widget_config_device_map.clear()
-        gc.collect()
+        # gc.collect()
 
     def getRegisteredWidget(self, key) -> QtWidgets.QWidget:
         ''' gets the widget for the given device id, None if not found'''
@@ -10002,7 +10033,15 @@ class QSplitTabWidget(QDataWidget):
 
     def getWidgetKey(self, input_type, input_id):
         ''' gets the content widget compound key for the item / input combination'''
-        return (gremlin.shared_state.edit_mode, self._device_id, input_type, input_id)
+        if isinstance(input_id, list):
+            input_id = tuple(input_id) # convert to hashable type
+        key =  (gremlin.shared_state.edit_mode, self._device_id, input_type, input_id)
+        if __debug__:
+            # ensure key is hashable
+            h = hash(key)
+
+        return key
+
 
     def getWidgetKeyForWidget(self, widget):
         ''' gets the content widget compound key for the given widget '''
@@ -10013,7 +10052,6 @@ class QSplitTabWidget(QDataWidget):
 
     def getContentInputId(self):
         ''' gets the input id currently displayed '''
-        import gremlin.ui.input_item
         widget : gremlin.ui.input_item.InputItemMappingWidget = self.getContentWidget()
         if widget:
             return widget.item_data.input_id
@@ -10021,7 +10059,6 @@ class QSplitTabWidget(QDataWidget):
 
     def getContentInputItem(self):
         ''' gets the input id currently displayed '''
-        import gremlin.ui.input_item
         widget : gremlin.ui.input_item.InputItemMappingWidget = self.getContentWidget()
         if widget:
             return widget.item_data
@@ -12822,7 +12859,7 @@ class QInputDialog(QRememberDialog):
 
 class QWarningWidget(QtWidgets.QWidget):
     ''' warning widget'''
-    def __init__(self, text = None, split : bool = False, parent = None):
+    def __init__(self, text = None, split : bool = False, tooltip : str = None, parent = None):
         super().__init__(parent)
 
 
@@ -12840,6 +12877,8 @@ class QWarningWidget(QtWidgets.QWidget):
         widget, _ = getHContainer([left_panel, right_panel],alignment = QtCore.Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(widget)
         self._text = text
+        if self.toolTip:
+            self.toolTip = tooltip
 
     def text(self) -> str:
         return self._text
@@ -12867,6 +12906,7 @@ class QJoystickInputWidget(QtWidgets.QWidget):
             QtWidgets.QSizePolicy.Minimum,
             QtWidgets.QSizePolicy.Expanding
         )
+        self._widget = None
         self._update_ui()
 
 
@@ -12876,7 +12916,10 @@ class QJoystickInputWidget(QtWidgets.QWidget):
             return
         widgets = []
         fcolor = Color.blueColor()
-        gremlin.util.clear_layout(self.main_layout)
+        if self._widget:
+            self.main_layout.removeWidget(self._widget)
+            self._widget.deleteLater()
+
         device = gremlin.joystick_handling.getDevice(self.device_guid)
         if device:
             if device.axis_count:
@@ -12925,10 +12968,11 @@ class QJoystickInputWidget(QtWidgets.QWidget):
 
             if widgets:
                 widget = getHContainer(widgets, widget_only=True)
-                self.main_layout.addWidget(widget)
         else:
             widget = QtWidgets.QLabel(f"Device not found: {gremlin.util.normalize_guid(self.device_guid)}")
-            self.main_layout.addWidget(widget)
+
+        self._widget = widget
+        self.main_layout.addWidget(widget)
 
     def setStats(self, stats):
         ''' sets the stats from a JoystickInputStats object '''

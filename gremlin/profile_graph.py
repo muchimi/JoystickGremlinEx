@@ -972,7 +972,7 @@ class ProfileInputNode(ProfileBaseNode):
             mode_object = device_modes.ensure_mode_exists(current_mode)
 
 
-            self._input_item = gremlin.base_profile.InputItem(mode_parent = mode_object)
+            self._input_item = gremlin.base_profile.InputItem(mode_object = mode_object)
             self._input_item.device_type = DeviceType.ModeControl
             self._input_item.setInputId(0)
 
@@ -1034,8 +1034,7 @@ class ProfileInputNode(ProfileBaseNode):
         if self.input_type in (InputType.KeyboardLatched, InputType.Keyboard):
             from gremlin.ui.keyboard_device import KeyboardInputItem
             from gremlin.keyboard import Key
-            input_entry = KeyboardInputItem()
-            input_entry.profile_mode = mode_object.name
+            input_entry = KeyboardInputItem(mode_object)
 
             if "id" in node.attrib and node.tag == "key":
                 # legacy format
@@ -1071,7 +1070,7 @@ class ProfileInputNode(ProfileBaseNode):
         elif self.input_type == InputType.Midi:
             # midi data
             from gremlin.ui.midi_device import MidiInputItem
-            midi_input_item = MidiInputItem(parent = mode_object)
+            midi_input_item = MidiInputItem(mode_object)
             for child in node:
                 if child.tag == "input":
                     midi_input_item.parse_xml(child, midi_input_item)
@@ -1081,7 +1080,7 @@ class ProfileInputNode(ProfileBaseNode):
         elif self.input_type == InputType.OpenSoundControl:
             # OSC data
             from gremlin.ui.osc_device import OscInputItem
-            osc_input_item = OscInputItem(parent = mode_object)
+            osc_input_item = OscInputItem(mode_object)
             for child in node:
                 if child.tag == "input":
                     osc_input_item.parse_xml(child, osc_input_item)

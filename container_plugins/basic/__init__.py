@@ -70,7 +70,7 @@ class BasicContainerWidget(AbstractContainerWidget):
             )
 
             self.action_layout.addWidget(widget)
-            widget.redraw()
+            
             widget.model.data_changed.connect(self.container_modified.emit)
         else:
             input_item = self.profile_data.input_item
