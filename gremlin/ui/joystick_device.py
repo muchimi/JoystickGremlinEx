@@ -16,47 +16,75 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+from typing  import Callable
 import logging
 
 from PySide6 import QtWidgets, QtCore
-import lxml.etree
-from lxml import etree
-import os
 
 import gremlin
 import dinput
 from dinput import DeviceSummary
 
+import gremlin.config
+import gremlin.ui.ui_common
 import gremlin.base_profile
-import gremlin.base_profile
-import gremlin.config
-import gremlin.config
-import gremlin.config
-import gremlin.event_handler
 import gremlin.event_handler
 import gremlin.joystick_handling
-import gremlin.profile
 import gremlin.shared_state
-import gremlin.shared_state
-import gremlin.types
-from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.ui
 import gremlin.ui.input_item
 import gremlin.util
-from gremlin.util import safe_read
 import gremlin.ui.ui_common
-from  gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
 from shiboken6 import Shiboken
-import psygnal
 from psygnal import Signal
 import gremlin.util
-import copy
-import vjoy.vjoy
+
+
 
 syslog = logging.getLogger("system")
 
+class JoystickInputModel(gremlin.ui.input_item.InputItemListModel):
 
+    ''' model for the list of input items for a joystick device '''
+
+    def __init__(self, profile : gremlin.base_profile.Profile, device_guid : str, mode : str, custom_filter_handler : Callable = None, show_filtered_only = False):
+        ''' creates a new model for the input items of a joystick device
+
+        :param profile the profile data for the device this model represents    
+        :param device_guid the GUID of the device this model represents
+        :param mode the current mode to display inputs for
+        :param custom_filter_handler a handler that takes an input item and returns true if it should be filtered (not displayed) or false if it should be visible
+        :param show_filtered_only if true only show filtered items, if false show all items with filtered items visually indicated
+        '''
+        super().__init__(profile = profile,
+                         device_guid = device_guid,
+                         mode = mode,
+                         allowed_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
+                         custom_filter_handler = custom_filter_handler,
+                         show_filtered_only = show_filtered_only,
+                         )
+        
+
+class JoystickInputListView(gremlin.ui.input_item.InputItemListView):
+
+    ''' view for the list of input items for a joystick device '''
+
+    def __init__(self, name, custom_widget_handler : Callable, device_id, model : JoystickInputModel, parent = None):
+        ''' creates a new view for the input items of a joystick device
+
+        :param name the name of the view to display
+        :param custom_widget_handler a handler that takes an index and data and returns a widget to display for that item in the list
+        :param device_id the id of the device this view is associated with
+        :param model the model containing the data to display in this view
+        :param parent the parent widget of this view
+        '''
+        super().__init__(name = name,
+                         custom_widget_handler = custom_widget_handler,
+                         device_guid = device_id,
+                         model = model,
+                         parent = parent)
+        
 
 class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
@@ -67,8 +95,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def __init__(
             self,
             device : DeviceSummary,
-            device_profile : gremlin.base_profile.Device,
-            current_mode,
+            profile : gremlin.base_profile.Profile,
+            mode : str,
             object_name = "Joystick",
             data = None,
             parent=None
@@ -76,35 +104,35 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """Creates a new object instance.
 
         :param device device information about this widget's device
-        :param device_profile profile data of the entire device
-        :param current_mode currently active mode
+        :param profile profile data of the entire device
+        :param mode the current mode to display
         :param parent the parent of this widget
         """
+
+        assert profile is not None, "Profile cannot be None"
+        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
+        assert mode is not None and mode != '', "Mode cannot be None or empty"
+
         super().__init__(object_name, device.device_guid, parent)
 
-        import gremlin.plugin_manager
-        import gremlin.config
-        import gremlin.ui.ui_common
-        import gremlin.ui.input_item
-        import gremlin
 
         config = gremlin.config.Configuration()
 
-        # if device.is_virtual and device.vjoy_id == 4:
-        #     pass
-
         # Store parameters
 
-        self.data : gremlin.ui.tab= data
+        self.data : gremlin.ui.tab = data
+        self.device_guid = device.device_guid
         self._refresh_lock = False # semaphore to block refresh in progress
         self.hook_id = gremlin.util.get_guid()
         self.curve_update_handler = {} # map of curve handlers to the input by index
 
         self.device = device
-        self.device_profile = device_profile
+        self.profile = profile
+        profile.ensure_mode_exists(mode)
+        self.device_profile = profile.getDevice(self.device_guid)
+        
         profile = gremlin.shared_state.current_profile
-
-        self.device_profile.ensure_mode_exists(current_mode, self.device)
+        
 
         #self.widget_tracker = gremlin.ui.ui_common.DeviceWidgetTracker() # caches the  InputConfigurationItem for this item
         self.last_item_data_key = None
@@ -118,20 +146,30 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._last_selected_index = 0 # last selected index in the list
 
 
+        # if device.is_virtual and not vjoy_as_input.get(device.vjoy_id, False):
+        #     self.input_item_list_view.limit_input_types([InputType.JoystickAxis])
 
-        # List of inputs
-        self.input_item_list_model = gremlin.ui.input_item.InputItemListModel(
-            device_profile,
-            current_mode,
+
+        # model that holds all the input items for the joystick device
+        self.input_item_list_model = JoystickInputModel(
+            profile= profile,
+            device_guid= device.device_guid,
+            mode = mode,
             custom_filter_handler = self._handle_custom_filter, 
             show_filtered_only=True,
         )
 
+        self.input_item_list_model.addCallback(self._handle_model_changed)
 
-        self.input_item_list_view = gremlin.ui.input_item.InputItemListView(name=device.name, 
-                                                                            custom_widget_handler = self._custom_widget_handler, 
-                                                                            device_id = device.device_id,
-                                                                            model = self.input_item_list_model)
+
+
+
+
+        # view that displays all the inputs in the model, which can be filtered
+        self.input_item_list_view = JoystickInputListView(name=device.name, 
+                                                          custom_widget_handler = self._custom_widget_handler, 
+                                                          device_id = device.device_id,
+                                                          model = self.input_item_list_model)
 
 
         # Handle vJoy as input and vJoy as output devices properly
@@ -139,8 +177,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # For vJoy as output only show axes entries, for all others treat them
         # as if they were physical input devices
-        if device.is_virtual and not vjoy_as_input.get(device.vjoy_id, False):
-            self.input_item_list_view.limit_input_types([InputType.JoystickAxis])
+      
 
         # device stats
         self.stats : gremlin.base_profile.JoystickInputStats= profile.settings.getJoystickInputStats(device.device_guid)
@@ -151,21 +188,16 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.input_item_list_view.item_edit_curve.connect(self._edit_curve_item_cb)
         self.input_item_list_view.item_delete_curve.connect(self._delete_curve_item_cb)
 
-        # load the model
-        self._redraw_inputs()
-
 
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
 
-
         # Add modifiable device label
 
+
         line_edit = gremlin.ui.ui_common.QDataLineEdit()
-        line_edit.setText(device_profile.label)
+        line_edit.setText(profile.getDeviceLabel(device.device_guid))
         line_edit.textChanged.connect(self.update_device_label)
-
-
 
         # lock widget (add filter for joystick devices)
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid, filter = True, filter_enabled = True)
@@ -270,6 +302,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # update filtered status box
         self.update_stats_display()
 
+    def _handle_model_changed(self):
+        ''' called when the input model changes to update the display of stats and filter status '''
+        self.update_stats_display(refresh = False)
+
     @property
     def last_selected_index(self) -> int:
         return self._last_selected_index
@@ -363,27 +399,6 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _handle_tab_changed(self, device_guid):
         ''' occurs when a tab is made visible '''
         pass
-        # if not gremlin.util.compare_guid(device_guid, self.device_guid):
-        #     # not ours
-        #     return
-
-
-        # if self._input_dirty:
-        #     # update
-        #     self._input_dirty = False
-        #     verbose = gremlin.config.Configuration().verbose_mode_filter
-        #     if verbose:
-        #         device = gremlin.joystick_handling.getDevice(device_guid)
-        #         syslog.info(f"FILTER: [{device.name}] - filter dirty - update list")
-        #     input_item = self.input_item_list_view.selected_item()
-        #     self.input_item_list_model.updateData() # force a model update for the new filter
-        #     for input_item in self.input_item_list_model.getFilteredItems():
-        #         syslog.info(f"\t{input_item.display_name}")
-        #     index = self.input_item_list_model.indexOfInputItem(input_item)
-        #     if index == -1 and self.input_item_list_model.rows():
-        #         # select the first item
-        #         index = 0
-        #     self._redraw_inputs()
 
 
     def _handle_jump_to_mapped_input_ui(self):
@@ -442,7 +457,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             input_item = self.input_item_list_view.selected_item()
 
             # set the filter list from the visible inputs
-            self.input_item_list_model.updateData()
+            self.input_item_list_model.refresh()
 
             index = self.input_item_list_model.indexOfInputItem(input_item)
             if index == -1 and self.input_item_list_model.rows():
@@ -634,19 +649,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if widget is not None:
             widget.update_display()
 
-    def _redraw_inputs(self, force = False):
-        gremlin.util.InvokeUiMethod(self._redraw_inputs_ui, force)
-
-    def _redraw_inputs_ui(self, force = False):
-        # self.input_item_list_view.beginModelChange() # prevent updates on every model change
-        # self.input_item_list_model.refresh() # indicate the list should be refreshed because it has changed
-        # self.input_item_list_view.endModelChange() # this will fire the view redraw if the model has changed
-        self.input_item_list_view.redraw()
-        self.stats.updateFilters(self.getInputFilter())
-        self.stats_widget.setStats(self.stats)
-
     def _config_changed_cb(self):
-        self._redraw_inputs()
+        self.input_item_list_model.refresh()
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
         ''' creates a widget for the input
@@ -720,11 +724,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_ui
 
-
-
-
             if force_update or self.inputCount > 0 and self.inputWidgetCount == 0:
-                self._redraw_inputs(force=True)
+                self.input_item_list_model.refresh()
 
 
 
@@ -883,19 +884,9 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         #self.input_item_list_view.select_item(-1)
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
             self.input_item_list_model.refresh()
-            self._redraw_inputs()
             self.select_item(self._last_selected_index)
 
-    def redraw(self):
-        gremlin.util.InvokeUiMethod(self._redraw_ui) # ensure on UI thread
-
-    def _redraw_ui(self):
-        ''' updates the list widget '''
-        if gremlin.shared_state.is_redraw_suspended():
-            # syslog.info("skip redraw")
-            return
-        self._redraw_inputs()
-
+    
     def refresh(self, emit = False):
         gremlin.util.InvokeUiMethod(self._refresh_ui, emit) # ensure on UI thread
 
@@ -932,7 +923,7 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         :param text the new label text
         """
-        self.device_profile.label = text
+        self.device_profile.setDeviceLabel(self.device.device_guid, text)
 
 
     @property

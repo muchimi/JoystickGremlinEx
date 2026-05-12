@@ -20,18 +20,16 @@ from lxml import etree as ElementTree
 import gremlin
 import gremlin.config
 from gremlin.input_types import InputType
-import gremlin.base_classes
+
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
-import gremlin.clipboard
+
 import gremlin.types
-from gremlin.base_profile import AbstractContainer, AbstractFunctor, ConditionContainer
+from gremlin.base_profile import AbstractContainer
 import gremlin.execution_graph
 from gremlin.ui.input_item import AbstractContainerWidget
 from shiboken6 import Shiboken
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
-import gremlin.ui.ui_activation_condition
 from gremlin.util import safe_format, safe_read
 import threading
 

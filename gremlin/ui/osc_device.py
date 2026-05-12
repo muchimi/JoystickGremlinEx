@@ -22,19 +22,18 @@ import logging
 
 from PySide6 import QtWidgets, QtCore, QtGui
 import threading
-import gremlin.base_classes
+
 import gremlin.config
 import gremlin.event_handler
-import gremlin.input_devices
+
 import gremlin.input_devices
 import gremlin.joystick_handling
-import gremlin.shared_state
+import gremlin.ui.ui_common as ui_common
 import gremlin.shared_state
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.shared_state
-from gremlin.keyboard import Key
-import gremlin.ui.joystick_device
+
 import gremlin.base_profile
 import uuid
 from gremlin.singleton_decorator import SingletonDecorator
@@ -3720,8 +3719,43 @@ Existing entries will be ignored.
 
     def text(self):
         return self.text_widget.toPlainText()
+    
 
+class OscInputItemModel(gremlin.ui.input_item.InputItemListModel):
 
+    ''' model for OSC input items '''
+
+    def __init__(self, profile : gremlin.base_profile.Profile, mode : str, custom_filter_handler = None):
+        ''' initializes the model 
+        :param profile: the profile containing the data
+        :param mode: the mode containing the data
+        :param custom_filter_handler: optional function to filter items, takes an OscInputItem
+        
+        '''
+        super().__init__(profile = profile,
+                         device_guid = OscDeviceTabWidget.device_guid,
+                         mode = mode,
+                         allowed_types = [InputType.OpenSoundControl],
+                         custom_filter_handler = custom_filter_handler)    
+
+    
+class OscInputItemListView(gremlin.ui.input_item.InputItemListView):
+
+    ''' list view for OSC input items '''
+
+    def __init__(self, custom_widget_handler : Callable = None,  parent : QtWidgets.QWidget = None, blank_message : str = None, model : OscInputItemModel= None):
+        '''' initializes the list view
+        :param custom_widget_handler: optional function to handle custom widgets, takes an OscInputItem and returns a QWidget
+        :param parent: the parent widget
+        :param blank_message: the message to show when there are no items in the list
+        :param model: the input item model to use
+        '''
+        super().__init__(custom_widget_handler = custom_widget_handler,
+                         device_guid =  OscDeviceTabWidget.device_guid,
+                         parent = parent,
+                         blank_message = blank_message,
+                         model = model,
+                         )
 class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
@@ -3731,26 +3765,29 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def __init__(
             self,
-            device_profile,
-            current_mode,
+            profile : gremlin.base_profile.Profile,
+            mode : str,
             object_name = "OSC Device",
             parent=None
     ):
         """Creates a new object instance.
 
-        :param device_profile profile data of the entire device
-        :param current_mode currently active mode
+        :param profile profile data of the entire device
+        :param mode the current mode to display
         :param parent the parent of this widget
         """
+
+        assert profile is not None, "Profile cannot be None"
+        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
+        assert mode is not None and mode != '', "Mode cannot be None or empty"
+
         super().__init__(object_name, gremlin.shared_state.osc_tab_guid, parent)
 
-        import gremlin.ui.ui_common as ui_common
-        import gremlin.ui.input_item as input_item
-
         # Store parameters
-        self.device_profile = device_profile
-        #assert self.device_profile.device_guid == gremlin.shared_state.osc_tab_guid
-        self.current_mode = current_mode
+        self.profile = profile
+        profile.ensure_mode_exists(mode)
+        self.device_profile = profile.getDevice(self.device_guid)
+        self.current_mode = mode
 
         config = gremlin.config.Configuration()
 
@@ -3763,20 +3800,19 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self._last_selected_index = -1 # index of last input, -1 if none
 
         # List of inputs
-        self.input_item_list_model = input_item.InputItemListModel(
-            device_profile,
-            current_mode,
-            [InputType.OpenSoundControl], # only allow OSC inputs for this widget
+        self.input_item_list_model = OscInputItemModel(
+            profile,
+            mode,
             custom_filter_handler = self._filter_data
         )
 
         # update the display names
 
-        self.input_item_list_view = input_item.InputItemListView(
+        self.input_item_list_view = OscInputItemListView(
             custom_widget_handler = self._custom_widget_handler,
-            device_id = self._device_id,
             parent = self,
-            blank_message = "Please add an OSC input.")
+            blank_message = "Please add an OSC input.",
+            model=self.input_item_list_model)
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -4210,21 +4246,10 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if index != -1:
             self._select_item_cb(index)
 
-
-
-
     def clearFilter(self):
         ''' clears the current data filter '''
         self._filter_widget.clearFilter()
-        self.input_item_list_view.redraw()
-
-
-    def _redraw_inputs(self, force = False):
-        gremlin.util.InvokeUiMethod(self._redraw_inputs_ui, force)
-
-    def _redraw_inputs_ui(self, force = False):
-        self.input_item_list_view.redraw(force)
-
+        self.input_item_list_model.refresh()
 
     def _select_item_cb(self, index, force_update = False, emit = True):
         """Handles the selection of an input item.
@@ -4264,7 +4289,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 if not pop_cursor:
                     gremlin.util.pushCursor()
                     pop_cursor = True
-                self._redraw_inputs(force=True)
+                self.input_item_list_model.refresh()
 
             device_guid = self.device_guid
             input_id = input_item.input_id if input_item else None

@@ -344,7 +344,7 @@ class ExecutionGraphContainerNode(ExecutionGraphNode):
     def to_string(self):
         container = self.container
         device_name = container.get_device_name()
-        condition : gremlin.base_profile.AbstractCondition = container.activation_condition
+        condition : gremlin.base_profile.BaseAbstractCondition = container.activation_condition
         condition_stub = f"True id: {condition.id}" if condition else ""
         stub = f"Container: {self.container.name} Device: {device_name} Input {container.input_display_name}  Condition: {condition_stub}  Comment: {self.container.comment}"
         return f"{self.node_string()} {stub}"
@@ -1175,7 +1175,7 @@ class ExecutionContext():
                                     node.functors = node_functors
                                     # done processing that branch
                                     return
-                                elif isinstance(condition, gremlin.base_conditions.AbstractCondition):
+                                elif isinstance(condition, gremlin.base_conditions.BaseAbstractCondition):
                                     if self._verbose_detailed: syslog.info(f"{logTabs}\tadding functor for condition: {str(condition)}")
                                     functor = self._convert_condition(condition)
                                     node_functors.append(functor)

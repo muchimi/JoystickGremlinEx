@@ -4374,6 +4374,20 @@ class Profile():
             self._default_start_mode = self.get_default_mode()
 
 
+    def getDeviceLabel(self, device_guid):
+        ''' gets the display label for a given device guid '''
+        if device_guid in self.devices:
+            return self.devices[device_guid].name
+        return None 
+    
+    def setDeviceLabel(self, device_guid, name):
+        ''' sets the display label for a given device guid '''
+        if device_guid in self.devices:
+            self.devices[device_guid].name = name
+            return True
+        return False   
+
+
     @property
     def dirty(self):
         return self._dirty
@@ -4395,7 +4409,12 @@ class Profile():
             if id in self.devices:
                 device_list.append(self.devices[id])
         return device_list
-
+    
+    def ensure_mode_exists(self, mode_name):
+        ''' ensures a mode exists in the profile '''
+        for device in self.devices.values():
+            device.ensure_mode_exists(mode_name)
+        
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.

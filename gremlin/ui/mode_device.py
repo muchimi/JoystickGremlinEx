@@ -80,6 +80,42 @@ class ModeInputModeType(enum.IntEnum):
         return f"Unknown mode: {value}"
 
 
+class ModeInputItemModel(gremlin.ui.input_item.InputItemListModel):
+
+    ''' model for mode input items '''
+
+    def __init__(self, profile : gremlin.base_profile.Profile, mode : str, custom_filter_handler = None):
+        ''' creates a new model for mode input items
+
+        :param profile: the profile data for the device this model represents
+        :param mode: the current mode to display inputs for
+        :param custom_filter_handler: a handler that takes an input item and returns true if it should be filtered (not displayed) or false if it should be visible
+        '''
+        
+        super().__init__(profile = profile,
+                         device_guid= ModeDeviceTabWidget.device_guid,
+                         mode = mode,
+                         allowed_types = [InputType.ModeControl],
+                         custom_filter_handler = custom_filter_handler,
+                         show_master_mode=True)   
+        
+
+class ModeInputItemListView(gremlin.ui.input_item.InputItemListView):
+
+    ''' list view for mode input items '''
+    def __init__(self, custom_widget_handler, model : ModeInputItemModel, parent = None):
+        ''' creates a new list view for mode input items
+
+        :param custom_widget_handler a handler that creates a widget for an input item
+        :param model the model for the list view
+        :param parent the parent widget of this view
+        '''
+        super().__init__(name = "Mode Inputs",
+                         custom_widget_handler = custom_widget_handler,
+                         device_guid= ModeDeviceTabWidget.device_guid,
+                         model = model,
+                         parent = parent)
+
 
 
 class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
@@ -94,37 +130,44 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def __init__(
             self,
-            device_profile,
-            current_mode,
+            profile : gremlin.base_profile.Profile,
+            mode : str,
             object_name = 'Mode Device',
             parent=None
     ):
         """Creates a new object instance.
 
-        :param device_profile profile data of the entire device
-        :param current_mode currently active mode
-        :param parent the parent of this widget
+        :param profile: profile data of the entire device
+        :param mode: currently active mode
+        :param object_name: name of the tab
+        :param parent: the parent of this widget
         """
-        self._device_guid =gremlin.shared_state.mode_tab_guid
-        self._device_id = str(self._device_guid)
+
+
+        assert profile is not None, "Profile cannot be None"
+        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
+        assert mode is not None and mode != '', "Mode cannot be None or empty"
+
+        
+        self._device_id = str(self.device_guid)
         super().__init__(object_name, self.device_guid , parent)
-        import gremlin.ui.ui_common as ui_common
-        import gremlin.ui.input_item as input_item
+        
 
         # Store parameters
-        self.device_profile = device_profile
-        self.device_profile.ensure_mode_exists(current_mode)
+        self.profile = profile
+        self.profile.ensure_mode_exists(mode)
+        self.device_profile = profile.getDevice(self.device_guid)
+        self.device_profile.ensure_mode_exists(mode)
+        
         self.widget_storage = {}
 
         # List of inputs
-        self.input_item_list_model = input_item.InputItemListModel(
-            device_profile,
-            current_mode,
-            [InputType.ModeControl], # only allow Mode inputs for this widget
-            show_master_mode = True
+        self.input_item_list_model = ModeInputItemModel(
+            profile,
+            mode,
         )
 
-        self.current_mode = current_mode
+        self.current_mode = mode
 
         # create the two entries
         self.ensureInputItems()
@@ -132,7 +175,10 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # update the display names
 
-        self.input_item_list_view = input_item.InputItemListView(custom_widget_handler=self._custom_widget_handler, device_id = self._device_id)
+        self.input_item_list_view = ModeInputItemListView(
+            custom_widget_handler = self._custom_widget_handler,
+            model = self.input_item_list_model
+            )
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups

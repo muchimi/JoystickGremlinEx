@@ -2634,9 +2634,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if not widget or not Shiboken.isValid(widget):
                         if verbose: syslog.info("\tcreating widget...")
                         widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
-                            device,
-                            device_profile,
-                            self.current_mode,
+                            device=device,
+                            profile=self.profile,
+                            mode = self.current_mode,
                             object_name= f"Joystick [{device_name}]"
                         )
 
@@ -2692,19 +2692,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # vjoy as input enabled
 
                 if device_name:
-                    device_profile = self.profile.get_device_modes(
-                        device.device_guid,
-                        DeviceType.Joystick,
-                        device_name
-                    )
+                    # device_profile = self.profile.get_device_modes(
+                    #     device.device_guid,
+                    #     DeviceType.Joystick,
+                    #     device_name
+                    # )
 
                     device_guid = gremlin.util.normalize_guid(device.device_guid)
                     widget = self.getRegisteredWidget(device_guid)
                     if not widget:
                         widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
-                            device,
-                            device_profile,
-                            self.current_mode,
+                            device = device,
+                            profile = self.profile,
+                            mode = self.current_mode,
                             object_name = f"Vjoy [{device_name}]"
                         )
 
@@ -2733,7 +2733,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             widget = self.getRegisteredWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.keyboard_device.KeyboardDeviceTabWidget(
-                    device_profile,
+                    self.profile,
                     self.current_mode
                 )
                 self.registerWidget(device_guid, widget)
@@ -2755,16 +2755,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             midi_device_guid = device_guid
             if midi_enabled:
-                device_profile = self.profile.get_device_modes(
-                    gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid,
-                    DeviceType.Midi,
-                    DeviceType.to_string(DeviceType.Midi)
-                )
+                # device_profile = self.profile.get_device_modes(
+                #     gremlin.ui.midi_device.MidiDeviceTabWidget.device_guid,
+                #     DeviceType.Midi,
+                #     DeviceType.to_string(DeviceType.Midi)
+                # )
                 widget = self.getRegisteredWidget(device_guid)
                 if not widget:
                     widget = gremlin.ui.midi_device.MidiDeviceTabWidget(
-                        device_profile,
-                        self.current_mode
+                        profile = self.profile,
+                        mode = self.current_mode
                     )
 
 
@@ -2788,16 +2788,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             osc_device_guid = device_guid
             if osc_enabled:
-                device_profile = self.profile.get_device_modes(
-                    gremlin.ui.osc_device.OscDeviceTabWidget.device_guid,
-                    DeviceType.Osc,
-                    DeviceType.to_string(DeviceType.Osc)
-                )
+                # device_profile = self.profile.get_device_modes(
+                #     gremlin.ui.osc_device.OscDeviceTabWidget.device_guid,
+                #     DeviceType.Osc,
+                #     DeviceType.to_string(DeviceType.Osc)
+                # )
                 widget = self.getRegisteredWidget(device_guid)
                 if not widget:
                     widget = gremlin.ui.osc_device.OscDeviceTabWidget(
-                        device_profile,
-                        self.current_mode
+                        profile = self.profile,
+                        mode = self.current_mode
                     )
 
 
@@ -2821,17 +2821,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 guid = gremlin.shared_state.octavi_tab_guid
                 device_guid = gremlin.util.normalize_guid(guid)
                 device_type = DeviceType.OctaviIFR1
-                device_profile = self.profile.get_device_modes(
-                    gremlin.ui.octavi_device.OctaviDeviceTabWidget.device_guid,
-                    device_type,
-                    DeviceType.to_string(device_type)
-                )
+                # device_profile = self.profile.get_device_modes(
+                #     gremlin.ui.octavi_device.OctaviDeviceTabWidget.device_guid,
+                #     device_type,
+                #     DeviceType.to_string(device_type)
+                # )
 
                 widget = self.getRegisteredWidget(device_guid)
                 if not widget:
                     widget = gremlin.ui.octavi_device.OctaviDeviceTabWidget(
-                        device_profile,
-                        self.current_mode
+                        profile = self.profile,
+                        mode = self.current_mode
                     )
                     self.registerWidget(device_guid, widget)
                     self._state_device_guid = device_guid
@@ -2848,17 +2848,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             device_guid = gremlin.util.normalize_guid(guid)
             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
 
-            device_profile = self.profile.get_device_modes(
-                    guid,
-                    DeviceType.ModeControl,
-                    DeviceType.to_string(DeviceType.ModeControl)
-                )
+            # device_profile = self.profile.get_device_modes(
+            #         guid,
+            #         DeviceType.ModeControl,
+            #         DeviceType.to_string(DeviceType.ModeControl)
+            #     )
 
             widget = self.getRegisteredWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.mode_device.ModeDeviceTabWidget(
-                    device_profile,
-                    self.current_mode
+                    profile = self.profile,
+                    mode = self.current_mode
                 )
                 self.registerWidget(device_guid, widget)
                 self._mode_device_guid = device_guid
@@ -2878,8 +2878,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             widget = self.getRegisteredWidget(device_guid)
             if not widget:
                 widget = gremlin.ui.state_device.StateDeviceTabWidget(
-                    self.profile,
-                    self.current_mode
+                    profile = self.profile,
+                    mode = self.current_mode
                 )
                 self.registerWidget(device_guid, widget)
                 self._state_device_guid = device_guid
@@ -4656,11 +4656,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
     @property
-    def profile(self):
+    def profile(self) -> gremlin.base_profile.Profile:
         return gremlin.shared_state.current_profile
 
     @profile.setter
-    def profile(self, value):
+    def profile(self, value : gremlin.base_profile.Profile):
         current_profile = gremlin.shared_state.current_profile
         if current_profile and current_profile != value:
             eh = gremlin.event_handler.EventListener()

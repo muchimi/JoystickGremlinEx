@@ -1548,6 +1548,38 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     def mode(self):
         ''' current input mode '''
         return self._mode
+    
+
+
+class MidiInputListModel(gremlin.ui.input_item.InputItemListModel):
+    ''' list model for MIDI inputs '''
+
+    def __init__(self, profile : gremlin.base_profile.Profile, mode : str):
+        ''' creates a new model for MIDI input items
+        :param profile: the profile data for the device this model represents
+        :param current_mode: the current mode
+        '''
+        super().__init__(profile = profile,
+                         device_guid = MidiDeviceTabWidget.device_guid,
+                         mode = mode,
+                         allowed_types = [InputType.Midi])
+
+class MidiInputListView(gremlin.ui.input_item.InputItemListView):
+     def __init__(self, custom_widget_handler : Callable = None,  parent : QtWidgets.QWidget = None, blank_message : str = None, model : MidiInputListModel= None):
+        ''' list view for MIDI input items
+        :param custom_widget_handler: callback to handle creating the custom widget for each input item
+        :param parent: the parent widget
+        :param blank_message: the message to show when there are no items in the list
+        :param model: the list model to use
+        '''
+        
+        super().__init__(custom_widget_handler = custom_widget_handler,
+                         device_guid = MidiDeviceTabWidget.device_guid ,
+                         parent = parent,
+                         blank_message = blank_message,
+                         model = model)
+
+    
 
 
 
@@ -1560,8 +1592,8 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def __init__(
             self,
-            device_profile,
-            current_mode,
+            profile : gremlin.base_profile.Profile,
+            mode : str,
             object_name = "MIDI Device",
             parent=None
     ):
@@ -1573,31 +1605,33 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """
         super().__init__(object_name, gremlin.shared_state.midi_tab_guid, parent)
 
-        import gremlin.ui.input_item as input_item
-        import gremlin.ui.ui_common as ui_common
+        assert profile is not None, "Profile cannot be None"
+        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
+        assert mode is not None and mode != '', "Mode cannot be None or empty"
 
 
 
         # Store parameters
-        self.device_profile = device_profile
-        self.current_mode = current_mode
-
-        self.device_profile.ensure_mode_exists(self.current_mode)
+        self.profile = profile
+        self.current_mode = mode
+        self.profile.ensure_mode_exists(self.current_mode)
+        self.device_profile = profile.getDevice(self.device_guid)
+        
         self.widget_storage = {}
 
         # List of inputs
-        self.input_item_list_model = input_item.InputItemListModel(
-            device_profile,
-            current_mode,
-            [InputType.Midi] # only allow MIDI inputs for this widget
+        self.input_item_list_model = MidiInputListModel(
+            profile,
+            mode
         )
 
         # create a list view with custom input widgets
-        self.input_item_list_view = input_item.InputItemListView(
+        self.input_item_list_view = MidiInputListView(
             custom_widget_handler = self._custom_widget_handler,
-            device_id = self._device_id,
             parent = self,
-            blank_message = "Please add a MIDI input.")
+            blank_message = "Please add a MIDI input.", 
+            model=self.input_item_list_model)
+        
         self.input_item_list_view.setMinimumWidth(350)
 
         # Input type specific setups
@@ -1647,7 +1681,7 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
 
         # clear inputs button
-        clear_button = ui_common.ConfirmPushButton("Clear MIDI Inputs", show_callback = self._show_clear_cb)
+        clear_button = gremlin.ui.ui_common.ConfirmPushButton("Clear MIDI Inputs", show_callback = self._show_clear_cb)
         icon = gremlin.ui.ui_common.Icons.trashIcon()
         clear_button.setIcon(icon)
         clear_button.confirmed.connect(self._clear_inputs_cb)

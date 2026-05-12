@@ -35,10 +35,9 @@ from .input_item import InputItemWidget, InputIdentifier, InputItemListView, Inp
 import uuid
 from gremlin.util import *
 from gremlin.input_types import InputType
-import gremlin.base_classes
-from lxml import etree as ElementTree
 from lxml import etree
 import gremlin.ui.ui_common
+import gremlin.base_profile
 
 
 syslog = logging.getLogger("system")
@@ -351,6 +350,44 @@ class KeyboardInputItem(gremlin.base_profile.InputItem):
         return self.to_string()
 
 
+class KeyboardInputItemModel(gremlin.ui.input_item.InputItemListModel):
+    ''' data model for state inputs '''
+    def __init__(self,
+                 profile : gremlin.base_profile.Profile,
+                 mode : str,
+                 custom_load_handler : Callable = None,
+                 custom_remove_handler : Callable = None,
+                 custom_filter_handler : Callable = None):
+        ''' creates a new model for keyboard input items
+        :param profile: the profile data for the device this model represents
+        :param mode: the current mode
+        :param custom_load_handler: a custom handler for loading items
+        :param custom_remove_handler: a custom handler for removing items
+        :param custom_filter_handler: a custom handler for filtering items
+        '''
+        super().__init__(profile = profile,
+                         device_guid = KeyboardDeviceTabWidget.device_guid,
+                         mode = mode,
+                         allowed_types = [InputType.Keyboard, InputType.KeyboardLatched],
+                         custom_load_handler = custom_load_handler,
+                         custom_remove_handler = custom_remove_handler,
+                         custom_filter_handler = custom_filter_handler)
+
+class KeyboardInputItemListView(gremlin.ui.input_item.InputItemListView):
+    ''' view for state inputs '''
+    def __init__(self, custom_widget_handler : Callable = None, parent : QtWidgets.QWidget = None, blank_message : str = None, model : KeyboardInputItemModel = None):
+        ''' creates a new list view for keyboard input items
+        :param custom_widget_handler: a handler for creating custom widgets for items in this list
+        :param parent: the parent of this widget
+        :param blank_message: the message to display when there are no items in the list
+        :param model: the data model for this list view
+        '''
+        
+        super().__init__(custom_widget_handler = custom_widget_handler,
+                         device_guid = KeyboardDeviceTabWidget.device_guid,
+                         parent = parent,
+                         blank_message = blank_message,
+                         model = model)
 
 
 
@@ -363,41 +400,48 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def __init__(
             self,
-            device_profile,
-            current_mode,
+            profile : gremlin.base_profile.Profile,
+            mode : str,
             object_name = "Keyboard",
             parent=None
     ):
         """Creates a new object instance.
 
-        :param device_profile profile data of the entire device
-        :param current_mode currently active mode
-        :param parent the parent of this widget
+        :param profile: profile data
+        :param mode: mode to display inputs for
+        :param parent: the parent of this widget
         """
         super().__init__(object_name, gremlin.shared_state.keyboard_tab_guid, parent)
 
+        assert profile is not None, "Profile cannot be None"
+        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
+        assert mode is not None and mode != '', "Mode cannot be None or empty"
 
         # Store parameters
-        self.device_profile = device_profile
+        self.profile = profile
 
-        self.device_profile.ensure_mode_exists(current_mode)
+        self.profile.ensure_mode_exists(mode)
+        self.device_profile = profile.getDevice(self.device_guid)
+        
         self.widget_storage = {}
 
         # List of inputs
-        self.input_item_list_model = None
+        self.input_item_list_model = KeyboardInputItemModel(
+            self.profile,
+            mode = mode)
 
 
         # last index selected, -1 means none
         self._last_selected_index = -1
 
-        self.input_item_list_view = input_item.InputItemListView(
+        self.input_item_list_view = KeyboardInputItemListView(
             custom_widget_handler = self._custom_widget_handler,
             parent=self,
-            device_id = self._device_id,
-            blank_message = "Please add a keyboard or mouse input.")
+            blank_message = "Please add a keyboard or mouse input.",
+            model = self.input_item_list_model
+        )
         self.input_item_list_view.setMinimumWidth(350)
-
-        self._reload_model()
+        self.input_item_list_model.refresh()
 
         # Handle user interaction
         self.input_item_list_view.item_selected.connect(self._select_item_cb)
@@ -551,9 +595,9 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _reload_model(self, mode = None):
         ''' reloads the data for the current device/mode '''
         current_mode = mode if mode else gremlin.shared_state.edit_mode
-        self.device_profile.ensure_mode_exists(current_mode)
+        self.profile.ensure_mode_exists(current_mode)
         self.input_item_list_model = input_item.InputItemListModel(
-            self.device_profile,
+            self.profile,
             current_mode,
             [InputType.Keyboard, InputType.KeyboardLatched]
         )
@@ -685,7 +729,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # creates the item in the profile if needed
         registry = gremlin.base_profile.ProfileRegistry()
-        self.device_profile.modes[current_mode].get_data(input_item.input_type, input_item.input_id) # creates the entry in the profile
+        self.profile.modes[current_mode].get_data(input_item.input_type, input_item.input_id) # creates the entry in the profile
         # ensure override type for keyboard input is a joystick button
         registry.sync()
 
@@ -789,7 +833,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :return index of the provided key
         """
         current_mode = gremlin.shared_state.edit_mode
-        mode = self.device_profile.modes[current_mode]
+        mode = self.profile.modes[current_mode]
         if isinstance(key_or_index, Key):
             key = key_or_index
             if key.is_latched:
@@ -811,7 +855,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         ''' changes the mode of the tab '''
         self.current_mode = mode
         #self._reload_model(mode)
-        self.device_profile.ensure_mode_exists(self.current_mode)
+        self.profile.ensure_mode_exists(self.current_mode)
         self.input_item_list_model.mode = mode
 
         #self.input_item_list_view.select_item(-1)
