@@ -17,3 +17,6 @@ joystick_gremlin.zip
 debug.txt
 debug.txt
 debug.txt
+*.aprof
+scalene-profile.html
+scalene-profile.json
