@@ -86,7 +86,7 @@ class JoystickInputListView(gremlin.ui.input_item.InputItemListView):
                          parent = parent)
         
 
-class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
+class JoystickDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     """Widget used to display the input joystick device."""
 
@@ -109,11 +109,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param parent the parent of this widget
         """
 
-        assert profile is not None, "Profile cannot be None"
-        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
-        assert mode is not None and mode != '', "Mode cannot be None or empty"
+        assert isinstance(device, DeviceSummary), "Device invalid"
 
-        super().__init__(object_name, device.device_guid, parent)
+        self.device_guid = device.device_guid
+        super().__init__(device, profile, mode, object_name, parent)
 
 
         config = gremlin.config.Configuration()
@@ -121,7 +120,8 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # Store parameters
 
         self.data : gremlin.ui.tab = data
-        self.device_guid = device.device_guid
+       
+
         self._refresh_lock = False # semaphore to block refresh in progress
         self.hook_id = gremlin.util.get_guid()
         self.curve_update_handler = {} # map of curve handlers to the input by index
@@ -783,10 +783,10 @@ class JoystickDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                         gremlin.util.pushCursor()
                         pop_cursor = True
                     # not in cache, create it and add to cache for this device/input combination
-                    widget = InputItemMappingWidget(input_item, object_name = f"Joystick [{input_item.display_name}]")
+                    widget = InputItemMappingWidget(input_item = input_item, object_name = f"Joystick [{input_item.display_name}]")
                     device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
                     widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} ")
-                    widget.action_model.data_changed.connect(self._create_change_cb(index))
+                    widget._container_model.data_changed.connect(self._create_change_cb(index))
                     widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
                     widget.description_clear.connect(lambda: self._description_clear_cb(index,widget))
 

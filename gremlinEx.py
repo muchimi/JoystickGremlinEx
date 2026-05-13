@@ -520,33 +520,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         ts = gremlin.tabstate.TabState()
 
-        widget = self.getRegisteredWidget(device_guid)
-        if device_name == "Controller (XBOX 360 For Windows)":
-            object_name = f"Game Controller [{device_name}]"
-        else:
-            object_name = device_name
-
-        if not widget:
-            device_profile = self.profile.get_device_modes(
-                device.device_guid,
-                DeviceType.Joystick,
-                device.name,
-            )
-
-            widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
-                        device,
-                        device_profile,
-                        self.current_mode,
-                        object_name= object_name
-                        )
-            widget.data = (TabDeviceType.VjoyInput, device_guid, index)
-
-            self.registerWidget(device_guid, widget)
-
-
-
-
-
         tab_name = override_name if override_name else device_name
         with QtCore.QSignalBlocker(self.ui.devices):
             if index is None:
@@ -2506,7 +2479,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def setTabsDirty(self, update = False):
         ''' indicate tabs must be refreshed next time create tabs is called '''
 
-
+        if gremlin.shared_state.profile_loading:
+            # ignore if loading a profile
+            return 
+        
         if update:
             self._create_tabs()
 
@@ -3079,8 +3055,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 if verbose: syslog.info(f"SELECT TAB INDEX: {index}")
                 index = self.getTabIndexForDevice(last_device_guid)
+        
                 if index is not None:
                     gremlin.util.pushCursor()
+
+                    widget = self.getRegisteredWidget(last_device_guid)
+                    assert widget is not None,"invalid widget"
+                    
+                    widget.refresh()
+
                     self.ui.devices.setCurrentIndex(index)
                     self._select_input(last_device_guid, last_input_type, last_input_id, force_switch=True)
                     gremlin.util.popCursor()
@@ -3427,6 +3410,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     return
 
 
+                
+
 
 
                 # index of current device tab
@@ -3440,9 +3425,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     return
 
 
-
                 current_device_guid = tabdata.device_guid
                 current_input_type, current_input_id = self._get_last_input(current_device_guid)
+
+                # refresh the input list view for that tab if needed
+
 
 
                 # guid of current device tab
@@ -4922,6 +4909,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             gremlin.shared_state.pop_suspend_save_input()
 
             el.profile_loading_completed.emit()
+
+            # update UI post load
+            self.refresh()
 
             # restore the mouse cursor
             popCursor()

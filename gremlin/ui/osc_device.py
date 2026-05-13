@@ -3756,7 +3756,8 @@ class OscInputItemListView(gremlin.ui.input_item.InputItemListView):
                          blank_message = blank_message,
                          model = model,
                          )
-class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
+        
+class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 
@@ -3777,22 +3778,13 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param parent the parent of this widget
         """
 
-        assert profile is not None, "Profile cannot be None"
-        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
-        assert mode is not None and mode != '', "Mode cannot be None or empty"
-
-        super().__init__(object_name, gremlin.shared_state.osc_tab_guid, parent)
-
-        # Store parameters
-        self.profile = profile
-        profile.ensure_mode_exists(mode)
-        self.device_profile = profile.getDevice(self.device_guid)
-        self.current_mode = mode
+        device = gremlin.joystick_handling.getDevice(self.device_guid)
+        super().__init__(device, profile, mode, object_name, parent)
+      
 
         config = gremlin.config.Configuration()
-
-        self.device_profile.ensure_mode_exists(self.current_mode)
-        self.widget_storage = {}
+        
+        self._widget_map = {}
         self._filter = gremlin.util.decorate_filter(config.osc_filter)
         self._in_input_dialog = False # flag to deal with focus issue
 
@@ -4304,10 +4296,10 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                     if not pop_cursor:
                         gremlin.util.pushCursor()
                         pop_cursor = True
-                    widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name=f"OSC: {input_item.display_name}")
+                    widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"OSC: {input_item.display_name}")
                     self.registerWidget(key, widget)
                     change_cb = self._create_change_cb(index)
-                    widget.action_model.data_changed.connect(change_cb)
+                    widget._container_model.data_changed.connect(change_cb)
                     widget.description_changed.connect(change_cb)
                     widget.redraw() # update the mapping
 
@@ -4320,7 +4312,7 @@ class OscDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Osc))
                 mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
                 input_item = OscInputItem(mode_object)
-                widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name="OSC Blank InputConfigItem (no item data)")
+                widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name="OSC Blank InputConfigItem (no item data)")
                 widget.redraw() # load the data
 
             #self.setRightPanelWidget(widget)

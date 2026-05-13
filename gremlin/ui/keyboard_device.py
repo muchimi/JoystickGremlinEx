@@ -391,7 +391,7 @@ class KeyboardInputItemListView(gremlin.ui.input_item.InputItemListView):
 
 
 
-class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
+class KeyboardDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure keyboard inputs """
 
@@ -411,28 +411,18 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param mode: mode to display inputs for
         :param parent: the parent of this widget
         """
-        super().__init__(object_name, gremlin.shared_state.keyboard_tab_guid, parent)
 
-        assert profile is not None, "Profile cannot be None"
-        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
-        assert mode is not None and mode != '', "Mode cannot be None or empty"
+        device = gremlin.joystick_handling.getDevice(self.device_guid)
+        super().__init__(device, profile, mode, object_name, parent)
 
-        # Store parameters
-        self.profile = profile
-
-        self.profile.ensure_mode_exists(mode)
-        self.device_profile = profile.getDevice(self.device_guid)
-        
-        self.widget_storage = {}
-
+  
+       
         # List of inputs
         self.input_item_list_model = KeyboardInputItemModel(
             self.profile,
             mode = mode)
 
 
-        # last index selected, -1 means none
-        self._last_selected_index = -1
 
         self.input_item_list_view = KeyboardInputItemListView(
             custom_widget_handler = self._custom_widget_handler,
@@ -773,19 +763,19 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if index == -1:
             if self.input_item_list_model.rows() > 0:
-                item_data = self.input_item_list_model.data(0)
+                input_item = self.input_item_list_model.data(0)
                 index = 0
             else:
                 self._blank_input()
                 return
         else:
-            item_data = self.input_item_list_model.data(index)
+            input_item = self.input_item_list_model.data(index)
 
         device_guid = self.device_guid
         input_type = InputType.KeyboardLatched
-        input_id = item_data.input_id if item_data else None
+        input_id = input_item.input_id if input_item else None
 
-        if item_data:
+        if input_item:
 
 
             profile = gremlin.shared_state.current_profile
@@ -798,16 +788,16 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             key = self.getWidgetKey(input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
-                widget = InputItemMappingWidget(item_data, object_name = f"Keyboard InputItemConfig for: {item_data.display_name}")
+                widget = InputItemMappingWidget(input_item = input_item, object_name = f"Keyboard InputItemConfig for: {input_item.display_name}")
                 self.registerWidget(key, widget)
                 widget.redraw() # load the data
 
             # Create new configuration widget
 
             change_cb = self._create_change_cb(index)
-            widget.action_model.data_changed.connect(change_cb)
+            widget._container_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
-            self.rightPanelLocked = item_data.locked
+            self.rightPanelLocked = input_item.locked
 
 
             #self.input_item_list_view.select_item(index, False)
@@ -868,6 +858,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def refresh(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization."""
+        self.input_item_list_view.redraw()
         self._select_item_cb(self.input_item_list_view.current_index, emit)
 
 

@@ -662,7 +662,7 @@ class OctaviInputItemListView(gremlin.ui.input_item.InputItemListView):
    
 
 
-class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
+class OctaviDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 
@@ -677,12 +677,10 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             parent=None
             ):
 
-        super().__init__(object_name, gremlin.shared_state.octavi_tab_guid, parent)
+        device = gremlin.joystick_handling.getDevice(self.device_guid)
+        super().__init__(device, profile, mode, object_name, parent)
 
-        assert profile is not None, "Profile cannot be None"
-        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
-        assert mode is not None and mode != '', "Mode cannot be None or empty"
-
+   
         # Store parameters
         self.profile = profile
         profile.ensure_mode_exists(mode)
@@ -924,7 +922,7 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             return
 
         # self._last_selected_index = index
-        item_data = None
+        input_item = None
 
         if index == -1:
             index = self._last_selected_index
@@ -932,32 +930,32 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if index == -1:
             # select the first item
             if self.input_item_list_model.rows():
-                item_data = self.input_item_list_model.data(0)
+                input_item = self.input_item_list_model.data(0)
                 index = 0
             else:
                 self._blank_input()
                 return
         else:
-            item_data = self.input_item_list_model.data(index)
+            input_item = self.input_item_list_model.data(index)
 
 
         device_guid = self.device_guid
-        input_id = item_data.input_id if item_data else None
+        input_id = input_item.input_id if input_item else None
         input_type = InputType.OctaviIfr1
 
-        if item_data:
+        if input_item:
             device_guid = self.device_guid
             key = self.getWidgetKey(input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
-                widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name=f"IFR1: {item_data.display_name}")
+                widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"IFR1: {input_item.display_name}")
                 self.registerWidget(key, widget)
                 widget.redraw() # load the data
 
             # Create new configuration widget
 
             change_cb = self._create_change_cb(index)
-            widget.action_model.data_changed.connect(change_cb)
+            widget._container_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
             self.selectRegisteredWidget(key)
@@ -967,15 +965,15 @@ class OctaviDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             device_guid = gremlin.shared_state.octavi_tab_guid
             device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Joystick))
             mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
-            item_data = gremlin.base_profile.InputItem(mode_object)
-            widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, object_name="IFR1 Blank InputConfigItem (no item data)")
+            input_item = gremlin.base_profile.InputItem(mode_object)
+            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name="IFR1 Blank InputConfigItem (no item data)")
             widget.redraw() # load the data
 
         #self.setRightPanelWidget(widget)
 
         self._last_selected_index = index
         self._item_data = widget
-        self._last_selected_input_item = item_data
+        self._last_selected_input_item = input_item
 
 
         # ensure visible

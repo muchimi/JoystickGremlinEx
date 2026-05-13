@@ -2786,7 +2786,7 @@ class StateInputItemListView(gremlin.ui.input_item.InputItemListView):
                          model = model,
                          )
 
-class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
+class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure state change actions """
 
@@ -2806,20 +2806,11 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param current_mode currently active mode
         :param parent the parent of this widget
         """
-        device_guid = gremlin.shared_state.state_tab_guid
-        super().__init__(object_name, device_guid=device_guid, parent= parent)
         
-
-        assert profile is not None, "Profile cannot be None"
-        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
-        assert mode is not None and mode != '', "Mode cannot be None or empty"
-
-        # Store parameters
-        self.profile = profile
-        profile.ensure_mode_exists(mode)
-        self.device_profile = profile.getDevice(self.device_guid)
-
-        self.widget_storage = {}
+        device = gremlin.joystick_handling.getDevice(self.device_guid)
+        super().__init__(device, profile, mode, object_name, parent)
+        
+        self._widget_map = {}
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
@@ -3374,7 +3365,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         key = self.getWidgetKey(input_type, input_id)
         widget = self.getRegisteredWidget(key)
         if not widget:
-            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name=f"STATE: {input_item.key}")
+            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"STATE: {input_item.key}")
             self.registerWidget(key, widget)
             widget.redraw() # load the data
 
@@ -3398,7 +3389,7 @@ class StateDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # Create new configuration widget
         input_item.is_axis = False
         change_cb = self._create_change_cb(index)
-        widget.action_model.data_changed.connect(change_cb)
+        widget._container_model.data_changed.connect(change_cb)
         widget.description_changed.connect(change_cb)
 
 

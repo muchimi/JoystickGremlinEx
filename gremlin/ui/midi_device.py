@@ -1583,7 +1583,7 @@ class MidiInputListView(gremlin.ui.input_item.InputItemListView):
 
 
 
-class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
+class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 
@@ -1603,21 +1603,11 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         :param current_mode currently active mode
         :param parent the parent of this widget
         """
-        super().__init__(object_name, gremlin.shared_state.midi_tab_guid, parent)
+        device = gremlin.joystick_handling.getDevice(self.device_guid)
+        super().__init__(device, profile, mode, object_name, parent)
 
-        assert profile is not None, "Profile cannot be None"
-        assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
-        assert mode is not None and mode != '', "Mode cannot be None or empty"
-
-
-
-        # Store parameters
-        self.profile = profile
-        self.current_mode = mode
-        self.profile.ensure_mode_exists(self.current_mode)
-        self.device_profile = profile.getDevice(self.device_guid)
-        
-        self.widget_storage = {}
+         
+        self._widget_map = {}
 
         # List of inputs
         self.input_item_list_model = MidiInputListModel(
@@ -1810,12 +1800,12 @@ class MidiDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             key = self.getWidgetKey(input_type, input_id)
             widget = self.getRegisteredWidget(key)
             if not widget:
-                widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name=f"MIDI: {input_item.display_name}")
+                widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"MIDI: {input_item.display_name}")
                 self.registerWidget(key, widget)
                 widget.redraw() # load the data
 
             change_cb = self._create_change_cb(index)
-            widget.action_model.data_changed.connect(change_cb)
+            widget._container_model.data_changed.connect(change_cb)
             widget.description_changed.connect(change_cb)
 
             self.selectRegisteredWidget(key)

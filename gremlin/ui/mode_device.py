@@ -118,7 +118,7 @@ class ModeInputItemListView(gremlin.ui.input_item.InputItemListView):
 
 
 
-class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
+class ModeDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure mode change actions """
 
@@ -149,16 +149,10 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         assert mode is not None and mode != '', "Mode cannot be None or empty"
 
         
-        self._device_id = str(self.device_guid)
-        super().__init__(object_name, self.device_guid , parent)
+        device = gremlin.joystick_handling.getDevice(self.device_guid)
+        super().__init__(device, profile, mode, object_name, parent)
         
 
-        # Store parameters
-        self.profile = profile
-        self.profile.ensure_mode_exists(mode)
-        self.device_profile = profile.getDevice(self.device_guid)
-        self.device_profile.ensure_mode_exists(mode)
-        
         self.widget_storage = {}
 
         # List of inputs
@@ -506,7 +500,7 @@ class ModeDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         key = self.getWidgetKey(input_type, index)
         widget = self.getRegisteredWidget(key)
         if not widget:
-            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name = f"Mode  [{input_item.display_name}]")
+            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name = f"Mode  [{input_item.display_name}]")
             self.registerWidget(key, widget)
             widget.redraw() # load the data
 

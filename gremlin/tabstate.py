@@ -33,6 +33,7 @@ from gremlin.types import TabDeviceType
 
 
 class TabData:
+	''' holds tab information for a given device tab '''
 	filteredChanged = Signal(bool) # fires when the filtered property changes 
 	lockedChanged = Signal(bool) # fires when the lock property changes
 
