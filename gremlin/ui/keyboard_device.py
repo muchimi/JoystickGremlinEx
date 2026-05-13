@@ -128,6 +128,8 @@ class KeyboardInputItem(AbstractInputItem):
         
     @property
     def keynames(self) -> list:
+        if not self._key:
+            return []
         key_list = [self._key.name]
         key_list.extend([key.name for key in self.latched_keys])
         return key_list

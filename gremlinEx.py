@@ -1452,7 +1452,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 if not result:
                     # profile start failed
                     gremlin.shared_state.profile_state = False
-                    self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+                    self.ui.tray_icon.setIcon(load_icon("icon.ico"))
                     with QtCore.QSignalBlocker(self.ui.actionActivate):
                         self.ui.actionActivate.setChecked(False) # toolbar icon "off"
 
@@ -1465,7 +1465,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 if gremlin.shared_state.profile_state:
                     #print ("set icon ACTIVE")
-                    self.ui.tray_icon.setIcon(load_icon("gfx/icon_active.ico"))
+                    self.ui.tray_icon.setIcon(load_icon("icon_active.ico"))
 
                     with QtCore.QSignalBlocker(self.ui.actionActivate):
                         self.ui.actionActivate.setChecked(True) # toolbar icon "on"
@@ -1514,7 +1514,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 try:
                     if self.ui.tray_icon is not None:
-                        self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+                        self.ui.tray_icon.setIcon(load_icon("icon.ico"))
                 except:
                      syslog.error(f"Load Icon: error: {err}\n{traceback.format_exc()}")
         except Exception as err:
@@ -2187,7 +2187,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         )
 
         self.ui.tray_icon = QtWidgets.QSystemTrayIcon()
-        self.ui.tray_icon.setIcon(load_icon("gfx/icon.ico"))
+        self.ui.tray_icon.setIcon(load_icon("icon.ico"))
         self.ui.tray_icon.setContextMenu(self.ui.tray_menu)
         self.ui.tray_icon.show()
 
@@ -3851,7 +3851,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         active_color = gremlin.ui.ui_common.Color.activeColor()
         is_dark = gremlin.shared_state.is_dark_theme
 
-        profile_icon = "gfx/dark_profile_open.svg" if is_dark else "gfx/profile_open.svg"
+        profile_icon = "dark_profile_open.svg" if is_dark else "profile_open.svg"
 
         icon = load_icon(profile_icon)
         #icon = self.load_icon("profile_open.svg"))
@@ -3859,33 +3859,33 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         prefix = "dark_" if is_dark else ""
 
-        profile_new_icon = f"gfx/{prefix}profile_new.svg"
+        profile_new_icon = f"{prefix}profile_new.svg"
 
         icon = load_icon(profile_new_icon)
         self.ui.actionNewProfile.setIcon(icon)
 
-        profile_save_icon = f"gfx/{prefix}profile_save.svg"
+        profile_save_icon = f"{prefix}profile_save.svg"
         icon = load_icon(profile_save_icon)
         self.ui.actionSaveProfile.setIcon(icon)
 
-        profile_save_as_icon = f"gfx/{prefix}profile_save_as.svg"
+        profile_save_as_icon = f"{prefix}profile_save_as.svg"
         icon = load_icon(profile_save_as_icon)
         self.ui.actionSaveProfileAs.setIcon(icon)
 
 
-        device_information_icon = f"gfx/{prefix}device_information.svg"
+        device_information_icon = f"{prefix}device_information.svg"
         icon = load_icon(device_information_icon)
         self.ui.actionDeviceInformation.setIcon(icon)
 
-        manage_module_icon = f"gfx/{prefix}manage_modules.svg"
+        manage_module_icon = f"{prefix}manage_modules.svg"
         icon = load_icon(manage_module_icon)
         self.ui.actionManageCustomModules.setIcon(icon)
 
-        manage_modes_icon = f"gfx/{prefix}manage_modes.svg"
+        manage_modes_icon = f"{prefix}manage_modes.svg"
         icon = load_icon(manage_modes_icon)
         self.ui.actionManageModes.setIcon(icon)
 
-        input_repeater_icon = f"gfx/{prefix}input_repeater.svg"
+        input_repeater_icon = f"{prefix}input_repeater.svg"
         icon = load_icon(input_repeater_icon)
         self.ui.actionInputRepeater.setIcon(icon)
 
@@ -3894,15 +3894,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # icon = load_icon(input_viewer_icon)
         # self.ui.actionInputViewer.setIcon(icon)
 
-        icon = load_icon(f"gfx/{prefix}logview.png")
+        icon = load_icon(f"{prefix}logview.png")
         self.ui.actionLogDisplay.setIcon(icon)
         self.ui.actionLogEdit.setIcon(icon)
 
-        options_icon = f"gfx/{prefix}options.svg"
+        options_icon = f"{prefix}options.svg"
         icon = load_icon(options_icon)
         self.ui.actionOptions.setIcon(icon)
 
-        # about_icon = f"gfx/{prefix}about.svg"
+        # about_icon = f"{prefix}about.svg"
         # icon = load_icon(about_icon)
         # self.ui.actionAbout.setIcon(icon)
 
@@ -5618,7 +5618,7 @@ if __name__ == "__main__":
     QtCore.QLocale.setDefault(locale)
 
 
-    app.setWindowIcon(load_icon("gfx/icon.png"))
+    app.setWindowIcon(load_icon("icon.png"))
     app.setApplicationDisplayName(gremlin.version.APPLICATION_NAME + " " + gremlin.version.APPLICATION_VERSION)
     app.setApplicationVersion(gremlin.version.APPLICATION_VERSION)
     # no longer needed in QT6

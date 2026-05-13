@@ -1791,7 +1791,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self.edit_mode_widget = QtWidgets.QPushButton()
         
-        manage_modes_icon = "gfx/dark_manage_modes.svg" if is_dark else "gfx/manage_modes.svg"
+        manage_modes_icon = "dark_manage_modes.svg" if is_dark else "manage_modes.svg"
         self.edit_mode_widget.setIcon(ui_common.load_icon(manage_modes_icon))
         self.edit_mode_widget.clicked.connect(self._manage_modes_cb)
         self.edit_mode_widget.setToolTip("Manage Modes")

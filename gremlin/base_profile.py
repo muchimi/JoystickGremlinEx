@@ -3546,15 +3546,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         try:
-            if node.tag == "input":
-                # walk the chain for the input type
-                parent_node = node.getparent()
-                while parent_node is not None and not "type" in parent_node.attrib:
-                    parent_node = parent_node.getparent()
-                input_type = InputType.to_enum(parent_node.get("type"))
-            else:
-                input_type = InputType.to_enum(node.tag)
-            self.input_type = input_type
+            self.input_type = InputType.to_enum(node.tag)
 
         except:
             syslog.error(f"XML: unknown input type: [{node.tag}]")
@@ -3602,10 +3594,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                                     key.latched_keys.append(latched_key)
                     else:
                         # new style
-                        for child in node:
-                            if child.tag == "input":
-                                input_item.parse_xml(child, data, extra_data = extra_data)
-                                break
+                        if node.tag == "input":
+                            input_item.parse_xml(node, data, extra_data = extra_data)
+                        else:
+                            for child in node:
+                                if child.tag == "input":
+                                    input_item.parse_xml(child, data, extra_data = extra_data)
+                                    break
                 self.input_type = InputType.KeyboardLatched # force new input type
                 #syslog.info(f"Loaded key input: {input_item.display_name}")
                 self.setOverrideInputType(InputType.JoystickButton)

@@ -1697,7 +1697,7 @@ class ActionSetView(ui_common.AbstractView):
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
         if ActionSetView.Interactions.Up in self.allowed_interactions:
             self.control_move_up = QtWidgets.QPushButton(
-                load_icon(f"gfx/{prefix}button_up.png"), ""
+                load_icon(f"{prefix}button_up.png"), ""
             )
             self.control_move_up.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Up)
@@ -1706,7 +1706,7 @@ class ActionSetView(ui_common.AbstractView):
             self.has_edit_controls = True
         if ActionSetView.Interactions.Down in self.allowed_interactions:
             self.control_move_down = QtWidgets.QPushButton(
-                load_icon(f"gfx/{prefix}button_down.png"), ""
+                load_icon(f"{prefix}button_down.png"), ""
             )
             self.control_move_down.clicked.connect(
                 lambda: self.interacted.emit(ActionSetView.Interactions.Down)
@@ -1717,7 +1717,7 @@ class ActionSetView(ui_common.AbstractView):
 
             self.control_delete = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = lambda: self.interacted.emit(ActionSetView.Interactions.Delete))
             # self.control_delete = QtWidgets.QPushButton(
-            #     load_icon(f"gfx/{prefix}button_delete.png"), ""
+            #     load_icon(f"{prefix}button_delete.png"), ""
             # )
             # # syslog.info(f"action: delete allowed")
             # self.control_delete.clicked.connect(
@@ -1728,7 +1728,7 @@ class ActionSetView(ui_common.AbstractView):
         if ActionSetView.Interactions.Edit in self.allowed_interactions:
             self.control_edit = gremlin.ui.ui_common.Buttons.getEditWidget(callback = lambda: self.interacted.emit(ActionSetView.Interactions.Edit))
             # self.control_edit = QtWidgets.QPushButton(
-            #     load_icon(f"gfx/{prefix}button_edit.png"), ""
+            #     load_icon(f"{prefix}button_edit.png"), ""
             # )
             # self.control_edit.clicked.connect(
             #     lambda: self.interacted.emit(ActionSetView.Interactions.Edit)
@@ -4196,7 +4196,7 @@ class TitleBar(QtWidgets.QWidget):
         self.close_button = TitleBarButton()
         close_icon = load_icon("mdi.delete")
 
-        pixmap_close = close_icon.pixmap(size,size) # load_pixmap("gfx/close.png")
+        pixmap_close = close_icon.pixmap(size,size) # load_pixmap("close.png")
         if not pixmap_close or pixmap_close.isNull():
             self.close_button.setText("X")
         else:

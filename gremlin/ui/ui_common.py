@@ -444,7 +444,7 @@ class Color():
         foreground_color = Color.normalColor
         selected_background_color = Color.selectedBackgroundColor()
         if gremlin.config.Configuration().is_debug:
-            relative_path = "gfx/"
+            relative_path = ""
         else:
             relative_path = "_internal/gfx/"
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
@@ -3317,7 +3317,7 @@ class ModeWidget(QtWidgets.QWidget):
         # add the mode change button
         self.mode_change = QtWidgets.QPushButton()
         is_dark = gremlin.shared_state.is_dark_theme
-        manage_modes_icon = "gfx/dark_manage_modes.svg" if is_dark else "gfx/manage_modes.svg"
+        manage_modes_icon = "dark_manage_modes.svg" if is_dark else "manage_modes.svg"
         self.mode_change.setIcon(load_icon(manage_modes_icon))
         self.mode_change.setToolTip("Manage Profile Modes")
         self.mode_change.clicked.connect(self._manage_modes_cb)

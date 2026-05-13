@@ -162,6 +162,7 @@ _InputType_to_enum_lookup = {
     "button": InputType.JoystickButton,
     "hat": InputType.JoystickHat,
     "key": InputType.KeyboardLatched,
+    "input": InputType.KeyboardLatched,
     "keyboard": InputType.KeyboardLatched,
     "keylatched": InputType.KeyboardLatched,
     "osc": InputType.OpenSoundControl,
