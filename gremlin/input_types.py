@@ -161,7 +161,8 @@ _InputType_to_enum_lookup = {
     "mouse" : InputType.Mouse,
     "button": InputType.JoystickButton,
     "hat": InputType.JoystickHat,
-    "key": InputType.Keyboard,
+    "key": InputType.KeyboardLatched,
+    "keyboard": InputType.KeyboardLatched,
     "keylatched": InputType.KeyboardLatched,
     "osc": InputType.OpenSoundControl,
     "midi": InputType.Midi,
@@ -181,4 +182,3 @@ _InputType_to_enum_lookup = {
     "State" : InputType.State,
     "OctaviIfr1" : InputType.OctaviIfr1
 }
-

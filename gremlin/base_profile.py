@@ -3546,7 +3546,16 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         try:
-            self.input_type = InputType.to_enum(node.tag)
+            if node.tag == "input":
+                # walk the chain for the input type
+                parent_node = node.getparent()
+                while parent_node is not None and not "type" in parent_node.attrib:
+                    parent_node = parent_node.getparent()
+                input_type = InputType.to_enum(parent_node.get("type"))
+            else:
+                input_type = InputType.to_enum(node.tag)
+            self.input_type = input_type
+
         except:
             syslog.error(f"XML: unknown input type: [{node.tag}]")
 
@@ -6595,6 +6604,7 @@ class Mode:
         child: lxml.etree.Element
         index = 0 # sorting index - order read in from the profile
         for child in node:
+
             item = InputItem(mode_parent = self)
             item.from_xml(child, item, extra_data) # send owner item to sub components as the data member
             item.device_guid = self.parent.device_guid

@@ -31,6 +31,7 @@ import uuid
 import dinput
 import winreg, win32api, win32con
 from ctypes import Structure, c_long, sizeof
+import collections
 
 import qtawesome as qta
 from lxml import etree as ElementTree
@@ -772,6 +773,33 @@ def find_file(file_path, root_folder = None):
     cache = SearchCache()
     return cache.find_file(file_path, root_folder)
 
+def find_icon(icon_file):
+    ''' locates an icon file '''
+    if not os.path.isfile(icon_file):
+        root_folder = get_root_folder()
+        # usual locations for images
+        folder_list = ["gfx"]
+        for folder in folder_list:
+            new_icon_file = os.path.join(root_folder,folder,icon_file)
+            if os.path.isfile(new_icon_file):
+                return new_icon_file
+    return None
+
+
+
+def get_root_folder() -> str:
+    ''' gets the root folder '''
+    import sys
+    import pathlib
+    import os
+
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # as exe via pyinstallaler
+        application_path = sys._MEIPASS
+    else:
+        application_path = pathlib.Path(os.path.dirname(__file__)).parent
+    return application_path
+
 
 def find_package_file(file_path):
     ''' find a package file '''
@@ -873,15 +901,25 @@ def get_icon_path(path):
             # no path provided
             return None
 
-        root_path = gremlin.shared_state.root_path
+        if os.path.isfile(path):
+            return path
+
+
+
 
         if the_path in gremlin.shared_state._icon_path_cache.keys():
             return gremlin.shared_state._icon_path_cache[the_path]
 
+        # root folder
+        root_path = get_root_folder()
+
         # find the file
         if not "/" in the_path and not os.sep in the_path:
             # raw find fine
-            icon_file = _find_file(the_path, root_path)
+            icon_file = find_icon(path)
+            if not icon_file:
+                icon_file = _find_file(the_path, root_path)
+
             if icon_file and os.path.isfile(icon_file):
                 gremlin.shared_state._icon_path_cache[the_path] = icon_file
                 return icon_file
@@ -994,11 +1032,18 @@ def load_icon(*paths, use_qta = False, qta_color = None):
     is_dark = gremlin.shared_state.is_dark_theme
 
     the_path = paths[0]
+    if not the_path:
+        return get_generic_icon()
+
     _ , ext = os.path.splitext(the_path.casefold())
 
     if ext == ".svg":
         if not os.path.isfile(the_path):
-            the_path = find_file(the_path)
+            new_path = find_icon(the_path)
+            if not new_path:
+                return get_generic_icon()
+            the_path = new_path
+
         if os.path.isfile(the_path):
             if is_dark:
                 dark_path = dark_file(the_path)
@@ -1112,7 +1157,7 @@ def get_generic_icon():
     ''' gets a generic icon'''
     import gremlin.shared_state
     root_path = gremlin.shared_state.root_path
-    generic_icon = os.path.join(root_path, "gfx/generic.png")
+    generic_icon = os.path.join(root_path, "generic.png")
     if generic_icon and os.path.isfile(generic_icon):
         pixmap = QtGui.QPixmap(generic_icon)
         if pixmap.isNull():
@@ -1569,29 +1614,59 @@ def waitCursor():
     pushCursor()
 
 _cursor_push = 0
+_cursor_timer = None # timer to display hourglass
 _cursor_level = []
 
 
-def pushCursor():
-    global _cursor_push
+def pushCursor(immediate = False):
+    ''' displays an hourglass cursor
+    :params immediate: if true, sets the cursor immediately instead of waiting for a short delay
+
+    '''
+    global _cursor_push, _cursor_timer
     if _cursor_push == 0:
-        InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
+        if immediate:
+            _cursor_show_hourglass()
+        else:
+            if _cursor_timer:
+                _cursor_timer.cancel()
+            _cursor_timer = threading.Timer(2.0, _cursor_show_hourglass)
+            _cursor_timer.start()
     _cursor_push += 1
 
+def _cursor_show_hourglass():
+    InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
+
 def _pushCursor_ui():
-    QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
+    global _cursor_push, _cursor_timer
+    _cursor_timer = None
+    if _cursor_push > 0:
+        # still active?
+        QtGui.QGuiApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
+        QtGui.QGuiApplication.processEvents()
+        # QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
+        # QtWidgets.QApplication.processEvents()
+        # syslog.info("show hourglass")
 
 
 def popCursor(reset = False):
-    global _cursor_push
+    global _cursor_push, _cursor_timer
     if _cursor_push > 0:
         _cursor_push -= 1
     if _cursor_push == 0 or reset:
-        InvokeUiMethod(_popCursor_ui, reset)
+        if _cursor_timer is not None:
+            _cursor_timer.cancel()
+            _cursor_timer = None
+        InvokeUiMethod(_popCursor_ui)
 
-def _popCursor_ui(reset = False):
-    ''' restores form wait cusor '''
-    QtWidgets.QApplication.restoreOverrideCursor()
+def _popCursor_ui():
+    ''' restores the normal cursor '''
+    QtGui.QGuiApplication.restoreOverrideCursor()
+    QtGui.QGuiApplication.processEvents()
+
+    # QtWidgets.QApplication.restoreOverrideCursor()
+    # QtWidgets.QApplication.processEvents()
+    # syslog.info("hide hourglass")
 
 def isWaitCursor() -> bool:
     ''' true if the cursor is an hourglass '''
@@ -2350,6 +2425,10 @@ def get_guid(strip=True,no_brackets = False) -> str:
         guid = guid.replace("{",'').replace("}",'')
     return guid
 
+def get_uuid() -> uuid.UUID:
+    ''' gets a unique ID '''
+    return uuid.uuid4()
+
 def is_guid(value):
     ''' verifies the quantity is a valid GUID '''
 
@@ -2668,3 +2747,29 @@ def getMonitorOrientation(hwnd):
         return orientation, orientations.get(orientation, "Unknown")
     return None, None
 
+
+
+class TriggerDict(collections.UserDict):
+    ''' dict that fires callbacks when data is changed '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._on_change_callbacks = []
+
+    def addCallback(self, callback):
+        """Registers a function to run on changes."""
+        self._on_change_callbacks.append(callback)
+
+
+    def __setitem__(self, key, value):
+        old_value = self.data.get(key)
+        super().__setitem__(key, value)
+        # run callbacks
+        for callback in self._on_change_callbacks:
+            callback(self, key, old_value, value)
+
+    def __delitem__(self, key):
+        old_value = self.data.get(key)
+        super().__delitem__(key)
+        # run callbacks
+        for callback in self._on_change_callbacks:
+            callback(self, key, old_value, None)
