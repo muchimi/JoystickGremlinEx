@@ -33,7 +33,7 @@ import gremlin.event_handler
 
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
-from gremlin.util import safe_format, safe_read
+from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
@@ -484,6 +484,7 @@ class RepeatContainer(AbstractContainer):
         node.set("repeat-count", safe_format(self.repeat_count, int))
 
         as_node = ElementTree.Element("action-set")
+        as_node.set("id", write_guid(action_sets[0].id))
         for action in self.action_sets[0]:
             as_node.append(action.to_xml())
         node.append(as_node)

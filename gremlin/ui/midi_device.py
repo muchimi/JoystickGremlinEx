@@ -36,13 +36,13 @@ from gremlin.util import parse_guid, byte_list_to_string
 import gremlin.event_handler
 import gremlin.config
 import gremlin.ui.ui_common
-import gremlin.ui.joystick_device
 import gremlin.base_profile
 import gremlin.util
 from gremlin.ui.ui_common import QBoxFrame
 import psygnal
 from psygnal import Signal
 from gremlin.types import DeviceType
+from gremlin.ui.input_item import InputItemMappingWidget
 
 syslog = logging.getLogger("system")
 
@@ -862,7 +862,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.setWindowTitle("Midi Input Mapper")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent # list view
-        assert hasattr(parent, "input_item_list_model"),"MIDI CONFIG: Parent widget does not have required listview model"
+        assert hasattr(parent, "inputItemListModel"),"MIDI CONFIG: Parent widget does not have required listview model"
         assert hasattr(parent, "input_item_list_view"),"MIDI CONFIG: Parent widget does not have required listview"
 
         self.config_widget =  QtWidgets.QWidget()
@@ -1491,7 +1491,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             if self._midi_message is not None:
                 # get the list of all the other inputs
                 parent_widget = self._parent
-                model = parent_widget.input_item_list_model
+                model = parent_widget.inputItemListModel
                 message = self._midi_message
                 input_item = MidiInputItem.from_message(self._port_name, message, self._mode)
                 key = input_item.message_key
@@ -1604,35 +1604,41 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         :param parent the parent of this widget
         """
         device = gremlin.joystick_handling.getDevice(self.device_guid)
-        super().__init__(device, profile, mode, object_name, parent)
+        super().__init__(
+                    device = device,
+                    profile = profile,
+                    mode = mode,
+                    object_name = object_name,
+                    parent = parent
+                    )
+
+
 
          
         self._widget_map = {}
 
         # List of inputs
-        self.input_item_list_model = MidiInputListModel(
+        self.inputItemListModel = MidiInputListModel(
             profile,
             mode
         )
 
         # create a list view with custom input widgets
-        self.input_item_list_view = MidiInputListView(
+        self.inputItemListView = MidiInputListView(
             custom_widget_handler = self._custom_widget_handler,
             parent = self,
             blank_message = "Please add a MIDI input.", 
-            model=self.input_item_list_model)
+            model=self.inputItemListModel)
         
-        self.input_item_list_view.setMinimumWidth(350)
+        self.inputItemListView.setMinimumWidth(350)
 
         # Input type specific setups
-        self.input_item_list_view.setModel(self.input_item_list_model)
-        self.input_item_list_view.updated.connect(self._update_conflicts)
-        self.input_item_list_view.redraw()
+        self.inputItemListView.updated.connect(self._update_conflicts)
+
 
         # Handle user interaction
-        self.input_item_list_view.item_selected.connect(self._select_item_cb)
-        self.input_item_list_view.item_edit.connect(self._edit_item_cb)
-        self.input_item_list_view.item_closed.connect(self._close_item_cb)
+        self.inputItemListView.item_edit.connect(self._edit_item_cb)
+        self.inputItemListView.item_closed.connect(self._close_item_cb)
 
         self._last_selected_index = -1 # last index selected, -1 = none
 
@@ -1664,7 +1670,7 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
             gremlin.ui.ui_common.synchronize_grids([w1, w2])
 
 
-        self.addLeftPanelWidget(self.input_item_list_view)
+        self.addLeftPanelWidget(self.inputItemListView)
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
@@ -1683,59 +1689,17 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         icon = gremlin.util.load_icon("mdi.midi")
         add_input_button.setIcon(icon)
         add_input_button.clicked.connect(self._add_input_cb)
-
+        button_container_layout.addWidget(add_input_button)
+        self.addLeftPanelWidget(button_container_widget)
 
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._handle_edit_mode_changed) # edit mode changed or mode added/removed
-        # lock all inputs
-        el.lock_inputs.connect(self._handle_lock_inputs)
-        el.unlock_inputs.connect(self._handle_unlock_inputs)
 
-        button_container_layout.addWidget(add_input_button)
-
-        self.addLeftPanelWidget(button_container_widget)
 
         # Select default entry
-        if self.input_item_list_model.rows() > 0:
-            selected_index = self.input_item_list_view.current_index
-            if selected_index is not None:
-                self._select_item_cb(selected_index)
-
-    @property
-    def inputCount(self) -> int:
-        ''' number of inputs in the device '''
-        return self.input_item_list_model.rows()
-
-    @property
-    def inputWidgetCount(self) -> int:
-        ''' number of input widgets currently in the device '''
-        return self.input_item_list_view.count()
-
-    def _handle_lock_inputs(self, data):
-        gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data) # ensure on UI thread
-
-    def _handle_unlock_inputs(self, data):
-        gremlin.util.InvokeUiMethod(self._handle_unlock_inputs_ui, data) # ensure on UI thread
-
-    def _handle_lock_inputs_ui(self, data):
-        ''' lock all inputs event'''
-        if Shiboken.isValid(self) and data == self.device_guid:
-            # ours
-            self.setUpdatesEnabled(False)
-            for input_item in self.input_item_list_model.getFilteredItems():
-                input_item.locked = True
-            self.setUpdatesEnabled(True)
-
-    def _handle_unlock_inputs_ui(self, data):
-        ''' unlock all inputs event '''
-        if Shiboken.isValid(self) and data == self.device_guid:
-            # ours
-            self.setUpdatesEnabled(False)
-            for input_item in self.input_item_list_model.getFilteredItems():
-                input_item.locked = False
-            self.setUpdatesEnabled(True)
-
-
+        selected_index = self.inputItemListView.currentIndex()
+        if selected_index is not None:
+            self.selectInputItemIndex(selected_index)
 
 
     def _handle_edit_mode_changed(self, mode : str):
@@ -1752,79 +1716,89 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
 
     def _show_clear_cb(self):
-        return self.input_item_list_model.rows() > 0
+        return self.inputItemListModel.rows() > 0
 
     def _clear_inputs_cb(self):
         ''' clears all input keys '''
-        self.input_item_list_model.clear(input_types=[InputType.Midi])
-        self.input_item_list_view.redraw()
+        self.inputItemListModel.clear(input_types=[InputType.Midi])
+        
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
         self._blank_input()
 
 
-    def itemAt(self, index):
-        ''' returns the input widget at the given index '''
-        return self.input_item_list_view.itemAt(index)
+
+    # def _handle_create_widget(self, input_item):
+    #     index = self.inputItemListView.indexOf(input_item)
+    #     assert index != -1,"input item is not in the list"
+            
+    #     widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"MIDI: {input_item.display_name}")
+    #     device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
+    #     widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} ")
+    #     widget._container_model.data_changed.connect(self._create_change_cb(index))
 
 
-    def _select_item_cb(self, index, emit = True):
-        """Handles the selection of an input item.
-
-        :param index the index of the selected item
-        """
-        import gremlin.ui.input_item
-        if not Shiboken.isValid(self.input_item_list_view):
-            return
-
-        if index == -1:
-            index = self._last_selected_index
-
-        if index == -1:
-            if self.input_item_list_model.rows() > 0:
-                input_item = self.input_item_list_model.data(0)
-                index = 0
-            else:
-                self._blank_input()
-                return
-        else:
-            input_item = self.input_item_list_model.data(index)
-
-        device_guid = self.device_guid
-        input_id = input_item.input_id if input_item else None
-        input_type = InputType.Midi
-
-        if input_item:
-            device_guid = self.device_guid
-            key = self.getWidgetKey(input_type, input_id)
-            widget = self.getRegisteredWidget(key)
-            if not widget:
-                widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"MIDI: {input_item.display_name}")
-                self.registerWidget(key, widget)
-                widget.redraw() # load the data
-
-            change_cb = self._create_change_cb(index)
-            widget._container_model.data_changed.connect(change_cb)
-            widget.description_changed.connect(change_cb)
-
-            self.selectRegisteredWidget(key)
-
-        else:
-            input_item = MidiInputItem()
-            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name="MIDI Blank InputConfigItem (no item data)")
-            widget.redraw() # load the data
+    #     return widget            
 
 
-        # update container display if blank
-        self.updateContainerViewBlankMessage(input_item, " MIDI ")
 
-        self._last_selected_index = index
-        self._item_data = widget
+    # def _select_item_cb(self, index, emit = True):
+    #     """Handles the selection of an input item.
 
-        if emit:
-            el = gremlin.event_handler.EventListener()
-            el.input_selection_changed.emit(device_guid, input_type, input_id)
+    #     :param index the index of the selected item
+    #     """
+    #     import gremlin.ui.input_item
+    #     if not Shiboken.isValid(self.inputItemListView):
+    #         return
+
+    #     if index == -1:
+    #         index = self._last_selected_index
+
+    #     if index == -1:
+    #         if self.inputItemListModel.rows() > 0:
+    #             input_item = self.inputItemListModel.data(0)
+    #             index = 0
+    #         else:
+    #             self._blank_input()
+    #             return
+    #     else:
+    #         input_item = self.inputItemListModel.data(index)
+
+    #     device_guid = self.device_guid
+    #     input_id = input_item.input_id if input_item else None
+    #     input_type = InputType.Midi
+
+    #     if input_item:
+    #         device_guid = self.device_guid
+    #         key = self.getWidgetKey(input_type, input_id)
+    #         widget = self.getRegisteredWidget(key)
+    #         if not widget:
+    #             widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"MIDI: {input_item.display_name}")
+    #             self.registerWidget(key, widget)
+    #             widget.redraw() # load the data
+
+    #         change_cb = self._create_change_cb(index)
+    #         widget._container_model.data_changed.connect(change_cb)
+    #         widget.description_changed.connect(change_cb)
+
+    #         self.selectRegisteredWidget(key)
+
+    #     else:
+    #         input_item = MidiInputItem()
+    #         widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name="MIDI Blank InputConfigItem (no item data)")
+    #         widget.redraw() # load the data
+
+
+    #     # update container display if blank
+    #     self.updateContainerViewBlankMessage(input_item, " MIDI ")
+
+    #     self._last_selected_index = index
+    #     self._item_data = widget
+
+    #     if emit:
+    #         el = gremlin.event_handler.EventListener()
+    #         el.input_selection_changed.emit(device_guid, input_type, input_id)
 
 
 
@@ -1836,25 +1810,20 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         device_modes =  profile.get_device_modes(self._device_guid, DeviceType.to_string(DeviceType.Midi))
         mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
 
-        input_id = MidiInputItem(mode_object)
-        input_id.id = uuid.uuid4() # unique ID for this new item
-        self.device_profile.modes[self.current_mode].get_data(input_type, input_id)
-        self.input_item_list_model.refresh()
-        self.input_item_list_view.redraw()
+        input_item = MidiInputItem(mode_object)
+        input_item.id = uuid.uuid4() # unique ID for this new item
+        self.device_profile.modes[self.current_mode].get_data(input_type, input_item)
+        self.inputItemListModel.refresh()
 
-        index = self.input_item_list_model.indexOf(input_id)
-        self.input_item_list_view.select_item(index,True)
 
-        self._last_selected_index = -1
-        self._last_selected_input_item = None
+        index = self.inputItemListModel.indexOf(input_item)
+        self.selectInputItem(input_item)
+
         self._item_data = None
 
 
-        # redraw the UI
-        self._select_item_cb(index)
-
         # auto edit input
-        self._edit_item_cb(None, index, input_id)
+        self._edit_item_cb(None, index, input_item)
 
 
 
@@ -1870,20 +1839,19 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         :param index the index of the content being changed
         :return callback function redrawing changed content
         """
-        return lambda: self.input_item_list_view.redraw_index(index)
+        return lambda: self.inputItemListView.redraw_index(index)
 
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode)
-        self.input_item_list_model.mode = mode
+        self.inputItemListModel.mode = mode
 
 
-        #self.input_item_list_view.select_item(-1)
+        #self.inputItemListView.select_item(-1)
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
-            self.input_item_list_model.refresh()
-            self.input_item_list_view.redraw()
-            self._select_item_cb(self._last_selected_index)
+            self.inputItemListModel.refresh()
+
 
 
 
@@ -1946,7 +1914,7 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
 
 
-        identifier = self.input_item_list_model.data(index)
+        identifier = self.inputItemListModel.data(index)
         input_item : MidiInputItem = identifier.input_id
         input_item.port_name = port_name
         input_item.message = message
@@ -1958,7 +1926,7 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
 
 
-        self.input_item_list_view.update_item(index)
+        self.inputItemListView.update_item(index)
 
 
         # update container display if blank
@@ -1973,7 +1941,7 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         ''' called when the close button is clicked '''
         key = self.getRegisteredKeyIndex(index)
         self.unregisterWidget(key)
-        if not self.input_item_list_model.rows():
+        if not self.inputItemListModel.rows():
             # display blank page if no item left
             self._blank_input()
 
@@ -1984,9 +1952,8 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     def _update_conflicts(self):
          # check for conflicts with other entries
-        model = self.input_item_list_model
 
-        widgets = [self.itemAt(index) for index in range(model.rows())]
+        widgets = self.inputItemListView.getWidgets()
         compared_widgets = []
         conflicted_widgets = []
         for input_widget in widgets:

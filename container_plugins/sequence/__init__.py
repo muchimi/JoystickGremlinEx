@@ -39,7 +39,7 @@ from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
 from PySide6 import QtCore
-from gremlin.util import safe_format, safe_read
+from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 from shiboken6 import Shiboken
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import SyncMode
@@ -1654,9 +1654,10 @@ Unlike a macro, any action suitable for the input can be used.'''
                 
 
 
-        for actions in self.action_sets:
+        for action_set in self.action_sets:
             as_node = ElementTree.Element("action-set")
-            for action in actions:
+            as_node.set("id", write_guid(action_set.id))
+            for action in action_set:
                 as_node.append(action.to_xml())
             node.append(as_node)
 

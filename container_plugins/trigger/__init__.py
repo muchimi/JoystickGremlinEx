@@ -449,6 +449,7 @@ class TriggerContainer(AbstractContainer):
         node = ElementTree.Element("container")
         node.set("type", "trigger")
         as_node = ElementTree.Element("action-set")
+        as_node.set("id", write_guid(action_sets[0].id))
         for action in self.action_sets[0]:
             as_node.append(action.to_xml())
         node.append(as_node)

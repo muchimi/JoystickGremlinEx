@@ -448,6 +448,22 @@ class Color():
             }}
             '''
         return css
+    
+    @staticmethod
+    def cssNormalBox():
+        border_color = Color.borderColor()
+        background_color = Color.backgroundColor()
+        css = f'''
+            QFrame {{
+                border: 1px solid {border_color};
+                background: {background_color};
+            }}
+            QLabel {{
+                border: none;
+            }}
+            '''
+        return css
+
 
 
 
@@ -9560,7 +9576,7 @@ class WidgetCacheTracker():
 
 class QSplitTabWidget(QDataWidget):
     ''' tab content widget split '''
-    def __init__(self, object_name, device_guid, parent = None):
+    def __init__(self, object_name, device_guid, enable_filter = True, parent = None):
         '''
         Creates a device split tab widget with inputs on the left and contents on the right
 
@@ -9577,6 +9593,7 @@ class QSplitTabWidget(QDataWidget):
         self._device_guid = device_guid
         self._device_id = gremlin.util.normalize_guid(device_guid)
         self._filtered = False # filter state for inputs
+        self._input_filters_enabled = enable_filter # true if filters are enabled
 
         self._lock = False
         self._tab_data = None
@@ -9628,7 +9645,40 @@ class QSplitTabWidget(QDataWidget):
 
         self.main_layout.addWidget(self._content_widget)
 
+        self._registered_callbacks = [] # list of callbacks called when a widget is added to the registry
+        self._unregistered_callbacks = [] # list of callbacks called when a widget is de-registered from the registry
+
         self._blank_input()
+
+    @property
+    def filtersEnabled(self) -> bool:
+        ''' true if filtering is enabled on the inputs '''
+        return self._input_filters_enabled
+
+
+    def addRegisteredWidgetCallback(self, callback : Callable):
+        ''' adds a new callback called when a registered content widget is added to this widget 
+            :param callback: callback(key, index, widget)
+                key = the unique registraion key
+                index = the index in the stacked container for the widget
+                widget = the input mapping widget that was registered
+        '''
+        assert isinstance(callback, Callable),"invalid callback"
+        if not callback in self._registered_callbacks:
+            self._registered_callbacks.append(callback)
+
+    def addUnregisteredWidgetCallback(self, callback : Callable):
+        ''' adds a new callback called when a registered content widget is removed from this widget
+            :param callback: callback(key, index, widget)
+                key = the unique registraion key
+                index = the index in the stacked container for the widget
+                widget = the input mapping widget that was registered
+        '''
+        assert isinstance(callback, Callable),"invalid callback"
+        if not callback in self._registered_callbacks:
+            self._unregistered_callbacks.append(callback)
+
+    
 
     def _handle_used_filter_changed(self, device_id, value):
         if self._device_id == device_id and self._filtered != value:
@@ -9648,7 +9698,7 @@ class QSplitTabWidget(QDataWidget):
 
 
     @property
-    def inputCount(self) -> int:
+    def inputItemCount(self) -> int:
         ''' number of inputs in the device '''
         assert False,"Must be implemented by derived class"
 
@@ -9733,16 +9783,21 @@ class QSplitTabWidget(QDataWidget):
         self._widget_config_index_map[key] = index
         self._widget_config_device_map[index] = key
 
+        
+
         if hasattr(widget,"params"):
             # add to the cache and bounce the oldest iteration if a cache limit is set
             iim = WidgetCacheTracker()
             iim.addWidget(key, widget)
             widget.expired.connect(self._handle_expired_widget)
 
+        for callback in self._registered_callbacks:
+            callback(key, index, widget)
+
         return index
 
     def _handle_expired_widget(self, key, widget):
-        gremlin.util.InvokeUiMethod(self._handle_expired_widget_ui, key)
+        gremlin.util.InvokeUiMethod(self._handle_expired_widget_ui, key, widget)
 
     def _handle_expired_widget_ui(self, key, widget):
         ''' called by the widget cache when a widget is being removed from the cache '''
@@ -9755,14 +9810,8 @@ class QSplitTabWidget(QDataWidget):
                 # one of ours
                 if verbose: syslog.info(f"\tremoving widget from stacked widget")
                 widget.expired.disconnect(self._handle_expired_widget)
-                self._right_panel_stacked_widget.removeWidget(widget)
-
-            index = self._widget_config_index_map[key]
-            # syslog.info(f"\tremoving index [{index}] from tracking data")
-            del self._widget_config_device_map[index]
-            del self._widget_config_index_map[key]
-
-
+                self.unregisterWidget(key)
+                
 
     def unload(self):
         ''' unloads UI resources used by a particular tab widget '''
@@ -9811,6 +9860,12 @@ class QSplitTabWidget(QDataWidget):
                     # this will trigger the expired event on the widget
                     widget = self._right_panel_stacked_widget.widget(index)
                     self._right_panel_stacked_widget.removeWidget(widget)
+
+                    # notify of the deletion
+                    for callback in self._unregistered_callbacks:
+                        callback(key, index, widget)
+
+
                     # not in the cache - straight up delete
                     if hasattr(widget, "_cleanup_ui"):
                         widget._cleanup_ui()
@@ -9836,18 +9891,24 @@ class QSplitTabWidget(QDataWidget):
         if verbose:
             syslog.info("RIGHT PANEL: clear all widgets")
 
-        clearStackedWidget(self._right_panel_stacked_widget)
-
         # remove cached widgets
         iis = gremlin.ui.ui_common.WidgetCacheTracker()
         keys = list(self._widget_config_index_map.keys())
         for key in keys:
             if iis.contains(key):
                 iis.removeWidget(key)
+            
+            index = self._widget_config_index_map[key]
+            widget = self._right_panel_stacked_widget.widget(index)
+            
+            for callback in self._unregistered_callbacks:
+                callback(key, index, widget)
+
+        clearStackedWidget(self._right_panel_stacked_widget)                
 
         self._widget_config_index_map.clear()
         self._widget_config_device_map.clear()
-        # gc.collect()
+        
 
     def getRegisteredWidget(self, key) -> QtWidgets.QWidget:
         ''' gets the widget for the given device id, None if not found'''
@@ -9897,6 +9958,22 @@ class QSplitTabWidget(QDataWidget):
         if isinstance(widget, gremlin.ui.input_item.InputItemMappingWidget):
             return widget
         return None
+    
+    
+    def getInputItemWidgetKey(self, input_item : gremlin.base_profile.InputItem):
+        ''' gets the widget key for a given input '''
+        input_id = input_item.input_id
+        device_guid = input_item.device_id
+        input_type = input_item.input_type
+
+        if isinstance(input_id, list):
+            input_id = tuple(input_id) # convert to hashable type
+        key =  (gremlin.shared_state.edit_mode, device_guid, input_type, input_id)
+        if __debug__:
+            # ensure key is hashable
+            h = hash(key)
+        return key
+
 
     def getWidgetKey(self, input_type, input_id):
         ''' gets the content widget compound key for the item / input combination'''
@@ -9960,26 +10037,6 @@ class QSplitTabWidget(QDataWidget):
         # select it
         self.selectRegisteredWidget(self._blank_input_id)
 
-    def ensureLoaded(self):
-        ts = gremlin.tabstate.TabState()
-        data = ts.getData(self._device_id)
-        if not data.populateEnabled:
-            data.populateEnabled = True # enable data loading
-            verbose = gremlin.config.Configuration().verbose_mode_ui
-            if verbose:
-                device_name = gremlin.joystick_handling.device_name_from_guid(self._device_id)
-                syslog.info(f"UI: enable device data population [{device_name}] [{self._device_id}]")
-
-            # verify this is a device tab
-            if hasattr(self, "input_item_list_model"):
-                # data needs to be populated - do this on the UI thread
-                gremlin.util.InvokeUiMethod(self._ensureLoaded_ui)
-
-    def _ensureLoaded_ui(self):
-        ''' ensures the data is loaded into the widget - runs on UI thread '''
-        if self.input_item_list_model.rows() == 0:
-            self.input_item_list_model.refresh()
-        self.input_item_list_view.redraw()
 
 
     def _ensure_blank_widget(self):
@@ -9999,22 +10056,6 @@ class QSplitTabWidget(QDataWidget):
             contents.setObjectName(f"Blank Input for [{self.objectName()}]")
 
             self.registerWidget(self._blank_input_id, contents)
-
-
-
-    def _select_item_cb(self, index):
-        assert False,"Must be implemented by subclass"
-
-    def select_item(self, index):
-        # implemented by a subclass
-        if not Shiboken.isValid(self):
-            return
-        if index == -1:
-            # nothing selected
-            self._blank_input()
-        else:
-            self._select_item_cb(index)
-
 
 
 
@@ -12353,13 +12394,16 @@ class QAutoResizingTextEdit(QtWidgets.QTextEdit):
 
 class QFrameBox(QtWidgets.QFrame):
     ''' widget for information text '''
-    def __init__(self, text = None, wrap = False, parent = None):
+    def __init__(self, text = None, css : str = None, wrap = False, parent = None):
         super().__init__(parent = parent)
         self._label_widget = QtWidgets.QLabel(text)
         layout = QtWidgets.QVBoxLayout(self)
-
         layout.addWidget(self._label_widget)
-        self.setStyleSheet(Color.cssFrameBox())
+        layout.addStretch()
+
+        if not css:
+            css = Color.cssFrameBox()
+        self.setStyleSheet(css)
 
         # size to the text
         # width = get_text_width(text)
@@ -12370,6 +12414,8 @@ class QFrameBox(QtWidgets.QFrame):
         if not Shiboken.isValid(self):
             return
         self._label_widget.setHtml(text)
+
+
 
 
 class QInfoBox(QtWidgets.QFrame):

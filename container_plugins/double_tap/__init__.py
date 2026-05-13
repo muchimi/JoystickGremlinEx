@@ -30,7 +30,7 @@ from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
-
+from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 
 syslog = logging.getLogger("system")
 
@@ -415,6 +415,7 @@ and another action on input double-click (tap)'''
         for action_set in self.action_sets:
             if action_set:
                 as_node = ElementTree.Element("action-set")
+                as_node.set("id", write_guid(action_set.id))
                 for action in action_set:
                     as_node.append(action.to_xml())
                 node.append(as_node)

@@ -362,9 +362,21 @@ class ProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
 
 
 class ActionSet(list):
-    ''' holds action set data with a data attribute '''
+    ''' holds action set data with a data and ID attribute '''
     def __init__(self, data = None):
         self.data = data # any special tag to identify the action set
+        self._id = uuid.uuid4() # unique ID of this action set
+
+    @property
+    def id(self):
+        return self._id
+    
+    @id.setter
+    def id(self, value):
+        self._id = value
+
+    def __hash__(self):
+        return hash(self._id)
 
 
 class ConditionContainer():
@@ -899,6 +911,11 @@ class AbstractContainer(ProfileData, ConditionContainer):
         """
         action_name_map = ActionPlugins().tag_map
         config = gremlin.config.Configuration()
+
+        # get the id
+        if "id" in node.attrib:
+            action_set.id = read_guid(node, "id")
+            
         for child in node:
 
             if child.tag not in action_name_map:
@@ -1558,7 +1575,9 @@ class AbstractAction(ProfileData):
             return self.display_name()
         return super().__str__()
 
-
+    def __hash__(self):
+        # index on the unique ID 
+        return hash(self._id)
 
 
 class MultiModeAbstractAction(AbstractAction):

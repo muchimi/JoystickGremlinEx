@@ -33,7 +33,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
-from gremlin.util import safe_format, safe_read
+from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
@@ -375,6 +375,7 @@ On long press the action receives a press input when the input is pressed, and a
         node.set("short-press-mode", safe_format(self.shortPressMode, bool))
 
         as_node = ElementTree.Element("action-set")
+        as_node.set("id", write_guid(self.action_sets[0].id))
         for action in self.action_sets[0]:
             as_node.append(action.to_xml())
         node.append(as_node)

@@ -806,11 +806,13 @@ For more advanced axis splitting capability, look at the Gated Axis action.
         node.set("autorelease", safe_format(self.autorelease, bool))
 
         # write children out
-        as_node = ElementTree.Element("action-set")
+        
         for action_set in self.action_sets:
+            as_node = ElementTree.Element("action-set")
+            as_node.set("id", write_guid(action_set.id))
             for action in self.action_sets[0]:
                 as_node.append(action.to_xml())
-        node.append(as_node)
+            node.append(as_node)
 
         return node
 

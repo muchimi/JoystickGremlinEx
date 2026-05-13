@@ -31,7 +31,7 @@ import gremlin.ui.ui_common
 import gremlin.ui.input_item
 from gremlin.ui.input_item import AbstractContainerWidget
 from gremlin.base_profile import AbstractContainer
-from gremlin.util import safe_read, safe_format
+from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 import gremlin.util
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
@@ -405,9 +405,10 @@ and another action on trigger release in a single container.'''
         node.set("autorelease", safe_format(self.autorelease,bool))
         node.set("delay", safe_format(self.autorelease_delay, int))
 
-        for actions in self.action_sets:
+        for action_set in self.action_sets:
             as_node = ElementTree.Element("action-set")
-            for action in actions:
+            as_node.set("id", write_guid(action_set.id))
+            for action in action_set:
                 as_node.append(action.to_xml())
             node.append(as_node)
         return node

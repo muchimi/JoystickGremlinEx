@@ -467,9 +467,10 @@ For a more advanced way to split an axis and trigger actions at specific points,
         node = ElementTree.Element("container")
         node.set("type", TickContainer.tag)
         node.set("interval", safe_format(self.interval, float))
-        for actions in self.action_sets:
+        for action_set in self.action_sets:
             as_node = ElementTree.Element("action-set")
-            for action in actions:
+            as_node.set("id", write_guid(action_set.id))
+            for action in action_set:
                 as_node.append(action.to_xml())
             node.append(as_node)
         return node

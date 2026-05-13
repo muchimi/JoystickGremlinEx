@@ -46,6 +46,7 @@ import gremlin.base_profile
 import psygnal
 from psygnal import Signal
 import gremlin.ui.input_item
+from gremlin.ui.input_item import InputItemMappingWidget
 
 
 syslog = logging.getLogger("system")
@@ -2808,8 +2809,15 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         """
         
         device = gremlin.joystick_handling.getDevice(self.device_guid)
-        super().__init__(device, profile, mode, object_name, parent)
-        
+        super().__init__(
+                    device = device,
+                    profile = profile,
+                    mode = mode,
+                    object_name = object_name,
+                    parent = parent
+                    )
+
+
         self._widget_map = {}
 
         button_container_widget = QtWidgets.QWidget()
@@ -2851,18 +2859,18 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     
 
         # data model
-        self.input_item_list_model = StateInputItemModel(
+        self.inputItemListModel = StateInputItemModel(
             profile,
             custom_load_handler= self._load_handler,
             custom_remove_handler = self._remove_handler,
             custom_filter_handler = self._filter_data
         )
 
-        self.input_item_list_model.addCallback(self._handle_model_changed_cb) # add an extra notification when the model changes so we can update the filter counts
+        self.inputItemListModel.addCallback(self._handle_model_changed_cb) # add an extra notification when the model changes so we can update the filter counts
 
         
 
-        self._filter_widget = StateFilterWidget(model = self.input_item_list_model)
+        self._filter_widget = StateFilterWidget(model = self.inputItemListModel)
         self._filter_widget.changed.connect(self._filter_changed)
         self._filter_widget.categoryChanged.connect(self._category_filter_changed)
         self._filter_widget.select.connect(self._select_input_item_cb)
@@ -2910,30 +2918,26 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
 
         # update the display names
-        self.input_item_list_view = StateInputItemListView(
+        self.inputItemListView = StateInputItemListView(
             custom_widget_handler = self._custom_widget_handler,
             parent = self,
             blank_message = "Please add a state.", 
-            model = self.input_item_list_model)
+            model = self.inputItemListModel)
         
-        self.input_item_list_view.setMinimumWidth(350)
+        self.inputItemListView.setMinimumWidth(350)
 
-        # Input type specific setups
-        self.input_item_list_view.setModel(self.input_item_list_model)
-        self.input_item_list_view.redraw()
 
         # Handle user interaction
-        self.input_item_list_view.item_selected.connect(self._select_item_cb)
-        self.input_item_list_view.item_edit.connect(self._edit_item_cb)
-        self.input_item_list_view.item_closed.connect(self._close_item_cb)
+        
+        self.inputItemListView.item_edit.connect(self._edit_item_cb)
+        self.inputItemListView.item_closed.connect(self._close_item_cb)
 
 
 
-        self.addLeftPanelWidget(self.input_item_list_view)
+        self.addLeftPanelWidget(self.inputItemListView)
         self.addLeftPanelWidget(button_container_widget)
 
-        self.input_item_list_model.refresh()
-        self.input_item_list_view.redraw()
+        self.inputItemListModel.refresh()
 
 
         # refresh on configuration change
@@ -2949,10 +2953,10 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
 
         # Select default entry
-        selected_index = self.input_item_list_view.current_index
-        if selected_index is None:
-            selected_index = -1
-        self._select_item_cb(selected_index)
+        selected_index = self.inputItemListView.currentIndex()
+        if selected_index is not None:
+            self.selectInputItemIndex(selected_index)
+        
 
     def _handle_model_changed_cb(self):
         ''' called when the model changes '''
@@ -2961,12 +2965,12 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     @property
     def inputCount(self) -> int:
         ''' number of inputs in the device '''
-        return self.input_item_list_model.rows()
+        return self.inputItemListModel.rows()
 
     @property
     def inputWidgetCount(self) -> int:
         ''' number of input widgets currently in the device '''
-        return self.input_item_list_view.count()
+        return self.inputItemListView.count()
 
     def _handle_lock_inputs(self, data):
         gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data) # ensure on UI thread
@@ -2990,7 +2994,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         if Shiboken.isValid(self) and data == self.device_guid:
             # ours
             self.setUpdatesEnabled(False)
-            for input_item in self.input_item_list_model.getFilteredItems():
+            for input_item in self.inputItemListModel.getFilteredItems():
                 input_item.locked = True
             self.setUpdatesEnabled(True)
 
@@ -3000,7 +3004,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         if Shiboken.isValid(self) and data == self.device_guid:
             # ours
             self.setUpdatesEnabled(False)
-            for input_item in self.input_item_list_model.getFilteredItems():
+            for input_item in self.inputItemListModel.getFilteredItems():
                 input_item.locked = False
             self.setUpdatesEnabled(True)
 
@@ -3008,7 +3012,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
 
     def _show_clear_cb(self):
-        return self.input_item_list_model.rows() > 0
+        return self.inputItemListModel.rows() > 0
 
     def _config_changed_cb(self):
         ''' called when configuraition has changed '''
@@ -3051,9 +3055,8 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     def _filter_changed(self, filter):
         ''' called when the filter changes '''
         self._filter = gremlin.util.decorate_filter(filter)
-        self.input_item_list_model.refresh(emit = False)
-        self.input_item_list_model.applyFilter()
-        self.input_item_list_view.redraw()
+        self.inputItemListModel.refresh(emit = False)
+        self.inputItemListModel.applyFilter()
         self._filter_widget.updateCounts()
 
     @QtCore.Slot()
@@ -3065,7 +3068,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
             if sc.exists(name):
                 data = sc.getState(name)
                 index = self._index_for_key(data)
-                self.input_item_list_view.select_item(index,True)
+                self.inputItemListView.select_item(index,True)
             else:
                 gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
 
@@ -3114,7 +3117,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
             if not edit_mode:
                 # add the new state
-                index = self.input_item_list_model.add(input_item)
+                index = self.inputItemListModel.add(input_item)
                 if verbose: syslog.info(f"adding id: [{input_item.id}]  key: [{input_item.key}] at index [{index}]")
 
                 # change the state
@@ -3124,7 +3127,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
                 # edit an existing state
 
-                index = self.input_item_list_model.indexOf(input_item)
+                index = self.inputItemListModel.indexOf(input_item)
                 assert index != -1, "Reference input is missing from model"
                 if verbose: syslog.info(f"modifying id: [{input_item.id}]  key: [{edited_input_item.key}] at index [{index}]")
 
@@ -3143,13 +3146,13 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
                 input_item.autorelease_mode = edited_input_item.autorelease_mode
                 input_item.autorelease_trigger_mode = edited_input_item.autorelease_trigger_mode
 
-                self.input_item_list_model.refresh()
+                self.inputItemListModel.refresh()
                 self._filter_widget.updateCounts()
 
-            self.input_item_list_view.redraw()
-            index = self.input_item_list_view.indexOf(input_item)
+   
+            index = self.inputItemListView.indexOf(input_item)
             syslog.info(f"selecting state index: [{index}] for [{input_item.input_id}]")
-            self._select_item_cb(index)
+            self.selectInputItemIndex(index)
 
             el = gremlin.event_handler.EventListener()
             el.device_mapping_changed.emit(self._device_id)
@@ -3165,7 +3168,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     def _sort_input_cb(self):
         ''' sorts states by key name '''
 
-        if not self.input_item_list_model.rows():
+        if not self.inputItemListModel.rows():
             # nothing to sort
             return
 
@@ -3173,14 +3176,14 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         index = self._last_selected_index
         current_selection = None
         if index != -1:
-            current_selection = self.input_item_list_model.data(index)
+            current_selection = self.inputItemListModel.data(index)
 
-        self.input_item_list_model.sort(self._sort_callback)
+        self.inputItemListModel.sort(self._sort_callback)
 
         if current_selection:
             # reselect the saved item - because the inputs were likely recreated - we can't compare the old with the new
             # so we need to find the matching data packet
-            self._select_item_cb(current_selection.index)
+            self.selectInputItemIndex(current_selection.index)
 
 
 
@@ -3193,7 +3196,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         ''' called when the close button is clicked '''
         key = self.getRegisteredKeyIndex(index)
         self.unregisterWidget(key)
-        if not self.input_item_list_model.rows():
+        if not self.inputItemListModel.rows():
             # display blank page if no item left
             self._blank_input()
 
@@ -3205,7 +3208,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         profile = gremlin.shared_state.current_profile
         profile.state.clear()
         
-        self.input_item_list_model.clear()
+        self.inputItemListModel.clear()
        
         self._filter_widget.updateCounts()
 
@@ -3288,7 +3291,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     def itemAt(self, index):
         ''' returns the input widget at the given index '''
-        return self.input_item_list_view.itemAt(index)
+        return self.inputItemListView.itemAt(index)
 
     def display_name(self, input_id):
         ''' returns the name for the given input ID '''
@@ -3310,103 +3313,103 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     def refresh(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization."""
         #self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
-        self.input_item_list_model.refresh()
+        self.inputItemListModel.refresh()
         self._filter_widget.updateCounts()
-        self._select_item_cb(self.input_item_list_view.current_index, emit)
+        self.selectInputItemIndex(self.inputItemListView.current_index, emit)
 
     def _select_input_item_cb(self, input_item, emit = True):
         ''' select by input '''
         input_id = input_item.input_id
-        index = self.input_item_list_model.indexOf(input_id)
+        index = self.inputItemListModel.indexOf(input_id)
         if index == -1:
             self.clearFilter()
-            index = self.input_item_list_model.indexOf(input_id)
+            index = self.inputItemListModel.indexOf(input_id)
         if index != -1:
-            self._select_item_cb(index)
+            self.selectInputItemIndex(index)
 
     def clearFilter(self):
         ''' clears the current data filter '''
         self._filter_widget.clearFilter()
-        self.input_item_list_model.refresh()
+        self.inputItemListModel.refresh()
 
-    def _select_item_cb(self, index, emit = True):
-        """Handles the selection of an input item.
+    # def _select_item_cb(self, index, emit = True):
+    #     """Handles the selection of an input item.
 
-        :param index the index of the selected item
-        """
-        import gremlin.ui.input_item
+    #     :param index the index of the selected item
+    #     """
+    #     import gremlin.ui.input_item
 
-        if not Shiboken.isValid(self.input_item_list_view):
-            return
+    #     if not Shiboken.isValid(self.inputItemListView):
+    #         return
 
-        if index == -1:
-            index = self._last_selected_index
+    #     if index == -1:
+    #         index = self._last_selected_index
 
-        if index == -1:
-            # select the first item
-            if self.input_item_list_model.rows():
-                index = 0
-            else:
-                return
+    #     if index == -1:
+    #         # select the first item
+    #         if self.inputItemListModel.rows():
+    #             index = 0
+    #         else:
+    #             return
 
-        if self.input_item_list_view.current_index != index:
-            # select the input in the input view
-            with QtCore.QSignalBlocker(self.input_item_list_view):
-                self.input_item_list_view.select_item(index, False)
+    #     if self.inputItemListView.current_index != index:
+    #         # select the input in the input view
+    #         with QtCore.QSignalBlocker(self.inputItemListView):
+    #             self.inputItemListView.select_item(index, False)
 
-        input_item : StateInputItem = self.input_item_list_model.data(index)
-        if not input_item:
-            # not in the model yet
-            return
+    #     input_item : StateInputItem = self.inputItemListModel.data(index)
+    #     if not input_item:
+    #         # not in the model yet
+    #         return
 
-        input_type = InputType.State
-        input_id = input_item.input_id
-        assert input_id is not None,"Invalid state input item configuration"
-        key = self.getWidgetKey(input_type, input_id)
-        widget = self.getRegisteredWidget(key)
-        if not widget:
-            widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"STATE: {input_item.key}")
-            self.registerWidget(key, widget)
-            widget.redraw() # load the data
+    #     input_type = InputType.State
+    #     input_id = input_item.input_id
+    #     assert input_id is not None,"Invalid state input item configuration"
+    #     key = self.getWidgetKey(input_type, input_id)
+    #     widget = self.getRegisteredWidget(key)
+    #     if not widget:
+    #         widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"STATE: {input_item.key}")
+    #         self.registerWidget(key, widget)
+           
 
-        # ensure the mapping widget is visible
-        self.selectRegisteredWidget(widget)
+    #     # ensure the mapping widget is visible
+    #     self.selectRegisteredWidget(widget)
 
-        self._item_data = input_item
-
-
-        # remember the last input
-        config = gremlin.config.Configuration()
-        device_guid = self.device_guid
-        input_type = InputType.State
-        input_id = input_item.input_id if input_item else None
-
-        profile = gremlin.shared_state.current_profile
-        if profile:
-            profile.setLastInput(device_guid, input_type, input_id)
-        config.set_last_input(device_guid, input_type, input_id)
-
-        # Create new configuration widget
-        input_item.is_axis = False
-        change_cb = self._create_change_cb(index)
-        widget._container_model.data_changed.connect(change_cb)
-        widget.description_changed.connect(change_cb)
+    #     self._item_data = input_item
 
 
+    #     # remember the last input
+    #     config = gremlin.config.Configuration()
+    #     device_guid = self.device_guid
+    #     input_type = InputType.State
+    #     input_id = input_item.input_id if input_item else None
+
+    #     profile = gremlin.shared_state.current_profile
+    #     if profile:
+    #         profile.setLastInput(device_guid, input_type, input_id)
+    #     config.set_last_input(device_guid, input_type, input_id)
+
+    #     # Create new configuration widget
+    #     input_item.is_axis = False
+    #     change_cb = self._create_change_cb(index)
+    #     widget._container_model.data_changed.connect(change_cb)
+    #     widget.description_changed.connect(change_cb)
 
 
-        # update container display if blank
-        self.updateContainerViewBlankMessage(input_item)
 
-        self._last_selected_index = index
-        self.selectRegisteredWidget(key)
-        # QtWidgets.QApplication.processEvents() # needed or scroll doesn't work
-        # self.input_item_list_view.scrollToIndex(index)
 
-        if emit:
-            el = gremlin.event_handler.EventListener()
-            el.select_input.emit(device_guid, input_type, input_id, False, True, False)
-        # el.input_selection_changed.emit(device_guid, input_type, input_id)
+    #     # update container display if blank
+    #     self.updateContainerViewBlankMessage(input_item)
+
+    #     self._last_selected_index = index
+    #     self.selectRegisteredWidget(key)
+    #     # QtWidgets.QApplication.processEvents() # needed or scroll doesn't work
+    #     # self.inputItemListView.scrollToIndex(index)
+
+    #     if emit:
+    #         el = gremlin.event_handler.EventListener()
+    #         el.select_input.emit(device_guid, input_type, input_id, False, True, False)
+    #     # el.input_selection_changed.emit(device_guid, input_type, input_id)
 
     def _custom_filter_handler(self, data) -> bool:
         ''' evaluates if the item should be included or not based on current input filters '''
@@ -3547,18 +3550,18 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         :param index the index of the content being changed
         :return callback function redrawing changed content
         """
-        return lambda: self.input_item_list_model.refresh()
+        return lambda: self.inputItemListModel.refresh()
 
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
         self.current_mode = mode
 
-        self.input_item_list_model.mode = mode
+        self.inputItemListModel.mode = mode
 
-        #self.input_item_list_view.select_item(-1)
+        #self.inputItemListView.select_item(-1)
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
-            self.input_item_list_model.refresh()
-            self._select_item_cb(self._last_selected_index)
+            self.inputItemListModel.refresh()
+            self.selectInputItemIndex(self._last_selected_index)
 
 
 

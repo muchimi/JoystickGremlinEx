@@ -29,7 +29,7 @@ from gremlin.base_profile import AbstractContainer, AbstractTriggerFunctor
 import gremlin.base_classes
 import gremlin.execution_graph
 import gremlin.config
-from gremlin.util import safe_format, safe_read
+from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 import logging
 from shiboken6 import Shiboken
 import vjoy.vjoy
@@ -497,6 +497,7 @@ class HatButtonsContainer(AbstractContainer):
             if len(action_set) > 0:
                 # only save used positions
                 as_node = ElementTree.Element("action-set")
+                as_node.set("id", write_guid(action_set.id))
                 position = action_set.data
                 name = vjoy.vjoy.Hat.getName(position) 
                 if name:

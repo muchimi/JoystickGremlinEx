@@ -67,6 +67,7 @@ import vjoy
 import vjoy.vjoy
 import psygnal
 from psygnal import Signal
+from gremlin.ui.input_item import InputItemMappingWidget
 
 
 syslog = logging.getLogger("system")
@@ -2872,7 +2873,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.setWindowTitle("OSC Input Mapper")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent # list view
-        assert hasattr(parent, "input_item_list_model"),"OSC CONFIG: Parent widget does not have required listview model"
+        assert hasattr(parent, "inputItemListModel"),"OSC CONFIG: Parent widget does not have required listview model"
         assert hasattr(parent, "input_item_list_view"),"OSC CONFIG: Parent widget does not have required listview"
 
         profile = gremlin.shared_state.current_profile
@@ -3101,7 +3102,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             if self._command is not None:
                 # get the list of all the other inputs
                 parent_widget = self._parent
-                model = parent_widget.input_item_list_model
+                model = parent_widget.inputItemListModel
                 message = self._command
 
                 input_item = OscInputItem(self._mode_object)
@@ -3662,7 +3663,7 @@ class  OscFilterWidget(QtWidgets.QWidget):
     #         # if sc.exists(name):
     #         #     data = sc.getState(name)
     #         #     index = self._index_for_key(data)
-    #         #     self.input_item_list_view.select_item(index,True)
+    #         #     self.inputItemListView.select_item(index,True)
     #         # else:
     #         #     gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
     #         pass
@@ -3779,7 +3780,15 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         """
 
         device = gremlin.joystick_handling.getDevice(self.device_guid)
-        super().__init__(device, profile, mode, object_name, parent)
+        super().__init__(
+                    device = device,
+                    profile = profile,
+                    mode = mode,
+                    object_name = object_name,
+                    parent = parent
+                    )
+
+
       
 
         config = gremlin.config.Configuration()
@@ -3792,7 +3801,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         self._last_selected_index = -1 # index of last input, -1 if none
 
         # List of inputs
-        self.input_item_list_model = OscInputItemModel(
+        self.inputItemListModel = OscInputItemModel(
             profile,
             mode,
             custom_filter_handler = self._filter_data
@@ -3800,22 +3809,20 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
         # update the display names
 
-        self.input_item_list_view = OscInputItemListView(
+        self.inputItemListView = OscInputItemListView(
             custom_widget_handler = self._custom_widget_handler,
             parent = self,
             blank_message = "Please add an OSC input.",
-            model=self.input_item_list_model)
-        self.input_item_list_view.setMinimumWidth(350)
+            model=self.inputItemListModel)
+        
 
+        
         # Input type specific setups
-        self.input_item_list_view.setModel(self.input_item_list_model)
-        self.input_item_list_view.updated.connect(self._update_conflicts)
-        self.input_item_list_view.redraw()
+        self.inputItemListView.updated.connect(self._update_conflicts)
 
         # Handle user interaction
-        self.input_item_list_view.item_selected.connect(self._select_item_cb)
-        self.input_item_list_view.item_edit.connect(self._edit_item_cb)
-        self.input_item_list_view.item_closed.connect(self._close_item_cb)
+        self.inputItemListView.item_edit.connect(self._edit_item_cb)
+        self.inputItemListView.item_closed.connect(self._close_item_cb)
 
 
         # lock widget
@@ -3847,7 +3854,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
 
         # filter view
-        self._filter_widget = OscFilterWidget(self.input_item_list_model)
+        self._filter_widget = OscFilterWidget(self.inputItemListModel)
         self._filter_widget.changed.connect(self._filter_changed)
         self._filter_widget.select.connect(self._select_input_item_cb)
 
@@ -3855,7 +3862,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
 
         # list of inputs
-        self.addLeftPanelWidget(self.input_item_list_view)
+        self.addLeftPanelWidget(self.inputItemListView)
 
 
 
@@ -3913,19 +3920,32 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
 
         # Select default entry
-        selected_index = self.input_item_list_view.current_index
+        selected_index = self.inputItemListView.currentIndex()
         if selected_index is not None:
-            self._select_item_cb(selected_index)
+            self.selectInputItemIndex(selected_index)
+
+    # def _handle_create_widget(self, input_item):
+    #     index = self.inputItemListView.indexOf(input_item)
+    #     assert index != -1,"input item is not in the list"
+            
+    #     widget = InputItemMappingWidget(input_item = input_item, object_name=f"OSC: {input_item.display_name}")
+    #     device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
+    #     widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} ")
+    #     widget._container_model.data_changed.connect(self._create_change_cb(index))
+    #     # widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
+    #     # widget.description_clear.connect(lambda: self._description_clear_cb(index,widget))
+
+    #     return widget            
 
     @property
     def inputCount(self) -> int:
         ''' number of inputs in the device '''
-        return self.input_item_list_model.rows()
+        return self.inputItemListModel.rows()
 
     @property
     def inputWidgetCount(self) -> int:
         ''' number of input widgets currently in the device '''
-        return self.input_item_list_view.count()
+        return self.inputItemListView.count()
 
     def _handle_lock_inputs(self, data):
         gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data) # ensure on UI thread
@@ -3938,7 +3958,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         if Shiboken.isValid(self) and data == self.device_guid:
             # ours
             self.setUpdatesEnabled(False)
-            for input_item in self.input_item_list_model.getFilteredItems():
+            for input_item in self.inputItemListModel.getFilteredItems():
                 input_item.locked = True
             self.setUpdatesEnabled(True)
 
@@ -3947,7 +3967,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         if Shiboken.isValid(self) and data == self.device_guid:
             # ours
             self.setUpdatesEnabled(False)
-            for input_item in self.input_item_list_model.getFilteredItems():
+            for input_item in self.inputItemListModel.getFilteredItems():
                 input_item.locked = False
             self.setUpdatesEnabled(True)
 
@@ -3979,8 +3999,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     def _filter_changed(self, filter):
         ''' called when the filter changes '''
         self._filter = gremlin.util.decorate_filter(filter)
-        self.input_item_list_model.applyFilter()
-        self.input_item_list_view.redraw()
+        self.inputItemListModel.applyFilter()
         self._filter_widget.updateCounts()
 
 
@@ -3990,7 +4009,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         osc : OscInputItem
         selected_index = None
         item = None
-        model = self.input_item_list_model.dataModel()
+        model = self.inputItemListModel.dataModel()
         for index, osc in model.items():
             if osc.message == input_id:
                 return osc
@@ -3999,7 +4018,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     def find_item_by_message(self, mode : str,  msg : str) -> tuple[int, OscInputItem]:
         ''' looks for OSC input messages to see if there's a match '''
         msg = msg.strip().casefold()
-        model = self.input_item_list_model.dataModel()
+        model = self.inputItemListModel.dataModel()
 
         for index, input_item in model.items():
             osc: OscInputItem = input_item.input_id
@@ -4021,22 +4040,18 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         ''' called when configuraition has changed '''
         self.refresh()
 
-    def itemAt(self, index):
-        ''' returns the input widget at the given index '''
-        return self.input_item_list_view.itemAt(index)
 
     def display_name(self, input_id):
         ''' returns the name for the given input ID '''
         return input_id.display_name
 
     def _show_clear_cb(self):
-        return self.input_item_list_model.rows() > 0
+        return self.inputItemListModel.rows() > 0
 
     @QtCore.Slot()
     def _clear_inputs_cb(self):
         ''' clears all input keys '''
-        self.input_item_list_model.clear(input_types=[InputType.OpenSoundControl])
-        self.input_item_list_view.redraw()
+        self.inputItemListModel.clear(input_types=[InputType.OpenSoundControl])
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         self._blank_input()
@@ -4058,13 +4073,12 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         self.device_profile.modes[self.current_mode].get_data(input_type, input_id) # adds the item
         registry.sync()
 
-        self.input_item_list_model.refresh()
-        self.input_item_list_view.redraw()
-        index = self.input_item_list_model.indexOf(input_id)
+        self.inputItemListModel.refresh()
+        index = self.inputItemListModel.indexOf(input_id)
 
-        self.input_item_list_view.select_item(index, False)
+        self.inputItemListView.select_item(index, False)
 
-        # index = self.input_item_list_view.current_index
+        # index = self.inputItemListView.current_index
 
         # last index selected, -1 means none
         self._last_selected_index = -1
@@ -4072,7 +4086,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         self._item_data = None
 
         # redraw the UI
-        self._select_item_cb(index, False)
+        self.selectInputItemIndex(index, False)
 
         # auto edit new input
         self._edit_item_cb(None, index, input_id)
@@ -4176,8 +4190,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
             if imported_list:
                 # reload list
-                self.input_item_list_model.refresh()
-                self.input_item_list_view.redraw()
+                self.inputItemListModel.refresh()
 
             # show results
             gremlin.ui.ui_common.MessageBox(prompt = f"Imported {len(imported_list):,} entries.", is_warning = False)
@@ -4191,21 +4204,21 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     @QtCore.Slot()
     def _sort_input_cb(self):
 
-        if not self.input_item_list_model.rows():
+        if not self.inputItemListModel.rows():
             # nothing to sort
             return
         index = self._last_selected_index
         current_selection = None
         if index != -1:
-            current_selection = self.input_item_list_model.data(index)
+            current_selection = self.inputItemListModel.data(index)
 
-        self.input_item_list_model.sort(self._sort_callback)
-        # self.input_item_list_view.redraw()
+        self.inputItemListModel.sort(self._sort_callback)
+        # self.inputItemListView.redraw()
 
         if current_selection:
             # reselect the saved item - because the inputs were likely recreated - we can't compare the old with the new
             # so we need to find the matching data packet
-            self._select_item_cb(current_selection.index)
+            self.selectInputItemIndex(current_selection.index)
 
 
     def _sort_callback(self, item_list : list )-> list:
@@ -4231,109 +4244,109 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     def _select_input_item_cb(self, input_item, emit = True):
         ''' select by input '''
         input_id = input_item.input_id
-        index = self.input_item_list_model.indexOf(input_id)
+        index = self.inputItemListModel.indexOf(input_id)
         if index == -1:
             self.clearFilter()
-            index = self.input_item_list_model.indexOf(input_id)
+            index = self.inputItemListModel.indexOf(input_id)
         if index != -1:
-            self._select_item_cb(index)
+            self.selectInputItemIndex(index)
 
     def clearFilter(self):
         ''' clears the current data filter '''
         self._filter_widget.clearFilter()
-        self.input_item_list_model.refresh()
+        self.inputItemListModel.refresh()
 
-    def _select_item_cb(self, index, force_update = False, emit = True):
-        """Handles the selection of an input item.
+    # def _select_item_cb(self, index, force_update = False, emit = True):
+    #     """Handles the selection of an input item.
 
-        :param index the index of the selected item
-        """
-        import gremlin.ui.input_item
-        import gremlin.shared_state
-        import gremlin.util
+    #     :param index the index of the selected item
+    #     """
+    #     import gremlin.ui.input_item
+    #     import gremlin.shared_state
+    #     import gremlin.util
 
-        if not Shiboken.isValid(self.input_item_list_view):
-            return
+    #     if not Shiboken.isValid(self.inputItemListView):
+    #         return
 
-        # self._last_selected_index = index
-        input_item = None
-
-
-        if index == -1:
-            index = self._last_selected_index
-
-        if index == -1:
-            # select the first item
-            if self.input_item_list_model.rows():
-                input_item = self.input_item_list_model.data(0)
-                index = 0
-            else:
-                self._blank_input()
-                return
-        else:
-            input_item = self.input_item_list_model.data(index)
+    #     # self._last_selected_index = index
+    #     input_item = None
 
 
-        pop_cursor = False
-        try:
+    #     if index == -1:
+    #         index = self._last_selected_index
 
-            if force_update or self.inputCount > 0 and self.inputWidgetCount == 0:
-                if not pop_cursor:
-                    gremlin.util.pushCursor()
-                    pop_cursor = True
-                self.input_item_list_model.refresh()
-
-            device_guid = self.device_guid
-            input_id = input_item.input_id if input_item else None
-            input_type = InputType.OpenSoundControl
-
-            if input_item:
-
-                device_guid = self.device_guid
-                key = self.getWidgetKey(input_type, input_id)
-                widget = self.getRegisteredWidget(key)
-                if not widget:
-                    if not pop_cursor:
-                        gremlin.util.pushCursor()
-                        pop_cursor = True
-                    widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"OSC: {input_item.display_name}")
-                    self.registerWidget(key, widget)
-                    change_cb = self._create_change_cb(index)
-                    widget._container_model.data_changed.connect(change_cb)
-                    widget.description_changed.connect(change_cb)
-                    widget.redraw() # update the mapping
-
-                self.selectRegisteredWidget(key)
+    #     if index == -1:
+    #         # select the first item
+    #         if self.inputItemListModel.rows():
+    #             input_item = self.inputItemListModel.data(0)
+    #             index = 0
+    #         else:
+    #             self._blank_input()
+    #             return
+    #     else:
+    #         input_item = self.inputItemListModel.data(index)
 
 
-            else:
-                profile = gremlin.shared_state.current_profile
-                device_guid = gremlin.shared_state.osc_tab_guid
-                device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Osc))
-                mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
-                input_item = OscInputItem(mode_object)
-                widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name="OSC Blank InputConfigItem (no item data)")
-                widget.redraw() # load the data
+    #     pop_cursor = False
+    #     try:
 
-            #self.setRightPanelWidget(widget)
+    #         if force_update or self.inputCount > 0 and self.inputWidgetCount == 0:
+    #             if not pop_cursor:
+    #                 gremlin.util.pushCursor()
+    #                 pop_cursor = True
+    #             self.inputItemListModel.refresh()
 
-            self._last_selected_index = index
-            self._item_data = widget
-            self._last_selected_input_item = input_item
+    #         device_guid = self.device_guid
+    #         input_id = input_item.input_id if input_item else None
+    #         input_type = InputType.OpenSoundControl
+
+    #         if input_item:
+
+    #             device_guid = self.device_guid
+    #             key = self.getWidgetKey(input_type, input_id)
+    #             widget = self.getRegisteredWidget(key)
+    #             if not widget:
+    #                 if not pop_cursor:
+    #                     gremlin.util.pushCursor()
+    #                     pop_cursor = True
+    #                 widget = InputItemMappingWidget(input_item = input_item, object_name=f"OSC: {input_item.display_name}")
+    #                 self.registerWidget(key, widget)
+    #                 change_cb = self._create_change_cb(index)
+    #                 widget._container_model.data_changed.connect(change_cb)
+    #                 widget.description_changed.connect(change_cb)
+                    
+
+    #             self.selectRegisteredWidget(key)
 
 
-            self.updateContainerViewBlankMessage(input_item, " OSC ")
+    #         else:
+    #             profile = gremlin.shared_state.current_profile
+    #             device_guid = gremlin.shared_state.osc_tab_guid
+    #             device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Osc))
+    #             mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
+    #             input_item = OscInputItem(mode_object)
+    #             widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name="OSC Blank InputConfigItem (no item data)")
+    #             widget.redraw() # load the data
 
-            # ensure visible
+    #         #self.setRightPanelWidget(widget)
 
-        finally:
-            if pop_cursor:
-                gremlin.util.popCursor()
+    #         self._last_selected_index = index
+    #         self._item_data = widget
+    #         self._last_selected_input_item = input_item
 
-        if emit:
-            el = gremlin.event_handler.EventListener()
-            el.select_input.emit(device_guid, input_type, input_id, False, True, False)
-            # el.input_selection_changed.emit(device_guid, input_type, input_id)
+
+    #         self.updateContainerViewBlankMessage(input_item, " OSC ")
+
+    #         # ensure visible
+
+    #     finally:
+    #         if pop_cursor:
+    #             gremlin.util.popCursor()
+
+    #     if emit:
+    #         el = gremlin.event_handler.EventListener()
+    #         el.select_input.emit(device_guid, input_type, input_id, False, True, False)
+    #         # el.input_selection_changed.emit(device_guid, input_type, input_id)
 
 
 
@@ -4343,7 +4356,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         ''' called when the close button is clicked '''
         key = self.getRegisteredKeyIndex(index)
         self.unregisterWidget(key)
-        if not self.input_item_list_model.rows():
+        if not self.inputItemListModel.rows():
             # display blank page if no item left
             self._blank_input()
 
@@ -4375,9 +4388,9 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     def _update_conflicts(self):
          # check for conflicts with other entries
-        model = self.input_item_list_model
-
-        widgets = [self.itemAt(index) for index in range(model.rows())]
+        # model = self.inputItemListModel
+        widgets = self.inputItemListView.getWidgets()
+        # widgets = [self.itemAt(index) for index in range(model.rows())]
         compared_widgets = []
         conflicted_widgets = []
         for input_widget in widgets:
@@ -4483,7 +4496,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         autorelease_delay = self._edit_dialog._pulse_delay
 
 
-        identifier = self.input_item_list_model.data(index)
+        identifier = self.inputItemListModel.data(index)
         input_item : OscInputItem = identifier.input_id
         input_item._message = message # OSC command message as text
         input_item._message_data = data  # arguments as a list
@@ -4499,7 +4512,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         self._item_data._item_data.is_axis =  input_item.is_axis
 
         input_item._update() # refresh other properties
-        self.input_item_list_view.update_item(index)
+        self.inputItemListView.update_item(index)
 
 
         el = gremlin.event_handler.EventListener()
@@ -4511,7 +4524,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     def _dialog_rejected_cb(self):
         index = self._edit_dialog.index
-        self.input_item_list_view.update_item(index)
+        self.inputItemListView.update_item(index)
 
     def _index_for_key(self, input_id):
         ''' returns the index of the selected input id'''
@@ -4526,25 +4539,24 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         :param index the index of the content being changed
         :return callback function redrawing changed content
         """
-        return lambda: self.input_item_list_view.redraw_index(index)
+        return lambda: self.inputItemListView.redraw_index(index)
 
     def set_mode(self, mode):
         ''' changes the mode of the tab '''
         self.current_mode = mode
         self.device_profile.ensure_mode_exists(self.current_mode)
-        self.input_item_list_model.mode = mode
+        self.inputItemListModel.mode = mode
 
-        #self.input_item_list_view.select_item(-1)
+        #self.inputItemListView.select_item(-1)
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
-            self.input_item_list_model.refresh()
-            self.input_item_list_view.redraw()
-            self._select_item_cb(self._last_selected_index)
+            self.inputItemListModel.refresh()
+            self.selectInputItemIndex(self._last_selected_index)
 
 
 
     def refresh(self, emit = True):
         """Refreshes the current selection, ensuring proper synchronization."""
-        self._select_item_cb(self.input_item_list_view.current_index, emit)
+        self.selectInputItemIndex(self.inputItemListView.current_index, emit)
 
 
 

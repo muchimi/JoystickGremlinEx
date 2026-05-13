@@ -896,9 +896,10 @@ an input toggle, press or release.  Multiple inputs can be specified for latchin
             node.append(child)
 
         # save the actions (the load is done in the base class)
-        for actions in self.action_sets:
+        for action_set in self.action_sets:
             as_node = ElementTree.Element("action-set")
-            for action in actions:
+            as_node.set("id", write_guid(action_set.id))
+            for action in action_set:
                 as_node.append(action.to_xml())
             node.append(as_node)
         return node

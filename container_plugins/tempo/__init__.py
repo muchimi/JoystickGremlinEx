@@ -493,6 +493,7 @@ Look at Tempo Ex for a container that allows more than one action per short or l
         for action_set in self.action_sets:
             if action_set:
                 as_node = ElementTree.Element("action-set")
+                as_node.set("id", write_guid(action_set.id))
                 for action in action_set:
                     as_node.append(action.to_xml())
                 node.append(as_node)

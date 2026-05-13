@@ -31,6 +31,7 @@ from gremlin.base_profile import AbstractContainer
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
+from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 
 
 class ChainContainerWidget(AbstractContainerWidget):
@@ -291,9 +292,10 @@ Unlike a macro or sequence container, only one step is executed for each trigger
         node = ElementTree.Element("container")
         node.set("type", ChainContainer.tag)
         node.set("timeout", str(self.timeout))
-        for actions in self.action_sets:
+        for action_set in self.action_sets:
             as_node = ElementTree.Element("action-set")
-            for action in actions:
+            as_node.set("id", write_guid(action_set.id))
+            for action in action_set:
                 as_node.append(action.to_xml())
             node.append(as_node)
         return node

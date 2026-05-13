@@ -26,7 +26,7 @@ from gremlin.base_profile import AbstractContainer, AbstractFunctor
 from gremlin.ui.input_item import AbstractContainerWidget
 
 from shiboken6 import Shiboken
-from gremlin.util import safe_format, safe_read
+from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 import logging
 from PySide6 import QtCore, QtGui, QtWidgets
 import gremlin.ui.state_device
@@ -396,6 +396,7 @@ class StateContainer(AbstractContainer):
         node.set("value", safe_format(self.required_value, bool))
 
         as_node = ElementTree.Element("action-set")
+        as_node.set("id", write_guid(self.action_sets[0].id))
         if self.action_sets:
             for action in self.action_sets[0]:
                 as_node.append(action.to_xml())

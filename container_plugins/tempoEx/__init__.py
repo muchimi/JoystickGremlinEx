@@ -1291,6 +1291,7 @@ More than one action per short press or long press can be added.'''
         for action_set in self.short_action_sets:
             if action_set:
                 as_node = ElementTree.Element("short-action-set")
+                as_node.set("id", write_guid(action_set.id))
                 for action in action_set:
                     as_node.append(action.to_xml())
                     
@@ -1298,6 +1299,7 @@ More than one action per short press or long press can be added.'''
         for action_set in self.long_action_sets:
             if action_set:
                 as_node = ElementTree.Element("long-action-set")
+                as_node.set("id", write_guid(action_set.id))
                 for action in action_set:
                     as_node.append(action.to_xml())
                     
@@ -1305,6 +1307,7 @@ More than one action per short press or long press can be added.'''
         for action_set in self.double_action_sets:
             if action_set:
                 as_node = ElementTree.Element("double-action-set")
+                as_node.set("id", write_guid(action_set.id))
                 for action in action_set:
                     as_node.append(action.to_xml())
                     

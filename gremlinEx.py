@@ -3276,23 +3276,23 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _get_input_item(self, device_guid : str, index : int) -> gremlin.base_profile.InputItem:
         ''' get the input item at the specified index in the device - index is 0 based '''
         widget = self._get_tab_widget_guid(device_guid)
-        if widget is None or not hasattr(widget,"input_item_list_model"):
+        if widget is None or not hasattr(widget,"inputItemListModel"):
             return None
 
-        row_count = widget.input_item_list_model.rows()
+        row_count = widget.inputItemListModel.rows()
         if row_count == 0 or index > row_count:
             return None
-        return widget.input_item_list_model.data(index)
+        return widget.inputItemListModel.data(index)
 
 
     def _get_input_items(self, device_guid : str) -> list[gremlin.base_profile.InputItem]:
         ''' gets the list of all input items for a given device '''
         widget = self._get_tab_widget_guid(device_guid)
-        if widget is None or not hasattr(widget,"input_item_list_model"):
+        if widget is None or not hasattr(widget,"inputItemListModel"):
             return None
 
-        row_count = widget.input_item_list_model.rows()
-        return [widget.input_item_list_model.data(index) for index in range(row_count)]
+        row_count = widget.inputItemListModel.rows()
+        return [widget.inputItemListModel.data(index) for index in range(row_count)]
 
     def _find_input_item(self, device_guid : str, input_type, input_id) -> gremlin.base_profile.InputItem:
         ''' find the input item matching the input id for a given device '''
@@ -3565,7 +3565,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 if not switch_input:
 
-                    if widget and isinstance(widget, gremlin.ui.ui_common.QSplitTabWidget):
+                    if widget and isinstance(widget, gremlin.ui.input_item.BaseDeviceTabWidget):
                         current_input_id = widget.getContentInputId()
                         if current_input_id:
                             switch_input = current_input_id != input_id
@@ -3576,7 +3576,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
                     if widget:
-                        if isinstance(widget, gremlin.ui.ui_common.QSplitTabWidget): # some tabs are not the standard widget - ignore those as they have no inputs
+                        if isinstance(widget, gremlin.ui.input_item.BaseDeviceTabWidget): # some tabs are not the standard widget - ignore those as they have no inputs
                             self.selectRegisteredWidget(device_guid)
                             if verbose: syslog.info(f"SELECT INPUT: select widget {input_type} {input_id}")
                             if tab_changed or not hasattr(widget, "input_item_list_view"):
@@ -3585,29 +3585,27 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 force_update = current_input_id != input_id or current_input_type != current_input_id or gremlin.util.compare_guid(current_device_guid, device_guid)
 
                             emit = gremlin.shared_state.profile_loading #True #not has_containers
+                            
+                            
 
-                            widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = emit)
-                            index = widget.input_item_list_view.current_index
+                            #widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = emit)
+                            #index = widget.input_item_list_view.current_index
+                            index = widget.indexOf(input_item)
+
                             # widget.input_item_list_view.redraw_index(index)
-                            widget._select_item_cb(index)
+                            widget.selectInputItemIndex(index)
                             #widget.refresh(False)
-
-                            item : gremlin.base_profile.InputItem = widget.input_item_list_view.select_item(index, emit = False)
-                            if not item:
-                                item = widget.input_item_list_view.selected_item()
-
 
                             #widget.select_item(index)
                             widget.setContentWidget(input_type, input_id)
 
-                            # syslog.info("sync input requested")
-                            el.sync_input.emit(item)
+                            # el.sync_input.emit(input_item)
 
 
-                            input_widget = widget.input_item_list_view.getWidgetAt(index)
-                            if input_widget:
-                                if not input_widget.selected:
-                                    input_widget.setSelected(True, emit = False)
+                            input_item_widget = widget.inputItemListView.widget(index)
+                            if input_item_widget:
+                                if not input_item_widget.selected:
+                                    input_item_widget.setSelected(True, emit = False)
 
                                 #input_widget.ensureStyle()
 

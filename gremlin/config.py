@@ -2002,10 +2002,11 @@ class Configuration(QtCore.QObject):
                     if item is not None:
                         save_input_id = item.identifier.guid
                 else:
-                    count = widget.input_item_list_model.rows()
+                    count = widget.inputItemListModel.rows()
                     found = False
                     save_input_id = input_id
-                    items = list(widget.input_item_list_model.getItems())
+
+                    items = list(widget.inputItemListModel.getItems())
                     for item in items:
                         if item.guid == input_id:
                             input_id = item

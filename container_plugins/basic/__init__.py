@@ -20,16 +20,14 @@ from lxml import etree as ElementTree
 import gremlin
 import gremlin.config
 from gremlin.input_types import InputType
-import gremlin.base_classes
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
-import gremlin.clipboard
 import gremlin.types
 from gremlin.base_profile import AbstractContainer, AbstractFunctor
 import gremlin.execution_graph
 from gremlin.ui.input_item import AbstractContainerWidget
 from shiboken6 import Shiboken
 import logging
+from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 
 syslog = logging.getLogger("system")
 class BasicContainerWidget(AbstractContainerWidget):
@@ -285,6 +283,7 @@ class BasicContainer(AbstractContainer):
             node.set("type", "basic")
             if self.action_sets:
                 as_node = ElementTree.Element("action-set")
+                as_node.set("id", write_guid(self.action_sets[0].id))
                 for action in self.action_sets[0]:
                     as_node.append(action.to_xml())
                 node.append(as_node)
