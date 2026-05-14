@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m76RC34A):
+- Fix: remove obsolete GFX folder from certain actions.
+
 ### (m76RC34):
 - Fix: icon search causes long I/O delay
 - Fix: Wooting keyboard in gamepad mode reports too many devices via directinput -filter added to isolate the correct one.
