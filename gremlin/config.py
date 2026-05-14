@@ -1998,7 +1998,7 @@ class Configuration(QtCore.QObject):
             #     widget = gremlin.shared_state.device_widget_map[dinput_device_guid]
             if widget:
                 if input_id is None:
-                    item = widget.itemAt(0)
+                    item = widget.getFilteredInputItemAt(0)
                     if item is not None:
                         save_input_id = item.identifier.guid
                 else:

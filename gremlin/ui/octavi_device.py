@@ -690,7 +690,7 @@ class OctaviDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         # Store parameters
         self.profile = profile
         profile.ensure_mode_exists(mode)
-        self.device_profile = profile.getDevice(self.device_guid)
+        self.device_profile = profile.getDevice(self.device_guid, autocreate = True)
         self.device_profile.ensure_mode_exists(mode)
         self.widget_storage = {}
 

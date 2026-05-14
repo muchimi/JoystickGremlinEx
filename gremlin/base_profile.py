@@ -2379,9 +2379,9 @@ class Settings:
 
 
     def getDeviceFiltered(self, device_guid) -> bool:
-        ''' gets the current device filtering state '''
+        ''' true if the device can be input filtered  '''
         device = gremlin.joystick_handling.getDevice(device_guid)
-        return device.device_type == DeviceType.Joystick # filter by default if a joystick device
+        return device.device_type in (DeviceType.Joystick, DeviceType.VJoy) # filter by default if a joystick device
 
 
 
@@ -2401,6 +2401,42 @@ class Settings:
                 if self.input_filter[device_guid][input_type][input_id]:
                     return True
         return False
+
+    def getInputFilter(self, device_guid : dinput.GUID | str | int) -> dict:
+        ''' gets the stored input filter map for the given device '''
+
+        input_filter = {}
+
+        def setFilter(device_guid, input_type, input_id, value):
+            nonlocal  input_filter
+            if not device_guid in input_filter:
+                input_filter[device_guid] = {}
+            if not input_type in input_filter[device_guid]:
+                input_filter[device_guid][input_type] = {}
+            input_filter[device_guid][input_type][input_id] = value
+
+
+
+        if self.getDeviceFiltered(device_guid):
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if device:
+                input_type = InputType.JoystickAxis
+                for index in range(device.axis_count):
+                    input_id = device.axis_sequence_to_input_id(index)
+                    filtered = self.getFiltered(device_guid, input_type, input_id)
+                    if filtered:
+                        setFilter(device_guid, input_type, input_id, filtered)
+
+                input_type = InputType.JoystickButton
+                for input_id in range(1, device.button_count+1):
+                    filtered = self.getFiltered(device_guid, input_type, input_id)
+                    if filtered:
+                        setFilter(device_guid, input_type, input_id, filtered)
+
+
+                       
+        return input_filter
+
 
     def getJoystickInputStats(self, device_guid: dinput.GUID | str | int) -> JoystickInputStats:
         ''' returns a stats object holding filtered data '''
@@ -2525,10 +2561,11 @@ class Settings:
             syslog.info(f"\tVisible count: {visible_count}")
 
 
-    def setFiltered(self, device_guid: dinput.GUID | str | int, input_type : InputType, input_id : int, value : bool):
+    def setFiltered(self, device_guid: dinput.GUID | str | int, input_type : InputType, input_id : int, value : bool, emit = False):
         ''' marks a joystick input as filtered or not '''
         device = gremlin.joystick_handling.getDevice(device_guid)
-        verbose = gremlin.config.Configuration().verbose_mode_filter
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_filter or config.verbose_mode_ui
         if not device:
             if verbose: syslog.warning(f"PROFILE SET FILTER: unknown device [{device_guid}]")
             return
@@ -2542,8 +2579,9 @@ class Settings:
         self.input_filter[device_guid][input_type][input_id] = value
 
 
-        el = gremlin.event_handler.EventListener()
-        el.input_filtered_change.emit(device_guid) # tell the widget the input list has changed
+        if emit:
+            el = gremlin.event_handler.EventListener()
+            el.input_filtered_change.emit(device_guid) # tell the widget the input list has changed
 
 
         if verbose and input_type == InputType.JoystickAxis and not device.is_virtual and "LEFT" in device.name:
@@ -2552,7 +2590,9 @@ class Settings:
     def setDefaultFiltered(self, device_guid: dinput.GUID | str | int, input_type : InputType, input_id : int, value : bool):
         ''' marks a joystick input as default filtered or not '''
         device = gremlin.joystick_handling.getDevice(device_guid)
-        verbose = gremlin.config.Configuration().verbose_mode_filter
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_filter or config.verbose_mode_ui
+
         if not device_guid in self.default_input_filter:
             self.default_input_filter[device_guid] = {}
         if not input_type in self.default_input_filter[device_guid]:
@@ -2571,20 +2611,43 @@ class Settings:
             del self.default_input_filter[device_guid]
             return self.saveFilterDefaults()
         return True
+    
+    def hasFilterDefinition(self, device_guid : dinput.GUID | str | int) -> bool:
+        ''' true if the device has saved filter data '''
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        device_guid = device.device_guid
+        if device_guid in self.input_filter:
+            return True
+        if device_guid in self.default_input_filter:
+            return True
+        return False
+    
+    def getFilterInputCounts(self, device_guid : dinput.GUID | str | int, input_type : InputType | list[InputType]) -> int:
+        ''' gets the counts of filtered inputs in the device in the profile input filter settings - add multiple types by including them in the list  '''
+        input_type_list = input_type if hasattr(input_type, "__iter__") else [input_type]
+        count = 0
+        if device_guid in self.input_filter:
+            for input_type in input_type_list:
+                if input_type in self.input_filter[device_guid]:
+                    filtered_count = sum(1 if self.input_filter[device_guid][input_type][input_id] else 0 for input_id in self.input_filter[device_guid][input_type])
+                    count += filtered_count
+
+        return count
+        
 
     def getFiltered(self, device_guid : dinput.GUID | str | int, input_type : InputType, input_id : int | object) -> bool:
         ''' gets the joystick input filtered state '''
         device = gremlin.joystick_handling.getDevice(device_guid)
         device_guid = device.device_guid
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_filter
+        verbose = config.verbose_mode_filter or config.verbose_mode_ui
         # verbose = True
 
 
         if not device_guid in self.input_filter:
-
+            # not in settings
             if device_guid in self.default_input_filter:
-                # device has a default entry saved globally
+                # found in saved defaults
                 if input_type in self.default_input_filter[device_guid]:
                     if input_id in self.default_input_filter[device_guid][input_type]:
                         return self.default_input_filter[device_guid][input_type][input_id]
@@ -2627,6 +2690,16 @@ class Settings:
     def getFilterMap(self):
         ''' gets the input filter'''
         return copy.deepcopy(self.input_filter) # return a copy so settings are not mutable
+    
+
+    def applyFilter(self, input_filter : dict):
+        ''' applies the filter data from the input filter '''
+        for device_guid in input_filter:
+            for input_type in input_filter[device_guid]:
+                for input_id in input_filter[device_guid][input_type]:
+                    filtered = input_filter[device_guid][input_type][input_id]
+                    self.setFiltered(device_guid, input_type, input_id, filtered, False)
+
 
 
     def loadFilterDefaults(self) -> bool:
@@ -3848,32 +3921,32 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 node = etree.Element(InputType.to_string(self.input_type))
 
                 container_node = node # default container node to the input node
-                if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
-                    if isinstance(self.input_id, Key):
-                        # keyboard key item
-                        key : Key
-                        key = self.input_id
-                        node.set("id", safe_format(key.scan_code, int))
-                        node.set("extended", safe_format(key.is_extended, bool))
-                        for latched_key in key.latched_keys:
-                            # latched keys
-                            child = etree.Element("latched")
-                            child.set("id", safe_format(latched_key.scan_code, int))
-                            child.set("extended", safe_format(latched_key.is_extended, bool))
-                            node.append(child)
-                    elif hasattr(self.input_id,"to_xml"):
-                        child = self.input_id.to_xml()
-                        node.append(child)
-                    else:
-                        node.set("id", safe_format(self.input_id[0], int))
-                        node.set("extended", safe_format(self.input_id[1], bool))
-                elif self.input_type in (InputType.Midi, InputType.OpenSoundControl):
-                    # write midi or OSC nodes
-                    child = self.input_id.to_xml()
-                    if child is not None:
-                        node.append(child)
-                else:
-                    node.set("id", safe_format(self.input_id, int))
+                # if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
+                #     if isinstance(self.input_id, Key):
+                #         # keyboard key item
+                #         key : Key
+                #         key = self.input_id
+                #         node.set("id", safe_format(key.scan_code, int))
+                #         node.set("extended", safe_format(key.is_extended, bool))
+                #         for latched_key in key.latched_keys:
+                #             # latched keys
+                #             child = etree.Element("latched")
+                #             child.set("id", safe_format(latched_key.scan_code, int))
+                #             child.set("extended", safe_format(latched_key.is_extended, bool))
+                #             node.append(child)
+                #     elif hasattr(self.input_id,"to_xml"):
+                #         child = self.input_id.to_xml()
+                #         node.append(child)
+                #     else:
+                #         node.set("id", safe_format(self.input_id[0], int))
+                #         node.set("extended", safe_format(self.input_id[1], bool))
+                # elif self.input_type in (InputType.Midi, InputType.OpenSoundControl):
+                #     # write midi or OSC nodes
+                #     child = self.input_id.to_xml()
+                #     if child is not None:
+                #         node.append(child)
+                # else:
+                node.set("id", safe_format(self.input_id, int))
             else:
                 node = parent_node
                 container_node = node
@@ -5292,12 +5365,25 @@ class Profile():
         return True
 
 
-    def getDevice(self, device_guid) -> Device:
-        ''' gets a device entry for this profile '''
+    def getDevice(self, device_guid, autocreate = False) -> Device:
+        ''' gets a device entry for this profile
+        :param device_guid: the guid of the device to get a device profile for
+        :param autocreate: autocreate the entry if it does not exist in the current profile and the device exists/is connected
+        :returns: the device object, or None if does not exist
+        '''
         device_guid = gremlin.util.parse_guid(device_guid)
-        if device_guid in self.devices:
-            return self.devices[device_guid]
-        return None
+        if not device_guid in self.devices:
+            if autocreate:
+                device = gremlin.joystick_handling.getDevice(device_guid)
+                if device:
+                    device_object = Device(self)
+                    device_object.device_guid = device_guid
+                    device_object.device_type = device.device_type
+                    self.devices[device_guid] = device_object
+                    return device_object
+            return None
+
+        return self.devices[device_guid]
 
 
     def is_mode(self, mode) -> bool:

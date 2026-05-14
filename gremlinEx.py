@@ -2599,7 +2599,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # this needs to be registered before widgets are created because widgets may need this data
                 gremlin.shared_state.device_profile_map[device.device_guid] = device_profile
                 gremlin.shared_state.device_type_map[device.device_guid] = DeviceType.Joystick
-                #tab_label = device.name.strip()
+
+                syslog.info(f"Create Device tab widget: for [{device.name}]")
+                if "left" in device.name.casefold():
+                    pass  
 
 
                 device_guid = device.device_id
@@ -2608,7 +2611,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     widget = self.getRegisteredWidget(device_guid)
 
                     if not widget or not Shiboken.isValid(widget):
-                        if verbose: syslog.info("\tcreating widget...")
+                        if verbose: syslog.info(f"\tcreating device widget for [{device.name}].")
                         widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
                             device=device,
                             profile=self.profile,
@@ -3053,7 +3056,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         last_input_id = input_item.input_id
                         last_input_type = input_item.input_type
 
-                if verbose: syslog.info(f"SELECT TAB INDEX: {index}")
+                if verbose: syslog.info(f"CreateTabs: select tab index: [{index}]  device: [{device.name}]")
                 index = self.getTabIndexForDevice(last_device_guid)
         
                 if index is not None:

@@ -22,6 +22,7 @@ import logging
 
 from PySide6 import QtWidgets, QtCore, QtGui
 import threading
+from lxml import etree
 
 import gremlin.config
 import gremlin.event_handler
@@ -2297,6 +2298,15 @@ class OscInputItem(gremlin.base_profile.InputItem):
             table.addField("Axis Range",f"[{self._min_range:0.3f}, {self._max_range:0.3f}]")
 
         return table.to_html()
+    
+    def to_xml(self):
+        node = etree.Element(InputType.to_string(self.input_type))
+        node.set("id", write_guid(self.id))
+        
+        child = self.input_id.to_xml()
+        if child is not None:
+            node.append(child)
+        return node
 
     def __deepcopy__(self, memo):
         return self

@@ -266,19 +266,19 @@ current_profile = None
 
 
 # holds the active (runtime) mode
-runtime_mode = None
+runtime_mode : str = None
 
 # terminating flag - set when the application is terminating
-terminating = False
+terminating : bool = False
 
 # holds the edit mode
-edit_mode = "Default"
+edit_mode : str = "Default"
 
 # true if a device change occurs when a profile is running
-has_device_changes = False
+has_device_changes : bool = False
 
 # previous runtime mode
-previous_runtime_mode = None
+previous_runtime_mode : str = None
 
 # import prompt count on import
 import_prompt_stack = 0

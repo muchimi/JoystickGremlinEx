@@ -159,6 +159,13 @@ class JoystickDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         # if device.is_virtual and not vjoy_as_input.get(device.vjoy_id, False):
         #     self.inputItemListView.limit_input_types([InputType.JoystickAxis])
 
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose:
+            device = gremlin.joystick_handling.getDevice(self._device_guid)
+            syslog.info(f"Create Device tab widget: for [{device.name}]")
+            if "left" in device.name.casefold():
+                pass        
+
 
         # model that holds all the input items for the joystick device
         self.inputItemListModel = JoystickInputModel(
@@ -168,6 +175,17 @@ class JoystickDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
             custom_filter_handler = self._handle_custom_filter, 
             show_filtered_only=True,
         )
+
+        # if there are no inputs in the model, pick the default filter for the devices
+        if self.inputItemListModel.filteredCount() == 0:
+            # nothing shown
+            if self.inputItemListModel.unfilteredCount():
+                # device has inputs
+                input_filter = self.getDefaultFilter()
+                self.inputItemListModel.applyFilter(False)
+                syslog.info(f"JOYSTICK: load defaults for device [{device.name}]")
+
+
 
         self.inputItemListModel.addCallback(self._handle_model_changed)
 
@@ -308,6 +326,49 @@ class JoystickDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         ''' called when the input model changes to update the display of stats and filter status '''
         self.update_stats_display(refresh = False)
 
+    def getDefaultFilter(self) -> dict:
+        ''' gets the default filter for the given device '''
+        
+        device_guid = self.device_guid
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        settings = profile.settings
+
+        # see if the profile has a default input setup saved for this input
+        
+        if settings.hasFilterDefinition(device_guid):
+            count = settings.getFilterInputCounts(device_guid, [InputType.JoystickAxis, InputType.JoystickButton])
+            if count:
+                input_filter = settings.getInputFilter(device_guid)
+                return input_filter
+            
+        # come up with a default value
+        
+        input_filter = {}
+        input_filter[device_guid] = {}
+        
+        # default axes
+        if device.axis_count:
+            axis_count = max(device.axis_count, 3) # first three axes
+            input_filter[device.device_guid][InputType.JoystickAxis] = {}
+            for index in range(axis_count):
+                input_id = device.axis_sequence_to_input_id(index)
+
+                input_filter[device.device_guid][InputType.JoystickAxis][input_id] = True
+        if device.button_count:
+            button_count = max(device.button_count, 2) # first 2 buttons
+            input_filter[device.device_guid][InputType.JoystickButton] = {}
+            for input_id in range(1, button_count + 1):
+                input_filter[device.device_guid][InputType.JoystickButton][input_id] = True
+        # ignore hats
+
+        # save the defaults to the settings
+        settings.applyFilter(input_filter)
+
+        return input_filter
+
+
+            
 
 
     def getInputFilter(self):

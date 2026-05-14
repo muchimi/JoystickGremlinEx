@@ -172,63 +172,73 @@ class KeyboardInputItem(gremlin.base_profile.InputItem):
 
     def from_xml(self, node, data = None, extra_data : dict = None):
         self.parse_xml(node, data, extra_data)
-        super().from_xml(node, data, extra_data)
-
+       
 
     def parse_xml(self, node, data = None, extra_data : dict = None):
         ''' loads itself from xml '''
         from gremlin.keyboard import key_from_code
         self._suspend_update = True
 
-        if node.tag == "input":
-            self.setId(read_guid(node, "guid", default_value=uuid.uuid4()))
+        if node.tag in ("keyboard","keylatched"):
+            if not "guid" in node.attrib:
+                # older style GUID is in the input tag
+                for child in node.xpath("./input"):
+                    self.setId(read_guid(child, "guid", default_value=uuid.uuid4()))
+                    break
+            else:
+                # new style
+                self.setId(read_guid(node, "guid", default_value=uuid.uuid4()))
 
-            for child in node:
-                # ready key nodes
-                if child.tag is etree.Comment:
-                    continue # skip comments
-                if child.tag == "key":
-                    virtual_code = safe_read(child,"virtual-code", int, 0)
-                    scan_code = safe_read(child, "scan-code", int, 0)
-                    is_extended = safe_read(child, "extended", bool, False)
-                    is_mouse = safe_read(child, "mouse", bool, False)
-                    # if is_mouse:
-                    #     pass
-                    # if virtual_code > 0:
-                    #     key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
-                    # else:
+            child = next((n for n in node.xpath(".//key")), None)
+            if child is None:
+                raise ValueError(f"Invalid XML - missing key definition in profile XML - offending line: [{node.sourceline}]")
 
-                    (scan_code, is_extended), _= gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
-                    key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+            # virtual_code = safe_read(child,"virtual-code", int, 0)
+            scan_code = safe_read(child, "scan-code", int, 0)
+            is_extended = safe_read(child, "extended", bool, False)
+            is_mouse = safe_read(child, "mouse", bool, False)
 
-                    self._key = key
-                    for latched_child in child:
-                        if latched_child.tag == "latched":
-                            virtual_code = safe_read(latched_child,"virtual-code", int, 0)
-                            scan_code = safe_read(latched_child, "scan-code", int, 0)
-                            is_extended = safe_read(latched_child, "extended", bool, False)
-                            is_mouse = safe_read(latched_child, "mouse", bool, False)
-                            if is_mouse:
 
-                                key = Key(scan_code = scan_code, is_mouse=True)
-                            else:
-                                # if virtual_code > 0:
-                                #     key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
-                                # else:
-                                (scan_code, is_extended), _ = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
-                                key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
-                            if not key in self._key.latched_keys:
-                                self._key._latched_keys.append(key)
+            (scan_code, is_extended), _= gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
+            key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
 
-                    self._key._update()
+            self._key = key
+            for latched_child in child:
+                if latched_child.tag == "latched":
+                    # virtual_code = safe_read(latched_child,"virtual-code", int, 0)
+                    scan_code = safe_read(latched_child, "scan-code", int, 0)
+                    is_extended = safe_read(latched_child, "extended", bool, False)
+                    is_mouse = safe_read(latched_child, "mouse", bool, False)
+                    if is_mouse:
+
+                        key = Key(scan_code = scan_code, is_mouse=True)
+                    else:
+                        # if virtual_code > 0:
+                        #     key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
+                        # else:
+                        (scan_code, is_extended), _ = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
+                        key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+                    if not key in self._key.latched_keys:
+                        self._key._latched_keys.append(key)
+
+            self._key._update()
+
+        # read the mappings
+        super().from_xml(node, data, extra_data)
+
         self._suspend_update = False
         self._update()
 
 
     def to_xml(self):
         # saves itself to xml
-        node = etree.Element("input")
-        node.set("guid", str(self.id))
+
+        node = etree.Element(InputType.to_string(self.input_type))
+        node.set("guid", write_guid(self.id))
+        
+        if self.description:
+            node.set("description", self.description)
+
 
 
         # comment
@@ -962,7 +972,7 @@ class KeyboardDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         data = self.model.data(index)
         sequence = data.input_id.sequence
 
-        syslog.info(f"Editing index {index} {data.input_id.display_name}")
+        syslog.info(f"Editing index {index} {data.display_name}")
         gremlin.shared_state.push_suspend_ui_keyinput()
         self._keyboard_dialog = InputKeyboardDialog(sequence, parent = self, select_single = False, index = index)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)

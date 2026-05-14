@@ -871,8 +871,8 @@ class Icons():
         return Icons._icon("fa6s.sitemap", qta_color = qta_color)
 
     @staticmethod
-    def warningIcon():
-        return Icons._icon("ph.shield-warning-fill",qta_color=QtGui.QColor(Color.warningColor()))
+    def warningIcon(qta_color = Color.warningColor()):
+        return Icons._icon("ph.shield-warning-fill",qta_color=qta_color)
     @staticmethod
     def infoIcon(qta_color = "#34b7eb"):
         return Icons._icon("fa5s.info-circle",qta_color=qta_color)
@@ -9839,7 +9839,7 @@ class QSplitTabWidget(QDataWidget):
                 syslog.info(f"RIGHT PANEL: select widget {index}")
             self._right_panel_stacked_widget.setCurrentIndex(index)
         else:
-            syslog.error("Unable to select widget in right panel: missing")
+            raise ValueError("Unable to select widget in right panel: missing from right panel - did you register?")
 
         return widget
 
@@ -9989,7 +9989,7 @@ class QSplitTabWidget(QDataWidget):
 
     def getWidgetKeyForWidget(self, widget):
         ''' gets the content widget compound key for the given widget '''
-        input_item = widget.getItemData()
+        input_item = widget.input_item
         input_type = input_item.input_type
         input_id = input_item.input_id
         return self.getWidgetKey(input_type, input_id)
@@ -12772,7 +12772,7 @@ class QInputDialog(QRememberDialog):
 
 class QWarningWidget(QtWidgets.QWidget):
     ''' warning widget'''
-    def __init__(self, text = None, split : bool = False, tooltip : str = None, parent = None):
+    def __init__(self, text = None, split : bool = False, tooltip : str = None, icon : QIcon = None, parent = None):
         super().__init__(parent)
 
 
@@ -12781,7 +12781,8 @@ class QWarningWidget(QtWidgets.QWidget):
         self.setContentsMargins(0,0,0,0)
         main_layout.setContentsMargins(0,0,0,0)
 
-        icon = Icons.warningIcon()
+        if icon is None:
+            icon = Icons.warningIcon()
         self._icon_widget = QIconLabel(icon_path = icon, text = text if not split else None)
         left_panel, _ = getVContainer(self._icon_widget)
         right_panel, _ = getVContainer(self._label_widget)
