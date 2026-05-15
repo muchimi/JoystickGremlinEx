@@ -30,7 +30,7 @@ from gremlin.profile import safe_read, safe_format
 from gremlin.util import rad2deg
 import gremlin.util
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.sendinput
 from gremlin import input_devices
 import psygnal
@@ -51,7 +51,7 @@ import gremlin.raw_input
 
 syslog = logging.getLogger("system")
 
-class KVMWidget(gremlin.ui.input_item.AbstractActionWidget):
+class KVMWidget(gremlin.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to mouse motion or buttons."""
 

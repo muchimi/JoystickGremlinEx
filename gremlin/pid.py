@@ -5,7 +5,7 @@
 
 
 '''
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import time
 from enum import Flag, auto
 from threading import Thread

@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 from PySide6 import QtWidgets, QtCore
 import json
@@ -25,25 +25,26 @@ import json
 # import container_plugins.basic
 # import gremlin
 import gremlin.config
+from .. import input_item
 from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.util
-from . import input_item, ui_common
+from . import ui_common
 from gremlin.keyboard import Key
-from .input_item import InputItemWidget, InputIdentifier, InputItemListView, InputItemMappingWidget
+from ..input_item import InputItemWidget, InputIdentifier, InputItemListView, InputItemMappingWidget
 import uuid
 from gremlin.util import *
 from gremlin.input_types import InputType
 from lxml import etree
 import gremlin.ui.ui_common
 import gremlin.base_profile
-from gremlin.ui.input_item import InputItemMappingWidget
+from gremlin.input_item import InputItemMappingWidget
 
 
 syslog = logging.getLogger("system")
 
-class KeyboardInputItem(gremlin.base_profile.InputItem):
+class KeyboardInputItem(gremlin.input_item.InputItem):
     ''' holds a keyboard input item '''
     def __init__(self, mode_object : gremlin.base_profile.Mode  ):
         ''' Keyboard input id
@@ -361,7 +362,7 @@ class KeyboardInputItem(gremlin.base_profile.InputItem):
         return self.to_string()
 
 
-class KeyboardInputItemModel(gremlin.ui.input_item.InputItemListModel):
+class KeyboardInputItemModel(gremlin.input_item.InputItemListModel):
     ''' data model for state inputs '''
     def __init__(self,
                  profile : gremlin.base_profile.Profile,
@@ -384,7 +385,7 @@ class KeyboardInputItemModel(gremlin.ui.input_item.InputItemListModel):
                          custom_remove_handler = custom_remove_handler,
                          custom_filter_handler = custom_filter_handler)
 
-class KeyboardInputItemListView(gremlin.ui.input_item.InputItemListView):
+class KeyboardInputItemListView(gremlin.input_item.InputItemListView):
     ''' view for state inputs '''
     def __init__(self, custom_widget_handler : Callable = None, parent : QtWidgets.QWidget = None, blank_message : str = None, model : KeyboardInputItemModel = None):
         ''' creates a new list view for keyboard input items
@@ -402,7 +403,7 @@ class KeyboardInputItemListView(gremlin.ui.input_item.InputItemListView):
 
 
 
-class KeyboardDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
+class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure keyboard inputs """
 

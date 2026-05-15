@@ -23,7 +23,7 @@ import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.dialogs
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.ui.ui_common
 import gremlin.util
 from gremlin.util import safe_read, safe_format
@@ -35,7 +35,7 @@ from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
-class RunProcessWidget(gremlin.ui.input_item.AbstractActionWidget):
+class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget which allows the configuration of TTS actions."""
 

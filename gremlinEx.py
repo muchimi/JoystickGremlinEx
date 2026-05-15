@@ -19,7 +19,7 @@
 Main UI of JoystickGremlin.
 """
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 # import qt5reactor
 import faulthandler
 import argparse
@@ -81,7 +81,7 @@ import gremlin.ui.osc_device
 import gremlin.ui.mode_device
 import gremlin.ui.state_device
 import gremlin.ui.theme
-import gremlin.ui.input_item
+import gremlin.input_item
 
 import gremlin.plugin_manager
 import gremlin.process
@@ -2425,7 +2425,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         data : gremlin.input_item.TabData = self.ui.devices.tabData(index)
         return  TabDeviceType(data.tab_type)
 
-    def _mapping_changed(self, item_data : gremlin.base_profile.InputItem):
+    def _mapping_changed(self, item_data : gremlin.input_item.InputItem):
         ''' called when mapping changes '''
 
         self._update_tab(item_data.device_id) # update tab header
@@ -2601,9 +2601,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 gremlin.shared_state.device_type_map[device.device_guid] = DeviceType.Joystick
 
                 syslog.info(f"Create Device tab widget: for [{device.name}]")
-                if "left" in device.name.casefold():
-                    pass  
-
 
                 device_guid = device.device_id
                 device_name = device.name
@@ -3271,12 +3268,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if not input_type:
             # pick the first input for that tab
             widget = self._get_tab_widget_guid(device_guid)
-            input_item: gremlin.base_profile.InputItem = self._get_input_item(device_guid, 0)
+            input_item: gremlin.input_item.InputItem = self._get_input_item(device_guid, 0)
             if input_item:
                 return (input_item.input_type, input_item.input_id)
         return (input_type, input_id)
 
-    def _get_input_item(self, device_guid : str, index : int) -> gremlin.base_profile.InputItem:
+    def _get_input_item(self, device_guid : str, index : int) -> gremlin.input_item.InputItem:
         ''' get the input item at the specified index in the device - index is 0 based '''
         widget = self._get_tab_widget_guid(device_guid)
         if widget is None or not hasattr(widget,"inputItemListModel"):
@@ -3288,7 +3285,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         return widget.inputItemListModel.data(index)
 
 
-    def _get_input_items(self, device_guid : str) -> list[gremlin.base_profile.InputItem]:
+    def _get_input_items(self, device_guid : str) -> list[gremlin.input_item.InputItem]:
         ''' gets the list of all input items for a given device '''
         widget = self._get_tab_widget_guid(device_guid)
         if widget is None or not hasattr(widget,"inputItemListModel"):
@@ -3297,7 +3294,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         row_count = widget.inputItemListModel.rows()
         return [widget.inputItemListModel.data(index) for index in range(row_count)]
 
-    def _find_input_item(self, device_guid : str, input_type, input_id) -> gremlin.base_profile.InputItem:
+    def _find_input_item(self, device_guid : str, input_type, input_id) -> gremlin.input_item.InputItem:
         ''' find the input item matching the input id for a given device '''
         if not device_guid or input_id is None or input_type is None:
             # nothing to match
@@ -3362,7 +3359,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         import gremlin.config
         import gremlin.event_handler
-        import gremlin.ui.input_item
+        import gremlin.input_item
         import gremlin.util
         import gremlin.shared_state
         import gremlin.joystick_handling
@@ -3568,7 +3565,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 if not switch_input:
 
-                    if widget and isinstance(widget, gremlin.ui.input_item.BaseDeviceTabWidget):
+                    if widget and isinstance(widget, gremlin.input_item.BaseDeviceTabWidget):
                         current_input_id = widget.getContentInputId()
                         if current_input_id:
                             switch_input = current_input_id != input_id
@@ -3579,7 +3576,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
 
                     if widget:
-                        if isinstance(widget, gremlin.ui.input_item.BaseDeviceTabWidget): # some tabs are not the standard widget - ignore those as they have no inputs
+                        if isinstance(widget, gremlin.input_item.BaseDeviceTabWidget): # some tabs are not the standard widget - ignore those as they have no inputs
                             self.selectRegisteredWidget(device_guid)
                             if verbose: syslog.info(f"SELECT INPUT: select widget {input_type} {input_id}")
                             if tab_changed or not hasattr(widget, "input_item_list_view"):
@@ -3662,8 +3659,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                     # current input
                     # if widget and hasattr(widget,"input_item_list_view"):
-                    #     lv : gremlin.ui.input_item.InputItemListView = widget.input_item_list_view
-                    #     item : gremlin.base_profile.InputItem = lv.selected_item()
+                    #     lv : gremlin.input_item.InputItemListView = widget.input_item_list_view
+                    #     item : gremlin.input_item.InputItem = lv.selected_item()
                     #     assert item is not None, f"SELECT: sync issue: no selection"
                     #     assert item.input_id == restore_input_id, f"SELECT: sync issue: input id mismatch: expected {restore_input_id} got {item.input_id}"
 
@@ -3714,7 +3711,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         ''' gets the index of the current tab '''
         return self.ui.devices.currentIndex()
 
-    def _active_input_item(self) -> gremlin.base_profile.InputItem:
+    def _active_input_item(self) -> gremlin.input_item.InputItem:
         ''' gets the current selected input item '''
         widget = self.getActiveTabWidget()
         if widget and hasattr(widget, "input_item_list_view"):

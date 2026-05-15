@@ -103,7 +103,7 @@ class Clipboard(QtCore.QObject):
     
     def _decode(self):
         # external clipboard
-        from gremlin.base_profile import AbstractContainer, AbstractAction
+        from gremlin.input_item import AbstractContainer
         data = None
         if self._persist_to_file:
             # see if the file exists
@@ -249,7 +249,7 @@ class Clipboard(QtCore.QObject):
     @property
     def is_container(self):
         ''' true if the data item is a container '''
-        from gremlin.base_profile import AbstractContainer
+        from gremlin.input_item import AbstractContainer
         data = self.data
         if isinstance(data, ObjectEncoder):
             return data.encoder_type in (EncoderType.Container, EncoderType.MultiContainer)

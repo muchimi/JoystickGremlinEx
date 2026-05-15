@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 
 import copy
 import logging
@@ -31,8 +31,7 @@ import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.event_handler
 
-from gremlin.ui.input_item import AbstractContainerWidget
-from gremlin.base_profile import AbstractContainer
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
 from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")

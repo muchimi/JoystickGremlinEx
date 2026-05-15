@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -68,7 +68,7 @@ import vjoy
 import vjoy.vjoy
 import psygnal
 from psygnal import Signal
-from gremlin.ui.input_item import InputItemMappingWidget
+from gremlin.input_item import InputItemMappingWidget
 
 
 syslog = logging.getLogger("system")
@@ -2205,7 +2205,7 @@ class OscInterface(QtCore.QObject):
 
 
 #class OscInputItem(AbstractInputItem):
-class OscInputItem(gremlin.base_profile.InputItem):
+class OscInputItem(gremlin.input_item.InputItem):
     ''' holds OSC input data '''
 
     message_key_changed = Signal(str, str) # fires when message key changes
@@ -3732,7 +3732,7 @@ Existing entries will be ignored.
         return self.text_widget.toPlainText()
     
 
-class OscInputItemModel(gremlin.ui.input_item.InputItemListModel):
+class OscInputItemModel(gremlin.input_item.InputItemListModel):
 
     ''' model for OSC input items '''
 
@@ -3750,7 +3750,7 @@ class OscInputItemModel(gremlin.ui.input_item.InputItemListModel):
                          custom_filter_handler = custom_filter_handler)    
 
     
-class OscInputItemListView(gremlin.ui.input_item.InputItemListView):
+class OscInputItemListView(gremlin.input_item.InputItemListView):
 
     ''' list view for OSC input items '''
 
@@ -3768,7 +3768,7 @@ class OscInputItemListView(gremlin.ui.input_item.InputItemListView):
                          model = model,
                          )
         
-class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
+class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 
@@ -4335,7 +4335,7 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     #             device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Osc))
     #             mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
     #             input_item = OscInputItem(mode_object)
-    #             widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name="OSC Blank InputConfigItem (no item data)")
+    #             widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name="OSC Blank InputConfigItem (no item data)")
     #             widget.redraw() # load the data
 
     #         #self.setRightPanelWidget(widget)
@@ -4381,9 +4381,9 @@ class OscDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         :param data the data associated with this input item
 
         '''
-        import gremlin.ui.input_item
+        import gremlin.input_item
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
+        widget = gremlin.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
         widget.data = data
         widget.create_action_icons(data)
         widget.setInputDescription(data.display_name)

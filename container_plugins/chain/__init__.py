@@ -25,9 +25,9 @@ import gremlin
 import gremlin.base_conditions
 import gremlin.config
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
-from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
-from gremlin.base_profile import AbstractContainer
+import gremlin.input_item
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
@@ -156,19 +156,19 @@ class ChainContainerWidget(AbstractContainerWidget):
             return
 
         # Perform action
-        if action == gremlin.ui.input_item.ActionSetView.Interactions.Up:
+        if action == gremlin.input_item.ActionSetView.Interactions.Up:
             if index > 0:
                 self.profile_data.action_sets[index],\
                     self.profile_data.action_sets[index-1] = \
                     self.profile_data.action_sets[index-1],\
                     self.profile_data.action_sets[index]
-        if action == gremlin.ui.input_item.ActionSetView.Interactions.Down:
+        if action == gremlin.input_item.ActionSetView.Interactions.Down:
             if index < len(self.profile_data.action_sets) - 1:
                 self.profile_data.action_sets[index], \
                     self.profile_data.action_sets[index + 1] = \
                     self.profile_data.action_sets[index + 1], \
                     self.profile_data.action_sets[index]
-        if action == gremlin.ui.input_item.ActionSetView.Interactions.Delete:
+        if action == gremlin.input_item.ActionSetView.Interactions.Delete:
             del self.profile_data.action_sets[index]
 
         if Shiboken.isValid(self):
@@ -261,9 +261,9 @@ Unlike a macro or sequence container, only one step is executed for each trigger
     ]
 
     interaction_types = [
-        gremlin.ui.input_item.ActionSetView.Interactions.Up,
-        gremlin.ui.input_item.ActionSetView.Interactions.Down,
-        gremlin.ui.input_item.ActionSetView.Interactions.Delete,
+        gremlin.input_item.ActionSetView.Interactions.Up,
+        gremlin.input_item.ActionSetView.Interactions.Down,
+        gremlin.input_item.ActionSetView.Interactions.Delete,
     ]
 
     functor = ChainContainerFunctor
@@ -292,12 +292,12 @@ Unlike a macro or sequence container, only one step is executed for each trigger
         node = ElementTree.Element("container")
         node.set("type", ChainContainer.tag)
         node.set("timeout", str(self.timeout))
-        for action_set in self.action_sets:
-            as_node = ElementTree.Element("action-set")
-            as_node.set("id", write_guid(action_set.id))
-            for action in action_set:
-                as_node.append(action.to_xml())
-            node.append(as_node)
+        # for action_set in self.action_sets:
+        #     as_node = ElementTree.Element("action-set")
+        #     as_node.set("id", write_guid(action_set.id))
+        #     for action in action_set:
+        #         as_node.append(action.to_xml())
+        #     node.append(as_node)
         return node
 
     def _is_container_valid(self):

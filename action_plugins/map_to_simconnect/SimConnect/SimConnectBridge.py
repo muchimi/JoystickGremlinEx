@@ -18,7 +18,7 @@
 
 # Adapted from: https://github.com/odwdinc/Python-SimConnect  Credit for original code goes to the authors of the Python-SimConnect project
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 import struct
 from time import sleep

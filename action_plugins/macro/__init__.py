@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 
 import logging
 import collections
@@ -1448,7 +1448,7 @@ class MacroSettingsWidget(gremlin.ui.ui_common.QContentWidget):
             widget = gremlin.ui.ui_common.getHContainer(self.repeat_widget, widget_only = True)
             self.container_repeat_layout.addWidget(widget)
 
-class MacroWidget(gremlin.ui.input_item.AbstractActionWidget):
+class MacroWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget which allows creating and editing of macros."""
     

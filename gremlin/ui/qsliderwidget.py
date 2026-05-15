@@ -1,5 +1,5 @@
 # implements a custom multi-gate slider widget
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import enum
 import time
 import threading

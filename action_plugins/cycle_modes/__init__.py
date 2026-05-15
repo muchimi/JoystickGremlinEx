@@ -28,7 +28,7 @@ import gremlin.base_profile
 import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.shared_state
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.ui.ui_common
 from shiboken6 import Shiboken
 import gremlin.util
@@ -111,7 +111,7 @@ class CycleModeModel(QtCore.QAbstractItemModel):
     def __len__(self):
         return len(self._data)
 
-class CycleModesWidget(gremlin.ui.input_item.AbstractActionWidget):
+class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget allowing the configuration of a list of modes to cycle."""
 

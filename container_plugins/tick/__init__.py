@@ -18,7 +18,7 @@
 # this code is build on Gremlin work by Lionel Ott
 
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 
 import copy
 import logging
@@ -33,11 +33,11 @@ import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.ui.qsliderwidget
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
-from gremlin.ui.input_item import AbstractContainerWidget
-from gremlin.base_profile import AbstractContainer
+import gremlin.input_item
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+
 from gremlin.input_types import InputType
-from gremlin.util import safe_format, safe_read
+from gremlin.util import safe_format, safe_read, write_guid, read_guid
 from shiboken6 import Shiboken
 class TickContainerWidget(AbstractContainerWidget):
 
@@ -408,7 +408,7 @@ For a more advanced way to split an axis and trigger actions at specific points,
         InputType.JoystickAxis,
     ]
     interaction_types = [
-        gremlin.ui.input_item.ActionSetView.Interactions.Edit,
+        gremlin.input_item.ActionSetView.Interactions.Edit,
     ]
 
     def getTick(self, value : float) -> int:
@@ -441,7 +441,11 @@ For a more advanced way to split an axis and trigger actions at specific points,
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.setActionSets([[],[]])
+        action_sets = ActionSets(self)
+        # action_sets.append(ActionSet(self,"short"))
+        # action_sets.append(ActionSet(self,"long"))
+
+        self.setActionSets(action_sets)
         self.delay = 0.5
         self.activate_on = "release"
         self.interval = 0.2 # interval between ticks
@@ -455,9 +459,9 @@ For a more advanced way to split an axis and trigger actions at specific points,
 
         :param node the XML node with which to populate the container
         """
-        self.setActionSets([])
+        # self.setActionSets(ActionSets(self))
         self.interval  = safe_read(node,"interval",float,0.2)
-        super()._parse_xml(node, data)
+        # super()._parse_xml(node, data)
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -467,12 +471,14 @@ For a more advanced way to split an axis and trigger actions at specific points,
         node = ElementTree.Element("container")
         node.set("type", TickContainer.tag)
         node.set("interval", safe_format(self.interval, float))
-        for action_set in self.action_sets:
-            as_node = ElementTree.Element("action-set")
-            as_node.set("id", write_guid(action_set.id))
-            for action in action_set:
-                as_node.append(action.to_xml())
-            node.append(as_node)
+        
+        # action_set : ActionSet
+        # for action_set in self.action_sets:
+        #     as_node = ElementTree.Element("action-set")
+        #     as_node.set("id", write_guid(action_set.id))
+        #     for action in action_set:
+        #         as_node.append(action.to_xml())
+        #     node.append(as_node)
         return node
 
     def _is_container_valid(self):

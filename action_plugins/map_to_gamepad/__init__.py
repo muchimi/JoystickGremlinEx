@@ -31,7 +31,7 @@ from gremlin.input_types import InputType
 from gremlin.profile import read_bool, safe_read, safe_format
 from gremlin.util import rad2deg
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.sendinput
 import gremlin.gamepad_handling
 from gremlin import input_devices
@@ -54,7 +54,7 @@ from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
-class MapToGamepadWidget(gremlin.ui.input_item.AbstractActionWidget):
+class MapToGamepadWidget(gremlin.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to mouse motion or buttons."""
 

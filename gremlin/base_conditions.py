@@ -1,4 +1,4 @@
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 from abc import abstractmethod, ABCMeta
 import enum
 import logging
@@ -100,7 +100,7 @@ class BaseAbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
         return self._comparison != ""
 
 
-class KeyboardCondition(BaseAbstractCondition):
+class BaseKeyboardCondition(BaseAbstractCondition):
 
     """Keyboard state based condition.
 
@@ -184,7 +184,7 @@ class KeyboardCondition(BaseAbstractCondition):
         return table.to_html()
 
 
-class JoystickCondition(BaseAbstractCondition):
+class BaseJoystickCondition(BaseAbstractCondition):
 
     """Joystick state based condition.
 
@@ -282,7 +282,7 @@ class JoystickCondition(BaseAbstractCondition):
         return table.to_html()   
 
 
-class StateCondition(BaseAbstractCondition):
+class BaseStateCondition(BaseAbstractCondition):
     ''' state condition '''
     def __init__(self):
         super().__init__()
@@ -344,7 +344,7 @@ class StateCondition(BaseAbstractCondition):
             table.addField("Description", self.description)
         return table.to_html()    
 
-class ModeCondition(BaseAbstractCondition):
+class BaseModeCondition(BaseAbstractCondition):
     ''' mode condition '''
     def __init__(self):
         super().__init__()
@@ -403,7 +403,7 @@ class ModeCondition(BaseAbstractCondition):
             table.addField("Description", self.description)
         return table.to_html()    
     
-class VJoyCondition(BaseAbstractCondition):
+class BaseVJoyCondition(BaseAbstractCondition):
 
     """vJoy device state based condition.
 
@@ -510,7 +510,7 @@ class VJoyCondition(BaseAbstractCondition):
             table.addField("Range", f"[{self.range[0]:0.3f},{self.range[1]:0.3f}]")
         return table.to_html()
 
-class InputActionCondition(BaseAbstractCondition):
+class BaseInputActionCondition(BaseAbstractCondition):
 
     """Input item press / release state based condition.
 
@@ -716,7 +716,7 @@ class ConditionTracker():
         
 
 
-class ActivationCondition(gremlin.base_classes.BaseCallbacks):
+class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
 
     """Dictates under what circumstances an associated code can be executed."""
     activation_condition_modified = Signal()
@@ -731,12 +731,12 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
     }
 
     condition_lookup = {
-        "keyboard": KeyboardCondition,
-        "joystick": JoystickCondition,
-        "vjoy": VJoyCondition,
-        "action": InputActionCondition,
-        "state": StateCondition,
-        "mode": ModeCondition
+        "keyboard": BaseKeyboardCondition,
+        "joystick": BaseJoystickCondition,
+        "vjoy": BaseVJoyCondition,
+        "action": BaseInputActionCondition,
+        "state": BaseStateCondition,
+        "mode": BaseModeCondition
     }
 
     def __init__(self, conditions, rule):
@@ -790,7 +790,7 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
         if "condition_id" in node.attrib:
             self._id = node.get("condition_id")
 
-        rule = ActivationCondition.rule_lookup[safe_read(node, "rule", str, "")]
+        rule = BaseActivationCondition.rule_lookup[safe_read(node, "rule", str, "")]
         tracker = ConditionTracker()
         mode_node = node
         while mode_node is not None and mode_node.tag not in ("mode","state"):
@@ -809,7 +809,7 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
         
         for cond_node in node.findall("condition"):
             condition_type = safe_read(cond_node, "condition-type", str, "")
-            condition = ActivationCondition.condition_lookup[condition_type]()
+            condition = BaseActivationCondition.condition_lookup[condition_type]()
             condition.from_xml(cond_node, data)
             self.conditions.append(condition)
             condition.setOwner(self)
@@ -825,7 +825,7 @@ class ActivationCondition(gremlin.base_classes.BaseCallbacks):
         :return XML node containing information about the activation condition
         """
         node = ElementTree.Element("activation-condition")
-        node.set("rule", ActivationCondition.rule_lookup[self._rule])
+        node.set("rule", BaseActivationCondition.rule_lookup[self._rule])
         node.set("condition_id", self._id)
 
         for condition in self.conditions:

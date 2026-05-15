@@ -24,7 +24,7 @@ import gremlin.actions
 import gremlin.base_profile
 import gremlin.event_handler
 from gremlin.input_types import InputType
-import gremlin.ui.input_item
+import gremlin.input_item
 from enum import IntEnum
 from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
 import threading
@@ -42,7 +42,7 @@ class PauseMode (IntEnum):
     Delay = 0 # delay mode
     PauseAction = 1 # pause action mode
 
-class PauseActionWidget(gremlin.ui.input_item.AbstractActionWidget):
+class PauseActionWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget for the pause action."""
 

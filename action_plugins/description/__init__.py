@@ -22,7 +22,7 @@ from lxml import etree as ElementTree
 
 import gremlin.config
 from gremlin.input_types import InputType
-import gremlin.ui.input_item
+import gremlin.input_item
 from gremlin.util import safe_format, safe_read
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 import logging
@@ -31,7 +31,7 @@ import html
 
 syslog = logging.getLogger("system")
 
-class DescriptionActionWidget(gremlin.ui.input_item.AbstractActionWidget):
+class DescriptionActionWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget for the description action."""
 

@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 import threading
 import time
@@ -39,13 +39,13 @@ import gremlin.ui.osc_device
 import gremlin.ui.qsliderwidget
 from gremlin.util import load_icon
 from shiboken6 import Shiboken
-from gremlin.base_conditions import InputActionCondition
+from gremlin.base_conditions import BaseInputActionCondition
 from gremlin.input_types import InputType
 from gremlin import input_devices, joystick_handling, util
 from gremlin.error import ProfileError
 from gremlin.util import safe_format, safe_read
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 import os
 import enum
 from gremlin.remote import remote_control
@@ -62,7 +62,7 @@ import time
 # import gremlin.pid
 
 IdMapToButton = -2 # map to button special ID
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.ui.osc_device
 import gremlin.ui.midi_device
 import gremlin.base_profile
@@ -751,7 +751,7 @@ class GridPopupWindow(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.close()
 
 
-class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
+class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     """Dialog which allows the selection of a vJoy output to use as
     as the remapping for the currently selected input.
@@ -2542,15 +2542,14 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
             # updates individual step widgets and layout
             self._ensure_step_widgets()
 
-            with QtCore.QSignalBlocker(self.step_count_widget):
-                self.step_count_widget.setValue(steps)
+            self.step_count_widget.setValue(steps, False)
 
             self.action_data : VjoyRemap
             if not self.action_data.target_step_start_index in self.action_data.target_step_list:
                 # reset the default if no longer in the list
                 self.action_data.target_step_start_index = 0
 
-            self.step_start_value_widget.setValue(self.action_data.target_step_list[self.action_data.target_step_start_index])
+            self.step_start_value_widget.setValue(self.action_data.target_step_list[self.action_data.target_step_start_index], emit = False)
 
             self.slider_widget.setTickMarks(self.action_data.target_step_list)
 
@@ -3427,7 +3426,7 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
                             hat_return_index = -1
                             for i, position in enumerate(name_map.keys()):
                                 icon_name = icon_map[position]
-                                icon = gremlin.ui.ui_common.load_icon(icon_name)
+                                icon = gremlin.util.load_icon(icon_name)
                                 key = (position, )
                                 self.cb_hat_selector.addItem(icon, f"{name_map[position]}", key)
                                 self.cb_hat_return_selector.addItem(icon, f"{name_map[position]}", key)
@@ -3778,6 +3777,8 @@ class VJoyRemapWidget(gremlin.ui.input_item.AbstractActionWidget):
 
     def _create_input_grid(self):
         ''' create a grid of buttons for easy selection'''
+
+        self._button_grid_widget = None
 
         if not self.action_data.vjoy_id in self.action_data.vjoy_map:
                 self.action_data.refresh_vjoy()
@@ -4364,20 +4365,20 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _convert_condition(self, condition):
         ''' converts a base condition to an action condition '''
-        if isinstance(condition, gremlin.base_conditions.KeyboardCondition):
+        if isinstance(condition, gremlin.base_conditions.BaseKeyboardCondition):
                 return gremlin.actions.KeyboardCondition(
                         condition.scan_code,
                         condition.is_extended,
                         condition.comparison
                     )
 
-        elif isinstance(condition, gremlin.base_conditions.JoystickCondition):
+        elif isinstance(condition, gremlin.base_conditions.BaseJoystickCondition):
             return gremlin.actions.JoystickCondition(condition)
 
-        elif isinstance(condition, gremlin.base_conditions.VJoyCondition):
+        elif isinstance(condition, gremlin.base_conditions.BaseVJoyCondition):
             return gremlin.actions.VJoyCondition(condition)
 
-        elif isinstance(condition, gremlin.base_conditions.InputActionCondition):
+        elif isinstance(condition, gremlin.base_conditions.BaseInputActionCondition):
             return gremlin.actions.InputActionCondition(condition.comparison)
 
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
@@ -4391,7 +4392,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         """
         conditions = []
         for condition in activation_condition.conditions:
-            if isinstance(condition, gremlin.base_conditions.ActivationCondition):
+            if isinstance(condition, gremlin.base_conditions.BaseActivationCondition):
                 for sub_condition in condition.conditions:
                     conditions.append(self._convert_condition(sub_condition))
             else:

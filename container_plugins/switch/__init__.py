@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 
 import logging
 import time
@@ -28,9 +28,8 @@ import gremlin
 import gremlin.actions
 import gremlin.event_handler
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
-from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
-from gremlin.base_profile import AbstractContainer
+import gremlin.input_item
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
 import gremlin.base_conditions
 import gremlin.joystick_handling
 from gremlin.input_types import InputType
@@ -467,19 +466,19 @@ class SwitchContainerWidget(AbstractContainerWidget):
             return
 
         # Perform action
-        if action == gremlin.ui.input_item.ActionSetView.Interactions.Up:
+        if action == gremlin.input_item.ActionSetView.Interactions.Up:
             if index > 0:
                 self.profile_data.action_sets[index],\
                     self.profile_data.action_sets[index-1] = \
                     self.profile_data.action_sets[index-1],\
                     self.profile_data.action_sets[index]
-        if action == gremlin.ui.input_item.ActionSetView.Interactions.Down:
+        if action == gremlin.input_item.ActionSetView.Interactions.Down:
             if index < len(self.profile_data.action_sets) - 1:
                 self.profile_data.action_sets[index], \
                     self.profile_data.action_sets[index + 1] = \
                     self.profile_data.action_sets[index + 1], \
                     self.profile_data.action_sets[index]
-        if action == gremlin.ui.input_item.ActionSetView.Interactions.Delete:
+        if action == gremlin.input_item.ActionSetView.Interactions.Delete:
             del self.profile_data.action_sets[index]
         if Shiboken.isValid(self):
             self.container_modified.emit()
@@ -508,7 +507,7 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self.switch_on_press = False
         if container.has_conditions:
             for cond in container.activation_condition.conditions:
-                if isinstance(cond, gremlin.base_conditions.InputActionCondition):
+                if isinstance(cond, gremlin.base_conditions.BaseInputActionCondition):
                     if cond.comparison == "press":
                         self.switch_on_press = True
 
@@ -828,9 +827,9 @@ an input toggle, press or release.  Multiple inputs can be specified for latchin
     ]
 
     interaction_types = [
-        # gremlin.ui.input_item.ActionSetView.Interactions.Up,
-        # gremlin.ui.input_item.ActionSetView.Interactions.Down,
-        gremlin.ui.input_item.ActionSetView.Interactions.Delete,
+        # gremlin.input_item.ActionSetView.Interactions.Up,
+        # gremlin.input_item.ActionSetView.Interactions.Down,
+        gremlin.input_item.ActionSetView.Interactions.Delete,
     ]
 
     functor = SwitchContainerFunctor
@@ -896,12 +895,12 @@ an input toggle, press or release.  Multiple inputs can be specified for latchin
             node.append(child)
 
         # save the actions (the load is done in the base class)
-        for action_set in self.action_sets:
-            as_node = ElementTree.Element("action-set")
-            as_node.set("id", write_guid(action_set.id))
-            for action in action_set:
-                as_node.append(action.to_xml())
-            node.append(as_node)
+        # for action_set in self.action_sets:
+        #     as_node = ElementTree.Element("action-set")
+        #     as_node.set("id", write_guid(action_set.id))
+        #     for action in action_set:
+        #         as_node.append(action.to_xml())
+        #     node.append(as_node)
         return node
 
     def _is_container_valid(self):

@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 
 import time
 import typing
@@ -197,8 +197,8 @@ class Device(QtCore.QAbstractListModel):
             An InputIdentifier instance referring to the input item with
             the given index.
         """
-        import gremlin.ui.input_item
-        identifier = gremlin.ui.input_item.InputIdentifier(self)
+        import gremlin.input_item
+        identifier = gremlin.input_item.InputIdentifier(self)
         identifier.device_guid = self._device.device_guid
         input_info = self._convert_index(index)
         identifier.input_type = input_info[0]

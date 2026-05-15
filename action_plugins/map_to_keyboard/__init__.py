@@ -26,13 +26,13 @@ from gremlin.input_types import InputType
 from gremlin.input_devices import CallbackActions
 import gremlin.shared_state
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.keyboard
 from gremlin.profile import safe_format, safe_read
 import gremlin.util
 from shiboken6 import Shiboken
 import html
-class MapToKeyboardWidget(gremlin.ui.input_item.AbstractActionWidget):
+class MapToKeyboardWidget(gremlin.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to keyboard key combinations."""
 

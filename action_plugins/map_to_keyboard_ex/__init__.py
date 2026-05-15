@@ -43,7 +43,7 @@ import win32gui
 
 syslog = logging.getLogger("system")
 
-class MapToKeyboardExWidget(gremlin.ui.input_item.AbstractActionWidget):
+class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to keyboard key combinations - adds extra functionality to the base module ."""
 

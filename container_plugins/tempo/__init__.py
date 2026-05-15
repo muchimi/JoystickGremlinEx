@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import copy
 import logging
 import threading
@@ -26,8 +26,7 @@ from PySide6 import QtWidgets, QtCore
 
 import gremlin
 import gremlin.ui.ui_common
-from gremlin.ui.input_item import AbstractContainerWidget
-from gremlin.base_profile import AbstractContainer
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
 from gremlin.input_types import InputType
 from gremlin.util import safe_read, safe_format
 import gremlin.execution_graph
@@ -242,13 +241,13 @@ class TempoContainerWidget(AbstractContainerWidget):
         else:
             self.profile_data.activate_on = "release"
 
-    def _handle_interaction(self, widget, action : gremlin.ui.input_item.ActionSetView.Interactions):
+    def _handle_interaction(self, widget, action : gremlin.input_item.ActionSetView.Interactions):
         """Handles interaction icons being pressed on the individual actions.
 
         :param widget the action widget on which an action was invoked
         :param action the type of action being invoked
         """
-        if action == gremlin.ui.input_item.ActionSetView.Interactions.Delete:
+        if action == gremlin.input_item.ActionSetView.Interactions.Delete:
             index = self._get_widget_index(widget)
             if index != -1:
                 if index == 0 and self.profile_data.action_sets[0] is None:
@@ -448,7 +447,7 @@ Look at Tempo Ex for a container that allows more than one action per short or l
     ]
     
     interaction_types = [
-        gremlin.ui.input_item.ActionSetView.Interactions.Delete,
+        gremlin.input_item.ActionSetView.Interactions.Delete,
     ]
 
     def __init__(self, parent=None, node = None):
@@ -490,13 +489,13 @@ Look at Tempo Ex for a container that allows more than one action per short or l
         node.set("autorelease-delay", safe_format(self.autorelease_delay, float))
 
         node.set("activate-on", self.activate_on)
-        for action_set in self.action_sets:
-            if action_set:
-                as_node = ElementTree.Element("action-set")
-                as_node.set("id", write_guid(action_set.id))
-                for action in action_set:
-                    as_node.append(action.to_xml())
-                node.append(as_node)
+        # for action_set in self.action_sets:
+        #     if action_set:
+        #         as_node = ElementTree.Element("action-set")
+        #         as_node.set("id", write_guid(action_set.id))
+        #         for action in action_set:
+        #             as_node.append(action.to_xml())
+        #         node.append(as_node)
         return node
 
     def _is_container_valid(self):

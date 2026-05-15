@@ -31,7 +31,7 @@ from gremlin.error import ProfileError
 import gremlin.plugin_manager
 from gremlin.profile import safe_format, safe_read
 from gremlin.ui import ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 import os
 from gremlin.util import *
 import gremlin.event_handler
@@ -39,7 +39,7 @@ import gremlin.util
 
 syslog = logging.getLogger("system")
 
-class RemapWidget(gremlin.ui.input_item.AbstractActionWidget):
+class RemapWidget(gremlin.input_item.AbstractActionWidget):
 
     """Dialog which allows the selection of a vJoy output to use as
     as the remapping for the currently selected input.

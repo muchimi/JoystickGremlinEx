@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import os
 from PySide6 import QtWidgets, QtCore, QtGui
 from lxml import etree as ElementTree
@@ -26,7 +26,7 @@ import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.shared_state
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.gated_handler
 import gremlin.shared_state
 import logging
@@ -1764,7 +1764,7 @@ making changes that impact the order of gates or ranges."""
   
 
 
-class GatedAxisWidget(gremlin.ui.input_item.AbstractActionWidget):
+class GatedAxisWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget associated with the action of switching to the previous mode."""
 
@@ -1871,7 +1871,7 @@ class GatedAxisFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
 
 
 
-class GatedAxis(gremlin.base_profile.MultiModeAbstractAction):
+class GatedAxis(gremlin.input_item.MultiModeAbstractAction):
 
     """ action data for the GatedAxis action """
 

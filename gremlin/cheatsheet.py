@@ -66,7 +66,7 @@
 #         :param input_item the InputItem instance this represents
 #         :param inherited_from mode from which this InputItem was inherited
 #         """
-#         self.input_item : gremlin.base_profile.InputItem = input_item
+#         self.input_item : gremlin.input_item.InputItem = input_item
 #         self.inherited_from = inherited_from
     
 

@@ -22,9 +22,9 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 import gremlin.types
-from gremlin.base_profile import AbstractContainer, AbstractFunctor
-import gremlin.execution_graph
-from gremlin.ui.input_item import AbstractContainerWidget
+from gremlin.base_profile import AbstractFunctor
+from gremlin.input_item import AbstractContainer
+from gremlin.input_item import AbstractContainerWidget
 from shiboken6 import Shiboken
 import logging
 from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
@@ -260,36 +260,36 @@ class BasicContainer(AbstractContainer):
         self.mapping_changed() # tell UI of changes
 
 
-    def _parse_xml(self, node, data = None, extra_data = None):
-        """Populates the container with the XML node's contents.
+    # def _parse_xml(self, node, data = None, extra_data = None):
+    #     """Populates the container with the XML node's contents.
 
-        :param node the XML node with which to populate the container
-        """
-        pass
+    #     :param node the XML node with which to populate the container
+    #     """
+    #     pass
 
 
-    def to_xml(self):
-        """Returns an XML node representing this container's data.
+    # def _generate_xml(self):
+    #     """Returns an XML node representing this container's data.
 
-        :return XML node representing the data of this container
-        """
-        if self._basic_container_generating_xml:
-            syslog.error("BASIC CONTAINER XML: recursion detected")
-            return None
-        self._basic_container_generating_xml = True
-        try:
+    #     :return XML node representing the data of this container
+    #     """
+    #     if self._basic_container_generating_xml:
+    #         syslog.error("BASIC CONTAINER XML: recursion detected")
+    #         return None
+    #     self._basic_container_generating_xml = True
+    #     try:
 
-            node = super().to_xml()
-            node.set("type", "basic")
-            if self.action_sets:
-                as_node = ElementTree.Element("action-set")
-                as_node.set("id", write_guid(self.action_sets[0].id))
-                for action in self.action_sets[0]:
-                    as_node.append(action.to_xml())
-                node.append(as_node)
-            return node
-        finally:
-            self._basic_container_generating_xml = False
+    #         node = super().to_xml()
+    #         node.set("type", "basic")
+    #         if self.action_sets:
+    #             as_node = ElementTree.Element("action-set")
+    #             as_node.set("id", write_guid(self.action_sets[0].id))
+    #             for action in self.action_sets[0]:
+    #                 as_node.append(action.to_xml())
+    #             node.append(as_node)
+    #         return node
+    #     finally:
+    #         self._basic_container_generating_xml = False
 
 
     def _is_container_valid(self):

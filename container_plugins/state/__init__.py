@@ -22,8 +22,8 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 import gremlin.types
-from gremlin.base_profile import AbstractContainer, AbstractFunctor
-from gremlin.ui.input_item import AbstractContainerWidget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+import gremlin.base_profile
 
 from shiboken6 import Shiboken
 from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
@@ -257,7 +257,7 @@ class StateContainerWidget(AbstractContainerWidget):
         return title
 
 
-class StateContainerFunctor(AbstractFunctor):
+class StateContainerFunctor(gremlin.base_profile.AbstractFunctor):
 
     """Executes the contents of the associated basic container."""
 
@@ -395,12 +395,12 @@ class StateContainer(AbstractContainer):
             node.set("state", self.state)
         node.set("value", safe_format(self.required_value, bool))
 
-        as_node = ElementTree.Element("action-set")
-        as_node.set("id", write_guid(self.action_sets[0].id))
-        if self.action_sets:
-            for action in self.action_sets[0]:
-                as_node.append(action.to_xml())
-        node.append(as_node)
+        # as_node = ElementTree.Element("action-set")
+        # as_node.set("id", write_guid(self.action_sets[0].id))
+        # if self.action_sets:
+        #     for action in self.action_sets[0]:
+        #         as_node.append(action.to_xml())
+        # node.append(as_node)
         return node
 
     def _is_container_valid(self):

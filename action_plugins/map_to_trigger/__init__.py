@@ -2,7 +2,7 @@
 
 # MaptoState - maps to a state
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 import math
 import os
@@ -19,7 +19,7 @@ from gremlin.types import SyncMode, HatDirection
 from gremlin.profile import read_bool, safe_read, safe_format
 import gremlin.ui.state_device
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 
 from gremlin import input_devices
 from gremlin.types import ButtonOutputMode
@@ -37,7 +37,7 @@ import gremlin.ui.ui_common
 
 syslog = logging.getLogger("system")
 
-class MapToTriggerWidget(gremlin.ui.input_item.AbstractActionWidget):
+class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget for the pause action."""
 

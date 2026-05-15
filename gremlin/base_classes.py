@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+import os
 from collections.abc import MutableSequence
 from abc import abstractmethod, ABCMeta
 from PySide6 import QtCore
@@ -551,3 +551,279 @@ class BaseCallbacks(QtCore.QObject):
         ''' runs the callbacks '''
         for callback in self._callbacks:
             callback(self)
+
+class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
+    pass
+
+
+
+def _get_input_item(parent):
+    ''' gets the InputItem parent hierarchy if it exists '''
+    import gremlin.input_item
+    import gremlin.profile_graph
+    while parent is not None:
+        if isinstance(parent, gremlin.input_item.InputItem):
+            break
+        if isinstance(parent, gremlin.profile_graph.ProfileInputNode):
+            return parent.input_item
+        if hasattr(parent,"parent"):
+            parent = parent.parent
+        else:
+            parent = None
+
+    if parent is not None:
+        return parent
+    return None
+
+
+class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
+
+    """Base class for all items holding profile data.
+
+    This is primarily used for containers and actions to represent their
+    configuration and to easily load and store them.
+    """
+
+    def __init__(self, parent):
+        """Creates a new instance.
+
+        :param: parent the parent item of this instance in the profile tree (type: InputItem)
+        """
+
+        super().__init__()
+        assert parent is not None
+        self.code = None
+        self._id = gremlin.util.get_guid(no_brackets=True)
+        self._input_item : gremlin.input_item.InputItem = _get_input_item(parent)
+
+
+        generic_icon = os.path.join(os.path.dirname(__file__),"generic.png")
+        if os.path.isfile(generic_icon):
+            self._generic_icon = generic_icon
+        else:
+            self._generic_icon = None
+
+        # reported device type to actions so they can configure themselves to a different hardware input type if needed
+        if isinstance(parent, BaseProfileData):
+            self.override_input_type = parent.override_input_type
+            self.override_input_id = parent.override_input_id
+        else:
+            self.override_input_type = None
+            self.override_input_id = None
+
+
+    def icon(self):
+        ''' gets the default icon'''
+        from gremlin.util import get_generic_icon
+        return get_generic_icon()
+
+
+    def from_xml(self, node, data = None, extra_data = None):
+        """Initializes this node's values based on the provided XML node.
+
+        :param node the XML node to use to populate this instance
+        """
+        self._parse_xml(node, data, extra_data)
+
+    def to_xml(self):
+        """Returns the XML representation of this instance.
+
+        :return XML representation of this instance
+        """
+        return self._generate_xml()
+
+    def is_valid(self):
+        """Returns whether or not an instance is fully specified.
+
+        :return True if all required variables are set, False otherwise
+        """
+        return self._is_valid()
+
+    def get_input_type(self):
+        """Returns the InputType of this data entry.
+
+        :return InputType of this entry
+        """
+        if self.override_input_type is not None:
+            return self.override_input_type
+        if self._input_item is not None:
+            return self._input_item.get_input_type()
+        return None
+
+    def get_input_id(self):
+        ''' gets the input id'''
+        if self.override_input_id is not None:
+            return self.override_input_id
+        if self._input_item is not None:
+            return self._input_item.input_id
+        return None
+
+    def get_input_item(self):
+        ''' gets the input item '''
+        return self._input_item
+
+
+    def update_inputs(self, item_data):
+        ''' updates inputs from another profile entry '''
+        self._input_item.setInputId(item_data.input_id)
+        self._input_item.device_guid = item_data.device_guid
+        self._input_item.device_name = item_data.device_name
+        self._input_item.device_type = item_data.device_type
+
+
+    def get_mode(self):
+        """Returns the Mode this data entry belongs to.
+
+        :return Mode instance this object belongs to
+        """
+        if self._input_item is not None:
+            mode = self._input_item.profile_mode
+            if mode == gremlin.shared_state.master_mode:
+                return gremlin.shared_state.master_mode_name
+            return mode
+        return None
+
+    def get_device_type(self):
+        """Returns the DeviceType of this data entry.
+
+        :return DeviceType of this entry
+        """
+        if self._input_item is not None:
+            return self._input_item.device_type
+        return None
+
+    def get_device_guid(self):
+        """Returns the DeviceType of this data entry.
+
+        :return DeviceType of this entry
+        """
+        if self._input_item is not None:
+            return self._input_item.device_guid
+        return None
+
+    def get_device_name(self):
+        ''' returns the name of the currently attached device '''
+        if self._input_item is not None:
+            return self._input_item.device_name
+        return None
+
+    @property
+    def input_display_name(self):
+        ''' gets a config display string for the input '''
+        return f"{gremlin.shared_state.get_device_name(self.get_device_guid())} {InputType.to_display_name(self.get_input_type())} {self.get_input_id()}"
+
+
+
+    def get_settings(self):
+        """Returns the Settings data of the profile.
+
+        :return Settings object of this profile
+        """
+
+        return gremlin.shared_state.current_profile.settings
+
+        # item = self.parent
+        # while not isinstance(item, Profile):
+        #     item = item.parent
+        # return item.settings
+
+
+    @property
+    def input_item(self):
+        return self._input_item
+
+
+
+    @property
+    def hardware_device(self):
+        ''' gets the hardware device attached to this action or container '''
+        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        device_guid = self.hardware_device_guid
+        if device_guid in profile.devices:
+            return profile.devices[device_guid]
+        return None
+
+    @property
+    def hardware_input_id(self):
+        ''' gets the input id on the hardware device attached to this '''
+        if self.override_input_id is not None:
+            return self.override_input_id
+        return self.input_item.input_id if self.input_item else None
+
+    @property
+    def hardware_raw_input_type(self) -> InputType:
+        return self._input_item.input_type if self._input_item else None
+
+    @property
+    def hardware_input_type(self) -> InputType :
+        ''' gets the type of hardware device attached to this '''
+        if self._input_item:
+            input_id = self._input_item.input_id
+            input_type = None
+            if hasattr(input_id, "getOverrideInputType"):
+                self.override_input_type = input_id.getOverrideInputType()
+            else:
+                self.override_input_type = input_type
+        if self.override_input_type is not None:
+            return self.override_input_type
+        return self._input_item.input_type if self._input_item else None
+
+
+    @property
+    def hardware_input_type_name(self) -> str:
+        ''' gets the type name of hardware device attached to this '''
+        return InputType.to_display_name(self.hardware_input_type)
+
+
+
+
+    @property
+    def profile_mode(self) -> str:
+        ''' gets the mode of this action '''
+        return self.get_mode()
+
+    @property
+    def hardware_device_guid(self) -> dinput.GUID:
+        ''' gets the currently attached hardware GUID '''
+        return self.input_item.device_guid if self.input_item else None
+
+
+    @property
+    def hardware_device_id(self) -> str:
+        ''' gets the currently attached hardware GUID '''
+        return str(self.input_item.device_guid) if self.input_item else None
+
+    @property
+    def hardware_device_name(self) -> str:
+        ''' gets the currently attached hardware name '''
+        return self.get_device_name()
+
+    @abstractmethod
+    def _parse_xml(self, node, data = None, extra_data = None):
+        """Implementation of the XML parsing.
+
+        :param node the XML node to use to populate this instance
+        """
+        pass
+
+    @abstractmethod
+    def _generate_xml(self):
+        """Implementation of the XML generation.
+
+        :return XML representation of this instance
+        """
+        pass
+
+    @abstractmethod
+    def _is_valid(self):
+        """Returns whether or not an instance is fully specified.
+
+        :return True if all required variables are set, False otherwise
+        """
+        pass
+
+    #@abstractmethod
+    def _sanitize(self):
+        pass
+
+

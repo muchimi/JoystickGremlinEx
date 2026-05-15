@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import os
 
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -36,7 +36,7 @@ import gremlin.shared_state
 import gremlin.shared_state
 import gremlin.singleton_decorator
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.input_devices
 #import gremlin.gated_handler
 import enum
@@ -2873,7 +2873,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
 
 
-class MapToSimConnectWidget(gremlin.ui.input_item.AbstractActionWidget):
+class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to keyboard key combinations - adds extra functionality to the base module ."""
 

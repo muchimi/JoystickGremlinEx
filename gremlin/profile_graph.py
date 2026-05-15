@@ -24,7 +24,7 @@ Implements the various tree functions to manipulate a profile using a graph data
 '''
 
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 
 
 from collections import namedtuple
@@ -972,20 +972,20 @@ class ProfileInputNode(ProfileBaseNode):
             mode_object = device_modes.ensure_mode_exists(current_mode)
 
 
-            self._input_item = gremlin.base_profile.InputItem(mode_object = mode_object)
+            self._input_item = gremlin.input_item.InputItem(mode_object = mode_object)
             self._input_item.device_type = DeviceType.ModeControl
             self._input_item.setInputId(0)
 
 
     @property
-    def input_item(self) -> gremlin.base_profile.InputItem:
+    def input_item(self) -> gremlin.input_item.InputItem:
         if self._input_item is None:
             registry = gremlin.base_profile.ProfileRegistry()
             self._input_item = registry.getInputItem(self.device_guid, self.input_type, self.input_id)
         return self._input_item
 
     @input_item.setter
-    def input_item(self, value: gremlin.base_profile.InputItem):
+    def input_item(self, value: gremlin.input_item.InputItem):
 
         self._input_item = value
 

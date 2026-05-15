@@ -18,7 +18,7 @@
 #
 # some code based on source from: https://github.com/h2oai/h2ogpt/tree/main
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import io
 import os
 import shutil
@@ -32,7 +32,7 @@ import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
 from gremlin.util import load_icon, userprofile_path
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.ui.ui_common
 import threading
 from shiboken6 import Shiboken

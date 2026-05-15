@@ -22,7 +22,7 @@ from lxml import etree as ElementTree
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
-from gremlin.ui.input_item import AbstractActionWidget
+from gremlin.input_item import AbstractActionWidget
 from shiboken6 import Shiboken
 
 class NoOpActionWidget(AbstractActionWidget):

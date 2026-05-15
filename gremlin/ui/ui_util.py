@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 from ast import In
 
 from collections.abc import Callable

@@ -2,7 +2,7 @@
 
 # MaptoState - maps to a state
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 from lxml import etree as ElementTree
 
@@ -15,7 +15,7 @@ from gremlin.types import SyncMode
 from gremlin.profile import read_bool, safe_read, safe_format
 import gremlin.ui.state_device
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 
 
 from gremlin.types import ButtonOutputMode
@@ -118,7 +118,7 @@ class StateAddDialog(gremlin.ui.ui_common.QRememberDialog):
         return self.description_widget.text()
 
 
-class MapToStateWidget(gremlin.ui.input_item.AbstractActionWidget):
+class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to modify a state  """
 

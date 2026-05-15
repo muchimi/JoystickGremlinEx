@@ -11,7 +11,7 @@ import gremlin.keyboard
 import gremlin.macro
 import gremlin.shared_state
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 import enum
 import gremlin.util
 from shiboken6 import Shiboken

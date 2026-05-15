@@ -1,4 +1,4 @@
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 import threading
 import time
@@ -16,14 +16,14 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.types
 from gremlin.util import load_icon
-
-from gremlin.base_conditions import InputActionCondition
+import gremlin.base_profile
+from gremlin.base_conditions import BaseInputActionCondition
 from gremlin.input_types import InputType
 from gremlin import input_devices, joystick_handling, util
 from gremlin.error import ProfileError
 from gremlin.util import safe_format, safe_read
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 import os
 import enum
 from gremlin.types import ControlAction
@@ -36,7 +36,7 @@ from gremlin.types import SyncMode
 
 syslog = logging.getLogger("system")
 
-class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
+class ControlWidget(gremlin.input_item.AbstractActionWidget):
     ''' control plugin UI '''
 
     def __init__(self, action_data, parent=None):
@@ -152,7 +152,7 @@ class ControlWidget(gremlin.ui.input_item.AbstractActionWidget):
                     for data_key in sorted_keys:
                         data = input_items.config[input_type][data_key]
                         data.device_guid = device.device_guid
-                        # identifier = gremlin.ui.input_item.InputIdentifier(
+                        # identifier = gremlin.input_item.InputIdentifier(
                         #     data.input_type,
                         #     data.device_guid,
                         #     data.input_id,
@@ -314,7 +314,7 @@ class ControlFunctor(gremlin.base_profile.AbstractFunctor):
                 for mode_name in dev.modes.keys():
                     mode = dev.modes[mode_name]
                     for input_type in mode.config.keys():
-                        item : gremlin.base_profile.InputItem
+                        item : gremlin.input_item.InputItem
                         for item in mode.config[input_type].values():
                             if item.input_id == input_id:
                                 match action:

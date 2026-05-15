@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 from typing  import Callable
 import logging
 
@@ -33,19 +33,19 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 from gremlin.input_types import InputType
 import gremlin.ui
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.util
 import gremlin.ui.ui_common
 from shiboken6 import Shiboken
 from psygnal import Signal
 import gremlin.util
-from gremlin.ui.input_item import InputItemMappingWidget
+from gremlin.input_item import InputItemMappingWidget
 
 
 
 syslog = logging.getLogger("system")
 
-class JoystickInputModel(gremlin.ui.input_item.InputItemListModel):
+class JoystickInputModel(gremlin.input_item.InputItemListModel):
 
     ''' model for the list of input items for a joystick device '''
 
@@ -67,7 +67,7 @@ class JoystickInputModel(gremlin.ui.input_item.InputItemListModel):
                          )
         
 
-class JoystickInputListView(gremlin.ui.input_item.InputItemListView):
+class JoystickInputListView(gremlin.input_item.InputItemListView):
 
     ''' view for the list of input items for a joystick device '''
 
@@ -88,7 +88,7 @@ class JoystickInputListView(gremlin.ui.input_item.InputItemListView):
                          parent = parent)
         
 
-class JoystickDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
+class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     """Widget used to display the input joystick device."""
 
@@ -481,7 +481,7 @@ class JoystickDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
             if index != -1:
                 self.select_item(index)
-                self.inputItemListView.select_item(index, emit = False)
+                self.inputItemListView._select_item(index, emit = False)
 
 
 
@@ -506,7 +506,7 @@ class JoystickDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
                         index = 0
 
                 if index != -1:
-                    self.inputItemListView.select_item(index)
+                    self.inputItemListView._select_item(index)
 
             finally:
                 dialog.deleteLater()
@@ -680,16 +680,16 @@ class JoystickDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
 
         if data.input_type == InputType.JoystickAxis:
-            widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
+            widget = gremlin.input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
             prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
             widget.setIcon(f"{prefix}joystick.png", use_qta=False)
             if widget.axis_widget is not None and identifier.is_axis:
                 widget.axis_widget.valueChanged.connect(lambda x: self._update_input_value_changed_cb(index, x))
         elif data.input_type == InputType.JoystickButton:
-            widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
+            widget = gremlin.input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
             widget.setIcon("mdi.gesture-tap-button")
         elif data.input_type == InputType.JoystickHat:
-            widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
+            widget = gremlin.input_item.InputItemWidget(identifier = identifier, parent=parent, data = data)
             widget.setIcon("ei.fullscreen")
         widget.create_action_icons(data)
         widget.disable_close()
@@ -726,7 +726,7 @@ class JoystickDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         #self.inputItemListView.select_item(-1)
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
             self.inputItemListModel.refresh()
-            self.select_item(self._last_selected_index)
+            self.selectInputItemIndex(self._last_selected_index)
 
 
     # def _create_change_cb(self, index):

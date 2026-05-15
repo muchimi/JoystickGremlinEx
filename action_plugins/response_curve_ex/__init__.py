@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import enum
 import logging
 import os
@@ -31,7 +31,7 @@ from gremlin.input_types import InputType
 import gremlin.joystick_handling
 import gremlin.ui.axis_calibration
 from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_width
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.shared_state
@@ -42,7 +42,7 @@ from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
-class ResponseCurveExWidget(gremlin.ui.input_item.AbstractActionWidget):
+class ResponseCurveExWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget that allows configuring the response of an axis to
     user inputs."""

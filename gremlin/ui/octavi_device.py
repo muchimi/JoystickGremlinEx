@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -624,7 +624,7 @@ class OctaviInterface():
 _octavi_device = OctaviInterface()
 
 
-class OctaviInputItemListModel(gremlin.ui.input_item.InputItemListModel):
+class OctaviInputItemListModel(gremlin.input_item.InputItemListModel):
 
     ''' model for mode input items '''
 
@@ -644,7 +644,7 @@ class OctaviInputItemListModel(gremlin.ui.input_item.InputItemListModel):
                          show_master_mode=True)   
         
 
-class OctaviInputItemListView(gremlin.ui.input_item.InputItemListView):
+class OctaviInputItemListView(gremlin.input_item.InputItemListView):
 
     ''' list view for mode input items '''
     def __init__(self, custom_widget_handler, model : OctaviInputItemListModel, parent = None):
@@ -662,7 +662,7 @@ class OctaviInputItemListView(gremlin.ui.input_item.InputItemListView):
    
 
 
-class OctaviDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
+class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 
@@ -834,7 +834,7 @@ class OctaviDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
                 continue # skip direction knobs
 
             if not button in config[input_type]:
-                input_item = gremlin.base_profile.InputItem(mode_object = mode_object)
+                input_item = gremlin.input_item.InputItem(mode_object = mode_object)
                 input_item.setInputId(button)
                 input_item.input_type = input_type
                 input_item.description = OctaviButton.to_display_name(button)
@@ -860,9 +860,9 @@ class OctaviDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         :param data the data associated with this input item
 
         '''
-        import gremlin.ui.input_item
+        import gremlin.input_item
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
+        widget = gremlin.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
         widget.data = data
         widget.create_action_icons(data)
         icon_name = OctaviButton.get_icon(data.input_id)
@@ -876,7 +876,7 @@ class OctaviDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         ''' called when the widget has to update itself on a data change '''
-        data : gremlin.base_profile.InputItem = input_widget.identifier
+        data : gremlin.input_item.InputItem = input_widget.identifier
         button = data.input_id
         name = OctaviButton.to_display_name(button)
         tooltip = OctaviButton.to_tooltip(button)
@@ -941,7 +941,7 @@ class OctaviDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     #         key = self.getWidgetKey(input_type, input_id)
     #         widget = self.getRegisteredWidget(key)
     #         if not widget:
-    #             widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"IFR1: {input_item.display_name}")
+    #             widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"IFR1: {input_item.display_name}")
     #             self.registerWidget(key, widget)
     #             widget.redraw() # load the data
 
@@ -958,8 +958,8 @@ class OctaviDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     #         device_guid = gremlin.shared_state.octavi_tab_guid
     #         device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Joystick))
     #         mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
-    #         input_item = gremlin.base_profile.InputItem(mode_object)
-    #         widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name="IFR1 Blank InputConfigItem (no item data)")
+    #         input_item = gremlin.input_item.InputItem(mode_object)
+    #         widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name="IFR1 Blank InputConfigItem (no item data)")
     #         widget.redraw() # load the data
 
     #     #self.setRightPanelWidget(widget)

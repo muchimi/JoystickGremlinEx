@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 from abc import abstractmethod, ABCMeta
 import codecs
 import collections
@@ -1554,7 +1554,7 @@ class ProfileModifier:
             device_guids.append(guid)
             device_names[guid] = dev.name
         for cond in self.all_conditions():
-            if isinstance(cond, gremlin.base_conditions.JoystickCondition):
+            if isinstance(cond, gremlin.base_conditions.BaseJoystickCondition):
                 device_guids.append(cond.device_guid)
                 device_names[cond.device_guid] = cond.device_name
         for entry in self.profile.merge_axes:
@@ -1594,10 +1594,10 @@ class ProfileModifier:
         :param device_guid GUID of the target device
         :return number of conditions associated with the given device
         """
-        from gremlin.base_conditions import JoystickCondition
+        from gremlin.base_conditions import BaseJoystickCondition
         count = 0
         for cond in self.all_conditions():
-            if isinstance(cond, JoystickCondition) and \
+            if isinstance(cond, BaseJoystickCondition) and \
                     cond.device_guid == device_guid:
                 count += 1
         return count
@@ -1720,7 +1720,7 @@ class ProfileModifier:
                 target_hardware_device = dev
 
         for condition in self.all_conditions():
-            if isinstance(condition, gremlin.base_conditions.JoystickCondition):
+            if isinstance(condition, gremlin.base_conditions.BaseJoystickCondition):
                 if condition.device_guid == source_guid:
                     condition.device_guid = target_guid
                     condition.device_name = target_hardware_device.name
@@ -1748,7 +1748,7 @@ class ProfileModifier:
         for device in self.profile.devices.values():
             name_map[device.device_guid] = device.name
         for cond in self.all_conditions():
-            if isinstance(cond, gremlin.base_conditions.JoystickCondition):
+            if isinstance(cond, gremlin.base_conditions.BaseJoystickCondition):
                 name_map[cond.device_guid] = cond.device_name
         return name_map
 

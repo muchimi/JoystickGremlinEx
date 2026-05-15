@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import copy
 import logging
 import threading
@@ -34,10 +34,10 @@ import gremlin.base_classes
 import gremlin.config
 import gremlin.plugin_manager
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 from gremlin.profile import safe_format, safe_read
-from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
-from gremlin.base_profile import AbstractContainer
+from gremlin.input_item import AbstractContainerWidget, AbstractContainer
+
 import gremlin.execution_graph
 import gremlin.base_profile
 from gremlin.input_types import InputType
@@ -588,12 +588,12 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_sets, index = self._find_widget(widget)
         if index != -1:
 
-            if action ==  gremlin.ui.input_item.ActionSetView.Interactions.Edit:
+            if action ==  gremlin.input_item.ActionSetView.Interactions.Edit:
                 action_sets[index] = []
-            elif action ==  gremlin.ui.input_item.ActionSetView.Interactions.Up:
+            elif action ==  gremlin.input_item.ActionSetView.Interactions.Up:
                 if index > 0:
                     action_sets[index], action_sets[index-1] =  action_sets[index-1], action_sets[index]
-            elif action ==  gremlin.ui.input_item.ActionSetView.Interactions.Down:
+            elif action ==  gremlin.input_item.ActionSetView.Interactions.Down:
                 if index < len(action_sets) - 1:
                     action_sets[index], action_sets[index + 1] = action_sets[index + 1], action_sets[index]
             if Shiboken.isValid(self):
@@ -654,7 +654,7 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.switch_on_press = False
         if container.has_conditions:
             for cond in container.activation_condition.conditions:
-                if isinstance(cond, gremlin.base_conditions.InputActionCondition):
+                if isinstance(cond, gremlin.base_conditions.BaseInputActionCondition):
                     if cond.comparison == "press":
                         self.switch_on_press = True       
 
@@ -700,7 +700,7 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         if self.verbose or not self.valid:
             syslog.info("TEMPOEX: Configuration:")
             syslog.info(f"\tContainer ID: {self.action_data.id}")
-            input_item : gremlin.base_profile.InputItem = self.action_data._input_item
+            input_item : gremlin.input_item.InputItem = self.action_data._input_item
             syslog.info(f"\tAttached input: {input_item.display_name}")
             syslog.info(f"\tExecution mode: activate on {self.action_data.activate_on}")
             syslog.info(f"\tShort action sets: {len(self.action_data.short_action_sets)}")
@@ -1195,9 +1195,9 @@ More than one action per short press or long press can be added.'''
     ]
 
     interaction_types = [
-    #     gremlin.ui.input_item.ActionSetView.Interactions.Up,
-    #     gremlin.ui.input_item.ActionSetView.Interactions.Down,
-    #     gremlin.ui.input_item.ActionSetView.Interactions.Delete,
+    #     gremlin.input_item.ActionSetView.Interactions.Up,
+    #     gremlin.input_item.ActionSetView.Interactions.Down,
+    #     gremlin.input_item.ActionSetView.Interactions.Delete,
         
      ]
 
@@ -1288,6 +1288,12 @@ More than one action per short press or long press can be added.'''
         node.set("chain_double",safe_format(self.chain_double, bool))
         node.set("timeout", str(self.timeout))
         
+        
+
+        return node
+    
+    def _generate_action_set_xml(self, node: ElementTree.Element):
+        ''' custom action set generation '''
         for action_set in self.short_action_sets:
             if action_set:
                 as_node = ElementTree.Element("short-action-set")
@@ -1313,8 +1319,6 @@ More than one action per short press or long press can be added.'''
                     
                 node.append(as_node)
         
-
-        return node
     
     def is_valid_for_save(self):
         # indicate always valid for saving

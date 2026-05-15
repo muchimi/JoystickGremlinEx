@@ -16,7 +16,7 @@
 # along with this program.	If not, see <http://www.gnu.org/licenses/>.
 
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import graphviz
 import os
 import gremlin.util
@@ -449,7 +449,7 @@ class ReportEngine():
                 return "none", label
 
             case ReportNodeType.InputItem:
-                input_item : gremlin.base_profile.InputItem = node.data
+                input_item : gremlin.input_item.InputItem = node.data
 
 
                 table = ReportTable(cellpadding=4)
@@ -473,7 +473,7 @@ class ReportEngine():
 
             case ReportNodeType.Container:
                 # container node
-                container : gremlin.base_profile.AbstractContainer = node.data
+                container : gremlin.input_item.AbstractContainer = node.data
 
 
                 table = ReportTable(cellpadding=4)

@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import os
 from lxml import etree as ElementTree
 from PySide6 import QtWidgets, QtCore, QtGui #QtWebEngineWidgets
@@ -25,7 +25,7 @@ from gremlin.input_types import InputType
 
 import gremlin.shared_state
 
-import gremlin.ui.input_item
+import gremlin.input_item
 
 
 import gremlin.util
@@ -524,7 +524,7 @@ class GateInfo():
         self.item_data_map[condition] = value
 
     @QtCore.Slot(object)
-    def _item_data_changed(self, item_data : gremlin.base_profile.InputItem):
+    def _item_data_changed(self, item_data : gremlin.input_item.InputItem):
         ''' called on container or action add/remove '''
         for item in self.item_data_map.values():
             if item._id == item_data._id:
@@ -1678,7 +1678,7 @@ class GateData():
             self.dumpActiveRanges()
 
         # build allowed mode list
-        item_data: gremlin.ui.input_item.InputItemMappingWidget
+        item_data: gremlin.input_item.InputItemMappingWidget
 
 
         # register gate crossings
@@ -3419,7 +3419,7 @@ class GateData():
     def _new_item_data(self, is_action = True):
         ''' creates a new item data from the existing one '''
         current_item_data = self._find_input_item()
-        item_data = gremlin.base_profile.InputItem(mode_object = current_item_data.parent)
+        item_data = gremlin.input_item.InputItem(mode_object = current_item_data.parent)
         item_data._input_type = current_item_data._input_type
         item_data._device_guid = current_item_data._device_guid
         item_data._input_id = current_item_data._input_id
@@ -4930,7 +4930,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
                     # create the container, cache it
 
 
-                container_widget = gremlin.ui.input_item.InputItemMappingWidget(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}", spacer_height = 4)
+                container_widget = gremlin.input_item.InputItemMappingWidget(item_data, input_type = input_type, object_name = f"Gate: {item_data.display_name}", spacer_height = 4)
                 container_widget.redraw() # load the data
 
 
@@ -4968,7 +4968,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             self._condition_tab.setTabIcon(index, self._icon_enabled if has_condition else self._icon_disabled)
 
     QtCore.Slot(object)
-    def _mapping_changed_cb(self, item_data : gremlin.ui.input_item.InputItemMappingWidget):
+    def _mapping_changed_cb(self, item_data : gremlin.input_item.InputItemMappingWidget):
         ''' hooks a mapping change '''
         item_data_map = self._range_info.item_data_map if self._is_range else self._gate_info.item_data_map
         if item_data in item_data_map.values():
@@ -5021,7 +5021,7 @@ class InputConfigurationWidgetCache():
         syslog.info("-"*50)
         syslog.info("UI widget cache dump")
         for index, input_item_config in enumerate(items):
-            item: gremlin.base_profile.InputItem = input_item_config.item_data
+            item: gremlin.input_item.InputItem = input_item_config.item_data
 
             if not current_device_guid or current_device_guid != item.device_guid:
                 device_name = gremlin.shared_state.get_device_name(item.device_guid)

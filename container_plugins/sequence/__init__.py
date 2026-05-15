@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 from PySide6 import QtWidgets
 import enum
 
@@ -34,9 +34,8 @@ import gremlin.execution_graph
 import gremlin.shared_state
 import gremlin.macro
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
-from gremlin.ui.input_item import AbstractContainerWidget, AbstractActionWidget
-from gremlin.base_profile import AbstractContainer
+import gremlin.input_item
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
 from gremlin.input_types import InputType
 from PySide6 import QtCore
 from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
@@ -970,19 +969,19 @@ class SequenceContainerWidget(AbstractContainerWidget):
         # Perform action
         match action:
 
-            case gremlin.ui.input_item.ActionSetView.Interactions.Up:
+            case gremlin.input_item.ActionSetView.Interactions.Up:
                 if index > 0:
                     self.action_data.action_sets[index],\
                         self.action_data.action_sets[index-1] = \
                         self.action_data.action_sets[index-1],\
                         self.action_data.action_sets[index]
-            case gremlin.ui.input_item.ActionSetView.Interactions.Down:
+            case gremlin.input_item.ActionSetView.Interactions.Down:
                 if index < len(self.action_data.action_sets) - 1:
                     self.action_data.action_sets[index], \
                         self.action_data.action_sets[index + 1] = \
                         self.action_data.action_sets[index + 1], \
                         self.action_data.action_sets[index]
-            case gremlin.ui.input_item.ActionSetView.Interactions.Delete:
+            case gremlin.input_item.ActionSetView.Interactions.Delete:
                 del self.action_data.action_sets[index]
             case _:
                 return
@@ -1011,7 +1010,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         # ensure proper cycling.
         self.switch_on_press = False
         for cond in container.activation_condition.conditions:
-            if isinstance(cond, gremlin.base_conditions.InputActionCondition):
+            if isinstance(cond, gremlin.base_conditions.BaseInputActionCondition):
                 if cond.comparison == "press":
                     self.switch_on_press = True
 
@@ -1514,9 +1513,9 @@ Unlike a macro, any action suitable for the input can be used.'''
     ]
     
     interaction_types = [
-        gremlin.ui.input_item.ActionSetView.Interactions.Up,
-        gremlin.ui.input_item.ActionSetView.Interactions.Down,
-        gremlin.ui.input_item.ActionSetView.Interactions.Delete,
+        gremlin.input_item.ActionSetView.Interactions.Up,
+        gremlin.input_item.ActionSetView.Interactions.Down,
+        gremlin.input_item.ActionSetView.Interactions.Delete,
     ]
 
     functor = SequenceContainerFunctor
@@ -1654,12 +1653,12 @@ Unlike a macro, any action suitable for the input can be used.'''
                 
 
 
-        for action_set in self.action_sets:
-            as_node = ElementTree.Element("action-set")
-            as_node.set("id", write_guid(action_set.id))
-            for action in action_set:
-                as_node.append(action.to_xml())
-            node.append(as_node)
+        # for action_set in self.action_sets:
+        #     as_node = ElementTree.Element("action-set")
+        #     as_node.set("id", write_guid(action_set.id))
+        #     for action in action_set:
+        #         as_node.append(action.to_xml())
+        #     node.append(as_node)
 
 
         

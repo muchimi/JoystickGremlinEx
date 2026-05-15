@@ -24,8 +24,8 @@ import dinput
 import gremlin
 import gremlin.ui.ui_common
 from gremlin.input_types import InputType
-from gremlin.ui.input_item import AbstractContainerWidget
-from gremlin.base_profile import AbstractContainer, AbstractTriggerFunctor
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+from gremlin.base_profile import AbstractTriggerFunctor
 import gremlin.base_classes
 import gremlin.execution_graph
 import gremlin.config

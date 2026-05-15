@@ -26,7 +26,7 @@ import gremlin.execution_graph
 from gremlin.input_types import InputType
 import gremlin.profile
 import gremlin.shared_state
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.shared_state
@@ -42,7 +42,7 @@ from gremlin.profile import safe_format, safe_read
 syslog = logging.getLogger("system")
 
 
-class SwitchModeWidget(gremlin.ui.input_item.AbstractActionWidget):
+class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget which allows the configuration of a mode to switch to."""
 

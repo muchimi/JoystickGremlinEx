@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import os
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 from lxml import etree as ElementTree
@@ -28,7 +28,7 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.ui_about
 from gremlin.util import load_icon, userprofile_path
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.ui.ui_common
 import threading
 from shiboken6 import Shiboken
@@ -126,7 +126,7 @@ class TimedRandomInt:
 
 
 
-class PlaySoundWidget(gremlin.ui.input_item.AbstractActionWidget):
+class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget for the resume action."""
 

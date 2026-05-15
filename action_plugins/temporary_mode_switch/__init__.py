@@ -27,7 +27,7 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.profile
 import gremlin.shared_state
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.ui.ui_common
 import anytree
 import logging
@@ -41,7 +41,7 @@ from gremlin.util import safe_format, safe_read
 syslog = logging.getLogger("system")
 
 
-class TemporaryModeSwitchWidget(gremlin.ui.input_item.AbstractActionWidget):
+class TemporaryModeSwitchWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget which allows the configuration of a mode to switch to."""
 

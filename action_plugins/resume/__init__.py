@@ -22,10 +22,10 @@ from lxml import etree as ElementTree
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
-import gremlin.ui.input_item
+import gremlin.input_item
 from shiboken6 import Shiboken
 
-class ResumeActionWidget(gremlin.ui.input_item.AbstractActionWidget):
+class ResumeActionWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget for the resume action."""
 

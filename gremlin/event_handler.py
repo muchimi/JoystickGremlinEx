@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.	If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import concurrent.futures
 import multiprocessing
 import functools
@@ -2373,7 +2373,7 @@ class EventHandler(QtCore.QObject):
 
 	def registerInputItem(self, mode : str, input_item):
 		''' registers an input item with the event handler '''
-		item: gremlin.base_profile.InputItem = input_item
+		item: gremlin.input_item.InputItem = input_item
 		device_guid = item.device_guid
 		input_type = item.input_type
 		if input_type == InputType.Keyboard:

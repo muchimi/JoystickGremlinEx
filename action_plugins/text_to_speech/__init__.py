@@ -22,7 +22,7 @@ from lxml import etree as ElementTree
 import threading
 import gremlin.base_profile
 from gremlin.input_types import InputType
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.tts
 import gremlin.ui.ui_common
 import gremlin.util
@@ -32,7 +32,7 @@ from shiboken6 import Shiboken
 import logging
 syslog = logging.getLogger("system")
 
-class TextToSpeechWidget(gremlin.ui.input_item.AbstractActionWidget):
+class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget which allows the configuration of TTS actions."""
 

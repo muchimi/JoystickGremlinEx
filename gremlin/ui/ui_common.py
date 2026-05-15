@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import sys
 import enum
 import time
@@ -2239,7 +2239,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         return False
 
 
-    def _update_value(self, value : int):
+    def _update_value(self, value : int, emit = True):
         if not Shiboken.isValid(self):
             return
         other = self.value()
@@ -2250,7 +2250,7 @@ class QIntLineEdit(QtWidgets.QLineEdit):
         if s_value != self.text():
             with QtCore.QSignalBlocker(self):
                 self.setText(s_value)
-        if not self._supressed and other is not None and other != value:
+        if emit and not self._supressed and other is not None and other != value:
             self.valueChanged.emit(v1)
 
     @QtCore.Slot()
@@ -2264,11 +2264,11 @@ class QIntLineEdit(QtWidgets.QLineEdit):
             if not self._supressed:
                 self.invalid.emit()
 
-    def setValue(self, value : int):
+    def setValue(self, value : int, emit = True):
         ''' sets the value '''
         v1 = int(value)
-        self._update_value(v1)
-        if not self._supressed:
+        self._update_value(v1, emit)
+        if emit and not self._supressed:
             self.valueChanged.emit(v1)
 
     def value(self) -> int:
@@ -2762,7 +2762,7 @@ class ActionSelector(QtWidgets.QWidget):
         # if not input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
         #     pass
 
-        assert isinstance(input_item, gremlin.base_profile.InputItem), "expected an input item, wrong type passed"
+        assert isinstance(input_item, gremlin.input_item.InputItem), "expected an input item, wrong type passed"
 
         self._input_item = input_item
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
@@ -2937,7 +2937,7 @@ class ActionSelector(QtWidgets.QWidget):
         parent = self
         while parent is not None:
             if hasattr(parent,"profile_data"):
-                if isinstance(parent.profile_data, gremlin.base_profile.AbstractContainer):
+                if isinstance(parent.profile_data, gremlin.input_item.AbstractContainer):
                     container = parent.profile_data
                     break
             parent = parent.parent()
@@ -9770,7 +9770,7 @@ class QSplitTabWidget(QDataWidget):
 
     def registerWidget(self, key, widget) -> int:
         ''' adds a new config input to the right panel '''
-        import gremlin.ui.input_item
+        import gremlin.input_item
 
         assert widget is not None, "Invalid widget"
         index =  self._right_panel_stacked_widget.indexOf(widget)
@@ -9953,14 +9953,14 @@ class QSplitTabWidget(QDataWidget):
 
     def getContentWidget(self):
         ''' returns configuration items currently displayed in the UI '''
-        import gremlin.ui.input_item
+        import gremlin.input_item
         widget =  self._right_panel_stacked_widget.currentWidget()
-        if isinstance(widget, gremlin.ui.input_item.InputItemMappingWidget):
+        if isinstance(widget, gremlin.input_item.InputItemMappingWidget):
             return widget
         return None
     
     
-    def getInputItemWidgetKey(self, input_item : gremlin.base_profile.InputItem):
+    def getInputItemWidgetKey(self, input_item : gremlin.input_item.InputItem):
         ''' gets the widget key for a given input '''
         input_id = input_item.input_id
         device_guid = input_item.device_id
@@ -9996,14 +9996,14 @@ class QSplitTabWidget(QDataWidget):
 
     def getContentInputId(self):
         ''' gets the input id currently displayed '''
-        widget : gremlin.ui.input_item.InputItemMappingWidget = self.getContentWidget()
+        widget : gremlin.input_item.InputItemMappingWidget = self.getContentWidget()
         if widget:
             return widget.item_data.input_id
         return None
 
     def getContentInputItem(self):
         ''' gets the input id currently displayed '''
-        widget : gremlin.ui.input_item.InputItemMappingWidget = self.getContentWidget()
+        widget : gremlin.input_item.InputItemMappingWidget = self.getContentWidget()
         if widget:
             return widget.item_data
         return None

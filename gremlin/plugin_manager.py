@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import importlib
 import logging
 import os
@@ -176,7 +176,7 @@ class ContainerPlugins:
         ''' duplicates a container '''
         # because containers can be quite complex - we'll just generate the xml and change IDs as needed and reload
         # into a new container of the same type
-        from gremlin.base_profile import AbstractContainer, InputItem
+        from gremlin.input_item import AbstractContainer, InputItem
         from gremlin.util import get_guid
         assert isinstance(container, AbstractContainer),"Invalid container data for duplicate()"
         assert isinstance(input_item, InputItem),"Invalid input item tyhpe for duplicate()"

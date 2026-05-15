@@ -24,7 +24,7 @@ Adds the ability to import a mapping from an existing device.
 '''
 
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 
 
 from collections import namedtuple
@@ -1235,7 +1235,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
             import_input_item.parent = import_mode_item
 
-            profile_input_item = gremlin.base_profile.InputItem()
+            profile_input_item = gremlin.input_item.InputItem()
             profile_input_item._input_type = input_type
             profile_input_item._device_guid = import_item.device_guid
             profile_input_item._input_id = input_id
@@ -2210,7 +2210,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                                 container_items = input_item.containers # [item for item in input_item.containers if item.selected]
                                 container_item : ImportContainerItem
 
-                                # profile_input_item : gremlin.base_profile.InputItem
+                                # profile_input_item : gremlin.input_item.InputItem
                                 input_device : gremlin.base_profile.Device
                                 #input_device = next((device for device in self.source_profile.devices.values() if device.device_guid == source_device_guid), None)
                                 #input_profile_mode = input_device.modes[source_mode]
@@ -2265,11 +2265,11 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
                                     elif target_input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
                                         profile_target_mode : gremlin.base_profile.Mode = target_device.modes[target_mode]
-                                        profile_target_input_item : gremlin.base_profile.InputItem
+                                        profile_target_input_item : gremlin.input_item.InputItem
                                         #profile_source_input_item = input_profile_mode.config[input_input_type][input_input_id]
 
 
-                                        # mode.config is a dictionary of [input_type][input_id] holding gremlin.base_profile.InputItem
+                                        # mode.config is a dictionary of [input_type][input_id] holding gremlin.input_item.InputItem
                                         # InputItems hold the containers for that input
                                         target_device.modes[target_mode].get_data(target_input_type, target_input_id)
                                         profile_target_input_item = profile_target_mode.config[target_input_type][target_input_id]

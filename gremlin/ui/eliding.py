@@ -4,7 +4,7 @@ Elidable controls show an ellipsis on a label and line edit if too long
 
 '''
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QFontMetrics, QTextLayout
 from PySide6.QtCore import QPoint, QRect, QSize, Qt

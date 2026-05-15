@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 import math
 import os
@@ -34,7 +34,7 @@ from gremlin.types import MouseButton
 from gremlin.profile import read_bool, safe_read, safe_format
 import gremlin.util
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.sendinput
 from gremlin import input_devices
 import gremlin.ui.osc_device
@@ -463,7 +463,7 @@ class OscInputWidget(QtWidgets.QWidget):
 
 
 
-class MapToOscWidget(gremlin.ui.input_item.AbstractActionWidget):
+class MapToOscWidget(gremlin.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to mouse motion or buttons."""
 

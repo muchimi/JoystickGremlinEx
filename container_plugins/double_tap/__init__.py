@@ -25,9 +25,8 @@ from PySide6 import QtWidgets
 
 import gremlin
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
-from gremlin.ui.input_item import AbstractContainerWidget
-from gremlin.base_profile import AbstractContainer
+import gremlin.input_item
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
 from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
@@ -378,9 +377,9 @@ and another action on input double-click (tap)'''
     ]
 
     interaction_types = [
-        #gremlin.ui.input_item.ActionSetView.Interactions.Edit,
-        gremlin.ui.input_item.ActionSetView.Interactions.Add,
-        gremlin.ui.input_item.ActionSetView.Interactions.Delete
+        #gremlin.input_item.ActionSetView.Interactions.Edit,
+        gremlin.input_item.ActionSetView.Interactions.Add,
+        gremlin.input_item.ActionSetView.Interactions.Delete
     ]
 
     def __init__(self, parent=None, node = None):
@@ -412,13 +411,13 @@ and another action on input double-click (tap)'''
         node.set("type", DoubleTapContainer.tag)
         node.set("delay", str(self.delay))
         node.set("activate-on", self.activate_on)
-        for action_set in self.action_sets:
-            if action_set:
-                as_node = ElementTree.Element("action-set")
-                as_node.set("id", write_guid(action_set.id))
-                for action in action_set:
-                    as_node.append(action.to_xml())
-                node.append(as_node)
+        # for action_set in self.action_sets:
+        #     if action_set:
+        #         as_node = ElementTree.Element("action-set")
+        #         as_node.set("id", write_guid(action_set.id))
+        #         for action in action_set:
+        #             as_node.append(action.to_xml())
+        #         node.append(as_node)
         return node
 
     def _is_container_valid(self):

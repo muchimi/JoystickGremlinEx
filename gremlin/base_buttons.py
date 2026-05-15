@@ -44,7 +44,7 @@ class VirtualAxisButton(AbstractVirtualButton):
         :param upper_limit the upper limit of the virtual button
         """
         from gremlin.types import AxisButtonDirection
-        from gremlin.base_profile import AbstractContainer
+        from gremlin.input_item import AbstractContainer
         import gremlin.shared_state
         container: AbstractContainer = container
         super().__init__()
@@ -145,7 +145,7 @@ class VirtualHatButton(AbstractVirtualButton):
         :param directions list of direction that form the virtual button
         """
         super().__init__()
-        from gremlin.base_profile import AbstractContainer
+        from gremlin.input_item import AbstractContainer
         import gremlin.shared_state
         container: AbstractContainer = container
         self.directions = list(set(directions))

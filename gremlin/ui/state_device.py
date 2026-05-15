@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 import fnmatch
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -45,8 +45,8 @@ import gremlin.util
 import gremlin.base_profile
 import psygnal
 from psygnal import Signal
-import gremlin.ui.input_item
-from gremlin.ui.input_item import InputItemMappingWidget
+import gremlin.input_item
+from gremlin.input_item import InputItemMappingWidget
 
 
 syslog = logging.getLogger("system")
@@ -372,7 +372,7 @@ class StateCategories(QtCore.QObject):
 
 
 #class StateInputItem(AbstractInputItem):
-class StateInputItem(gremlin.base_profile.InputItem):
+class StateInputItem(gremlin.input_item.InputItem):
     ''' holds a single state '''
     changed = Signal(object) # fires when a state changes (state)
     key_changed = Signal(object, str, str) # fires when the key (StateInputItem, old_name, new_name)
@@ -429,7 +429,7 @@ class StateInputItem(gremlin.base_profile.InputItem):
         self._autorelease_trigger_mode = autorelease_trigger_mode # trigger mode required to enable the autorelease timer
 
 
-        item = gremlin.base_profile.InputItem(mode_object = mode_object) #self._custom_name_handler)
+        item = gremlin.input_item.InputItem(mode_object = mode_object) #self._custom_name_handler)
         item.input_type = InputType.State
         item.device_name = "State"
         item.device_type = DeviceType.State
@@ -1585,11 +1585,11 @@ class StateData():
         def _condition_callback(input_item, owner, condition, extra_data : dict = None):
             nonlocal used, key, used_list
             import gremlin.base_conditions, gremlin.base_profile
-            if isinstance(condition, gremlin.base_conditions.StateCondition):
+            if isinstance(condition, gremlin.base_conditions.BaseStateCondition):
                 if condition.key == key:
                     used = True # state is used
                     if return_usage:
-                        stub = "Container" if isinstance(owner, gremlin.base_profile.AbstractContainer) else "Action"
+                        stub = "Container" if isinstance(owner, gremlin.input_item.AbstractContainer) else "Action"
                         used_list.append(f"{stub} Condition: Device [{input_item.device_name}] Input [{input_item.display_name}] in [{owner.name}]")
                     else:
                         return False # stop further processing
@@ -2765,7 +2765,7 @@ class  StateFilterWidget(QtWidgets.QWidget):
                 el.select_input.emit(input_item.device_guid, input_item.input_type, input_item.input_id, False, True, False)
 
 
-class StateInputItemModel(gremlin.ui.input_item.InputItemListModel):
+class StateInputItemModel(gremlin.input_item.InputItemListModel):
     ''' data model for state inputs '''
     def __init__(self, profile : gremlin.base_profile.Profile, custom_load_handler : Callable = None, custom_remove_handler : Callable = None, custom_filter_handler : Callable = None):
         super().__init__(profile = profile, 
@@ -2777,7 +2777,7 @@ class StateInputItemModel(gremlin.ui.input_item.InputItemListModel):
                          custom_filter_handler = custom_filter_handler,
                          show_master_mode=True)
 
-class StateInputItemListView(gremlin.ui.input_item.InputItemListView):
+class StateInputItemListView(gremlin.input_item.InputItemListView):
     ''' view for state inputs '''
     def __init__(self, custom_widget_handler : Callable = None, parent : QtWidgets.QWidget = None, blank_message : str = None, model : StateInputItemModel= None):
         super().__init__(custom_widget_handler = custom_widget_handler,
@@ -2787,7 +2787,7 @@ class StateInputItemListView(gremlin.ui.input_item.InputItemListView):
                          model = model,
                          )
 
-class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
+class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure state change actions """
 
@@ -3068,7 +3068,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
             if sc.exists(name):
                 data = sc.getState(name)
                 index = self._index_for_key(data)
-                self.inputItemListView.select_item(index,True)
+                self.inputItemListView._select_item(index,True)
             else:
                 gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
 
@@ -3368,7 +3368,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     #     key = self.getWidgetKey(input_type, input_id)
     #     widget = self.getRegisteredWidget(key)
     #     if not widget:
-    #         widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"STATE: {input_item.key}")
+    #         widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"STATE: {input_item.key}")
     #         self.registerWidget(key, widget)
            
 
@@ -3425,11 +3425,11 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         :param data the data associated with this input item
 
         '''
-        import gremlin.ui.input_item
+        import gremlin.input_item
 
         assert isinstance(data, StateInputItem),f"Unexpected type in widget handler - expected StateInputItem and got [{type(data).__name__}]"
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier,
+        widget = gremlin.input_item.InputItemWidget(identifier = identifier,
                                                        populate_ui_callback = self._populate_input_widget_ui,
                                                        update_callback = self._update_input_widget,
                                                        confirm_delete_callback=self._handle_confirm_delete,
@@ -3471,7 +3471,7 @@ class StateDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         widget.index = index
         return widget
 
-    def _handle_confirm_delete(self, input_item : gremlin.base_profile.InputItem):
+    def _handle_confirm_delete(self, input_item : gremlin.input_item.InputItem):
         ''' confirms if a state can be deleted '''
         state : StateInputItem= input_item.input_id
         sd = StateData()

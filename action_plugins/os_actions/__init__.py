@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import win32gui
 import win32con
 import win32api
@@ -31,7 +31,7 @@ import html
 import gremlin.base_profile
 import gremlin.event_handler
 from gremlin.input_types import InputType
-import gremlin.ui.input_item
+import gremlin.input_item
 from enum import IntEnum
 from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
 import threading
@@ -60,7 +60,7 @@ class OsActionMode (IntEnum):
 
 
 
-class OsActionWidget(gremlin.ui.input_item.AbstractActionWidget):
+class OsActionWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget for the pause action."""
 

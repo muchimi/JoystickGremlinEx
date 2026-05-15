@@ -24,9 +24,10 @@ from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 
 import gremlin.types
-from gremlin.base_profile import AbstractContainer
+import gremlin.input_item
 import gremlin.execution_graph
-from gremlin.ui.input_item import AbstractContainerWidget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+
 from shiboken6 import Shiboken
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -370,7 +371,7 @@ class TriggerContainer(AbstractContainer):
         super().__init__(parent, node)
 
         self.trigger_delay = 0 # delay in seconds to wait for the contents to execute
-        self.condition_data = gremlin.base_profile.ConditionContainer() # conditions for the trigger release
+        self.condition_data = gremlin.input_item.ConditionContainer() # conditions for the trigger release
         self.condition_data.setContainer(self)
         self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
@@ -448,11 +449,11 @@ class TriggerContainer(AbstractContainer):
         """
         node = ElementTree.Element("container")
         node.set("type", "trigger")
-        as_node = ElementTree.Element("action-set")
-        as_node.set("id", write_guid(action_sets[0].id))
-        for action in self.action_sets[0]:
-            as_node.append(action.to_xml())
-        node.append(as_node)
+        # as_node = ElementTree.Element("action-set")
+        # as_node.set("id", write_guid(action_sets[0].id))
+        # for action in self.action_sets[0]:
+        #     as_node.append(action.to_xml())
+        # node.append(as_node)
 
         node.set("delay", safe_format(self.trigger_delay, float))
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))

@@ -28,9 +28,9 @@ from PySide6 import QtWidgets, QtCore
 import gremlin
 import gremlin.config
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
-from gremlin.ui.input_item import AbstractContainerWidget
-from gremlin.base_profile import AbstractContainer
+import gremlin.input_item
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+
 from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 import gremlin.util
 from gremlin.input_types import InputType
@@ -346,7 +346,7 @@ and another action on trigger release in a single container.'''
          InputType.JoystickHat,
     ]
     interaction_types = [
-        gremlin.ui.input_item.ActionSetView.Interactions.Edit,
+        gremlin.input_item.ActionSetView.Interactions.Edit,
     ]
 
     def __init__(self, parent=None, node = None):
@@ -355,7 +355,6 @@ and another action on trigger release in a single container.'''
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-        self.resetActionSets()
         self.delay = 0.5
         self.activate_on = "release"
         self.autorelease = True
@@ -380,18 +379,13 @@ and another action on trigger release in a single container.'''
 
         self.setActionSets([[],[]])
 
-        actionset_nodes = node.xpath("./action-set")   
-        for index, actionset_node in enumerate(actionset_nodes):
-            action_set = gremlin.base_profile.ActionSet()
-            self._parse_action_xml(actionset_node, action_set, data, extra_data)
-            self.action_sets[index] = action_set
+        # actionset_nodes = node.xpath("./action-set")   
+        # for index, actionset_node in enumerate(actionset_nodes):
+        #     action_set = gremlin.base_profile.ActionSet()
+        #     self._parse_action_xml(actionset_node, action_set, data, extra_data)
+        #     self.action_sets[index] = action_set
 
-
-   
-    def _parse_action_set(elf, node, data = None, extra_data = None):
-        pass # do nothing
-        
-        
+    
         
 
 
@@ -405,13 +399,13 @@ and another action on trigger release in a single container.'''
         node.set("autorelease", safe_format(self.autorelease,bool))
         node.set("delay", safe_format(self.autorelease_delay, int))
 
-        for action_set in self.action_sets:
-            as_node = ElementTree.Element("action-set")
-            as_node.set("id", write_guid(action_set.id))
-            for action in action_set:
-                as_node.append(action.to_xml())
-            node.append(as_node)
-        return node
+        # for action_set in self.action_sets:
+        #     as_node = ElementTree.Element("action-set")
+        #     as_node.set("id", write_guid(action_set.id))
+        #     for action in action_set:
+        #         as_node.append(action.to_xml())
+        #     node.append(as_node)
+        # return node
 
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.

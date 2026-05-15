@@ -30,7 +30,7 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
 from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_width
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.shared_state
@@ -1100,7 +1100,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
             widget.setUpperPosition(value * self._normalizer)
 
 
-class ResponseCurveWidget(gremlin.ui.input_item.AbstractActionWidget):
+class ResponseCurveWidget(gremlin.input_item.AbstractActionWidget):
 
     """Widget that allows configuring the response of an axis to
     user inputs."""

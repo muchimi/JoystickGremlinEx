@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 
 from PySide6 import QtWidgets, QtCore
@@ -42,7 +42,7 @@ from gremlin.ui.ui_common import QBoxFrame
 import psygnal
 from psygnal import Signal
 from gremlin.types import DeviceType
-from gremlin.ui.input_item import InputItemMappingWidget
+from gremlin.input_item import InputItemMappingWidget
 
 syslog = logging.getLogger("system")
 
@@ -167,7 +167,7 @@ _string_to_midi_lookup = {
 }
 
 
-class MidiInputItem(gremlin.base_profile.InputItem):
+class MidiInputItem(gremlin.input_item.InputItem):
     ''' holds the data for a MIDI device '''
 
     message_key_changed = Signal(str, str) # fires when message key changes
@@ -1551,7 +1551,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     
 
 
-class MidiInputListModel(gremlin.ui.input_item.InputItemListModel):
+class MidiInputListModel(gremlin.input_item.InputItemListModel):
     ''' list model for MIDI inputs '''
 
     def __init__(self, profile : gremlin.base_profile.Profile, mode : str):
@@ -1564,7 +1564,7 @@ class MidiInputListModel(gremlin.ui.input_item.InputItemListModel):
                          mode = mode,
                          allowed_types = [InputType.Midi])
 
-class MidiInputListView(gremlin.ui.input_item.InputItemListView):
+class MidiInputListView(gremlin.input_item.InputItemListView):
      def __init__(self, custom_widget_handler : Callable = None,  parent : QtWidgets.QWidget = None, blank_message : str = None, model : MidiInputListModel= None):
         ''' list view for MIDI input items
         :param custom_widget_handler: callback to handle creating the custom widget for each input item
@@ -1583,7 +1583,7 @@ class MidiInputListView(gremlin.ui.input_item.InputItemListView):
 
 
 
-class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
+class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     """Widget used to configure open sound control (OSC) inputs """
 
@@ -1733,7 +1733,7 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     #     index = self.inputItemListView.indexOf(input_item)
     #     assert index != -1,"input item is not in the list"
             
-    #     widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"MIDI: {input_item.display_name}")
+    #     widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"MIDI: {input_item.display_name}")
     #     device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
     #     widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} ")
     #     widget._container_model.data_changed.connect(self._create_change_cb(index))
@@ -1774,7 +1774,7 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
     #         key = self.getWidgetKey(input_type, input_id)
     #         widget = self.getRegisteredWidget(key)
     #         if not widget:
-    #             widget = gremlin.ui.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"MIDI: {input_item.display_name}")
+    #             widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"MIDI: {input_item.display_name}")
     #             self.registerWidget(key, widget)
     #             widget.redraw() # load the data
 
@@ -1786,7 +1786,7 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
 
     #     else:
     #         input_item = MidiInputItem()
-    #         widget = gremlin.ui.input_item.InputItemMappingWidget(input_item, object_name="MIDI Blank InputConfigItem (no item data)")
+    #         widget = gremlin.input_item.InputItemMappingWidget(input_item, object_name="MIDI Blank InputConfigItem (no item data)")
     #         widget.redraw() # load the data
 
 
@@ -1871,9 +1871,9 @@ class MidiDeviceTabWidget(gremlin.ui.input_item.BaseDeviceTabWidget):
         :param data the data associated with this input item
 
         '''
-        import gremlin.ui.input_item
+        import gremlin.input_item
 
-        widget = gremlin.ui.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
+        widget = gremlin.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
         input_id : MidiInputItem = identifier.input_id
         widget.data = data
         widget.create_action_icons(data)

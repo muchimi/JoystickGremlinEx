@@ -2,7 +2,7 @@
 
 # MaptoMouseEx - enhanced version of MapToMouse
 
-from __future__ import annotations
+# from __future__ import annotations # deprecated with python 3.14+
 import logging
 import math
 import os
@@ -16,7 +16,7 @@ from gremlin.types import MouseButton, MouseAction, MouseClickMode
 from gremlin.profile import read_bool, safe_read, safe_format
 from gremlin.util import rad2deg
 import gremlin.ui.ui_common
-import gremlin.ui.input_item
+import gremlin.input_item
 import gremlin.sendinput
 from gremlin import input_devices
 import psygnal
@@ -39,7 +39,7 @@ from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
-class MapToMouseExWidget(gremlin.ui.input_item.AbstractActionWidget):
+class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
 
     """UI widget for mapping inputs to mouse motion or buttons."""
 

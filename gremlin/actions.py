@@ -162,7 +162,7 @@ class ActivationCondition:
     @property
     def is_container(self) -> bool:
         if self.target:
-            return isinstance(self.target, gremlin.base_profile.AbstractContainer)
+            return isinstance(self.target, gremlin.input_item.AbstractContainer)
         return False
 
     @property
