@@ -499,8 +499,6 @@ class Color():
                 border: 1px solid {border_color};
             }}
 
-
-
             QGroupBox::indicator:checked {{
                 image: url({relative_path}{checkbox_checked});
             }}

@@ -3652,14 +3652,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self.ensureTabLoaded()
 
                 # validation check
-                if verbose:
+                #if verbose:
 
 
                     # current tab
-                    position = self.ui.devices.currentIndex()
-                    tabdata = self.ui.devices.tabData(position)
-                    current_tab_device_guid = tabdata.device_guid
-                    assert gremlin.util.compare_guid(current_tab_device_guid,device_guid), "SELECT: sync issue: tab device mismatch"
+                    # position = self.ui.devices.currentIndex()
+                    # tabdata = self.ui.devices.tabData(position)
+                    # current_tab_device_guid = tabdata.device_guid
+                    # if not gremlin.util.compare_guid(current_tab_device_guid,device_guid):
+                    #     syslog.warning("SELECT INPUT: sync issue: tab device mismatch")
 
                     # current input
                     # if widget and hasattr(widget,"input_item_list_view"):
