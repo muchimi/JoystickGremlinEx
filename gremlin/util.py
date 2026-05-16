@@ -1616,7 +1616,8 @@ def waitCursor():
 _cursor_push = 0
 _cursor_timer = None # timer to display hourglass
 _cursor_level = []
-
+_cursor_wait = False
+_qt_wait_cursor = None
 
 def pushCursor(immediate = False):
     ''' displays an hourglass cursor
@@ -1626,47 +1627,73 @@ def pushCursor(immediate = False):
     global _cursor_push, _cursor_timer
     if _cursor_push == 0:
         if immediate:
-            _cursor_show_hourglass()
+            syslog.info("PUSH CURSOR: show cursor timer [immediate]")
+            InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
         else:
+            syslog.info("PUSH CURSOR: show cursor timer [delay]")
             if _cursor_timer:
                 _cursor_timer.cancel()
-            _cursor_timer = threading.Timer(2.0, _cursor_show_hourglass)
+            _cursor_timer = threading.Timer(1.0, _cursor_show_hourglass)
             _cursor_timer.start()
+    
     _cursor_push += 1
+  
 
 def _cursor_show_hourglass():
-    InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
+    global _cursor_wait
+    _cursor_timer = None 
+    if not _cursor_wait:
+        syslog.info("PUSH CURSOR: show cursor timer")
+        InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
+        while not _cursor_wait:
+            time.sleep(0)
 
 def _pushCursor_ui():
-    global _cursor_push, _cursor_timer
+    global _cursor_push, _cursor_timer, _cursor_wait, _qt_wait_cursor
     _cursor_timer = None
-    if _cursor_push > 0:
-        # still active?
-        QtGui.QGuiApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
-        QtGui.QGuiApplication.processEvents()
-        # QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
-        # QtWidgets.QApplication.processEvents()
+    syslog.info(f"PUSH CURSOR: [{_cursor_push}]")
+    if not _cursor_wait:
+        _cursor_wait = True
+        syslog.info("\tchange to wait cursor")
+        win32gui.LoadCursor(None, win32con.IDC_WAIT)
+
+        # if not _qt_wait_cursor:
+        #     # create a wait cursor
+        #     _qt_wait_cursor = QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor)
+
+        # cursor = QtWidgets.QApplication.overrideCursor()
+        # QtWidgets.QApplication.setOverrideCursor(_qt_wait_cursor)
+
+        # while cursor != _qt_wait_cursor:
+        #     cursor = QtWidgets.QApplication.overrideCursor()
+        #     QtWidgets.QApplication.processEvents()
+        
+        
         # syslog.info("show hourglass")
 
 
 def popCursor(reset = False):
-    global _cursor_push, _cursor_timer
+    global _cursor_push, _cursor_timer, _cursor_wait
+    syslog.info(f"POP CURSOR: [{_cursor_push}]")
     if _cursor_push > 0:
         _cursor_push -= 1
     if _cursor_push == 0 or reset:
         if _cursor_timer is not None:
             _cursor_timer.cancel()
             _cursor_timer = None
-        InvokeUiMethod(_popCursor_ui)
-
-def _popCursor_ui():
+        if _cursor_wait or reset:
+            InvokeUiMethod(_popCursor_ui, reset)
+            
+def _popCursor_ui(force : bool = False):
     ''' restores the normal cursor '''
-    QtGui.QGuiApplication.restoreOverrideCursor()
-    QtGui.QGuiApplication.processEvents()
-
-    # QtWidgets.QApplication.restoreOverrideCursor()
-    # QtWidgets.QApplication.processEvents()
-    # syslog.info("hide hourglass")
+    global _cursor_wait, _qt_wait_cursor
+    if _cursor_wait or force:
+        _cursor_wait = False
+        syslog.info("PUSH CURSOR: change to normal cursor")
+        win32gui.LoadCursor(None, win32con.IDC_ARROW)
+        # QtWidgets.QApplication.restoreOverrideCursor()
+        # while QtWidgets.QApplication.overrideCursor() == _qt_wait_cursor:
+        #     QtWidgets.QApplication.processEvents()
 
 def isWaitCursor() -> bool:
     ''' true if the cursor is an hourglass '''
@@ -1687,24 +1714,25 @@ def popCursorLevel():
     if _cursor_level:
         _cursor_push = _cursor_level.pop()
         if _cursor_push > 0:
-            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
+            InvokeUiMethod(_pushCursor_ui)
 
 
 
-def popCursorTemporary(pop = True):
+def popCursorTemporary_ui(pop = True):
     ''' restore cursor temporarily without changing the stack - use for dialog boxes/prompt
 
     :param pop: when true, restores the arrow, when false, shows the wait cursor if it was displayed
 
     '''
-    global _cursor_push
+    global _cursor_push, _qt_wait_cursor
     if _cursor_push > 0:
         if pop:
-            QtWidgets.QApplication.restoreOverrideCursor()
+            _popCursor_ui()
         else:
-            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
+            _pushCursor_ui()
 
-
+def popCursorTemporary(pop = True):
+    InvokeUiMethod(popCursorTemporary_ui, pop)
 
 def isCursorActive():
     ''' true if the cursor stack is not empty '''
@@ -2466,6 +2494,18 @@ def normalize_guid(device_guid) -> str:
         device_guid = device_guid.casefold().replace("-","").replace("{","").replace("}","")
     return device_guid
 
+def to_guid(device_guid) -> uuid.UUID:
+    ''' converts a string GUID to a GUID'''
+    if device_guid is None:
+        return None
+    if hasattr(device_guid, "toId"):
+        device_guid = device_guid.toId()
+    if isinstance(device_guid, str):
+        return uuid.UUID(device_guid)
+    raise ValueError(f"Unable to convert [{device_guid}] to a GUID")
+
+
+
 
 def compare_guid(id1, id2) -> bool:
     ''' compares two GUIDs and returns true if equal - the second parameter can be a list of IDs to check against '''
@@ -2773,3 +2813,5 @@ class TriggerDict(collections.UserDict):
         # run callbacks
         for callback in self._on_change_callbacks:
             callback(self, key, old_value, None)
+
+

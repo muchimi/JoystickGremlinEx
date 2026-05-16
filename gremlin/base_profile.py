@@ -85,32 +85,6 @@ ProfileDeviceInformation = collections.namedtuple(
 
 
 
-def _get_input_item(parent):
-    ''' gets the InputItem parent hierarchy if it exists '''
-    while parent is not None:
-        if isinstance(parent, InputItem):
-            break
-        if isinstance(parent, gremlin.profile_graph.ProfileInputNode):
-            return parent.input_item
-        if hasattr(parent,"parent"):
-            parent = parent.parent
-        else:
-            parent = None
-
-    if parent is not None:
-        return parent
-    return None
-
-def _is_curve_tag(tag):
-     ''' true if a curve tag'''
-     if tag:
-        return tag.casefold() in ("curve-data","response-curve","response-curve-ex")
-     return False
-
-
-
-
-
 class Device:
     ''' device information '''
     def __init__(self, profile : Profile):

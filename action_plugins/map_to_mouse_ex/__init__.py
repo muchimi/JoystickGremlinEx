@@ -893,7 +893,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         actions = []
         nodes = []
         for node in self.getSiblings():
-            if gremlin.base_profile._is_curve_tag(node.action.tag):
+            if gremlin.input_item._is_curve_tag(node.action.tag):
                 nodes.append(node)
 
 

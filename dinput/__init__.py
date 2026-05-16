@@ -219,6 +219,8 @@ class GUID:
         return f"{self.guid[0]:08x}{self.guid[1]:04x}{self.guid[2]:04x}{self.guid[3]:04x}{self.guid[4]:012x}"
 
     def __eq__(self, other):
+        if isinstance(other, uuid.UUID):
+            return other.int == self._guid_int
         return hash(self) == hash(other)
 
 

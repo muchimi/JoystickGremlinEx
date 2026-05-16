@@ -1098,7 +1098,7 @@ class ProfileInputNode(ProfileBaseNode):
         elif self.input_type == InputType.JoystickAxis:
             # check for curve data
             for child in node:
-                if gremlin.base_profile._is_curve_tag(child.tag):
+                if gremlin.input_item._is_curve_tag(child.tag):
                     self.curve_data = gremlin.curve_handler.AxisCurveData()
                     self.curve_data._parse_xml(child)
                     self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.input_id)
@@ -1140,7 +1140,7 @@ class ProfileInputNode(ProfileBaseNode):
         # add container nodes to the input node
         child: Element
         for child in node:
-            if child.tag in ("latched", "input", "keylatched") or gremlin.base_profile._is_curve_tag(child.tag):
+            if child.tag in ("latched", "input", "keylatched") or gremlin.input_item._is_curve_tag(child.tag):
                 # not a container
                 continue
             if not "type" in child.attrib:

@@ -3414,7 +3414,7 @@ class GateData():
 
 
     def _find_input_item(self):
-        return gremlin.base_profile._get_input_item(self._action_data)
+        return gremlin.input_item._get_input_item(self._action_data)
 
     def _new_item_data(self, is_action = True):
         ''' creates a new item data from the existing one '''

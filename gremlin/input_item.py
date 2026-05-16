@@ -62,7 +62,7 @@ from gremlin.base_conditions import ConditionTracker
 
 from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.actions
-
+import _collections_abc
 
 
 from gremlin.ui import virtual_button
@@ -70,6 +70,34 @@ from gremlin.ui import virtual_button
 syslog = logging.getLogger("system")
 
 CallbackData = collections.namedtuple("ContainerCallback", ["callback", "event"])
+
+
+def _get_input_item(parent):
+    ''' gets the InputItem parent hierarchy if it exists '''
+    import gremlin.input_item
+    import gremlin.profile_graph
+    while parent is not None:
+        if isinstance(parent, gremlin.input_item.InputItem):
+            break
+        if isinstance(parent, gremlin.profile_graph.ProfileInputNode):
+            return parent.input_item
+        if hasattr(parent,"parent"):
+            parent = parent.parent
+        else:
+            parent = None
+
+    if parent is not None:
+        return parent
+    return None
+
+
+def _is_curve_tag(tag):
+     ''' true if a curve tag'''
+     if tag:
+        return tag.casefold() in ("curve-data","response-curve","response-curve-ex")
+     return False
+
+
 
 class InputIdentifier(QtCore.QObject):
 
@@ -979,7 +1007,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             elif self.input_type == InputType.JoystickAxis:
                 # check for curve data
                 for child in node:
-                    if gremlin.base_profile._is_curve_tag(child.tag):
+                    if _is_curve_tag(child.tag):
                         self.curve_data = gremlin.curve_handler.AxisCurveData()
                         self.curve_data._parse_xml(child)
                         self.input_id = safe_read(node,"input_id",int, 0)
@@ -1012,7 +1040,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         # read containers for this input item
         container_nodes = node.xpath("./container")
         for child in container_nodes:
-            if child.tag in ("latched", "input", "keylatched") or gremlin.base_profile._is_curve_tag(child.tag):
+            if child.tag in ("latched", "input", "keylatched") or _is_curve_tag(child.tag):
                 # ignore extra data
                 continue
             if not "type" in child.attrib:
@@ -3734,7 +3762,6 @@ class InputItemListView(AbstractView):
     def create_ui(self):
         ''' creates or recreates the contents of the input list view (left side input selector) '''
 
-        push_cursor = True
         gremlin.util.pushCursor()
 
         config = gremlin.config.Configuration()
@@ -3824,8 +3851,7 @@ class InputItemListView(AbstractView):
 
         finally:
 
-            if push_cursor:
-                gremlin.util.popCursor()
+            gremlin.util.popCursor()
             
             # self.setUpdatesEnabled(True)
             self.update()
@@ -4203,7 +4229,9 @@ class ActionSetModel(AbstractModel):
 
     def __init__(self, action_set=[]):
         super().__init__()
-        assert isinstance(action_set, list),"Invalid action set provided"
+        if not isinstance(action_set, ActionSet):
+            # convert
+            action_set = ActionSet.fromList(action_set)
         self._action_set = action_set
 
     def rows(self):
@@ -4396,7 +4424,7 @@ class AbstractAction(BaseProfileData):
         curve_list = []
         for action_set in container.action_sets:
             for action in action_set:
-                 if gremlin.base_profile._is_curve_tag(action.tag):
+                 if _is_curve_tag(action.tag):
                     curve_data = action.curve_data
                     if curve_data:
                         curve_data.curve_update()
@@ -4449,7 +4477,7 @@ class AbstractAction(BaseProfileData):
 
     def get_input_item(self):
         ''' gets the input item owning this action '''
-        input_item = self._get_input_item(self.parent_container)
+        input_item = _get_input_item(self.parent_container)
         return input_item
 
     def get_container(self):
@@ -4606,7 +4634,7 @@ class AbstractAction(BaseProfileData):
         super().from_xml(node, data, extra_data)
 
 
-        self.activation_condition = gremlin.actions.ActivationCondition([],ActivationRule.All)
+        self.activation_condition = gremlin.base_conditions.BaseActivationCondition([],ActivationRule.All)
         self.activation_condition.setContainer(self)
         for _ in node.findall("activation-condition"):
             cond_node = node.find("activation-condition")
@@ -4756,18 +4784,19 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.parent = parent
 
         self._abstract_container_generating_xml = False # true if generating
-        self._action_sets = ActionSets(self)
+        self._action_sets = ActionSets(self) # containers contain one or more action sets, each action sets contains a list of action set object
         self.action_model = None # set at creation by the parent of this container
         self.custom_action_sets = False # true if the container uses custom action sets (need a converter to produce action_sets)
         self._condition_enabled = True # condition flag
         self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor - action / container set
         self._virtual_button_user_enabled = True # determins if callbacks use the virtual button function - user set
-        # self.activation_condition = ActivationCondition([],ActivationRule.All) # activation condition that applies to the container
+        # self.activation_condition = gremlin.base_conditions.BaseActivationCondition([],ActivationRule.All) # activation condition that applies to the container
         # self.activation_condition.setContainer(self)
         self.virtual_button = None
         self.current_view_type = None
         self.parent_node = node
         self.comment = None # user comment
+        self._description = None # description
         self._callbacks_enabled = True # callbacks are enabled by default for this container
         self._collapsed = False # true if the container is collapsed
         self.actionsetParseCallback = None # callback to use when parsing action set if it has additional data (node), returns an action set
@@ -4783,14 +4812,14 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         # attached hardware device to this container
         input_item = None
         if isinstance(parent, gremlin.profile_graph.ProfileContainerNode):
-            input_item = self._get_input_item(parent)
+            input_item = _get_input_item(parent)
             if not input_item:
-                input_item = self._get_input_item(parent)
+                input_item = _get_input_item(parent)
 
         if not input_item:
-            input_item = self._get_input_item(parent)
+            input_item = _get_input_item(parent)
             if input_item is None:
-                input_item = self._get_input_item(parent)
+                input_item = _get_input_item(parent)
 
         self._input_item = input_item
         assert input_item is not None
@@ -4800,58 +4829,36 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.device_input_type = input_item.input_type
         self.device = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
 
-    def _get_input_item(self, parent):
-        ''' gets the InputItem parent hierarchy if it exists '''
-        while parent is not None:
-            if isinstance(parent, InputItem):
-                break
-            if isinstance(parent, gremlin.profile_graph.ProfileInputNode):
-                return parent.input_item
-            if hasattr(parent,"parent"):
-                parent = parent.parent
-            else:
-                parent = None
-
-        if parent is not None:
-            return parent
-        return None
-
-    @property
-    def action_sets(self):
-        return self._action_sets
-    
-    # @action_sets.setter
-    # def action_sets(self, value):
-    #     pass
-
     def getActionsSets(self) -> ActionSets:
         return self._action_sets
 
-
-    def setActionSets(self, data : ActionSets):
-        ''' sets a custom action set'''
-
-        if isinstance(data, ActionSets):
-            # already an object?
-            self._action_sets = data
-            return
-        
-        # default style action set definitions provided as lists
-        action_sets = ActionSets(self)
-        for item in data:
-            if hasattr(item,"__iter__"):
-                if not item:
-                    # blank list = create an action set
-                    action_sets.add(ActionSet())
-                else:
-                    assert isinstance(item, ActionSet)
+    def ensureActionSets(self):
+        ''' convert to an action set if needed'''
+        if not isinstance(self._action_sets, ActionSets):
+            action_sets = ActionSets(self)
+            if item:
+                for item in self._action_sets:
+                    if hasattr(item,"__iter__"):
+                        if not item:
+                            # blank list = create an action set
+                            action_sets.add(ActionSet())
+                        else:
+                            assert isinstance(item, ActionSet)
+                            action_sets.append(item)
                     action_sets.append(item)
-        else:
-            # single action set
-            action_sets.append(ActionSet())
+            else:                    
+                # single action set
+                action_sets.append(ActionSet())
+            self._action_sets = action_sets
 
-        self._action_sets = action_sets
 
+
+    def setActionSets(self, value : ActionSets | list):
+        ''' sets a custom action set'''
+        assert value is not None,"actionsets must be provided"
+        self._action_sets = value
+        self.ensureActionSets()
+        
 
     def resetActionSets(self):
         ''' resets actions sets - override in derived class if the action set default should be different '''
@@ -4984,7 +4991,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     @property
     def input_item(self):
         ''' gets the associated input item for this container '''
-        return self._get_input_item(self.parent)
+        return _get_input_item(self.parent)
 
     @property
     def has_conditions(self):
@@ -5074,11 +5081,27 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     @property
     def action_sets(self):
         ''' gets the action sets for this container '''
+        if self._action_sets is None:
+            self._action_sets = ActionSets(self)
         return self._action_sets
+    
+    def createActionSets(self, action_list, description : str = None, data = None):
+        action_sets = ActionSets(self, description, data)
+        for item in action_list:
+            if not isinstance(item, ActionSet):
+                action_set = ActionSet()
+                action_set.append(item)
+                action_sets.append(action_set)
+            else:
+                action_sets.append(item)
+        return action_sets
+            
+
 
     @action_sets.setter
     def action_sets(self, value):
-        self._action_sets = value
+        assert False,"Action set cannot be changed"
+        
 
     @property
     def action_count(self):
@@ -5167,6 +5190,9 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         if "container_id" in node.attrib:
             self._id = node.get("container_id")
 
+        assert node.tag == "container", "Invalid container node"
+        assert "type" in node.attrib,"Invalid container node"
+
 
         comment = None
         if "comment" in node.attrib:
@@ -5236,19 +5262,24 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     def _generate_xml(self) -> ElementTree.Element:
         ''' this should be overriden in derived containers to write custom data - default is do nothing '''
+        assert hasattr(self, "tag"),"Invalid container instance - instance should be derived"
+
         node = ElementTree.Element("container")
+        node.set("container_id", write_guid(self.id))
+        node.set("type", self.tag)
         return node
     
     def _generate_action_set_xml(self, parent_node: ElementTree.Element):
         ''' generates the action set for the container, can be overriden '''
-        for action_set in self.action_sets:
+        self.ensureActionSets()
+        action_sets = self.action_sets
+        for action_set in action_sets:
             node = action_set.to_xml()
             node.set("set-guid", write_guid(self._id))
-            if self._description:
-                node.set("set-description", html.escape(self._description))
-            node.set("set-guid", write_guid(action_set.id))
-            if action_set.description:
-                node.set("set-description", html.escape(action_set.description))
+            if action_sets.description:
+                node.set("set-description", html.escape(action_sets.description))
+            node.set("set-guid", write_guid(action_sets.id))
+            
         parent_node.append(node)
 
         
@@ -5286,12 +5317,13 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
             self._parse_action_xml(child, action_set, data, extra_data)
             if action_set:
                 if index == len(self.action_sets):
-                    self.action_sets.append([])
-                self.action_sets[index] = action_set
+                    self.action_sets.append(action_set)
+                else:
+                    self.action_sets[index] = action_set
             if not as_read:
                 as_read = True
                 if "set-guid" in child.attrib:
-                    self.actions_sets.id = read_guid(child,"set-guid")
+                    self.action_sets.id = read_guid(child,"set-guid")
                 if "set-description" in child.attrib:
                     self.action_sets.description = html.unescape(node.get("description"))
                 
@@ -5314,9 +5346,9 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         action_name_map = ActionPlugins().tag_map
         config = gremlin.config.Configuration()
 
-        # get the id
-        if "id" in node.attrib:
-            action_set.id = read_guid(node, "id")
+        # get the id of the action set
+        if "guid" in node.attrib:
+            action_set.id = read_guid(node, "guid")
             
         for child in node:
 
@@ -5326,7 +5358,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
             # apply any conversions
             tag = child.tag
-            if config.convert_response_curve and gremlin.base_profile._is_curve_tag(tag):
+            if config.convert_response_curve and _is_curve_tag(tag):
                 tag = "response-curve-ex"
                 if not tag in action_name_map:
                     # new mapper not found
@@ -5363,7 +5395,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     def _parse_activation_condition_xml(self, node, data, extra_data = None):
         ''' load the container condition '''
-        self.activation_condition = gremlin.actions.ActivationCondition([], ActivationRule.All)
+        self.activation_condition = gremlin.base_conditions.BaseActivationCondition([], ActivationRule.All)
         self.activation_condition.setContainer(self)
         input_item = data
         activation_node = gremlin.util.get_xml_child(node,"activation-condition")
@@ -5423,13 +5455,41 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
 
 
-class ActionSet(list):
+class ActionSet(collections.UserList):
     ''' holds action set data with a data and ID attribute '''
     def __init__(self, data = None):
-        self.data = data # any special tag to identify the action set
+        super().__init__()
+        self._data = data # any special tag to identify the action set
         self._id = uuid.uuid4() # unique ID of this action set
-        
+        self.description : str = None # description of the action set (optional)
 
+
+    def __setitem__(self, i, item):
+        # override for data checking
+        assert isinstance(item, AbstractAction),"ActionSet can only contain actions"
+        super().__setitem__(i, item)
+
+        
+    def append(self, item):
+        ''' override for data checking '''
+        assert isinstance(item, AbstractAction),"ActionSet can only contain actions"
+        super().append(item)
+
+    def insert(self, i, item):
+        ''' override for data checking '''
+        assert isinstance(item, AbstractAction),"ActionSet can only contain actions"
+        super().insert(i, item)
+                
+    @staticmethod
+    def fromList(source):
+        ''' returns an action set from the source list'''
+        action_set = ActionSet()
+        action_set.extend(source)
+        return action_set
+
+                
+
+    
     @property
     def id(self):
         return self._id
@@ -5438,10 +5498,13 @@ class ActionSet(list):
     def id(self, value):
         self._id = value
 
+
     def to_xml(self):
         ''' writes the actions in the action set out '''
         node = ElementTree.Element("action-set")
         node.set("guid", write_guid(self._id))
+        if self.description:
+            node.set("description", html.escape(self.description))
         for action in self:
             node.append(action.to_xml())
         return node
@@ -5451,6 +5514,8 @@ class ActionSet(list):
         if node.tag == "action-set":
             if "guid" in node.attrib:
                 self._id = read_guid(node, "guid")
+            if "description" in node.attrib:
+                self.description = html.unescape(node.get("desription"))
 
         config = gremlin.config.Configuration()
         self.clear()
@@ -5462,7 +5527,7 @@ class ActionSet(list):
                 syslog.warning(f"ActionSet XML: don't know how to handle action: [{child.tag}]")
                 continue
 
-            if config.convert_response_curve and gremlin.base_profile._is_curve_tag(tag):
+            if config.convert_response_curve and _is_curve_tag(tag):
                 tag = "response-curve-ex"
                 if not tag in action_name_map:
                     # new mapper not found
@@ -5483,16 +5548,42 @@ class ActionSet(list):
     def __hash__(self):
         return hash(self._id)
 
-class ActionSets(list):
+class ActionSets(collections.UserList):
     ''' holds a list of ActionSet objects for a container '''
     def __init__(self, container: AbstractContainer, description : str = None, data = None):
-        self.data = data # any special tag to identify the action set
+        super().__init__()
+        self._data = data # any special tag to identify the action set
         self._id = uuid.uuid4() # unique ID of this action set
         assert isinstance(container, AbstractContainer),"Invalid container object"
         self._container = container
         self._input_item = self._container.input_item
         self._description = description
         assert isinstance(self._input_item, InputItem),"Invalid input item for container"
+        
+    def __setitem__(self, i, item):
+        ''' override for data checking '''
+        assert isinstance(item, ActionSet),"ActionSets can only contain ActionSet object"
+        super().__setitem__(i, item)
+        
+    def append(self, item):
+        ''' override for data checking '''
+
+        if not isinstance(item, ActionSet):
+            # adding a list
+            item = ActionSet.fromList(item)
+
+        super().append(item)
+
+    def insert(self, i, item):
+        ''' override for data checking '''
+        if not isinstance(item, ActionSet):
+            # adding a list
+            item = ActionSet.fromList(item)
+
+        super().insert(i, item)
+        
+
+
 
     def clear(self):
         super().clear()
@@ -7393,7 +7484,7 @@ class BasicActionWrapper(AbstractActionWrapper):
 
         self.main_layout.addWidget(self.action_widget)
 
-        gremlin.util.singleShot(self._config_visible)
+        #gremlin.util.singleShot(self._config_visible)
 
     def _config_visible(self):
         if not Shiboken.isValid(self):

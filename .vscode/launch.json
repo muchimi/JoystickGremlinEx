@@ -12,6 +12,7 @@
             "program": "${workspaceFolder}/gremlinEx.py",
             "console": "integratedTerminal",
             "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
+            "justMyCode": true,
             //"args": ["--np"]
         },
         // {

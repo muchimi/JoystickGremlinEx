@@ -846,6 +846,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             # init default widget tracking
             self.button_grid_widget  = None
+            self.button_grid_stack_widget = None # container for the grid widget
             self.container_axis_widget = None
 
             # handler to update curve widget if displayed
@@ -3662,7 +3663,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         # self.sb_start_value.setEnabled(start_value_enabled)
 
         if self.button_grid_widget:
-            self.button_grid_widget.setVisible(grid_visible)
+            # hide/show the grid in the stack widget
+            self.button_grid_stack_widget.setCurrentIndex(1 if grid_visible else 0)
+            #self.button_grid_widget.setVisible(grid_visible)
+
         if self.container_axis_widget:
             self.container_axis_widget.setVisible(axis_visible)
 
@@ -3690,8 +3694,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self.action_label.setText(VjoyAction.to_description(action))
 
-        self.button_grid_widget.setVisible(self.action_data.grid_visible)
-        self.button_grid_widget.setVisible(grid_visible)
+        
+        #self.button_grid_widget.setVisible(self.action_data.grid_visible)
+        self.button_grid_stack_widget.setVisible(grid_visible)
 
         self.container_hat_widget.setVisible(hat_visible)
 
@@ -3778,7 +3783,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _create_input_grid(self):
         ''' create a grid of buttons for easy selection'''
 
-        self._button_grid_widget = None
 
         if not self.action_data.vjoy_id in self.action_data.vjoy_map:
                 self.action_data.refresh_vjoy()
@@ -3786,88 +3790,96 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     gremlin.ui.ui_common.MessageBox(prompt=f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.vjoy_id}")
                     return
 
-
-        self.button_grid_widget = QtWidgets.QWidget()
-
-
-        # link all radio buttons
-        self.button_group = QtWidgets.QButtonGroup()
-        self.button_group.buttonClicked.connect(self._select_changed)
-        self.icon_map = {}
-
-        self._last_button_id = -1
+        self.button_grid_stack_widget = QtWidgets.QStackedWidget()
+        self.button_grid_stack_widget.addWidget(QtWidgets.QWidget()) # blank item at index 0
+        
+        
+        if self.action_data.grid_visible and not self.button_grid_widget:
+            # create the widget if requested
+        
+            self.button_grid_widget = QtWidgets.QWidget()
 
 
-        vjoy_id = self.action_data.vjoy_id
-        input_type = self._get_selector_input_type()
-        dev = self.action_data.vjoy_map[vjoy_id]
-        count = dev.button_count
-        grid = QtWidgets.QGridLayout(self.button_grid_widget)
-        grid.setSpacing(2)
-        self.remap_type_layout = grid
+            # link all radio buttons
+            self.button_group = QtWidgets.QButtonGroup()
+            self.button_group.buttonClicked.connect(self._select_changed)
+            self.icon_map = {}
 
-        max_col = 16
-        col = 0
-        row = 0
-
-        vjoy_id = dev.vjoy_id # use joystick id as vjoy_id is -1 if disconnected
-        input_type = self.action_data.input_type
+            self._last_button_id = -1
 
 
-        for id in range(1, count+1):
-            # container for the vertical box
-            v_cont = QtWidgets.QWidget()
-            #v_cont.setFixedWidth(32)
-            v_box = QtWidgets.QVBoxLayout(v_cont)
-            v_box.setContentsMargins(0,0,0,5)
-            v_box.setAlignment(QtCore.Qt.AlignCenter)
+            vjoy_id = self.action_data.vjoy_id
+            input_type = self._get_selector_input_type()
+            dev = self.action_data.vjoy_map[vjoy_id]
+            count = dev.button_count
+            grid = QtWidgets.QGridLayout(self.button_grid_widget)
+            grid.setSpacing(2)
+            self.remap_type_layout = grid
 
-            # line 1
-            h_cont = QtWidgets.QWidget()
-            h_cont.setFixedWidth(36)
-            h_box = QtWidgets.QHBoxLayout(h_cont)
-            h_box.setContentsMargins(0,0,0,0)
-            h_box.setAlignment(QtCore.Qt.AlignCenter)
-            cb = gremlin.ui.ui_common.QDataRadioButton()
+            max_col = 16
+            col = 0
+            row = 0
 
-            self.button_group.addButton(cb)
-            self.button_group.setId(cb, id)
-            cb.data = id # data has the button id
-
-            name = str(id)
-            h_box.addWidget(cb)
-            v_box.addWidget(h_cont)
-
-            # line 2
-            line2_cont = gremlin.ui.ui_common.GridClickWidget(vjoy_id, input_type, id)
-            line2_cont.setFixedWidth(36)
-            h_box = QtWidgets.QHBoxLayout(line2_cont)
-            h_box.setContentsMargins(0,0,0,0)
-            h_box.setSpacing(0)
+            vjoy_id = dev.vjoy_id # use joystick id as vjoy_id is -1 if disconnected
+            input_type = self.action_data.input_type
 
 
-            icon_lbl = QtWidgets.QLabel()
+            for id in range(1, count+1):
+                # container for the vertical box
+                v_cont = QtWidgets.QWidget()
+                #v_cont.setFixedWidth(32)
+                v_box = QtWidgets.QVBoxLayout(v_cont)
+                v_box.setContentsMargins(0,0,0,5)
+                v_box.setAlignment(QtCore.Qt.AlignCenter)
 
-            lbl = QtWidgets.QLabel(name)
-            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+                # line 1
+                h_cont = QtWidgets.QWidget()
+                h_cont.setFixedWidth(36)
+                h_box = QtWidgets.QHBoxLayout(h_cont)
+                h_box.setContentsMargins(0,0,0,0)
+                h_box.setAlignment(QtCore.Qt.AlignCenter)
+                cb = gremlin.ui.ui_common.QDataRadioButton()
+
+                self.button_group.addButton(cb)
+                self.button_group.setId(cb, id)
+                cb.data = id # data has the button id
+
+                name = str(id)
+                h_box.addWidget(cb)
+                v_box.addWidget(h_cont)
+
+                # line 2
+                line2_cont = gremlin.ui.ui_common.GridClickWidget(vjoy_id, input_type, id)
+                line2_cont.setFixedWidth(36)
+                h_box = QtWidgets.QHBoxLayout(line2_cont)
+                h_box.setContentsMargins(0,0,0,0)
+                h_box.setSpacing(0)
 
 
-            self.icon_map[id] = icon_lbl
+                icon_lbl = QtWidgets.QLabel()
 
-            h_box.addWidget(icon_lbl)
-            h_box.addWidget(lbl)
-            v_box.addWidget(line2_cont)
-
-            line2_cont.clicked.connect(self._grid_button_clicked)
+                lbl = QtWidgets.QLabel(name)
+                lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
 
-            grid.addWidget(v_cont, row, col)
-            col+=1
-            if col == max_col:
-                row+=1
-                col=0
+                self.icon_map[id] = icon_lbl
 
-        self.main_layout.addWidget(self.button_grid_widget)
+                h_box.addWidget(icon_lbl)
+                h_box.addWidget(lbl)
+                v_box.addWidget(line2_cont)
+
+                line2_cont.clicked.connect(self._grid_button_clicked)
+
+
+                grid.addWidget(v_cont, row, col)
+                col+=1
+                if col == max_col:
+                    row+=1
+                    col=0
+
+                self.button_grid_stack_widget.addWidget(self.button_grid_widget) # index 1
+
+        self.main_layout.addWidget(self.button_grid_stack_widget)
 
 
     @QtCore.Slot(bool)
@@ -4204,6 +4216,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if not self.action_data.grid_visible:
             # nothing to do
             return
+        
+        if not self.button_grid_stack_widget.count():
+            # create a grid widget at widget position 1
+            self._create_input_grid()
+
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose: syslog.info(f"populate grid {self.action_data.id}")
         used_pixmap = load_pixmap("used.png")
@@ -4217,7 +4234,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             button_id = self.button_group.id(cb)
             self._grid_widgets[button_id] = cb
             used = button_id in used_list
-            # used = self.usage_state.get_usage_state(vjoy_id, button_id)
 
             if used and button_id == self.action_data.vjoy_input_id:
                 # update OURS only for the CB
@@ -4228,6 +4244,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             lbl.setPixmap(used_pixmap if used else unused_pixmap)
 
 
+    
 
 
 
@@ -4332,7 +4349,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         actions = []
         nodes = []
         for node in self.getSiblings():
-            if gremlin.base_profile._is_curve_tag(node.action.tag):
+            if gremlin.input_item._is_curve_tag(node.action.tag):
                 nodes.append(node)
 
 

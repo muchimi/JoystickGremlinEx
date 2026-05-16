@@ -390,7 +390,7 @@ class TriggerContainer(AbstractContainer):
             for container in self.parent.containers:
                 for action_set in container.action_sets:
                     for t_action in action_set:
-                        if gremlin.base_profile._is_curve_tag(t_action.tag): 
+                        if gremlin.input_item._is_curve_tag(t_action.tag): 
                             curve_sets.append(action_set)
                         elif t_action.tag == "remap":
                             remap_sets.append(action_set)
@@ -398,7 +398,7 @@ class TriggerContainer(AbstractContainer):
             if action.tag == "remap" and len(curve_sets) == 1 and \
                     len(remap_sets) == 0:
                 curve_sets[0].append(action)
-            elif gremlin.base_profile._is_curve_tag(action.tag) and len(remap_sets) == 1 and \
+            elif gremlin.input_item._is_curve_tag(action.tag) and len(remap_sets) == 1 and \
                     len(curve_sets) == 0:
                 remap_sets[0].append(action)
             else:

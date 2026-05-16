@@ -23,8 +23,7 @@ from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 import gremlin.types
 from gremlin.base_profile import AbstractFunctor
-from gremlin.input_item import AbstractContainer
-from gremlin.input_item import AbstractContainerWidget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSet, ActionSets
 from shiboken6 import Shiboken
 import logging
 from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
@@ -34,7 +33,7 @@ class BasicContainerWidget(AbstractContainerWidget):
 
     """Basic container which holds a single action."""
 
-    def __init__(self, container, parent=None):
+    def __init__(self, container : AbstractContainer, parent=None):
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
@@ -58,7 +57,7 @@ class BasicContainerWidget(AbstractContainerWidget):
                 break
 
         if has_actions:
-            action_sets = [action_set for action_set in self.container.action_sets if action_set]
+            action_sets = self.container.action_sets # [action_set for action_set in self.container.action_sets if action_set]
             assert len(action_sets) == 1, "invalid action set count - expected a single action set"
 
             self.container.create_or_delete_virtual_button()
@@ -231,7 +230,7 @@ class BasicContainer(AbstractContainer):
             for container in self.parent.containers:
                 for action_set in container.action_sets:
                     for t_action in action_set:
-                        if gremlin.base_profile._is_curve_tag(t_action.tag):
+                        if gremlin.input_item._is_curve_tag(t_action.tag):
                             curve_sets.append(action_set)
                         elif t_action.tag == "remap":
                             remap_sets.append(action_set)
@@ -239,7 +238,7 @@ class BasicContainer(AbstractContainer):
             if action.tag == "remap" and len(curve_sets) == 1 and \
                     len(remap_sets) == 0:
                 curve_sets[0].append(action)
-            elif gremlin.base_profile._is_curve_tag(action.tag) and len(remap_sets) == 1 and \
+            elif gremlin.input_item._is_curve_tag(action.tag) and len(remap_sets) == 1 and \
                     len(curve_sets) == 0:
                 remap_sets[0].append(action)
             else:

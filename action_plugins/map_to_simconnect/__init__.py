@@ -2385,172 +2385,174 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
              return
 
         gremlin.util.pushCursor()
+        try:
 
-        item : SimconnectAicraftDefinition
+            item : SimconnectAicraftDefinition
 
-        self._mode_selector_map = {}
-        self._selected_cb_map = {}
-        self._manual_mode_selector_map = {}
-        self._manual_selected_cb_map = {}
+            self._mode_selector_map = {}
+            self._selected_cb_map = {}
+            self._manual_mode_selector_map = {}
+            self._manual_selected_cb_map = {}
 
-        row = 0
-        display_width = self._width
+            row = 0
+            display_width = self._width
 
-        # current profile
-        profile = gremlin.shared_state.current_profile
-        default_mode = profile.get_default_mode()
+            # current profile
+            profile = gremlin.shared_state.current_profile
+            default_mode = profile.get_default_mode()
 
-        icon_color = gremlin.ui.ui_common.Color.normalColor()
+            icon_color = gremlin.ui.ui_common.Color.normalColor()
 
-        create_mode_icon = gremlin.ui.ui_common.Icons.addIcon()
+            create_mode_icon = gremlin.ui.ui_common.Icons.addIcon()
 
-        start_index = self.paginator_widget.startIndex
-        end_index = self.paginator_widget.endIndex
-        for item in self._data[start_index:end_index]:
+            start_index = self.paginator_widget.startIndex
+            end_index = self.paginator_widget.endIndex
+            for item in self._data[start_index:end_index]:
 
-            # header row
-            if row == 0:
+                # header row
+                if row == 0:
 
-                select_widget = QtWidgets.QCheckBox()
-                select_widget.clicked.connect(self._global_selected_changed_cb)
-                select_widget.setToolTip("Select/Deselect All")
+                    select_widget = QtWidgets.QCheckBox()
+                    select_widget.clicked.connect(self._global_selected_changed_cb)
+                    select_widget.setToolTip("Select/Deselect All")
 
-                display_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_display_up_cb, tooltip="Sort aircraft ascending")
-                display_sort_up_widget.setMaximumWidth(20)
-                display_sort_up_widget.setStyleSheet("border: none;")
+                    display_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_display_up_cb, tooltip="Sort aircraft ascending")
+                    display_sort_up_widget.setMaximumWidth(20)
+                    display_sort_up_widget.setStyleSheet("border: none;")
 
-                display_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_display_down_cb, tooltip="Sort aircraft descending")
-                display_sort_down_widget.setMaximumWidth(20)
-                display_sort_down_widget.setStyleSheet("border: none;")
+                    display_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_display_down_cb, tooltip="Sort aircraft descending")
+                    display_sort_down_widget.setMaximumWidth(20)
+                    display_sort_down_widget.setStyleSheet("border: none;")
 
-                # model_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_model_up_cb, tooltip="Sort model ascending")
-                # model_sort_up_widget.setMaximumWidth(20)
-                # model_sort_up_widget.setStyleSheet("border: none;")
+                    # model_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_model_up_cb, tooltip="Sort model ascending")
+                    # model_sort_up_widget.setMaximumWidth(20)
+                    # model_sort_up_widget.setStyleSheet("border: none;")
 
-                # model_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_model_down_cb, tooltip="Sort model descending")
-                # model_sort_down_widget.setMaximumWidth(20)
-                # model_sort_down_widget.setStyleSheet("border: none;")
+                    # model_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_model_down_cb, tooltip="Sort model descending")
+                    # model_sort_down_widget.setMaximumWidth(20)
+                    # model_sort_down_widget.setStyleSheet("border: none;")
 
-                mode_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_mode_up_cb, tooltip="Sort by mode")
-                mode_sort_up_widget.setMaximumWidth(20)
-                mode_sort_up_widget.setStyleSheet("border: none;")
+                    mode_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_mode_up_cb, tooltip="Sort by mode")
+                    mode_sort_up_widget.setMaximumWidth(20)
+                    mode_sort_up_widget.setStyleSheet("border: none;")
 
-                # mode_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_mode_down_cb, tooltip="Sort by mode descending")
-                # mode_sort_down_widget.setMaximumWidth(20)
-                # mode_sort_down_widget.setStyleSheet("border: none;")
+                    # mode_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_mode_down_cb, tooltip="Sort by mode descending")
+                    # mode_sort_down_widget.setMaximumWidth(20)
+                    # mode_sort_down_widget.setStyleSheet("border: none;")
 
 
-                aircraft_display_widget = gremlin.ui.ui_common.getHContainer(["||", display_sort_up_widget, display_sort_down_widget],"Aircraft:", widget_only = True)
+                    aircraft_display_widget = gremlin.ui.ui_common.getHContainer(["||", display_sort_up_widget, display_sort_down_widget],"Aircraft:", widget_only = True)
 
-                mode_header_widget = gremlin.ui.ui_common.getHContainer(["||", mode_sort_up_widget],"Mode:", widget_only = True)
+                    mode_header_widget = gremlin.ui.ui_common.getHContainer(["||", mode_sort_up_widget],"Mode:", widget_only = True)
 
-                row_selector = gremlin.ui.ui_common.QRowSelectorFrame()
-                row_selector.setSelectable(False)
+                    row_selector = gremlin.ui.ui_common.QRowSelectorFrame()
+                    row_selector.setSelectable(False)
+                    spacer = QDataWidget()
+                    spacer.setMinimumWidth(3)
+                    self.map_layout.addWidget(row_selector, 0, 0, 1, -1)
+
+                    col = 1
+                    self.map_layout.addWidget(spacer, row, col)
+                    col+=1
+                    self.map_layout.addWidget(select_widget, 0, col)
+                    col+=1
+                    self.map_layout.addWidget(aircraft_display_widget, 0, col)
+                    # col+=1
+                    # self.map_layout.addWidget(aircraft_model_widget, 0, col)
+                    col+=1
+                    self.map_layout.addWidget(QtWidgets.QLabel(" "), 0, col) # mode add button
+                    col+=1
+                    self.map_layout.addWidget(mode_header_widget, 0, col)
+                    row+=1
+
+
+
+                # selector
+                row_selector = gremlin.ui.ui_common.QRowSelectorFrame(selected = item.selected)
+                row_selector.setMinimumHeight(30)
+                row_selector.selected_changed.connect(self._row_selector_clicked_cb)
+                selected_widget = gremlin.ui.ui_common.QDataCheckbox(data = (item, row_selector))
+                selected_widget.setChecked(item.selected)
+                selected_widget.checkStateChanged.connect(self._selected_changed_cb)
+                row_selector.data = ((item, selected_widget))
+
+                # aicraft display
+                display_header_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
+                display_header_widget.setReadOnly(True)
+                display_header_widget.setText(item.display_name)
+                display_header_widget.setToolTip(item.display_name)
+                display_header_widget.installEventFilter(self)
+                w = len(item.display_name)* self._char_width
+                if w > display_width:
+                    display_width = w
+
+                # model_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
+                # model_widget.setReadOnly(True)
+                # if item.icao_model:
+                #     model_widget.setText(item.icao_model)
+                # model_widget.installEventFilter(self)
+
+                # mode drop down
+                mode_selector = gremlin.ui.ui_common.QDataComboBox(data = (item, selected_widget), wheel_enabled=False)
+
+                for display_mode, mode in self.mode_pair_list:
+                    mode_selector.addItem(display_mode, mode)
+
+                mode = profile.getSimconnectMode(item.key)
+                if not mode:
+                    mode = item.mode
+                if not mode:
+                    mode = default_mode
+
+                index = mode_selector.findData(mode)
+                mode_selector.setCurrentIndex(index)
+                mode_selector.currentIndexChanged.connect(self._mode_selector_changed_cb)
+                self._mode_selector_map[item] = mode_selector
+                self._selected_cb_map[item] = selected_widget
+
+
+                create_mode_widget = gremlin.ui.ui_common.QDataPushButton()
+                create_mode_widget.setIcon(create_mode_icon)
+                create_mode_widget.data = (item, select_widget)
+                create_mode_widget.setMaximumWidth(24)
+                create_mode_widget.clicked.connect(self._create_mode_cb)
+                create_mode_widget.setToolTip(f"Create mode {item.sim_name}")
+
+
+                self.map_layout.addWidget(row_selector, row ,0 , 1, -1)
+
                 spacer = QDataWidget()
                 spacer.setMinimumWidth(3)
-                self.map_layout.addWidget(row_selector, 0, 0, 1, -1)
+                spacer.installEventFilter(self)
 
                 col = 1
                 self.map_layout.addWidget(spacer, row, col)
-                col+=1
-                self.map_layout.addWidget(select_widget, 0, col)
-                col+=1
-                self.map_layout.addWidget(aircraft_display_widget, 0, col)
-                # col+=1
-                # self.map_layout.addWidget(aircraft_model_widget, 0, col)
-                col+=1
-                self.map_layout.addWidget(QtWidgets.QLabel(" "), 0, col) # mode add button
-                col+=1
-                self.map_layout.addWidget(mode_header_widget, 0, col)
-                row+=1
+                col +=1
+                self.map_layout.addWidget(selected_widget, row, col)
+                col +=1
+                self.map_layout.addWidget(display_header_widget, row, col)
+                # col +=1
+                # self.map_layout.addWidget(model_widget, row, col)
+                col +=1
+                self.map_layout.addWidget(create_mode_widget, row, col)
+                col +=1
+                self.map_layout.addWidget(mode_selector, row, col)
+                col +=1
+
+                spacer = QDataWidget()
+                spacer.installEventFilter(self)
+                spacer.setMinimumWidth(6)
+                self.map_layout.addWidget(spacer, row, 8)
 
 
-
-             # selector
-            row_selector = gremlin.ui.ui_common.QRowSelectorFrame(selected = item.selected)
-            row_selector.setMinimumHeight(30)
-            row_selector.selected_changed.connect(self._row_selector_clicked_cb)
-            selected_widget = gremlin.ui.ui_common.QDataCheckbox(data = (item, row_selector))
-            selected_widget.setChecked(item.selected)
-            selected_widget.checkStateChanged.connect(self._selected_changed_cb)
-            row_selector.data = ((item, selected_widget))
-
-            # aicraft display
-            display_header_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            display_header_widget.setReadOnly(True)
-            display_header_widget.setText(item.display_name)
-            display_header_widget.setToolTip(item.display_name)
-            display_header_widget.installEventFilter(self)
-            w = len(item.display_name)* self._char_width
-            if w > display_width:
-                display_width = w
-
-            # model_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-            # model_widget.setReadOnly(True)
-            # if item.icao_model:
-            #     model_widget.setText(item.icao_model)
-            # model_widget.installEventFilter(self)
-
-            # mode drop down
-            mode_selector = gremlin.ui.ui_common.QDataComboBox(data = (item, selected_widget), wheel_enabled=False)
-
-            for display_mode, mode in self.mode_pair_list:
-                mode_selector.addItem(display_mode, mode)
-
-            mode = profile.getSimconnectMode(item.key)
-            if not mode:
-                mode = item.mode
-            if not mode:
-                mode = default_mode
-
-            index = mode_selector.findData(mode)
-            mode_selector.setCurrentIndex(index)
-            mode_selector.currentIndexChanged.connect(self._mode_selector_changed_cb)
-            self._mode_selector_map[item] = mode_selector
-            self._selected_cb_map[item] = selected_widget
+                row += 1
 
 
-            create_mode_widget = gremlin.ui.ui_common.QDataPushButton()
-            create_mode_widget.setIcon(create_mode_icon)
-            create_mode_widget.data = (item, select_widget)
-            create_mode_widget.setMaximumWidth(24)
-            create_mode_widget.clicked.connect(self._create_mode_cb)
-            create_mode_widget.setToolTip(f"Create mode {item.sim_name}")
-
-
-            self.map_layout.addWidget(row_selector, row ,0 , 1, -1)
-
-            spacer = QDataWidget()
-            spacer.setMinimumWidth(3)
-            spacer.installEventFilter(self)
-
-            col = 1
-            self.map_layout.addWidget(spacer, row, col)
-            col +=1
-            self.map_layout.addWidget(selected_widget, row, col)
-            col +=1
-            self.map_layout.addWidget(display_header_widget, row, col)
-            # col +=1
-            # self.map_layout.addWidget(model_widget, row, col)
-            col +=1
-            self.map_layout.addWidget(create_mode_widget, row, col)
-            col +=1
-            self.map_layout.addWidget(mode_selector, row, col)
-            col +=1
-
-            spacer = QDataWidget()
-            spacer.installEventFilter(self)
-            spacer.setMinimumWidth(6)
-            self.map_layout.addWidget(spacer, row, 8)
-
-
-            row += 1
-
-
-        self.map_layout.setColumnStretch(3,2)
-        display_width = min(display_width, 250)
-        self.map_layout.setColumnMinimumWidth(3, display_width)
-
+            self.map_layout.setColumnStretch(3,2)
+            display_width = min(display_width, 250)
+            self.map_layout.setColumnMinimumWidth(3, display_width)
+        finally:
+            gremlin.util.popCursor()
 
 
     def _update_manual_list(self):

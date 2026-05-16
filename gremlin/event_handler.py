@@ -2812,7 +2812,7 @@ class EventHandler(QtCore.QObject):
 		verbose_detail = config.verbose_mode_mode
 		current_profile = gremlin.shared_state.current_profile
 
-
+		push_cursor = False
 
 		if verbose_detail:
 			if is_running:
@@ -2840,6 +2840,7 @@ class EventHandler(QtCore.QObject):
 				el = EventListener()
 				el.push_input_selection()
 				if not is_running:
+					push_cursor = True
 					gremlin.util.pushCursor()
 
 				# find the mode in the profile
@@ -2974,6 +2975,8 @@ class EventHandler(QtCore.QObject):
 						if emit:
 							el.edit_mode_changed.emit(self.edit_mode)
 
+				
+
 
 
 
@@ -2989,7 +2992,7 @@ class EventHandler(QtCore.QObject):
 				el.update_input_state.emit(device_guid)  # force a UI widget status update
 			finally:
 				el.pop_input_selection()
-				if not is_running:
+				if push_cursor:
 					gremlin.util.popCursor()
 
 		finally:

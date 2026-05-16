@@ -557,23 +557,6 @@ class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
 
 
 
-def _get_input_item(parent):
-    ''' gets the InputItem parent hierarchy if it exists '''
-    import gremlin.input_item
-    import gremlin.profile_graph
-    while parent is not None:
-        if isinstance(parent, gremlin.input_item.InputItem):
-            break
-        if isinstance(parent, gremlin.profile_graph.ProfileInputNode):
-            return parent.input_item
-        if hasattr(parent,"parent"):
-            parent = parent.parent
-        else:
-            parent = None
-
-    if parent is not None:
-        return parent
-    return None
 
 
 class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
@@ -594,7 +577,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         assert parent is not None
         self.code = None
         self._id = gremlin.util.get_guid(no_brackets=True)
-        self._input_item : gremlin.input_item.InputItem = _get_input_item(parent)
+        self._input_item : gremlin.input_item.InputItem = gremlin.input_item._get_input_item(parent)
 
 
         generic_icon = os.path.join(os.path.dirname(__file__),"generic.png")

@@ -37,19 +37,42 @@ class TabData:
 	filteredChanged = Signal(bool) # fires when the filtered property changes 
 	lockedChanged = Signal(bool) # fires when the lock property changes
 
-	def __init__(self, device_guid, tab_type : TabDeviceType, device : dinput.DeviceSummary, filtered = False, dirty = True, locked = False):
-		device_guid = gremlin.util.normalize_guid(device_guid)
-		self._device_guid = device_guid
+	def __init__(self, position : int,  tab_type : TabDeviceType, device : dinput.DeviceSummary, filtered = False, dirty = True, locked = False):
+		assert position >= 0, "invalid position"
+		assert isinstance(device, dinput.DeviceSummary),"Invalid device"
 		self._tab_type = tab_type
 		self._device = device
+		self._position = position
+		
 		self._filtered = filtered # true if inputs are filtered by used inputs only
 		self._dirty = dirty # true if the tab is dirty and needs to be reloaded
-		self._locked = False
+		self._locked = locked
 		self._populate_enabled = False # true if the UI can be populated for this tab
 
 	@property
-	def device_guid(self) -> str:
-		return self._device_guid
+	def position(self) -> int:
+		return self._position
+
+	@property
+	def device_guid(self) -> dinput.GUID:
+		''' gets the associated device GUID'''
+		return self._device.device_guid
+	
+	@property
+	def device_id(self) -> str:
+		''' gets the associated device GUID as a string'''
+		return self.device_id
+	
+	@property
+	def device(self) -> dinput.DeviceSummary:
+		''' gets the associated device'''
+		return self._device
+	
+	@property
+	def device_name(self) -> str:
+		''' gets the associated device name'''
+		return self._device.name
+
 	@property
 	def tab_type(self) -> TabDeviceType:
 		return self._tab_type
@@ -108,15 +131,32 @@ class TabState():
 		''' resets the data '''
 		self._tab_map.clear()
 
+	def getTabIndex(self, device_guid) -> int:
+		''' gets the tab index for a specific tab, -1 if not found '''
+		device_guid = gremlin.util.to_guid(device_guid)
+		if device_guid in self._tab_map:
+			return self._tab_map[device_guid].position
+		return -1 # not found
+
 	def getData(self, device_guid) -> TabData:
+		device_guid = gremlin.util.to_guid(device_guid)
 		if device_guid in self._tab_map:
 			return self._tab_map[device_guid]
 		
 		return None
 
-	def addData(self, device_guid, tab_type : TabDeviceType, device : dinput.DeviceSummary, filtered : bool = False, locked : bool = False):
+	def addData(self, position: int,  tab_type : TabDeviceType, device : dinput.DeviceSummary, filtered : bool = False, locked : bool = False):
+		''' adds a data block for tab 
+		:param position: the as built tab index
+		:param tab_type: the type of the tab
+		:param device: the device associated with the tab
+		:param filtered: optional flag to track tab filtered status (on means not displayed)
+		:parm locked: optionaal falg to track tab locking status
+		'''
+		assert isinstance(device, dinput.DeviceSummary),"invalid device"
+		device_guid = gremlin.util.to_guid(device.device_guid)
 		if not device_guid in self._tab_map:
-			data = TabData(device_guid, tab_type=tab_type, device=device, filtered = filtered, locked = locked)
+			data = TabData(position = position, tab_type=tab_type, device=device, filtered = filtered, locked = locked)
 			self._tab_map[device_guid] = data
 		
 		return self._tab_map[device_guid]

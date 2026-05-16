@@ -350,6 +350,7 @@ class ProfileConverter:
         :param root the v3 profile
         :return v4 representation of the profile
         """
+        import gremlin.input_item
         new_root = copy.deepcopy(root)
         new_root.set("version", "4")
         for mode in new_root.iter("mode"):
@@ -400,7 +401,7 @@ class ProfileConverter:
                                 if "button" in action.keys() or \
                                         "hat" in action.keys():
                                     copy_condition = True
-                            elif gremlin.base_profile._is_curve_tag(action.tag):
+                            elif gremlin.input_tem._is_curve_tag(action.tag):
                                 pass
                             else:
                                 copy_condition = True
