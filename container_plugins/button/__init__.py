@@ -195,7 +195,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
         )
         layout.addWidget(widget)
         widget.redraw()
-        widget.model.data_changed.connect()
+        widget.model.data_changed.connect(self._handle_container_changed)
 
 
     def _handle_container_changed(self):

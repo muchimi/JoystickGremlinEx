@@ -444,7 +444,7 @@ class Color():
         foreground_color = Color.normalColor
         selected_background_color = Color.selectedBackgroundColor()
         if gremlin.config.Configuration().is_debug:
-            relative_path = ""
+            relative_path = "gfx/"
         else:
             relative_path = "_internal/gfx/"
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
@@ -454,6 +454,9 @@ class Color():
 
         radio_unchecked = f"{prefix}radiobox_blank.png"
         radio_checked = f"{prefix}radiobox_marked.png"
+
+    
+
 
         css = f'''
             QCheckBox::indicator {{
