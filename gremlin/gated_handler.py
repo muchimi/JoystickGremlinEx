@@ -1948,14 +1948,11 @@ class GateData():
                     extra_data["trigger"] = trigger
                     extra_data["source"] = "Gate Condition"
 
-                    if trigger.condition == GateConditionType.EnterRange:
-                        pass
-
                     if trigger.condition in (GateConditionType.EnterRange, GateConditionType.ExitRange, GateConditionType.InRange, GateConditionType.OutsideRange):
                         # range condition
                         if verbose: syslog.info(f"\tTrigger value: {trigger.value:0.3f} input: {input_value:0.3f} range: [{trigger.range.to_display()}]")
                         action_value = gremlin.actions.Value(trigger.value, trigger.raw_value)
-                        syslog.info(f"trigger node: {self._action_data.id}")
+                        if verbose: syslog.info(f"trigger node: {self._action_data.id}")
                         self._ec.execute_functor_id(self._action_data.id, trigger_event, action_value, extra_data, True)
 
 

@@ -1296,9 +1296,9 @@ class ExecutionContext():
 
     def _ensure_action_set(self, items):
         ''' ensure an action set is not just a list, but a list with a data attribute '''
-        if isinstance(items, gremlin.base_profile.ActionSet):
+        if isinstance(items, gremlin.input_item.ActionSet):
             return items
-        action_set = gremlin.base_profile.ActionSet()
+        action_set = gremlin.input_item.ActionSet()
         action_set.extend(items)
         return action_set
 

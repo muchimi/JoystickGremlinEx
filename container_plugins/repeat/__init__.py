@@ -457,7 +457,7 @@ class RepeatContainer(AbstractContainer):
 
         actionset_nodes = node.xpath("./action-set")   
         for index, actionset_node in enumerate(actionset_nodes):
-            action_set = gremlin.base_profile.ActionSet()
+            action_set = gremlin.input_item.ActionSet()
             self._parse_action_xml(actionset_node, action_set, data, extra_data)
             self.action_sets.append(action_set)
             break # only read the first set

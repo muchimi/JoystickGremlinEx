@@ -35,9 +35,8 @@ import gremlin.config
 import gremlin.plugin_manager
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.profile import safe_format, safe_read
 from gremlin.input_item import AbstractContainerWidget, AbstractContainer
-
+from gremlin.util import write_guid, read_guid, safe_format, safe_read
 import gremlin.execution_graph
 import gremlin.base_profile
 from gremlin.input_types import InputType
@@ -1256,17 +1255,17 @@ More than one action per short press or long press can be added.'''
         # custom read of action sets
         for as_node in node:
             if as_node.tag == "short-action-set":
-                action_set = gremlin.base_profile.ActionSet("short")
+                action_set = gremlin.input_item.ActionSet("short")
                 self._parse_action_xml(as_node, action_set, input_item, extra_data, "short")
                 self.short_action_sets.append(action_set)
                 self.action_sets.append(action_set)
             if as_node.tag == "long-action-set":
-                action_set = gremlin.base_profile.ActionSet("long")
+                action_set = gremlin.input_item.ActionSet("long")
                 self._parse_action_xml(as_node, action_set, input_item, extra_data, "long")
                 self.long_action_sets.append(action_set)
                 self.action_sets.append(action_set)
             if as_node.tag == "double-action-set":
-                action_set = gremlin.base_profile.ActionSet("double")
+                action_set = gremlin.input_item.ActionSet("double")
                 self._parse_action_xml(as_node, action_set, input_item, extra_data, "double")
                 self.double_action_sets.append(action_set)
                 self.action_sets.append(action_set)     

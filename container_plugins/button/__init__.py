@@ -195,7 +195,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
         )
         layout.addWidget(widget)
         widget.redraw()
-        widget.model.data_changed.connect()
+        widget.model.data_changed.connect(self._handle_container_changed)
 
 
     def _handle_container_changed(self):
@@ -381,7 +381,7 @@ and another action on trigger release in a single container.'''
 
         # actionset_nodes = node.xpath("./action-set")   
         # for index, actionset_node in enumerate(actionset_nodes):
-        #     action_set = gremlin.base_profile.ActionSet()
+        #     action_set = gremlin.input_item.ActionSet()
         #     self._parse_action_xml(actionset_node, action_set, data, extra_data)
         #     self.action_sets[index] = action_set
 
