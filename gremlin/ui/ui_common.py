@@ -4246,7 +4246,7 @@ class QDataPushButton(QtWidgets.QPushButton):
 
 
     ''' a checkbox that has a data property to track an object associated with the checkbox '''
-    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, callbackEx = None, clicked = None, enabled = None):
+    def __init__(self, text = None, data = None, parent = None, tooltip = None, callback = None, callbackEx = None, clicked = None, enabled = None, enhanced = False):
         ''' custom push button
 
         :param text: label for the button (optiona)
@@ -4257,6 +4257,7 @@ class QDataPushButton(QtWidgets.QPushButton):
         :param callback_ex: click callback (ctrl, shft, right) as boolean flags as parameters to the event (optional)
         :param clicked: click callback()
         :param enabled: default enabled state (optional) - button is enabled by default
+        :param enhanced: true if the button monitors shift states and double click
 
 
         '''
@@ -4275,14 +4276,28 @@ class QDataPushButton(QtWidgets.QPushButton):
 
         self._callback = callback
         self._callback_ex = callbackEx
+        self._enhanced = enhanced
+
         if enabled is not None:
             self.setEnabled(enabled)
         if clicked:
             self.clicked.connect(clicked)
 
-        self.installEventFilter(self)
+        if enhanced:
+            self.installEventFilter(self)
 
+    def setEnhanced(self, value : bool):
+        ''' enable enhanced shift states and double click tracking on/off'''
+        if self._enhanced != value:
+            self._enhanced = value
+            if value:
+                self.installEventFilter(self)
+            else:
+                self.removeEventFilter(self)
 
+    def enhanced(self) -> bool:
+        ''' gets the enhanced state for tracking states and double click '''
+        return self._enhanced
 
     def _handle_callback(self):
         if self._callback:

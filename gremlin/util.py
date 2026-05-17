@@ -1627,10 +1627,10 @@ def pushCursor(immediate = False):
     global _cursor_push, _cursor_timer
     if _cursor_push == 0:
         if immediate:
-            syslog.info("PUSH CURSOR: show cursor timer [immediate]")
+            # syslog.info("PUSH CURSOR: show cursor timer [immediate]")
             InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
         else:
-            syslog.info("PUSH CURSOR: show cursor timer [delay]")
+            # syslog.info("PUSH CURSOR: show cursor timer [delay]")
             if _cursor_timer:
                 _cursor_timer.cancel()
             _cursor_timer = threading.Timer(1.0, _cursor_show_hourglass)
@@ -1640,10 +1640,10 @@ def pushCursor(immediate = False):
   
 
 def _cursor_show_hourglass():
-    global _cursor_wait
+    global _cursor_wait, _cursor_timer
     _cursor_timer = None 
     if not _cursor_wait:
-        syslog.info("PUSH CURSOR: show cursor timer")
+        # syslog.info("PUSH CURSOR: show cursor timer")
         InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
         while not _cursor_wait:
             time.sleep(0)
@@ -1651,10 +1651,10 @@ def _cursor_show_hourglass():
 def _pushCursor_ui():
     global _cursor_push, _cursor_timer, _cursor_wait, _qt_wait_cursor
     _cursor_timer = None
-    syslog.info(f"PUSH CURSOR: [{_cursor_push}]")
+    # syslog.info(f"PUSH CURSOR: [{_cursor_push}]")
     if not _cursor_wait:
         _cursor_wait = True
-        syslog.info("\tchange to wait cursor")
+        # syslog.info("\tchange to wait cursor")
         win32gui.LoadCursor(None, win32con.IDC_WAIT)
 
         # if not _qt_wait_cursor:
@@ -1674,7 +1674,7 @@ def _pushCursor_ui():
 
 def popCursor(reset = False):
     global _cursor_push, _cursor_timer, _cursor_wait
-    syslog.info(f"POP CURSOR: [{_cursor_push}]")
+    # syslog.info(f"POP CURSOR: [{_cursor_push}]")
     if _cursor_push > 0:
         _cursor_push -= 1
     if _cursor_push == 0 or reset:
@@ -1689,7 +1689,7 @@ def _popCursor_ui(force : bool = False):
     global _cursor_wait, _qt_wait_cursor
     if _cursor_wait or force:
         _cursor_wait = False
-        syslog.info("PUSH CURSOR: change to normal cursor")
+        # syslog.info("PUSH CURSOR: change to normal cursor")
         win32gui.LoadCursor(None, win32con.IDC_ARROW)
         # QtWidgets.QApplication.restoreOverrideCursor()
         # while QtWidgets.QApplication.overrideCursor() == _qt_wait_cursor:
@@ -2788,6 +2788,13 @@ def getMonitorOrientation(hwnd):
     return None, None
 
 
+def timeit(callback, *args, **kwargs):
+    ''' times a call '''
+    start_time = time.perf_counter()
+    callback(*args, **kwargs)
+    end_time = time.perf_counter()
+    elapsed = end_time - start_time
+    syslog.info(f"Perf: [{callback.__module__}] [{callback.__name__}] time: [{elapsed:.6f}]")
 
 class TriggerDict(collections.UserDict):
     ''' dict that fires callbacks when data is changed '''

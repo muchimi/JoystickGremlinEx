@@ -862,21 +862,32 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self._repeater_axis_widget = None
             self._relative_pulse_widget = None
 
-            self._create_override_input_type()
-            self._create_selector()
-            self._create_repeater()
-            self._create_input_axis()
-            self._create_range_widgets()
-            self._create_sync_widget()
-            self._create_button_modes()
-            self._create_hat_mapping()
-            self._create_output_range()
-            self._create_merge_ui()
-            self._create_step_ui()
-            self._create_info()
+            steps = [
+                self._create_override_input_type,
+                self._create_selector,
+                self._create_repeater,
+                self._create_input_axis,
+                self._create_range_widgets,
+                self._create_sync_widget,
+                self._create_button_modes,
+                self._create_hat_mapping,
+                self._create_output_range,
+                self._create_merge_ui,
+                self._create_step_ui,
+                self._create_info,
+                self._create_input_grid,
+                self._update_axis_widget,
+                ]
 
-            self._create_input_grid()
-            self._update_axis_widget()
+            verbose_perf = gremlin.config.Configuration().verbose_mode_perf
+            if verbose_perf:
+                container = self.action_data.get_container()
+                syslog.info(f'VJOYREMAP: create UI: [{self.action_data.debug_name}]')
+                for callback in steps:
+                    gremlin.util.timeit(callback)
+            else:
+                for callback in steps:
+                    callback()
 
 
             self.main_layout.setContentsMargins(0, 0, 0, 0)

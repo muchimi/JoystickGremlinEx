@@ -216,6 +216,8 @@ class AbstractModel(QtCore.QAbstractItemModel):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.id = uuid.uuid4() # unique ID of this model
+
 
     def rows(self):
         """Returns the number of rows in the model.
@@ -226,30 +228,228 @@ class AbstractModel(QtCore.QAbstractItemModel):
 
     def count(self):
         return self.rows()
+    
+    def __iter__(self):
+        ''' generator '''
+        assert False, "method must be implemented in the derived class"
 
-    def data(self, index):
+    def data(self, index : int):
         """Returns the data entry stored at the provided index.
 
         :param index the index for which to return data
         :return data stored at the given index
         """
-        assert False, "data method not implemented in model subclass" 
+        assert False, "method must be implemented in the derived class"
 
     def add(self, data):
         """Adds a new entry to the model. """
-        assert False, "Add method not implemented in model subclass"
+        assert False, "method must be implemented in the derived class"
 
     def remove(self, data):
         """Removes the given entry from the model."""
-        assert False, "Remove method not implemented in model subclass" 
+        assert False, "method must be implemented in the derived class"
 
     def clear(self, data):
         """Removes all the given entry from the model."""
-        assert False, "Remove method not implemented in model subclass" 
+        assert False, "method must be implemented in the derived class"
 
-    def refresh(self, emit = True):
-        """Refreshes the model, triggering a data changed event.""" 
-        assert False, "Refresh method not implemented in model subclass"
+    def refresh(self, force = False, emit = True):
+        """
+        Refreshes the model, triggering a data changed event if the model data was changed and not emitted yet
+        """ 
+        assert False, "method must be implemented in the derived class"
+
+    def modelChanged(self) -> bool:
+        ''' true if the model changed since the last change event was fired '''
+        assert False, "method must be implemented in the derived class"
+
+     
+
+class AbstractCallbackModel(AbstractModel):
+    ''' adds callbacks on change to a regular model '''
+
+    
+
+    def __init__(self, callback : Callable = None, allowed_types : tuple = None):
+        ''' callback enabled model
+        :param callback: optional initial callback
+        :param allowable types: optiona list of allowable types in the model
+
+        '''
+        super().__init__()
+        self._old_hash = None # last change hash
+        self._data_changed_callbacks = []
+        self._item_map = {} # map of item (hashable) to index [hashable] -> int
+        self._index_map = {} # map of index to item  [int] -> hashable
+
+        if allowed_types:
+            assert isinstance(allowed_types, tuple), "allowed types must be a tuple"
+        self._allowed_types = allowed_types
+        self._suspend_stack = 0 # tracks suspension of change events
+        self._change_pending = False # true if a change is pending
+        
+        if callback:
+            self.addCallback(callback)
+
+    def __iter__(self):
+        ''' iterator '''
+        return iter(self._item_map.values())
+    
+    def append(self, item):
+        ''' appends an item '''
+        self.add(item)
+
+    def add(self, item) -> int:
+        """Adds a new entry to the model, returns the position inserted """
+        if self._allowed_types:
+            if not isinstance(item, self._allowed_types):
+                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
+        assert isinstance(item, _collections_abc.Hashable),"item must be hashable"
+        if not item in self._index_map:
+            index = len(self._item_map)
+            self._item_map[item] = index
+            self._index_map[index] = item
+            self._fireChanged()
+        self._item_map[item]
+
+    def insert(self, i, item):            
+        ''' inserts an item '''
+        if self._allowed_types:
+            if not isinstance(item, self._allowed_types):
+                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
+        if i in self._index_map:
+            # bump all the items down 1
+            start_index = i
+            stop_index = len(self._index_map)
+            for index in range(stop_index, start_index, step = -1):
+                data = self._index_map[index]
+                self._index_map[index+1] = data
+                self._item_map[data] = index +1
+
+        # insert the item
+        self._index_map[i] = item
+        self._item_map[item] = i
+
+    def place(self, item, index : int):
+        ''' places an item at a given index - no checking '''
+        if item in self._item_map:
+            i = self._index_map[index]
+            if i == index:
+                # already there
+                return 
+            # remove the old entry from the model
+            del self._index_map[i]
+        self._index_map[index] = item
+        self._item_map[item] = index
+
+    def remove(self, item):
+        """Removes the given entry from the model."""
+        if item in self._item_map:
+            index = self._item_map[item]
+            if hasattr(item,"_cleanup"):
+                item._cleanup()
+            del self._item_map[item]
+            del self._index_map[index]
+            self._fireChanged()
+
+    def removeAt(self, index : int):
+        ''' removes the entry at the given model index '''
+        if index in self._index_map:
+            item = self._index_map[index]
+            if hasattr(item,"_cleanup"):
+                item._cleanup()
+            del self._item_map[item]
+            del self._index_map[index]
+            self._fireChanged()
+
+    def clear(self):
+        """Removes all the given entry from the model."""
+        if self._item_map:
+            self._item_map.clear()
+            self._index_map.clear()
+            self._fireChanged()
+
+    def data(self, index : int):
+        ''' returns the item stored at the given index, None if not found
+        :param index: the index
+        '''
+        if index in self._index_map:
+            return self._index_map[index]
+        return None
+        
+    def rows(self) -> int:
+        ''' returns the size of the model'''
+        return len(self._index_map)    
+   
+
+    def refresh(self, force=False, emit=True):
+        ''' trigger a data change if them model has changed '''
+        self._fireChanged(force, emit)
+
+    def pushSuspend(self):
+        ''' suspends change notifications '''
+        self._suspend_stack += 1
+
+    def popSuspend(self, reset = False, emit = True):
+        ''' restores change notifications '''
+        if reset and self._suspend_stack > 0:
+            self._suspend_stack = 0
+        if self._suspend_stack > 0:
+            self._suspend_stack-= 1
+        if self._suspend_stack == 0:
+            self._fireChanged(force = self._change_pending, emit = emit)
+
+    def resetChanges(self):
+        ''' resets any changes to the model '''
+        self._suspend_stack = 0
+        self._change_pending = False
+
+
+    def addCallback(self, callback : Callable):
+        ''' adds a callback to be called when the model data changes '''
+        if __debug__ and callback is not None and not callable(callback):
+            raise TypeError("Callback must be callable")
+        if not callback in self._data_changed_callbacks:
+            self._data_changed_callbacks.append(callback)
+
+    def removeCallback(self, callback : Callable):
+        ''' removes a callback from the list of callbacks to be called when the model data changes '''
+        if callback in self._data_changed_callbacks:
+            self._data_changed_callbacks.remove(callback)
+
+    def modelChanged(self) -> bool:
+        ''' true if data has changed  '''
+        return self._change_pending or hash(self) != self._old_hash
+
+    def _fireChanged(self, force = False, emit = False):
+        ''' fires a data changed signal if the data has changed or if force is true '''
+        if self._change_pending and not force:
+            return
+        new_hash = hash(self)
+        if self._suspend_stack:
+            # firing changes currently suspended
+            self._change_pending = new_hash != self._old_hash
+            return
+        
+        new_hash = hash(self)
+        if new_hash != self._old_hash or force or self._change_pending:
+            verbose = gremlin.config.Configuration().verbose_mode_perf
+            if verbose: syslog.info("ActionSetModel: trigger model change")
+                
+            self._old_hash = new_hash
+
+            for callback in self._data_changed_callbacks:
+                callback()
+
+            if emit:
+                self.data_changed.emit() # indicate the model changed
+
+            self._change_pending = False
+
+
+    def __hash__(self):
+        ''' unique hash value of model contents '''
+        return hash((self.id, self._index_map))
 
 
 class AbstractView(QtWidgets.QWidget):
@@ -267,7 +467,7 @@ class AbstractView(QtWidgets.QWidget):
     def __init__(self, model : AbstractModel =None, callback : Callable = None, parent=None):
         """Creates a new view instance.
         :param model: the model to visualize
-        :param callback: an optional callback to be called when the model changes - this is used by the container to trigger updates when the model changes subject to begin/end model change calls
+        :param callback: an optional callback to be called when the model changes - this is used by the container to trigger updates when the model changes subject to begin/end model change calls - more can be added with addCallback()
         :param parent: the parent of this view widget
         """
         super().__init__(parent)
@@ -275,6 +475,7 @@ class AbstractView(QtWidgets.QWidget):
         if model is not None and not isinstance(model, AbstractModel):
             raise TypeError("Invalid model type")  
         self._model = model
+        self._model.data_changed.connect(self._handle_model_changed) # hook changes
 
         self._redraw_suspended_stack = 0 # non 0 = redraw is suspended
         self._redraw_pending = False # true if a redraw is pending while redraw is disabled
@@ -289,7 +490,7 @@ class AbstractView(QtWidgets.QWidget):
 
         self._model_call_stack = 0 # stack to manage when the model change event is fired
 
-    def addCallabck(self, callback : Callable):
+    def addCallback(self, callback : Callable):
         ''' adds a callback to be called when the model changes - this is used by the container
         :param callback: the callback to add
         '''
@@ -305,14 +506,9 @@ class AbstractView(QtWidgets.QWidget):
         if callback in self._model_change_callbacks:
             self._model_change_callbacks.remove(callback)
 
-    def refreshModel(self):
+    def refreshModel(self, force = False):
         ''' forces a refresh of the view by refreshing a model if it changed '''
-        if self._model:
-            self.pushSuspended()
-            self._model.refresh()
-            self._redraw_pending = True # force an update
-            self.popSuspended()
-            
+        self._model.refresh(force) # triggers an update if the model was changed
         
     def pushSuspended(self):
         ''' disable redraw on model change '''
@@ -1312,12 +1508,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             container.generateGuids()
 
     @property
-    def debug_display(self):
+    def debug_name(self):
         ''' debug string for this item'''
         mode = self.profile_mode
         if mode == gremlin.shared_state.master_mode:
             mode = gremlin.shared_state.master_mode_name
-        return f"InputItem: [{gremlin.shared_state.get_device_name(self.device_guid)}] Input: [{InputType.to_display_name(self.input_type)}] Type: [{self.display_name}] mode: [{mode}]"
+        
+        return f"InputItem: device: [{self.device_name}] input: [{self.display_name}] mode: [{mode}]"
 
     def __eq__(self, other):
         ''' true if the input item are the same object '''
@@ -1701,8 +1898,13 @@ class InputItemWidget(QBoxFrame):
 
     def _fireSelectionChangeCallbacks(self):
         ''' fires the selection change callbacks  callback(InputItemWidget) - the parameter is the widget that has changed state'''
-        for callback in self._selection_change_callbacks:
-            callback(self)
+        verbose_perf = gremlin.config.Configuration().verbose_mode_perf
+        if verbose_perf:
+            for callback in self._selection_change_callbacks:
+                gremlin.util.timeit(callback, self)
+        else:
+            for callback in self._selection_change_callbacks:
+                callback(self)
 
 
 
@@ -2629,7 +2831,7 @@ class InputItemWidget(QBoxFrame):
 
 
 
-class InputItemListModel(AbstractModel):
+class InputItemListModel(AbstractCallbackModel):
 
     """Model storing a device's input item list."""
 
@@ -2655,7 +2857,7 @@ class InputItemListModel(AbstractModel):
         :param show_filtered_only: determines if only filtered items are shown in the model
         """
         import gremlin.base_profile
-        super().__init__()
+        super().__init__(allowed_types=(InputItem,))
 
         if profile is None:
             raise ValueError("Profile cannot be None")
@@ -2676,7 +2878,7 @@ class InputItemListModel(AbstractModel):
         self._show_filtered_only = show_filtered_only
         self._is_filtered = False # true if the data should be filtered
         self._data_changed = False # flag to track if data membership has changed 
-        self._data_changed_callbacks = [] # list of callbacks when data changes
+        
 
         
         self._index_map = TriggerDict() # map of input_id to index
@@ -2721,19 +2923,7 @@ class InputItemListModel(AbstractModel):
         ''' display name for the model'''
         device = gremlin.joystick_handling.getDevice(self._device_guid)
         return f"Input Item Model for: [{device.name}] - filtered inputs: [{len(self._filtered_index_map)}] total inputs: [{len(self._index_map)}]"
-      
-    def addCallback(self, callback : Callable):
-        ''' adds a callback to be called when the model data changes '''
-        if __debug__ and callback is not None and not callable(callback):
-            raise TypeError("Callback must be callable")
-        if not callback in self._data_changed_callbacks:
-            self._data_changed_callbacks.append(callback)
-
-    def removeCallback(self, callback : Callable):
-        ''' removes a callback from the list of callbacks to be called when the model data changes '''
-        if callback in self._data_changed_callbacks:
-            self._data_changed_callbacks.remove(callback)
-
+    
     def setFiltered(self, value : bool):
         ''' sets whether the model is filtered or not, updates the model data '''
         if self._show_filtered_only != value:
@@ -4223,84 +4413,70 @@ class InputItemListView(AbstractView):
         return self.count()
 
 
-class ActionSetModel(AbstractModel):
+class ActionSetModel(AbstractCallbackModel):
 
     """Model storing a set of actions."""
 
-    def __init__(self, action_set=[]):
-        super().__init__()
+    def __init__(self, action_set : ActionSet | list = []):
+        super().__init__(allowed_types=(ActionSet,))
         if not isinstance(action_set, ActionSet):
             # convert
             action_set = ActionSet.fromList(action_set)
-        self._action_set = action_set
 
-    def rows(self):
-        return len(self._action_set)
-
-    def data(self, index):
-        return self._action_set[index]
+        assert isinstance(action_set, ActionSet),"Action set must be provided"
+        # change the storage of the model
+        self._items = action_set
+        self.resetChanges()
+        
 
     def add_action(self, action):
-        self._action_set.append(action)
+        ''' adds an action to the model '''
+        self.add(action)
+        self._fireIconChange(self, action)
 
-        el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.DeviceChangeEvent()
-        event.device_guid = action.hardware_device_guid
-        event.device_input_id = action.hardware_input_id
-        event.device_input_type = action.hardware_input_type
-        event.source = action
-
-        el.icon_changed.emit(event)
-
-        container : gremlin.input_item.AbstractContainer = action.get_container()
-        container.mapping_changed() # tell the UI about the change
-
-        # blows up in QT 6.11
-        # try:
-        #     self.data_changed.emit()
-        # except:
-        #     pass # ignore signal issues
-
-
+    def _fireIconChange(self, action):
+            # fire change event for action icons
+            el = gremlin.event_handler.EventListener()
+            event = gremlin.event_handler.DeviceChangeEvent()
+            event.device_guid = action.hardware_device_guid
+            event.device_input_id = action.hardware_input_id
+            event.device_input_type = action.hardware_input_type
+            event.source = action
+            el.icon_changed.emit(event)
 
     def remove_action(self, action):
         ''' runs when an action should be deleted '''
         import gremlin.util
         try:
             gremlin.util.pushCursor()
-            if action in self._action_set:
+            if action in self._items:
                 input_item = action.get_input_item()
                 container : gremlin.input_item.AbstractContainer = action.get_container()
-                del self._action_set[self._action_set.index(action)]
+                self.remove(action)
 
-                # run action delete if the action supports it
-                if hasattr(action,"actionDeleted"):
-                    action.actionDeleted()
+                # del self._items[self._items.index(action)]
+
+                # # run action delete if the action supports it
+                # if hasattr(action,"actionDeleted"):
+                #     action.actionDeleted()
+
+                
+                # if hasattr(action,"_cleanup"):
+                #     action._cleanup()
+
+                #self._fireChanged()
 
                 el = gremlin.event_handler.EventListener()
                 el.action_delete.emit(input_item, container, action) # tell the UI the action is being deleted
-                if hasattr(action,"_cleanup"):
-                    action._cleanup()
 
-                event = gremlin.event_handler.DeviceChangeEvent()
-                event.source = input_item
-                event.device_input_id = input_item
-                el.icon_changed.emit(event)
+                self._fireIconChange(self, action)
 
-                container.mapping_changed() # tell the UI about the change
-
-
-            # try:
-            #     self.data_changed.emit()
-            # except:
-            #     pass
         finally:
             gremlin.util.popCursor()
 
-    def refresh(self, emit=True):
-        # refresh the action set
-        pass
+        
 
+  
 
 class AbstractAction(BaseProfileData):
 
@@ -4351,6 +4527,11 @@ class AbstractAction(BaseProfileData):
         el.profile_unload.connect(self._cleanup)
         el.action_delete.connect(self._action_delete)
 
+
+    @property
+    def debug_name(self) -> str:
+        ''' friendly display name '''
+        return f"[action: {self.tag} id: {str(self.id)}] input: [{self.get_container().debug_name}]"
 
     def hook(self):
         if not self._hooked:
@@ -4480,7 +4661,7 @@ class AbstractAction(BaseProfileData):
         input_item = _get_input_item(self.parent_container)
         return input_item
 
-    def get_container(self):
+    def get_container(self) -> AbstractContainer:
         return self.parent_container
 
 
@@ -4713,7 +4894,7 @@ class AbstractAction(BaseProfileData):
         return super().__str__()
 
     def __hash__(self):
-        # index on the unique ID 
+        # index on the unique ID of each action
         return hash(self._id)
 
 
@@ -4829,6 +5010,11 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.device_input_type = input_item.input_type
         self.device = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
 
+    @property
+    def debug_name(self) -> str:
+        ''' friendly display name '''
+        return f"container: [{self.tag}] id: [{str(self.id)}] {self.input_item.debug_name}"
+
     def getActionsSets(self) -> ActionSets:
         return self._action_sets
 
@@ -4863,8 +5049,9 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     def resetActionSets(self):
         ''' resets actions sets - override in derived class if the action set default should be different '''
         if self.action_sets:
-            for action_set in self.action_sets:
-                action_set.clear()
+            # for action_set in self.action_sets:
+            #     action_set.clear()
+            self.action_sets.clear()
 
 
 
@@ -4912,7 +5099,9 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
 
 
-
+    def clear(self):
+        ''' removes all actions from this container '''
+        self.action_sets.clear()
 
 
     @property
@@ -5064,11 +5253,14 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         """
 
         if index == -1:
-            self.action_sets.append([])
-            index = len(self.action_sets) - 1
-        if index > len(self.action_sets):
-            while len(self.action_sets) <= index:
-                self.action_sets.append([])
+            # add a new action set to the container
+            index = self.action_sets.add(ActionSet())
+
+        count = self.action_sets.count()
+        if index > count:
+            for i in range(count, index):
+                if not self.action_sets.data(i):
+                    self.action_set.place(ActionSet(), i)
         self.action_sets[index].append(action)
 
         # Create activation condition data if needed
@@ -5084,19 +5276,13 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         if self._action_sets is None:
             self._action_sets = ActionSets(self)
         return self._action_sets
-    
-    def createActionSets(self, action_list, description : str = None, data = None):
-        action_sets = ActionSets(self, description, data)
-        for item in action_list:
-            if not isinstance(item, ActionSet):
-                action_set = ActionSet()
-                action_set.append(item)
-                action_sets.append(action_set)
-            else:
-                action_sets.append(item)
-        return action_sets
             
-
+    def createActionSet(self, action_list, description : str = None, data = None) -> ActionSet:
+        ''' creates an action set from a list of actions '''
+        action_set = ActionSet(self, description, data)
+        action_set.append(action_list)
+        return action_set
+        
 
     @action_sets.setter
     def action_sets(self, value):
@@ -5105,9 +5291,8 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     @property
     def action_count(self):
-        ''' returns the count of defined actions in this container '''
-        count = sum(len(action_list) for action_list in self.action_sets)
-        return count
+        ''' returns the total count of defined actions in this container (all action sets) '''
+        return self.action_sets.actionCount()
 
 
     def getFlatActionSetList(self, action_sets):
@@ -5117,7 +5302,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     def _flatten_list(self, items):
         data = []
-        if isinstance(items, list):
+        if hasattr(items, "__iter__"):
             for item in items:
                 data.extend(self._flatten_list(item))
         else:
@@ -5333,7 +5518,11 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
 
 
-    def _parse_action_xml(self, node, action_set, input_item = None, extra_data = None, data = None):
+    def _parse_action_xml(self, node : ElementTree.Element,
+                          action_set : ActionSet,
+                          input_item : InputItem= None,
+                          extra_data : dict = None,
+                          data = None):
         """Parses the XML content related to actions in an action-set.
 
         :param node the XML node to process
@@ -5347,9 +5536,12 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         config = gremlin.config.Configuration()
 
         # get the id of the action set
-        if "guid" in node.attrib:
+        if "set-guid" in node.attrib:
             action_set.id = read_guid(node, "guid")
+        if "set-description" in node.attrib:
+            action_set.description = html.unescape(node.get("set-description"))
             
+        action_set.pushSuspend() # stop notifications while we're adding
         for child in node:
 
             if child.tag not in action_name_map:
@@ -5375,7 +5567,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
             action_set.append(entry)
             if data is not None:
                 entry.data = data
-
+        action_set.popSuspend(emit = False) # allow notifications but don't update
 
 
     def _parse_virtual_button_xml(self, node, data = None, extra_data = None):
@@ -5455,49 +5647,32 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
 
 
-class ActionSet(collections.UserList):
-    ''' holds action set data with a data and ID attribute '''
+class ActionSet(AbstractCallbackModel):
+    ''' holds action set data with a data and ID attribute - each action set contains a list of AbstractActions '''
     def __init__(self, data = None):
-        super().__init__()
+        super().__init__(allowed_types=(AbstractAction,))
         self._data = data # any special tag to identify the action set
-        self._id = uuid.uuid4() # unique ID of this action set
         self.description : str = None # description of the action set (optional)
-
-
-    def __setitem__(self, i, item):
-        # override for data checking
-        assert isinstance(item, AbstractAction),"ActionSet can only contain actions"
-        super().__setitem__(i, item)
-
-        
-    def append(self, item):
-        ''' override for data checking '''
-        assert isinstance(item, AbstractAction),"ActionSet can only contain actions"
-        super().append(item)
-
-    def insert(self, i, item):
-        ''' override for data checking '''
-        assert isinstance(item, AbstractAction),"ActionSet can only contain actions"
-        super().insert(i, item)
                 
     @staticmethod
-    def fromList(source):
+    def fromList(source : list | tuple):
         ''' returns an action set from the source list'''
         action_set = ActionSet()
-        action_set.extend(source)
+        action_set.pushSuspend()
+        for item in source:
+            action_set.add(item)
+        action_set.popSuspend()
         return action_set
-
-                
-
     
-    @property
-    def id(self):
-        return self._id
-    
-    @id.setter
-    def id(self, value):
-        self._id = value
-
+    def removeAction(self, action: AbstractAction, delete = True):
+        ''' removes the given action from the set
+        :param item: the action
+        :param delete: if true, deletes the action from the profile
+        '''
+        if action in self:
+            self.remove(action)
+            if hasattr(action,"actionDeleted"):
+                action.actionDeleted()
 
     def to_xml(self):
         ''' writes the actions in the action set out '''
@@ -5540,60 +5715,35 @@ class ActionSet(collections.UserList):
 
             entry = action_name_map[tag](self)
             entry.from_xml(child, (input_item, self), extra_data) # pass input item, container as a tuple
-            self.append(entry)
+            self.add(entry)
 
             if data is not None:
                 entry.data = data
     
-    def __hash__(self):
-        return hash(self._id)
-
-class ActionSets(collections.UserList):
+class ActionSets(AbstractCallbackModel):
     ''' holds a list of ActionSet objects for a container '''
     def __init__(self, container: AbstractContainer, description : str = None, data = None):
-        super().__init__()
-        self._data = data # any special tag to identify the action set
-        self._id = uuid.uuid4() # unique ID of this action set
+        super().__init__(allowed_types=(ActionSet,))
         assert isinstance(container, AbstractContainer),"Invalid container object"
         self._container = container
         self._input_item = self._container.input_item
         self._description = description
+        self._data = data
         assert isinstance(self._input_item, InputItem),"Invalid input item for container"
-        
-    def __setitem__(self, i, item):
-        ''' override for data checking '''
-        assert isinstance(item, ActionSet),"ActionSets can only contain ActionSet object"
-        super().__setitem__(i, item)
         
     def append(self, item):
         ''' override for data checking '''
-
-        if not isinstance(item, ActionSet):
-            # adding a list
+        if isinstance(item, (list, tuple,)):
             item = ActionSet.fromList(item)
-
-        super().append(item)
-
-    def insert(self, i, item):
-        ''' override for data checking '''
-        if not isinstance(item, ActionSet):
-            # adding a list
-            item = ActionSet.fromList(item)
-
-        super().insert(i, item)
-        
-
-
+        super().add(item)
 
     def clear(self):
+        ''' clears all the actions'''
+        action_set : ActionSet
+        for action_set in self:
+            action_set.clear()
         super().clear()
-        self._id = uuid.uuid4() # unique ID of this action set
-        self._description = None
 
-    @property
-    def id(self):
-        return self._id
-    
     @property
     def description(self) -> str:
         return self._description
@@ -5601,10 +5751,9 @@ class ActionSets(collections.UserList):
     def description(self, value : str):
         self._description = value
 
-    
-    @id.setter
-    def id(self, value):
-        self._id = value
+    def actionCount(self) -> int:
+        ''' returns the total number of actions in all action set'''
+        return sum(action_set.count() for action_set in self)
 
     def to_xml(self, parent_node : ElementTree.Element):
         ''' writes the actions in the action set out '''
@@ -5635,10 +5784,6 @@ class ActionSets(collections.UserList):
                 if "s-description" in node.attrib:
                     self._description = html.unescape(node.get("description"))
                     set_read = True
-
-
-    
-
 
 class ActionSetView(AbstractView):
     ''' widget that displays actions defined in a container '''
@@ -5789,9 +5934,12 @@ class ActionSetView(AbstractView):
         self._container_layout = None
 
         self._drawn_once = False # only load widgets on demand when a redraw is requested
-
+        
         self.popSuspended() # supend redraw
-        self.refreshModel()
+
+
+        self.refreshModel() # load the data
+        
 
 
     def setSelected(self, value:bool):
@@ -5920,6 +6068,7 @@ class ActionSetView(AbstractView):
             return
 
         verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = True
         if verbose:
             syslog.info(f"ActionSetView: redraw {self._input_display()}")
 
@@ -7557,7 +7706,7 @@ class ConditionActionWrapper(AbstractActionWrapper):
 
 
 
-class ContainerModel(AbstractModel):
+class ContainerModel(AbstractCallbackModel):
 
     """ container model for input mapping widget """
 
@@ -7569,10 +7718,18 @@ class ContainerModel(AbstractModel):
         :param input_type: the override input type if different from the input item configuration
         :param parent: the parent of this widget
         """
-        super().__init__(parent)
-        self._containers = input_item.containers
-        self._input_item_widget = input_item_widget
+        super().__init__(allowed_types=(AbstractContainer,))
+
+        self._input_item_widget = input_item_widget # the widget tied to this model
         self._input_type = input_type if input_type is not None else input_item_widget._input_type
+
+        # load the input item containers into this model
+        self.pushSuspend()
+        for container in input_item.containers:
+            self.add(container)
+        self.popSuspend()
+        self.resetChanges()
+
 
     @property
     def item_data(self) -> InputItemMappingWidget:
@@ -7589,98 +7746,69 @@ class ContainerModel(AbstractModel):
         :return number of rows in the model
         """
         return len(self._containers)
-    
-    def refresh(self, emit=True):
-        ''' refresh the model '''
-        pass
-        
 
-    def data(self, index):
-        """Returns the data stored at the given location.
-
-        :param index the location for which to return data
-        :return the data stored at the requested location
-        """
-        assert len(self._containers) > index
-        return self._containers[index]
-
-    def add_container(self, container):
+    def addContainer(self, container : AbstractContainer):
         """Adds a container to the model.
 
         :param container the container instance to be added
         """
-        if not container in self._containers:
-            self._containers.append(container)
-            self.data_changed.emit()
 
-    def remove_container(self, container):
+        self.add(container)
+
+    def removeContainer(self, container : AbstractContainer, emit = True):
         """Removes an existing container from the model.
+        
 
         :param container the container instance to remove
         """
+        
         el = gremlin.event_handler.EventListener()
-        if container in self._containers:
+        changed = False
+        if container in self:
             # notify actions that the container is closing
+            container.action_sets.delete()
+
             for action_set in container.action_sets:
                 if action_set:
                     for action in action_set:
-                        if hasattr(action,"actionDeleted"):
-                            action.actionDeleted()
-                        el.action_delete.emit(self._input_item_widget, container, action)
-
-
+                        action_set.removeAction(action)
             self._containers.remove(container)
 
-            # self._input_item.remove_container(container)
-
-            self.data_changed.emit()
-            el.container_delete.emit(self.item_data, container)
-            el.mapping_changed.emit(self.item_data)
-
-
-    def remove_all_containers(self):
-        """Removes an existing container from the model.
-
-        :param container the container instance to remove
-        """
-        el = gremlin.event_handler.EventListener()
-        container_list = [container for container in self._containers]
-        for container in container_list:
-            # notify actions that the container is closing
-            for action_set in container.action_sets:
-                for action in action_set:
-                    # if hasattr(action, "_cleanup"):
-                    #     action._cleanup()
-                    el.action_delete.emit(self._input_item_widget, container, action)
-
-            el.container_delete.emit(self.item_data, container)
-            del self._containers[self._containers.index(container)]
-
-        self.data_changed.emit()
-        el.mapping_changed.emit(self.item_data)
+            if emit:
+                self.data_changed.emit()
+                el.container_delete.emit(self.item_data, container)
+                el.mapping_changed.emit(self.item_data)
 
 
+    def clear(self):
+        '''Removes all containers from the model'''
+
+        if self.rows():
+            for container in self:
+                # notify actions that the container is closing
+                container.clear()
+
+            self._fireChanged()
 
 class ContainerView(AbstractView):
 
     ''' widget that displays container mappings for an input item '''
 
-    def __init__(self, input_item : AbstractInputItem, action_model : ActionSetModel, parent = None):
+    def __init__(self, input_item : AbstractInputItem, container_model : ContainerModel, parent = None):
         """Creates a new view instance.
 
         :param parent the parent of the widget
         """
 
-        if __debug__:
-            if input_item is None and not isinstance(input_item, AbstractInputItem):
-                raise ValueError("ContainerView requires an AbstractInputItem")
-            if action_model is None and not isinstance(action_model, ActionSetModel):
-                raise ValueError("ContainerView requires an ActionSetModel")
+        assert isinstance(input_item, AbstractInputItem), "invalid input item"
+        assert isinstance(container_model, ContainerModel), "invalid container model"
             
                
-        super().__init__(model = action_model, parent=parent)
+        super().__init__(model = container_model, parent=parent)
 
         self.pushSuspended() # suspend updates
+
+
 
         # Create required UI items
         self._main_layout = QtWidgets.QVBoxLayout(self)
@@ -7689,12 +7817,10 @@ class ContainerView(AbstractView):
         self._deleted = False
 
 
-        assert input_item is not None,"input item must be provided"
-        assert action_model is not None, "action model must be provided"
+        
 
         self._input_item = input_item
-       
-
+        
         verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose: self._main_layout.addWidget(QtWidgets.QLabel("ContainerView:"))
 
@@ -7737,7 +7863,7 @@ class ContainerView(AbstractView):
         self._drawn_once = False # draw on demand only on first redraw
 
         self.popSuspended() # allow updates
-        self.refreshModel()
+        self.refreshModel(True) # refreh data
 
 
     @property
@@ -8227,6 +8353,9 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         plugin_manager.set_widget(self._input_item, self)
 
+        # update the mapping widgets with mapped containers
+        self._redraw_ui()
+
         
 
     def getContainerView(self) -> ContainerView:
@@ -8309,7 +8438,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             container.add_action(action)
 
             if len(container.action_sets) > 0:
-                self._container_model.add_container(container)
+                self._container_model.addContainer(container)
 
             # update the visual on action change
             self.redraw()
@@ -8387,7 +8516,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         container.add_action(action_item)
 
         if len(container.action_sets) > 0:
-            self._container_model.add_container(container)
+            self._container_model.addContainer(container)
         self._container_model.data_changed.emit()
 
         eh = gremlin.event_handler.EventListener()
@@ -8407,7 +8536,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             container = plugin_manager.get_class(container_name)(self._input_item)
             if hasattr(container, "action_model"):
                 container.action_model = self._container_model
-            self._container_model.add_container(container)
+            self._container_model.addContainer(container)
             plugin_manager.set_container_data(self._input_item, container)
 
             eh = gremlin.event_handler.EventListener()
@@ -8522,7 +8651,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
                         new_container.action_model = self._container_model
 
                         plugin_manager.set_container_data(self._input_item, new_container)
-                        self._container_model.add_container(new_container)
+                        self._container_model.addContainer(new_container)
 
 
 
@@ -8620,7 +8749,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
                     new_container.action_model = self._container_model
 
                     plugin_manager.set_container_data(self._input_item, new_container)
-                    self._container_model.add_container(new_container)
+                    self._container_model.addContainer(new_container)
 
 
 
@@ -8661,7 +8790,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         if result == QtWidgets.QMessageBox.StandardButton.Cancel:
             return
 
-        self._container_model.remove_all_containers()
+        self._container_model.removeAllContainers()
 
         # update
         self.redraw()
@@ -11009,7 +11138,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         if verbose:
             if input_item:
-                syslog.info(f"Selecting input config item for {device.name} input index [{widget.index}] mode: {current_mode}: {input_item.debug_display}")
+                syslog.info(f"Selecting input config item for {device.name} input index [{widget.index}] mode: {current_mode}: {input_item.debug_name}")
             else:
                 syslog.info(f"Selecting input config item for {device.name} input index [{widget.index}] mode: {current_mode}: Empty content")
         
@@ -11025,7 +11154,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.updateContainerViewBlankMessage(input_item)
 
             if config.debug_ui:
-                self._debug_widget.setText(f"Contents for : {input_item.debug_display}")
+                self._debug_widget.setText(f"Contents for : {input_item.debug_name}")
 
             # make the mapping widget visible and redraw if needed
             self.selectInputItemMappingWidget(input_item)

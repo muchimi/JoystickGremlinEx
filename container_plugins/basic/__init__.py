@@ -23,7 +23,7 @@ from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 import gremlin.types
 from gremlin.base_profile import AbstractFunctor
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSet, ActionSets
+from gremlin.input_item import AbstractContainer, AbstractAction, AbstractContainerWidget, ActionSet, ActionSets
 from shiboken6 import Shiboken
 import logging
 from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
@@ -220,7 +220,7 @@ class BasicContainer(AbstractContainer):
 
 
     def add_action(self, action, index=-1):
-        assert isinstance(action, gremlin.base_profile.AbstractAction)
+        assert isinstance(action, AbstractAction)
 
         # Make sure if we're dealing with axis with remap and response curve
         # actions that they are arranged sensibly

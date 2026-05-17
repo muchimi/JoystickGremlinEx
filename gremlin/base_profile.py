@@ -3141,6 +3141,8 @@ class Profile():
                             )
 
         return remap_actions
+    
+
 
     def list_unused_vjoy_inputs(self):
         """Returns a list of unused vjoy inputs for the given profile.

@@ -24,6 +24,7 @@ from typing import Callable
 from psygnal import Signal
 import logging
 import uuid
+import dinput
 
 syslog = logging.getLogger("system")
 

@@ -1567,8 +1567,13 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_perf(self):
         ''' true if verbose mode for performance timing '''
-        return self.verbose and VerboseMode.Perf in self.verbose_mode
-
+        return True
+        # return self.verbose and VerboseMode.Perf in self.verbose_mode
+    
+    @property
+    def verbose_mode_timing(self):
+        ''' true if verbose mode is in timing mode '''
+        return self.verbose_mode_perf
 
     @property
     def verbose_mode_events(self):
@@ -1615,6 +1620,10 @@ class Configuration(QtCore.QObject):
     def verbose_mode_mode(self):
         ''' true if verbose mode is in Mode mode '''
         return self.verbose and VerboseMode.Mode in self.verbose_mode
+    
+
+    
+    
 
     @property
     def midi_enabled(self):
