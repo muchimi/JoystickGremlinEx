@@ -25,6 +25,8 @@ import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
 from gremlin.types import ActivationRule, AxisButtonDirection
+import gremlin.input_item
+from gremlin.input_item import AbstractCondition
 
 
 import gremlin.input_types
@@ -40,32 +42,7 @@ import math
 
 syslog = logging.getLogger("system")
 
-def smart_all(conditions):
-    """Returns True if all conditions are True, False otherwise.
 
-    Employs short circuiting in order to prevent unnecessary evaluations.
-
-    :param conditions the conditions to check
-    :return True if all conditions are True, False otherwise
-    """
-    for condition in conditions:
-        if not condition():
-            return False
-    return True
-
-
-def smart_any(conditions):
-    """Returns True if any conditions is True, False if none is True.
-
-    Employs short circuiting in order to prevent unnecessary evaluations.
-
-    :param conditions the conditions to check
-    :return True if at least one condition is True, False otherwise
-    """
-    for condition in conditions:
-        if condition():
-            return True
-    return False
 
 
 class Value:
@@ -134,102 +111,6 @@ class Value:
 
 
 
-class ActivationCondition:
-
-    """Represents a set of conditions dictating the activation of actions.
-
-    This class contains a set of functions which evaluate to either True or
-    False which is used to indicate whether or not the entire condition is
-    True or False.
-    """
-
-
-    rule_function = {
-        ActivationRule.All: smart_all,
-        ActivationRule.Any: smart_any
-    }
-
-    def __init__(self, conditions, rule, target, is_container_condition = False):
-        self._conditions = conditions
-        self._rule = rule
-        self.enabled = True # always enabled
-        self.target = target # the target this condition applies to (container or action)
-        self.id = target.id # the id of this node is the same as the one for the container or action
-        self.is_container_condition = is_container_condition
-        self.manual_callback = False
-
-
-    @property
-    def is_container(self) -> bool:
-        if self.target:
-            return isinstance(self.target, gremlin.input_item.AbstractContainer)
-        return False
-
-    @property
-    def isAny(self) -> bool:
-        ''' true if the activiation condition is any sub condition '''
-        return self._rule == ActivationRule.Any
-
-    def process_event(self, event, value, extra_data = None):
-        """Returns whether or not a condition is satisfied, i.e. true.
-
-        :param event the event this condition was triggered through
-        :param value process event value
-        :return True if all conditions are satisfied, False otherwise
-        """
-        if not self._conditions:
-            # no conditions, always succeeds
-            return True
-        return ActivationCondition.rule_function[self._rule](
-            [partial(c, event, value, extra_data) for c in self._conditions]
-        )
-
-
-    def condition_name(self)->str:
-        ''' returns a condition name for diagnostics purposes '''
-        rule_name = "all" if self._rule == ActivationRule.All else "any"
-        condition_name = ""
-        for index, c in enumerate(self._conditions):
-            condition_name += f"[C{index}] {c.condition_name()}"
-        return f"Rule: [{rule_name}] Is container: [{self.is_container}] Is container condition: [{self.is_container_condition}] Conditions: [{condition_name}] "
-
-    def __str__(self):
-        return self.condition_name()
-
-class AbstractCondition(metaclass=ABCMeta):
-
-    """Represents an abstract condition.
-
-    Conditions evaluate to either True or False and are given an event as well
-    as possibly processed Value when being evaluated.
-    """
-
-    def __init__(self, comparison = None):
-        """Creates a new condition with a specific comparision operation.
-
-        :param comparison the comparison operation to perform when evaluated
-        """
-        self.comparison = comparison
-        self.id = gremlin.util.get_guid()
-        self.manual_callback = False
-        self.delay = 0.0 # delay in seconds
-
-    @abstractmethod
-    def __call__(self, event, value, extra_data = None):
-        """Evaluates the condition using the condition and provided data.
-
-        :param event raw event that caused the condition to be evaluated
-        :param value the possibly modified value
-        :return True if the condition is satisfied, False otherwise
-        """
-        pass
-
-    @abstractmethod
-    def process_event(self, event, value, extra_data = None):
-        pass
-
-    def condition_name(self)->str:
-        return "condition_name() member not implemented: Condition not set"
 
 
 class KeyboardCondition(AbstractCondition):

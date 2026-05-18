@@ -26,7 +26,7 @@ from lxml import etree as ElementTree
 from PySide6 import QtWidgets, QtCore
 from PySide6.QtCore import Slot
 
-import gremlin.base_conditions
+import gremlin.input_item
 from  gremlin.clipboard import Clipboard
 import gremlin
 import gremlin.util
@@ -653,7 +653,7 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.switch_on_press = False
         if container.has_conditions:
             for cond in container.activation_condition.conditions:
-                if isinstance(cond, gremlin.base_conditions.BaseInputActionCondition):
+                if isinstance(cond, gremlin.input_item.BaseInputActionCondition):
                     if cond.comparison == "press":
                         self.switch_on_press = True       
 

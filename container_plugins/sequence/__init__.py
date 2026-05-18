@@ -27,7 +27,7 @@ import threading
 import random
 import gremlin
 import gremlin.actions
-import gremlin.base_conditions
+import gremlin.input_item
 import gremlin.config
 import gremlin.event_handler
 import gremlin.execution_graph
@@ -1010,7 +1010,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         # ensure proper cycling.
         self.switch_on_press = False
         for cond in container.activation_condition.conditions:
-            if isinstance(cond, gremlin.base_conditions.BaseInputActionCondition):
+            if isinstance(cond, gremlin.input_item.BaseInputActionCondition):
                 if cond.comparison == "press":
                     self.switch_on_press = True
 

@@ -25,7 +25,7 @@ import time
 
 
 import gremlin.base_buttons
-import gremlin.base_classes
+import gremlin.input_item
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
@@ -36,7 +36,7 @@ import gremlin.error
 import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.plugin_manager
-import gremlin.base_conditions
+import gremlin.input_item
 import gremlin.shared_state
 import anytree
 import queue
@@ -532,26 +532,26 @@ class ExecutionContext():
 
     def _convert_condition(self, condition):
         ''' converts a base condition to an action condition '''
-        if isinstance(condition, gremlin.base_conditions.BaseKeyboardCondition):
+        if isinstance(condition, gremlin.input_item.BaseKeyboardCondition):
                 return gremlin.actions.KeyboardCondition(
                         condition.scan_code,
                         condition.is_extended,
                         condition.comparison
                     )
 
-        elif isinstance(condition, gremlin.base_conditions.BaseJoystickCondition):
+        elif isinstance(condition, gremlin.input_item.BaseJoystickCondition):
             return gremlin.actions.JoystickCondition(condition)
 
-        elif isinstance(condition, gremlin.base_conditions.BaseVJoyCondition):
+        elif isinstance(condition, gremlin.input_item.BaseVJoyCondition):
             return gremlin.actions.VJoyCondition(condition)
 
-        elif isinstance(condition, gremlin.base_conditions.BaseInputActionCondition):
+        elif isinstance(condition, gremlin.input_item.BaseInputActionCondition):
             return gremlin.actions.InputActionCondition(condition.comparison)
 
-        elif isinstance(condition, gremlin.base_conditions.BaseStateCondition):
+        elif isinstance(condition, gremlin.input_item.BaseStateCondition):
             return gremlin.actions.StateCondition(condition)
 
-        elif isinstance(condition, gremlin.base_conditions.BaseModeCondition):
+        elif isinstance(condition, gremlin.input_item.BaseModeCondition):
             return gremlin.actions.ModeCondition(condition)
 
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
@@ -1000,23 +1000,23 @@ class ExecutionContext():
 
     def _convert_condition(self, condition):
         ''' converts a base condition to an action condition '''
-        if isinstance(condition, gremlin.base_conditions.BaseKeyboardCondition):
+        if isinstance(condition, gremlin.input_item.BaseKeyboardCondition):
                 return gremlin.actions.KeyboardCondition(
                         condition.scan_code,
                         condition.is_extended,
                         condition.comparison
                     )
-        elif isinstance(condition, gremlin.base_conditions.BaseJoystickCondition):
+        elif isinstance(condition, gremlin.input_item.BaseJoystickCondition):
             return gremlin.actions.JoystickCondition(condition)
-        elif isinstance(condition, gremlin.base_conditions.BaseVJoyCondition):
+        elif isinstance(condition, gremlin.input_item.BaseVJoyCondition):
             return gremlin.actions.VJoyCondition(condition)
-        elif isinstance(condition, gremlin.base_conditions.BaseInputActionCondition):
+        elif isinstance(condition, gremlin.input_item.BaseInputActionCondition):
             return gremlin.actions.InputActionCondition(condition.comparison)
         elif isinstance(condition, gremlin.actions.VirtualButtonCondition):
             return condition
-        elif isinstance(condition, gremlin.base_conditions.BaseStateCondition):
+        elif isinstance(condition, gremlin.input_item.BaseStateCondition):
             return gremlin.actions.StateCondition(condition)
-        elif isinstance(condition, gremlin.base_conditions.BaseModeCondition):
+        elif isinstance(condition, gremlin.input_item.BaseModeCondition):
             return gremlin.actions.ModeCondition(condition)
 
 
@@ -1030,7 +1030,7 @@ class ExecutionContext():
         """
         conditions = []
         for condition in activation_condition.conditions:
-            if isinstance(condition, gremlin.base_conditions.BaseActivationCondition):
+            if isinstance(condition, gremlin.input_item.BaseActivationCondition):
                 for sub_condition in condition.conditions:
                     conditions.append(self._convert_condition(sub_condition))
             else:
@@ -1167,7 +1167,7 @@ class ExecutionContext():
                         node_functors = []
                         for condition in node.conditions:
                             if condition and container:
-                                if isinstance(condition, gremlin.base_conditions.BaseActivationCondition):
+                                if isinstance(condition, gremlin.input_item.BaseActivationCondition):
                                     if self._verbose_detailed: syslog.info(f"{logTabs}\tprocessing ALL rule")
                                     for child in node.children:
                                         self._traverse_node_functors(child, node_functors)
@@ -1175,7 +1175,7 @@ class ExecutionContext():
                                     node.functors = node_functors
                                     # done processing that branch
                                     return
-                                elif isinstance(condition, gremlin.base_conditions.BaseAbstractCondition):
+                                elif isinstance(condition, gremlin.input_item.BaseAbstractCondition):
                                     if self._verbose_detailed: syslog.info(f"{logTabs}\tadding functor for condition: {str(condition)}")
                                     functor = self._convert_condition(condition)
                                     node_functors.append(functor)
@@ -1229,7 +1229,7 @@ class ExecutionContext():
                     for condition in n.conditions:
                         container = n.container
                         if condition and container:
-                            if isinstance(condition, gremlin.base_conditions.BaseActivationCondition):
+                            if isinstance(condition, gremlin.input_item.BaseActivationCondition):
                                 functor = self._create_activation_condition(condition, container, True)
                             else:
                                 functor = self._convert_condition(condition)
@@ -2369,24 +2369,24 @@ class AbstractExecutionGraph(QtCore.QObject):
 
     def _convert_condition(self, condition):
         ''' converts a base condition to an action condition '''
-        if isinstance(condition, gremlin.base_conditions.BaseKeyboardCondition):
+        if isinstance(condition, gremlin.input_item.BaseKeyboardCondition):
                 return gremlin.actions.KeyboardCondition(
                         condition.scan_code,
                         condition.is_extended,
                         condition.comparison
                     )
 
-        elif isinstance(condition, gremlin.base_conditions.BaseJoystickCondition):
+        elif isinstance(condition, gremlin.input_item.BaseJoystickCondition):
             return gremlin.actions.JoystickCondition(condition)
 
-        elif isinstance(condition, gremlin.base_conditions.BaseVJoyCondition):
+        elif isinstance(condition, gremlin.input_item.BaseVJoyCondition):
             return gremlin.actions.VJoyCondition(condition)
 
-        elif isinstance(condition, gremlin.base_conditions.BaseInputActionCondition):
+        elif isinstance(condition, gremlin.input_item.BaseInputActionCondition):
             return gremlin.actions.InputActionCondition(condition.comparison)
-        elif isinstance(condition, gremlin.base_conditions.BaseStateCondition):
+        elif isinstance(condition, gremlin.input_item.BaseStateCondition):
             return gremlin.actions.StateCondition(condition)
-        elif isinstance(condition, gremlin.base_conditions.BaseModeCondition):
+        elif isinstance(condition, gremlin.input_item.BaseModeCondition):
             return gremlin.actions.ModeCondition(condition)
 
 
@@ -2401,7 +2401,7 @@ class AbstractExecutionGraph(QtCore.QObject):
         """
         conditions = []
         for condition in activation_condition.conditions:
-            if isinstance(condition, gremlin.base_conditions.BaseActivationCondition):
+            if isinstance(condition, gremlin.input_item.BaseActivationCondition):
                 for sub_condition in condition.conditions:
                     conditions.append(self._convert_condition(sub_condition))
             else:
@@ -2423,7 +2423,7 @@ class AbstractExecutionGraph(QtCore.QObject):
         """
         if activation_condition:
             return any([
-                isinstance(cond, gremlin.base_conditions.BaseInputActionCondition)
+                isinstance(cond, gremlin.input_item.BaseInputActionCondition)
                 for cond in activation_condition.conditions
             ])
         else:
@@ -2635,10 +2635,10 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
             condition_functor = None
             if add_default_activation and not has_input_action:
-                condition = gremlin.base_conditions.BaseInputActionCondition()
+                condition = gremlin.input_item.BaseInputActionCondition()
                 condition.comparison = ActionSetExecutionGraph.comparison_map[action.default_button_activation]
 
-                activation_condition = gremlin.base_conditions.BaseActivationCondition([condition], gremlin.actions.ActivationRule.All)
+                activation_condition = gremlin.input_item.BaseActivationCondition([condition], gremlin.actions.ActivationRule.All)
                 functor = self._create_activation_condition(activation_condition, action)
                 self.functors.append(functor)
                 sequence.append("Condition")

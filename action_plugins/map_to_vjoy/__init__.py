@@ -23,13 +23,11 @@ from lxml import etree as ElementTree
 import traceback
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.actions
-import gremlin.base_conditions
 import gremlin.config
 import gremlin.event_handler
 import gremlin.execution_graph
 import gremlin.input_types
 import gremlin.joystick_handling
-import gremlin.keyboard
 import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.repeater
@@ -39,7 +37,6 @@ import gremlin.ui.osc_device
 import gremlin.ui.qsliderwidget
 from gremlin.util import load_icon
 from shiboken6 import Shiboken
-from gremlin.base_conditions import BaseInputActionCondition
 from gremlin.input_types import InputType
 from gremlin import input_devices, joystick_handling, util
 from gremlin.error import ProfileError
@@ -4393,20 +4390,20 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _convert_condition(self, condition):
         ''' converts a base condition to an action condition '''
-        if isinstance(condition, gremlin.base_conditions.BaseKeyboardCondition):
+        if isinstance(condition, gremlin.input_item.BaseKeyboardCondition):
                 return gremlin.actions.KeyboardCondition(
                         condition.scan_code,
                         condition.is_extended,
                         condition.comparison
                     )
 
-        elif isinstance(condition, gremlin.base_conditions.BaseJoystickCondition):
+        elif isinstance(condition, gremlin.input_item.BaseJoystickCondition):
             return gremlin.actions.JoystickCondition(condition)
 
-        elif isinstance(condition, gremlin.base_conditions.BaseVJoyCondition):
+        elif isinstance(condition, gremlin.input_item.BaseVJoyCondition):
             return gremlin.actions.VJoyCondition(condition)
 
-        elif isinstance(condition, gremlin.base_conditions.BaseInputActionCondition):
+        elif isinstance(condition, gremlin.input_item.BaseInputActionCondition):
             return gremlin.actions.InputActionCondition(condition.comparison)
 
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
@@ -4420,7 +4417,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         """
         conditions = []
         for condition in activation_condition.conditions:
-            if isinstance(condition, gremlin.base_conditions.BaseActivationCondition):
+            if isinstance(condition, gremlin.input_item.BaseActivationCondition):
                 for sub_condition in condition.conditions:
                     conditions.append(self._convert_condition(sub_condition))
             else:

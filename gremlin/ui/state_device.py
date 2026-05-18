@@ -1584,8 +1584,8 @@ class StateData():
 
         def _condition_callback(input_item, owner, condition, extra_data : dict = None):
             nonlocal used, key, used_list
-            import gremlin.base_conditions, gremlin.base_profile
-            if isinstance(condition, gremlin.base_conditions.BaseStateCondition):
+            import gremlin.input_item, gremlin.base_profile
+            if isinstance(condition, gremlin.input_item.BaseStateCondition):
                 if condition.key == key:
                     used = True # state is used
                     if return_usage:

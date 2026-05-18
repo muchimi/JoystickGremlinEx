@@ -40,7 +40,7 @@ import gremlin.types
 from lxml import etree
 from gremlin.types import DeviceType
 
-from gremlin.base_conditions import *
+import gremlin.input_item
 from gremlin.base_buttons import VirtualAxisButton, VirtualHatButton
 from gremlin.input_types import InputType
 from gremlin.plugin_manager import ActionPlugins, ContainerPlugins
@@ -394,7 +394,7 @@ class AbstractFunctor(QtCore.QObject):
         needs_auto_release = True
         if activation_condition:
             for condition in activation_condition.conditions:
-                if isinstance(condition, BaseInputActionCondition):
+                if isinstance(condition, gremlin.input_item.BaseInputActionCondition):
                     # Remap like actions typically have an always activation
                     # condition associated with them
                     if condition.comparison != "always":

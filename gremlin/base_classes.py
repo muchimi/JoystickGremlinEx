@@ -25,8 +25,36 @@ from psygnal import Signal
 import logging
 import uuid
 import dinput
+from gremlin.types import SendType, ActivationRule
+import _collections_abc
 
 syslog = logging.getLogger("system")
+
+def _get_input_item(parent):
+    ''' gets the InputItem parent hierarchy if it exists '''
+    import gremlin.input_item
+    import gremlin.profile_graph
+    while parent is not None:
+        if isinstance(parent, gremlin.input_item.InputItem):
+            break
+        if isinstance(parent, gremlin.profile_graph.ProfileInputNode):
+            return parent.input_item
+        if hasattr(parent,"parent"):
+            parent = parent.parent
+        else:
+            parent = None
+
+    if parent is not None:
+        return parent
+    return None
+
+
+def _is_curve_tag(tag):
+     ''' true if a curve tag'''
+     if tag:
+        return tag.casefold() in ("curve-data","response-curve","response-curve-ex")
+     return False
+
 
 
 class TraceableList(MutableSequence):
@@ -811,3 +839,259 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         pass
 
 
+
+class AbstractModel(QtCore.QAbstractItemModel):
+
+    """Base class for MVC models."""
+
+    data_changed = QtCore.Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.id = uuid.uuid4() # unique ID of this model
+
+
+    def rows(self):
+        """Returns the number of rows in the model.
+
+        :return number of rows
+        """
+        pass
+
+    def count(self):
+        return self.rows()
+    
+    def __iter__(self):
+        ''' generator '''
+        assert False, "method must be implemented in the derived class"
+
+    def data(self, index : int):
+        """Returns the data entry stored at the provided index.
+
+        :param index the index for which to return data
+        :return data stored at the given index
+        """
+        assert False, "method must be implemented in the derived class"
+
+    def add(self, data):
+        """Adds a new entry to the model. """
+        assert False, "method must be implemented in the derived class"
+
+    def remove(self, data):
+        """Removes the given entry from the model."""
+        assert False, "method must be implemented in the derived class"
+
+    def clear(self, data):
+        """Removes all the given entry from the model."""
+        assert False, "method must be implemented in the derived class"
+
+    def refresh(self, force = False, emit = True):
+        """
+        Refreshes the model, triggering a data changed event if the model data was changed and not emitted yet
+        """ 
+        assert False, "method must be implemented in the derived class"
+
+    def modelChanged(self) -> bool:
+        ''' true if the model changed since the last change event was fired '''
+        assert False, "method must be implemented in the derived class"
+
+     
+
+class AbstractCallbackModel(AbstractModel):
+    ''' adds callbacks on change to a regular model '''
+
+    
+
+    def __init__(self, callback : Callable = None, allowed_types : tuple = None, description : str = None):
+        ''' callback enabled model
+        :param callback: optional initial callback
+        :param allowable types: optiona list of allowable types in the model
+
+        '''
+        super().__init__()
+        self._old_hash = None # last change hash
+        self._data_changed_callbacks = []
+        self._item_map = {} # map of item (hashable) to index [hashable] -> int
+        self._index_map = {} # map of index to item  [int] -> hashable
+        if not description:
+            description = "Model"
+        self._description = description
+
+        if allowed_types:
+            assert isinstance(allowed_types, tuple), "allowed types must be a tuple"
+        self._allowed_types = allowed_types
+        self._suspend_stack = 0 # tracks suspension of change events
+        self._change_pending = False # true if a change is pending
+        
+        if callback:
+            self.addCallback(callback)
+
+    def __iter__(self):
+        ''' iterator - gets an iterator to the contents '''
+        return iter(self._index_map.values())
+    
+    def __len__(self):
+        ''' number of items in the model '''
+        return len(self._item_map)
+    
+    def __getitem__(self, index):
+        ''' subscribtable '''
+        if index in self._index_map:
+            return self._index_map[index]
+        raise IndexError
+    
+    def append(self, item):
+        ''' appends an item '''
+        self.add(item)
+
+    def add(self, item) -> int:
+        """Adds a new entry to the model, returns the position inserted """
+        if self._allowed_types:
+            if not isinstance(item, self._allowed_types):
+                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
+        assert isinstance(item, _collections_abc.Hashable),"item must be hashable"
+        if not item in self._index_map:
+            index = len(self._item_map)
+            self._item_map[item] = index
+            self._index_map[index] = item
+            self._fireChanged()
+        
+
+    def insert(self, i, item):            
+        ''' inserts an item '''
+        if self._allowed_types:
+            if not isinstance(item, self._allowed_types):
+                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
+        if i in self._index_map:
+            # bump all the items down 1
+            start_index = i
+            stop_index = len(self._index_map)
+            for index in range(stop_index, start_index, step = -1):
+                data = self._index_map[index]
+                self._index_map[index+1] = data
+                self._item_map[data] = index +1
+
+        # insert the item
+        self._index_map[i] = item
+        self._item_map[item] = i
+
+    def place(self, item, index : int):
+        ''' places an item at a given index - no checking '''
+        if item in self._item_map:
+            i = self._index_map[index]
+            if i == index:
+                # already there
+                return 
+            # remove the old entry from the model
+            del self._index_map[i]
+        self._index_map[index] = item
+        self._item_map[item] = index
+
+    def remove(self, item):
+        """Removes the given entry from the model."""
+        if item in self._item_map:
+            index = self._item_map[item]
+            if hasattr(item,"_cleanup"):
+                item._cleanup()
+            del self._item_map[item]
+            del self._index_map[index]
+            self._fireChanged()
+
+    def removeAt(self, index : int):
+        ''' removes the entry at the given model index '''
+        if index in self._index_map:
+            item = self._index_map[index]
+            if hasattr(item,"_cleanup"):
+                item._cleanup()
+            del self._item_map[item]
+            del self._index_map[index]
+            self._fireChanged()
+
+    def clear(self):
+        """Removes all the given entry from the model."""
+        if self._item_map:
+            self._item_map.clear()
+            self._index_map.clear()
+            self._fireChanged()
+
+    def data(self, index : int):
+        ''' returns the item stored at the given index, None if not found
+        :param index: the index
+        '''
+        if index in self._index_map:
+            return self._index_map[index]
+        return None
+        
+    def rows(self) -> int:
+        ''' returns the size of the model'''
+        return len(self._index_map)    
+   
+
+    def refresh(self, force=False, emit=True):
+        ''' trigger a data change if them model has changed '''
+        self._fireChanged(force, emit)
+
+    def pushSuspend(self):
+        ''' suspends change notifications '''
+        self._suspend_stack += 1
+
+    def popSuspend(self, reset = False, emit = True):
+        ''' restores change notifications '''
+        if reset and self._suspend_stack > 0:
+            self._suspend_stack = 0
+        if self._suspend_stack > 0:
+            self._suspend_stack-= 1
+        if self._suspend_stack == 0:
+            self._fireChanged(force = self._change_pending, emit = emit)
+
+    def resetChanges(self):
+        ''' resets any changes to the model '''
+        self._suspend_stack = 0
+        self._change_pending = False
+
+
+    def addCallback(self, callback : Callable):
+        ''' adds a callback to be called when the model data changes '''
+        if __debug__ and callback is not None and not callable(callback):
+            raise TypeError("Callback must be callable")
+        if not callback in self._data_changed_callbacks:
+            self._data_changed_callbacks.append(callback)
+
+    def removeCallback(self, callback : Callable):
+        ''' removes a callback from the list of callbacks to be called when the model data changes '''
+        if callback in self._data_changed_callbacks:
+            self._data_changed_callbacks.remove(callback)
+
+    def modelChanged(self) -> bool:
+        ''' true if data has changed  '''
+        return self._change_pending or hash(self) != self._old_hash
+
+    def _fireChanged(self, force = False, emit = False):
+        ''' fires a data changed signal if the data has changed or if force is true '''
+        if self._change_pending and not force:
+            return
+        new_hash = hash(self)
+        if self._suspend_stack:
+            # firing changes currently suspended
+            self._change_pending = new_hash != self._old_hash
+            return
+        
+        if new_hash != self._old_hash or force or self._change_pending:
+            config = gremlin.config.Configuration()
+            verbose = config.verbose_mode_ui
+            if verbose: syslog.info(f"Model: [{self._description}] trigger model change")
+                
+            self._old_hash = new_hash
+
+            for callback in self._data_changed_callbacks:
+                callback()
+
+            if emit:
+                self.data_changed.emit() # indicate the model changed
+
+            self._change_pending = False
+
+
+    def __hash__(self):
+        ''' unique hash value of model contents '''
+        return hash((self.id, frozenset(self._index_map.values())))

@@ -30,7 +30,7 @@ import gremlin.event_handler
 import gremlin.ui.ui_common
 import gremlin.input_item
 from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
-import gremlin.base_conditions
+import gremlin.input_item
 import gremlin.joystick_handling
 from gremlin.input_types import InputType
 import enum
@@ -507,7 +507,7 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self.switch_on_press = False
         if container.has_conditions:
             for cond in container.activation_condition.conditions:
-                if isinstance(cond, gremlin.base_conditions.BaseInputActionCondition):
+                if isinstance(cond, gremlin.input_item.BaseInputActionCondition):
                     if cond.comparison == "press":
                         self.switch_on_press = True
 

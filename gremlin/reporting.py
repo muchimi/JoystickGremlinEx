@@ -34,7 +34,7 @@ import dinput
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.base_profile
 from collections import namedtuple
-import gremlin.base_conditions
+import gremlin.input_item
 import traceback
 import html
 

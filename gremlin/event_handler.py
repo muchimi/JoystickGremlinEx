@@ -4336,7 +4336,7 @@ class JoystickEventProcessor():
 
 	def handle_config_changed(self):
 		config = gremlin.config.Configuration()
-		self.verbose = config.verbose_mode_perf # or config.verbose_mode_hooks
+		self.verbose = config.verbose_mode_perf and config.verbose_mode_events # or config.verbose_mode_hooks
 
 	def profile_unload(self):
 		self.reset()

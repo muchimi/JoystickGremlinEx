@@ -27,7 +27,6 @@ import gremlin.config
 import gremlin.event_handler
 import gremlin.singleton_decorator
 import gremlin.types
-import gremlin.base_conditions
 import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
@@ -58,11 +57,11 @@ from gremlin.types import SendType, ActivationRule
 
 from gremlin.base_classes import AbstractInputItem, BaseProfileData
 from gremlin.plugin_manager import ActionPlugins, ContainerPlugins
-from gremlin.base_conditions import ConditionTracker
+
 
 from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.actions
-import _collections_abc
+from gremlin.base_classes import AbstractCallbackModel, _get_input_item, _is_curve_tag
 
 
 from gremlin.ui import virtual_button
@@ -70,34 +69,6 @@ from gremlin.ui import virtual_button
 syslog = logging.getLogger("system")
 
 CallbackData = collections.namedtuple("ContainerCallback", ["callback", "event"])
-
-
-def _get_input_item(parent):
-    ''' gets the InputItem parent hierarchy if it exists '''
-    import gremlin.input_item
-    import gremlin.profile_graph
-    while parent is not None:
-        if isinstance(parent, gremlin.input_item.InputItem):
-            break
-        if isinstance(parent, gremlin.profile_graph.ProfileInputNode):
-            return parent.input_item
-        if hasattr(parent,"parent"):
-            parent = parent.parent
-        else:
-            parent = None
-
-    if parent is not None:
-        return parent
-    return None
-
-
-def _is_curve_tag(tag):
-     ''' true if a curve tag'''
-     if tag:
-        return tag.casefold() in ("curve-data","response-curve","response-curve-ex")
-     return False
-
-
 
 class InputIdentifier(QtCore.QObject):
 
@@ -208,250 +179,6 @@ class InputIdentifier(QtCore.QObject):
         return None # not found
 
 
-class AbstractModel(QtCore.QAbstractItemModel):
-
-    """Base class for MVC models."""
-
-    data_changed = QtCore.Signal()
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.id = uuid.uuid4() # unique ID of this model
-
-
-    def rows(self):
-        """Returns the number of rows in the model.
-
-        :return number of rows
-        """
-        pass
-
-    def count(self):
-        return self.rows()
-    
-    def __iter__(self):
-        ''' generator '''
-        assert False, "method must be implemented in the derived class"
-
-    def data(self, index : int):
-        """Returns the data entry stored at the provided index.
-
-        :param index the index for which to return data
-        :return data stored at the given index
-        """
-        assert False, "method must be implemented in the derived class"
-
-    def add(self, data):
-        """Adds a new entry to the model. """
-        assert False, "method must be implemented in the derived class"
-
-    def remove(self, data):
-        """Removes the given entry from the model."""
-        assert False, "method must be implemented in the derived class"
-
-    def clear(self, data):
-        """Removes all the given entry from the model."""
-        assert False, "method must be implemented in the derived class"
-
-    def refresh(self, force = False, emit = True):
-        """
-        Refreshes the model, triggering a data changed event if the model data was changed and not emitted yet
-        """ 
-        assert False, "method must be implemented in the derived class"
-
-    def modelChanged(self) -> bool:
-        ''' true if the model changed since the last change event was fired '''
-        assert False, "method must be implemented in the derived class"
-
-     
-
-class AbstractCallbackModel(AbstractModel):
-    ''' adds callbacks on change to a regular model '''
-
-    
-
-    def __init__(self, callback : Callable = None, allowed_types : tuple = None):
-        ''' callback enabled model
-        :param callback: optional initial callback
-        :param allowable types: optiona list of allowable types in the model
-
-        '''
-        super().__init__()
-        self._old_hash = None # last change hash
-        self._data_changed_callbacks = []
-        self._item_map = {} # map of item (hashable) to index [hashable] -> int
-        self._index_map = {} # map of index to item  [int] -> hashable
-
-        if allowed_types:
-            assert isinstance(allowed_types, tuple), "allowed types must be a tuple"
-        self._allowed_types = allowed_types
-        self._suspend_stack = 0 # tracks suspension of change events
-        self._change_pending = False # true if a change is pending
-        
-        if callback:
-            self.addCallback(callback)
-
-    def __iter__(self):
-        ''' iterator '''
-        return iter(self._item_map.values())
-    
-    def append(self, item):
-        ''' appends an item '''
-        self.add(item)
-
-    def add(self, item) -> int:
-        """Adds a new entry to the model, returns the position inserted """
-        if self._allowed_types:
-            if not isinstance(item, self._allowed_types):
-                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
-        assert isinstance(item, _collections_abc.Hashable),"item must be hashable"
-        if not item in self._index_map:
-            index = len(self._item_map)
-            self._item_map[item] = index
-            self._index_map[index] = item
-            self._fireChanged()
-        self._item_map[item]
-
-    def insert(self, i, item):            
-        ''' inserts an item '''
-        if self._allowed_types:
-            if not isinstance(item, self._allowed_types):
-                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
-        if i in self._index_map:
-            # bump all the items down 1
-            start_index = i
-            stop_index = len(self._index_map)
-            for index in range(stop_index, start_index, step = -1):
-                data = self._index_map[index]
-                self._index_map[index+1] = data
-                self._item_map[data] = index +1
-
-        # insert the item
-        self._index_map[i] = item
-        self._item_map[item] = i
-
-    def place(self, item, index : int):
-        ''' places an item at a given index - no checking '''
-        if item in self._item_map:
-            i = self._index_map[index]
-            if i == index:
-                # already there
-                return 
-            # remove the old entry from the model
-            del self._index_map[i]
-        self._index_map[index] = item
-        self._item_map[item] = index
-
-    def remove(self, item):
-        """Removes the given entry from the model."""
-        if item in self._item_map:
-            index = self._item_map[item]
-            if hasattr(item,"_cleanup"):
-                item._cleanup()
-            del self._item_map[item]
-            del self._index_map[index]
-            self._fireChanged()
-
-    def removeAt(self, index : int):
-        ''' removes the entry at the given model index '''
-        if index in self._index_map:
-            item = self._index_map[index]
-            if hasattr(item,"_cleanup"):
-                item._cleanup()
-            del self._item_map[item]
-            del self._index_map[index]
-            self._fireChanged()
-
-    def clear(self):
-        """Removes all the given entry from the model."""
-        if self._item_map:
-            self._item_map.clear()
-            self._index_map.clear()
-            self._fireChanged()
-
-    def data(self, index : int):
-        ''' returns the item stored at the given index, None if not found
-        :param index: the index
-        '''
-        if index in self._index_map:
-            return self._index_map[index]
-        return None
-        
-    def rows(self) -> int:
-        ''' returns the size of the model'''
-        return len(self._index_map)    
-   
-
-    def refresh(self, force=False, emit=True):
-        ''' trigger a data change if them model has changed '''
-        self._fireChanged(force, emit)
-
-    def pushSuspend(self):
-        ''' suspends change notifications '''
-        self._suspend_stack += 1
-
-    def popSuspend(self, reset = False, emit = True):
-        ''' restores change notifications '''
-        if reset and self._suspend_stack > 0:
-            self._suspend_stack = 0
-        if self._suspend_stack > 0:
-            self._suspend_stack-= 1
-        if self._suspend_stack == 0:
-            self._fireChanged(force = self._change_pending, emit = emit)
-
-    def resetChanges(self):
-        ''' resets any changes to the model '''
-        self._suspend_stack = 0
-        self._change_pending = False
-
-
-    def addCallback(self, callback : Callable):
-        ''' adds a callback to be called when the model data changes '''
-        if __debug__ and callback is not None and not callable(callback):
-            raise TypeError("Callback must be callable")
-        if not callback in self._data_changed_callbacks:
-            self._data_changed_callbacks.append(callback)
-
-    def removeCallback(self, callback : Callable):
-        ''' removes a callback from the list of callbacks to be called when the model data changes '''
-        if callback in self._data_changed_callbacks:
-            self._data_changed_callbacks.remove(callback)
-
-    def modelChanged(self) -> bool:
-        ''' true if data has changed  '''
-        return self._change_pending or hash(self) != self._old_hash
-
-    def _fireChanged(self, force = False, emit = False):
-        ''' fires a data changed signal if the data has changed or if force is true '''
-        if self._change_pending and not force:
-            return
-        new_hash = hash(self)
-        if self._suspend_stack:
-            # firing changes currently suspended
-            self._change_pending = new_hash != self._old_hash
-            return
-        
-        new_hash = hash(self)
-        if new_hash != self._old_hash or force or self._change_pending:
-            verbose = gremlin.config.Configuration().verbose_mode_perf
-            if verbose: syslog.info("ActionSetModel: trigger model change")
-                
-            self._old_hash = new_hash
-
-            for callback in self._data_changed_callbacks:
-                callback()
-
-            if emit:
-                self.data_changed.emit() # indicate the model changed
-
-            self._change_pending = False
-
-
-    def __hash__(self):
-        ''' unique hash value of model contents '''
-        return hash((self.id, self._index_map))
-
-
 class AbstractView(QtWidgets.QWidget):
 
     """Base class for MVC views."""
@@ -464,7 +191,7 @@ class AbstractView(QtWidgets.QWidget):
     item_closed = QtCore.Signal(object, int, object)  # widget, index, model data object
     
 
-    def __init__(self, model : AbstractModel =None, callback : Callable = None, parent=None):
+    def __init__(self, model : AbstractCallbackModel =None, callback : Callable = None, parent=None):
         """Creates a new view instance.
         :param model: the model to visualize
         :param callback: an optional callback to be called when the model changes - this is used by the container to trigger updates when the model changes subject to begin/end model change calls - more can be added with addCallback()
@@ -472,10 +199,9 @@ class AbstractView(QtWidgets.QWidget):
         """
         super().__init__(parent)
         self._id = gremlin.util.get_uuid()
-        if model is not None and not isinstance(model, AbstractModel):
-            raise TypeError("Invalid model type")  
+        assert isinstance(model, AbstractCallbackModel),"invalid model"
         self._model = model
-        self._model.data_changed.connect(self._handle_model_changed) # hook changes
+        self._model.addCallback(self._handle_model_changed) # hook changes to the model
 
         self._redraw_suspended_stack = 0 # non 0 = redraw is suspended
         self._redraw_pending = False # true if a redraw is pending while redraw is disabled
@@ -567,13 +293,13 @@ class AbstractView(QtWidgets.QWidget):
     def model(self):
         return self._model
     @model.setter
-    def model(self, value):
+    def model(self, value : AbstractCallbackModel):
         
         if value != self._model:
             
             if self._model:
                 self._model.data_changed.disconnect(self._model_changed)
-            if __debug__ and value is not None and not isinstance(value, AbstractModel):
+            if __debug__ and value is not None and not isinstance(value, AbstractCallbackModel):
                 raise TypeError("Invalid model type")
             self._model = value
             if self._model:
@@ -622,7 +348,12 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     lockedChanged = Signal(object) # (input_item) fires when the lock state changes - passes the input item as the parameter
 
-    def __init__(self, mode_object : str | gremlin.base_profile.Mode, custom_name_handler : Callable = None, custom_mode_name_handler : Callable = None, override_input_type = None, device_guid = None):
+    def __init__(self,
+                 mode_object : str | gremlin.base_profile.Mode,
+                 custom_name_handler : Callable = None,
+                 custom_mode_name_handler : Callable = None,
+                 override_input_type = None,
+                 device_guid = None):
         """Creates a new InputItem instance.
         :param mode_parent: the parent mode object of this input item (gremlin.base_profile.Mode) - required
         :param custom_name_handler: handler() returns a string, whenever the input name is needed
@@ -643,7 +374,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._device_guid = device_guid # hardware input ID
         self._device_id = None # hardware input ID as a string
         self._name = None # device name
-
         self._input_name = None # input name of the hardware (axis name if an axis)
         if custom_name_handler is not None:
             assert callable(custom_name_handler), "Name handler must be callable "
@@ -654,7 +384,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         if custom_mode_name_handler is not None:
             assert callable(custom_mode_name_handler), "Mode name handler must be callable "
         self._profile_mode_callback = custom_mode_name_handler # special callback to use to get the profile mode for this item (if special)
-        self._containers = []
+        self._containers = ContainerModel(self) # holds the containers for this input
+        self._containers.addCallback(self._handle_containers_changed) # called when containers are changed
         self._selected = False # true if the item is selected
         self._is_action = False # true if the object is a sub-item for a sub-action (GateHandler for example)
         self._device_type = None
@@ -702,6 +433,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             assert callable(callback), "Callback must be a callable method"
         self._profile_mode_callback = callback
 
+    @property
+    def containerModel(self) -> ContainerModel:
+        ''' the container data for this input '''
+        return self.containers
 
     @property
     def is_action(self) -> bool:
@@ -904,14 +639,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         ''' true if this item is setup as an axis input (momentary) '''
         return not self.is_axis
 
-
-    def add_container(self, container):
-        self._containers.append(container)
-
-        # tell the UI about the change
+    def _handle_containers_changed(self):
+        ''' tells the UI about the container change'''
         el = gremlin.event_handler.EventListener()
         el.mapping_changed.emit(self)
         el.input_used_changed.emit(self._device_guid, self._input_type, self._input_id, True)
+
+        
 
     def remove_container(self, container):
 
@@ -949,12 +683,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         return self._containers
 
     @property
-    def containers(self):
+    def containers(self) -> ContainerModel:
+        ''' containers defined for this input '''
         return self._containers
-
-    def setContainers(self, containers):
-        self._containers = containers
-
 
     @gremlin.base_classes.AbstractInputItem.input_type.setter
     def input_type(self, input_type : InputType):
@@ -1061,7 +792,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         plugins = ActionPlugins()
         action_type = plugins.get_class(action_name)
         if action_type is not None:
-            container : gremlin.input_item.AbstractContainer
+            container : AbstractContainer
             for container in self._containers:
                 for action_set in container.action_sets:
                     action : gremlin.base_profile.AbstractAction
@@ -1169,7 +900,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         #assert data is not None, "InputItem must be provided"
         import gremlin.ui.octavi_device
 
-        container_node = node # node that holds the container information
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         if extra_data and "input_type" in extra_data:
@@ -1234,6 +964,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
 
         # read containers for this input item
+        self._containers.pushSuspend() # stop updates
+        self._containers.clear() # remove any prior data
         container_nodes = node.xpath("./container")
         for child in container_nodes:
             if child.tag in ("latched", "input", "keylatched") or _is_curve_tag(child.tag):
@@ -1263,12 +995,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
             entry.from_xml(child, data, extra_data)
             # verify the entry has data
-            self.add_container(entry)
+            self._containers.add(entry)
+            
             if hasattr(entry, "action_model"):
                 entry.action_model = self.containers
             container_plugins.set_container_data(self, entry)
 
-        # register joystic axis items
+        self._containers.popSuspend() # allow updates
 
     def is_valid_for_save(self) -> bool:
         ''' true if the item has something to save to a profile '''
@@ -1305,31 +1038,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 node = etree.Element(InputType.to_string(self.input_type))
 
                 container_node = node # default container node to the input node
-                # if self.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
-                #     if isinstance(self.input_id, Key):
-                #         # keyboard key item
-                #         key : Key
-                #         key = self.input_id
-                #         node.set("id", safe_format(key.scan_code, int))
-                #         node.set("extended", safe_format(key.is_extended, bool))
-                #         for latched_key in key.latched_keys:
-                #             # latched keys
-                #             child = etree.Element("latched")
-                #             child.set("id", safe_format(latched_key.scan_code, int))
-                #             child.set("extended", safe_format(latched_key.is_extended, bool))
-                #             node.append(child)
-                #     elif hasattr(self.input_id,"to_xml"):
-                #         child = self.input_id.to_xml()
-                #         node.append(child)
-                #     else:
-                #         node.set("id", safe_format(self.input_id[0], int))
-                #         node.set("extended", safe_format(self.input_id[1], bool))
-                # elif self.input_type in (InputType.Midi, InputType.OpenSoundControl):
-                #     # write midi or OSC nodes
-                #     child = self.input_id.to_xml()
-                #     if child is not None:
-                #         node.append(child)
-                # else:
                 node.set("id", safe_format(self.input_id, int))
             else:
                 node = parent_node
@@ -1352,19 +1060,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 node.set("locked", safe_format(self._locked, bool))
 
             for entry in self.containers:
-                # gremlinex change: containers can still be saved if they are invalid if they are still being configured:
-                # valid = entry.is_valid_for_save()
-                # if valid:
+                # write the containers
                 child = entry.to_xml()
-                if child is None:
-                    child = entry.to_xml()
-                    # pass
                 if child is not None:
-                    container_node.append(entry.to_xml())
-
-                # else:
-                #     if gremlin.config.Configuration().verbose:
-                #         syslog.info(f"SaveProfile: input: {self.input_type} {InputType.to_display_name(self.input_type)} input id: {self.input_id} container has no data - won't save {entry.name}")
+                    container_node.append(child)
 
             return node
         finally:
@@ -2857,7 +2556,7 @@ class InputItemListModel(AbstractCallbackModel):
         :param show_filtered_only: determines if only filtered items are shown in the model
         """
         import gremlin.base_profile
-        super().__init__(allowed_types=(InputItem,))
+        super().__init__(allowed_types=(InputItem,), description=f"InputItemListModel")
 
         if profile is None:
             raise ValueError("Profile cannot be None")
@@ -4418,10 +4117,11 @@ class ActionSetModel(AbstractCallbackModel):
     """Model storing a set of actions."""
 
     def __init__(self, action_set : ActionSet | list = []):
-        super().__init__(allowed_types=(ActionSet,))
         if not isinstance(action_set, ActionSet):
             # convert
             action_set = ActionSet.fromList(action_set)
+
+        super().__init__(allowed_types=(ActionSet,), description=f"ActionSetModel: [{action_set.description}]")
 
         assert isinstance(action_set, ActionSet),"Action set must be provided"
         # change the storage of the model
@@ -4451,7 +4151,7 @@ class ActionSetModel(AbstractCallbackModel):
             gremlin.util.pushCursor()
             if action in self._items:
                 input_item = action.get_input_item()
-                container : gremlin.input_item.AbstractContainer = action.get_container()
+                container : AbstractContainer = action.get_container()
                 self.remove(action)
 
                 # del self._items[self._items.index(action)]
@@ -4478,431 +4178,6 @@ class ActionSetModel(AbstractCallbackModel):
 
   
 
-class AbstractAction(BaseProfileData):
-
-    """Base class for all actions that can be encoded via the XML and
-    UI system."""
-
-    #id_changed = Signal(str, str)  # triggers when the ID changes
-
-    # allow all input types by default
-    input_types = InputType.to_list()
-    # data_changed = QtCore.Signal() # indicates the action data changed
-
-    def __init__(self, parent):
-        """Creates a new instance.
-
-        :parent the container which is the parent to this action
-        """
-        # assert isinstance(parent, AbstractContainer)
-        super().__init__(parent)
-
-        self._abstract_action_generating_xml = False # true if generating XML
-        self.activation_condition = None # stores the conditions attached to that action
-        self._id = gremlin.util.get_guid()
-        self._action_type = None
-        self._enabled = False # true if the action is enabled
-        self.singleton = False # true if the action can only appear once in the input's mapping
-        self.parent_container = parent # holds the reference to the parent container holding this action
-        self._is_axis = False
-        self._is_hardware = None
-        self.comment = None # user comments/notes
-        self._priority = 5 # default priority
-        self.data = None # additional data for runtime purposes, context dependent used to tag actions at runtime for some purpose like action grouping
-        self.data_ex = None # additional data for
-        self.condition_view = None # holds the condition view object for this action
-        self._is_multi_mode_action = False # true if a multimode action
-        self._send_mode = SendType.Normal # normal send type
-
-        # new T83 - remote control configuration object
-        self.remote_config = gremlin.remote.RemoteConfig() # this action does not allow local control
-
-
-
-        self._hooked = False
-        el = gremlin.event_handler.EventListener()
-        el.profile_hook.connect(self.hook)
-        el.profile_unhook.connect(self.unhook)
-        el.action_created.emit(self)
-        el.profile_unload.connect(self._cleanup)
-        el.action_delete.connect(self._action_delete)
-
-
-    @property
-    def debug_name(self) -> str:
-        ''' friendly display name '''
-        return f"[action: {self.tag} id: {str(self.id)}] input: [{self.get_container().debug_name}]"
-
-    def hook(self):
-        if not self._hooked:
-            self._hooked = True
-            el = gremlin.event_handler.EventListener()
-            el.profile_start.connect(self.profile_start)
-            el.profile_started.connect(self.profile_started)
-            el.profile_stop.connect(self.profile_stop)
-            el.profile_after_start.connect(self.profile_post_start)
-
-    def unhook(self):
-        if not self._hooked:
-            el = gremlin.event_handler.EventListener()
-            el.profile_start.disconnect(self.profile_start)
-            el.profile_started.disconnect(self.profile_started)
-            el.profile_stop.disconnect(self.profile_stop)
-            el.profile_after_start.disconnect(self.profile_post_start)
-            self._hooked = False
-
-    @property
-    def sendMode(self) -> SendType:
-        return self._send_mode
-    @sendMode.setter
-    def sendMode(self, value : SendType):
-        self._send_mode = value
-
-    def sendFlags(self) -> tuple:
-        ''' returns a (is_local, is_remote) boolean tuple based on the action's current send mode '''
-
-
-        match self._send_mode:
-            case SendType.Normal:
-                return self.remote_config.state
-                #return gremlin.remote.remote_control.state
-            case SendType.LocalAndRemote:
-                return (True, True)
-            case SendType.LocalOnly:
-                return (True, False)
-            case SendType.RemoteOnly:
-                return (False, True)
-
-        syslog.warning(f"Don't know how to handle sendmode: [{self._send_mode}]")
-        return self.remote_config.state
-        # return gremlin.remote.remote_control.state
-
-
-
-    def isMultiMode(self) -> bool:
-        ''' true if the action is a multimode action'''
-        return self._is_multi_mode_action
-
-    def profile_start(self):
-        ''' start event - override in subclass as needed '''
-        pass
-
-    def profile_stop(self):
-        ''' stop event - override in subclass as needed '''
-        pass
-
-    def profile_post_start(self):
-        ''' post start event - occurs after profile started '''
-        pass
-
-    def profile_started(self):
-        ''' started event - override in subclass as needed '''
-        pass
-
-    def getCurves(self) -> list:
-        ''' gets action node siblings'''
-        container = self.parent_container
-        curve_list = []
-        for action_set in container.action_sets:
-            for action in action_set:
-                 if _is_curve_tag(action.tag):
-                    curve_data = action.curve_data
-                    if curve_data:
-                        curve_data.curve_update()
-                        curve_list.append(curve_data)
-        return curve_list
-
-
-
-    @property
-    def id(self):
-        ''' unique ID for this condition, persisted '''
-        return self._id
-
-
-    def setId(self, value : str):
-        ''' sets the ID '''
-        self._id = value
-
-    @property
-    def priority(self):
-        return self._priority
-
-    def setPriority(self, value : int):
-        ''' sets the priority of the action, numeric'''
-        value = gremlin.util.clamp(value,0, 1000)
-        self._priority = value
-
-    @property
-    def has_conditions(self):
-        ''' true if the action has conditions defined '''
-        return self.activation_condition is not None and len(self.activation_condition.conditions) > 0
-
-    def _action_delete(self, input_item, container, action):
-        if self._id == action._id:
-            if not input_item.is_action:
-                self._cleanup()
-
-    def _cleanup(self):
-        ''' called when the action should clean itself up '''
-        el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.DeviceChangeEvent()
-        event.source = self
-        el.icon_changed.emit(event)
-        el.profile_unload.disconnect(self._cleanup)
-        el.action_delete.disconnect(self._action_delete)
-
-
-
-
-
-    def get_input_item(self):
-        ''' gets the input item owning this action '''
-        input_item = _get_input_item(self.parent_container)
-        return input_item
-
-    def get_container(self) -> AbstractContainer:
-        return self.parent_container
-
-
-    def get_sibblings(self):
-        ''' gets action sibblings in the same container '''
-        container = self.get_container()
-        return container.getActions()
-
-    def setEnabled(self, value):
-        ''' enables or disables the functor - a disabled functor will not receive the start profile event nor will the process_event be called
-
-        This is done to make sure that functors only get called if the plugin is referenced in a profile's execution graph to avoid unecessary initializations
-
-        '''
-        import gremlin.event_handler
-
-        if self._enabled == value:
-            return # nothing to do
-        self._enabled = value
-
-        verbose = gremlin.config.Configuration().verbose_mode_details
-
-        if verbose and value:
-            syslog.info(f"ACTION: SET ENABLED STATE: Functor: {self.name} {type(self).__name__} enabled")
-
-    def enabled(self)-> bool:
-        return self._enabled
-
-    def input_is_axis(self):
-        ''' true if the input is an axis type input '''
-        input_item = self.input_item
-        if hasattr(input_item, "is_axis"):
-            return input_item.is_axis
-        is_axis = False
-        if hasattr(self, "hardware_input_type"):
-            input_type : InputType = self.hardware_input_type
-            if input_type == InputType.JoystickAxis:
-                return True
-
-        if hasattr(self.hardware_input_id, "is_axis"):
-            is_axis = self.hardware_input_id.is_axis
-            return is_axis
-        if hasattr(self.input_item,"is_axis") and hasattr(self._input_item,"axis_value"):
-            is_axis = is_axis or self.input_item.is_axis
-
-        return is_axis
-
-    def input_is_button(self):
-        ''' true if the input is a button '''
-        is_button = False
-        input_item = self.input_item
-        # check hat first
-        hardware_input_type = self.hardware_raw_input_type
-
-        input_type = None
-        if hasattr(self.parent_container,"get_input_type"):
-            input_type = self.parent_container.get_input_type() # container override input type
-
-        if input_type:
-            return input_type == InputType.JoystickButton
-
-        if hardware_input_type == InputType.JoystickHat:
-            return False
-
-        if hasattr(input_item, "is_button"):
-            is_button = input_item.is_button
-            return is_button
-
-        if hasattr(self, "hardware_input_type"):
-            input_type : InputType = self.hardware_input_type
-            return input_type == InputType.JoystickButton
-
-        if hasattr(self.hardware_input_id, "is_button"):
-            is_button = self.hardware_input_id.is_button
-
-        if hasattr(self.hardware_input_id, "is_axis"):
-            is_button = not self.hardware_input_id.is_axis
-
-
-        return is_button
-
-
-    def input_is_hardware(self):
-        ''' true if the device is a hardware input device '''
-        if self._is_hardware is None:
-            self._is_hardware =  gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid)
-        return self._is_hardware
-
-    @property
-    def enabled(self):
-        return self._enabled
-
-
-    @property
-    def action_id(self):
-        ''' id '''
-        return self._id
-
-
-    @property
-    def action_type(self):
-        ''' type name of this action '''
-        return self._action_type
-
-
-
-    def display_name(self):
-        ''' display name for this action '''
-        return "N/A"
-
-
-
-
-    def from_xml(self, node, data = None, extra_data = None):
-        """Populates the instance with data from the given XML node.
-
-        :param node the XML node to populate fields with
-        """
-
-        # set the action ID first as it can be read by subsequent code
-        import_data = gremlin.base_profile.ProfileImportData()
-
-        if "action_id" in node.attrib:
-            self._id = node.get("action_id")
-
-        if "send-mode" in node.attrib:
-            mode_int = safe_read(node, "send-mode", int, 0)
-            mode = SendType(mode_int)
-            self._send_mode = mode
-
-
-        comment = None
-        if "comment" in node.attrib:
-            comment = node.get("comment")
-        if comment:
-            self.comment = comment
-
-        priority = 5 # default priority for actions
-        if "priority" in node.attrib:
-            priority = safe_read(node, "priority",int, 5)
-            priority = gremlin.util.clamp(priority,0, 1000)
-            self._priority = priority
-
-
-        nodes = node.xpath(".//remote-config")
-        if nodes:
-            self.remote_config.from_xml(nodes[0])
-
-
-
-        super().from_xml(node, data, extra_data)
-
-
-        self.activation_condition = gremlin.base_conditions.BaseActivationCondition([],ActivationRule.All)
-        self.activation_condition.setContainer(self)
-        for _ in node.findall("activation-condition"):
-            cond_node = node.find("activation-condition")
-            if cond_node is not None:
-                self.activation_condition.from_xml(cond_node, data, extra_data)
-
-
-        # record the type of this action
-        self._action_name = node.tag
-
-    def to_xml(self):
-        """Returns a XML node representing the instance's contents.
-
-        :return XML node representing the state of this instance
-        """
-
-        if self._abstract_action_generating_xml:
-            syslog.error("ACTION XML: Recusion detected:")
-            return None
-
-        try:
-
-            self._abstract_action_generating_xml = True
-
-            node = super().to_xml()
-            if self.has_conditions:
-                # output the conditions
-                node.append(self.activation_condition.to_xml())
-
-            # output the ID
-            node.set("action_id", self.action_id)
-
-            # send mode
-            if self._send_mode != SendType.Normal:
-                # only save if not default
-                node.set("send-mode", safe_format(self._send_mode.value, int))
-
-            # output any notes
-            if self.comment:
-                node.set("comment", self.comment)
-
-            node.set("priority", safe_format(self._priority, int))
-
-            # remote configuration
-            rc_node = self.remote_config.to_xml()
-            node.append(rc_node)
-
-            return node
-        finally:
-            self._abstract_action_generating_xml = False
-
-
-    def requires_virtual_button(self):
-        """Returns whether or not the action requires the use of a
-        virtual button.
-
-        :return True if a virtual button has to be used, False otherwise
-        """
-        raise error.MissingImplementationError(
-            "AbstractAction.requires_virtual_button() not implemented"
-        )
-
-    def _is_valid(self):
-        raise error.MissingImplementationError(
-            "AbstractAction._is_valid() not implemented"
-        )
-
-    def is_valid_for_save(self):
-        ''' indicates an action can be saved to a profile even if it's not configured - this allows in process profile saving '''
-        return True
-
-
-    def __str__(self):
-        if hasattr(self,"display_name"):
-            return self.display_name()
-        return super().__str__()
-
-    def __hash__(self):
-        # index on the unique ID of each action
-        return hash(self._id)
-
-
-class MultiModeAbstractAction(AbstractAction):
-    ''' indicates the action works with multiple modes '''
-    def __init__(self, parent):
-        super().__init__(parent)
-        self._is_multi_mode_action = True # indicate this is a multimode action
 
 
 class ConditionContainer():
@@ -4910,9 +4185,9 @@ class ConditionContainer():
 
     def __init__(self):
         self._id = gremlin.util.get_guid() # unique GUID of this container
-        self.activation_condition = gremlin.base_conditions.BaseActivationCondition([],ActivationRule.All) # activation condition that applies to the container
+        self.activation_condition = BaseActivationCondition(ConditionModel(self),ActivationRule.All) # activation condition that applies to the container
         self.activation_condition.setContainer(self)
-        self._container = None
+        # self._container = None
 
     @property
     def condition_count(self):
@@ -4926,12 +4201,163 @@ class ConditionContainer():
         ''' sets the ID '''
         self._id = value
 
-    def setContainer(self, container):
-        self._container = container
+    def setContainer(self, container : AbstractContainer):
+        assert isinstance(container, AbstractContainer), "invalid container"
+        self.activation_condition.setContainer(container)
+        #self._container = container
 
     def get_container(self):
-        return self._container
+        return self.activation_condition.container
+        # return self._container
 
+@SingletonDecorator
+class ConditionTracker():
+    ''' tracks conditions '''
+    def __init__(self):
+        import gremlin.event_handler
+        self._cache = {} # map of known conditions keyed by mode and condition ID
+        self._owner_map = {} # map of condition ID to its input item owner so we know which input item has which condition
+        self._data_map = {} # map of condition ID to tracker data
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self.reset)
+        el.profile_unloaded.connect(self.reset)
+        
+    @QtCore.Slot()
+    def reset(self):
+        ''' triggered on app exit or profile unload '''
+        self._cache.clear()
+        self._owner_map.clear()
+        self._data_map.clear()
+
+
+
+    def registerCondition(self, data : ConditionTrackerData):
+        ''' registers a condition and its owner - owner is an input_item'''
+        mode = data.mode
+        condition = data.condition
+        input_item = data.input_item
+        if not mode in self._cache:
+            self._cache[mode] = {}
+        self._cache[mode][condition.id] = data
+        self._owner_map[condition.id] = input_item
+        self._data_map[condition.id] = data
+        el = gremlin.event_handler.EventListener()
+        el.condition_added.emit(input_item, mode, condition)
+        el.condition_state_changed.emit(data.container)
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        if verbose:
+            syslog = logging.getLogger("system")
+            syslog.info(f"creating condition: {condition.id} for input: {data.input_item.display_name if hasattr(data.input_item,"display_name") else data.input_item} mode: {data.mode}")
+        #data.condition.id_changed.connect(self._condition_id_changed)
+
+    def unregisterCondition(self, condition : BaseAbstractCondition):
+        ''' unregisters a condition '''
+        syslog = logging.getLogger("system")
+        syslog.info(f"delete condition: {condition.id}")
+        id = condition.id
+        for mode in self._cache:
+            if id in self._cache[mode]:
+                data = self._cache[mode][id]
+                del self._cache[mode][id]
+                del self._owner_map[id]
+                # (input_item, mode, condition)
+                el = gremlin.event_handler.EventListener()
+                el.condition_removed.emit(data.input_item, data.mode, data.condition)
+                if Shiboken.isValid(data.container):
+                    el.condition_state_changed.emit(data.container)
+                return
+            
+
+    def count(self):
+        ''' gets a count of registered conditions '''
+        return len(self._cache)
+    
+    def getInputItemConditionCount(self, input_item, mode : str = None):
+        ''' gets a count of registered condition for a specific owner - owner is an input_item'''
+        
+        if not mode:
+            mode = input_item.profile_mode
+        if mode in self._cache:
+            id_list = [item.condition.id for item in self._cache[mode].values() if item.input_item == input_item]
+            return len(id_list)
+        return 0
+    
+    def getInputItemConditions(self, input_item, mode : str = None):
+        ''' gets the conditions for the specified input '''
+        if not mode:
+            mode = input_item.profile_mode
+        if mode in self._cache:
+            condition_list = [item.condition for item in self._cache[mode].values() if item.input_item == input_item]
+            return condition_list
+        return None
+
+    
+    def getContainerConditionCount(self, container, mode : str = None):
+        ''' gets a count of registered condition for a specific owner - owner is an input_item'''
+        
+        if not mode:
+            input_item = container.parent
+            mode = input_item.profile_mode #gremlin.shared_state.current_mode
+        if mode in self._cache:
+            id_list = [item.condition.id for item in self._cache[mode].values() if item.container == container]
+            return len(id_list)
+        else:
+            # not in cache
+            input_item = container.input_item
+
+        return 0
+
+    
+    def getConditionInputItem(self, condition : BaseAbstractCondition):
+        ''' gets the input item attached to a condition '''
+        id = condition.id
+        if id in self._owner_map:
+            return self._owner_map[id]
+        return None
+    
+    def getConditionsForInputItem(self, input_item, mode : str): 
+        ''' checks to see if conditions are defined for this input item'''
+        import gremlin.shared_state
+        if not mode:
+            mode = gremlin.shared_state.current_mode
+        if mode in self._cache:
+            id_list = [id for id, item in self._owner_map[mode].items() if item == input_item]
+            conditions = [self._cache[mode][id] for id in id_list]
+            return conditions
+        return None
+    
+    def getConditionForAction(self, action):
+        ''' gets a condition for an action '''
+        data : ConditionTrackerData = self.getActionData(action)
+        if data:
+            return data.condition
+        return None
+            
+    def getRuleForAction(self, action):
+        ''' gets the condition rule for an action '''
+        data : ConditionTrackerData = self.getActionData(action)
+        if data:
+            return data.rule
+        return None
+
+
+    def owner(self, condition : BaseAbstractCondition):
+        ''' what input item owns the condition '''
+        if condition.id in self._cache:
+            return self._owner_map[condition.id]
+        return None
+
+    def getData(self, condition : BaseAbstractCondition):
+        ''' gets the condition tracking data '''
+        if condition.id in self._data_map:
+            return self._data_map[condition.id]
+        return None
+    
+    def getActionData(self, action):
+        if action.action_id in self._data_map:
+            return self._data_map[action.action_id]
+        return None
+        
 
 class AbstractContainer(BaseProfileData, ConditionContainer):
 
@@ -4971,7 +4397,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self._condition_enabled = True # condition flag
         self._virtual_button_enabled = True # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor - action / container set
         self._virtual_button_user_enabled = True # determins if callbacks use the virtual button function - user set
-        # self.activation_condition = gremlin.base_conditions.BaseActivationCondition([],ActivationRule.All) # activation condition that applies to the container
+        # self.activation_condition = BaseActivationCondition(ConditionModel(self),ActivationRule.All) # activation condition that applies to the container
         # self.activation_condition.setContainer(self)
         self.virtual_button = None
         self.current_view_type = None
@@ -5165,7 +4591,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
                 data = tracker.getData(condition)
                 condition.setId(gremlin.util.get_guid())
                 if data:
-                    new_data = gremlin.base_conditions.ConditionTrackerData(data.mode, data.input_item, self, condition, data.rule)
+                    new_data = ConditionTrackerData(data.mode, data.input_item, self, condition, data.rule)
                     tracker.registerCondition(new_data)
 
 
@@ -5587,7 +5013,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     def _parse_activation_condition_xml(self, node, data, extra_data = None):
         ''' load the container condition '''
-        self.activation_condition = gremlin.base_conditions.BaseActivationCondition([], ActivationRule.All)
+        self.activation_condition = BaseActivationCondition(ConditionModel(self), ActivationRule.All)
         self.activation_condition.setContainer(self)
         input_item = data
         activation_node = gremlin.util.get_xml_child(node,"activation-condition")
@@ -5645,6 +5071,1251 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         """ returns action sets - used for duplication (override if needed) """
         return self.action_sets
 
+class AbstractCondition(metaclass=ABCMeta):
+
+    """Represents an abstract condition.
+
+    Conditions evaluate to either True or False and are given an event as well
+    as possibly processed Value when being evaluated.
+    """
+
+    def __init__(self, comparison = None):
+        """Creates a new condition with a specific comparision operation.
+
+        :param comparison the comparison operation to perform when evaluated
+        """
+        self.comparison = comparison
+        self.id = gremlin.util.get_guid()
+        self.manual_callback = False
+        self.delay = 0.0 # delay in seconds
+
+    @abstractmethod
+    def __call__(self, event, value, extra_data = None):
+        """Evaluates the condition using the condition and provided data.
+
+        :param event raw event that caused the condition to be evaluated
+        :param value the possibly modified value
+        :return True if the condition is satisfied, False otherwise
+        """
+        pass
+
+    @abstractmethod
+    def process_event(self, event, value, extra_data = None):
+        pass
+
+    def condition_name(self)->str:
+        return "condition_name() member not implemented: Condition not set"
+
+class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
+    pass
+
+
+
+
+#class BaseAbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
+class BaseAbstractCondition():
+
+    """Base class of all individual condition representations."""
+
+    #id_changed = Signal(str, str)  # triggers when the ID changes
+
+    def __init__(self):
+        """Creates a new condition."""
+        #super().__init__()
+        import gremlin.util
+        self._id = gremlin.util.get_guid()
+        self._comparison = ""
+        self._activation_condition = None # owning container
+        self.delay = 0.0 # delay in seconds
+
+    def setOwner(self, owner):
+        self._activation_condition = owner
+
+    @property
+    def owner(self):
+        return self._activation_condition
+        
+    @property
+    def id(self):
+        ''' unique ID for this condition, persisted '''
+        return self._id
+    
+    def setId(self, value):
+        self._id = value
+    
+
+    @property
+    def comparison(self):
+        return self._comparison
+    
+    @comparison.setter
+    def comparison(self, value):
+        self._comparison = value
+
+    
+    def from_xml(self, node, data = None, extra_data = None):
+        """Populates the object with data from an XML node.
+
+        :param node the XML node to parse for data
+        """
+        import_data = gremlin.base_profile.ProfileImportData()
+        if "condition_id" in node.attrib:
+            self._id = node.get("condition_id")
+        self.delay = safe_read(node,"delay", float, 0.0)
+      
+    
+    def to_xml(self):
+        """Returns an XML node containing the objects data.
+
+        :return XML node containing the object's data
+        """
+        node = ElementTree.Element("condition")
+        node.set("condition_id", self._id)
+        node.set("delay", safe_format(self.delay, float))
+        return node
+        
+
+    def is_valid(self):
+        """Returns whether or not a condition is fully specified.
+
+        :return True if the condition is properly specified, False otherwise
+        """
+        return self._comparison != ""
+
+
+class BaseKeyboardCondition(BaseAbstractCondition):
+
+    """Keyboard state based condition.
+
+    The condition is for a single key and as such contains the key's scan
+    code as well as the extended flag.
+    """
+
+    def __init__(self):
+        """Creates a new instance."""
+        super().__init__()
+        self.input_item = None
+        self.scan_code = None
+        self.is_extended = None
+        self.comparison = "pressed"
+
+    def from_xml(self, node, data = None, extra_data = None):
+        """Populates the object with data from an XML node.
+
+        :param node the XML node to parse for data
+        """
+
+        super().from_xml(node, data, extra_data)
+        self.comparison = safe_read(node, "comparison", str, "")
+        self.scan_code = safe_read(node, "scan-code", int, 0)
+        self.is_extended = parse_bool(safe_read(node, "extended", str, ""))
+        input_item = None
+        for child in node:
+            if child.tag=="input":
+                from gremlin.keyboard import Key
+                from gremlin.ui.keyboard_device import KeyboardInputItem
+                input_item = KeyboardInputItem()
+                input_item.parse_xml(child, data)
+
+        
+        self.input_item = input_item
+
+                
+
+    def to_xml(self):
+        """Returns an XML node containing the objects data.
+
+        :return XML node containing the object's data
+        """
+        node = super().to_xml() #ElementTree.Element("condition")
+        node.set("condition-type", "keyboard")
+        node.set("input", "keyboard")
+        node.set("comparison", str(self.comparison))
+        node.set("scan-code", str(self.scan_code))
+        node.set("extended", str(self.is_extended))
+        
+        if self.input_item:
+            child = self.input_item.to_xml()
+            node.append(child)
+
+        return node
+
+    def is_valid(self):
+        """Returns whether or not a condition is fully specified.
+
+        :return True if the condition is properly specified, False otherwise
+        """
+        return super().is_valid() and \
+            self.scan_code is not None and \
+            self.is_extended is not None
+    
+
+    def __str__(self):
+        from gremlin.ui.keyboard_device import Key
+        key = Key(scan_code=self.scan_code, is_extended=self.is_extended)
+        return f"Keyboard condition: id: {self.id} comparison: {self.comparison} key {key.debug_name}"
+    
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.ui.keyboard_device import Key
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","Keyboard")
+        table.addField("Comparison", self.comparison)
+        key = Key(scan_code=self.scan_code, is_extended=self.is_extended)
+        table.addField("Key", key.name)
+        return table.to_html()
+
+
+class BaseJoystickCondition(BaseAbstractCondition):
+
+    """Joystick state based condition.
+
+    This condition is based on the state of a joystick axis, button, or hat.
+    """
+
+    def __init__(self):
+        """Creates a new instance."""
+        super().__init__()
+        self.device_guid = 0 # use this as the invalid GUID
+        self.input_type = None
+        self.input_id = 0
+        self.range = [0.0, 0.0]
+        self.device_name = ""
+        self.use_calibrated_data = True # true if the input should use the calibrated data if any
+        self.ignore_release = False # true if the condition always succeeds on input release
+
+    def from_xml(self, node, data = None, extra_data = None):
+        """Populates the object with data from an XML node.
+
+        :param node the XML node to parse for data
+        """
+
+        super().from_xml(node, data, extra_data)
+
+        self.input_type = InputType.to_enum(safe_read(node, "input", str, ""))
+        comparison = safe_read(node, "comparison", str, "")
+        if not comparison:
+            match self.input_type:
+                case InputType.JoystickAxis:
+                    comparison = "inside"
+                case InputType.JoystickButton:
+                    comparison = "pressed"
+                case InputType.JoystickHat:
+                    comparison = "center"
+        self.comparison = comparison
+
+
+        self.input_id = safe_read(node, "id", int, 1)
+        self.device_guid = parse_guid(node.get("device-guid"))
+        self.device_name = safe_read(node, "device-name", str, "")
+        self.range = [
+            safe_read(node, "range-low", float, 0),
+                 safe_read(node, "range-high", float, 0)
+        ]
+        self.use_calibrated_data = safe_read(node,"use-calibrated",bool,False)
+        self.ignore_release = safe_read(node,"ignore-release",bool,False)
+
+    def to_xml(self):
+        """Returns an XML node containing the objects data.
+
+        :return XML node containing the object's data
+        """
+        #node = ElementTree.Element("condition")
+        node = super().to_xml() 
+        node.set("comparison", str(self.comparison))
+        node.set("condition-type", "joystick")
+        node.set("input", InputType.to_string(self.input_type))
+        node.set("id", safe_format(self.input_id, int))
+        node.set("device-guid", write_guid(self.device_guid))
+        node.set("device-name", str(self.device_name))
+        node.set("range-low", safe_format(self.range[0], float))
+        node.set("range-high", safe_format(self.range[1], float))
+        node.set("ignore-release", safe_format(self.ignore_release, bool))
+        node.set("use-calibrated", safe_format(self.use_calibrated_data, bool))
+        
+        return node
+
+    def is_valid(self):
+        """Returns whether or not a condition is fully specified.
+
+        :return True if the condition is properly specified, False otherwise
+        """
+        return self.input_type is not None # super().is_valid() and self.input_type is not None
+
+    def __str__(self):
+        return f"Joystick Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} device: {self.device_name} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[0]:0.3f}]  use calibrated: {self.use_calibrated_data}"
+    
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        import gremlin.joystick_handling
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","Joystick")
+        table.addField("Comparison", self.comparison)
+        table.addField("Device", self.device_name)
+        table.addField("Type", self.input_type.name)
+        table.addField("ID", f"{self.input_id}")
+        if self.input_type == InputType.JoystickAxis:
+            table.addField("Range", f"[{self.range[0]:0.3f},{self.range[1]:0.3f}]")
+            table.addField("Use calibrated data", "Yes" if self.use_calibrated_data else "No")
+
+
+        table.addField("Ignore release","Yes" if self.ignore_release else "No")
+        return table.to_html()   
+
+
+class BaseStateCondition(BaseAbstractCondition):
+    ''' state condition '''
+    def __init__(self):
+        super().__init__()
+
+        self.key = None
+        self.description = None
+        self.comparison = "pressed"
+        self.ignore_release = False
+
+    def from_xml(self, node, data = None, extra_data = None):
+        import gremlin.ui.state_device
+        super().from_xml(node, data, extra_data)
+
+        condition_type = node.get("condition-type")
+        if condition_type != "state":
+            return
+        
+        
+        self.key = node.get("key")
+        if "description" in node.attrib:
+            self.description = html.unescape(node.get("description"))
+        self.comparison = safe_read(node, "comparison", str, "")
+        self.ignore_release = safe_read(node,"ignore-release",bool,False)
+        sd =  gremlin.ui.state_device.StateData()
+        sd.register(self.key, description = self.description)
+
+    def to_xml(self):
+        node = super().to_xml() 
+        node.set("comparison", str(self.comparison))
+        node.set("condition-type", "state")
+        node.set("key", self.key)
+        node.set("ignore-release", safe_format(self.ignore_release, bool))
+        if self.description:
+            node.set("description", html.escape(self.description))
+
+        return node
+
+    def is_valid(self):
+        """Returns whether or not a condition is fully specified.
+
+        :return True if the condition is properly specified, False otherwise
+        """
+        return super().is_valid() and bool(self.key)
+    
+    def __str__(self):
+        return f"State Condition: [{self.key}] comparison: {self.comparison}"
+    
+    
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.ui.keyboard_device import Key
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","State")
+        table.addField("Comparison", self.comparison)
+        table.addField("State", self.key)
+        table.addField("Ignore release","Yes" if self.ignore_release else "No")
+        if self.description:
+            table.addField("Description", self.description)
+        return table.to_html()    
+
+class BaseModeCondition(BaseAbstractCondition):
+    ''' mode condition '''
+    def __init__(self):
+        super().__init__()
+
+        self.description = None
+        self.comparison = "equal"
+        self.mode = gremlin.shared_state.edit_mode
+        self.ignore_release = False
+
+    def from_xml(self, node, data = None, extra_data = None):
+        import gremlin.ui.state_device
+        super().from_xml(node, data, extra_data)
+
+        condition_type = node.get("condition-type")
+        if condition_type != "mode":
+            return
+        assert "mode" in node.attrib
+        self.mode = node.get("mode")
+        
+        if "description" in node.attrib:
+            self.description = node.get("description")
+
+        self.comparison = safe_read(node, "comparison", str, "")
+        self.ignore_release = safe_read(node,"ignore-release",bool,False)
+
+    def to_xml(self):
+        node = super().to_xml() 
+        node.set("comparison", str(self.comparison))
+        node.set("mode", self.mode if self.mode else "")
+        node.set("condition-type", "mode")
+        node.set("ignore-release", safe_format(self.ignore_release, bool))
+        if self.description:
+            node.set("description", self.description)
+
+        return node
+
+    def is_valid(self):
+        """Returns whether or not a condition is fully specified.
+
+        :return True if the condition is properly specified, False otherwise
+        """
+        return super().is_valid() and bool(self.mode)
+    
+    def __str__(self):
+        return f"Mode Condition:  Mode: [{self.mode}] comparison: {self.comparison}"    
+    
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.ui.keyboard_device import Key
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","Mode")
+        table.addField("Comparison", self.comparison)
+        table.addField("Mode", self.mode)
+        if self.description:
+            table.addField("Description", self.description)
+        return table.to_html()    
+    
+class BaseVJoyCondition(BaseAbstractCondition):
+
+    """vJoy device state based condition.
+
+    This condition is based on the state of a vjoy axis, button, or hat.
+    """
+
+    def __init__(self):
+        """Creates a new instance."""
+        super().__init__()
+        self.vjoy_id = 0
+        self.input_type = None
+        self.input_id = 0
+        self.range = [0.0, 0.0]
+        self.ignore_release = False
+
+    def from_xml(self, node, data = None, extra_data = None):
+        """Populates the object with data from an XML node.
+
+        Parameters
+        ==========
+        node : ElementTree.Element
+            XML node to parse for data
+        """
+
+        super().from_xml(node, data, extra_data)
+        self.comparison = safe_read(node, "comparison", str, "")
+        if not "input" in node.attrib:
+            syslog.error("VJOY XML: invalid input in XML - NULL ")
+            return
+        
+        self.input_type = InputType.to_enum(safe_read(node, "input", str, ""))
+
+        input_id = safe_read(node, "id", int, 0)
+        vjoy_id = safe_read(node, "vjoy-id", int, 0)
+
+        if input_id == 0 or vjoy_id == 0:
+            syslog.error(f"VJOY XML: invalid input in XML: device: {vjoy_id}  input: {input_id}")
+            return
+        self.input_id = input_id
+        self.vjoy_id = vjoy_id
+        self.ignore_release = safe_read(node,"ignore-release",bool,False)
+        self.range = [
+            safe_read(node, "range-low", float, 0),
+            safe_read(node, "range-high", float, 0)
+        ]
+
+    def to_xml(self):
+        """Returns an XML node containing the objects data.
+
+        Return
+        ======
+        ElementTree.Element
+            XML node containing the object's data
+        """
+        #node = ElementTree.Element("condition")
+
+        
+        node = super().to_xml() 
+        node.set("comparison", str(self.comparison))
+        node.set("condition-type", "vjoy")
+        
+        is_error = False
+        if self.input_type is None:
+            syslog.error("VJOY CONDITION: invalid data: bad input type (NULL)")
+            is_error = True
+        if self.input_id == 0:
+            syslog.error("VJOY CONDITION: invalid data: bad input 0")
+            is_error = True
+        if self.vjoy_id == 0:
+            syslog.error("VJOY CONDITION: invalid data: bad device ID 0")
+            is_error = True
+
+        if not is_error:
+            node.set("input", InputType.to_string(self.input_type))
+            node.set("id", safe_format(self.input_id, int))
+            node.set("vjoy-id", write_guid(self.vjoy_id))
+            node.set("range-low", safe_format(self.range[0], float))
+            node.set("range-high", safe_format(self.range[1], float))
+            node.set("ignore-release", safe_format(self.ignore_release, bool))
+        return node
+
+    def is_valid(self):
+        """Returns whether or not a condition is fully specified.
+
+        :return True if the condition is properly specified, False otherwise
+        """
+        return super().is_valid() and self.input_type is not None and self.vjoy_id > 0 and self.input_id > 0
+
+    def __str__(self):
+        return f"Vjoy Condition: id: {self.id} comparison: {self.comparison} input type: {self.input_type.name} vjoy device: {self.vjoy_id} input id: {self.input_id}  range: [{self.range[0]:0.3f},{self.range[1]:0.3f}]"
+ 
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.ui.keyboard_device import Key
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","VJoy")
+        table.addField("Comparison", self.comparison)
+        table.addField("Vjoy Device", self.vjoy_id)
+        table.addField("Type", self.input_type.name)
+        table.addField("ID", f"{self.input_id}")
+        table.addField("Ignore release","Yes" if self.ignore_release else "No")
+        if self.input_type == InputType.JoystickAxis:
+            table.addField("Range", f"[{self.range[0]:0.3f},{self.range[1]:0.3f}]")
+        return table.to_html()
+
+class BaseInputActionCondition(BaseAbstractCondition):
+
+    """Input item press / release state based condition.
+
+    The condition is for the current input item, triggering based on whether
+    or not the input item is being pressed or released.
+    """
+
+    def __init__(self):
+        """Creates a new instance."""
+        super().__init__()
+        self._comparison = "always" # default comparison is press or release
+
+    def from_xml(self, node, data = None, extra_data = None):
+        """Populates the object with data from an XML node.
+
+        :param node the XML node to parse for data
+        """
+        super().from_xml(node, data, extra_data)
+        self.comparison = safe_read(node, "comparison", str, "")
+        
+
+    def to_xml(self):
+        """Returns an XML node containing the objects data.
+
+        :return XML node containing the object's data
+        """
+        #node = ElementTree.Element("condition")
+        node = super().to_xml() 
+        node.set("condition-type", "action")
+        node.set("input", "action")
+        node.set("comparison", str(self.comparison))
+        return node
+
+    def __str__(self):
+        return f"Input Condition: id: [{self.id}] comparison: [{self.comparison}]"
+    
+    def to_html(self) -> str:
+        ''' html output version '''
+        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition","Input")
+        table.addField("Comparison", self.comparison)
+ 
+        return table.to_html()   
+
+
+
+class ConditionTrackerData():
+    def __init__(self, mode, input_item, container, condition, rule):
+        self.condition = condition
+        self.container = container
+        self.input_item = input_item
+        self.mode = mode
+        self.rule = rule
+    
+
+class ConditionModel(AbstractCallbackModel):
+
+    """Stores and represents condition data."""
+
+    def __init__(self,
+                 action_data : AbstractContainer | AbstractAction | ConditionContainer,
+                 condition_data : BaseActivationCondition = None,
+                 
+                 ):
+        """Creates a new model to store condition data.
+
+        :param action_data the condition data to represent (container, action or condition container)
+        :param parent the parent of this object
+        """
+        
+        super().__init__(allowed_types= (BaseAbstractCondition,), description=f"ConditionModel")
+        self.condition_data = condition_data
+        # self.action_data = action_data
+        self.container = None
+        if isinstance(action_data, AbstractContainer):
+            self.container = action_data
+        elif isinstance(action_data, AbstractAction):
+            # find the container for the given action
+            self.container = action_data.get_container()
+        elif isinstance(action_data, ConditionContainer):
+            self.container = action_data.get_container()
+
+        assert self.container is not None,"invalid data"
+
+    @property
+    def input_item(self) -> InputItem:
+        ''' input item the condition applies to'''
+        return self.container.input_item
+
+
+    def rows(self):
+        """Returns the number of rows in the model.
+        :return number of rows
+        """
+        return len(self.condition_data.conditions)
+
+    def data(self, index):
+        """Returns the data stored at the given index.
+
+        :param index the index for which to return the data
+        :return the data stored at the provided index
+        """
+        return self.condition_data.conditions[index]
+
+    def add_condition(self, condition):
+        """Adds a condition to to the model.
+
+        :param condition_data the condition data to add
+        """
+
+        self.condition_data.conditions.append(condition)
+        condition.setOwner(self.condition_data)
+        tracker = ConditionTracker()
+        mode = gremlin.shared_state.current_mode
+        container = self.container
+        input_item = self.input_item
+        if input_item:
+            data = ConditionTrackerData(mode, input_item, container, condition, rule = ActivationRule.All)
+            tracker.registerCondition(data)
+        self.data_changed.emit()
+        el = gremlin.event_handler.EventListener()
+        el.condition_state_changed.emit(container)
+
+
+
+    def delete_condition(self, condition):
+        """Deletes a condition from the model.
+
+        Attempts to locate the provided condition and deletes it, if it is
+        present.
+
+        :param condition the condition to remove.
+        """
+        if condition in self.condition_data.conditions:
+            self.condition_data.conditions.remove(condition)
+
+        if self.input_item:
+            tracker = ConditionTracker()
+            tracker.unregisterCondition(condition)
+
+        container = self.container
+
+        el = gremlin.event_handler.EventListener()
+        el.condition_state_changed.emit(container)
+        self.data_changed.emit()
+
+    @property
+    def rule(self):
+        """Returns the current application rule for the conditions.
+
+        :return current application rule of conditions
+        """
+        return self.condition_data._rule
+
+    @rule.setter
+    def rule(self, rule):
+        """Sets the application rule of the conditions.
+
+        :param rule the new application type
+        """
+        self.condition_data._rule = rule
+
+       
+
+class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
+
+    """Dictates under what circumstances an associated code can be executed."""
+    activation_condition_modified = Signal()
+
+    rule_lookup = {
+        # String to enum
+        "all": ActivationRule.All,
+        "any": ActivationRule.Any,
+        # Enum to string
+        ActivationRule.All: "all",
+        ActivationRule.Any: "any",
+    }
+
+    condition_lookup = {
+        "keyboard": BaseKeyboardCondition,
+        "joystick": BaseJoystickCondition,
+        "vjoy": BaseVJoyCondition,
+        "action": BaseInputActionCondition,
+        "state": BaseStateCondition,
+        "mode": BaseModeCondition
+    }
+
+    def __init__(self, conditions : AbstractCallbackModel, rule):
+        """Creates a new instance."""
+        super().__init__()
+        import gremlin.input_item
+        assert isinstance(conditions, AbstractCallbackModel), "invalid condition model"
+        
+        self._rule = rule
+        self.conditions = conditions
+        self._id = gremlin.util.get_guid()
+        self._container = None # owning container
+
+
+    def setContainer(self, container):
+        ''' sets the owning container '''
+        self._container = container
+
+    @property
+    def container(self):
+        ''' gets the owning container of this activation condition '''
+        return self._container
+
+    @property 
+    def rule(self) -> ActivationRule:
+        # rule for the activation condition
+        return self._rule
+
+    @rule.setter
+    def rule(self, value : ActivationRule):
+        self._rule = value
+        
+
+    @property
+    def id(self):
+        ''' unique ID for this condition, persisted '''
+        return self._id
+    
+    def setId(self, value : str):
+        ''' sets the ID '''
+        self._id = value
+ 
+
+    def from_xml(self, node, data = None, extra_data = None):
+        """Extracts activation condition data from an XML node.
+
+        :param node: the XML node to parse
+        :param data: tuple containing (input_item, container) associated with this condition
+        """
+        # import gremlin.base_profile
+        # import gremlin.ui.ui_common
+        import gremlin.shared_state
+        
+        if "condition_id" in node.attrib:
+            self._id = node.get("condition_id")
+
+        rule = BaseActivationCondition.rule_lookup[safe_read(node, "rule", str, "")]
+        tracker = ConditionTracker()
+        mode_node = node
+        while mode_node is not None and mode_node.tag not in ("mode","state"):
+            mode_node = mode_node.getparent()
+        if mode_node is not None:
+            if mode_node.tag == "state":
+                mode = gremlin.shared_state.master_mode
+            else:
+                mode = mode_node.get("name")
+        else:
+            
+            mode = gremlin.shared_state.edit_mode
+        assert data is not None,f"XML: error: data not provided for activation condition - offending line: {node.sourceline}"    
+        input_item, container = data
+        self.rule = rule
+        
+        for cond_node in node.findall("condition"):
+            condition_type = safe_read(cond_node, "condition-type", str, "")
+            condition = BaseActivationCondition.condition_lookup[condition_type]()
+            condition.from_xml(cond_node, data)
+            self.conditions.append(condition)
+            condition.setOwner(self)
+            if input_item:
+                item = ConditionTrackerData(mode, input_item, container, condition, rule)
+                tracker.registerCondition(item)
+            
+            
+
+    def to_xml(self):
+        """Returns an XML node containing the activation condition information.
+
+        :return XML node containing information about the activation condition
+        """
+        node = ElementTree.Element("activation-condition")
+        node.set("rule", BaseActivationCondition.rule_lookup[self._rule])
+        node.set("condition_id", self._id)
+
+        for condition in self.conditions:
+            # save the condition, valid or not so the data is saved
+            condition_node = condition.to_xml()
+            node.append(condition_node)
+        return node
+    
+    def condition_name(self):
+        return f"Activation Condition: [{self.id}] rule: {self._rule.name} contains: {len(self.conditions)} condition(s)"
+    
+    def __str__(self):
+        return f"Activation Condition: [{self.id}] rule: {self._rule.name} contains: {len(self.conditions)} condition(s)"
+    
+
+
+
+class AbstractAction(BaseProfileData):
+
+    """Base class for all actions that can be encoded via the XML and
+    UI system."""
+
+    #id_changed = Signal(str, str)  # triggers when the ID changes
+
+    # allow all input types by default
+    input_types = InputType.to_list()
+    # data_changed = QtCore.Signal() # indicates the action data changed
+
+    def __init__(self, parent):
+        """Creates a new instance.
+
+        :parent the container which is the parent to this action
+        """
+        # assert isinstance(parent, AbstractContainer)
+        super().__init__(parent)
+
+        self._abstract_action_generating_xml = False # true if generating XML
+        self.activation_condition = None # stores the conditions attached to that action
+        self._id = gremlin.util.get_guid()
+        self._action_type = None
+        self._enabled = False # true if the action is enabled
+        self.singleton = False # true if the action can only appear once in the input's mapping
+        self.parent_container = parent # holds the reference to the parent container holding this action
+        self._is_axis = False
+        self._is_hardware = None
+        self.comment = None # user comments/notes
+        self._priority = 5 # default priority
+        self.data = None # additional data for runtime purposes, context dependent used to tag actions at runtime for some purpose like action grouping
+        self.data_ex = None # additional data for
+        self.condition_view = None # holds the condition view object for this action
+        self._is_multi_mode_action = False # true if a multimode action
+        self._send_mode = SendType.Normal # normal send type
+
+        # new T83 - remote control configuration object
+        self.remote_config = gremlin.remote.RemoteConfig() # this action does not allow local control
+
+
+
+        self._hooked = False
+        el = gremlin.event_handler.EventListener()
+        el.profile_hook.connect(self.hook)
+        el.profile_unhook.connect(self.unhook)
+        el.action_created.emit(self)
+        el.profile_unload.connect(self._cleanup)
+        el.action_delete.connect(self._action_delete)
+
+
+    @property
+    def debug_name(self) -> str:
+        ''' friendly display name '''
+        return f"[action: {self.tag} id: {str(self.id)}] input: [{self.get_container().debug_name}]"
+
+    def hook(self):
+        if not self._hooked:
+            self._hooked = True
+            el = gremlin.event_handler.EventListener()
+            el.profile_start.connect(self.profile_start)
+            el.profile_started.connect(self.profile_started)
+            el.profile_stop.connect(self.profile_stop)
+            el.profile_after_start.connect(self.profile_post_start)
+
+    def unhook(self):
+        if not self._hooked:
+            el = gremlin.event_handler.EventListener()
+            el.profile_start.disconnect(self.profile_start)
+            el.profile_started.disconnect(self.profile_started)
+            el.profile_stop.disconnect(self.profile_stop)
+            el.profile_after_start.disconnect(self.profile_post_start)
+            self._hooked = False
+
+    @property
+    def sendMode(self) -> SendType:
+        return self._send_mode
+    @sendMode.setter
+    def sendMode(self, value : SendType):
+        self._send_mode = value
+
+    def sendFlags(self) -> tuple:
+        ''' returns a (is_local, is_remote) boolean tuple based on the action's current send mode '''
+
+
+        match self._send_mode:
+            case SendType.Normal:
+                return self.remote_config.state
+                #return gremlin.remote.remote_control.state
+            case SendType.LocalAndRemote:
+                return (True, True)
+            case SendType.LocalOnly:
+                return (True, False)
+            case SendType.RemoteOnly:
+                return (False, True)
+
+        syslog.warning(f"Don't know how to handle sendmode: [{self._send_mode}]")
+        return self.remote_config.state
+        # return gremlin.remote.remote_control.state
+
+
+
+    def isMultiMode(self) -> bool:
+        ''' true if the action is a multimode action'''
+        return self._is_multi_mode_action
+
+    def profile_start(self):
+        ''' start event - override in subclass as needed '''
+        pass
+
+    def profile_stop(self):
+        ''' stop event - override in subclass as needed '''
+        pass
+
+    def profile_post_start(self):
+        ''' post start event - occurs after profile started '''
+        pass
+
+    def profile_started(self):
+        ''' started event - override in subclass as needed '''
+        pass
+
+    def getCurves(self) -> list:
+        ''' gets action node siblings'''
+        container = self.parent_container
+        curve_list = []
+        for action_set in container.action_sets:
+            for action in action_set:
+                 if _is_curve_tag(action.tag):
+                    curve_data = action.curve_data
+                    if curve_data:
+                        curve_data.curve_update()
+                        curve_list.append(curve_data)
+        return curve_list
+
+
+
+    @property
+    def id(self):
+        ''' unique ID for this condition, persisted '''
+        return self._id
+
+
+    def setId(self, value : str):
+        ''' sets the ID '''
+        self._id = value
+
+    @property
+    def priority(self):
+        return self._priority
+
+    def setPriority(self, value : int):
+        ''' sets the priority of the action, numeric'''
+        value = gremlin.util.clamp(value,0, 1000)
+        self._priority = value
+
+    @property
+    def has_conditions(self):
+        ''' true if the action has conditions defined '''
+        return self.activation_condition is not None and len(self.activation_condition.conditions) > 0
+
+    def _action_delete(self, input_item, container, action):
+        if self._id == action._id:
+            if not input_item.is_action:
+                self._cleanup()
+
+    def _cleanup(self):
+        ''' called when the action should clean itself up '''
+        el = gremlin.event_handler.EventListener()
+        event = gremlin.event_handler.DeviceChangeEvent()
+        event.source = self
+        el.icon_changed.emit(event)
+        el.profile_unload.disconnect(self._cleanup)
+        el.action_delete.disconnect(self._action_delete)
+
+
+
+
+
+    def get_input_item(self):
+        ''' gets the input item owning this action '''
+        input_item = _get_input_item(self.parent_container)
+        return input_item
+
+    def get_container(self) -> AbstractContainer:
+        return self.parent_container
+
+
+    def get_sibblings(self):
+        ''' gets action sibblings in the same container '''
+        container = self.get_container()
+        return container.getActions()
+
+    def setEnabled(self, value):
+        ''' enables or disables the functor - a disabled functor will not receive the start profile event nor will the process_event be called
+
+        This is done to make sure that functors only get called if the plugin is referenced in a profile's execution graph to avoid unecessary initializations
+
+        '''
+        import gremlin.event_handler
+
+        if self._enabled == value:
+            return # nothing to do
+        self._enabled = value
+
+        verbose = gremlin.config.Configuration().verbose_mode_details
+
+        if verbose and value:
+            syslog.info(f"ACTION: SET ENABLED STATE: Functor: {self.name} {type(self).__name__} enabled")
+
+    def enabled(self)-> bool:
+        return self._enabled
+
+    def input_is_axis(self):
+        ''' true if the input is an axis type input '''
+        input_item = self.input_item
+        if hasattr(input_item, "is_axis"):
+            return input_item.is_axis
+        is_axis = False
+        if hasattr(self, "hardware_input_type"):
+            input_type : InputType = self.hardware_input_type
+            if input_type == InputType.JoystickAxis:
+                return True
+
+        if hasattr(self.hardware_input_id, "is_axis"):
+            is_axis = self.hardware_input_id.is_axis
+            return is_axis
+        if hasattr(self.input_item,"is_axis") and hasattr(self._input_item,"axis_value"):
+            is_axis = is_axis or self.input_item.is_axis
+
+        return is_axis
+
+    def input_is_button(self):
+        ''' true if the input is a button '''
+        is_button = False
+        input_item = self.input_item
+        # check hat first
+        hardware_input_type = self.hardware_raw_input_type
+
+        input_type = None
+        if hasattr(self.parent_container,"get_input_type"):
+            input_type = self.parent_container.get_input_type() # container override input type
+
+        if input_type:
+            return input_type == InputType.JoystickButton
+
+        if hardware_input_type == InputType.JoystickHat:
+            return False
+
+        if hasattr(input_item, "is_button"):
+            is_button = input_item.is_button
+            return is_button
+
+        if hasattr(self, "hardware_input_type"):
+            input_type : InputType = self.hardware_input_type
+            return input_type == InputType.JoystickButton
+
+        if hasattr(self.hardware_input_id, "is_button"):
+            is_button = self.hardware_input_id.is_button
+
+        if hasattr(self.hardware_input_id, "is_axis"):
+            is_button = not self.hardware_input_id.is_axis
+
+
+        return is_button
+
+
+    def input_is_hardware(self):
+        ''' true if the device is a hardware input device '''
+        if self._is_hardware is None:
+            self._is_hardware =  gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid)
+        return self._is_hardware
+
+    @property
+    def enabled(self):
+        return self._enabled
+
+
+    @property
+    def action_id(self):
+        ''' id '''
+        return self._id
+
+
+    @property
+    def action_type(self):
+        ''' type name of this action '''
+        return self._action_type
+
+
+
+    def display_name(self):
+        ''' display name for this action '''
+        return "N/A"
+
+
+
+
+    def from_xml(self, node, data = None, extra_data = None):
+        """Populates the instance with data from the given XML node.
+
+        :param node the XML node to populate fields with
+        """
+
+        # set the action ID first as it can be read by subsequent code
+        import_data = gremlin.base_profile.ProfileImportData()
+
+        if "action_id" in node.attrib:
+            self._id = node.get("action_id")
+
+        if "send-mode" in node.attrib:
+            mode_int = safe_read(node, "send-mode", int, 0)
+            mode = SendType(mode_int)
+            self._send_mode = mode
+
+
+        comment = None
+        if "comment" in node.attrib:
+            comment = node.get("comment")
+        if comment:
+            self.comment = comment
+
+        priority = 5 # default priority for actions
+        if "priority" in node.attrib:
+            priority = safe_read(node, "priority",int, 5)
+            priority = gremlin.util.clamp(priority,0, 1000)
+            self._priority = priority
+
+
+        nodes = node.xpath(".//remote-config")
+        if nodes:
+            self.remote_config.from_xml(nodes[0])
+
+
+
+        super().from_xml(node, data, extra_data)
+
+
+        self.activation_condition = BaseActivationCondition(ConditionModel(self),ActivationRule.All)
+        self.activation_condition.setContainer(self)
+        for _ in node.findall("activation-condition"):
+            cond_node = node.find("activation-condition")
+            if cond_node is not None:
+                self.activation_condition.from_xml(cond_node, data, extra_data)
+
+
+        # record the type of this action
+        self._action_name = node.tag
+
+    def to_xml(self):
+        """Returns a XML node representing the instance's contents.
+
+        :return XML node representing the state of this instance
+        """
+
+        if self._abstract_action_generating_xml:
+            syslog.error("ACTION XML: Recusion detected:")
+            return None
+
+        try:
+
+            self._abstract_action_generating_xml = True
+
+            node = super().to_xml()
+            if self.has_conditions:
+                # output the conditions
+                node.append(self.activation_condition.to_xml())
+
+            # output the ID
+            node.set("action_id", self.action_id)
+
+            # send mode
+            if self._send_mode != SendType.Normal:
+                # only save if not default
+                node.set("send-mode", safe_format(self._send_mode.value, int))
+
+            # output any notes
+            if self.comment:
+                node.set("comment", self.comment)
+
+            node.set("priority", safe_format(self._priority, int))
+
+            # remote configuration
+            rc_node = self.remote_config.to_xml()
+            node.append(rc_node)
+
+            return node
+        finally:
+            self._abstract_action_generating_xml = False
+
+
+    def requires_virtual_button(self):
+        """Returns whether or not the action requires the use of a
+        virtual button.
+
+        :return True if a virtual button has to be used, False otherwise
+        """
+        raise error.MissingImplementationError(
+            "AbstractAction.requires_virtual_button() not implemented"
+        )
+
+    def _is_valid(self):
+        raise error.MissingImplementationError(
+            "AbstractAction._is_valid() not implemented"
+        )
+
+    def is_valid_for_save(self):
+        ''' indicates an action can be saved to a profile even if it's not configured - this allows in process profile saving '''
+        return True
+
+
+    def __str__(self):
+        if hasattr(self,"display_name"):
+            return self.display_name()
+        return super().__str__()
+
+    def __hash__(self):
+        # index on the unique ID of each action
+        return hash(self._id)
+
+
+class MultiModeAbstractAction(AbstractAction):
+    ''' indicates the action works with multiple modes '''
+    def __init__(self, parent):
+        super().__init__(parent)
+        self._is_multi_mode_action = True # indicate this is a multimode action
+
+
 
 
 class ActionSet(AbstractCallbackModel):
@@ -5677,7 +6348,7 @@ class ActionSet(AbstractCallbackModel):
     def to_xml(self):
         ''' writes the actions in the action set out '''
         node = ElementTree.Element("action-set")
-        node.set("guid", write_guid(self._id))
+        node.set("guid", write_guid(self.id))
         if self.description:
             node.set("description", html.escape(self.description))
         for action in self:
@@ -5803,7 +6474,7 @@ class ActionSetView(AbstractView):
     def __init__(
             self,
             profile : gremlin.base_profile.Profile,
-            container : gremlin.input_item.AbstractContainer,
+            container : AbstractContainer,
             model : ActionSetModel,
             label = None,
             view_type=ui_common.ContainerViewTypes.Action,
@@ -5814,7 +6485,7 @@ class ActionSetView(AbstractView):
         
 
         assert isinstance(profile, gremlin.base_profile.Profile), "invalid profile"
-        assert isinstance(container, gremlin.input_item.AbstractContainer), "invalid container"
+        assert isinstance(container, AbstractContainer), "invalid container"
         assert isinstance(model, ActionSetModel),"invalid model"
 
 
@@ -6016,7 +6687,7 @@ class ActionSetView(AbstractView):
                         case ui_common.ContainerViewTypes.Conditions:
                             # create the action widget from the plugin
                             widget = data.widget(data)
-                            wrapped_widget = ConditionActionWrapper(widget)
+                            wrapped_widget = ConditionActionWrapperWidget(widget)
 
                         case _:
                             syslog.error(f"Invalid view type in ActionSetview: don't know how to handle: {self.view_type}")
@@ -6486,7 +7157,7 @@ class ConditionStateTracker():
 
     def register(self, input_item, container, container_widget):
         ''' registers a condition tracker '''
-        if not isinstance(container, gremlin.input_item.AbstractContainer):
+        if not isinstance(container, AbstractContainer):
             return
 
         dock_tab : QtWidgets.QTabWidget = container_widget.dock_tabs
@@ -6507,9 +7178,9 @@ class ConditionStateTracker():
 
     def unregister(self, input_item, container):
         ''' unregisters a condition tracker '''
-        if not isinstance(container, gremlin.input_item.AbstractContainer):
+        if not isinstance(container, AbstractContainer):
             return
-        assert isinstance(container, gremlin.input_item.AbstractContainer)
+        assert isinstance(container, AbstractContainer)
         device_guid = input_item.device_guid
         mode = input_item.profile_mode # gremlin.shared_state.current_mode
         input_id = input_item.input_id
@@ -6522,7 +7193,7 @@ class ConditionStateTracker():
 
     @QtCore.Slot(object)
     def _condition_state_changed(self, container):
-        if not isinstance(container, gremlin.input_item.AbstractContainer):
+        if not isinstance(container, AbstractContainer):
             return
         device_guid = container.hardware_device_guid
         input_id = container.hardware_input_id
@@ -6558,7 +7229,7 @@ class ConditionStateTracker():
 
     @QtCore.Slot(object, object)
     def _container_delete(self, input_item, container):
-        if not isinstance(container, gremlin.input_item.AbstractContainer):
+        if not isinstance(container, AbstractContainer):
             return
         self.unregister(input_item, container)
 
@@ -6608,7 +7279,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         VirtualHatButton: virtual_button.VirtualHatButtonWidget
     }
 
-    def __init__(self, input_item : InputItem, container : gremlin.input_item.AbstractContainer, parent=None):
+    def __init__(self, input_item : InputItem, container : AbstractContainer, parent=None):
         """Creates a new container widget object.
 
         :param profile_data the data the container handles
@@ -6850,7 +7521,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             return
         dock_tabs = self.dock_tabs
         if dock_tabs.data == container:
-            # tracker = gremlin.base_conditions.ConditionTracker()
+            # tracker = ConditionTracker()
             #input_item = container.input_item
             # count = tracker.getInputItemConditionCount(input_item)
             enabled = container.hasConditions() # tracker.getContainerConditionCount(container) > 0
@@ -7663,7 +8334,7 @@ class BasicActionWrapper(AbstractActionWrapper):
         syslog.info(f"copy to clipboard: {action.name}")
 
 
-class ConditionActionWrapper(AbstractActionWrapper):
+class ConditionActionWrapperWidget(AbstractActionWrapper):
 
     """Wraps an action widget and displays the condition config dialog."""
 
@@ -7687,14 +8358,14 @@ class ConditionActionWrapper(AbstractActionWrapper):
         container = self.action_widget.action_data
         # if action_data.parent.has_action_conditions:
         if container.activation_condition is None:
-            container.activation_condition = gremlin.base_conditions.BaseActivationCondition([],gremlin.types.ActivationRule.All)
+            container.activation_condition = BaseActivationCondition(ConditionModel(self), ActivationRule.All)
             container.activation_condition.setContainer(container)
 
         self.condition_model = ConditionModel(
             container,
             container.activation_condition
         )
-        self.condition_view = ConditionView()
+        self.condition_view = ConditionView(self.condition_model)
         container.condition_view = self.condition_view
         self.condition_view.setContainer(container)
         self.condition_view.setModel(self.condition_model)
@@ -7710,7 +8381,7 @@ class ContainerModel(AbstractCallbackModel):
 
     """ container model for input mapping widget """
 
-    def __init__(self, input_item, input_item_widget : InputItemMappingWidget = None, input_type: InputType = None, parent=None):
+    def __init__(self, input_item, parent=None):
         """Creates a new instance.
 
         :param input_item:  the input item owning the container
@@ -7718,34 +8389,19 @@ class ContainerModel(AbstractCallbackModel):
         :param input_type: the override input type if different from the input item configuration
         :param parent: the parent of this widget
         """
-        super().__init__(allowed_types=(AbstractContainer,))
+        assert isinstance(input_item, InputItem),"Invalid input item object"
+        super().__init__(allowed_types=(AbstractContainer,), description=f"ContainerModel")
+        
+        self._input_item = input_item
 
-        self._input_item_widget = input_item_widget # the widget tied to this model
-        self._input_type = input_type if input_type is not None else input_item_widget._input_type
-
-        # load the input item containers into this model
-        self.pushSuspend()
-        for container in input_item.containers:
-            self.add(container)
-        self.popSuspend()
-        self.resetChanges()
-
-
-    @property
-    def item_data(self) -> InputItemMappingWidget:
-        ''' get the item data associated with this action container '''
-        return self._input_item_widget
+    def input_item(self) -> InputItem:
+        ''' gets the associated input item'''
+        return self._input_item
 
     @property
     def input_type(self) -> InputType:
-        return self._input_type
-
-    def rows(self):
-        """Returns the number of rows in the model.
-
-        :return number of rows in the model
-        """
-        return len(self._containers)
+        ''' gets the associated input type '''
+        return self._input_item.input_type
 
     def addContainer(self, container : AbstractContainer):
         """Adds a container to the model.
@@ -7755,60 +8411,31 @@ class ContainerModel(AbstractCallbackModel):
 
         self.add(container)
 
-    def removeContainer(self, container : AbstractContainer, emit = True):
+    def removeContainer(self, container : AbstractContainer):
         """Removes an existing container from the model.
         
 
         :param container the container instance to remove
         """
-        
-        el = gremlin.event_handler.EventListener()
-        changed = False
-        if container in self:
-            # notify actions that the container is closing
-            container.action_sets.delete()
-
-            for action_set in container.action_sets:
-                if action_set:
-                    for action in action_set:
-                        action_set.removeAction(action)
-            self._containers.remove(container)
-
-            if emit:
-                self.data_changed.emit()
-                el.container_delete.emit(self.item_data, container)
-                el.mapping_changed.emit(self.item_data)
-
-
-    def clear(self):
-        '''Removes all containers from the model'''
-
-        if self.rows():
-            for container in self:
-                # notify actions that the container is closing
-                container.clear()
-
-            self._fireChanged()
+        self.remove(container)
 
 class ContainerView(AbstractView):
 
     ''' widget that displays container mappings for an input item '''
 
-    def __init__(self, input_item : AbstractInputItem, container_model : ContainerModel, parent = None):
+    def __init__(self, input_item : AbstractInputItem, parent = None):
         """Creates a new view instance.
 
         :param parent the parent of the widget
         """
 
         assert isinstance(input_item, AbstractInputItem), "invalid input item"
-        assert isinstance(container_model, ContainerModel), "invalid container model"
+        assert isinstance(input_item.containerModel, ContainerModel), "invalid container model"
             
                
-        super().__init__(model = container_model, parent=parent)
+        super().__init__(model = input_item.containerModel, parent=parent)
 
         self.pushSuspended() # suspend updates
-
-
 
         # Create required UI items
         self._main_layout = QtWidgets.QVBoxLayout(self)
@@ -8054,7 +8681,7 @@ class ContainerView(AbstractView):
             model
         """
 
-        return lambda: self._delete_container(widget.profile_data)
+        return lambda: self._delete_container(widget.container)
 
     def _delete_container(self, profile_data):
         ''' called when delete container button clicked'''
@@ -8078,7 +8705,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
     description_clear = Signal() # clear the description field
     expired = Signal(object, QtWidgets.QWidget) # (key, widget) fires when the input mapping expires to notify the owner
 
-    def __init__(self, input_item, input_type = None, object_name : str = None, spacer_height = 32, parent=None):
+    def __init__(self, input_item : InputItem, input_type : InputType= None, object_name : str = None, spacer_height = 32, parent=None):
         """Creates a new object instance.
 
         :params:
@@ -8103,7 +8730,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         assert input_item is not None,"Input Item must be provided"
         self._input_item = input_item
         self._input_type = input_type
-        self._container_model = ContainerModel(input_item, self, input_type)
+
         
 
         # self.setObjectName(object_name if object_name else "(object name not provided)")
@@ -8174,9 +8801,9 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         return self._deleted
     
     @property
-    def containerModel(self):
+    def containerModel(self) -> ContainerModel:
         ''' gets the mapping container model '''
-        return self._container_model
+        return self.input_item.containers
 
 
     def refresh(self):
@@ -8334,7 +8961,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             container_layout.addWidget(widget)
 
 
-        container_view = ContainerView(self._input_item, self._container_model, parent = self)
+        container_view = ContainerView(self._input_item, parent = self)
 
         container_layout.addWidget(container_view)
         # reference the widget so we can update it
@@ -8671,7 +9298,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         container_list = []
 
-        # tracker = gremlin.base_conditions.ConditionTracker()
+        # tracker = ConditionTracker()
         import_data = gremlin.base_profile.ProfileImportData()
         verbose = gremlin.config.Configuration().verbose
 
@@ -8971,101 +9598,6 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         return self.id == other.id
 
 
-class ConditionModel(AbstractModel):
-
-    """Stores and represents condition data."""
-
-    def __init__(self, action_data, condition_data, parent=None):
-        """Creates a new model to store condition data.
-
-        :param condition_data the condition data to represent
-        :param parent the parent of this object
-        """
-        super().__init__(parent)
-        self.condition_data = condition_data
-        self.action_data = action_data
-        self.input_item = None
-        self.container = None
-        if isinstance(action_data, gremlin.input_item.AbstractContainer):
-            self.container = action_data
-            self.input_item = action_data.input_item
-        elif isinstance(action_data, gremlin.base_profile.AbstractAction):
-            # find the container for the given action
-            self.container = action_data.get_container()
-        elif isinstance(action_data, gremlin.input_item.ConditionContainer):
-            self.container = action_data.get_container()
-
-    def rows(self):
-        """Returns the number of rows in the model.
-        :return number of rows
-        """
-        return len(self.condition_data.conditions)
-
-    def data(self, index):
-        """Returns the data stored at the given index.
-
-        :param index the index for which to return the data
-        :return the data stored at the provided index
-        """
-        return self.condition_data.conditions[index]
-
-    def add_condition(self, condition):
-        """Adds a condition to to the model.
-
-        :param condition_data the condition data to add
-        """
-
-        self.condition_data.conditions.append(condition)
-        condition.setOwner(self.condition_data)
-        tracker = gremlin.base_conditions.ConditionTracker()
-        mode = gremlin.shared_state.current_mode
-        container = self.container
-        input_item = self.input_item
-        if input_item:
-            data = gremlin.base_conditions.ConditionTrackerData(mode, input_item, container, condition, rule = gremlin.base_conditions.ActivationRule.All)
-            tracker.registerCondition(data)
-        self.data_changed.emit()
-        el = gremlin.event_handler.EventListener()
-        el.condition_state_changed.emit(container)
-
-
-
-    def delete_condition(self, condition):
-        """Deletes a condition from the model.
-
-        Attempts to locate the provided condition and deletes it, if it is
-        present.
-
-        :param condition the condition to remove.
-        """
-        if condition in self.condition_data.conditions:
-            self.condition_data.conditions.remove(condition)
-
-        if self.input_item:
-            tracker = gremlin.base_conditions.ConditionTracker()
-            tracker.unregisterCondition(condition)
-
-        container = self.container
-
-        el = gremlin.event_handler.EventListener()
-        el.condition_state_changed.emit(container)
-        self.data_changed.emit()
-
-    @property
-    def rule(self):
-        """Returns the current application rule for the conditions.
-
-        :return current application rule of conditions
-        """
-        return self.condition_data._rule
-
-    @rule.setter
-    def rule(self, rule):
-        """Sets the application rule of the conditions.
-
-        :param rule the new application type
-        """
-        self.condition_data._rule = rule
 
 @SingletonDecorator
 class ConditionHelper:
@@ -9088,7 +9620,7 @@ class ConditionHelper:
         from gremlin.clipboard import ObjectEncoder, EncoderType
         if isinstance(container, gremlin.base_profile.AbstractAction):
             input_item = container.parent.parent
-        elif isinstance(container, gremlin.input_item.AbstractContainer):
+        elif isinstance(container, AbstractContainer):
             input_item = container.parent
         else:
             assert False,"Pasted container is not a valid container type - expected AbstractContainer or AbstractAction"
@@ -9096,7 +9628,7 @@ class ConditionHelper:
         if isinstance(oc, ObjectEncoder):
             
             data = (input_item, container) # (input item, container)
-            tracker = gremlin.base_conditions.ConditionTracker()
+            tracker = ConditionTracker()
             mode = gremlin.shared_state.edit_mode
             
             if oc.encoder_type == EncoderType.ActivationCondition:
@@ -9104,19 +9636,19 @@ class ConditionHelper:
                 node = lxml.etree.fromstring(xml)    
                 if node.tag == 'activation-condition':
                     # temporary activation condition
-                    activation_condition = gremlin.base_conditions.BaseActivationCondition([], gremlin.base_conditions.ActivationRule.All)
+                    activation_condition = BaseActivationCondition(ConditionModel(self), ActivationRule.All)
                     rule = container.activation_condition.rule
                     activation_condition.from_xml(node, data)
                     for condition in activation_condition.conditions:
                         condition.setId(gremlin.util.get_guid())
                         # add the condition to the existing container
                         container.activation_condition.conditions.append(condition)
-                        item = gremlin.base_conditions.ConditionTrackerData(mode, input_item, container, condition, rule)
+                        item = ConditionTrackerData(mode, input_item, container, condition, rule)
                         tracker.registerCondition(item)
                 if isinstance(container, gremlin.base_profile.AbstractAction):
                     # we need to send the main container, not the action container for the update
                     self.update_condition_ui(container.parent)
-                elif isinstance(container, gremlin.input_item.AbstractContainer):
+                elif isinstance(container, AbstractContainer):
                     self.update_condition_ui(container)        
         
 
@@ -9125,7 +9657,7 @@ class ConditionHelper:
                 node = lxml.etree.fromstring(xml)
                 if node.tag == 'condition':
                     condition_type = safe_read(node, "condition-type",str, "")
-                    condition = gremlin.base_conditions.BaseActivationCondition.condition_lookup[condition_type]()
+                    condition = BaseActivationCondition.condition_lookup[condition_type]()
                     condition.from_xml(node, data)
                     condition.setId(gremlin.util.get_guid())
 
@@ -9134,12 +9666,12 @@ class ConditionHelper:
                     condition.setOwner(container.activation_condition)
                     rule = container.activation_condition.rule
                     input_item = container.parent
-                    item = gremlin.base_conditions.ConditionTrackerData(mode, input_item, container, condition, rule)
+                    item = ConditionTrackerData(mode, input_item, container, condition, rule)
                     tracker.registerCondition(item)
                     if isinstance(container, gremlin.base_profile.AbstractAction):
                         # we need to send the main container, not the action container for the update
                         self.update_condition_ui(container.parent)
-                    elif isinstance(container, gremlin.input_item.AbstractContainer):
+                    elif isinstance(container, AbstractContainer):
                         self.update_condition_ui(container)
                     
                     
@@ -9163,7 +9695,7 @@ class ConditionHelper:
             encoded = ObjectEncoder(condition, xml, "activation-condition", EncoderType.ActivationCondition)
             clipboard.data = encoded
             syslog.info(f"activation condition copied to clipboard")
-        elif isinstance(condition, gremlin.base_conditions.AbstractCondition):
+        elif isinstance(condition, AbstractCondition):
             # regular condition
             node = condition.to_xml()
             xml = lxml.etree.tostring(node)
@@ -9183,7 +9715,7 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
     #deleted = Signal(base_classes.AbstractCondition)
     deleted = Signal(object)
 
-    def __init__(self, condition : gremlin.base_conditions.AbstractCondition, parent=None):
+    def __init__(self, condition : AbstractCondition, parent=None):
         """Creates a new widget.
 
         :param condition_data the data to be represented by the widget
@@ -10438,33 +10970,34 @@ class ConditionView(AbstractView):
 
     condition_map = {
         "Keyboard":
-            [gremlin.base_conditions.BaseKeyboardCondition, KeyboardConditionWidget],
+            [BaseKeyboardCondition, KeyboardConditionWidget],
         "Joystick":
-            [gremlin.base_conditions.BaseJoystickCondition, JoystickConditionWidget],
+            [BaseJoystickCondition, JoystickConditionWidget],
         "vJoy":
-            [gremlin.base_conditions.BaseVJoyCondition, VJoyConditionWidget],
+            [BaseVJoyCondition, VJoyConditionWidget],
         "Action":
-            [gremlin.base_conditions.BaseInputActionCondition, InputActionConditionWidget],
+            [BaseInputActionCondition, InputActionConditionWidget],
         "State":
-            [gremlin.base_conditions.BaseStateCondition, StateConditionWidget],
+            [BaseStateCondition, StateConditionWidget],
         "Mode":
-            [gremlin.base_conditions.BaseModeCondition, ModeConditionWidget]
+            [BaseModeCondition, ModeConditionWidget]
     }
 
     # Mapping between application rule label and enumeration
     rules_map = {
-        "All": gremlin.base_conditions.ActivationRule.All,
-        "Any": gremlin.base_conditions.ActivationRule.Any,
-        gremlin.base_conditions.ActivationRule.All: "All",
-        gremlin.base_conditions.ActivationRule.Any: "Any"
+        "All": ActivationRule.All,
+        "Any": ActivationRule.Any,
+        ActivationRule.All: "All",
+        ActivationRule.Any: "Any"
     }
 
-    def __init__(self, parent=None):
+    def __init__(self, model : ConditionModel, parent=None):
         """Creates a new instance.
 
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        assert isinstance(model, ConditionModel),"invalid condition model"
+        super().__init__(model = model, parent = parent)
 
         self._container = None
         self._redraw_lock = False
@@ -10639,20 +11172,15 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         "container": 2
     }
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, container : AbstractContainer, parent=None):
         """Creates a new instance.
 
         :param profile_data the profile data associated with the conditions
         :param parent the parent widget of this
         """
+        assert isinstance(container, AbstractContainer),"invalid container"
         super().__init__(parent)
-        self.profile_data = profile_data
-        #if isinstance(profile_data, gremlin.input_item.AbstractContainer) or isinstance(profile_data, gremlin.input_item.ConditionContainer):
-        if isinstance(profile_data, gremlin.input_item.ConditionContainer):
-            self.container = profile_data
-        else:
-            self.container = None
-
+        self.container = container
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
         self._create_ui()
@@ -10689,11 +11217,11 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         self.activation_count_widget = QtWidgets.QLabel()
         self.container_condition_frame_layout.addWidget(self.activation_count_widget)
-        self.container_condition_model = ConditionModel(self.profile_data, self.profile_data.activation_condition)
+        self.container_condition_model = ConditionModel(self.container, self.container.activation_condition)
 
 
-        self.container_condition_view = ConditionView()
-        self.container_condition_view.setContainer(self.profile_data)
+        self.container_condition_view = ConditionView(self.container_condition_model)
+        self.container_condition_view.setContainer(self.container)
         self.container_condition_view.setModel(self.container_condition_model)
 
         self.container_condition_frame_layout.addWidget(self.container_condition_view)
@@ -11197,6 +11725,5 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         
             
 
-       
     
 

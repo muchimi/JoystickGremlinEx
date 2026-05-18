@@ -1,36 +1,23 @@
 # from __future__ import annotations # deprecated with python 3.14+
 import logging
-import threading
-import time
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.actions
-import gremlin.base_conditions
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
-import gremlin.execution_graph
-import gremlin.input_types
 import gremlin.joystick_handling
 import gremlin.shared_state
-import gremlin.types
-from gremlin.util import load_icon
 import gremlin.base_profile
-from gremlin.base_conditions import BaseInputActionCondition
 from gremlin.input_types import InputType
-from gremlin import input_devices, joystick_handling, util
-from gremlin.error import ProfileError
-from gremlin.util import safe_format, safe_read
+from gremlin.util import safe_format, safe_read, write_guid, read_guid
 import gremlin.ui.ui_common
 import gremlin.input_item
-import os
-import enum
 from gremlin.types import ControlAction
 from gremlin.util import *
-import gremlin.util
 import psygnal
-from psygnal import Signal
+
 from gremlin.types import SyncMode
 
 

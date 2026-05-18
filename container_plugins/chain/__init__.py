@@ -22,7 +22,7 @@ import time
 from lxml import etree as ElementTree
 
 import gremlin
-import gremlin.base_conditions
+import gremlin.input_item
 import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.input_item
@@ -198,7 +198,7 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         # ensure proper cycling.
         self.switch_on_press = False
         for cond in container.activation_condition.conditions:
-            if isinstance(cond, gremlin.base_conditions.InputActionCondition):
+            if isinstance(cond, gremlin.input_item.InputActionCondition):
                 if cond.comparison == "press":
                     self.switch_on_press = True
 
