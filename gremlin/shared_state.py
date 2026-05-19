@@ -457,6 +457,8 @@ def set_last_input_id(device_guid, input_type, input_id):
         if current_profile:
             current_profile.setLastInput(device_guid, input_type, input_id)
 
+active_device_guid : uuid.UUID = None # guid of the active device, None if not set
+
 def get_last_input_id():
     import gremlin.config
     config = gremlin.config.Configuration()

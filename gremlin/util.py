@@ -2498,6 +2498,10 @@ def to_guid(device_guid) -> uuid.UUID:
     ''' converts a string GUID to a GUID'''
     if device_guid is None:
         return None
+    if isinstance(device_guid, uuid.UUID):
+        return device_guid
+    if isinstance(device_guid, dinput.GUID):
+        return uuid.UUID(int = device_guid._guid_int)
     if hasattr(device_guid, "toId"):
         device_guid = device_guid.toId()
     if isinstance(device_guid, str):
@@ -2797,28 +2801,56 @@ def timeit(callback, *args, **kwargs):
     syslog.info(f"Perf: [{callback.__module__}] [{callback.__name__}] time: [{elapsed:.6f}]")
 
 class TriggerDict(collections.UserDict):
-    ''' dict that fires callbacks when data is changed '''
+    ''' hashable dict that fires callbacks when data is changed '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._on_change_callbacks = []
+        self.id = uuid.uuid4() # unique ID of this dict
+        self._suspend_stack = 0
+        self._callback_pending = False
 
-    def addCallback(self, callback):
+
+
+    def pushSuspend(self):
+        ''' suspends callbacks on change '''
+        self._suspend_stack += 1
+
+    def popSuspend(self, reset = False):
+        ''' restores callbacks on change '''
+        if reset:
+            self._suspend_stack = 0
+        if self._suspend_stack > 0:
+            self._suspend_stack -= 1
+
+    def addCallback(self, callback: Callable):
         """Registers a function to run on changes."""
-        self._on_change_callbacks.append(callback)
+        if callback and not callback in self._on_change_callbacks:
+            self._on_change_callbacks.append(callback)
 
+    
+
+    def clearCallbacks(self):
+        ''' clears any change callbacks'''
+        self._on_change_callbacks.clear()
 
     def __setitem__(self, key, value):
         old_value = self.data.get(key)
         super().__setitem__(key, value)
         # run callbacks
-        for callback in self._on_change_callbacks:
-            callback(self, key, old_value, value)
+        if self._suspend_stack == 0:
+            for callback in self._on_change_callbacks:
+                callback(self, key, old_value, value)
 
     def __delitem__(self, key):
         old_value = self.data.get(key)
         super().__delitem__(key)
         # run callbacks
-        for callback in self._on_change_callbacks:
-            callback(self, key, old_value, None)
+        if self._suspend_stack == 0:
+            for callback in self._on_change_callbacks:
+                callback(self, key, old_value, None)
+
+    def __hash__(self):
+        ''' make this dict hashable '''
+        return hash(frozenset(self.values()))
 
 

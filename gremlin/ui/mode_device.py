@@ -181,12 +181,6 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             )
         self.inputItemListView.setMinimumWidth(350)
 
-        # Input type specific setups
-        self.inputItemListView.setModel(self.inputItemListModel)
-        # self.inputItemListView.redraw()
-
-  
-
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
         widget = gremlin.ui.ui_common.getHContainer(lock_widget, left_stretch=True, widget_only = True)

@@ -2662,7 +2662,7 @@ class  StateFilterWidget(QtWidgets.QWidget):
             self._count_widget.setText(None)
             return
         total = self._model.rows()
-        filtered = self._model.filteredRows()
+        filtered = self._model.count()
 
         plural = "s" if total > 1 else ""
         if total == 0:
@@ -3215,7 +3215,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         self._blank_input()
 
-    def _load_handler(self, model : StateInputItemModel, emit_change = True):
+    def _load_handler(self, model : StateInputItemModel, emit = True) -> bool:
         ''' called when the data model for the input list needs to be updated - refreshes the model view '''
         state = self.profile.state
         self._input_items = {}
@@ -3223,7 +3223,9 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         keys = [key for key in state]
         keys.sort()
 
+        model.pushSuspend()
         model.clear(emit = False)
+        
 
         config = gremlin.config.Configuration()
         is_filter = config.state_filter_enabled
@@ -3254,11 +3256,12 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             model.setData(index, input_item)
             index += 1
 
-        model.applyFilter() # update model filters
+        model.applyFilter() # update model filters and sort
+        model.popSuspend()
 
-
-        if changed and emit_change:
-            model.data_changed.emit()
+        if changed and emit:
+            model.trigger() # causes an update
+        return changed
 
     def _remove_handler(self, model : StateInputItemModel, index, emit_change = True):
         ''' clears a single index '''

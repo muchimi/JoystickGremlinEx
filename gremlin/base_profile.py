@@ -1661,6 +1661,21 @@ class ProfileRegistry():
             else:
                 # single
                 input_type_list = [input_type]
+
+            if __debug__:
+                for tt in input_type_list:
+                    assert isinstance(tt, InputType),f"Invalid input type: {tt}"
+            # items = []
+            # for key in self._input_item_registry:
+            #     key_device_guid, key_mode, key_input_type, key_input_id = key
+            #     if key_device_guid == device_guid:
+            #         if key_mode == mode_name:
+            #             if key_input_type in input_type_list:
+            #                 items.append(self._input_item_registry[key])
+                            
+            # return items
+                
+
             return [item for item in self._input_item_registry.values() if item.device_guid == device_guid and item.profile_mode == mode_name and item.input_type in input_type_list]
 
         return [item for item in self._input_item_registry.values() if item.device_guid == device_guid and item.profile_mode == mode_name]

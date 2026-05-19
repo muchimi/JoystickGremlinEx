@@ -3625,7 +3625,7 @@ class  OscFilterWidget(QtWidgets.QWidget):
     def _update_count(self):
         ''' updates the count of defined inputs '''
         total = self._model.rows()
-        filtered = self._model.filteredRows()
+        filtered = self._model.count()
 
         plural = "s" if total > 1 else ""
         if total == 0:

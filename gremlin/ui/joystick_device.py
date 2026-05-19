@@ -176,28 +176,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             show_filtered_only=True,
         )
 
-        # if there are no inputs in the model, pick the default filter for the devices
-        if self.inputItemListModel.filteredCount() == 0:
-            # nothing shown
-            if self.inputItemListModel.unfilteredCount():
-                # device has inputs
-                input_filter = self.getDefaultFilter()
-                self.inputItemListModel.applyFilter(False)
-                syslog.info(f"JOYSTICK: load defaults for device [{device.name}]")
-
-
-
-        self.inputItemListModel.addCallback(self._handle_model_changed)
-
-
-
-
-
-        # view that displays all the inputs in the model, which can be filtered
-        self.inputItemListView = JoystickInputListView(name=device.name, 
-                                                          custom_widget_handler = self._custom_widget_handler, 
-                                                          device_id = device.device_id,
-                                                          model = self.inputItemListModel)
+        self.inputItemListView : JoystickInputListView = None # delay load
 
 
         # Handle vJoy as input and vJoy as output devices properly
@@ -211,13 +190,6 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.stats : gremlin.base_profile.JoystickInputStats= profile.settings.getJoystickInputStats(device.device_guid)
         self.stats_widget = gremlin.ui.ui_common.QJoystickInputWidget(device.device_guid)
         self.stats_widget.setStats(self.stats)
-
-
-        self.inputItemListView.item_edit_curve.connect(self._edit_curve_item_cb)
-        self.inputItemListView.item_delete_curve.connect(self._delete_curve_item_cb)
-
-
-
 
         # Add modifiable device label
 
@@ -273,7 +245,10 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         gremlin.ui.ui_common.synchronize_grids(grids)
 
-        self.addLeftPanelWidget(self.inputItemListView)
+        self.listview_container = QtWidgets.QStackedWidget()
+        self.listview_container.addWidget(QtWidgets.QWidget()) # index 0 = blank placeholder
+
+        self.addLeftPanelWidget(self.listview_container)
 
         # Add a help text for the purpose of the vJoy tab
         if device is not None and \
@@ -306,21 +281,77 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.config_changed.connect(self._config_changed_cb)
 
 
+
         self.updating = False
         self.last_event = None
 
-        # update the selection if nothing is selected
-        selected_index = self.inputItemListView.currentIndex()
-        if selected_index is not None:
-            self.selectInputItemIndex(selected_index)
+
+    def ensureLoaded(self):
+        ''' called when the tab is about to be selected - finish any delay load if needed '''
+        if gremlin.util.compare_guid(gremlin.shared_state.active_device_guid, self.device.device_guid):
+            # active device matches this current device widget
+            if self.inputItemListView is None:
+                # do the delay load
+                gremlin.util.InvokeUiMethod(self._create_ui)
+
+    def _create_ui(self):
+        ''' load the list view for the joystick device if not loaded yet '''
+        # if there are no inputs in the model, pick the default filter for the devices
+        if self.inputItemListModel.count() == 0:
+            # no inputs in the model
+            if self.inputItemListModel.rows():
+                # device has inputs
+                model = self.inputItemListModel
+                input_filter = self.getDefaultFilter()
+                input_items = model.getUnfilteredItems()
+                for device_guid in input_filter:
+                    for input_type in input_filter[device_guid]:
+                        for input_id in input_filter[device_guid][input_id]:
+                            input_item : gremlin.input_item.InputItem
+                            input_item = next((item for item in input_items if item.device_guid == device_guid and item.input_type == input_type and item.input_id == input_id), None)
+                            model.setItemFiltered(input_item, True, False)
+
+                syslog.info(f"JOYSTICK: load defaults for device [{device.name}]")
+
+
+        
+
+
+        if self.inputItemListView is None:
 
 
 
-        # update all curve icons
-        self.update_curve_icons()
+            device = self.device
+            # view that displays all the inputs in the model, which can be filtered
+            self.inputItemListView = JoystickInputListView(name=device.name, 
+                                                            custom_widget_handler = self._custom_widget_handler, 
+                                                            device_id = device.device_id,
+                                                            model = self.inputItemListModel)
+            
+            self.inputItemListView.item_edit_curve.connect(self._edit_curve_item_cb)
+            self.inputItemListView.item_delete_curve.connect(self._delete_curve_item_cb)
 
-        # update filtered status box
-        self.update_stats_display()
+            self.listview_container.addWidget(self.inputItemListView)
+
+            # self.inputItemListModel.addCallback(self._handle_model_changed)    
+            # self.inputItemListModel.trigger() # update the list view
+
+            self.listview_container.setCurrentIndex(1) # display the list view in the stack widget
+
+            # update the selection if nothing is selected
+            selected_index = self.inputItemListView.currentIndex()
+            if selected_index is not None:
+                self.selectInputItemIndex(selected_index)
+
+
+            # update all curve icons
+            self.update_curve_icons()
+
+            # update filtered status box
+            self.update_stats_display()
+
+            
+
 
     def _handle_model_changed(self):
         ''' called when the input model changes to update the display of stats and filter status '''
@@ -353,7 +384,6 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             input_filter[device.device_guid][InputType.JoystickAxis] = {}
             for index in range(axis_count):
                 input_id = device.axis_sequence_to_input_id(index)
-
                 input_filter[device.device_guid][InputType.JoystickAxis][input_id] = True
         if device.button_count:
             button_count = max(device.button_count, 2) # first 2 buttons
@@ -416,6 +446,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         profile = gremlin.shared_state.current_profile
 
         verbose = gremlin.config.Configuration().verbose_mode_filter
+
+
         # filtered = true if the input should not be displayed (filtered), false if it should be visible
         filtered = profile.isInputFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
         if verbose and not filtered:
@@ -498,7 +530,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 # filter setup
                 self.inputItemListModel.show_filtered = True
                 # find the index in the filtered list, -1 if not found
-                count = self.inputItemListModel.filteredRows()
+                count = self.inputItemListModel.count()
                 if count:
                     index = self.inputItemListModel.indexOfInputItem(input_item)
                     if index == -1:

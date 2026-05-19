@@ -349,8 +349,8 @@ class GateInfo():
         self._delay = delay  # delay in milliseconds for the trigger duration between a press and release
         self._error = False # no error state
 
-        eh = gremlin.event_handler.EventListener()
-        eh.mapping_changed.connect(self._item_data_changed)
+        # eh = gremlin.event_handler.EventListener()
+        # eh.mapping_changed.connect(self._item_data_changed)
 
         self.autorelease_map = {
             GateConditionType.OnCross: True,
@@ -4675,7 +4675,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         if not self._hooked:
             self._hooked = True
             el = gremlin.event_handler.EventListener()
-            el.mapping_changed.connect(self._mapping_changed_cb)
+            # l.mapping_changed.connect(self._mapping_changed_cb)
 
             gh = GateEventHandler()
             self._gate_data.registerTriggerCallback(self._trigger_handler)
@@ -4690,7 +4690,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             self._condition_pages.clear()
 
             el = gremlin.event_handler.EventListener()
-            el.mapping_changed.disconnect(self._mapping_changed_cb)
+            # el.mapping_changed.disconnect(self._mapping_changed_cb)
 
             gh = GateEventHandler()
 
