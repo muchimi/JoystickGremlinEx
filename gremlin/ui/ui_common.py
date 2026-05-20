@@ -3364,11 +3364,11 @@ class QBoxFrame(QtWidgets.QFrame):
         self.setStyleSheet(css)
 
     @property
-    def data(self):
+    def _identifier(self):
         return self._data
 
-    @data.setter
-    def data(self, value):
+    @_identifier.setter
+    def _identifier(self, value):
         self._data = value
 
 class QBoxFrameLayout(QBoxFrame):
@@ -4073,13 +4073,22 @@ class QIconLabel(QtWidgets.QWidget):
             pixmap = icon_or_path.pixmap(self._icon_size)
 
         elif isinstance(icon_or_path, str):
-            if use_qta:
-                if color:
-                    pixmap = qta.icon(icon_or_path, color=color).pixmap(self._icon_size)
+            ext = gremlin.util.get_ext(icon_or_path)
+            if ext == ".png":
+                icon_or_path = gremlin.util.find_icon(icon_or_path)
+                if not icon_or_path:
+                    # not found pixmap
+                    pixmap = Icons.invalidIcon()
                 else:
-                    pixmap = qta.icon(icon_or_path).pixmap(self._icon_size)
+                    pixmap = load_pixmap(icon_or_path, self._icon_size, color)
             else:
-                pixmap = load_pixmap(icon_or_path) if icon_or_path else None
+                if use_qta:
+                    if color:
+                        pixmap = qta.icon(icon_or_path, color=color).pixmap(self._icon_size)
+                    else:
+                        pixmap = qta.icon(icon_or_path).pixmap(self._icon_size)
+                else:
+                    pixmap = load_pixmap(icon_or_path) if icon_or_path else None
         else:
             pixmap = None
         if pixmap:
@@ -12923,7 +12932,8 @@ class QJoystickInputWidget(QtWidgets.QWidget):
             f_hat = 0
 
         f_visible = f_axis + f_button + f_hat
-        gremlin.util.InvokeUiMethod(self._update_ui, f_axis, f_button, f_hat, f_visible)
+        # run update on UI thread
+        gremlin.util.InvokeUiMethod(self._update_ui, f_axis, f_button, f_hat, f_visible) 
 
 
 

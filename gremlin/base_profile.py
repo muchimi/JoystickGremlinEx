@@ -1540,10 +1540,10 @@ class ProfileRegistry():
                     input_item.setOverrideInputType(override_input_type)
             case _:
                 input_item = InputItem(mode_object = mode_object,
-                                   override_input_type = override_input_type,
-                                   custom_name_handler = custom_name_handler,
-                                   custom_mode_name_handler = custom_mode_name_handler)
-                input_item.device_guid = device_guid
+                                       device_guid = device_guid,
+                                       override_input_type = override_input_type,
+                                       custom_name_handler = custom_name_handler,
+                                       custom_mode_name_handler = custom_mode_name_handler)
                 input_item.setInputType(input_type)
                 input_item.setInputId(input_id)
 
@@ -4463,8 +4463,7 @@ class Mode:
                     case InputType.Midi:
                         item = gremlin.ui.midi_device.MidiInputItem(self)
                     case _:
-                        item = InputItem(mode_object = self)
-                        item.device_guid = self.parent.device_guid
+                        item = InputItem(mode_object = self, device_guid=self.parent.device_guid)
 
                 if extra_data is None:
                     extra_data = {}

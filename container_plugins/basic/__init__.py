@@ -23,7 +23,7 @@ from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 import gremlin.types
 from gremlin.base_profile import AbstractFunctor
-from gremlin.input_item import AbstractContainer, AbstractAction, AbstractContainerWidget, ActionSet, ActionSets
+from gremlin.input_item import AbstractContainer, AbstractAction, AbstractContainerWidget, ActionSet, ActionSets, InputItem
 from shiboken6 import Shiboken
 import logging
 from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
@@ -33,14 +33,14 @@ class BasicContainerWidget(AbstractContainerWidget):
 
     """Basic container which holds a single action."""
 
-    def __init__(self, container : AbstractContainer, parent=None):
+    def __init__(self, input_item : InputItem, container: AbstractContainer, parent = None):
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(container, parent)
-        self.container = container
+        super().__init__(input_item, container, parent)
+
 
 
     def _create_action_ui(self):

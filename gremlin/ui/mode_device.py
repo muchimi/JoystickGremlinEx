@@ -100,21 +100,21 @@ class ModeInputItemModel(gremlin.input_item.InputItemListModel):
                          show_master_mode=True)   
         
 
-class ModeInputItemListView(gremlin.input_item.InputItemListView):
+# class ModeInputItemListView(gremlin.input_item.InputItemListView):
 
-    ''' list view for mode input items '''
-    def __init__(self, custom_widget_handler, model : ModeInputItemModel, parent = None):
-        ''' creates a new list view for mode input items
+#     ''' list view for mode input items '''
+#     def __init__(self, custom_widget_handler, model : ModeInputItemModel, parent = None):
+#         ''' creates a new list view for mode input items
 
-        :param custom_widget_handler a handler that creates a widget for an input item
-        :param model the model for the list view
-        :param parent the parent widget of this view
-        '''
-        super().__init__(name = "Mode Inputs",
-                         custom_widget_handler = custom_widget_handler,
-                         device_guid= ModeDeviceTabWidget.device_guid,
-                         model = model,
-                         parent = parent)
+#         :param custom_widget_handler a handler that creates a widget for an input item
+#         :param model the model for the list view
+#         :param parent the parent widget of this view
+#         '''
+#         super().__init__(name = "Mode Inputs",
+#                          custom_widget_handler = custom_widget_handler,
+#                          device_guid= ModeDeviceTabWidget.device_guid,
+#                          model = model,
+#                          parent = parent)
 
 
 
@@ -155,6 +155,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                     profile = profile,
                     mode = mode,
                     object_name = object_name,
+                    custom_input_widget_callback = self._custom_widget_handler,
                     parent = parent
                     )
         
@@ -169,22 +170,12 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self.current_mode = mode
 
-        # create the two entries
-        self.ensureInputItems()
 
-
-        # update the display names
-
-        self.inputItemListView = ModeInputItemListView(
-            custom_widget_handler = self._custom_widget_handler,
-            model = self.inputItemListModel
-            )
-        self.inputItemListView.setMinimumWidth(350)
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
         widget = gremlin.ui.ui_common.getHContainer(lock_widget, left_stretch=True, widget_only = True)
-        self.addLeftPanelWidget(widget)
+        self.addLeftPanelHeaderWidget(widget)
 
 
         config = gremlin.config.Configuration()
@@ -196,7 +187,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
             widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only = True)
-            self.addLeftPanelWidget(widget)
+            self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
             line_edit = gremlin.ui.ui_common.QDataLineEdit()
@@ -204,12 +195,12 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
             widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only = True)
-            self.addLeftPanelWidget(widget)
+            self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
             gremlin.ui.ui_common.synchronize_grids([w1, w2])
 
-        self.addLeftPanelWidget(self.inputItemListView)
+  
 
 
         el = gremlin.event_handler.EventListener()
@@ -219,16 +210,11 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
+    def onInputListViewCreated(self):
+        # create the two mode entries in the input
+        self.ensureInputItems()
 
 
-        # last index selected, -1 means none
-        self._last_selected_index = -1
-
-
-        # update the selection if nothing is selected
-        selected_index = self.inputItemListView.current_index
-        if selected_index is not None and selected_index != -1:
-            self.selectInputItemIndex(selected_index)
 
     @property
     def inputCount(self) -> int:
@@ -536,7 +522,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         import gremlin.input_item
 
         widget = gremlin.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
-        widget.data = data
+        widget._identifier = data
         widget.create_action_icons(data)
         widget.setTitle(self._custom_name_handler(data))
         widget.setInputDescription(data.description)

@@ -3301,8 +3301,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _get_input_item(self, device_guid : str, index : int) -> gremlin.input_item.InputItem:
         ''' get the input item at the specified index in the device - index is 0 based '''
-        widget = self._get_tab_widget_guid(device_guid)
-        if widget is None or not hasattr(widget,"inputItemListModel"):
+        widget : gremlin.input_item.BaseDeviceTabWidget = self._get_tab_widget_guid(device_guid)
+        if widget is None or not hasattr(widget,"inputItemListModel") or not widget.isLoaded():
             return None
 
         row_count = widget.inputItemListModel.rows()
@@ -3314,7 +3314,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _get_input_items(self, device_guid : str) -> list[gremlin.input_item.InputItem]:
         ''' gets the list of all input items for a given device '''
         widget = self._get_tab_widget_guid(device_guid)
-        if widget is None or not hasattr(widget,"inputItemListModel"):
+        if widget is None or not hasattr(widget,"inputItemListModel") or not widget.isLoaded():
             return None
 
         row_count = widget.inputItemListModel.rows()
@@ -3397,6 +3397,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         widget = None
         push_cursor = False
 
+                    
+
+
+
         with self._change_input_lock:
             try:
 
@@ -3439,9 +3443,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     return
 
 
-                
-
-
+    
 
                 # index of current device tab
                 index = self.ui.devices.currentIndex()
@@ -3518,20 +3520,24 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     switch_input = True # we are switching inputs
 
 
+
+
                 if switch_tabs and not force_switch and not config.highlight_autoswitch:
                     if verbose: syslog.info("SELECT INPUT: Tab change ignored: auto tab switching is disabled")
                     return
 
-
-
-
-                # get the device widget
-                widget = self.getRegisteredWidget(device_guid)
-                if not widget:
+                # validate the current device widget first
+                widget : gremlin.input_item.BaseDeviceTabWidget = self.getRegisteredWidget(device_guid)
+                if widget is None:
                     return
-                
-                
                 widget.ensureLoaded()
+                if not widget.isLoaded():
+                    return
+
+
+
+         
+                
                 input_count = widget.inputCount
                 input_widget_count = widget.inputWidgetCount
                 if verbose: syslog.info(f"Device widget: input count: {input_count:,}  widget count: {input_widget_count}")

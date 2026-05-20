@@ -1609,6 +1609,8 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                     profile = profile,
                     mode = mode,
                     object_name = object_name,
+                    custom_input_widget_callback = self._custom_widget_handler,
+                    blank_input_message = "Please add a MIDI input.",
                     parent = parent
                     )
 
@@ -1623,29 +1625,11 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             mode
         )
 
-        # create a list view with custom input widgets
-        self.inputItemListView = MidiInputListView(
-            custom_widget_handler = self._custom_widget_handler,
-            parent = self,
-            blank_message = "Please add a MIDI input.", 
-            model=self.inputItemListModel)
-        
-        self.inputItemListView.setMinimumWidth(350)
-
-        # Input type specific setups
-        self.inputItemListView.updated.connect(self._update_conflicts)
-
-
-        # Handle user interaction
-        self.inputItemListView.item_edit.connect(self._edit_item_cb)
-        self.inputItemListView.item_closed.connect(self._close_item_cb)
-
-        self._last_selected_index = -1 # last index selected, -1 = none
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
         widget = gremlin.ui.ui_common.getHContainer(["MIDI Inputs", "||", lock_widget], widget_only = True)
-        self.addLeftPanelWidget(widget)
+        self.addLeftPanelHeaderWidget(widget)
 
         config = gremlin.config.Configuration()
         if config.show_container_id:
@@ -1656,7 +1640,7 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
             widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only = True)
-            self.addLeftPanelWidget(widget)
+            self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
             line_edit = gremlin.ui.ui_common.QDataLineEdit()
@@ -1664,13 +1648,13 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
             widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only = True)
-            self.addLeftPanelWidget(widget)
+            self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
             gremlin.ui.ui_common.synchronize_grids([w1, w2])
 
 
-        self.addLeftPanelWidget(self.inputItemListView)
+
 
         button_container_widget = QtWidgets.QWidget()
         button_container_layout = QtWidgets.QHBoxLayout(button_container_widget)
@@ -1690,17 +1674,27 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         add_input_button.setIcon(icon)
         add_input_button.clicked.connect(self._add_input_cb)
         button_container_layout.addWidget(add_input_button)
-        self.addLeftPanelWidget(button_container_widget)
+        self.addLeftPanelHeaderWidget(button_container_widget)
 
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._handle_edit_mode_changed) # edit mode changed or mode added/removed
 
 
-        # Select default entry
-        selected_index = self.inputItemListView.currentIndex()
-        if selected_index is not None:
-            self.selectInputItemIndex(selected_index)
 
+
+    def onInputListViewCreated(self):
+        ''' called when input item list view is created '''        
+        # Handle user interaction
+        self.inputItemListView.item_edit.connect(self._edit_item_cb)
+        self.inputItemListView.item_closed.connect(self._close_item_cb)
+        self.inputItemListView.updated.connect(self._update_conflicts)
+
+    def onInputListViewRemoved(self):
+        ''' called when input item list view is created '''        
+        # Handle user interaction
+        self.inputItemListView.item_edit.disconnect(self._edit_item_cb)
+        self.inputItemListView.item_closed.disconnect(self._close_item_cb)
+        self.inputItemListView.updated.disconnect(self._update_conflicts)
 
     def _handle_edit_mode_changed(self, mode : str):
         ''' occurs when a new mode is selected '''
@@ -1875,7 +1869,7 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         widget = gremlin.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
         input_id : MidiInputItem = identifier.input_id
-        widget.data = data
+        widget._identifier = data
         widget.create_action_icons(data)
         #widget.setTitle(input_id.title_name)
         widget.setInputDescription(input_id.display_name)

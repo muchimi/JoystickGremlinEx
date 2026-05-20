@@ -683,6 +683,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                     profile = profile,
                     mode = mode,
                     object_name = object_name,
+                    custom_input_widget_callback = self._custom_widget_handler,
                     parent = parent
                     )
 
@@ -700,20 +701,10 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             mode = mode,
         )
 
-
-        self.ensureInputItems()
-
-        # update the display names
-
-        self.inputItemListView = OctaviInputItemListView(
-            custom_widget_handler=self._custom_widget_handler,
-            model = self.inputItemListModel,
-        )
-
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
         widget = gremlin.ui.ui_common.getHContainer(lock_widget, left_stretch=True, widget_only = True)
-        self.addLeftPanelWidget(widget)
+        self.addLeftPanelHeaderWidget(widget)
 
 
         config = gremlin.config.Configuration()
@@ -725,7 +716,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
             widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only = True)
-            self.addLeftPanelWidget(widget)
+            self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
             line_edit = gremlin.ui.ui_common.QDataLineEdit()
@@ -733,25 +724,18 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
             widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only = True)
-            self.addLeftPanelWidget(widget)
+            self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
             gremlin.ui.ui_common.synchronize_grids([w1, w2])
-
-        self.addLeftPanelWidget(self.inputItemListView)
-
 
         el = gremlin.event_handler.EventListener()
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
-        # last index selected, -1 means none
-        self._last_selected_index = -1
-
-        # Select default entry
-        selected_index = self.inputItemListView.currentIndex()
-        if selected_index is not None:
-            self.selectInputItemIndex(selected_index)
+    def onInputListViewCreate(self):
+        ''' called when input list is created'''
+        self.ensureInputItems()
 
     @property
     def inputCount(self) -> int:
@@ -863,7 +847,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         import gremlin.input_item
 
         widget = gremlin.input_item.InputItemWidget(identifier = identifier, populate_ui_callback = self._populate_input_widget_ui, update_callback = self._update_input_widget, config_external=True, parent = parent, data = data)
-        widget.data = data
+        widget._identifier = data
         widget.create_action_icons(data)
         icon_name = OctaviButton.get_icon(data.input_id)
         widget.setIcon(icon_name)

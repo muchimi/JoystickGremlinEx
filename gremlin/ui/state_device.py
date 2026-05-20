@@ -2777,15 +2777,15 @@ class StateInputItemModel(gremlin.input_item.InputItemListModel):
                          custom_filter_handler = custom_filter_handler,
                          show_master_mode=True)
 
-class StateInputItemListView(gremlin.input_item.InputItemListView):
-    ''' view for state inputs '''
-    def __init__(self, custom_widget_handler : Callable = None, parent : QtWidgets.QWidget = None, blank_message : str = None, model : StateInputItemModel= None):
-        super().__init__(custom_widget_handler = custom_widget_handler,
-                         device_guid = StateDeviceTabWidget.device_guid,
-                         parent = parent,
-                         blank_message = blank_message,
-                         model = model,
-                         )
+# class StateInputItemListView(gremlin.input_item.InputItemListView):
+#     ''' view for state inputs '''
+#     def __init__(self, custom_widget_handler : Callable = None, parent : QtWidgets.QWidget = None, blank_message : str = None, model : StateInputItemModel= None):
+#         super().__init__(custom_widget_handler = custom_widget_handler,
+#                          device_guid = StateDeviceTabWidget.device_guid,
+#                          parent = parent,
+#                          blank_message = blank_message,
+#                          model = model,
+#                          )
 
 class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
@@ -2814,6 +2814,8 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                     profile = profile,
                     mode = mode,
                     object_name = object_name,
+                    custom_input_widget_callback = self._custom_widget_handler,
+                    blank_input_message = "Please add a state.",
                     parent = parent
                     )
 
@@ -2829,7 +2831,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data = self.device_guid)
         widget = gremlin.ui.ui_common.getHContainer(["State Inputs", "||", lock_widget], widget_only = True)
-        self.addLeftPanelWidget(widget)
+        self.addLeftPanelHeaderWidget(widget)
 
 
         if config.show_container_id:
@@ -2840,7 +2842,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
             widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only = True)
-            self.addLeftPanelWidget(widget)
+            self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
             line_edit = gremlin.ui.ui_common.QDataLineEdit()
@@ -2848,7 +2850,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
             widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only = True)
-            self.addLeftPanelWidget(widget)
+            self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
             gremlin.ui.ui_common.synchronize_grids([w1, w2])
@@ -2866,9 +2868,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             custom_filter_handler = self._filter_data
         )
 
-        self.inputItemListModel.addCallback(self._handle_model_changed_cb) # add an extra notification when the model changes so we can update the filter counts
-
-        
+       
 
         self._filter_widget = StateFilterWidget(model = self.inputItemListModel)
         self._filter_widget.changed.connect(self._filter_changed)
@@ -2876,7 +2876,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._filter_widget.select.connect(self._select_input_item_cb)
         self._category_filter = self._filter_widget.category # current category
 
-        self.addLeftPanelWidget(self._filter_widget)
+        self.addLeftPanelHeaderWidget(self._filter_widget)
 
         # clear and add buttons to add/clear all states
         clear_button = gremlin.ui.ui_common.ConfirmPushButton("Clear", show_callback = self._show_clear_cb)
@@ -2914,28 +2914,8 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         button_container_layout.addWidget(add_button)
 
-
-
-
-        # update the display names
-        self.inputItemListView = StateInputItemListView(
-            custom_widget_handler = self._custom_widget_handler,
-            parent = self,
-            blank_message = "Please add a state.", 
-            model = self.inputItemListModel)
-        
-        self.inputItemListView.setMinimumWidth(350)
-
-
         # Handle user interaction
-        
-        self.inputItemListView.item_edit.connect(self._edit_item_cb)
-        self.inputItemListView.item_closed.connect(self._close_item_cb)
-
-
-
-        self.addLeftPanelWidget(self.inputItemListView)
-        self.addLeftPanelWidget(button_container_widget)
+        self.addLeftPanelHeaderWidget(button_container_widget)
 
         self.inputItemListModel.refresh()
 
@@ -2947,16 +2927,17 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.unlock_inputs.connect(self._handle_unlock_inputs)
         el.find_next.connect(self._handle_find_next)
 
-        # last index selected, -1 means none
-        self._last_selected_index = -1
+    def onInputListViewCreated(self):
+        ''' called when list view is created '''
+        self.inputItemListView.item_edit.connect(self._edit_item_cb)
+        self.inputItemListView.item_closed.connect(self._close_item_cb)
+
+    def onInputListViewRemoved(self):
+        ''' called when list view is removed '''
+        self.inputItemListView.item_edit.disconnect(self._edit_item_cb)
+        self.inputItemListView.item_closed.disconnect(self._close_item_cb)
 
 
-
-        # Select default entry
-        selected_index = self.inputItemListView.currentIndex()
-        if selected_index is not None:
-            self.selectInputItemIndex(selected_index)
-        
 
     def _handle_model_changed_cb(self):
         ''' called when the model changes '''
@@ -3068,7 +3049,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             if sc.exists(name):
                 data = sc.getState(name)
                 index = self._index_for_key(data)
-                self.inputItemListView._select_item(index,True)
+                self.inputItemListView._select_item_ui(index,True)
             else:
                 gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
 
@@ -3437,7 +3418,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                                                        update_callback = self._update_input_widget,
                                                        confirm_delete_callback=self._handle_confirm_delete,
                                                        config_external=True, parent = parent, data = data)
-        widget.data = data
+        widget._identifier = data
         widget.create_action_icons(data)
         input_item : StateInputItem = data
 

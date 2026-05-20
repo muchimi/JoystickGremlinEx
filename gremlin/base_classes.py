@@ -916,7 +916,8 @@ class AbstractCallbackModel(AbstractModel):
                  sort_callback: Callable[[_collections_abc.Iterable],_collections_abc.Iterable] = None,
                  added_callback: Callable[[object], (object, int, int)] = None, 
                  removed_callback: Callable[[object]] = None, 
-                 allowed_types : tuple = None, description : str = None):
+                 allowed_types : tuple = None, 
+                 model_description : str = None):
         ''' callback enabled model
         :param callback: optional initial callback
         :param filter_callback: optional filtering callback for models that are filtered, takes in an object and returns True if the item should be included in the filter
@@ -958,9 +959,8 @@ class AbstractCallbackModel(AbstractModel):
 
         self._show_filtered_only = False
         
-        if not description:
-            description = "Model"
-        self._description = description
+        assert model_description,"model description not provided"
+        self._model_description = model_description
         
         self._allowed_types = allowed_types
         self._suspend_stack = 0 # tracks suspension of change events
@@ -1212,7 +1212,8 @@ class AbstractCallbackModel(AbstractModel):
 
         new_index = 0
         for item in self._index_map.values():
-            if self._filtered_callback(item):
+            include = self._filtered_callback(item)
+            if include:
                 if verbose: syslog.info(f"\t{item.display_name} -> ON")
                 new_index_map[new_index] = item
                 new_item_map[item] = new_index
@@ -1384,13 +1385,13 @@ class AbstractCallbackModel(AbstractModel):
         ''' gets index,input_item tuples for all unfiltered items in the model '''
         return self._index_map.items()
 
-    def refresh(self, force=False, emit=True):
-        ''' trigger a data change if them model has changed '''
-        self._fireChanged(force, emit)
+    def refresh(self, emit=True):
+        ''' trigger a data change if the model has changed - use this to prevent updates if the data didn't change'''
+        self._fireChanged(emit = emit)
     
-    def trigger(self):
-        ''' trigers a model change manually '''
-        self._fireChanged(force = True, emit = True)
+    def trigger(self, force = True, emit = True):
+        ''' trigers a model change manually - use this to force a reload even if the data didn't change '''
+        self._fireChanged(force = force, emit = True)
 
     def pushSuspend(self):
         ''' suspends change notifications '''
@@ -1454,11 +1455,18 @@ class AbstractCallbackModel(AbstractModel):
         self._change_pending = True
             
 
-
+    @property
+    def modelDescription(self) -> str:
+        return self._model_description
     
     def markDirty(self):
         # mark the model changed for the next update
         self._change_pending = True
+
+    @property
+    def debug_name(self) -> str:
+        ''' gets a debug string for the model contents '''
+        return f"[{self.modelDescription} items: [{len(self._index_map)}] filtered: [{len(self._filtered_index_map)}] callbacks: [{len(self._data_changed_callbacks)}]"
 
     def _fireChanged(self, force = False, emit = False):
         ''' fires a data changed signal if the data has changed or if force is true '''
@@ -1473,7 +1481,7 @@ class AbstractCallbackModel(AbstractModel):
         if new_hash != self._old_hash or force or self._change_pending:
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_ui
-            if verbose: syslog.info(f"Model: [{self._description}] trigger model change")
+            if verbose: syslog.info(f"MODEL CHANGE TRIGGER: {self.debug_name} ")
                 
             self._old_hash = new_hash
 

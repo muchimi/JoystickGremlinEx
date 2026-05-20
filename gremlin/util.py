@@ -775,14 +775,17 @@ def find_file(file_path, root_folder = None):
 
 def find_icon(icon_file):
     ''' locates an icon file '''
-    if not os.path.isfile(icon_file):
-        root_folder = get_root_folder()
-        # usual locations for images
-        folder_list = ["icons", "gfx"]
-        for folder in folder_list:
-            new_icon_file = os.path.join(root_folder,folder,icon_file)
-            if os.path.isfile(new_icon_file):
-                return new_icon_file
+    if os.path.isfile(icon_file):
+        return icon_file
+    
+    root_folder = get_root_folder()
+    # usual locations for images
+    folder_list = ["icons", "gfx"]
+    for folder in folder_list:
+        new_icon_file = os.path.join(root_folder,folder,icon_file)
+        if os.path.isfile(new_icon_file):
+            return new_icon_file
+            
     return None
 
 
@@ -973,8 +976,10 @@ def load_pixmap(path, size = 24, qta_color = None):
     if not path:
         return None
 
-
-    desired_size = QtCore.QSize(size, size)
+    if isinstance(size, QtCore.QSize):
+        desired_size = size
+    else:
+        desired_size = QtCore.QSize(size, size)
 
     if isinstance(path, QtGui.QIcon):
         return  path.pixmap(desired_size)
@@ -1401,7 +1406,7 @@ def get_xml_input_data(node, extra_data = None):
     return (device_guid, input_type, input_id, mode)
 
 
-def parse_guid(value):
+def parse_guid(value) -> uuid.UUID:
     """Reads a string GUID representation into the internal data format.
 
     This transforms a GUID of the form {B4CA5720-11D0-11E9-8002-444553540000}
@@ -1416,6 +1421,8 @@ def parse_guid(value):
     if isinstance(value, str) and len(value) < 32:
         return None
     if isinstance(value, dinput.GUID):
+        return uuid.UUID(int = value._guid_int)
+    if isinstance(value, uuid.UUID):
         return value
     try:
         tmp = uuid.UUID(value)
