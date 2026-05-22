@@ -319,7 +319,7 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     gremlin.shared_state.pushLog()
                     logTabs = gremlin.shared_state.logTabs(True)
                     condition_name = condition.condition_name()
-                    if isinstance(condition, gremlin.actions.ActivationCondition):
+                    if isinstance(condition,  gremlin.input_item.BaseActivationCondition):
                         syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                     elif isinstance(condition, gremlin.actions.AbstractCondition):
                         syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}") 

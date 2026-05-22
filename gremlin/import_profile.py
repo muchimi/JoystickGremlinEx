@@ -455,7 +455,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
         devices = []
         for base_device in base_devices:
-            device = gremlin.joystick_handling.device_info_from_guid(base_device.device_guid)
+            device = gremlin.joystick_handling.getDevice(base_device.device_guid)
             self.target_devices_map[base_device.device_guid] = device
             devices.append(device)
             self.base_device_map[base_device.device_guid] = base_device
@@ -1602,7 +1602,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                 input_item.map_to_widget = widget
                 self._map[input_item] = widget
 
-                # target_device = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
+                # target_device = gremlin.joystick_handling.getDevice(target_device_guid)
 
                 for container_item in input_item.containers:
 
@@ -1868,7 +1868,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                     items[input_type].append(item)
 
                 elif input_type == InputType.JoystickAxis:
-                    info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
+                    info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.getDevice(target_device_guid)
                     if info is not None:
                         # only create axis outputs that exist on the device
                         if verbose:
@@ -1893,7 +1893,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                                     syslog.info(f"\t\t\tAxis {source_input_item.input_id} -> {item.input_id}")
 
                 elif input_type == InputType.JoystickButton:
-                    info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
+                    info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.getDevice(target_device_guid)
                     # only create button outputs that exist on the device
                     if info is not None:
                         if verbose:
@@ -1917,7 +1917,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                                 items[input_type].append(item)
 
                 elif input_type == InputType.JoystickHat:
-                    info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
+                    info : gremlin.joystick_handling.DeviceSummary = gremlin.joystick_handling.getDevice(target_device_guid)
                     # only create hat outputs that exist on the device
                     if info is not None:
                         if verbose:
@@ -2330,10 +2330,10 @@ class ImportDetailDialog(gremlin.ui.ui_common.QRememberDialog):
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         # syslog = logging.getLogger("system")
 
-        target_info : DeviceSummary = gremlin.joystick_handling.device_info_from_guid(target_device_guid)
+        target_info : DeviceSummary = gremlin.joystick_handling.getDevice(target_device_guid)
         self.main_layout = QtWidgets.QHBoxLayout(self)
 
-        source_info : DeviceSummary = gremlin.joystick_handling.device_info_from_guid(import_item.device_guid)
+        source_info : DeviceSummary = gremlin.joystick_handling.getDevice(import_item.device_guid)
 
         source_widget = DeviceInfoWidget(source_info)
         target_widget = DeviceInfoWidget(target_info)
@@ -2777,7 +2777,7 @@ class Mapper():
         ''' shows the dialog '''
         #input_item = gremlin.shared_state.ui._active_input_item()
         device_guid = gremlin.shared_state.ui._active_tab_guid()
-        device_info = gremlin.joystick_handling.device_info_from_guid(device_guid)
+        device_info = gremlin.joystick_handling.getDevice(device_guid)
         if device_info is not None:
             dialog = Mapper.MapperDialog(device_info)
             gremlin.util.centerDialog(dialog, width = dialog.width(), height=dialog.height())

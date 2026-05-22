@@ -342,7 +342,7 @@ class JoystickCondition(AbstractCondition):
 
         if verbose:
             logtabs = gremlin.shared_state.logTabs(True)
-            info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
+            info = gremlin.joystick_handling.getDevice(self.device_guid)
 
         joy = gremlin.input_devices.JoystickProxy()[self.device_guid]
         if joy is None:
@@ -433,7 +433,7 @@ class JoystickCondition(AbstractCondition):
             return False
 
     def condition_name(self)->str:
-        info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
+        info = gremlin.joystick_handling.getDevice(self.device_guid)
         match self.input_type:
             case InputType.JoystickButton:
                 state = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
@@ -510,7 +510,7 @@ class VJoyCondition(AbstractCondition):
 
 
         if verbose:
-            info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
+            info = gremlin.joystick_handling.getDevice(self.device_guid)
 
 
         if self.input_type == InputType.JoystickAxis:
@@ -561,7 +561,7 @@ class VJoyCondition(AbstractCondition):
             return False
 
     def condition_name(self)->str:
-        info = gremlin.joystick_handling.device_info_from_guid(self.device_guid)
+        info = gremlin.joystick_handling.getDevice(self.device_guid)
         return f"VJoyCondition: mode: {self.comparison} type: {gremlin.input_types.InputType.to_display_name(self.input_type)} input: {self.input_id} device: {info.name if info else '(device not found)'} "
 
 

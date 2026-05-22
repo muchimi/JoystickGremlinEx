@@ -172,6 +172,7 @@ class QElidingLabel(_GenericEliding, QLabel):
     def resizeEvent(self, event: QResizeEvent) -> None:
         event.accept()
         super().setText(self._elidedText())
+        super().resizeEvent(event)
 
     def setWordWrap(self, wrap: bool) -> None:
         super().setWordWrap(wrap)

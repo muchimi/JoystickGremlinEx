@@ -110,6 +110,8 @@ class Device:
 
     @device_guid.setter
     def device_guid(self, value : dinput.GUID):
+        if not isinstance(value, dinput.GUID):
+            value = dinput.GUID(value)
         assert isinstance(value, dinput.GUID) if value is not None else True
         self._device_guid = value
 
@@ -1921,7 +1923,7 @@ class Profile():
         self.plugins = []
         self._simconnect_modes = {} # map of simconnect startup modes to aicraft - the key is the SimconnectAicraftDefinition key which is unique per aicraft that can be loaded by MSFS
         self._substitution_map = {} # map of device GUID to any new device GUID for the load process
-        self._profile_graph = gremlin.profile_graph.ProfileGraph()
+        self._profile_graph = None
         self.state.clear()
         self._loaded = False
         self.settings.reset() # reset settings
@@ -2629,7 +2631,7 @@ class Profile():
         ''' returns the list of devices removed '''
         result = {}
         for id in self._removed_devices:
-            device = gremlin.joystick_handling.device_info_from_guid(id)
+            device = gremlin.joystick_handling.getDevice(id)
             result[id] = device
 
         return result
@@ -2689,20 +2691,6 @@ class Profile():
         if not device.device_id in self._removed_devices:
             self._removed_devices.append(device.device_id)
 
-        # if device.connected:
-        #     syslog.error(f"PROFILE: cannot remove a connected device: {device.name}")
-        #     return
-
-        # gremlin.util.pushCursor()
-        # device_guid = device.device_guid
-        # if device_guid in self.devices:
-        #     del self.devices[device_guid]
-
-        # gremlin.joystick_handling.removeDevice(device)
-
-        # node = self.graph.get_device_node(device.device_guid)
-        # if node is not None:
-        #     node.parent = None
 
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(True) # reset and rebuild data around the profile
@@ -3299,7 +3287,7 @@ class Profile():
             device.from_xml(child, data, extra_data)
             self.devices[device.device_guid] = device
 
-            dd : dinput.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(device.device_guid)
+            dd : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device.device_guid)
             if not dd:
                 syslog.warning(f"PROFILE: unable to find device [{device.device_guid}] - XML source line: {child.sourceline}")
             elif dd.is_virtual:
@@ -3482,11 +3470,9 @@ class Profile():
         config = gremlin.config.Configuration()
         config.ensure_profile(self)
 
-
         # load the profile graph
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
         self._profile_graph.from_xml(fname, fname_is_xml = fname_is_xml)
-
 
 
         # load the mode tree
@@ -4089,11 +4075,11 @@ class Profile():
         if isinstance(target_guid, str):
             target_guid = gremlin.util.parse_guid(target_guid)
 
-        source_device = gremlin.joystick_handling.device_info_from_guid(source_guid)
+        source_device = gremlin.joystick_handling.getDevice(source_guid)
         if not source_device  or not target_guid in self.devices:
             syslog.warning(f"DEVICE COPY: source device [{source_guid}] not found")
             return
-        target_device = gremlin.joystick_handling.device_info_from_guid(target_guid)
+        target_device = gremlin.joystick_handling.getDevice(target_guid)
         if not target_device or not target_guid in self.devices:
             syslog.warning(f"DEVICE COPY: target device [{target_guid}] not found")
 

@@ -37,6 +37,30 @@ from collections import deque
 syslog = logging.getLogger("system")
 
 import gremlin.singleton_decorator
+
+
+# class ConfigEncoder(json.JSONEncoder):
+#     ''' config JSON encoder to handle non serializable types '''
+#     def default(self, obj):
+#         if isinstance(obj, UUID):
+#             # if the obj is uuid, we simply return the string version
+#             return str(obj)
+#         return json.JSONEncoder.default(self, obj)
+    
+# class ConfigDecoder(json.JSONDecoder):
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(object_hook=self.object_hook, *args, **kwargs)
+
+#     def object_hook(self, obj):
+#         for key, value in obj.items():
+#             if key == "" isinstance(value, str):
+#                 try:
+#                     # Attempt to convert valid UUID strings
+#                     obj[key] = UUID(value)
+#                 except ValueError:
+#                     pass # Keep original string if it fails
+#         return obj    
+    
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
 
@@ -563,7 +587,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def tts_mode_switch_enabled(self) -> bool:
-        return self._get_data("tts_mode_switch_enabled", True)
+        return self._get_data("tts_mode_switch_enabled", False) # change in m77 default is to not speak mode changes by default
     @tts_mode_switch_enabled.setter
     def tts_mode_switch_enabled(self, value : bool):
         self._set_data("tts_mode_switch_enabled", value)
@@ -1396,6 +1420,7 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_ui(self):
         ''' true if verbose mode is in UI mode '''
+        # return True
         return self.verbose and VerboseMode.UI in self.verbose_mode
 
     @property
@@ -1960,6 +1985,7 @@ class Configuration(QtCore.QObject):
 
         '''
         import gremlin.joystick_handling
+        
         save_input_id = input_id
         input_type = None
         # syslog = logging.getLogger("system")
@@ -1975,7 +2001,7 @@ class Configuration(QtCore.QObject):
 
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         if device_type in (gremlin.types.DeviceType.Joystick, gremlin.types.DeviceType.VJoy):
-            device_info = gremlin.joystick_handling.device_info_from_guid(dinput_device_guid)
+            device_info = gremlin.joystick_handling.getDevice(dinput_device_guid)
             if device_info:
                 if device_info.axis_count > 0:
                     input_type = gremlin.input_types.InputType.JoystickAxis

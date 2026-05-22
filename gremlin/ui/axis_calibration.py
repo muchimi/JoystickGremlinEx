@@ -985,7 +985,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self.mgr : CalibrationManager = CalibrationManager()
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+        self.device = gremlin.joystick_handling.getDevice(device_guid)
         self.source_data : CalibrationData = self.mgr.getCalibration(device_guid, input_id)
         self.action_data = CalibrationData(self.source_data)
         self.cloned_action_data = self.action_data.clone()
@@ -995,7 +995,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         
 
         self.setWindowTitle("Input Axis Calibration")
-        info = gremlin.joystick_handling.device_info_from_guid(device_guid)
+        info = gremlin.joystick_handling.getDevice(device_guid)
         axis_id = info.getAxisLinearId(input_id)       
         self.main_layout.addWidget(QtWidgets.QLabel(f"{info.name} Axis: {info.axis_names[axis_id-1]}/L{axis_id}"))
         self.main_layout.addWidget(QtWidgets.QLabel("Note: Calibration options will apply to the computed input data value before any other parts of GremlinEx process the input."))

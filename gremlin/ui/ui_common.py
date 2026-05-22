@@ -3562,7 +3562,7 @@ class InputListenerWidget(QBoxFrame):
     def _selected_ui(self, event):
         ''' input selected - runs on UI thread'''
         if self._virtual_only:
-            dev = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+            dev = gremlin.joystick_handling.getDevice(event.device_guid)
             if not dev.is_virtual:
                 return
 
@@ -4961,7 +4961,8 @@ class QProgressBar(QtWidgets.QWidget):
         self._value = None
         self._orientation = orientation
         self._step = step
-        self._readOnly = readonly
+        self.setReadOnly(readonly)
+        
         self._data = data
         self._percent = {} # percent valuess of the progress bar by value index
         self._colors = {} # color gradient assigned to a specific channel
@@ -5037,7 +5038,13 @@ class QProgressBar(QtWidgets.QWidget):
         self._data = value
 
     def setReadOnly(self, value: bool):
+        ''' sets the widget as readonly '''
         self._readOnly = value
+        if value:
+            self.installEventFilter(self)
+        else:
+            self.removeEventFilter(self)
+        
 
     def isReadOnly(self):
         return self._readOnly
@@ -5047,10 +5054,7 @@ class QProgressBar(QtWidgets.QWidget):
 
     def eventFilter(self, widget, event):
 
-        if self._readOnly:
-            # ignore
-            return super().eventFilter(widget, event)
-
+       
         t = event.type()
         if t == QtCore.QEvent.Type.Wheel:
             # handle wheel up/down change
@@ -5093,7 +5097,7 @@ class QProgressBar(QtWidgets.QWidget):
                 self.setValue(0.0)
                 self.valueChanged.emit()
             return True # indicate handled
-        return super().eventFilter(widget, event)
+        return False # not handled
 
     @property
     def channels(self) -> int:
@@ -6638,8 +6642,8 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
                 axis_widget = QProgressBar(data = axis_id, value = values)
                 el = gremlin.event_handler.EventListener()
-                el.joystick_event.connect(self.process_event)
-
+                el.addJoystickEventCallback(self.process_event_ui)
+                
 
                 if not self._readonly:
                     axis_widget.valueChanged.connect(self._manual_bar_changed) # axis set by the user
@@ -6693,7 +6697,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         # disconnect joystick handler
         el = gremlin.event_handler.EventListener()
-        el.joystick_event.disconnect(self.process_event)
+        el.removeJoystickEventCallback(self.process_event_ui)
 
         # disconnect widgets if needed
         if not self._readonly:
@@ -6711,7 +6715,8 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
 
 
-    def process_event(self, event):
+    def process_event_ui(self, event):
+        ''' handles updates on UI thread '''
         if not event.is_axis:
             return
         if event.device_guid != self.device.device_guid:
@@ -6866,7 +6871,7 @@ class HatWidget(QtWidgets.QWidget):
 
     def resizeEvent(self, event):
         self._update_hotspots()
-        return super().resizeEvent(event)
+        super().resizeEvent(event)
 
     def _get_rect(self, angle):
         ''' computes the click hotspot angle for the widget '''
@@ -7204,6 +7209,8 @@ class TimeLinePlotWidget(QtWidgets.QWidget):
         self._pixmap.fill(self._background_qcolor)
         self._horizontal_steps = 0
         self._vertical_timestep = time.time()
+        
+        super().resizeEvent(event)
 
     def minimumSizeHint(self):
         """Returns the minimum size of this widget.
@@ -7417,6 +7424,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             case gremlin.types.VisualizationType.AxisCurrent:
                 self._create_current_axis()
                 # el.joystick_event.connect(self._current_axis_update) # hook runtime event so it works at runtime or edit time
+                el.addUIJoystickEventCallback(self._current_axis_update)
                 el.vjoy_output_event.connect(self._vjoy_current_axis_update) # hook vjoy separately
 
             case gremlin.types.VisualizationType.AxisTemporal:
@@ -7424,17 +7432,17 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
             case gremlin.types.VisualizationType.ButtonHat:
                 self._create_button_hat()
-                el.joystick_event.connect(self._button_hat_update)
+                el.addUIJoystickEventCallback(self._button_hat_update)
                 el.vjoy_output_event.connect(self._vjoy_button_hat_update) # hook vjoy separately
 
             case gremlin.types.VisualizationType.Button:
                 self._create_button()
-                el.joystick_event.connect(self._button_update)
+                el.addUIJoystickEventCallback(self._button_update)
                 el.vjoy_output_event.connect(self._vjoy_button_update) # hook vjoy separately
 
             case gremlin.types.VisualizationType.Hat:
                 self._create_hat()
-                el.joystick_event.connect(self._hat_update)
+                el.addUIJoystickEventCallback(self._hat_update)
                 el.vjoy_output_event.connect(self._vjoy_hat_update) # hook vjoy separately
 
         self._hooked = True
@@ -7447,21 +7455,28 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             return
         vis_type = self.vis_type
         el = gremlin.event_handler.EventListener()
-        if vis_type == gremlin.types.VisualizationType.AxisCurrent:
-            el.joystick_event.disconnect(self._current_axis_update)
+        match vis_type:
+            case  gremlin.types.VisualizationType.AxisCurrent:
+                el.removeUIJoystickEventCallback(self._current_axis_update)
+                el.vjoy_output_event.disconnect(self._vjoy_current_axis_update)
 
-        elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
-            pass
-            # jep = gremlin.event_handler.JoystickEventProcessor()
-            # jep.unregisterCallback(self.hook_id) # this unregisters ALL hooks to this callback
+            case gremlin.types.VisualizationType.Button:
+                self._unhook_buttons()
+                el.removeUIJoystickEventCallback(self._button_update)
+                el.vjoy_output_event.disconnect(self._vjoy_button_update)
 
-        elif vis_type == gremlin.types.VisualizationType.ButtonHat:
-            self._unhook_buttons()
-            el.joystick_event.disconnect(self._button_hat_update)
-            #el.vjoy_event.connect(self._vjoy_button_hat_update)
-            el.vjoy_output_event.connect(self._vjoy_button_hat_update)
-            # if self._device.is_virtual:
-            #     el.unregisterVjoyCallback(self._vjoy_button_hat_update)
+            case gremlin.types.VisualizationType.AxisTemporal:
+                pass
+                # jep = gremlin.event_handler.JoystickEventProcessor()
+                # jep.unregisterCallback(self.hook_id) # this unregisters ALL hooks to this callback
+
+            case gremlin.types.VisualizationType.ButtonHat:
+                self._unhook_buttons()
+                el.removeUIJoystickEventCallback(self._button_hat_update)
+                #el.vjoy_event.connect(self._vjoy_button_hat_update)
+                el.vjoy_output_event.disconnect(self._vjoy_button_hat_update)
+                # if self._device.is_virtual:
+                #     el.unregisterVjoyCallback(self._vjoy_button_hat_update)
         self._hooked = False
 
     def _cleanup_ui(self):
@@ -7545,14 +7560,13 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
         :param event the event to use in the update
         """
-        if not gremlin.util.compare_guid(self.device_guid,event.device_guid):
-            return
-        if event.event_type in (InputType.JoystickButton, InputType.JoystickHat):
-            gremlin.util.InvokeUiMethod(self._button_hat_update_ui, event) # on ui thread
+        if event.event_type in (InputType.JoystickButton, InputType.JoystickHat) and gremlin.util.compare_guid(self.device_guid,event.device_guid):
+            self._button_hat_update_ui(event)
+            # gremlin.util.InvokeUiMethod(self._button_hat_update_ui, event) # on ui thread
 
     def _button_hat_update_ui(self, event : gremlin.event_handler.Event):
         for widget in self.widgets:
-            widget.process_event(event)
+            widget.process_event_ui(event)
 
     def _vjoy_button_hat_update(self, event: gremlin.event_handler.VjoyEvent):
         if self._device.vjoy_id != event.vjoy_id:
@@ -7570,7 +7584,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _vjoy_button_hat_update_ui(self, event : gremlin.event_handler.VjoyEvent):
         for widget in self.widgets:
-            widget.process_event(event)
+            widget.process_event_ui(event)
 
     # --------------
 
@@ -7579,14 +7593,13 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
         :param event the event to use in the update
         """
-        if not gremlin.util.compare_guid(self.device_guid,event.device_guid):
-            return
-        if event.event_type == InputType.JoystickButton:
-            gremlin.util.InvokeUiMethod(self._button_update_ui, event) # on ui thread
+        if event.event_type == InputType.JoystickButton and gremlin.util.compare_guid(self.device_guid,event.device_guid):
+            self._button_update_ui(event)
+            # gremlin.util.InvokeUiMethod(self._button_update_ui, event) # on ui thread
 
     def _button_update_ui(self, event : gremlin.event_handler.Event):
         for widget in self.widgets:
-            widget.process_event(event)
+            widget.process_event_ui(event)
 
     def _vjoy_button_update(self, event: gremlin.event_handler.VjoyEvent):
         if self._device.vjoy_id != event.vjoy_id:
@@ -7604,7 +7617,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _vjoy_button_update_ui(self, event : gremlin.event_handler.VjoyEvent):
         for widget in self.widgets:
-            widget.process_event(event)
+            widget.process_event_ui(event)
 
     # --------------
 
@@ -7620,7 +7633,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _hat_update_ui(self, event : gremlin.event_handler.Event):
         for widget in self.widgets:
-            widget.process_event(event)
+            widget.process_event_ui(event)
 
     def _vjoy_hat_update(self, event: gremlin.event_handler.VjoyEvent):
         if self._device.vjoy_id != event.vjoy_id:
@@ -7638,23 +7651,22 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _vjoy_hat_update_ui(self, event : gremlin.event_handler.VjoyEvent):
         for widget in self.widgets:
-            widget.process_event(event)
+            widget.process_event_ui(event)
 
     # --------------
 
 
 
     def _current_axis_update(self, event : gremlin.event_handler.Event):
-        if self.device_guid != event.device_guid:
-            return
-        if event.event_type == InputType.JoystickAxis:
-            gremlin.util.InvokeUiMethod(self._current_axis_update_ui, event)
+        if event.event_type == InputType.JoystickAxis and gremlin.util.compare_guid(self.device_guid, event.device_guid):
+            self._current_axis_update_ui(event)
+            # gremlin.util.InvokeUiMethod(self._current_axis_update_ui, event)
 
     def _current_axis_update_ui(self, event : gremlin.event_handler.Event):
 
         for widget in self.widgets:
             widget.show_raw = self.show_raw
-            widget.process_event(event)
+            widget.process_event_ui(event)
 
     def _vjoy_current_axis_update(self, event : gremlin.event_handler.VjoyEvent):
         if self._device.vjoy_id != event.vjoy_id:
@@ -7674,7 +7686,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _vjoy_current_axis_update_ui(self, event : gremlin.event_handler.VjoyEvent):
         for widget in self.widgets:
-            widget.process_event(event)
+            widget.process_event_ui(event)
 
 
     def _temporal_axis_update(self, event : gremlin.event_handler.Event, values = None):
@@ -9404,13 +9416,17 @@ class ActionLabel(QtWidgets.QLabel):
 class QContentWidget(QtWidgets.QWidget):
     ''' a widget that fires a resize event when its size changes '''
 
-    resized = QtCore.Signal(QtCore.QSize)
+    resized = QtCore.Signal(int, int)
     def __init__(self, parent = None):
         super().__init__(parent)
 
     def resizeEvent(self, event):
-        self.resized.emit(event.size)
-        return super().resizeEvent(event)
+        size = event.size()
+        width = size.width()
+        height = size.height()
+        self.resized.emit(width, height)
+        super().resizeEvent(event)
+
 
 
 class QVContentWidget(QContentWidget):
@@ -9627,7 +9643,7 @@ class QSplitTabWidget(QDataWidget):
         self.setContentsMargins(0,0,0,0)
 
         self._content_widget = QContentWidget()
-        self._content_widget.resized.connect(self._content_resized)
+        self._content_widget.resized.connect(self._handle_content_resized)
         self._content_widget.setContentsMargins(0,0,0,0)
 
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, self._content_widget)
@@ -9650,6 +9666,7 @@ class QSplitTabWidget(QDataWidget):
 
         # input configuration content - new in m76 - have QT track the widgets itself to avoid reference problems in pyside
         self._right_panel_stacked_widget = QtWidgets.QStackedWidget()
+        self._right_panel_stacked_widget.addWidget(QtWidgets.QLabel("No input selected")) # index 0
         self._right_panel_stacked_widget.setProperty("class","hack")
 
         self.addRightPanelWidget(self._right_panel_stacked_widget)
@@ -9765,13 +9782,11 @@ class QSplitTabWidget(QDataWidget):
             self._splitter.setSizes(sizes)
         self._last_sizes = sizes
 
-    @QtCore.Slot(QtCore.QSize)
-    def _content_resized(self, size : QtCore.QSize):
-        ''' called when the container object is resized '''
+    @QtCore.Slot(int, int)
+    def _handle_content_resized(self, width : int, height : int):
         # resize the splitter to the container's size as it doesn't happen by itself for some reason
-        width = self._content_widget.frameGeometry().width()
-        height = self._content_widget.frameGeometry().height()
-        #if width > 400:
+        # width = self._content_widget.frameGeometry().width()
+        # height = self._content_widget.frameGeometry().height()
         self._splitter.setFixedWidth(width)
         self._splitter.setFixedHeight(height)
 
@@ -9791,6 +9806,7 @@ class QSplitTabWidget(QDataWidget):
         gremlin.util.clear_layout(self._left_container_layout)
         gremlin.util.clear_layout(self._right_container_layout)
 
+   
 
     def registerWidget(self, key, widget) -> int:
         ''' adds a new config input to the right panel '''
@@ -9806,7 +9822,7 @@ class QSplitTabWidget(QDataWidget):
         index = self._right_panel_stacked_widget.indexOf(widget)
         self._widget_config_index_map[key] = index
         self._widget_config_device_map[index] = key
-
+        
         
 
         if hasattr(widget,"params"):
@@ -9858,9 +9874,11 @@ class QSplitTabWidget(QDataWidget):
 
         index = self._right_panel_stacked_widget.indexOf(widget)
         if index != -1:
+            # update the widget if needed
             verbose = gremlin.config.Configuration().verbose_mode_ui
             if verbose:
                 syslog.info(f"RIGHT PANEL: select widget {index}")
+            
             self._right_panel_stacked_widget.setCurrentIndex(index)
         else:
             raise ValueError("Unable to select widget in right panel: missing from right panel - did you register?")
@@ -10145,7 +10163,9 @@ class QRememberMainWindow(QtWidgets.QMainWindow):
         self._resize_count = 0
         assert key,"unique key must be provided"
         self._window_key = key
-
+        self._position = None # saved window position
+        self._size = None # saved window size
+        
         self.active_screen = QtWidgets.QApplication.screenAt(self.pos())
         self._apply_window_settings()
 
@@ -10165,31 +10185,27 @@ class QRememberMainWindow(QtWidgets.QMainWindow):
             self.active_screen = QtWidgets.QApplication.screenAt(self.pos())
 
 
-    def moveEvent(self, evt):
-        """Handle changing the position of the window.
+    def getActiveScreen(self):
+        ''' gets the screen the application is on '''
+        pos = self.frameGeometry() # save the position
+        return QtWidgets.QApplication.screenAt(pos)
+        
 
-        :param evt event information
-        """
+    def closeEvent(self, event):
+        # save the window position
         config = gremlin.config.Configuration()
-        pos = evt.pos()
-        config.setWindowLocation(self._window_key, pos.x(), pos.y())
+        pos = self.frameGeometry() # save the position
 
-        # track the screen the application is on (used for cursor positioning)
-        self.active_screen = QtWidgets.QApplication.screenAt(pos)
-
-        super().moveEvent(evt)
-
-    def resizeEvent(self, evt):
-        """Handling changing the size of the window.
-
-        :param evt event information
-        """
-        if self._resize_count > 1:
-            config = gremlin.config.Configuration()
-            config.setWindowSize(self._window_key, evt.size().width(), evt.size().height())
-
-        self._resize_count += 1
-        super().resizeEvent(evt)
+        if pos is not None:
+            # save position information
+            config.setWindowLocation(self._window_key, pos.x(), pos.y())
+       
+        # save size information
+        size = self.size()
+        w = size.width()
+        h = size.height()
+        config.setWindowSize(self._window_key, w, h)
+        super().closeEvent(event)
 
 def get_main_window():
     """Finds and returns the main QMainWindow instance."""
@@ -10212,7 +10228,7 @@ class QShowAtCursorDialog(QtWidgets.QDialog):
 
         # which screen is the main window on
         main_window = gremlin.shared_state.ui
-        screen = main_window.active_screen
+        screen = main_window.getActiveScreen()
         if not screen:
             screen = QtWidgets.QApplication.primaryScreen()
 
@@ -10257,19 +10273,14 @@ class QRememberDialog(QtWidgets.QDialog):
     def __init__(self, key: str, width : int = 300, height : int = 200 , parent = None):
         super().__init__(parent)
 
-        self._resize_count = 0
         assert key,"unique key must be provided"
-        self.window_key = key
+        self._window_key = key
         self._moving = False
         self._resizable = True
         self._move_stack = []
         self._move_lock = False
-        self._visible = False
         self._default_width = width
         self._default_height = height
-
-
-
 
     def getResizable(self) -> bool:
         return self._resizable
@@ -10287,8 +10298,8 @@ class QRememberDialog(QtWidgets.QDialog):
     def _apply_window_settings_ui(self):
         """Restores the stored window geometry settings."""
         config = gremlin.config.Configuration()
-        window_size = config.getWindowSize(self.window_key)
-        window_location = config.getWindowLocation(self.window_key)
+        window_size = config.getWindowSize(self._window_key)
+        window_location = config.getWindowLocation(self._window_key)
         if window_size:
             self.resize(window_size[0], window_size[1])
         else:
@@ -10299,56 +10310,46 @@ class QRememberDialog(QtWidgets.QDialog):
             # syslog.info(f"recall move window {self.window_key} to {x},{y}")
             self.move(pos)
 
+    def preferredSize(self) -> QtCore.QSize:
+        ''' preferred window size '''
+        config = gremlin.config.Configuration()
+        window_size = config.getWindowSize(self._window_key)
+        hint_size = self.sizeHint()
+        if window_size:
+            
+            size =  QtCore.QSize(window_size[0], window_size[1])
+            return size.expandedTo(hint_size)
+        else:
+            hint_size
+
 
     def showEvent(self, event):
         ''' occurs when window is displayed (made visible)'''
         super().showEvent(event)
-        self._visible = True
         self._apply_window_settings_ui()
 
-    def hideEvent(self, event):
-        ''' occurs when window is hidden '''
-        self._visible = False
-        return super().hideEvent(event)
 
     def closeEvent(self, event):
         ''' occurs when window is closed '''
-        self._visible = False
+        config = gremlin.config.Configuration()
+
+        # save position information
+        pos = self.frameGeometry() # save the position
+        config.setWindowLocation(self._window_key, pos.x(), pos.y())
+
+        # save size information
+        size = self.size()
+        w = size.width()
+        h = size.height()
+        config.setWindowSize(self._window_key, w, h)
         self.dialog_closed.emit(self)
         return super().closeEvent(event)
 
     def hasConfig(self) -> bool:
         ''' checks if the window has saved geometry/position data '''
         config = gremlin.config.Configuration()
-        window_location = config.getWindowLocation(self.window_key)
+        window_location = config.getWindowLocation(self._window_key)
         return window_location is not None
-
-    def moveEvent(self, evt):
-        ''' occurs when window is moved '''
-        if self._visible:
-            # only save the position if the window is visible - that's because the move event can occur multiple times before the window is visible
-            pos = evt.pos()
-            config = gremlin.config.Configuration()
-            x = pos.x()
-            y = pos.y()
-            config.setWindowLocation(self.window_key, x, y)
-            # syslog.info(f"move event save {self.window_key} to {x},{y}")
-
-        super().moveEvent(evt)
-
-    def resizeEvent(self, evt):
-        """Handling changing the size of the window.
-
-        :param evt event information
-        """
-        if self._resize_count:
-            config = gremlin.config.Configuration()
-            config.setWindowSize(self.window_key, evt.size().width(), evt.size().height())
-        if not self._resize_count:
-            self._resize_count = 1
-        super().resizeEvent(evt)
-
-
 
 
 
@@ -12858,7 +12859,10 @@ class QJoystickInputWidget(QtWidgets.QWidget):
             self.main_layout.removeWidget(self._widget)
             self._widget.deleteLater()
 
+        widget = None
         device = gremlin.joystick_handling.getDevice(self.device_guid)
+        if "wooting" in device.name.casefold():
+            pass
         if device:
             if device.axis_count:
 
@@ -12906,7 +12910,8 @@ class QJoystickInputWidget(QtWidgets.QWidget):
 
             if widgets:
                 widget = getHContainer(widgets, widget_only=True)
-        else:
+        
+        if not widget:
             widget = QtWidgets.QLabel(f"Device not found: {gremlin.util.normalize_guid(self.device_guid)}")
 
         self._widget = widget
@@ -13849,7 +13854,7 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
         gremlin.util.InvokeUiMethod(self._handle_listen_selection_ui, event)
 
     def _handle_listen_selection_ui(self, event):
-        dev = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+        dev = gremlin.joystick_handling.getDevice(event.device_guid)
         if self._virtual_only and not dev.is_virtual:
             return
         if event.event_type:
@@ -13941,7 +13946,7 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
 
     def _handle_listen_selection_ui(self, event):
 
-        dev = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+        dev = gremlin.joystick_handling.getDevice(event.device_guid)
         if self._virtual_only and not dev.is_virtual:
             return
         if event.event_type:

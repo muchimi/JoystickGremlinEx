@@ -550,7 +550,7 @@
 #         # visual tree
 #         profile = gremlin.shared_state.current_profile
 #         for device_guid in profile.devices:
-#             device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+#             device = gremlin.joystick_handling.getDevice(device_guid)
 #             tree_device_item = QtWidgets.QTreeWidgetItem([f"Device: [{device.name}]"])
 #             add_device = False
             

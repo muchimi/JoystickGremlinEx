@@ -28,7 +28,7 @@ import gremlin.types
 from glob import glob
 from pathlib import Path
 import traceback
-
+from dataclasses import dataclass, asdict
 
 syslog = logging.getLogger("system")
 
@@ -148,6 +148,7 @@ class _DeviceSummary(ctypes.Structure):
     ]
 
 
+
 class GUID:
 
     """Python GUID class."""
@@ -169,10 +170,16 @@ class GUID:
                 return None
             guid = _GUID(guid.int) # convert to internal _GUID
             guid_int = guid.int
-
+        elif isinstance(guid, int):
+            guid = _GUID(guid)
+            guid_int = guid.int
         elif isinstance(guid, uuid.UUID):
             # convert to ctypes structure using the integer value if the class is given a regular python UUID
-            guid = _GUID(guid.int)
+            guid_int = guid.int
+            guid = _GUID(guid_int) # convert to internal _GUID
+            
+        elif isinstance(guid, GUID):
+            guid = guid
             guid_int = guid.int
         else:
             assert isinstance(guid, _GUID)
@@ -255,6 +262,14 @@ class GUID:
         #     self._ctypes_guid.Data4[6],
         #     self._ctypes_guid.Data4[7]
         # ))
+
+    def to_dict(self):
+        return {"guid": str(self)}
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data.get("guid"))
+        
 
 
 GUID_Keyboard = GUID(_GUID_SysKeyboard)

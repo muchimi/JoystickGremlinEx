@@ -466,8 +466,11 @@ class OptionsUi(ui_common.BaseDialogUi):
         # Actual configuration object being managed
         self._reload_needed = False # true if UI reload is needed on option changes
         self.config = gremlin.config.Configuration()
+
+        self.resize(self.preferredSize()) # read default size or size hint
         self.setMinimumWidth(400)
         self._max_content_width = 800
+
 
         self._custom_host_name = self.config.custom_host_name # to detect changes
 
@@ -478,6 +481,8 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.main_layout.addLayout(self.dialog_layout)
         self.tab_container = QtWidgets.QTabWidget()
         self.main_layout.addWidget(self.tab_container)
+
+
 
 
 
@@ -529,6 +534,10 @@ class OptionsUi(ui_common.BaseDialogUi):
         #self.setMinimumWidth(self._max_content_width)
 
 
+    def sizeHint(self):
+        # recommended size
+        return QtCore.QSize(500, 300)
+        
 
     @property
     def reload_profile(self) -> bool:
@@ -1889,6 +1898,9 @@ This setting is also available on a profile by profile basis on the profile tab,
                                                     )
 
         page_layout.addWidget(widget)
+        container_widget.setEnabled(verbose)
+        self._verbose_container_widget : QtCore.Qwidget = container_widget
+
 
 
         # info box
@@ -2517,8 +2529,9 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def _verbose_cb(self, checked : bool):
         ''' stores verbose setting '''
         self.config.verbose = checked
-        for widget in self._verbose_mode_widgets.values():
-            widget.setEnabled(checked)
+        self._verbose_container_widget.setEnabled(checked)
+        # for widget in self._verbose_mode_widgets.values():
+        #     widget.setEnabled(checked)
 
     def _verbose_set_cb(self):
         # is_checked = self._verbose_mode_widgets[mode].isChecked()
@@ -4350,7 +4363,7 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
 #             device_name = node.get("name")
 #             device_id = node.get("device-guid")
 #             device_guid = gremlin.util.parse_guid(device_id)
-#             info = gremlin.joystick_handling.device_info_from_guid(device_guid)
+#             info = gremlin.joystick_handling.getDevice(device_guid)
 #             if not info:
 #                 # device not found
 #                 if not device_id in self._substitution_map:

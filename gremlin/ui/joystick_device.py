@@ -162,7 +162,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose:
             device = gremlin.joystick_handling.getDevice(self._device_guid)
-            syslog.info(f"Create Device tab widget: for [{device.name}]")
+            syslog.info(f"Create Joystick Device tab widget: for [{device.name}]")
             if "left" in device.name.casefold():
                 pass        
 
@@ -618,20 +618,21 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
 
     def update_curve_icons(self):
-        widgets = self.inputItemListView.getWidgets()
-        if widgets:
-            for index, widget in enumerate(widgets):
-                if widget is not None:
-                    self._update_curve_icon(index, self.inputItemListView.model.data(index))
+        if self.inputItemListView: # check for delay load
+            widgets = self.inputItemListView.getWidgets()
+            if widgets:
+                for index, widget in enumerate(widgets):
+                    if widget is not None:
+                        self._update_curve_icon(index, self.inputItemListView.model.data(index))
 
     def _update_curve_icon(self, index : int, data):
-
         widget = self.inputItemListView.widget(index)
         if widget is not None:
             widget.update_display()
 
     def _config_changed_cb(self):
-        self.inputItemListModel.refresh()
+        if self.inputItemListView: # check for delay load
+            self.inputItemListModel.refresh()
 
     def _custom_widget_handler(self, list_view, index : int, identifier, data, parent = None):
         ''' creates a widget for the input

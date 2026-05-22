@@ -137,7 +137,7 @@ class ExecutionGraphNode(ABC, anytree.NodeMixin):
     def getConditionFunctors(self):
         ''' gets the list of condition functors in the node '''
         functor_list = self.getFunctors()
-        return [functor for functor in functor_list if isinstance(functor, gremlin.actions.ActivationCondition) or isinstance(functor, gremlin.actions.AbstractCondition)]
+        return [functor for functor in functor_list if isinstance(functor, gremlin.input_item.BaseActivationCondition) or isinstance(functor, gremlin.actions.AbstractCondition)]
 
     def getActionFunctors(self):
         functor_list = self.getFunctors()
@@ -213,7 +213,7 @@ class BaseExecutionConditionNode(ExecutionGraphNode):
         self.container = None # owning container for the condition
         if condition:
             self.addCondition(condition)
-        #self.condition : gremlin.actions.ActivationCondition = condition # holds the condition
+        #self.condition :  gremlin.input_item.BaseActivationCondition = condition # holds the condition
 
     def addCondition(self, condition):
         self.conditions.append(condition)
@@ -304,7 +304,7 @@ class ExecutionGraphActivationGroup(ExecutionGraphNode):
     ''' holds an input item in the execution graph '''
     def __init__(self, condition = None):
         super().__init__(ExecutionGraphNodeType.Group)
-        self.condition : gremlin.actions.ActivationCondition = condition # holds the condition
+        self.condition :  gremlin.input_item.BaseActivationCondition = condition # holds the condition
 
     def to_string(self):
         stub = str(self.condition)
@@ -1036,7 +1036,7 @@ class ExecutionContext():
             else:
                 conditions.append(self._convert_condition(condition))
 
-        return gremlin.actions.ActivationCondition(
+        return  gremlin.input_item.BaseActivationCondition(
             conditions,
             activation_condition.rule,
             target,
@@ -1926,7 +1926,7 @@ class ExecutionContext():
                         result =  self.process_functor(functor, event, value, extra_data, manual)
                         if verbose_condition:
                             condition_name = functor.condition_name()
-                            if isinstance(functor, gremlin.actions.ActivationCondition):
+                            if isinstance(functor,  gremlin.input_item.BaseActivationCondition):
                                 syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                             elif isinstance(functor, gremlin.actions.AbstractCondition):
                                 syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}")
@@ -1973,7 +1973,7 @@ class ExecutionContext():
                     result =  self.process_functor(functor, event, value, extra_data, manual)
                     if verbose_condition:
                         condition_name = functor.condition_name()
-                        if isinstance(functor, gremlin.actions.ActivationCondition):
+                        if isinstance(functor,  gremlin.input_item.BaseActivationCondition):
                             syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                         elif isinstance(functor, gremlin.actions.AbstractCondition):
                             syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}")
@@ -2012,7 +2012,7 @@ class ExecutionContext():
                     result =  self.process_functor(functor, event, value, extra_data, manual)
                     if verbose_condition:
                         condition_name = functor.condition_name()
-                        if isinstance(functor, gremlin.actions.ActivationCondition):
+                        if isinstance(functor,  gremlin.input_item.BaseActivationCondition):
                             syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                         elif isinstance(functor, gremlin.actions.AbstractCondition):
                             syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
@@ -2088,7 +2088,7 @@ class ExecutionContext():
             result =  self.process_functor(functor, event, value, extra_data, manual)
             if verbose_condition:
                 condition_name = functor.condition_name()
-                if isinstance(functor, gremlin.actions.ActivationCondition):
+                if isinstance(functor,  gremlin.input_item.BaseActivationCondition):
                     syslog.info(f"{logTabs}>Executed activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                 elif isinstance(functor, gremlin.actions.AbstractCondition):
                     syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
@@ -2407,7 +2407,7 @@ class AbstractExecutionGraph(QtCore.QObject):
             else:
                 conditions.append(self._convert_condition(condition))
 
-        return gremlin.actions.ActivationCondition(
+        return  gremlin.input_item.BaseActivationCondition(
             conditions,
             activation_condition.rule,
             target,

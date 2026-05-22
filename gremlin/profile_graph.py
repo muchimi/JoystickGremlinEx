@@ -79,7 +79,6 @@ from vjoy import vjoy
 import gremlin.config
 from gremlin.ui import ui_common
 from gremlin.util import parse_guid, safe_format, safe_read, get_guid, write_guid, read_bool
-import gremlin.import_profile
 
 #from xml.dom import minidom
 import lxml
@@ -259,7 +258,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
         warning_widget = gremlin.ui.ui_common.QWarningWidget("This is an experimental feature.")
         self.main_layout.addWidget(warning_widget)
 
-        self.source_device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+        self.source_device = gremlin.joystick_handling.getDevice(device_guid)
         if not self.source_device:
             syslog.error(f"Device copy: source [{device_guid}] device not found")
             self.close()
@@ -850,7 +849,7 @@ class ProfileDeviceNode(ProfileBaseNode):
 
     def _get_device(self, device_name : str, device_guid : dinput.GUID, device_type : DeviceType = DeviceType.Joystick):
         ''' gets an existing device or creates a new device '''
-        device = gremlin.joystick_handling.device_info_from_guid(device_guid) if device_guid else None
+        device = gremlin.joystick_handling.getDevice(device_guid) if device_guid else None
         if not device:
             # create a fake device
             device = DeviceSummary()
@@ -1403,7 +1402,7 @@ class ProfileGraph():
         device_nodes = [node for node in self._root.children if node.nodeType == ProfileNodeType.Device]
         device_guids = [node.device_guid for node in device_nodes if node.device_type == DeviceType.Joystick]
         for device_guid in device_guids:
-            info = gremlin.joystick_handling.device_info_from_guid(device_guid)
+            info = gremlin.joystick_handling.getDevice(device_guid)
             if not info:
                 return True
         return False

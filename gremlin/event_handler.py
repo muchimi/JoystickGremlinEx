@@ -35,6 +35,7 @@ import math
 import gremlin.base_classes
 import gremlin.shared_state
 import gremlin.threading
+from gremlin.types import DeviceType
 
 from PySide6 import QtCore, QtWidgets
 
@@ -966,15 +967,26 @@ class EventListener:
 		self._vjoy_events_use_time = False # config.vjoy_loopback_use_time
 		self.vjoy_event.connect(self._handle_vjoy_event) # hook internal vjoy events generated whenever something is output to vjoy
 
+		self._ui_joystick_event_callbacks = [] # callbacks for joystick event runner
+
 		# setup the event queue for joystick events
 		self._event_queue = JoystickEventQueue("event listener queue") # queue.Queue() # holds the queue of events waiting to be processed
+		self._valid_device_map = gremlin.joystick_handling.getValidJoystickDevicesMap()
 		self._event_thread =  gremlin.threading.AbortableThreadX(target = self._event_runner, eh = self)
 		self._event_thread.name = "EVENTLISTENER listener"
 		self._event_thread.start()
 
 		self.profile_unload.connect(self.reset) # reset data on profile unload before a new profile is loaded
 
+	def addUIJoystickEventCallback(self, callback):
+		''' adds a callback to update UI when a joystick event arrives '''
+		if not callback in self._ui_joystick_event_callbacks:
+			self._ui_joystick_event_callbacks.append(callback)
 
+	def removeUIJoystickEventCallback(self, callback):
+		''' removes a callback to update UI when a joystick event arrives '''
+		if callback in self._ui_joystick_event_callbacks:
+			self._ui_joystick_event_callbacks.remove(callback)
 
 
 	def registerVjoyCallback(self, callback):
@@ -991,16 +1003,18 @@ class EventListener:
 
 	def queueJoystickEvent(self, event):
 		''' queues a single joystick event '''
-		if self._verbose_queue: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")
-		self._event_queue.put(event)
+		if event.device_guid in self._valid_device_map:
+			if self._verbose_queue: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")
+			self._event_queue.put(event)
 
 
 	def queueJoystickEventList(self, event_list):
 		''' queues a list of joystick events '''
 		verbose = self._verbose_queue
 		for event in event_list:
-			if verbose: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")
-			self._event_queue.put(event)
+			if event.device_guid in self._valid_device_map:
+				if verbose: syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")
+				self._event_queue.put(event)
 
 	def _event_runner(self):
 		''' runner for inbound joystick events '''
@@ -1012,6 +1026,7 @@ class EventListener:
 
 			event = self._event_queue.get()
 			#if verbose: syslog.info(f"EVENTLISTEN: DEQUEUE event {event.id} QUEUE size: {self._event_queue.qsize():,}")
+			self._fireUIJoystickEventCallbacks(event)
 			self.joystick_event.emit(event)
 			if not gremlin.shared_state.is_running:
 				self.joystick_event_ui.emit(event)
@@ -1022,6 +1037,16 @@ class EventListener:
 
 
 			#self._event_queue.task_done()
+
+	def _fireUIJoystickEventCallbacks(self, event):
+		# run the UI callbacks on the UI thread
+		gremlin.util.InvokeUiMethod(self._fireUIJoystickEventCallbacks_ui, event)
+
+
+	def _fireUIJoystickEventCallbacks_ui(self, event):
+		''' runs the UI update oriented joystick event callbacks on the UI thread to avoid constant switching '''
+		for callback in self._ui_joystick_event_callbacks:
+			callback(event)
 
 	def reset(self):
 		self._vjoy_events.clear()
@@ -1151,6 +1176,9 @@ class EventListener:
 		# self._vjoy_events_times.clear()# map of processed events times
 		self._vjoy_events_delay = config.vjoy_loopback_delay / 1000 # quarter second delay for event loopback checking
 		self._vjoy_events_use_time = config.vjoy_loopback_use_time
+
+		# update valid device map on profile start
+		self._valid_device_map = gremlin.joystick_handling.getValidJoystickDevicesMap()
 
 		# enable mouse hooks
 		self.enableMouse(True)
@@ -1633,7 +1661,7 @@ class EventListener:
 
 
 		event = dinput.InputEvent(data)
-		device = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+		device = gremlin.joystick_handling.getDevice(event.device_guid)
 
 		if device is None:
 			if verbose: syslog.info(f"DINPUT EVENT: device not found: [{str(event.device_guid)}]: {event}")
@@ -2004,7 +2032,7 @@ class EventListener:
 		verbose = gremlin.config.Configuration().verbose_mode_joystick
 		new_value = calibration.getValue(value, filter = filter)
 		if verbose:
-			device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+			device = gremlin.joystick_handling.getDevice(device_guid)
 			nv = new_value[0] if hasattr(new_value,"__iter__") else new_value
 			syslog.info(f"CALIBRATION: filter: device: [{device.name}] id: [{device_guid}] filter: [{filter}] in: {value:0.3f} out: {nv:0.3f}")
 
@@ -2021,7 +2049,7 @@ class EventListener:
 		if curved_value is not None:
 			verbose = gremlin.config.Configuration().verbose_mode_curve
 			if verbose:
-				device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+				device = gremlin.joystick_handling.getDevice(device_guid)
 				syslog.info(f"APPLY CURVE: device: [{device.name}] id: [{device_guid}] in: {value:0.4f} out: {curved_value:0.4f}")
 			return curved_value
 		# no curve applied
@@ -2416,6 +2444,8 @@ class EventHandler(QtCore.QObject):
 
 		assert callback is not None and callable(callback), 'Callback must be provided and be a callable'
 
+		valid_devices_map = gremlin.joystick_handling.getValidJoystickDevicesMap() # list of valid joystick devices
+
 		if event:
 			if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
 				verbose = gremlin.config.Configuration().verbose_mode_keyboard
@@ -2515,6 +2545,13 @@ class EventHandler(QtCore.QObject):
 
 			else:
 				# regular event - events are stored by the event key
+				verbose = gremlin.config.Configuration().verbose
+				if not device_guid in valid_devices_map:
+					device = gremlin.joystick_handling.getDevice(device_guid)
+					if verbose: syslog.info(f"CALLBACK: device [{device.name}] [{device.device_id}] is disabled in callbacks ")
+					return
+
+
 				if device_guid not in self.callbacks:
 					self.callbacks[device_guid] = {}
 				if mode not in self.callbacks[device_guid]:
@@ -2992,13 +3029,13 @@ class EventHandler(QtCore.QObject):
 				el.update_input_state.emit(device_guid)  # force a UI widget status update
 			finally:
 				el.pop_input_selection()
-				if push_cursor:
-					gremlin.util.popCursor()
+			
 
 		finally:
 			# sync visual selectors
 			self._update_mode_selectors(self.current_mode)
-
+			if push_cursor:
+				gremlin.util.popCursor()
 
 
 
@@ -3047,7 +3084,7 @@ class EventHandler(QtCore.QObject):
 
 
 		config =  gremlin.config.Configuration()
-		verbose = config.verbose_mode_inputs
+		verbose = config.verbose_mode_inputs or config.verbose_mode_exec
 		verbose_detailed = verbose and config.verbose_mode_extra
 
 		self.registry.update(event) # record the event
@@ -3064,6 +3101,8 @@ class EventHandler(QtCore.QObject):
 
 			if verbose and event.event_type != InputType.JoystickAxis:
 				syslog.info(f"EVENT EXECUTE: process event - mode [{mode}] event: {str(event)}")
+				if event.event_type == InputType.JoystickButton:
+					pass
 
 
 
@@ -3210,8 +3249,8 @@ class EventHandler(QtCore.QObject):
 	def _trigger_callbacks(self, callbacks, event):
 		''' trigger regular callbacks '''
 		#verbose = gremlin.config.Configuration().verbose'
-		if event.event_type == InputType.State and event.is_pressed == False:
-			pass
+		# if event.event_type == InputType.State and event.is_pressed == False:
+		# 	pass
 		for cb in callbacks:
 			try:
 				# if verbose:
@@ -3529,7 +3568,7 @@ class JoystickState():
 		if not isinstance(device_guid, str):
 			device_guid = gremlin.util.normalize_guid(device_guid)
 		if verbose:
-			device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+			device = gremlin.joystick_handling.getDevice(device_guid)
 			syslog.info(f"VJOY: {device.name} input: {'off' if enabled else 'on'}")
 		self._input_ignored_device_list[device_guid] = not enabled
 		if verbose: syslog.info("VJOY ")
@@ -3542,7 +3581,7 @@ class JoystickState():
 		if not isinstance(device_guid, str):
 			device_guid = gremlin.util.normalize_guid(device_guid)
 		self._output_ignored_device_list[device_guid] = not enabled
-		device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+		device = gremlin.joystick_handling.getDevice(device_guid)
 		if verbose:
 			syslog.info(f"VJOY: {device.name} output: {'off' if enabled else 'on'}")
 		if device.is_virtual:
@@ -3833,7 +3872,7 @@ class AxisState():
 
 	def registerDeviceGuid(self, device_guid):
 		import gremlin.joystick_handling
-		device = gremlin.joystick_handling.device_info_from_guid(device_guid)
+		device = gremlin.joystick_handling.getDevice(device_guid)
 		config = gremlin.config.Configuration()
 		verbose = config.verbose_mode_inputs or config.verbose_mode_joystick
 		if verbose:
@@ -4315,7 +4354,7 @@ class JoystickEventProcessor():
 		self._generic_callbacks = {False:{}, True:{}} # holds callbacks without filters,
 		self._event_queue = JoystickEventQueue("event dispatcher queue") # holds the queue of events waiting to be processed
 		self._ui_event_queue = JoystickEventQueue("ui event dispatcher queue")
-
+		
 		self._count = 0 # number of items in the fire queue
 		self._callback_count = 0 # number of registered callbacks
 		self._event_thread =  None
@@ -4333,6 +4372,7 @@ class JoystickEventProcessor():
 		self.handle_config_changed() # setup verbose flags
 		self.exe = concurrent.futures.ThreadPoolExecutor()
 		self.start()
+
 
 	def handle_config_changed(self):
 		config = gremlin.config.Configuration()
@@ -4468,7 +4508,8 @@ class JoystickEventProcessor():
 			with self._lock:
 				if self._event_thread:
 					el = EventListener()
-					el.joystick_event.disconnect(self.queueJoystickEvent)
+					el.removeUIJoystickEventCallback(self.queueJoystickEvent)
+					# el.joystick_event.disconnect(self.queueJoystickEvent)
 					if self._event_thread.is_alive():
 						self._event_thread.stop()
 						self._event_thread.join()
@@ -4482,8 +4523,9 @@ class JoystickEventProcessor():
 	def start(self):
 		''' start the dispatch thread if stopped '''
 		if not self._event_thread:
+			
 			el = EventListener()
-			el.joystick_event.connect(self.queueJoystickEvent)
+			el.addUIJoystickEventCallback(self.queueJoystickEvent)
 
 			#self._event_thread = multiprocessing.Process(target = self._event_runner)
 			self._event_thread =  gremlin.threading.AbortableThreadX(target = self._event_runner)
@@ -4500,12 +4542,13 @@ class JoystickEventProcessor():
 					syslog.info("DISPATCH: start")
 
 
-	def queueJoystickEvent(self, event):
+	def queueJoystickEvent(self, event : Event):
 		''' queues a single joystick event '''
 		self._event_queue.put(event)
 
 	def queueJoystickEventList(self, event_list):
 		''' queues a list of joystick events '''
+		event : Event
 		for event in event_list:
 			self._event_queue.put(event)
 

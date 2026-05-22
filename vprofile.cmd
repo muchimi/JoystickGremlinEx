@@ -1,0 +1,1 @@
+viztracer --tracer_entries 500000 gremlinex.py

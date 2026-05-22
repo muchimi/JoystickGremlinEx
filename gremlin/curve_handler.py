@@ -54,7 +54,6 @@ from psygnal import Signal
 import gremlin.ui.ui_common
 
 import numpy as np
-from scipy.signal import savgol_filter
 
 import logging
 syslog = logging.getLogger("system")
@@ -2357,6 +2356,7 @@ class SmoothingFilter():
 
     def update(self, value : float, ts = None) -> float:
         ''' updates the filter with a single value '''
+        from scipy.signal import savgol_filter # delay load this import because it takes a while to initialize 
         if ts is None:
             ts = time.time() # current timestamp of the data
         pt = [ts, value]

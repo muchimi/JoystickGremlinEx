@@ -167,7 +167,7 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
         gremlin.util.InvokeUiMethod(self._handle_listen_selection_ui, event)
 
     def _handle_listen_selection_ui(self, event):
-        dev : dinput.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+        dev : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(event.device_guid)
         
         self.action_data.device_id = dev.device_id
         self.action_data.input_id = event.identifier
@@ -238,7 +238,7 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
         config.trigger_last_input_id = self.action_data.input_id
         config.trigger_last_input_type = self.action_data.input_type
 
-        dev = gremlin.joystick_handling.device_info_from_guid(self.action_data.device_id)
+        dev = gremlin.joystick_handling.getDevice(self.action_data.device_id)
         syslog.info(f"received: {dev.name} [{dev.device_id}] input: {self.action_data.input_id} type: {self.action_data.input_type}")
         self._update_ui()
 
@@ -375,7 +375,7 @@ class MapToTrigger(gremlin.base_profile.AbstractAction):
         default_device = gremlin.joystick_handling.default_device()
         config = gremlin.config.Configuration()
         last_device_id = config.trigger_last_device_id
-        dev = gremlin.joystick_handling.device_info_from_guid(last_device_id)
+        dev = gremlin.joystick_handling.getDevice(last_device_id)
         if not dev:
             last_device_id = default_device.device_id
         
@@ -407,7 +407,7 @@ class MapToTrigger(gremlin.base_profile.AbstractAction):
 
         node.set("id", self._id)
 
-        dev = gremlin.joystick_handling.device_info_from_guid(self.device_id)
+        dev = gremlin.joystick_handling.getDevice(self.device_id)
         comment = f"Trigger device: {dev.name}  [{dev.device_id}]"
         node_comment = ElementTree.Comment(comment)
         node.append(node_comment)
@@ -464,7 +464,7 @@ class MapToTrigger(gremlin.base_profile.AbstractAction):
 
         table.addField("Map to Trigger", self.mode.name)
 
-        device : dinput.DeviceSummary = gremlin.joystick_handling.device_info_from_guid(self.device_id)
+        device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(self.device_id)
         if not device:
             table.addField("Unknown device", self.device_id)
         else:

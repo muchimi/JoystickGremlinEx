@@ -4,12 +4,12 @@
         {
             "type": "austin",
             "file": "C:\\JoystickGremlin-develop\\gremlinEx.py",
-            "label": "gremlinEx.py",
+            "label": "profile with austin gremlinEx",
         },
         {
             "type": "flamegraph",
             "file": "C:\\JoystickGremlin-develop\\gremlinEx.py",
             "label": "Flamegraph: profile gremlinex"
-        }
+        },
     ]
 }

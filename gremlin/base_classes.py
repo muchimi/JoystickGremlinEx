@@ -1218,8 +1218,8 @@ class AbstractCallbackModel(AbstractModel):
                 new_index_map[new_index] = item
                 new_item_map[item] = new_index
                 new_index +=1
-            if verbose and new_index == 0:
-                syslog.info(f"\tall inputs are filtered for this device")
+        if verbose and new_index == 0:
+            syslog.info(f"\tall inputs are filtered for this device")
 
 
         is_filtered = self._compare_maps(self._index_map, new_index_map)

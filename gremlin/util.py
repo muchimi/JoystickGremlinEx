@@ -1626,24 +1626,59 @@ _cursor_level = []
 _cursor_wait = False
 _qt_wait_cursor = None
 
-def pushCursor(immediate = False):
-    ''' displays an hourglass cursor
-    :params immediate: if true, sets the cursor immediately instead of waiting for a short delay
 
+def pushCursor(immediate = False, callback : Callable = None, *args, **kwargs):
+    ''' displays an hourglass cursor.
+
+    If a callback is specified, a thread will be started and called so the UI thread remains responsive.
+    The callback will get an on_complete parameter to execute when the operation is complete.
+
+    A thread is not created for the callback if the cursor is already set to an hourglass.
+
+    :param immediate: if true, sets the cursor immediately instead of waiting for a short delay
+    :param callback: the function to call while the cursor is displayed
+    :param args: positional arguments for the callback
+    :param kwargs: keyword arguments for the callback
     '''
     global _cursor_push, _cursor_timer
+    
     if _cursor_push == 0:
+        immediate = True
         if immediate:
             # syslog.info("PUSH CURSOR: show cursor timer [immediate]")
-            InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
+            if callback is not None:
+                assert isinstance(callback, Callable),"invalid callback"
+                if not kwargs:
+                    # add completion callback
+                    kwargs = {"on_complete" : popCursor}
+                thread = threading.Thread(target = callback, args=args, kwargs=kwargs)
+            else:
+                thread = None
+            InvokeUiMethod(_pushCursor_ui, thread) # ensure on UI thread
+            QtWidgets.QApplication.processEvents()
         else:
             # syslog.info("PUSH CURSOR: show cursor timer [delay]")
             if _cursor_timer:
                 _cursor_timer.cancel()
             _cursor_timer = threading.Timer(1.0, _cursor_show_hourglass)
             _cursor_timer.start()
+        _cursor_push += 1
+    else:
+        _cursor_push += 1
+        if callback is not None:
+            # run the callback immediately if the cursor is already changed
+            if not kwargs:
+                # add completion callback
+                kwargs = {"on_complete" : popCursor}
+            callback(*args, **kwargs)
+         
     
-    _cursor_push += 1
+    
+    # allow other processing to happen
+    syslog.info(f"PUSH CURSOR: [{_cursor_push}]")
+
+
+
   
 
 def _cursor_show_hourglass():
@@ -1652,36 +1687,45 @@ def _cursor_show_hourglass():
     if not _cursor_wait:
         # syslog.info("PUSH CURSOR: show cursor timer")
         InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
-        while not _cursor_wait:
-            time.sleep(0)
+        time.sleep(0.1)
 
-def _pushCursor_ui():
+def _pushCursor_ui(thread = None):
     global _cursor_push, _cursor_timer, _cursor_wait, _qt_wait_cursor
     _cursor_timer = None
     # syslog.info(f"PUSH CURSOR: [{_cursor_push}]")
     if not _cursor_wait:
         _cursor_wait = True
-        # syslog.info("\tchange to wait cursor")
-        win32gui.LoadCursor(None, win32con.IDC_WAIT)
+  
+        if not _qt_wait_cursor:
+            # create a wait cursor
+            _qt_wait_cursor = QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor)
 
-        # if not _qt_wait_cursor:
-        #     # create a wait cursor
-        #     _qt_wait_cursor = QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor)
+
+        syslog.info("set hourglass")
+        win32gui.LoadCursor(None, win32con.IDC_WAIT)
+        QtWidgets.QApplication.setOverrideCursor(_qt_wait_cursor)
+        QtWidgets.QApplication.processEvents()
 
         # cursor = QtWidgets.QApplication.overrideCursor()
-        # QtWidgets.QApplication.setOverrideCursor(_qt_wait_cursor)
-
         # while cursor != _qt_wait_cursor:
-        #     cursor = QtWidgets.QApplication.overrideCursor()
+        #     time.sleep(0)
         #     QtWidgets.QApplication.processEvents()
-        
-        
-        # syslog.info("show hourglass")
+        #     cursor = QtWidgets.QApplication.overrideCursor()
+
+
+        syslog.info("show hourglass")
+    # start the thread if provided
+    if thread:
+        # start the thread when hourglass is displayed
+        thread.start()
+
+
+    
 
 
 def popCursor(reset = False):
     global _cursor_push, _cursor_timer, _cursor_wait
-    # syslog.info(f"POP CURSOR: [{_cursor_push}]")
+    syslog.info(f"POP CURSOR: [{_cursor_push}]")
     if _cursor_push > 0:
         _cursor_push -= 1
     if _cursor_push == 0 or reset:
@@ -1690,6 +1734,9 @@ def popCursor(reset = False):
             _cursor_timer = None
         if _cursor_wait or reset:
             InvokeUiMethod(_popCursor_ui, reset)
+            time.sleep(0.1) # allow other processing to occur
+
+
             
 def _popCursor_ui(force : bool = False):
     ''' restores the normal cursor '''
@@ -1697,10 +1744,11 @@ def _popCursor_ui(force : bool = False):
     if _cursor_wait or force:
         _cursor_wait = False
         # syslog.info("PUSH CURSOR: change to normal cursor")
-        win32gui.LoadCursor(None, win32con.IDC_ARROW)
-        # QtWidgets.QApplication.restoreOverrideCursor()
-        # while QtWidgets.QApplication.overrideCursor() == _qt_wait_cursor:
-        #     QtWidgets.QApplication.processEvents()
+        # win32gui.LoadCursor(None, win32con.IDC_ARROW)
+               
+        QtWidgets.QApplication.restoreOverrideCursor()
+        QtWidgets.QApplication.processEvents()
+        syslog.info("hide hourglass")
 
 def isWaitCursor() -> bool:
     ''' true if the cursor is an hourglass '''
@@ -1713,6 +1761,7 @@ def pushCursorLevel(pop = True):
     _cursor_level.append(_cursor_push)
     if pop:
         popCursor(True)
+    time.sleep(0.01) # allow other processing to happen
 
 
 def popCursorLevel():
@@ -1722,6 +1771,8 @@ def popCursorLevel():
         _cursor_push = _cursor_level.pop()
         if _cursor_push > 0:
             InvokeUiMethod(_pushCursor_ui)
+
+    time.sleep(0.01) # allow other processing to happen
 
 
 
@@ -1738,8 +1789,11 @@ def popCursorTemporary_ui(pop = True):
         else:
             _pushCursor_ui()
 
+    time.sleep(0.01) # allow other processing to happen
+
 def popCursorTemporary(pop = True):
     InvokeUiMethod(popCursorTemporary_ui, pop)
+    time.sleep(0.01) # allow other processing to happen
 
 def isCursorActive():
     ''' true if the cursor stack is not empty '''
@@ -1774,6 +1828,8 @@ def compare_nocase(a : str, b : str):
 
 def getSignal (oObject : QtCore.QObject, signal_name : str):
     ''' gets a reference to an object signal  '''
+    if oObject is None:
+        return False
     oMetaObj = oObject.metaObject()
     for i in range (oMetaObj.methodCount()):
         oMetaMethod = oMetaObj.method(i)
@@ -1786,6 +1842,8 @@ def getSignal (oObject : QtCore.QObject, signal_name : str):
 
 def isSignalConnected(oObject : QtCore.QObject, signal_name : str):
     ''' true if a signal is connected '''
+    if oObject is None:
+        return False
     mm = getSignal(oObject, signal_name)
     return mm is not None and oObject.isSignalConnected(mm)
 
@@ -1974,7 +2032,9 @@ def is_close(a, b, tolerance = 0.0001):
 class InvokeUiMethod(QtCore.QObject):
     ''' invokes a call on the UI thread as QT is not thread safe '''
     _called = QtCore.Signal(object, object, object, object, object, object, object, object)
+
     def __init__(self, method: Callable, p0 = None, p1 = None, p2 = None, p3 = None, p4 = None, p5 = None, p6 = None, p7 = None):
+    
         ''' Invokes a method on the main ui thread.
 
         :params: method: lambda expression
@@ -1988,18 +2048,11 @@ class InvokeUiMethod(QtCore.QObject):
 
 
         ui_thread = QtWidgets.QApplication.instance().thread() # QT thread
+        
 
         if current_thread != ui_thread:
-            # non on the QT UI thread, move it to the UI thread - because this is an indirect call - make a copy of parameters
-            # self._p0 = copy.deepcopy(p0) if p0 is not None else None
-            # self._p1 = copy.deepcopy(p1) if p1 is not None else None
-            # self._p2 = copy.deepcopy(p2) if p2 is not None else None
-            # self._p3 = copy.deepcopy(p3) if p3 is not None else None
-            # self._p4 = copy.deepcopy(p4) if p4 is not None else None
-            # self._p5 = copy.deepcopy(p5) if p5 is not None else None
-            # self._p6 = copy.deepcopy(p6) if p6 is not None else None
-            # self._p7 = copy.deepcopy(p7) if p7 is not None else None
-
+            # not on the QT UI thread, move it to the UI thread - because this is an indirect call
+            # create references to the objects so they don't go out of scope later
             self._p0 = p0
             self._p1 = p1
             self._p2 = p2
@@ -2013,7 +2066,14 @@ class InvokeUiMethod(QtCore.QObject):
             self.setParent(QtWidgets.QApplication.instance())
             self._called.connect(self._execute)
             self.method = method
+            self._waiting = True
+            # syslog.info("invoke: call start")
             self._called.emit(self._p0, self._p1, self._p2, self._p3, self._p4, self._p5, self._p6, self._p7)
+            while self._waiting:
+                time.sleep(0)
+            # syslog.info("invoke: call completed")
+            self.deleteLater()
+
         else:
             # direct call
             self._exec(method, p0, p1, p2, p3, p4, p5, p6, p7)
@@ -2062,8 +2122,9 @@ class InvokeUiMethod(QtCore.QObject):
 
         # trigger garbage collector
         self._called.disconnect(self._execute)
-        self.setParent(None)
-        self.deleteLater()
+
+
+        self._waiting = False
 
 
 def is_ui_thread():

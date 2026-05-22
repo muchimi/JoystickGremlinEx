@@ -737,7 +737,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         gremlin.util.InvokeUiMethod(self._handle_listen_selection_ui, event)
 
     def _handle_listen_selection_ui(self, event):
-        dev = gremlin.joystick_handling.device_info_from_guid(event.device_guid)
+        dev = gremlin.joystick_handling.getDevice(event.device_guid)
         if not dev.is_virtual:
             return
         self._modify_joystick(event)
@@ -748,7 +748,7 @@ class MacroActionEditor(QtWidgets.QWidget):
         ''' creates the joystick macro UI when joystick is the selected type '''
         import gremlin.joystick_handling
         if hasattr(action,"device_guid"):
-            device = gremlin.joystick_handling.device_info_from_guid(action.device_guid)
+            device = gremlin.joystick_handling.getDevice(action.device_guid)
         elif hasattr(action, "vjoy_id"):
             device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(action.vjoy_id)
             
@@ -1107,7 +1107,7 @@ class MacroActionEditor(QtWidgets.QWidget):
             
             config = gremlin.config.Configuration()
             device_id = config.macro_last_device_id
-            dev = gremlin.joystick_handling.device_info_from_guid(device_id) if device_id else None
+            dev = gremlin.joystick_handling.getDevice(device_id) if device_id else None
             input_type = config.macro_last_input_type if dev else None
             input_id = config.macro_last_input_id if dev else None
             

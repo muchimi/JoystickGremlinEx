@@ -311,11 +311,12 @@ class CodeRunner:
                 mode_nodes[mode] = mode_node
 
             # Create input callbacks based on the profile's content
+            profile.sync()
 
             verbose = gremlin.config.Configuration().verbose_mode_exec
             device : gremlin.base_profile.Device
             for device in profile.devices.values():
-                device_info = gremlin.joystick_handling.device_info_from_guid(device.device_guid)
+                device_info = gremlin.joystick_handling.getDevice(device.device_guid)
                 if not device_info:
                     syslog.warning(f"CALLBACK: skipping a device: ID referenced in profile data is not currently found in the list of known devices:")
                     syslog.warning(f"\t{str(device)}")
@@ -374,7 +375,7 @@ class CodeRunner:
                                         for functor in cb_data.callback.execution_graph.functors:
                                             if hasattr(functor,"action_set"):
                                                 for action in functor.action_set.functors:
-                                                    if isinstance(action, gremlin.actions.ActivationCondition):
+                                                    if isinstance(action,  gremlin.input_item.BaseActivationCondition):
                                                         syslog.info(f"\t\t\tActivation Condition: target :{action.target.name}")
                                                     else:
                                                         import action_plugins.map_to_simconnect
@@ -387,7 +388,7 @@ class CodeRunner:
                                                         action_set = [action_set]
                                                     for action_item in action_set:
                                                         for action in action_item.functors:
-                                                            if isinstance(action, gremlin.actions.ActivationCondition):
+                                                            if isinstance(action,  gremlin.input_item.BaseActivationCondition):
                                                                 syslog.info(f"\t\t\tActivation Condition: target :{action.target.name}")
                                                             else:
                                                                 import action_plugins.map_to_simconnect
