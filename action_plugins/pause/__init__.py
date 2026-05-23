@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
 from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
 
@@ -26,13 +25,10 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.input_item
 from enum import IntEnum
-from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
-import threading
+from gremlin.profile import safe_read
 import gremlin.ui.ui_common
 import time
 import logging
-import psygnal
-from psygnal import Signal
 from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")

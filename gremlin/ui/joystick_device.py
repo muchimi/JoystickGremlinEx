@@ -21,7 +21,6 @@ import logging
 
 from PySide6 import QtWidgets, QtCore
 
-import gremlin
 import dinput
 from dinput import DeviceSummary
 
@@ -39,7 +38,6 @@ import gremlin.ui.ui_common
 from shiboken6 import Shiboken
 from psygnal import Signal
 import gremlin.util
-from gremlin.input_item import InputItemMappingWidget, InputItemWidget
 
 
 
@@ -63,30 +61,20 @@ class JoystickInputModel(gremlin.input_item.InputItemListModel):
                          mode = mode,
                          allowed_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
                          custom_filter_handler = custom_filter_handler,
+                         custom_sort_handler= self._custom_sort,
                          show_filtered_only = show_filtered_only,
                          )
         
-
-# class JoystickInputListView(gremlin.input_item.InputItemListView):
-
-#     ''' view for the list of input items for a joystick device '''
-
-#     def __init__(self, name, custom_widget_handler : Callable, device_id, model : JoystickInputModel, parent = None):
-#         ''' creates a new view for the input items of a joystick device
-
-#         :param name the name of the view to display
-#         :param custom_widget_handler a handler that takes an index and data and returns a widget to display for that item in the list
-#         :param device_id the id of the device this view is associated with
-#         :param model the model containing the data to display in this view
-#         :param parent the parent widget of this view
-#         '''
-#         super().__init__(name = name,
-#                          custom_widget_handler = custom_widget_handler,
-#                          device_guid = device_id,
-#                          model = model,
-#                          enable_filter=True,
-#                          parent = parent)
+    def _custom_sort(self, items):
+        ''' sorting for joystick devices has axes first, buttons next, hats last '''
+        data = [(item, item.sortKey) for item in items]
+        data.sort(key=lambda x: x[1])
+        # sequence the list
+        indices = (data.index(x) for x in data)
+        return indices
         
+        
+       
 
 class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
@@ -146,7 +134,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         #self.widget_tracker = gremlin.ui.ui_common.DeviceWidgetTracker() # caches the  InputConfigurationItem for this item
         self.last_item_data_key = None
-        self._last_selected_index = index = 0
+        self._last_selected_index = _index = 0
         self._last_selected_input_item = None
         self.device_guid = device.device_guid
         self.device_name = device.name
@@ -383,17 +371,13 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
 
         # filtered = true if the input should not be displayed (filtered), false if it should be visible
-        include = not profile.isInputFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
+        include = profile.isInputFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
         if verbose and include:
             syslog.info(f"custom filter: {input_item.input_type.name} {input_item.input_id} visible")
         return include
 
 
 
-    @property
-    def inputWidgetCount(self) -> int:
-        ''' number of input widgets currently in the device '''
-        return self.inputItemListView.count()
 
     # def _handle_jump_to_mapped_input(self):
     #     gremlin.util.InvokeUiMethod(self._handle_jump_to_mapped_input_ui)
@@ -458,7 +442,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
             try:
                 index = -1
-                gremlin.util.pushCursor()
+                
                 selected_index = self.inputItemListView.current_index
                 input_item = self.inputItemListModel.inputItemAtIndex(selected_index)
                 # filter setup
@@ -476,7 +460,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
             finally:
                 dialog.deleteLater()
-                gremlin.util.popCursor()
+                
 
 
     def _handle_locked_changed(self, value : bool):
@@ -590,7 +574,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         result = message_box.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
             verbose = gremlin.config.Configuration().verbose_mode_ui
-            if verbose: syslog.info("delete curve data")
+            if verbose:
+                syslog.info("delete curve data")
             data.curve_data = None
             self._update_curve_icon(index, data)
 
@@ -613,7 +598,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.set_mode(mode)
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_mode
-        if verbose: syslog.info(f"DeviceWidget: {self.device_name} change mode: [{mode}]")
+        if verbose:
+            syslog.info(f"DeviceWidget: {self.device_name} change mode: [{mode}]")
         self.update_curve_icons()
 
 
@@ -917,7 +903,7 @@ class JoystickInputDialog(gremlin.ui.ui_common.QRememberDialog):
             flow_layouts[input_type].addWidget(btn)
 
 
-            if not input_type in self.input_widgets:
+            if input_type not in self.input_widgets:
                 self.input_widgets[input_type] = {}
             self.input_widgets[input_type][input_id] = btn
 
@@ -1106,7 +1092,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
 
     def dump_filter(self, p_device_guid = None):
         syslog.info("=" * 30)
-        syslog.info(f"dialog input filter dump")
+        syslog.info("dialog input filter dump")
         visible_count = 0
 
         for device_guid, input_type, input_id, _, _ in self.input_map:
@@ -1127,7 +1113,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
         profile = gremlin.shared_state.current_profile
         device = self.device
         device_guid = self.device_guid
-        verbose = gremlin.config.Configuration().verbose_mode_filter
+        _verbose = gremlin.config.Configuration().verbose_mode_filter
 
 
         # global modes that impact multiple inputs
@@ -1172,7 +1158,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
                     # filter to mapped devices only
                     current_mode = gremlin.shared_state.edit_mode
 
-                    if is_control and not mode in applied_all_filter:
+                    if is_control and mode not in applied_all_filter:
                         profile.settings.setAllFiltered(mode)
                         applied_all_filter.append(mode)
                         # if not prompt:
@@ -1230,7 +1216,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
                 case "hide_all":
                     # hide all inputs
                     filtered = True
-                    if is_control and not mode in applied_all_filter:
+                    if is_control and mode not in applied_all_filter:
                         profile.settings.setAllFiltered(mode)
                         applied_all_filter.append(mode)
                         if not prompt:
@@ -1276,7 +1262,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
     def _set_default_filter_list(self, device : dinput.DeviceSummary, input_type : InputType, max_count : int, add_only = False):
         ''' sets a default list of filtered inputs based on given parameters '''
 
-        device_guid = device.device_guid
+        _device_guid = device.device_guid
         match input_type:
             case InputType.JoystickAxis:
                 device_count = device.axis_count
@@ -1312,7 +1298,7 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
 
         # remove visible list from filtered list
         if map_data:
-            map_data = [i for i in map_data if not i in visible_list]
+            map_data = [i for i in map_data if i not in visible_list]
 
 
         for index in range(device_count):
@@ -1357,11 +1343,12 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
         verbose = gremlin.config.Configuration().verbose_mode_filter
 
         device_guid = self.device.device_guid
-        if not device_guid in self.input_filter:
+        if device_guid not in self.input_filter:
             self.input_filter[device_guid] = {}
-        if not input_type in self.input_filter[device_guid]:
+        if input_type not in self.input_filter[device_guid]:
             self.input_filter[device_guid][input_type] = {}
-        if verbose: syslog.info(f"Toggle {input_type.name} {input_id} {value}")
+        if verbose:
+            syslog.info(f"Toggle {input_type.name} {input_id} {value}")
         self.input_filter[device_guid][input_type][input_id] = value
         if verbose and input_type == InputType.JoystickAxis:
             syslog.info(f"set filter: {self.device.name} axis: {input_id} filtered: {value}")
@@ -1380,11 +1367,11 @@ Inputs will highlight when the associated axis, button or hat is triggered to he
     def _is_filtered(self, input_type : InputType, input_id : int) -> bool:
         ''' checks filtered state internal to the dialog '''
         device_guid = self.device.device_guid
-        if not device_guid in self.input_filter:
+        if device_guid not in self.input_filter:
             return True
-        if not input_type in self.input_filter[device_guid]:
+        if input_type not in self.input_filter[device_guid]:
             return True
-        if not input_id in self.input_filter[device_guid][input_type]:
+        if input_id not in self.input_filter[device_guid][input_type]:
             return True
         return self.input_filter[device_guid][input_type][input_id]
 

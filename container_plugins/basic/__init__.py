@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from lxml import etree as ElementTree
 
 import gremlin
 import gremlin.config
@@ -23,10 +22,9 @@ from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 import gremlin.types
 from gremlin.base_profile import AbstractFunctor
-from gremlin.input_item import AbstractContainer, AbstractAction, AbstractContainerWidget, ActionSet, ActionSets, InputItem
+from gremlin.input_item import AbstractContainer, AbstractAction, AbstractContainerWidget, InputItem
 from shiboken6 import Shiboken
 import logging
-from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 
 syslog = logging.getLogger("system")
 class BasicContainerWidget(AbstractContainerWidget):
@@ -49,7 +47,8 @@ class BasicContainerWidget(AbstractContainerWidget):
             return
 
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-        if verbose_ui: syslog.info("BasicContainerWidget: create action UI start")
+        if verbose_ui:
+            syslog.info("BasicContainerWidget: create action UI start")
         has_actions = False
         for action_set in self.container.action_sets:
             if action_set:
@@ -88,7 +87,8 @@ class BasicContainerWidget(AbstractContainerWidget):
 
             self.action_layout.addWidget(action_selector)
 
-        if verbose_ui: syslog.info("BasicContainerWidget: create action UI completed")
+        if verbose_ui:
+            syslog.info("BasicContainerWidget: create action UI completed")
 
     def _create_condition_ui(self):
         if self.container.action_sets:
@@ -114,41 +114,33 @@ class BasicContainerWidget(AbstractContainerWidget):
         if not Shiboken.isValid(self):
             return
 
-        gremlin.util.pushCursor()
+        if isinstance(action_data, str):
+            action_name = action_data
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.get_class(action_name)(self.container)
+        elif isinstance(action_data, Clipboard):
+            # paste operation
+            if action_data.is_action:
+                # verify the action in the clipboard is appropriate for this input
 
-        try:
+                action_item = plugin_manager.duplicate(action_data.data, self.container)
 
-            if isinstance(action_data, str):
-                action_name = action_data
-                plugin_manager = gremlin.plugin_manager.ActionPlugins()
-                action_item = plugin_manager.get_class(action_name)(self.container)
-            elif isinstance(action_data, Clipboard):
-                # paste operation
-                if action_data.is_action:
-                    # verify the action in the clipboard is appropriate for this input
+        self.container.add_action(action_item)
 
-                    action_item = plugin_manager.duplicate(action_data.data, self.container)
-
-            self.container.add_action(action_item)
-
-            # blows up in QT 6.11
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        # blows up in QT 6.11
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+        
 
     def _paste_action(self, action, container):
         ''' paste action'''
-
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.container)
-            self.container.add_action(action_item)
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.container)
+        self.container.add_action(action_item)
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+    
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.

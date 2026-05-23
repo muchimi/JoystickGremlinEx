@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,156 +19,105 @@
 import ctypes
 import enum
 import os
-from gremlin.error import GremlinError
 import logging
 
 syslog = logging.getLogger("system")
 
-class VJoyState(enum.Enum):
 
+class VJoyState(enum.Enum):
     """Enumeration of the possible VJoy device states."""
 
-    Owned = 0       # The device is owned by the current application VJD_STAT_OWN
-    Free = 1        # The device is not owned by any application VJD_STAT_FREE
-    Bust = 2        # The device is owned by another application VJD_STAT_BUSY
-    Missing = 3     # The device is not present VJD_STAT_MISS
-    Unknown = 4     # Unknown type of error VJD_STAT_UNKN
+    Owned = 0  # The device is owned by the current application VJD_STAT_OWN
+    Free = 1  # The device is not owned by any application VJD_STAT_FREE
+    Bust = 2  # The device is owned by another application VJD_STAT_BUSY
+    Missing = 3  # The device is not present VJD_STAT_MISS
+    Unknown = 4  # Unknown type of error VJD_STAT_UNKN
 
 
 class VJoyInterface:
-
     """Allows low level interaction with VJoy devices via ctypes."""
 
     vjoy_dll = None
-
 
     # Declare argument and return types for all the functions
     # exposed by the dll
     api_functions = {
         # General vJoy information
-        "GetvJoyVersion": {
-            "arguments": [],
-            "returns": ctypes.c_short
-        },
-        "vJoyEnabled": {
-            "arguments": [],
-            "returns": ctypes.c_bool
-        },
-        "GetvJoyProductString": {
-            "arguments": [],
-            "returns": ctypes.c_wchar_p
-        },
-        "GetvJoyManufacturerString": {
-            "arguments": [],
-            "returns": ctypes.c_wchar_p
-        },
-        "GetvJoySerialNumberString": {
-            "arguments": [],
-            "returns": ctypes.c_wchar_p
-        },
-
+        "GetvJoyVersion": {"arguments": [], "returns": ctypes.c_short},
+        "vJoyEnabled": {"arguments": [], "returns": ctypes.c_bool},
+        "GetvJoyProductString": {"arguments": [], "returns": ctypes.c_wchar_p},
+        "GetvJoyManufacturerString": {"arguments": [], "returns": ctypes.c_wchar_p},
+        "GetvJoySerialNumberString": {"arguments": [], "returns": ctypes.c_wchar_p},
         # Device properties
-        "GetVJDButtonNumber": {
-            "arguments": [ctypes.c_uint],
-            "returns": ctypes.c_int
-        },
-        "GetVJDDiscPovNumber": {
-            "arguments": [ctypes.c_uint],
-            "returns": ctypes.c_int
-        },
-        "GetVJDContPovNumber": {
-            "arguments": [ctypes.c_uint],
-            "returns": ctypes.c_int
-        },
+        "GetVJDButtonNumber": {"arguments": [ctypes.c_uint], "returns": ctypes.c_int},
+        "GetVJDDiscPovNumber": {"arguments": [ctypes.c_uint], "returns": ctypes.c_int},
+        "GetVJDContPovNumber": {"arguments": [ctypes.c_uint], "returns": ctypes.c_int},
         # API claims this should return a bool, however, this is untrue and
         # is an int, see:
         # http://vjoystick.sourceforge.net/site/index.php/forum/5-Discussion/1026-bug-with-getvjdaxisexist
         "GetVJDAxisExist": {
             "arguments": [ctypes.c_uint, ctypes.c_uint],
-            "returns": ctypes.c_int
+            "returns": ctypes.c_int,
         },
         "GetVJDAxisMax": {
             "arguments": [ctypes.c_uint, ctypes.c_uint, ctypes.c_void_p],
-            "returns": ctypes.c_bool
+            "returns": ctypes.c_bool,
         },
         "GetVJDAxisMin": {
             "arguments": [ctypes.c_uint, ctypes.c_uint, ctypes.c_void_p],
-            "returns": ctypes.c_bool
+            "returns": ctypes.c_bool,
         },
-
         # Device management
-        "GetOwnerPid": {
-            "arguments": [ctypes.c_uint],
-            "returns": ctypes.c_int
-        },
-        "AcquireVJD": {
-            "arguments": [ctypes.c_uint],
-            "returns": ctypes.c_bool
-        },
+        "GetOwnerPid": {"arguments": [ctypes.c_uint], "returns": ctypes.c_int},
+        "AcquireVJD": {"arguments": [ctypes.c_uint], "returns": ctypes.c_bool},
         "RelinquishVJD": {
             "arguments": [ctypes.c_uint],
             "returns": None,
         },
         "UpdateVJD": {
             "arguments": [ctypes.c_uint, ctypes.c_void_p],
-            "returns": ctypes.c_bool
+            "returns": ctypes.c_bool,
         },
-        "GetVJDStatus": {
-            "arguments": [ctypes.c_uint],
-            "returns": ctypes.c_int
-        },
-
+        "GetVJDStatus": {"arguments": [ctypes.c_uint], "returns": ctypes.c_int},
         # Reset functions
-        "ResetVJD": {
-            "arguments": [ctypes.c_uint],
-            "returns": ctypes.c_bool
-        },
-        "ResetAll": {
-            "arguments": [],
-            "returns": None
-        },
-        "ResetButtons": {
-            "arguments": [ctypes.c_uint],
-            "returns": ctypes.c_bool
-        },
-        "ResetPovs": {
-            "arguments": [ctypes.c_uint],
-            "returns": ctypes.c_bool
-        },
-
+        "ResetVJD": {"arguments": [ctypes.c_uint], "returns": ctypes.c_bool},
+        "ResetAll": {"arguments": [], "returns": None},
+        "ResetButtons": {"arguments": [ctypes.c_uint], "returns": ctypes.c_bool},
+        "ResetPovs": {"arguments": [ctypes.c_uint], "returns": ctypes.c_bool},
         # Set values
         "SetAxis": {
             "arguments": [ctypes.c_long, ctypes.c_uint, ctypes.c_uint],
-            "returns": ctypes.c_bool
+            "returns": ctypes.c_bool,
         },
         "SetBtn": {
             "arguments": [ctypes.c_bool, ctypes.c_uint, ctypes.c_ubyte],
-            "returns": ctypes.c_bool
+            "returns": ctypes.c_bool,
         },
         "SetDiscPov": {
             "arguments": [ctypes.c_int, ctypes.c_uint, ctypes.c_ubyte],
-            "returns": ctypes.c_bool
+            "returns": ctypes.c_bool,
         },
         "SetContPov": {
             "arguments": [ctypes.c_ulong, ctypes.c_uint, ctypes.c_ubyte],
-            "returns": ctypes.c_bool
+            "returns": ctypes.c_bool,
         },
-
     }
 
     @classmethod
     def initialize(self):
         """Initializes the functions as class methods."""
         from pathlib import Path
-        from gremlin.util import display_error, get_dll_version, version_valid #, get_vjoy_driver_version
+        from gremlin.util import (
+            display_error,
+            get_dll_version,
+            version_valid,
+        )  # , get_vjoy_driver_version
 
         if VJoyInterface.vjoy_dll is None:
-
             dll_folder = os.path.dirname(__file__)
             dll_file = "vJoyInterface.dll"
-            _dll_path = os.path.join(dll_folder, dll_file )
+            _dll_path = os.path.join(dll_folder, dll_file)
             if not os.path.isfile(_dll_path):
-
                 # look one level up for packaging in 3.12
                 parent = Path(dll_folder).parent
                 _dll_path = os.path.join(parent, dll_file)
@@ -176,21 +125,19 @@ class VJoyInterface:
                     msg = f"Unable to continue - missing dll: {_dll_path}"
                     display_error(msg)
                     syslog.critical(msg)
-                    os._exit(1) 
+                    os._exit(1)
 
-  
-            # check DLL version                
+            # check DLL version
             min_version = "2.1.9.1"
             try:
-
                 dll_version = get_dll_version(_dll_path)
-            
+
                 if not version_valid(dll_version, min_version):
                     msg = f"Invalid version dll: {_dll_path}\nVersion {min_version} required, found {dll_version}"
                     display_error(msg)
                     syslog.critical(msg)
                     os._exit(1)
-            except:
+            except Exception:
                 msg = "Error: VJOY is not installed or not configured."
                 display_error(msg)
                 syslog.critical(msg)
@@ -206,7 +153,6 @@ class VJoyInterface:
                 syslog.critical(msg)
                 os._exit(1)
 
-
         for fn_name, params in self.api_functions.items():
             dll_fn = getattr(self.vjoy_dll, fn_name)
             if "arguments" in params:
@@ -214,5 +160,3 @@ class VJoyInterface:
             if "returns" in params:
                 dll_fn.restype = params["returns"]
             setattr(self, fn_name, dll_fn)
-
-

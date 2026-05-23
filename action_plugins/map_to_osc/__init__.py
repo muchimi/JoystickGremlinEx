@@ -17,8 +17,6 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 import logging
-import math
-import os
 from lxml import etree as ElementTree
 
 from PySide6 import QtCore, QtWidgets, QtGui
@@ -30,17 +28,11 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
 import gremlin.shared_state
-from gremlin.types import MouseButton
-from gremlin.profile import read_bool, safe_read, safe_format
+from gremlin.profile import safe_read, safe_format
 import gremlin.util
 import gremlin.ui.ui_common
 import gremlin.input_item
-import gremlin.sendinput
-from gremlin import input_devices
-import gremlin.ui.osc_device
-from gremlin.ui.osc_device import OscInterface, OscClient
-import logging
-import psygnal
+from gremlin.ui.osc_device import OscInterface
 from psygnal import Signal
 from shiboken6 import Shiboken
 import html
@@ -646,7 +638,7 @@ class MapToOscWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _reset_server(self):
         ''' reset IP and port to configured defaults '''
-        result =  gremlin.ui.ui_common.ConfirmBox(f"Reset server data to defaults?")
+        result =  gremlin.ui.ui_common.ConfirmBox("Reset server data to defaults?")
         if result:
             config = gremlin.config.Configuration()
             self._server_ip_widget.setText(config.osc_host) # also updates action_data
@@ -789,7 +781,7 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
             return False
         
         if not self.osc_client:
-            verbose = gremlin.config.Configuration().verbose_mode_osc
+            _verbose = gremlin.config.Configuration().verbose_mode_osc
             device = gremlin.joystick_handling.get_device(self.hardware_device_guid)
             device_name = device.name
             if gremlin.util.validateIp(self.action_data.server_ip):
@@ -851,7 +843,7 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
         if not self._start_client():
             return
         
-        verbose = gremlin.config.Configuration().verbose_mode_osc
+        _verbose = gremlin.config.Configuration().verbose_mode_osc
         is_axis = self.action_data.input_is_axis()
         if is_axis:
             # axis mode - compute the output values
@@ -1150,7 +1142,7 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
 
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
 
         table = ReportTable(cellpadding=4)
         table.addField("Message", html.escape(self.command ))

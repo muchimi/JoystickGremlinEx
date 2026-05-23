@@ -15,13 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import enum
-import logging
-import gremlin.error
-import os
-import sys
 
-from PySide6 import QtGui
+import gremlin.error
+
 
 from gremlin.input_types import InputType
 import gremlin.types
@@ -104,53 +100,53 @@ direction_tuple_lookup = {
 
 
 
-class PluginVariableType(enum.Enum):
+# class PluginVariableType(enum.Enum):
 
-    """Enumeration of all supported variable types."""
+#     """Enumeration of all supported variable types."""
 
-    Int = 1
-    Float = 2
-    String = 3
-    Bool = 4
-    PhysicalInput = 5
-    VirtualInput = 6
-    Mode = 7
-    Selection = 8
+#     Int = 1
+#     Float = 2
+#     String = 3
+#     Bool = 4
+#     PhysicalInput = 5
+#     VirtualInput = 6
+#     Mode = 7
+#     Selection = 8
 
-    @staticmethod
-    def to_string(value):
-        try:
-            return _PluginVariableType_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
+#     @staticmethod
+#     def to_string(value):
+#         try:
+#             return _PluginVariableType_to_string_lookup[value]
+#         except KeyError:
+#             raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
-    @staticmethod
-    def to_enum(value):
-        try:
-            return _PluginVariableType_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
+#     @staticmethod
+#     def to_enum(value):
+#         try:
+#             return _PluginVariableType_to_enum_lookup[value]
+#         except KeyError:
+#             raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
 
 
-_PluginVariableType_to_string_lookup = {
-    PluginVariableType.Int: "Int",
-    PluginVariableType.Float: "Float",
-    PluginVariableType.String: "String",
-    PluginVariableType.Bool: "Bool",
-    PluginVariableType.PhysicalInput: "PhysicalInput",
-    PluginVariableType.VirtualInput: "VirtualInput",
-    PluginVariableType.Mode: "Mode",
-    PluginVariableType.Selection: "Selection"
-}
+# _PluginVariableType_to_string_lookup = {
+#     PluginVariableType.Int: "Int",
+#     PluginVariableType.Float: "Float",
+#     PluginVariableType.String: "String",
+#     PluginVariableType.Bool: "Bool",
+#     PluginVariableType.PhysicalInput: "PhysicalInput",
+#     PluginVariableType.VirtualInput: "VirtualInput",
+#     PluginVariableType.Mode: "Mode",
+#     PluginVariableType.Selection: "Selection"
+# }
 
-_PluginVariableType_to_enum_lookup = {
-    "Int": PluginVariableType.Int,
-    "Float": PluginVariableType.Float,
-    "String": PluginVariableType.String,
-    "Bool": PluginVariableType.Bool,
-    "PhysicalInput": PluginVariableType.PhysicalInput,
-    "VirtualInput": PluginVariableType.VirtualInput,
-    "Mode": PluginVariableType.Mode,
-    "Selection": PluginVariableType.Selection
-}
+# _PluginVariableType_to_enum_lookup = {
+#     "Int": PluginVariableType.Int,
+#     "Float": PluginVariableType.Float,
+#     "String": PluginVariableType.String,
+#     "Bool": PluginVariableType.Bool,
+#     "PhysicalInput": PluginVariableType.PhysicalInput,
+#     "VirtualInput": PluginVariableType.VirtualInput,
+#     "Mode": PluginVariableType.Mode,
+#     "Selection": PluginVariableType.Selection
+# }

@@ -27,7 +27,6 @@ from lxml import etree as ElementTree
 import gremlin.error
 import gremlin.plugin_manager
 from gremlin.profile import Profile
-import gremlin.profile_library
 import gremlin.types
 import gremlin.util
 
@@ -243,7 +242,7 @@ def test_hierarchy():
     n1 = root.node_at_index(1)
     n2 = root.node_at_index(2)
     n3 = root.node_at_index(3)
-    n4 = n2.node_at_index(1)
+    _n4 = n2.node_at_index(1)
 
     assert n1.parent == root
     assert n2.parent == root

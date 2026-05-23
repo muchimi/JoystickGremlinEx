@@ -22,11 +22,10 @@ import uuid
 import time
 
 import gremlin.joystick_handling
-from gremlin.input_types import InputType
 import gremlin.shared_state
 from gremlin.types import DeviceType
 import logging
-from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtCore
 import gremlin.util
 
 syslog = logging.getLogger("system")
@@ -59,6 +58,7 @@ This is ugly but the only sane way to do this at the moment.
 """
 
 root_path = None # root path
+initialized = False # true if app is initialized
 
 data_path = None # application data path
 
@@ -295,10 +295,10 @@ def _current_mode() -> str:
 
 def resetState():
     device_profile_map.clear()
-    current_profile = None
-    runtime_mode = None
-    edit_mode = None
-    previous_runtime_mode = None
+    _current_profile = None
+    _runtime_mode = None
+    _edit_mode = None
+    _previous_runtime_mode = None
 
 
 

@@ -19,23 +19,15 @@
 import os
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 from lxml import etree as ElementTree
-import qtawesome as qta
 import gremlin.util
-import gremlin.event_handler
-import re
 import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
-import gremlin.ui.ui_about
-from gremlin.util import load_icon, userprofile_path
+from gremlin.util import load_icon
 import gremlin.input_item
 import gremlin.ui.ui_common
-import threading
-from shiboken6 import Shiboken
 from gremlin.util import safe_format, safe_read
 import logging
-import psygnal
-from psygnal import Signal
 import gremlin.sound
 import enum
 import gremlin.ktts
@@ -62,7 +54,7 @@ class PlayMode(enum.Enum):
 
             
     @staticmethod
-    def from_string(value) -> PlayMode:
+    def from_string(value) -> PlayMode:  # noqa: F821
         match value:
             case "ktts":
                 return PlayMode.CoquiAI
@@ -260,7 +252,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        verbose = gremlin.config.Configuration().verbose_mode_sound
+        _verbose = gremlin.config.Configuration().verbose_mode_sound
         
         device_index = self.action_data.getAudioDeviceIndex()
         
@@ -440,36 +432,33 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             self.action_data.speaker = last_speaker
 
         ktts = gremlin.ktts.KTTS()
-        try:
-            gremlin.util.pushCursor()
-            speakers = ktts.getSpeakers(initialize = initialize)
-            with QtCore.QSignalBlocker(self.speaker_widget):
-                self.speaker_widget.clear()
-            if speakers:
-                # we have a list of speakers
-                for speaker in speakers:
-                    self.speaker_widget.addItem(speaker, speaker)
-                if self.action_data.speaker:
-                    speaker = self.action_data.speaker
-                else:
-                    speaker = config.ai_tts_last_speaker
-                if speaker:
-                    index = self.speaker_widget.findText(speaker)
-                    if index != -1:
-                        self.speaker_widget.setCurrentIndex(index)
-                else:
-                    speaker = self.speaker_widget.currentText()
-                    config.ai_tts_last_speaker = speaker
-                    self.action_data.speaker = speaker
-            else:
-                if self.action_data.speaker:
-                    speaker = self.action_data.speaker
-                    self.speaker_widget.addItem(speaker, speaker)
-            
-            self.speaker_widget.setEnabled(speakers is not None)
-        finally:
-            gremlin.util.popCursor()
         
+        speakers = ktts.getSpeakers(initialize = initialize)
+        with QtCore.QSignalBlocker(self.speaker_widget):
+            self.speaker_widget.clear()
+        if speakers:
+            # we have a list of speakers
+            for speaker in speakers:
+                self.speaker_widget.addItem(speaker, speaker)
+            if self.action_data.speaker:
+                speaker = self.action_data.speaker
+            else:
+                speaker = config.ai_tts_last_speaker
+            if speaker:
+                index = self.speaker_widget.findText(speaker)
+                if index != -1:
+                    self.speaker_widget.setCurrentIndex(index)
+            else:
+                speaker = self.speaker_widget.currentText()
+                config.ai_tts_last_speaker = speaker
+                self.action_data.speaker = speaker
+        else:
+            if self.action_data.speaker:
+                speaker = self.action_data.speaker
+                self.speaker_widget.addItem(speaker, speaker)
+        
+        self.speaker_widget.setEnabled(speakers is not None)
+
 
     def _handle_generate(self, widget):
         if self.action_data.text:
@@ -477,11 +466,8 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             dialog = gremlin.sound.GenerateDialog(self.action_data, parent = ui)
             result = dialog.exec()
             if result == QtWidgets.QDialog.accepted:
-                try:
-                    gremlin.util.pushCursor()
-                    self.action_data.generate()
-                finally:
-                    gremlin.util.popCursor()
+                self.action_data.generate()
+            
             self._update_ui()
 
         # update speakers if not done
@@ -531,7 +517,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         ktts = gremlin.sound.KTTS()
         wav = ktts.getActionWav(self.action_data)
         if wav:
-            sound = gremlin.sound.Sound()         
+            _sound = gremlin.sound.Sound()         
                 
         
     @QtCore.Slot()
@@ -668,7 +654,7 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
 
 
     def process_event(self, event, value, extra_data = None):
-        verbose = gremlin.config.Configuration().verbose_mode_sound
+        _verbose = gremlin.config.Configuration().verbose_mode_sound
         is_pressed = event.is_pressed
         trigger = (is_pressed and self.action_data.exec_on_press) or \
                     (not is_pressed and self.action_data.exec_on_release) 
@@ -1097,7 +1083,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         import html
         table = ReportTable(cellpadding=4) 
         
@@ -1108,6 +1094,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                 table.addField("Play", html.escape(self.sound_file))
             case PlayMode.CoquiAI:
                 ktts = gremlin.sound.KTTS()
+                text = self.text
                 text = html.escape(text) if text else ""
                 table.addField("Text", text)
                 sound_file = ktts.getActionWav(self)

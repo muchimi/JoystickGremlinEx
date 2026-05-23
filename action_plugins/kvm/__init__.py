@@ -17,34 +17,21 @@
 
 
 import logging
-import math
-import os
 from lxml import etree as ElementTree
 
-from PySide6 import QtCore, QtWidgets, QtGui
+from PySide6 import QtCore
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
-from gremlin.types import MouseButton
 from gremlin.profile import safe_read, safe_format
-from gremlin.util import rad2deg
-import gremlin.util
 import gremlin.ui.ui_common
 import gremlin.input_item
-import gremlin.sendinput
-from gremlin import input_devices
-import psygnal
-from psygnal import Signal
-from shiboken6 import Shiboken
 import gremlin.remote
-import threading
 import gremlin.keyboard
 import gremlin.windows_event_hook
-import win32con, win32api, win32gui
-import ctypes
+import win32con, win32api
 from gremlin.types import SyncMode
 import gremlin.joystick_handling
-import gremlin.ui.osc_device
 import gremlin.event_handler
 import gremlin.raw_input
 
@@ -305,7 +292,8 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
     def _mouse_button_handler(self, event : gremlin.windows_event_hook.MouseEvent):
         ''' handles a mouse button '''
         verbose = gremlin.config.Configuration().verbose_mode_remote
-        if verbose: syslog.info(f"KVM: mouse button {event.button_id} {event.is_pressed}")
+        if verbose:
+            syslog.info(f"KVM: mouse button {event.button_id} {event.is_pressed}")
         gremlin.remote.remote_client.send_kvm_mouse_button(event.button_id, event.is_pressed)
 
     
@@ -319,7 +307,8 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
                 case gremlin.raw_input.RawInputDataType.Motion:
                     dx = data.dx
                     dy = data.dy
-                    if verbose: syslog.info(f"KVM: motion {dx} {dy}")
+                    if verbose:
+                        syslog.info(f"KVM: motion {dx} {dy}")
 
                     # apply transforms if any
                     if self.action_data.invert_x:
@@ -341,7 +330,8 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
     def _mouse_wheel_handler(self, delta : int, leftright : bool):
         ''' handles a mouse wheel event '''
         verbose = gremlin.config.Configuration().verbose_mode_remote
-        if verbose: syslog.info("KVM: wheel")
+        if verbose:
+            syslog.info("KVM: wheel")
         gremlin.remote.remote_client.send_kvm_mouse_wheel(delta, leftright, client_list = self.client_list)
 
     def _keyboard_handler(self, event : gremlin.windows_event_hook.KeyEvent):
@@ -351,7 +341,8 @@ class KVMFunctor(gremlin.base_profile.AbstractFunctor):
 
         if self.action_data.keyboard_enabled:
             verbose = gremlin.config.Configuration().verbose_mode_remote
-            if verbose: syslog.info(f"KVM: kbd key:  {key.debug_name} ")
+            if verbose:
+                syslog.info(f"KVM: kbd key:  {key.debug_name} ")
             flags = win32con.KEYEVENTF_EXTENDEDKEY if event.is_extended else 0
             if not event.is_pressed:
                 flags |= win32con.KEYEVENTF_KEYUP
@@ -477,7 +468,7 @@ class KVM(gremlin.base_profile.AbstractAction):
   
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)    
 
         table.addField("Mode", f"{self.mode}")

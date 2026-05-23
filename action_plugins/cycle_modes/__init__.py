@@ -16,11 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtWidgets
 from lxml import etree as ElementTree
 
-from PySide6.QtGui import QIcon
 from PySide6.QtCore import QModelIndex
 
 
@@ -100,7 +98,7 @@ class CycleModeModel(QtCore.QAbstractItemModel):
         return [data[0] for data in self._data.values()]
     
     def index(self, row, column, parent=QModelIndex()):
-        if not row in self._data:
+        if row not in self._data:
             return QModelIndex()
 
         return self.createIndex(row, column, row)
@@ -130,7 +128,6 @@ class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        from gremlin.util import load_icon
 
         self.ec = gremlin.execution_graph.ExecutionContext()
         self.model = CycleModeModel()
@@ -202,7 +199,7 @@ class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
         mode_list = self.action_data.mode_list
         
         for mode in mode_list:
-            if mode is None or not mode in modes:
+            if mode is None or mode not in modes:
                 mode_list.remove(mode)
         self.model.clear()
         for mode in mode_list:
@@ -350,7 +347,7 @@ on a round robin sequence.'''
             if not mode:
                 syslog.error(f"CYCLE MODE: null mode in profile XML -  offending line: {child.sourceline}")
                 continue
-            if not mode in mode_list:
+            if mode not in mode_list:
                 syslog.error(f"CYCLE MODE: mode [{mode}] does not exist in the profile -  offending line: {child.sourceline}")
                 syslog.error(f"\tValid modes: {"".join(f"[{m}] " for m in mode_list)}")
                 continue
@@ -370,7 +367,7 @@ on a round robin sequence.'''
 
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4) 
         
         for index, mode in enumerate(self.mode_list):

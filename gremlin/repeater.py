@@ -171,10 +171,12 @@ class Repeater(QtCore.QObject):
         while self.is_running:
             event = self._events[index]
             if event.event_type == common.InputType.Keyboard:
-                if verbose: syslog.info(f"REPEATER: send keyboard event: {str(event)}")
+                if verbose:
+                    syslog.info(f"REPEATER: send keyboard event: {str(event)}")
                 el.keyboard_event.emit(event)
             else:
-                if verbose: syslog.info(f"REPEATER: send joystick event: {str(event)}")
+                if verbose:
+                    syslog.info(f"REPEATER: send joystick event: {str(event)}")
                 el.joystick_event.emit(event)
 
             self._update_func(f"{common.InputType.to_string(event.event_type).capitalize()} {str(event.identifier)}")
@@ -275,7 +277,6 @@ class PulseWorker():
 
     def _run(self):
         ''' pulse worker '''
-        import gremlin.util
         syslog = logging.getLogger("system")
         # verbose = gremlin.config.Configuration().verbose
         verbose = False
@@ -305,7 +306,8 @@ class PulseWorker():
             #if verbose: syslog.info("Stop pulse")
             if self._off_callback:
                 # fire the pulse off callback (or abort)
-                if verbose: syslog.info("Fire off callback")
+                if verbose:
+                    syslog.info("Fire off callback")
                 if self.data:
                     self._off_callback(self.data)
                 else:
@@ -317,20 +319,24 @@ class PulseWorker():
                 self._keep_running = self._repeat_count > 0
 
             if not self._keep_running or self._repeat_interval < 0:
-                if verbose: syslog.info("End pulse worker")
+                if verbose:
+                    syslog.info("End pulse worker")
                 return
 
             # start the repeat timer
             if self._repeat_interval > 0:
-                if verbose: syslog.info("Start wait")
+                if verbose:
+                    syslog.info("Start wait")
                 time_lapsed = time.time() + self._repeat_interval
                 while self._keep_running and time.time() < time_lapsed:
                     time.sleep(0)
-                if verbose: syslog.info("Stop wait")
+                if verbose:
+                    syslog.info("Stop wait")
 
 
 
-        if verbose: syslog.info("End pulse worker")
+        if verbose:
+            syslog.info("End pulse worker")
 
     @property
     def is_pulse(self) -> bool:

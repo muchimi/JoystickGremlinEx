@@ -52,7 +52,7 @@ class KeyboardOutputMode(Enum): # order is that of the display order for keyboar
     Toggle = 5 # toggles make / break
 
     @staticmethod
-    def to_displayname(value : KeyboardOutputMode):
+    def to_displayname(value : KeyboardOutputMode):  # noqa: F821
         match value:
             case  KeyboardOutputMode.Pulse:
                 return "Pulse Single"
@@ -63,16 +63,6 @@ class KeyboardOutputMode(Enum): # order is that of the display order for keyboar
     
 
     
-class ActivationRule(Enum):
-
-    """Activation rules for collections of conditions.
-
-    All requires all the conditions in a collection to evaluate to True while
-    Any only requires a single condition to be True.
-    """
-
-    All = 1
-    Any = 2
 
 
 
@@ -90,7 +80,7 @@ class AxisNames(Enum):
     DIAL = 8
 
     @staticmethod
-    def to_string(value: AxisNames) -> str:
+    def to_string(value: AxisNames) -> str:  # noqa: F821
         try:
             return _AxisNames_to_string_lookup[value]
         except KeyError:
@@ -98,7 +88,7 @@ class AxisNames(Enum):
             return "X"
 
     @staticmethod
-    def to_enum(value: str) -> AxisNames:
+    def to_enum(value: str) -> AxisNames:  # noqa: F821
         try:
             return _AxisNames_to_enum_lookup[value]
         except KeyError:
@@ -141,7 +131,7 @@ class AxisButtonDirection(Enum):
     Above = 3,
     
     @staticmethod
-    def to_string(value: AxisButtonDirection) -> str:
+    def to_string(value: AxisButtonDirection) -> str:  # noqa: F821
         try:
             return _AxisButtonDirection_to_string_lookup[value]
         except KeyError:
@@ -150,7 +140,7 @@ class AxisButtonDirection(Enum):
             )
 
     @staticmethod
-    def to_enum(value: str) -> AxisButtonDirection:
+    def to_enum(value: str) -> AxisButtonDirection:  # noqa: F821
         try:
             return _AxisButtonDirection_to_enum_lookup[value]
         except KeyError:
@@ -333,7 +323,7 @@ class PluginVariableType(xIntEnum):
     Selection = 8
 
     @staticmethod
-    def to_string(value: PluginVariableType) -> str:
+    def to_string(value: PluginVariableType) -> str:  # noqa: F821
         try:
             v = value.value
             data = next((item for item in PluginVariableType if item.value == v),None)
@@ -344,7 +334,7 @@ class PluginVariableType(xIntEnum):
             )
 
     @staticmethod
-    def to_enum(value: str) -> PluginVariableType:
+    def to_enum(value: str) -> PluginVariableType:  # noqa: F821
         try:
             return _PluginVariableType_to_enum_lookup[value]
         except KeyError:
@@ -387,7 +377,7 @@ class MergeAxisOperation(Enum):
     Sum = 4
 
     @staticmethod
-    def to_string(value: MergeAxisOperation) -> str:
+    def to_string(value: MergeAxisOperation) -> str:  # noqa: F821
         try:
             return _MergeAxisOperation_to_string_lookup[value]
         except KeyError:
@@ -396,7 +386,7 @@ class MergeAxisOperation(Enum):
             )
 
     @staticmethod
-    def to_enum(value: str) -> MergeAxisOperation:
+    def to_enum(value: str) -> MergeAxisOperation:  # noqa: F821
         try:
             return _MergeAxisOperation_to_enum_lookup[value.lower()]
         except KeyError:
@@ -441,7 +431,7 @@ class PropertyType(Enum):
     List = 16
 
     @staticmethod
-    def to_string(value: PropertyType) -> str:
+    def to_string(value: PropertyType) -> str:  # noqa: F821
         try:
             return _PropertyType_to_string_lookup[value]
         except KeyError:
@@ -450,7 +440,7 @@ class PropertyType(Enum):
             )
 
     @staticmethod
-    def to_enum(value: str) -> PropertyType:
+    def to_enum(value: str) -> PropertyType:  # noqa: F821
         try:
             return _PropertyType_to_enum_lookup[value.lower()]
         except KeyError:
@@ -502,7 +492,7 @@ class AxisMode(Enum):
     Relative = 2
 
     @staticmethod
-    def to_string(value: AxisMode) -> str:
+    def to_string(value: AxisMode) -> str:  # noqa: F821
         try:
             return _AxisMode_to_string_lookup[value]
         except KeyError:
@@ -511,7 +501,7 @@ class AxisMode(Enum):
             )
 
     @staticmethod
-    def to_enum(value: str) -> AxisMode:
+    def to_enum(value: str) -> AxisMode:  # noqa: F821
         try:
             return _AxisMode_to_enum_lookup[value.lower()]
         except KeyError:
@@ -544,7 +534,7 @@ class HatDirection(Enum):
     NorthWest = (-1, 1)
 
     @staticmethod
-    def to_string(value: HatDirection) -> str:
+    def to_string(value: HatDirection) -> str:  # noqa: F821
         try:
             return _HatDirection_to_string_lookup[value]
         except KeyError:
@@ -553,7 +543,7 @@ class HatDirection(Enum):
             )
 
     @staticmethod
-    def to_enum(value: Union[str, Tuple[int, int]]) -> HatDirection:
+    def to_enum(value: Union[str, Tuple[int, int]]) -> HatDirection:  # noqa: F821
         try:
             if isinstance(value, HatDirection):
                 return value
@@ -567,11 +557,11 @@ class HatDirection(Enum):
             )
         
     @staticmethod
-    def to_position(value : HatDirection) -> tuple:
+    def to_position(value : HatDirection) -> tuple:  # noqa: F821
         return value.value
         
     @staticmethod
-    def to_display_name(value: HatDirection) -> str:
+    def to_display_name(value: HatDirection) -> str:  # noqa: F821
         return value.name
 
 _HatDirection_to_string_lookup = {
@@ -619,7 +609,7 @@ class LogicalOperator(Enum):
     All = 2
 
     @staticmethod
-    def to_display(instance: LogicalOperator) -> str:
+    def to_display(instance: LogicalOperator) -> str:  # noqa: F821
         lookup = {
             LogicalOperator.Any: "Any",
             LogicalOperator.All: "All"
@@ -632,7 +622,7 @@ class LogicalOperator(Enum):
         return value
 
     @staticmethod
-    def to_string(instance: LogicalOperator) -> str:
+    def to_string(instance: LogicalOperator) -> str:  # noqa: F821
         lookup = {
             LogicalOperator.Any: "any",
             LogicalOperator.All: "all"
@@ -645,7 +635,7 @@ class LogicalOperator(Enum):
         return value
 
     @staticmethod
-    def to_enum(string: str) -> LogicalOperator:
+    def to_enum(string: str) -> LogicalOperator:  # noqa: F821
         lookup = {
             "any": LogicalOperator.Any,
             "all": LogicalOperator.All
@@ -667,7 +657,7 @@ class ConditionType(Enum):
     CurrentInput = 3
 
     @staticmethod
-    def to_display(instance: ConditionType) -> str:
+    def to_display(instance: ConditionType) -> str:  # noqa: F821
         lookup = {
             ConditionType.Joystick: "Joystick",
             ConditionType.Keyboard: "Keyboard",
@@ -681,7 +671,7 @@ class ConditionType(Enum):
         return value
 
     @staticmethod
-    def to_string(instance: ConditionType) -> str:
+    def to_string(instance: ConditionType) -> str:  # noqa: F821
         lookup = {
             ConditionType.Joystick: "joystick",
             ConditionType.Keyboard: "keyboard",
@@ -695,7 +685,7 @@ class ConditionType(Enum):
         return value
 
     @staticmethod
-    def to_enum(string: str) -> ConditionType:
+    def to_enum(string: str) -> ConditionType:  # noqa: F821
         lookup = {
             "joystick": ConditionType.Joystick,
             "keyboard": ConditionType.Keyboard,

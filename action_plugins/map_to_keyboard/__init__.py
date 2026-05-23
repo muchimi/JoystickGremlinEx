@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtGui, QtCore
@@ -24,11 +23,10 @@ import gremlin.base_profile
 
 from gremlin.input_types import InputType
 from gremlin.input_devices import CallbackActions
-import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.input_item
 import gremlin.keyboard
-from gremlin.profile import safe_format, safe_read
+from gremlin.profile import safe_format
 import gremlin.util
 from shiboken6 import Shiboken
 import html
@@ -252,7 +250,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
     
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)    
         names = []
         text = ""

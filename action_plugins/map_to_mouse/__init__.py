@@ -18,7 +18,6 @@
 
 import logging
 import math
-import os
 from lxml import etree as ElementTree
 
 from PySide6 import QtCore, QtWidgets, QtGui
@@ -32,9 +31,6 @@ import gremlin.util
 import gremlin.ui.ui_common
 import gremlin.input_item
 import gremlin.sendinput
-from gremlin import input_devices
-import psygnal
-from psygnal import Signal
 from shiboken6 import Shiboken
 import gremlin.remote
 
@@ -582,7 +578,7 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
   
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)    
 
         if self.motion_input:

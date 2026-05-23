@@ -2,12 +2,10 @@
 Adapted from ViGEm source
 """
 
-import platform
-from pathlib import Path
 import ctypes
-from ctypes import CDLL, POINTER, CFUNCTYPE, c_void_p, c_uint, c_ushort, c_ulong, c_bool, c_ubyte
+from ctypes import c_void_p, c_uint, c_ushort, c_ulong, c_bool
 
-from .vigem_commons import XUSB_REPORT, DS4_REPORT, DS4_REPORT_EX, VIGEM_TARGET_TYPE
+from .vigem_commons import XUSB_REPORT, DS4_REPORT, VIGEM_TARGET_TYPE
 import os
 import logging
 import gremlin.util 

@@ -17,10 +17,8 @@
 #
 # this code is build on Gremlin work by Lionel Ott
 
-import copy
 import logging
 import threading
-import time
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore
@@ -29,10 +27,9 @@ import gremlin
 import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget
 
-from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
-import gremlin.util
+from gremlin.util import safe_format, safe_read
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
 import gremlin.base_profile
@@ -209,35 +206,30 @@ class ButtonContainerWidget(AbstractContainerWidget):
         :param action_name the name of the action to add
         """
 
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            if self.profile_data.action_sets[index] is None:
-                self.profile_data.action_sets[index] = []
-            self.profile_data.action_sets[index].append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-            self._update_actions()
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        if self.profile_data.action_sets[index] is None:
+            self.profile_data.action_sets[index] = []
+        self.profile_data.action_sets[index].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+        self._update_actions()
+    
 
     def _paste_action(self, index, action):
         ''' paste action'''
 
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.profile_data)
-            if self.profile_data.action_sets[index] is None:
-                self.profile_data.action_sets[index] = []
-            self.profile_data.action_sets[index].append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-            self._update_actions()
-        finally:
-            gremlin.util.popCursor()
-
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.profile_data)
+        if self.profile_data.action_sets[index] is None:
+            self.profile_data.action_sets[index] = []
+        self.profile_data.action_sets[index].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        self._update_actions()
+    
 
 
     def _handle_interaction(self, widget, action):
@@ -291,7 +283,8 @@ class ButtonContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
         if is_pressed:
             # button press
-            if self.verbose: syslog.info("BUTTON CONTAINER: trigger [press]")
+            if self.verbose:
+                syslog.info("BUTTON CONTAINER: trigger [press]")
             self._trigger(0, event, value, extra_data)
             if self.autorelease:
                 # setup autorelease trigger
@@ -307,7 +300,8 @@ class ButtonContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         else:
             # button release
             event.is_pressed = True
-            if self.verbose: syslog.info("BUTTON CONTAINER: trigger [release]")
+            if self.verbose:
+                syslog.info("BUTTON CONTAINER: trigger [release]")
             self._trigger(1, event, value, extra_data)
             if self.autorelease:
                 # setup autorelease trigger

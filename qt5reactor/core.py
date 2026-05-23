@@ -142,7 +142,11 @@ found = False
 try:
     # try PySide6
     from PySide6.QtCore import (
-        QCoreApplication, QEventLoop, QObject, QSocketNotifier, QTimer,
+        QCoreApplication,
+        QEventLoop,
+        QObject,
+        QSocketNotifier,
+        QTimer,
     )
 except ImportError as e:
     failures["PySide6"] = e
@@ -151,7 +155,9 @@ else:
 
 if not found:
     raise ImportError(
-        "No supported Qt wrapper found.\n{}".format("\n".join("{}: {}".format(k, v) for k, v in failures.items()))
+        "No supported Qt wrapper found.\n{}".format(
+            "\n".join("{}: {}".format(k, v) for k, v in failures.items())
+        )
     )
 
 from twisted.internet.error import ReactorAlreadyInstalledError
@@ -202,7 +208,7 @@ class TwistedSocketNotifier(QObject):
             try:
                 why = w.doRead()
                 inRead = True
-            except:
+            except Exception:
                 inRead = False
                 log.err()
                 why = sys.exc_info()[1]
@@ -225,7 +231,7 @@ class TwistedSocketNotifier(QObject):
             self.notifier.setEnabled(False)
             try:
                 why = w.doWrite()
-            except:
+            except Exception:
                 log.err()
                 why = sys.exc_info()[1]
             if why:
@@ -361,7 +367,7 @@ class QtReactor(posixbase.PosixReactorBase):
             self.stop()
             self.runUntilCurrent()
 
-            
+
 class QtEventReactor(QtReactor):
     def __init__(self, *args, **kwargs):
         self._events = {}
@@ -381,7 +387,9 @@ class QtEventReactor(QtReactor):
         if len(handles) > 0:
             val = None
             while val != WAIT_TIMEOUT:
-                val = MsgWaitForMultipleObjects(handles, 0, 0, QS_ALLINPUT | QS_ALLEVENTS)
+                val = MsgWaitForMultipleObjects(
+                    handles, 0, 0, QS_ALLINPUT | QS_ALLEVENTS
+                )
                 if val >= WAIT_OBJECT_0 and val < WAIT_OBJECT_0 + len(handles):
                     event_id = handles[val - WAIT_OBJECT_0]
                     if event_id in self._events:
@@ -390,17 +398,17 @@ class QtEventReactor(QtReactor):
                 elif val == WAIT_TIMEOUT:
                     pass
                 else:
-                    #print 'Got an unexpected return of %r' % val
+                    # print 'Got an unexpected return of %r' % val
                     return
 
     def _runAction(self, action, fd):
         try:
             closed = getattr(fd, action)()
-        except:
+        except Exception:
             closed = sys.exc_info()[1]
             log.deferr()
         if closed:
-            self._disconnectSelectable(fd, closed, action == 'doRead')
+            self._disconnectSelectable(fd, closed, action == "doRead")
 
     def iterate(self, delay=None, fromqt=False):
         """See twisted.internet.interfaces.IReactorCore.iterate."""
@@ -412,6 +420,7 @@ class QtEventReactor(QtReactor):
 def posixinstall():
     """Install the Qt reactor."""
     from twisted.internet.main import installReactor
+
     p = QtReactor()
     installReactor(p)
 
@@ -437,7 +446,7 @@ def win32install():
     #   3)  raise another exception if the assumptions about twisted's
     #       installReactor don't hold true
 
-    if 'twisted.internet.reactor' not in sys.modules:
+    if "twisted.internet.reactor" not in sys.modules:
         p = QtEventReactor()
         installReactor(p)
     else:
@@ -446,16 +455,17 @@ def win32install():
         except ReactorAlreadyInstalledError:
             raise
         except Exception as e:
-            raise Qt5ReactorError('Unexpected error while installing') from e
+            raise Qt5ReactorError("Unexpected error while installing") from e
         else:
             raise Qt5ReactorError(
-                'Exception expected but not raised while installing',
+                "Exception expected but not raised while installing",
             )
 
 
-if runtime.platform.getType() == 'win32':
-    from win32event import CreateEvent, MsgWaitForMultipleObjects
+if runtime.platform.getType() == "win32":
+    from win32event import MsgWaitForMultipleObjects
     from win32event import WAIT_OBJECT_0, WAIT_TIMEOUT, QS_ALLINPUT, QS_ALLEVENTS
+
     install = win32install
 else:
     install = posixinstall

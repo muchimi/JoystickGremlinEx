@@ -17,14 +17,12 @@
 
 import logging
 
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtWidgets
 
-import psygnal
 from psygnal import Signal
-from gremlin.common import PluginVariableType
+from gremlin.types import PluginVariableType
 import gremlin.config
 import gremlin.shared_state
-from gremlin.util import load_icon
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.user_plugin
@@ -33,7 +31,6 @@ from gremlin.ui.ui_common import QBoxFrame
 import os
 from shiboken6 import Shiboken
 
-import gremlin.util
 
 syslog = logging.getLogger("system")
 
@@ -76,7 +73,7 @@ class ModuleManagementController(QtCore.QObject):
                 module.file_name = fname
 
                 # Create new data instance
-                instance = self._create_module_instance("Default", module)
+                _instance = self._create_module_instance("Default", module)
 
                 self.profile_data.plugins.append(module)
 
@@ -127,7 +124,6 @@ class ModuleManagementController(QtCore.QObject):
     def copy_instance(self, instance, widget):
         ''' copy to a new instance '''
         import re
-        gremlin.util.pushCursor()
         module_data = instance.parent
         new_instance =  gremlin.base_profile.PluginInstance(module_data)
         
@@ -173,8 +169,6 @@ class ModuleManagementController(QtCore.QObject):
 
         module_widget.add_instance(new_instance_widget)
         self._connect_instance_signals(new_instance, new_instance_widget)
-        gremlin.util.popCursor()
-
 
     def configure_instance(self, instance, widget):
         # Get data from the custom module itself
@@ -412,7 +406,6 @@ This is due to the way dynamic module loading and packaging works in Python.
     def _handle_add_module(self):
         """Asks the user to select the path to the module to add."""
         import gremlin.config
-        import gremlin.util
         config = gremlin.config.Configuration()
         dir = config.last_plugin_folder
         if dir is None or not os.path.isdir(dir):
@@ -491,7 +484,7 @@ class ModuleWidget(QBoxFrame):
         header_layout.addWidget(QtWidgets.QLabel(module_name))
         header_layout.addStretch()
 
-        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        _prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
         if self.has_variables:
             icon = gremlin.ui.ui_common.Icons.addIcon()

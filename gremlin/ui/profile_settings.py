@@ -23,7 +23,6 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.util
-import psygnal
 from psygnal import Signal
 from gremlin.ui.qdatawidget import QDataWidget
 from shiboken6 import Shiboken
@@ -135,7 +134,7 @@ class ProfileSettingsWidget(QDataWidget):
         vjoy_as_input_widget.changed.connect(self.vjoy_as_input_changed)
 
         # vJoy axis initialization value setup
-        widget = QtWidgets.QGroupBox(f"Profile Start Initial Values")
+        widget = QtWidgets.QGroupBox("Profile Start Initial Values")
         box_layout = QtWidgets.QHBoxLayout()
         widget.setLayout(box_layout)
 
@@ -615,7 +614,7 @@ class VJoyAxisDefaultsWidget(QtWidgets.QWidget):
             if Shiboken.isValid(self._grid_widgets[id]):
                 with QtCore.QSignalBlocker(self._grid_widgets[id]):
                     value = self.getValue(id)
-                    if not value is None:
+                    if value is not None:
                         self._grid_widgets[id].setValue(value)
             if Shiboken.isValid(self._grid_enabled[id]):
                 with QtCore.QSignalBlocker(self._grid_enabled[id]):

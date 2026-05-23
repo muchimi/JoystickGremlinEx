@@ -1,8 +1,6 @@
 
 
 from abc import abstractmethod, ABCMeta
-import enum
-import logging
 from lxml import etree as ElementTree
 from gremlin.input_types import InputType
 

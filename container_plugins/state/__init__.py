@@ -22,13 +22,13 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 import gremlin.types
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget
 import gremlin.base_profile
 
 from shiboken6 import Shiboken
-from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
+from gremlin.util import safe_format, safe_read
 import logging
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtWidgets
 import gremlin.ui.state_device
 
 syslog = logging.getLogger("system")
@@ -56,7 +56,8 @@ class StateContainerWidget(AbstractContainerWidget):
             return
 
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-        if verbose_ui: syslog.info("StateContainerWidget: create action UI start")
+        if verbose_ui:
+            syslog.info("StateContainerWidget: create action UI start")
         
 
         self.state_selector_widget = gremlin.ui.ui_common.QDataComboBox()
@@ -133,7 +134,8 @@ class StateContainerWidget(AbstractContainerWidget):
 
         gremlin.ui.ui_common.synchronize_grids([w1, w2, w3]) 
 
-        if verbose_ui: syslog.info("StateContainerWidget: create action UI completed")
+        if verbose_ui:
+            syslog.info("StateContainerWidget: create action UI completed")
 
 
     def _handle_execute_changed(self, widget, checked : bool):
@@ -201,40 +203,32 @@ class StateContainerWidget(AbstractContainerWidget):
         if action_data is None:
             return
         
-        gremlin.util.pushCursor()
+        if isinstance(action_data, str):
+            action_name = action_data
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        elif isinstance(action_data, Clipboard):
+            # paste operation
+            if action_data.is_action:
+                # verify the action in the clipboard is appropriate for this input
 
-        try:
+                action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
 
-            if isinstance(action_data, str):
-                action_name = action_data
-                plugin_manager = gremlin.plugin_manager.ActionPlugins()
-                action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            elif isinstance(action_data, Clipboard):
-                # paste operation
-                if action_data.is_action:
-                    # verify the action in the clipboard is appropriate for this input
-
-                    action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
-
-            self.profile_data.add_action(action_item)
-            # blows up in QT 6.11
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        self.profile_data.add_action(action_item)
+        # blows up in QT 6.11
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+        
 
     def _paste_action(self, action, container):
         ''' paste action'''
 
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.profile_data)
-            self.profile_data.add_action(action_item)
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.profile_data)
+        self.profile_data.add_action(action_item)
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+        
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -282,23 +276,27 @@ class StateContainerFunctor(gremlin.base_profile.AbstractFunctor):
         key = self.action_data.state
         if not key:
             # state not provided = succeed
-            if self.verbose: syslog.info("STATE CONTAINER: no state provided: SUCCESS")
+            if self.verbose:
+                syslog.info("STATE CONTAINER: no state provided: SUCCESS")
             return True
         
         state = self.sd.getState(key)
         if state is None:
             # state does not exist = FAIL
-            if self.verbose: syslog.info(f"STATE CONTAINER: state [{key}] does not exist: FAIL")
+            if self.verbose:
+                syslog.info(f"STATE CONTAINER: state [{key}] does not exist: FAIL")
             return False
         
         required_value = self.action_data.required_value
         if required_value is None:
-            if self.verbose: syslog.info("STATE CONTAINER: required value ANY:  SUCCESS")
+            if self.verbose:
+                syslog.info("STATE CONTAINER: required value ANY:  SUCCESS")
             return True
         
         state_value = state.value
         result = state_value == required_value
-        if self.verbose: syslog.info(f"STATE CONTAINER: required value [{required_value}] state [{key}] value [{state_value}]: {'SUCCESS' if result else 'FAIL'}")
+        if self.verbose:
+            syslog.info(f"STATE CONTAINER: required value [{required_value}] state [{key}] value [{state_value}]: {'SUCCESS' if result else 'FAIL'}")
         return result
         
 

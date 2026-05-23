@@ -20,12 +20,12 @@ from collections.abc import MutableSequence
 from abc import abstractmethod, ABCMeta
 from PySide6 import QtCore
 from typing import Callable
+from gremlin.input_types import InputType
 
 from psygnal import Signal
 import logging
 import uuid
 import dinput
-from gremlin.types import SendType, ActivationRule
 from gremlin.util import TriggerDict
 import _collections_abc
 
@@ -81,7 +81,7 @@ class TraceableList(MutableSequence):
     def add_callback(self, callback : Callable):
         ''' adds a callback - signature (action: str, index: int, value [optional object])'''
         assert callable(callback), "Callback must be a callable method"
-        if not callback in self._callbacks:
+        if callback not in self._callbacks:
             self._callbacks.append(callback)
 
     def remove_callback(self, callback : Callable):
@@ -350,10 +350,6 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         ''' gets the description for this input if any '''
         return self._input_description
 
-    @property
-    def input_type(self) -> InputType:
-        ''' gets the type for this input '''
-        return self._input_type
 
     def setInputType(self, value : InputType):
         ''' force a different input type '''
@@ -559,7 +555,6 @@ class PickleTarget():
 
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
-import gremlin.event_handler
 
 
 class BaseCallbacks(QtCore.QObject):
@@ -570,7 +565,7 @@ class BaseCallbacks(QtCore.QObject):
         self._callbacks = []
 
     def registerCallback(self, callback):
-        if not callback in self._callbacks:
+        if callback not in self._callbacks:
             self._callbacks.append(callback)
 
     def unregisterCallback(self, callback):
@@ -1025,7 +1020,7 @@ class AbstractCallbackModel(AbstractModel):
             if not isinstance(item, self._allowed_types):
                 raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
         assert isinstance(item, _collections_abc.Hashable),"item must be hashable"
-        if not item in self._index_map:
+        if item not in self._index_map:
             self.markDirty()
             index = len(self._item_map)
             self._item_map[item] = index
@@ -1214,12 +1209,13 @@ class AbstractCallbackModel(AbstractModel):
         for item in self._index_map.values():
             include = self._filtered_callback(item)
             if include:
-                if verbose: syslog.info(f"\t{item.display_name} -> ON")
+                if verbose:
+                    syslog.info(f"\t{item.display_name} -> ON")
                 new_index_map[new_index] = item
                 new_item_map[item] = new_index
                 new_index +=1
         if verbose and new_index == 0:
-            syslog.info(f"\tall inputs are filtered for this device")
+            syslog.info("\tall inputs are filtered for this device")
 
 
         is_filtered = self._compare_maps(self._index_map, new_index_map)
@@ -1306,7 +1302,7 @@ class AbstractCallbackModel(AbstractModel):
             invalid = (i for i in indices if i < 0 or i >= count)
             if invalid:
                 # invalid list
-                syslog.warning(f"ModelSort: sorted data has incorrect indices, indices are missing")
+                syslog.warning("ModelSort: sorted data has incorrect indices, indices are missing")
                 return 
         # valid
         for item, index in zip(items, indices):
@@ -1314,13 +1310,7 @@ class AbstractCallbackModel(AbstractModel):
             self._filtered_item_map[item] = index
         if emit:
             self._fireChanged()
-            
-
-            
-        
-
-
-
+  
     def setFilteredEnabled(self, value : bool, emit = True):
         ''' enables or disables the filter - has no effect is no filtering is setup '''
         if self._filtered_callback and self._filtered_enabled != value:
@@ -1428,7 +1418,7 @@ class AbstractCallbackModel(AbstractModel):
         ''' adds a callback to be called when the model data changes '''
         if __debug__ and callback is not None and not callable(callback):
             raise TypeError("Callback must be callable")
-        if not callback in self._data_changed_callbacks:
+        if callback not in self._data_changed_callbacks:
             self._data_changed_callbacks.append(callback)
 
     def removeCallback(self, callback : Callable):
@@ -1481,7 +1471,8 @@ class AbstractCallbackModel(AbstractModel):
         if new_hash != self._old_hash or force or self._change_pending:
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_ui
-            if verbose: syslog.info(f"MODEL CHANGE TRIGGER: {self.debug_name} ")
+            if verbose:
+                syslog.info(f"MODEL CHANGE TRIGGER: {self.debug_name} ")
                 
             self._old_hash = new_hash
 

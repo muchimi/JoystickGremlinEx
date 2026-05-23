@@ -26,9 +26,9 @@ from PySide6 import QtWidgets, QtCore
 
 import gremlin
 import gremlin.ui.ui_common
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget
 from gremlin.input_types import InputType
-from gremlin.util import safe_read, safe_format
+from gremlin.util import safe_format
 import gremlin.execution_graph
 import gremlin.base_profile
 from shiboken6 import Shiboken
@@ -39,13 +39,14 @@ class TempoContainerWidget(AbstractContainerWidget):
 
     """Container with two actions, triggered based on activation duration."""
 
-    def __init__(self, profile_data : TempoContainer, parent=None):
+    def __init__(self, container : TempoContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(profile_data, parent)
+        self.container : TempoContainer = container
+        super().__init__(container, parent)
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -185,33 +186,29 @@ class TempoContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            if self.profile_data.action_sets[index] is None:
-                self.profile_data.action_sets[index] = []
-            self.profile_data.action_sets[index].append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        if self.profile_data.action_sets[index] is None:
+            self.profile_data.action_sets[index] = []
+        self.profile_data.action_sets[index].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+        
 
     def _paste_action(self, index, action):
         """paste action into the container """
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.profile_data)
-            if self.profile_data.action_sets[index] is None:
-                self.profile_data.action_sets[index] = []
-            self.profile_data.action_sets[index].append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.profile_data)
+        if self.profile_data.action_sets[index] is None:
+            self.profile_data.action_sets[index] = []
+        self.profile_data.action_sets[index].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+        
         
 
     @QtCore.Slot()
@@ -271,7 +268,8 @@ class TempoContainerWidget(AbstractContainerWidget):
 
 class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
-    def __init__(self, container : TempoContainer, parent = None):
+    def __init__(self, container : TempoContainer, parent = None):  # noqa: F821
+        self.container : TempoContainer = container
         super().__init__(container, parent)
 
 

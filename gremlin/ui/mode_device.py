@@ -18,34 +18,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # from __future__ import annotations # deprecated with python 3.14+
-import logging
 
-from PySide6 import QtWidgets, QtCore, QtGui
-import threading
+from PySide6 import QtWidgets
 import gremlin.config
 import gremlin.event_handler
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.shared_state
-from gremlin.keyboard import Key
 import gremlin.ui.joystick_device
-import uuid
-from gremlin.singleton_decorator import SingletonDecorator
-import collections
-import logging
-import re
-import time
-from typing import Any, Iterator, List, Union
-import gremlin.input_item
-import os
 import gremlin.input_item
 from gremlin.util import *
-from lxml import etree as ElementTree
 import enum
 import gremlin.util
 import gremlin.base_profile
-import psygnal
-from psygnal import Signal
 
 
 
@@ -276,9 +261,9 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             case ModeInputModeType.ModeExit:
                 return f"Mode [{current_mode}] Deactivate"
             case ModeInputModeType.ModeGlobalEnter:
-                return f"Mode Activate (any)"
+                return "Mode Activate (any)"
             case ModeInputModeType.ModeGlobalExit:
-                return f"Mode Deactivate (any)"
+                return "Mode Deactivate (any)"
             case ModeInputModeType.ModeProfileLoad:
                 return "Profile load"
             case ModeInputModeType.ModeProfileStart:
@@ -313,7 +298,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         registry = gremlin.base_profile.ProfileRegistry()
 
 
-        if not ModeInputModeType.ModeEnter in config[InputType.ModeControl]:
+        if ModeInputModeType.ModeEnter not in config[InputType.ModeControl]:
             modeEnter = registry.getInputItem(
                 device_guid = gremlin.shared_state.mode_tab_guid,
                 device_type = DeviceType.ModeControl,
@@ -336,7 +321,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             modeEnter = config[InputType.ModeControl][ModeInputModeType.ModeEnter]
 
 
-        if not ModeInputModeType.ModeExit in config[InputType.ModeControl]:
+        if ModeInputModeType.ModeExit not in config[InputType.ModeControl]:
             modeExit = registry.getInputItem(
                 device_guid = gremlin.shared_state.mode_tab_guid,
                 device_type = DeviceType.ModeControl,
@@ -357,7 +342,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         else:
             modeExit = config[InputType.ModeControl][ModeInputModeType.ModeExit]
 
-        if not ModeInputModeType.ModeProfileStart in master_config[InputType.ModeControl]:
+        if ModeInputModeType.ModeProfileStart not in master_config[InputType.ModeControl]:
             modeProfileStart = registry.getInputItem(
                 device_guid = gremlin.shared_state.mode_tab_guid,
                 device_type = DeviceType.ModeControl,
@@ -382,7 +367,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         else:
             modeProfileStart = master_config[InputType.ModeControl][ModeInputModeType.ModeProfileStart]
 
-        if not ModeInputModeType.ModeProfileStop in master_config[InputType.ModeControl]:
+        if ModeInputModeType.ModeProfileStop not in master_config[InputType.ModeControl]:
             modeProfileStop = registry.getInputItem(
                 device_guid = gremlin.shared_state.mode_tab_guid,
                 device_type = DeviceType.ModeControl,
@@ -412,7 +397,6 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def refreshInputItems(self):
         ''' refreshes input list'''
-        import gremlin.input_item as input_item
         # syslog.info(f"refresh: mode {self.current_mode}")
         self.inputItemListModel.refresh()
 

@@ -19,7 +19,6 @@
 import os
 from PySide6 import QtWidgets, QtCore, QtGui
 from lxml import etree as ElementTree
-import threading
 
 import gremlin.base_profile
 import gremlin.config
@@ -31,12 +30,9 @@ import gremlin.gated_handler
 import gremlin.shared_state
 import logging
 from shiboken6 import Shiboken
-from gremlin.gated_handler import GateInfo, RangeInfo, DisplayMode, GateData, GateEventHandler, GateInfoWidget, RangeInfoWidget, GateConditionType,TriggerData, TriggerMode, GateRangeOutputMode
-import gremlin.ui.qsliderwidget
+from gremlin.gated_handler import GateInfo, RangeInfo, DisplayMode, GateData, GateEventHandler, GateInfoWidget, RangeInfoWidget, TriggerMode
 import gremlin.ui.ui_common
 import gremlin.util
-import psygnal
-from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -126,7 +122,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self.verbose_ui = config.verbose_mode_ui
         self.verbose_extra = config.verbose_mode_extra
 
-        if self.verbose_ui: syslog.info(f"GATE Widget: init : {object_name}")
+        if self.verbose_ui:
+            syslog.info(f"GATE Widget: init : {object_name}")
 
 
         self.valid = True
@@ -527,7 +524,8 @@ making changes that impact the order of gates or ranges."""
             return
         if not self._deleted:
             verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-            if verbose_ui: syslog.info(f"GATE Widget: {self.objectName()} cleanup")
+            if verbose_ui:
+                syslog.info(f"GATE Widget: {self.objectName()} cleanup")
             self.unhook()
             self._gate_data.unhook()
             gremlin.util.clear_layout(self.main_layout)
@@ -543,7 +541,8 @@ making changes that impact the order of gates or ranges."""
             
         
         verbose = gremlin.config.Configuration().verbose
-        if verbose: syslog.info("GATE: state saved")
+        if verbose:
+            syslog.info("GATE: state saved")
         node = ElementTree.Element("gate-state")
         node.set("mode",self._gate_data.profile_mode)
 
@@ -555,7 +554,8 @@ making changes that impact the order of gates or ranges."""
         ''' restores the data from the stack '''
         if self._stack:
             verbose = gremlin.config.Configuration().verbose
-            if verbose: syslog.info("GATE: state restore")
+            if verbose:
+                syslog.info("GATE: state restore")
             node = self._stack.pop()
             profile_mode = node.get("mode")
             gate_node = node[0]
@@ -755,7 +755,8 @@ making changes that impact the order of gates or ranges."""
         config = gremlin.config.Configuration()
         verbose_extra = config.verbose_mode_gate and config.verbose_mode_extra
 
-        if verbose_extra: syslog.info("Gate table:")
+        if verbose_extra:
+            syslog.info("Gate table:")
         for index, gate in enumerate(gate_list):
             # create a widget for this gate
             assert isinstance(gate,GateInfo)
@@ -837,11 +838,13 @@ making changes that impact the order of gates or ranges."""
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_gate
         verbose_extra = verbose and config.verbose_mode_extra
-        if verbose_extra: syslog.info(f"Reload range: found {len(range_list)} used ranges")
+        if verbose_extra:
+            syslog.info(f"Reload range: found {len(range_list)} used ranges")
     
         index = 0
         decimals = self._gate_data.decimals
-        if verbose_extra: syslog.info("Range table:")
+        if verbose_extra:
+            syslog.info("Range table:")
         for index, rng in enumerate(range_list):
             
             widget = RangeInfoWidget(index + 1, 
@@ -856,7 +859,8 @@ making changes that impact the order of gates or ranges."""
             # track the widget so we can find it
             self._rwi_map[rng] = widget # (row, col)
             
-            if verbose_extra: syslog.info(f"\tRange: {rng.to_display()}")
+            if verbose_extra:
+                syslog.info(f"\tRange: {rng.to_display()}")
             
 
         self._update_range_display()
@@ -1073,7 +1077,8 @@ making changes that impact the order of gates or ranges."""
                 self._slider_widget.setValue(values)
                 self._update_gate_tooltips()
 
-            if self.verbose_ui: syslog.info(f"GATE Widget: update slider completed")
+            if self.verbose_ui:
+                syslog.info("GATE Widget: update slider completed")
         finally:
             #self.lock.release()
             self._lock = False
@@ -1152,9 +1157,9 @@ making changes that impact the order of gates or ranges."""
             self.configure_range_requested.emit(rng)
         else:
             gremlin.shared_state.push_suspend_highlighting()
-            gremlin.util.pushCursor()
+            
             dialog = gremlin.gated_handler.GateConditionEditorDialog(gate_data = self._gate_data, info_object = rng, action_data = self.action_data, input_type = InputType.JoystickAxis)
-            gremlin.util.popCursor()
+            
             dialog.exec()
             gh = GateEventHandler()
             gh.range_configuration_changed.emit(rng)
@@ -1263,9 +1268,9 @@ making changes that impact the order of gates or ranges."""
         ''' called on double click on slider '''
         gate = self._gate_data.getGateSliderIndex(handle_index)
 
-        gremlin.util.pushCursor()        
+          
         dialog = gremlin.gated_handler.GateConditionEditorDialog(gate_data = gate.parent, info_object = gate, action_data = self.action_data, input_type=InputType.JoystickButton)
-        gremlin.util.popCursor()
+        
         dialog.exec()
         
     
@@ -1297,7 +1302,8 @@ making changes that impact the order of gates or ranges."""
             return
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
         if self._deleted:
-            if verbose_ui: syslog.info(f"GATE Widget: update slider marker : {self.objectName()} ignored - object marked deleted ")
+            if verbose_ui:
+                syslog.info(f"GATE Widget: update slider marker : {self.objectName()} ignored - object marked deleted ")
             return
         
         if self._lock:
@@ -1309,14 +1315,16 @@ making changes that impact the order of gates or ranges."""
             self._axis_value = value
             if Shiboken.isValid(self._slider_widget):
                 verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-                if verbose_ui: syslog.info(f"GATE Widget: update slider marker : {self.objectName()} value: {value:0.3f}")
+                if verbose_ui:
+                    syslog.info(f"GATE Widget: update slider marker : {self.objectName()} value: {value:0.3f}")
                 gremlin.util.assert_ui_thread()
 
                 with QtCore.QSignalBlocker(self._slider_widget):
                     self._slider_widget.setMarkerValue(value)
                     
 
-                if verbose_ui: syslog.info(f"GATE Widget: update slider marker completed")
+                if verbose_ui:
+                    syslog.info("GATE Widget: update slider marker completed")
         finally:
             self._lock = False
 
@@ -1326,7 +1334,7 @@ making changes that impact the order of gates or ranges."""
         row = 0
         col = 0
         for _, trigger in enumerate(TriggerMode):
-            if not trigger in self._gate_data.filter_map.keys():
+            if trigger not in self._gate_data.filter_map.keys():
                 self._gate_data.filter_map[trigger] = True
             widget = gremlin.ui.ui_common.QDataCheckbox(
                 label = TriggerMode.to_display_name(trigger),
@@ -1479,7 +1487,7 @@ making changes that impact the order of gates or ranges."""
         gate = self._gate_data.addGate(value, update = False)
         if not gate:
             # ran too many gates
-            gremlin.ui.ui_common.MessageBox(prompt =f"Unable to add gate.  Check the log.")
+            gremlin.ui.ui_common.MessageBox(prompt ="Unable to add gate.  Check the log.")
             return
         
         self._pushState() # for undo
@@ -1571,7 +1579,8 @@ making changes that impact the order of gates or ranges."""
         #self._gate_data.gates = value
         if not Shiboken.isValid(self):
             return
-        if save_state: self._pushState()
+        if save_state:
+            self._pushState()
         self._gate_data.normalize_steps(True)
         self._update_values_cb(self._gate_data, save_state)
 
@@ -1582,7 +1591,8 @@ making changes that impact the order of gates or ranges."""
         #self._gate_data.gates = value
         if not Shiboken.isValid(self):
             return
-        if save_state: self._pushState()
+        if save_state:
+            self._pushState()
         self._gate_data.normalize_steps(False)
         self._update_values_cb(self._gate_data, save_state)
 
@@ -1604,7 +1614,8 @@ making changes that impact the order of gates or ranges."""
         if self._gate_data == gate_data:
             values = self._gate_data.getGateValues()
             if values != self._slider_widget.value():
-                if save_state: self._pushState() 
+                if save_state:
+                    self._pushState()
                 with QtCore.QSignalBlocker(self._slider_widget):
                     self._update_slider(values)
                     
@@ -1631,7 +1642,7 @@ making changes that impact the order of gates or ranges."""
         for index, gate in enumerate(gates):
             gate.isError = False # assume no error
             value = f"{gate.value:0.4f}"
-            if not value in conflicts_map:
+            if value not in conflicts_map:
                 conflicts_map[value] = []
             conflicts_map[value].append(gate)
 
@@ -1904,7 +1915,8 @@ the input is in a specific range of values, or crosses gates.
 
 
         verbose = gremlin.config.Configuration().verbose_mode_gate
-        if verbose: syslog.info(f"GATE ACTION: loading [{self.id}]")
+        if verbose:
+            syslog.info(f"GATE ACTION: loading [{self.id}]")
 
         gremlin.util.singleShot(self.gate_data.hook)
 
@@ -1916,7 +1928,8 @@ the input is in a specific range of values, or crosses gates.
     def _cleanup_ui(self):
         ''' clean ourselves up '''
         verbose = gremlin.config.Configuration().verbose_mode_gate
-        if verbose: syslog.info(f"GATE ACTION: cleanup: [{self.id}]")
+        if verbose:
+            syslog.info(f"GATE ACTION: cleanup: [{self.id}]")
         if self.gates:
             self.gates.clear()
         if self.gate_data:
@@ -1935,9 +1948,9 @@ the input is in a specific range of values, or crosses gates.
         import gremlin.util
 
         if extra_data and "paste" in extra_data:
-            paste_mode = extra_data["paste"]
+            _paste_mode = extra_data["paste"]
         else:
-            paste_mode = False
+            _paste_mode = False
         
         gates = []
         gate_node = gremlin.util.get_xml_child(node,"gates")
@@ -1945,7 +1958,7 @@ the input is in a specific range of values, or crosses gates.
         input_item = self.get_input_item()
         profile_mode = input_item.profile_mode
 
-        if not gate_node is None:
+        if gate_node is not None:
             for child in gate_node:
                 gate_data = gremlin.gated_handler.GateData(profile_mode, action_data = self)
                 gate_data.from_xml(child, data, extra_data)
@@ -1979,8 +1992,7 @@ the input is in a specific range of values, or crosses gates.
     
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
-        import html
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)    
         gate_count = len(self.gate_data.getUsedGates())
         range_count = len(self.gate_data.getRanges())

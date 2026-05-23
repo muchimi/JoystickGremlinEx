@@ -5,7 +5,6 @@
 # from __future__ import annotations # deprecated with python 3.14+
 import logging
 import math
-import os
 from lxml import etree as ElementTree
 
 from PySide6 import QtCore, QtWidgets
@@ -18,20 +17,15 @@ from gremlin.util import rad2deg
 import gremlin.ui.ui_common
 import gremlin.input_item
 import gremlin.sendinput
-from gremlin import input_devices
-import psygnal
-from psygnal import Signal
 import gremlin.config
-import gremlin.repeater
-import gremlin.event_handler
-import win32api, win32com, ctypes, win32gui
+import win32api
+import win32gui
 import gremlin.process
 import gremlin.remote
-from gremlin.types import MouseAction, MouseButton
+
 import gremlin.curve_handler
 import gremlin.types
 
-import enum, threading,time, random
 
 import gremlin.util
 from shiboken6 import Shiboken
@@ -283,12 +277,8 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
         )
         message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(message_box)
-        is_cursor = gremlin.util.isCursorActive()
-        if is_cursor:
-            gremlin.util.popCursor()
         response = message_box.exec()
-        if is_cursor:
-            gremlin.util.pushCursor()
+        
         if response == QtWidgets.QMessageBox.StandardButton.Ok:
             self.action_data.curve_data = None
             self._update_curve_icon()        
@@ -395,7 +385,7 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
 
         if action_mode == MouseAction.MouseButton:
             show_button = True
-            if not self.action_data.button_id in [MouseButton.WheelDown, MouseButton.WheelUp]:
+            if self.action_data.button_id not in [MouseButton.WheelDown, MouseButton.WheelUp]:
                 show_click_mode = True
         elif action_mode == MouseAction.MouseMotion:
             show_motion = True
@@ -441,7 +431,8 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_process_started_ui(self, started : bool):
         verbose = gremlin.config.Configuration().verbose_mode_mouse
-        if verbose: syslog.info(f"MOUSE: profile start [{'OK' if started else 'FAIL'}]")
+        if verbose:
+            syslog.info(f"MOUSE: profile start [{'OK' if started else 'FAIL'}]")
         if started:
             hwnd = self.action_data.getProcessWindowHwnd()
             if hwnd:
@@ -468,10 +459,12 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
             hwnd = self.action_data.getProcessWindowHwnd()
             if hwnd:
                 rx,ry = win32gui.ScreenToClient(hwnd, (x,y))
-                if verbose: syslog.info(f"MOUSE: position: {x} {y}, relative to window: {rx} {ry}")
+                if verbose:
+                    syslog.info(f"MOUSE: position: {x} {y}, relative to window: {rx} {ry}")
                 x,y = rx, ry
         else:
-            if verbose: syslog.info(f"MOUSE: position: {x} {y}")
+            if verbose:
+                syslog.info(f"MOUSE: position: {x} {y}")
         
         self.x_widget.setValue(x)
         self.y_widget.setValue(y)
@@ -846,7 +839,6 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
         )
         dialog.show()
 
-
 class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
 
     """Implements the functionality required to move a mouse cursor.
@@ -858,7 +850,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
 
 
 
-    def __init__(self, action : MapToMouseEx, parent = None):
+    def __init__(self, action, parent = None):
         """Creates a new functor with the provided data.
 
         :param action contains parameters to use with the functor
@@ -939,9 +931,12 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 # handle motion requests
                 value = event.value
                 curves = self.getCurveData(None, value)
+                if verbose:
+                    _curve_msg = ""
                 for curve_data in curves:
                     curve_value = curve_data.curve_value(value) # remember to make sure curve_data had curve_update() called or the data will be incorrect
-                    if verbose: curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
+                    if verbose:
+                        _curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
                     value = curve_value
                 event.curve_value = value
                 match event.event_type:
@@ -975,7 +970,8 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                     direction = -wheel_factor
                     if self.action_data.button_id == MouseButton.WheelDown:
                         direction = wheel_factor
-                    if verbose: syslog.info(f"MOUSE: send wheel up/dn [{direction}]")
+                    if verbose:
+                        syslog.info(f"MOUSE: send wheel up/dn [{direction}]")
                     if is_local:
                         gremlin.sendinput.mouse_wheel(direction)
                     if is_remote:
@@ -985,7 +981,8 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                     direction = -wheel_factor
                     if self.action_data.button_id == MouseButton.WheelRight:
                         direction = wheel_factor
-                    if verbose: syslog.info(f"MOUSE: send wheel l/r [{direction}]")
+                    if verbose:
+                        syslog.info(f"MOUSE: send wheel l/r [{direction}]")
                     if is_local:
                         gremlin.sendinput.mouse_h_wheel(direction)
                     if is_remote:
@@ -994,13 +991,15 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 match self.action_data.click_mode:
                     case MouseClickMode.Normal:
                         if is_pressed:
-                            if verbose: syslog.info(f"MOUSE: press button [{self.action_data.button_id}]")
+                            if verbose:
+                                syslog.info(f"MOUSE: press button [{self.action_data.button_id}]")
                             if is_local:
                                 gremlin.sendinput.mouse_press(self.action_data.button_id)
                             if is_remote:
                                 gremlin.remote.remote_client.send_mouse_button(self.action_data.button_id.value, True)
                         else:
-                            if verbose: syslog.info(f"MOUSE: release button [{self.action_data.button_id}]")
+                            if verbose:
+                                syslog.info(f"MOUSE: release button [{self.action_data.button_id}]")
                             if is_local:
                                 gremlin.sendinput.mouse_release(self.action_data.button_id)
                             if is_remote:
@@ -1008,27 +1007,31 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
 
                     case MouseClickMode.DoubleClick:
                         if is_pressed:
-                            if verbose: syslog.info(f"MOUSE: press dclick button [{self.action_data.button_id}]")
+                            if verbose:
+                                syslog.info(f"MOUSE: press dclick button [{self.action_data.button_id}]")
                             if is_local:
                                 gremlin.sendinput.mouse_press_double_click(self.action_data.button_id)    
                             if is_remote:
                                 gremlin.remote.remote_client.send_mouse_button_double_click(self.action_data.button_id.value, True)
                         else:
-                            if verbose: syslog.info(f"MOUSE: release dclick button [{self.action_data.button_id}]")
+                            if verbose:
+                                syslog.info(f"MOUSE: release dclick button [{self.action_data.button_id}]")
                             if is_local:
                                 gremlin.sendinput.mouse_release(self.action_data.button_id)
                             if is_remote:
                                 gremlin.remote.remote_client.send_mouse_button(self.action_data.button_id.value, False)                        
 
                     case MouseClickMode.Press:
-                        if verbose: syslog.info(f"MOUSE: press button [{self.action_data.button_id}]")
+                        if verbose:
+                            syslog.info(f"MOUSE: press button [{self.action_data.button_id}]")
                         if is_local:
                             gremlin.sendinput.mouse_press(self.action_data.button_id)
                         if is_remote:
                             gremlin.remote.remote_client.send_mouse_button(self.action_data.button_id.value, True)
 
                     case MouseClickMode.Release:
-                        if verbose: syslog.info(f"MOUSE: release button [{self.action_data.button_id}]")
+                        if verbose:
+                            syslog.info(f"MOUSE: release button [{self.action_data.button_id}]")
                         if is_local:
                             gremlin.sendinput.mouse_release(self.action_data.button_id)
                         if is_remote:
@@ -1056,10 +1059,12 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
             # convert local coords to global coords
             x, y = win32gui.ClientToScreen(hwnd, (x,y))
             if self.action_data.process_focus:
-                if verbose: syslog.info(f"MOUSE: set focus to [{hwnd}]")
+                if verbose:
+                    syslog.info(f"MOUSE: set focus to [{hwnd}]")
                 gremlin.process.ProcessHelper().setFocus(hwnd)
         
-        if verbose: syslog.info(f"MOUSE: set position: {x} {y}")
+        if verbose:
+            syslog.info(f"MOUSE: set position: {x} {y}")
         match self.action_data.action_mode:
             case MouseAction.MousePosition:
                 win32api.SetCursorPos((x,y))
@@ -1070,16 +1075,19 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
     def _handle_process_started(self, started : bool):
         ''' callback on process start request '''
         verbose = gremlin.config.Configuration().verbose_mode_mouse
-        if verbose: syslog.info(f"MOUSE: profile start [{'OK' if started else 'FAIL'}]")
+        if verbose:
+            syslog.info(f"MOUSE: profile start [{'OK' if started else 'FAIL'}]")
         if started:
             # convert local coords to global coords
             hwnd = self.action_data.getProcessWindowHwnd()
             x, y = win32gui.ClientToScreen(hwnd, self.target_point)
             if self.action_data.process_focus:
-                if verbose: syslog.info(f"MOUSE: set focus to [{hwnd}]")
+                if verbose:
+                    syslog.info(f"MOUSE: set focus to [{hwnd}]")
                 gremlin.process.ProcessHelper().setFocus(hwnd)
                 
-            if verbose: syslog.info(f"MOUSE: set position: {x} {y}")
+            if verbose:
+                syslog.info(f"MOUSE: set position: {x} {y}")
             win32api.SetCursorPos((x, y))
 
      
@@ -1122,10 +1130,12 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
         delta_motion = math.copysign(delta_motion, raw_value)
 
         if is_x:
-            if verbose: syslog.info(f"MOUSE: x motion [{delta_motion}]")
+            if verbose:
+                syslog.info(f"MOUSE: x motion [{delta_motion}]")
             mc.set_absolute_motion(delta_motion, None)
         else:
-            if verbose: syslog.info(f"MOUSE: y motion [{delta_motion}]")
+            if verbose:
+                syslog.info(f"MOUSE: y motion [{delta_motion}]")
             mc.set_absolute_motion(None, delta_motion)
 
 
@@ -1182,6 +1192,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                                                                     self.action_data.min_speed,
                                                                     self.action_data.max_speed,
                                                                     self.action_data.time_to_max_speed)
+
 
 
 
@@ -1467,7 +1478,7 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
 
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)    
 
         if self.action_mode == MouseAction.MousePosition:
@@ -1495,3 +1506,5 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.''
 version = 1
 name = "map_to_mouse_ex"
 create = MapToMouseEx
+
+

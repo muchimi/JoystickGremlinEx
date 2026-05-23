@@ -20,10 +20,6 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 
-import copy
-import logging
-import threading
-import time
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore
@@ -34,10 +30,10 @@ import gremlin.joystick_handling
 import gremlin.ui.qsliderwidget
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets
 
 from gremlin.input_types import InputType
-from gremlin.util import safe_format, safe_read, write_guid, read_guid
+from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
 class TickContainerWidget(AbstractContainerWidget):
 
@@ -49,13 +45,14 @@ class TickContainerWidget(AbstractContainerWidget):
     
     """
 
-    def __init__(self, action_data : TickContainer, parent=None):
+    def __init__(self, container : TickContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(action_data, parent)
+        self.container : TickContainer = container
+        super().__init__(container, parent)
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -79,7 +76,7 @@ class TickContainerWidget(AbstractContainerWidget):
             ui_only = True,
             persist = False,
             description = description)        
-        el = gremlin.event_handler.EventListener()
+        _el = gremlin.event_handler.EventListener()
         # el.joystick_event.connect(self._joystick_event_handler)
 
         self.action_data : TickContainer = self.profile_data
@@ -261,32 +258,27 @@ class TickContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            if self.profile_data.action_sets[index] is None:
-                self.profile_data.action_sets[index] = []
-            self.profile_data.action_sets[index].append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        if self.profile_data.action_sets[index] is None:
+            self.profile_data.action_sets[index] = []
+        self.profile_data.action_sets[index].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+        
 
     def _paste_action(self, index, action):
         ''' paste action'''
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.profile_data)
-            if self.profile_data.action_sets[index] is None:
-                self.profile_data.action_sets[index] = []
-            self.profile_data.action_sets[index].append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-        finally:
-            gremlin.util.popCursor()
-
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.profile_data)
+        if self.profile_data.action_sets[index] is None:
+            self.profile_data.action_sets[index] = []
+        self.profile_data.action_sets[index].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -314,27 +306,22 @@ class TickContainerWidget(AbstractContainerWidget):
 
 class TickContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
-    def __init__(self, container : TickContainer, parent = None):
+    def __init__(self, container : TickContainer, parent = None):  # noqa: F821
         super().__init__(container, parent)
-        # self.increase_set = gremlin.execution_graph.ActionSetExecutionGraph(
-        #     container.action_sets[0], parent
-        # )
-        # self.decrease_set = gremlin.execution_graph.ActionSetExecutionGraph(
-        #     container.action_sets[1], parent
-        # )
-        self.action_data = container
+        
+        self.container : TickContainer = container
 
     def profile_start(self):
         self.last_value = None
 
         # current position
-        count = self.action_data.getTickCount()
+        count = self.container.getTickCount()
         interval = 2 / (count-1)
-        self.last_tick = self.action_data.currentTick()
+        self.last_tick = self.container.currentTick()
 
         # build the ranges for each tick
         self._tick_map = [-1.0 + x * interval for x in range(count)]
-        self._last_value = self.action_data._get_value()
+        self._last_value = self.container._get_value()
       
     def process_event(self, event, value, extra_data = None):
         

@@ -20,19 +20,16 @@ import logging
 from lxml import etree as ElementTree
 import gremlin.actions
 import gremlin.config
-import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
-from gremlin.util import rad2deg, get_guid
+from gremlin.util import get_guid
 from gremlin.profile import safe_format, safe_read
 import gremlin.ui.ui_common
 import gremlin.input_item
 import os
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget
+from PySide6 import QtCore, QtWidgets
 
-
-from action_plugins.map_to_keyboard import *
-from action_plugins.map_to_mouse import *
 import gremlin.config
 from shiboken6 import Shiboken
 
@@ -323,27 +320,23 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            self.profile_data.add_action(action_item)
-            if Shiboken.isValid(self):
-                self.container_modified.emit()      
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        self.profile_data.add_action(action_item)
+        if Shiboken.isValid(self):
+            self.container_modified.emit()      
+        
 
     def _paste_action(self, action, container):
         """ pastes an action into the container """
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.profile_data)
-            self.profile_data.add_action(action_item)
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.profile_data)
+        self.profile_data.add_action(action_item)
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+        
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -786,7 +779,7 @@ For more advanced axis splitting capability, look at the Gated Axis action.
             if "autorelease" in node.attrib:
                 self.autorelease = safe_read(node,"autorelease", bool, False)
             
-        except:
+        except Exception:
             pass
         
 

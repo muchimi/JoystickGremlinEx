@@ -1,5 +1,3 @@
-import os
-from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
@@ -8,11 +6,8 @@ import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.keyboard
-import gremlin.macro
 import gremlin.shared_state
 import gremlin.ui.ui_common
-import gremlin.input_item
-import enum
 import gremlin.util
 from shiboken6 import Shiboken
 from gremlin.keyboard import Key
@@ -20,7 +15,6 @@ from gremlin.util import load_icon
 import logging
 import datetime
 import time
-import psygnal
 from psygnal import Signal
 import threading
       
@@ -425,44 +419,44 @@ class QKeyboardWidget(QtWidgets.QWidget):
 
                     icon = None
                     # handle special key names
-                    tooltip = ""
+                    _tooltip = ""
                     match key:
                         case  "mouse_1":
                             key = "M1"
                             icon = "mdi.mouse"
-                            toolltip = "Left Mouse Button"
+                            _toolltip = "Left Mouse Button"
                         case "mouse_2":
                             key = "M2"
                             icon = "mdi.mouse"
-                            toolltip = "Middle Mouse Button"
+                            _toolltip = "Middle Mouse Button"
                         case "mouse_3":
                             key = "M3"
                             icon = "mdi.mouse"
-                            toolltip = "Right Mouse Button"
+                            _toolltip = "Right Mouse Button"
                         case "mouse_4":
                             key = "M4"
                             icon = "mdi.mouse"
-                            toolltip = "Forward Mouse Button"
+                            _toolltip = "Forward Mouse Button"
                         case "mouse_5":
                             key = "M5"
                             icon = "mdi.mouse"
-                            toolltip = "Back Mouse Button"
+                            _toolltip = "Back Mouse Button"
                         case "wheel_up":
                             key = "MWU"
                             icon = "mdi.mouse"
-                            toolltip = "Wheel Up"
+                            _toolltip = "Wheel Up"
                         case "wheel_down":
                             key = "MWD"
                             icon = "mdi.mouse"
-                            toolltip = "Wheel Down"
+                            _toolltip = "Wheel Down"
                         case "wheel_left":
                             key = "MWL"
                             icon = "mdi.mouse"    
-                            toolltip = "Tilt Left"  
+                            _toolltip = "Tilt Left"  
                         case "wheel_right":
                             key = "MWR"
                             icon = "mdi.mouse"
-                            toolltip = "Tilt Right"
+                            _toolltip = "Tilt Right"
                         case "null" | "v_wheel" | "h_wheel":
                             continue
                       
@@ -640,7 +634,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         if key is not None:
             map_key = key.key_id
             if map_key is not None:
-                if not map_key in self._key_widget_map:
+                if map_key not in self._key_widget_map:
                     # see if a translation is needed
                     map_key, vk = gremlin.keyboard.KeyMap.translate(map_key)
                 if map_key in self._key_widget_map:
@@ -904,7 +898,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                 if isinstance(item, Key):
                     # key object
                     lookup = item.index_tuple()
-                    if not lookup in self._key_map:
+                    if lookup not in self._key_map:
                         continue
                     key_name = self._key_map[lookup]
                     widget = self._key_widget_map[key_name]
@@ -914,7 +908,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                 elif isinstance(item, tuple):
                     # key id
                     lookup = item
-                    if not lookup in self._key_map:
+                    if lookup not in self._key_map:
                         lookup = gremlin.keyboard.KeyMap.translate_lookup(lookup)
                     if lookup in self._key_map:
                         key_name = self._key_map[lookup]
@@ -1015,7 +1009,6 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         """
         import gremlin.windows_event_hook
         import gremlin.keyboard
-        import gremlin.types
         if isinstance(data, gremlin.windows_event_hook.MouseEvent):
             if not data.is_pressed:
                 return # ignore releases 

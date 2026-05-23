@@ -16,24 +16,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
 from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
 
 import gremlin.base_profile
 import gremlin.config
-import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
-import gremlin.profile
 import gremlin.shared_state
 import gremlin.input_item
 import gremlin.ui.ui_common
 import anytree
 import logging
 import gremlin.execution_graph
-import psygnal
-from psygnal import Signal
 from shiboken6 import Shiboken
 import gremlin.util
 from gremlin.util import safe_format, safe_read
@@ -195,7 +190,8 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
             else:
                 return_mode = current_mode
 
-            if verbose: syslog.info(f"Temporary mode change: [{current_mode}] - next mode: [{next_mode}] - return mode: [{return_mode}] - specific mode to return: [{'enabled' if self.action_data.enable_return_mode else 'disabled'}]")
+            if verbose:
+                syslog.info(f"Temporary mode change: [{current_mode}] - next mode: [{next_mode}] - return mode: [{return_mode}] - specific mode to return: [{'enabled' if self.action_data.enable_return_mode else 'disabled'}]")
 
 
             if next_mode != current_mode:
@@ -206,7 +202,8 @@ class TemporaryModeSwitchFunctor(gremlin.base_profile.AbstractFunctor):
              
             else:
                 # nothing to come back to
-                if verbose: syslog.info(f"Temporary mode change: [{current_mode}] (no change because current mode is the same as the requested temporary mode)")
+                if verbose:
+                    syslog.info(f"Temporary mode change: [{current_mode}] (no change because current mode is the same as the requested temporary mode)")
                 self.action_data.restore_mode = None
         
 
@@ -357,7 +354,7 @@ When the trigger is released, the mode reverts to the prior mode.'''
     
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4) 
         table.addField("Mode", self.mode)
         table.addField("Return mode", 'last mode' if not self.enable_return_mode else self.return_mode)

@@ -20,41 +20,32 @@ import importlib
 import logging
 import math
 import os
-import gc
 import re
 import sys
 import threading
-import queue
 import time
 import shutil
 import uuid
 import dinput
-import winreg, win32api, win32con
-from ctypes import Structure, c_long, sizeof
+import win32api
+import win32con
+from ctypes import Structure, c_long
 import collections
-
 import qtawesome as qta
 from lxml import etree as ElementTree
 from typing import Callable
-from types import FunctionType, MethodType
 
 from PySide6 import QtCore, QtWidgets, QtGui
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 from PySide6.QtGui import QColor
-import win32gui, win32con
-import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
 import inspect
-import lxml
-import copy
 import html
+import gremlin.singleton_decorator
 
 
 from . import error
-
-
-
 
 
 # Table storing which modules have been imported already
@@ -64,7 +55,6 @@ syslog = logging.getLogger("system")
 
 
 class FileWatcher(QtCore.QObject):
-
     """Watches files in the filesystem for changes."""
 
     # Signal emitted when the watched file is modified
@@ -129,9 +119,6 @@ def axis_calibration(value, minimum, center, maximum):
         # if no center provided, use the slider function with no center
         return slider_calibration(value, minimum, maximum)
 
-
-
-
     if value < center:
         div = float(center - minimum)
         if div == 0.0:
@@ -157,7 +144,6 @@ def slider_calibration(value, minimum, maximum):
     return value
 
 
-
 def create_calibration_function(minimum, center, maximum):
     """Returns a calibration function appropriate for the provided data.
 
@@ -167,7 +153,7 @@ def create_calibration_function(minimum, center, maximum):
     :return function which returns a value in [-1, 1] corresponding
         to the provided raw input value
     """
-    if center is None or  minimum == center or maximum == center:
+    if center is None or minimum == center or maximum == center:
         return lambda x: slider_calibration(x, minimum, maximum)
     else:
         return lambda x: axis_calibration(x, minimum, center, maximum)
@@ -200,31 +186,42 @@ def script_path():
 def userprofile_path():
     """Returns the path to the user's profile folder, %userprofile%."""
 
-    path = os.path.abspath(os.path.join(os.getenv("userprofile"),"Joystick Gremlin Ex"))
+    path = os.path.abspath(
+        os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex")
+    )
     if not os.path.isdir(path):
         # profile folder does not exist - see if we can create it from the original profile
-        source_path = os.path.abspath(os.path.join(os.getenv("userprofile"),"Joystick Gremlin"))
+        source_path = os.path.abspath(
+            os.path.join(os.getenv("userprofile"), "Joystick Gremlin")
+        )
         if os.path.isdir(source_path):
             try:
                 # copy from original profile
                 shutil.copytree(source_path, path)
-                syslog.info(f"First run - copied Joystick Gremlin profiles to to Joystick Gremlin Ex")
+                syslog.info(
+                    "First run - copied Joystick Gremlin profiles to to Joystick Gremlin Ex"
+                )
             except Exception as error:
-                syslog.error(f"Unable to copy profile from Joystick Gremlin to Joystick Gremlin Ex:\n{error}")
+                syslog.error(
+                    f"Unable to copy profile from Joystick Gremlin to Joystick Gremlin Ex:\n{error}"
+                )
         if not os.path.isdir(path):
             try:
                 # just create it
                 os.mkdir(path)
             except Exception as error:
-                syslog.error(f"Unable to create profile folder for Joystick Gremlin Ex:\n{error}")
+                syslog.error(
+                    f"Unable to create profile folder for Joystick Gremlin Ex:\n{error}"
+                )
 
         if not os.path.isdir(path):
-                from gremlin.error import GremlinError
-                raise GremlinError(f"Critical error: Unable to create profile folder: {path}")
+            from gremlin.error import GremlinError
 
+            raise GremlinError(
+                f"Critical error: Unable to create profile folder: {path}"
+            )
 
     return os.path.normcase(path)
-
 
 
 def copy_tree_if_newer(src, dst):
@@ -239,14 +236,13 @@ def copy_tree_if_newer(src, dst):
                 copy_tree_if_newer(s, d)
             else:
                 if not os.path.exists(d) or os.stat(s).st_mtime > os.stat(d).st_mtime:
-                    shutil.copy2(s, d) # copy with metadata
+                    shutil.copy2(s, d)  # copy with metadata
     else:
         shutil.copytree(src, dst)
 
 
-
 def resource_path(relative_path):
-    """ Get absolute path to resource, handling development and pyinstaller
+    """Get absolute path to resource, handling development and pyinstaller
     based usage.
 
     :param relative_path the relative path to the file of interest
@@ -254,7 +250,7 @@ def resource_path(relative_path):
     """
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
-        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
             base_path = sys._MEIPASS
         else:
             base_path = script_path()
@@ -262,12 +258,6 @@ def resource_path(relative_path):
         base_path = script_path()
 
     return os.path.normcase(os.path.join(base_path, relative_path))
-
-
-
-
-
-
 
 
 def display_error(msg):
@@ -289,7 +279,7 @@ def display_error(msg):
         QtWidgets.QMessageBox.Critical,
         "Joystick Gremlin Ex Error",
         msg,
-        QtWidgets.QMessageBox.Ok
+        QtWidgets.QMessageBox.Ok,
     )
     box.exec()
 
@@ -304,21 +294,26 @@ def log(msg):
     """
     logging.getLogger("user").debug(str(msg))
 
+
 def log_sys(msg):
-    ''' logs to the system log '''
+    """logs to the system log"""
     syslog.info(str(msg))
+
 
 def log_info(msg):
-    ''' logs to the system log '''
+    """logs to the system log"""
     syslog.info(str(msg))
 
+
 def log_sys_warn(msg):
-    ''' logs to the system log '''
+    """logs to the system log"""
     syslog.warning(str(msg))
 
+
 def log_sys_error(msg):
-    ''' logs to the system error log'''
+    """logs to the system error log"""
     syslog.error(str(msg))
+
 
 def format_name(name):
     """Returns the name formatted as valid python variable name.
@@ -326,8 +321,9 @@ def format_name(name):
     :param name the name to format
     :return name formatted to be suitable as a python variable name
     """
-    return re.sub("[^A-Za-z]", "", name.lower()[0]) + \
-        re.sub("[^A-Za-z0-9]", "", name.lower()[1:])
+    return re.sub("[^A-Za-z]", "", name.lower()[0]) + re.sub(
+        "[^A-Za-z0-9]", "", name.lower()[1:]
+    )
 
 
 def valid_python_identifier(name):
@@ -338,11 +334,12 @@ def valid_python_identifier(name):
     """
     return re.match(r"^[^\d\W]\w*\Z", name) is not None
 
+
 def valid_integer_string(text):
     return re.match(r"^-?\d+$", text) is not None
 
 
-def clamp(value, min_val = -1.0, max_val = 1.0):
+def clamp(value, min_val=-1.0, max_val=1.0):
     """Returns the value clamped to the provided range.
 
     :param value the input value
@@ -370,17 +367,18 @@ def hat_tuple_to_direction(value):
     :return textual equivalent of the event tuple
     """
     lookup = {
-        ( 0,  0): "center",
-        ( 0,  1): "north",
-        ( 1,  1): "north-east",
-        ( 1,  0): "east",
-        ( 1, -1): "south-east",
-        ( 0, -1): "south",
+        (0, 0): "center",
+        (0, 1): "north",
+        (1, 1): "north-east",
+        (1, 0): "east",
+        (1, -1): "south-east",
+        (0, -1): "south",
         (-1, -1): "south-west",
-        (-1,  0): "west",
-        (-1,  1): "north-west",
+        (-1, 0): "west",
+        (-1, 1): "north-west",
     }
     return lookup[value]
+
 
 def hat_index_to_tuple(index):
     lookup = {
@@ -392,39 +390,40 @@ def hat_index_to_tuple(index):
         "south": (0, -1),
         "south-west": (-1, -1),
         "west": (-1, 0),
-        "north-west": (-1, 1)
+        "north-west": (-1, 1),
     }
     keys = list(lookup.keys())
     if index < len(keys):
         return lookup[keys[index]]
     return None
 
+
 def hat_tuples():
     lookup = {
-        ( 0,  0): "center",
-        ( 0,  1): "north",
-        ( 1,  1): "north-east",
-        ( 1,  0): "east",
-        ( 1, -1): "south-east",
-        ( 0, -1): "south",
+        (0, 0): "center",
+        (0, 1): "north",
+        (1, 1): "north-east",
+        (1, 0): "east",
+        (1, -1): "south-east",
+        (0, -1): "south",
         (-1, -1): "south-west",
-        (-1,  0): "west",
-        (-1,  1): "north-west",
+        (-1, 0): "west",
+        (-1, 1): "north-west",
     }
     return list(lookup.keys())
 
 
 def hat_direction_to_name(value):
     lookup = {
-        ( 0,  0): "center",
-        ( 0,  1): "north",
-        ( 1,  1): "north-east",
-        ( 1,  0): "east",
-        ( 1, -1): "south-east",
-        ( 0, -1): "south",
+        (0, 0): "center",
+        (0, 1): "north",
+        (1, 1): "north-east",
+        (1, 0): "east",
+        (1, -1): "south-east",
+        (0, -1): "south",
         (-1, -1): "south-west",
-        (-1,  0): "west",
-        (-1,  1): "north-west",
+        (-1, 0): "west",
+        (-1, 1): "north-west",
     }
     if value in lookup:
         return lookup[value]
@@ -446,7 +445,7 @@ def hat_direction_to_tuple(value):
         "south": (0, -1),
         "south-west": (-1, -1),
         "west": (-1, 0),
-        "north-west": (-1, 1)
+        "north-west": (-1, 1),
     }
     value = value.casefold()
     if value in lookup:
@@ -454,15 +453,15 @@ def hat_direction_to_tuple(value):
     return None
 
 
-
 _logtabs = ""
 _cleaned_widgets = []
 
 
 def clear_layout(layout):
-    ''' removes all widgets and layouts from the given layout '''
+    """removes all widgets and layouts from the given layout"""
     _clear_layout(layout)
     # gc.collect()
+
 
 def _clear_layout(layout):
     for index in reversed(range(layout.count())):
@@ -474,6 +473,7 @@ def _clear_layout(layout):
             widget.deleteLater()
         elif item.layout():
             _clear_layout(item.layout())
+
 
 # def clear_layout(layout: QtWidgets.QLayout):
 #     """Removes all widgets from the given layout.
@@ -507,23 +507,25 @@ def _clear_layout(layout):
 #                 widget.deleteLater()
 #         layout.removeItem(item)
 
-def delete_widget(widget : QtWidgets.QWidget):
-    ''' removes a widget from memory '''
+
+def delete_widget(widget: QtWidgets.QWidget):
+    """removes a widget from memory"""
     if widget and Shiboken.isValid(widget):
-        widget.hide() # hide the widget from the UI
+        widget.hide()  # hide the widget from the UI
         # clear any widget layout to release contents as well
-        if hasattr(widget,"unhook"):
+        if hasattr(widget, "unhook"):
             widget.unhook()
-        if hasattr(widget,"_cleanup_ui"):
+        if hasattr(widget, "_cleanup_ui"):
             widget._cleanup_ui()
         layout = widget.layout()
         if layout is not None:
             clear_layout(layout)
-        widget.setParent(None) # removes the widget from the containing layout
-        widget.deleteLater() # tell QT to free the widget from memory
+        widget.setParent(None)  # removes the widget from the containing layout
+        widget.deleteLater()  # tell QT to free the widget from memory
 
-def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
-    ''' returns a list of layout widgets '''
+
+def get_layout_widgets(layout: QtWidgets.QLayout) -> list:
+    """returns a list of layout widgets"""
     widgets = []
     if layout and Shiboken.isValid(layout):
         index = layout.count()
@@ -540,30 +542,34 @@ def get_layout_widgets(layout : QtWidgets.QLayout) -> list:
 
     return widgets
 
-def dumpWidgets(widget, title = None):
-        ''' outputs layout contents to the log file '''
-        layout = widget.layout() if isinstance(widget, QtWidgets.QWidget) else widget
-        if layout:
-            widgets = get_layout_widgets(layout)
-            if title:
-                syslog.info(f"---------------- widget dump for {title}--------------------")
-            else:
-                syslog.info("---------------- widget dump --------------------")
-            if widgets:
-                for widget in widgets:
-                    w_text = widget.text() if hasattr(widget,"text") else ""
-                    w_value = str(widget.value()) if hasattr(widget,"value") else ""
-                    w_name = widget.objectName()
-                    syslog.info(f"\tWidget: [{type(widget)}] name: [{w_name}] text: [{w_text}] value: [{w_value}]")
-            else:
-                syslog.info("\tNo widgets.")
 
-def get_layout_horizontal_size(layout : QtWidgets.QLayout) -> QtCore.QSize:
-    ''' gets the desired size of a layout '''
+def dumpWidgets(widget, title=None):
+    """outputs layout contents to the log file"""
+    layout = widget.layout() if isinstance(widget, QtWidgets.QWidget) else widget
+    if layout:
+        widgets = get_layout_widgets(layout)
+        if title:
+            syslog.info(f"---------------- widget dump for {title}--------------------")
+        else:
+            syslog.info("---------------- widget dump --------------------")
+        if widgets:
+            for widget in widgets:
+                w_text = widget.text() if hasattr(widget, "text") else ""
+                w_value = str(widget.value()) if hasattr(widget, "value") else ""
+                w_name = widget.objectName()
+                syslog.info(
+                    f"\tWidget: [{type(widget)}] name: [{w_name}] text: [{w_text}] value: [{w_value}]"
+                )
+        else:
+            syslog.info("\tNo widgets.")
+
+
+def get_layout_horizontal_size(layout: QtWidgets.QLayout) -> QtCore.QSize:
+    """gets the desired size of a layout"""
     widgets = get_layout_widgets(layout)
     size = QtCore.QSize()
     h = 0
-    widget : QtWidgets.QWidget
+    widget: QtWidgets.QWidget
     for widget in widgets:
         w_size = widget.sizeHint()
         wh = w_size.height()
@@ -574,8 +580,9 @@ def get_layout_horizontal_size(layout : QtWidgets.QLayout) -> QtCore.QSize:
     size.setHeight(h)
     return size
 
+
 def layout_contains(layout, widget):
-    ''' true if widget is contained in the given layout '''
+    """true if widget is contained in the given layout"""
     while layout.count() > 0:
         child = layout.takeAt(0)
         if child.layout():
@@ -586,8 +593,9 @@ def layout_contains(layout, widget):
             return True
     return False
 
+
 def layout_remove(layout, widget):
-    ''' removes widget from the layout if the layout includes that widget '''
+    """removes widget from the layout if the layout includes that widget"""
     while layout.count() > 0:
         child = layout.takeAt(0)
         if child.layout():
@@ -609,7 +617,7 @@ dill_hat_lookup = {
     18000: (0, -1),
     22500: (-1, -1),
     27000: (-1, 0),
-    31500: (-1, 1)
+    31500: (-1, 1),
 }
 
 
@@ -645,51 +653,52 @@ def rad2deg(angle):
     return angle * (180.0 / math.pi)
 
 
-
-def get_dll_version(path, as_string = True):
-    ''' gets the dll file version number
+def get_dll_version(path, as_string=True):
+    """gets the dll file version number
 
     :param path - the full path to the file
     :returns file major, file minor, product version major, product version minor as integers
-    '''
+    """
     if not os.path.isfile(path):
         if as_string:
             return None
-        return (0,0,0,0)
+        return (0, 0, 0, 0)
 
     try:
-        info = GetFileVersionInfo (path, "\\")
-        ms = info['FileVersionMS']
-        ls = info['FileVersionLS']
+        info = GetFileVersionInfo(path, "\\")
+        ms = info["FileVersionMS"]
+        ls = info["FileVersionLS"]
 
-        f_major = HIWORD (ms)
-        f_minor = LOWORD (ms)
-        p_major = HIWORD (ls)
-        p_minor = LOWORD (ls)
+        f_major = HIWORD(ms)
+        f_minor = LOWORD(ms)
+        p_major = HIWORD(ls)
+        p_minor = LOWORD(ls)
 
         if as_string:
             return f"{f_major}.{f_minor}.{p_major}.{p_minor}"
         return (f_major, f_minor, p_major, p_minor)
-    except:
+    except Exception:
         syslog = logging.getLogger("system")
-        syslog.warning(f"Unable to get file version information due to an OS error for: {path} ")
+        syslog.warning(
+            f"Unable to get file version information due to an OS error for: {path} "
+        )
         return None
 
 
-
-
 def version_valid(v, v_req):
-    ''' compares two versions
+    """compares two versions
 
     :param v - version as string in x.x.x.x format
     :param r - version required as string in x.x.x.x format
 
-    '''
+    """
+
     def compare_version(version1, version2):
         def parse_version(version):
-            version_parts = version.split('.')
+            version_parts = version.split(".")
             version_ints = [int(part) for part in version_parts]
             return version_ints
+
         v1_parts = parse_version(version1)
         v2_parts = parse_version(version2)
         for i in range(max(len(v1_parts), len(v2_parts))):
@@ -699,104 +708,107 @@ def version_valid(v, v_req):
             if v1_num < v2_num:
                 return -1  # version1 is smaller
             elif v1_num > v2_num:
-                return 1   # version2 is smaller
-        return 0 # equal
+                return 1  # version2 is smaller
+        return 0  # equal
 
     return compare_version(v, v_req) >= 0
 
 
 def grouped(iterable, n):
-    ''' returns n items for a given iterable item '''
-    return zip(*[iter(iterable)]*n)
+    """returns n items for a given iterable item"""
+    return zip(*[iter(iterable)] * n)
+
 
 def get_dinput_guid():
-    ''' gets a DirectInput compatible GUID'''
-    return parse_guid(get_guid(strip=False,no_brackets=True))
+    """gets a DirectInput compatible GUID"""
+    return parse_guid(get_guid(strip=False, no_brackets=True))
 
 
-
-
-def find_files(root_folder, source_pattern = "*") -> list:
-    ''' runs native file search to find files without blowing up on borked sym links in windows unlike rglob - returns full paths to the found file pattern '''
+def find_files(root_folder, source_pattern="*") -> list:
+    """runs native file search to find files without blowing up on borked sym links in windows unlike rglob - returns full paths to the found file pattern"""
     import subprocess
+
     if not os.path.isdir(root_folder):
         return []
 
     wd = os.getcwd()
     os.chdir(root_folder)
     process = subprocess.Popen(
-        ["cmd", "/c", "dir", source_pattern, "/b","/s"],
+        ["cmd", "/c", "dir", source_pattern, "/b", "/s"],
         creationflags=subprocess.CREATE_NO_WINDOW,
-        stdout=subprocess.PIPE)
+        stdout=subprocess.PIPE,
+    )
     out, err = process.communicate()
     os.chdir(wd)
-    encoding = 'utf-8'
+    encoding = "utf-8"
     # the link will be in square brackets
     if out:
-        lines = str(out,encoding)
+        lines = str(out, encoding)
         if lines:
-            lines = lines.replace('\r','')
-            lines = lines.split('\n')
-            lines = [l for l in lines if l]
+            lines = lines.replace("\r", "")
+            lines = lines.split("\n")
+            lines = [ln for ln in lines if ln]
             return lines
 
     return []
 
 
-
-
-def find_folders(root_folder, source_pattern = "*") -> list:
-    ''' looks for a subfolder off the root folder '''
+def find_folders(root_folder, source_pattern="*") -> list:
+    """looks for a subfolder off the root folder"""
     if not os.path.isdir(root_folder):
         return []
 
     folders = os.listdir(root_folder)
     return [os.path.join(root_folder, folder) for folder in folders]
 
-import gremlin.singleton_decorator
+
+
+
 
 @gremlin.singleton_decorator.SingletonDecorator
-class SearchCache():
-    ''' file search cache service '''
+class SearchCache:
+    """file search cache service"""
+
     def __init__(self):
         self.cache = {}
 
-    def find_file(self, file_path, root_folder = None):
-        if not file_path in self.cache:
+    def find_file(self, file_path, root_folder=None):
+        if file_path not in self.cache:
             item = _find_file(file_path, root_folder)
             if item is not None:
                 self.cache[file_path] = item
             return item
         return self.cache[file_path]
 
-def find_file(file_path, root_folder = None):
+
+def find_file(file_path, root_folder=None):
     cache = SearchCache()
     return cache.find_file(file_path, root_folder)
 
+
 def find_icon(icon_file):
-    ''' locates an icon file '''
+    """locates an icon file"""
     if os.path.isfile(icon_file):
         return icon_file
-    
+
     root_folder = get_root_folder()
     # usual locations for images
     folder_list = ["icons", "gfx"]
     for folder in folder_list:
-        new_icon_file = os.path.join(root_folder,folder,icon_file)
+        new_icon_file = os.path.join(root_folder, folder, icon_file)
         if os.path.isfile(new_icon_file):
             return new_icon_file
-            
+
     return None
 
 
-
 def get_root_folder() -> str:
-    ''' gets the root folder '''
+    """gets the root folder"""
     import sys
     import pathlib
     import os
 
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
         # as exe via pyinstallaler
         application_path = sys._MEIPASS
     else:
@@ -805,11 +817,11 @@ def get_root_folder() -> str:
 
 
 def find_package_file(file_path):
-    ''' find a package file '''
+    """find a package file"""
     syslog = logging.getLogger("system")
     # get the execution folder
     root_folder = None
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         app = QtWidgets.QApplication.instance()
         root_folder = app.applicationDirPath()
     elif __file__:
@@ -819,15 +831,16 @@ def find_package_file(file_path):
     return find_file(file_path, root_folder)
 
 
-def _find_file(file_path, root_folder = None):
-    ''' finds a file '''
+def _find_file(file_path, root_folder=None):
+    """finds a file"""
 
     from pathlib import Path
     from gremlin.config import Configuration
     import gremlin.shared_state
+
     verbose = Configuration().verbose_mode_details
 
-    file_path = file_path.lower().replace("/",os.sep)
+    file_path = file_path.lower().replace("/", os.sep)
     sub_folders = None
     folders = []
 
@@ -850,16 +863,21 @@ def _find_file(file_path, root_folder = None):
         if ext:
             extensions = [ext]
         else:
-            extensions = [".svg",".png"]
+            extensions = [".svg", ".png"]
 
         for dirpath, _, filenames in os.walk(root_folder):
-            if any([part.startswith('.') for part in Path(dirpath).relative_to(root_folder).parts]):
+            if any(
+                [
+                    part.startswith(".")
+                    for part in Path(dirpath).relative_to(root_folder).parts
+                ]
+            ):
                 # ignore hidden folders, anywhere between the search root and the current file
                 # note: this also allows skipping non-hidden folders within hidden ones (like in .git),
                 #     : thereby saving quite a bit of room in the "circuit breaker", when running from
                 #     : a git repository
                 continue
-            circuit_breaker-=1
+            circuit_breaker -= 1
             if circuit_breaker == 0:
                 break
             if sub_folders and not dirpath.endswith(sub_folders):
@@ -870,108 +888,105 @@ def _find_file(file_path, root_folder = None):
                         files.append(os.path.join(dirpath, filename))
 
     if files:
-        files.sort(key = lambda x: len(x)) # shortest to largest
-        found_path = files.pop(0) # grab the first one
+        files.sort(key=lambda x: len(x))  # shortest to largest
+        found_path = files.pop(0)  # grab the first one
         if verbose:
             syslog.info(f"Find_files() - found : {found_path} for {file_path}")
         return found_path
 
     if circuit_breaker == 0:
-        syslog.error(f"Find_files() - search exceeded maximum when searching for: {file_path}")
+        syslog.error(
+            f"Find_files() - search exceeded maximum when searching for: {file_path}"
+        )
 
     if verbose or circuit_breaker == 0:
         syslog.error(f"Find_files() failed for: {file_path}")
     return None
 
 
-
-
 def get_icon_path(path):
-        '''
-        gets an icon path
+    """
+    gets an icon path
 
-        '''
+    """
 
-        from gremlin.config import Configuration
-        verbose = Configuration().verbose_mode_details
+    from gremlin.config import Configuration
 
-        import gremlin.shared_state
+    verbose = Configuration().verbose_mode_details
 
-        # be aware of runtime environment
-        if path:
-            the_path = path.casefold()
-        else:
-            # no path provided
-            return None
+    import gremlin.shared_state
 
-        if os.path.isfile(path):
-            return path
-
-
-
-
-        if the_path in gremlin.shared_state._icon_path_cache.keys():
-            return gremlin.shared_state._icon_path_cache[the_path]
-
-        # root folder
-        root_path = get_root_folder()
-
-        # find the file
-        if not "/" in the_path and not os.sep in the_path:
-            # raw find fine
-            icon_file = find_icon(path)
-            if not icon_file:
-                icon_file = _find_file(the_path, root_path)
-
-            if icon_file and os.path.isfile(icon_file):
-                gremlin.shared_state._icon_path_cache[the_path] = icon_file
-                return icon_file
-
-        if "gfx" in the_path.casefold():
-            search_path = [the_path]
-        else:
-            search_path = [the_path, os.path.normpath(os.path.join("gfx",the_path))]
-        for stub_path in search_path:
-
-            # syslog.info(f"icon path: {the_path}  root: {root_path}")
-            icon_file = os.path.join(root_path, stub_path)
-            icon_file = icon_file.replace("/",os.sep).lower()
-            if icon_file:
-                if os.path.isfile(icon_file):
-                    if verbose:
-                        syslog.info(f"Icon file (straight) found: {icon_file}")
-                    gremlin.shared_state._icon_path_cache[the_path] = icon_file
-                    return icon_file
-                if not icon_file.endswith(".png"):
-                    icon_file_png = icon_file + ".png"
-                    if os.path.isfile(icon_file_png):
-                        if verbose:
-                            syslog.info(f"Icon file (png) found: {icon_file_png}")
-                        gremlin.shared_state._icon_path_cache[the_path] = icon_file_png
-                        return icon_file_png
-                if not icon_file.endswith(".svg"):
-                    icon_file_svg = icon_file + ".svg"
-                    if os.path.isfile(icon_file_svg):
-                        if verbose:
-                            syslog.info(f"Icon file (svg) found: {icon_file_svg}")
-                        gremlin.shared_state._icon_path_cache[the_path] = icon_file_svg
-                        return icon_file_svg
-                brute_force = find_file(the_path)
-                if brute_force and os.path.isfile(brute_force):
-                    gremlin.shared_state._icon_path_cache[the_path] = brute_force
-                    return brute_force
-
-        syslog.error(f"Icon file not found: {icon_file}")
-
-        # cache it to avoid the search next time
-        gremlin.shared_state._icon_path_cache[the_path] = None
-
+    # be aware of runtime environment
+    if path:
+        the_path = path.casefold()
+    else:
+        # no path provided
         return None
 
-def load_pixmap(path, size = 24, qta_color = None):
-    ''' gets a pixmap from the path '''
-    import gremlin.ui.ui_common
+    if os.path.isfile(path):
+        return path
 
+    if the_path in gremlin.shared_state._icon_path_cache.keys():
+        return gremlin.shared_state._icon_path_cache[the_path]
+
+    # root folder
+    root_path = get_root_folder()
+
+    # find the file
+    if "/" not in the_path and os.sep not in the_path:
+        # raw find fine
+        icon_file = find_icon(path)
+        if not icon_file:
+            icon_file = _find_file(the_path, root_path)
+
+        if icon_file and os.path.isfile(icon_file):
+            gremlin.shared_state._icon_path_cache[the_path] = icon_file
+            return icon_file
+
+    if "gfx" in the_path.casefold():
+        search_path = [the_path]
+    else:
+        search_path = [the_path, os.path.normpath(os.path.join("gfx", the_path))]
+    for stub_path in search_path:
+        # syslog.info(f"icon path: {the_path}  root: {root_path}")
+        icon_file = os.path.join(root_path, stub_path)
+        icon_file = icon_file.replace("/", os.sep).lower()
+        if icon_file:
+            if os.path.isfile(icon_file):
+                if verbose:
+                    syslog.info(f"Icon file (straight) found: {icon_file}")
+                gremlin.shared_state._icon_path_cache[the_path] = icon_file
+                return icon_file
+            if not icon_file.endswith(".png"):
+                icon_file_png = icon_file + ".png"
+                if os.path.isfile(icon_file_png):
+                    if verbose:
+                        syslog.info(f"Icon file (png) found: {icon_file_png}")
+                    gremlin.shared_state._icon_path_cache[the_path] = icon_file_png
+                    return icon_file_png
+            if not icon_file.endswith(".svg"):
+                icon_file_svg = icon_file + ".svg"
+                if os.path.isfile(icon_file_svg):
+                    if verbose:
+                        syslog.info(f"Icon file (svg) found: {icon_file_svg}")
+                    gremlin.shared_state._icon_path_cache[the_path] = icon_file_svg
+                    return icon_file_svg
+            brute_force = find_file(the_path)
+            if brute_force and os.path.isfile(brute_force):
+                gremlin.shared_state._icon_path_cache[the_path] = brute_force
+                return brute_force
+
+    syslog.error(f"Icon file not found: {icon_file}")
+
+    # cache it to avoid the search next time
+    gremlin.shared_state._icon_path_cache[the_path] = None
+
+    return None
+
+
+def load_pixmap(path, size=24, qta_color=None):
+    """gets a pixmap from the path"""
+    import gremlin.ui.ui_common
 
     if not path:
         return None
@@ -982,12 +997,12 @@ def load_pixmap(path, size = 24, qta_color = None):
         desired_size = QtCore.QSize(size, size)
 
     if isinstance(path, QtGui.QIcon):
-        return  path.pixmap(desired_size)
+        return path.pixmap(desired_size)
     elif isinstance(path, str):
         path = path.casefold()
 
     # see if a built-in icon
-    exts = (".png",".svg",".jpg",".ico",".bmp")
+    exts = (".png", ".svg", ".jpg", ".ico", ".bmp")
     is_image = False
     for ext in exts:
         if ext in path:
@@ -1001,8 +1016,8 @@ def load_pixmap(path, size = 24, qta_color = None):
             assert qta_color.startswith("#") and len(qta_color) == 7
         icon = None
         try:
-            icon = QtGui.QIcon(qta.icon(path, color = qta_color))
-        except:
+            icon = QtGui.QIcon(qta.icon(path, color=qta_color))
+        except Exception:
             pass
 
         if icon:
@@ -1014,7 +1029,7 @@ def load_pixmap(path, size = 24, qta_color = None):
 
     the_path = get_icon_path(path)
     if the_path:
-        #syslog.info(f"load_pixmap(): {the_path}")
+        # syslog.info(f"load_pixmap(): {the_path}")
         pixmap = QtGui.QPixmap(the_path)
         if pixmap.isNull():
             syslog.warning(f"load_pixmap(): pixmap failed: {the_path}")
@@ -1023,15 +1038,18 @@ def load_pixmap(path, size = 24, qta_color = None):
 
     # return a dummy pixmap so the code doesn't blow up
     syslog.error(f"load_pixmap(): invalid path: {the_path} {path}")
-    icon : QtGui.QIcon = load_icon("ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor())
+    icon: QtGui.QIcon = load_icon(
+        "ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor()
+    )
     return icon.pixmap(desired_size)
 
 
-def load_icon(*paths, use_qta = False, qta_color = None):
-    ''' gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search '''
+def load_icon(*paths, use_qta=False, qta_color=None):
+    """gets an icon (returns a QIcon) - uses the qtawesome library or does a raw file search"""
     import gremlin.config
     import gremlin.shared_state
     import gremlin.ui.ui_common
+
     verbose = gremlin.config.Configuration().verbose_mode_details
 
     is_dark = gremlin.shared_state.is_dark_theme
@@ -1040,7 +1058,7 @@ def load_icon(*paths, use_qta = False, qta_color = None):
     if not the_path:
         return get_generic_icon()
 
-    _ , ext = os.path.splitext(the_path.casefold())
+    _, ext = os.path.splitext(the_path.casefold())
 
     if ext == ".svg":
         if not os.path.isfile(the_path):
@@ -1060,21 +1078,23 @@ def load_icon(*paths, use_qta = False, qta_color = None):
                     the_path = dark_path
 
     icon = None
-    if ext == "" or not (ext in (".png",".ico",".svg")) or use_qta:
+    if ext == "" or ext not in (".png", ".ico", ".svg") or use_qta:
         # assume a QTA icon if no extension
         try:
             if not qta_color:
                 qta_color = gremlin.ui.ui_common.Color.normalColor()
             if isinstance(qta_color, str):
                 assert qta_color.startswith("#") and len(qta_color) == 7
-            icon = QtGui.QIcon(qta.icon(the_path, color = qta_color))
-        except:
+            icon = QtGui.QIcon(qta.icon(the_path, color=qta_color))
+        except Exception:
             pass
     if not icon:
         pixmap = load_pixmap(*paths)
         if not pixmap or pixmap.isNull():
             if verbose:
-                syslog.info(f"LoadIcon() using generic icon - failed to locate: {paths}")
+                syslog.info(
+                    f"LoadIcon() using generic icon - failed to locate: {paths}"
+                )
             return get_generic_icon()
 
         icon = QtGui.QIcon()
@@ -1085,7 +1105,7 @@ def load_icon(*paths, use_qta = False, qta_color = None):
 
 
 def dark_file(image_path):
-    ''' gets the dark file name for an icon, if it exists '''
+    """gets the dark file name for an icon, if it exists"""
     the_path = image_path.casefold()
     dirname, basefile = os.path.split(the_path)
     basename, ext = os.path.splitext(basefile)
@@ -1094,21 +1114,19 @@ def dark_file(image_path):
     return image_path
 
 
-
-def create_dark_svg(source_path, dark_path, hexcolor = ""):
+def create_dark_svg(source_path, dark_path, hexcolor=""):
     if os.path.isfile(source_path):
         if not os.path.isfile(dark_path):
             new_color = "#CCCCCC"
             new_gray_color = "#AAAAAA"
             new_stroke = "#666666"
-            with open(source_path,"r") as fin:
-                with open(dark_path,"w") as fout:
+            with open(source_path, "r") as fin:
+                with open(dark_path, "w") as fout:
                     for line in fin.readlines():
-
-                        line = line.replace("#ffffff",new_stroke)
-                        line = line.replace("#666666",new_gray_color)
-                        line = line.replace("#000000",new_color)
-                        line = line.replace("#000005;",new_color)
+                        line = line.replace("#ffffff", new_stroke)
+                        line = line.replace("#666666", new_gray_color)
+                        line = line.replace("#000000", new_color)
+                        line = line.replace("#000005;", new_color)
 
                         fout.write(line)
                     fout.flush()
@@ -1116,12 +1134,10 @@ def create_dark_svg(source_path, dark_path, hexcolor = ""):
                 fin.close()
 
 
-
-
-def recolor_icon_pixmap(image_path, color = "red"):
-    ''' recolors non-transparent pixels in an icon image
+def recolor_icon_pixmap(image_path, color="red"):
+    """recolors non-transparent pixels in an icon image
     :Returns: pixmap of the recolored item
-    '''
+    """
     syslog.info(f"Recolor pixmap: {image_path}")
     the_path = get_icon_path(image_path)
     if the_path:
@@ -1131,9 +1147,9 @@ def recolor_icon_pixmap(image_path, color = "red"):
             if tmp:
                 c = QtGui.QColor(color)
                 for y in range(tmp.height()):
-                    for x in range (tmp.width()):
-                        c.setAlpha(tmp.pixelColor(x,y).alpha())
-                        tmp.setPixelColor(x,y,color)
+                    for x in range(tmp.width()):
+                        c.setAlpha(tmp.pixelColor(x, y).alpha())
+                        tmp.setPixelColor(x, y, color)
 
                 pixmap = QtGui.QPixmap.fromImage(tmp)
                 syslog.info("Recolor complete")
@@ -1141,10 +1157,10 @@ def recolor_icon_pixmap(image_path, color = "red"):
     return None
 
 
-
 def load_image(*paths):
-    ''' loads an image '''
+    """loads an image"""
     import gremlin.config
+
     verbose = gremlin.config.Configuration().verbose_mode_details
     the_path = get_icon_path(*paths)
     if the_path:
@@ -1152,15 +1168,14 @@ def load_image(*paths):
             syslog.info(f"LoadImage() found image: {paths}")
         return QtGui.QImage(the_path)
     if verbose:
-            syslog.info(f"LoadImage() failed to locate: {paths}")
+        syslog.info(f"LoadImage() failed to locate: {paths}")
     return None
 
 
-
-
 def get_generic_icon():
-    ''' gets a generic icon'''
+    """gets a generic icon"""
     import gremlin.shared_state
+
     root_path = gremlin.shared_state.root_path
     generic_icon = os.path.join(root_path, "generic.png")
     if generic_icon and os.path.isfile(generic_icon):
@@ -1175,7 +1190,6 @@ def get_generic_icon():
     return None
 
 
-
 def write_guid(guid):
     """Returns the string representation of a GUID object.
 
@@ -1185,7 +1199,7 @@ def write_guid(guid):
     return normalize_guid(guid)
 
 
-def safe_read(node, key, type_cast, default_value, unescape : bool = False):
+def safe_read(node, key, type_cast, default_value, unescape: bool = False):
     """Safely reads an attribute from an XML node.
 
     If the attempt at reading the attribute fails, due to the attribute not
@@ -1202,7 +1216,7 @@ def safe_read(node, key, type_cast, default_value, unescape : bool = False):
     # in case reading fails
     syslog = logging.getLogger("system")
     value = default_value
-    if not key in node.attrib:
+    if key not in node.attrib:
         if default_value is None:
             match type_cast:
                 case str():
@@ -1220,12 +1234,11 @@ def safe_read(node, key, type_cast, default_value, unescape : bool = False):
     else:
         value = node.get(key)
 
-
     if type_cast is not None:
         try:
-            if type_cast == bool and isinstance(value,str):
-                    value = value.strip().casefold()
-                    value = value == "true"
+            if type_cast is bool and isinstance(value, str):
+                value = value.strip().casefold()
+                value = value == "true"
             else:
                 if value == "none" or value == "None":
                     value = None
@@ -1233,17 +1246,27 @@ def safe_read(node, key, type_cast, default_value, unescape : bool = False):
                     value = 0
                 else:
                     try:
-                        if type_cast == int and isinstance(value, str) and isNumeric(value):
+                        if (
+                            type_cast is int
+                            and isinstance(value, str)
+                            and isNumeric(value)
+                        ):
                             value = int(float(value))
-                        elif type_cast == float and isinstance(value, str) and isNumeric(value):
+                        elif (
+                            type_cast is float
+                            and isinstance(value, str)
+                            and isNumeric(value)
+                        ):
                             value = float(value)
-                        elif unescape and type_cast == str and isinstance(value, str):
+                        elif unescape and type_cast is str and isinstance(value, str):
                             value = html.unescape(value)
 
                         else:
                             value = type_cast(value)
-                    except:
-                        syslog.error(f"XML: safe read - unable to convert type: {type_cast} value: [{value}] - using default: {default_value}")
+                    except Exception:
+                        syslog.error(
+                            f"XML: safe read - unable to convert type: {type_cast} value: [{value}] - using default: {default_value}"
+                        )
                         value = default_value
 
         except ValueError:
@@ -1253,7 +1276,7 @@ def safe_read(node, key, type_cast, default_value, unescape : bool = False):
     return value
 
 
-def safe_format(value, data_type, formatter=str, escape : bool = False):
+def safe_format(value, data_type, formatter=str, escape: bool = False):
     """Returns a formatted value ensuring type correctness.
 
     This function ensures that the value being formatted is of correct type
@@ -1285,22 +1308,22 @@ def safe_format(value, data_type, formatter=str, escape : bool = False):
         return formatter(value)
     else:
         raise error.ProfileError(
-            f"Value \"{value}\" has type {type(value)} when {data_type} is expected"
+            f'Value "{value}" has type {type(value)} when {data_type} is expected'
         )
 
 
-def get_xml_child(node, tag : str, multiple = False):
-    ''' gets a specific xml child node by tag - None if not found
+def get_xml_child(node, tag: str, multiple=False):
+    """gets a specific xml child node by tag - None if not found
 
     :param: multiple - if set, returns all matching subnodes as a list, blank list if nothing found - if not set, returns None or the first node found
 
-    '''
+    """
 
     value = tag.casefold()
     if multiple:
         nodes = []
         for child in list(node):
-            if not child.tag is ElementTree.Comment:
+            if child.tag is not ElementTree.Comment:
                 if child.tag.casefold() == value:
                     nodes.append(child)
         return nodes
@@ -1309,13 +1332,13 @@ def get_xml_child(node, tag : str, multiple = False):
         if child.tag is ElementTree.Comment:
             continue
         if child.tag.casefold() == value:
-
             return child
     return None
 
-def get_xml_parent(node, tag : str):
-    ''' gets the first parent node of that tag '''
-    value = tag.casefold()
+
+def get_xml_parent(node, tag: str):
+    """gets the first parent node of that tag"""
+    _value = tag.casefold()
     parent = node.getparent()
     while parent is not None:
         if parent.tag.casefold() == tag:
@@ -1323,12 +1346,14 @@ def get_xml_parent(node, tag : str):
         parent = parent.getparent()
     return None
 
+
 def get_xml_mode(node):
-    ''' gets the mode from a parent xml node '''
+    """gets the mode from a parent xml node"""
     import gremlin.shared_state
+
     # grab the mode
     mode_node = node
-    while mode_node is not None and mode_node.tag in ("mode","state"):
+    while mode_node is not None and mode_node.tag in ("mode", "state"):
         mode_node = mode_node.getparent()
 
     if mode_node is not None:
@@ -1340,13 +1365,14 @@ def get_xml_mode(node):
 
     return None
 
-def get_xml_input_data(node, extra_data = None):
-    ''' for a given XML node, find in the parent hierarchy of a profile the device_guid, mode, input_type and input_id
+
+def get_xml_input_data(node, extra_data=None):
+    """for a given XML node, find in the parent hierarchy of a profile the device_guid, mode, input_type and input_id
 
     :param node: the child node
     :returns: (device_guid, input_type, input_id, mode)
 
-    '''
+    """
     from gremlin.input_types import InputType
 
     device_guid = None
@@ -1371,23 +1397,22 @@ def get_xml_input_data(node, extra_data = None):
 
     # grab the input type and input id this applies to
     input_node = node
-    tags = ["axis","button","hat","osc","midi"]
+    tags = ["axis", "button", "hat", "osc", "midi"]
 
-    while input_node is not None and not input_node.tag in tags:
+    while input_node is not None and input_node.tag not in tags:
         input_node = input_node.getparent()
-
 
     if input_node is not None:
         match input_node.tag:
             case "axis":
                 input_type = InputType.JoystickAxis
-                input_id = safe_read(input_node,"id",int, 0)
+                input_id = safe_read(input_node, "id", int, 0)
             case "button":
                 input_type = InputType.JoystickButton
-                input_id = safe_read(input_node,"id",int, 0)
+                input_id = safe_read(input_node, "id", int, 0)
             case "hat":
                 input_type = InputType.JoystickHat
-                input_id = safe_read(input_node,"id",int, 0)
+                input_id = safe_read(input_node, "id", int, 0)
             case "osc":
                 child = get_xml_child(input_node, "input")
                 input_type = InputType.OpenSoundControl
@@ -1396,12 +1421,6 @@ def get_xml_input_data(node, extra_data = None):
                 child = get_xml_child(input_node, "input")
                 input_type = InputType.Midi
                 input_id = str(parse_guid(child.get("guid")))
-
-
-
-
-
-
 
     return (device_guid, input_type, input_id, mode)
 
@@ -1416,12 +1435,13 @@ def parse_guid(value) -> uuid.UUID:
     :param dinput.GUID object representing the provided value
     """
     import dinput
+
     if value is None or value == "None" or not value:
         return None
     if isinstance(value, str) and len(value) < 32:
         return None
     if isinstance(value, dinput.GUID):
-        return uuid.UUID(int = value._guid_int)
+        return uuid.UUID(int=value._guid_int)
     if isinstance(value, uuid.UUID):
         return value
     try:
@@ -1434,7 +1454,7 @@ def parse_guid(value) -> uuid.UUID:
             raw_guid.Data4[i] = tmp.bytes[8 + i]
 
         return dinput.GUID(raw_guid)
-    except:
+    except Exception:
         syslog.error(f"Failed parsing GUID from value [{value}]")
         return None
 
@@ -1458,37 +1478,30 @@ def parse_bool(value, default_value=False):
             if int_value in [0, 1]:
                 return int_value == 1
             else:
-                raise error.ProfileError(
-                    f"Invalid bool value used: {value}"
-                )
+                raise error.ProfileError(f"Invalid bool value used: {value}")
         else:
             value = value.lower()
             if value in ["true", "false"]:
                 return value == "true"
             else:
-                raise error.ProfileError(
-                    f"Invalid bool value used: {value}"
-                )
+                raise error.ProfileError(f"Invalid bool value used: {value}")
     except ValueError:
         value = value.lower()
         if value in ["true", "false"]:
             return value == "true"
         else:
-            raise error.ProfileError(
-                f"Invalid bool value used: {value}"
-            )
+            raise error.ProfileError(f"Invalid bool value used: {value}")
     except TypeError:
-        raise error.ProfileError(
-            f"Invalid type provided: {type(value)}"
-        )
+        raise error.ProfileError(f"Invalid type provided: {type(value)}")
 
-def read_guid(node, key, default_value = None):
-    ''' reads a GUID '''
+
+def read_guid(node, key, default_value=None):
+    """reads a GUID"""
     if key in node.attrib:
         try:
             s_guid = node.get(key)
             return uuid.UUID(s_guid)
-        except:
+        except Exception:
             pass
     return default_value
 
@@ -1507,22 +1520,26 @@ def read_bool(node, key, default_value=False):
         return parse_bool(node.get(key), default_value)
     return default_value
 
-def byte_string_to_list(value : str) -> list:
-    ''' converts a text string of sequential bytes separated by a space'''
+
+def byte_string_to_list(value: str) -> list:
+    """converts a text string of sequential bytes separated by a space"""
     tokens = value.split()
     data = []
     for token in tokens:
         try:
-            value = int(token, 16) # expecting a hexadecimal number
+            value = int(token, 16)  # expecting a hexadecimal number
             data.append(value)
-        except:
-            raise ValueError(f"Unable to convert byte string to list, offending value: {token}")
+        except Exception:
+            raise ValueError(
+                f"Unable to convert byte string to list, offending value: {token}"
+            )
 
     return data
 
-def byte_list_to_string(data, as_hex = True):
-    ''' converts a byte list to a string '''
-    result = ''
+
+def byte_list_to_string(data, as_hex=True):
+    """converts a byte list to a string"""
+    result = ""
     for value in data:
         if as_hex:
             result += f"{value:02x} "
@@ -1533,8 +1550,16 @@ def byte_list_to_string(data, as_hex = True):
     result = result[:-1]
     return result
 
-def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0, target_max = 1.0, invert = False):
-    ''' scales a value on one range to the new range
+
+def scale_to_range(
+    value,
+    source_min=-1.0,
+    source_max=1.0,
+    target_min=-1.0,
+    target_max=1.0,
+    invert=False,
+):
+    """scales a value on one range to the new range
 
     value: the value to scale
     r_min: the source value's min range
@@ -1542,7 +1567,7 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
     new_min: the new range's min
     new_max: the new range's max
     invert: true if the value should be reversed
-    '''
+    """
     if value is None:
         return None
 
@@ -1557,305 +1582,141 @@ def scale_to_range(value, source_min = -1.0, source_max = 1.0, target_min = -1.0
         value = source_max
 
     if invert:
-        result = (((source_max - value) * (target_max - target_min)) / (source_max - source_min)) + target_min
+        result = (
+            ((source_max - value) * (target_max - target_min))
+            / (source_max - source_min)
+        ) + target_min
     else:
-        result = (((value - source_min) * (target_max - target_min)) / (source_max - source_min)) + target_min
+        result = (
+            ((value - source_min) * (target_max - target_min))
+            / (source_max - source_min)
+        ) + target_min
     return result + 0
 
+
 def list_to_csv(data) -> str:
-    ''' converts an input list to a CSV stream  - returns a single row '''
+    """converts an input list to a CSV stream  - returns a single row"""
     if not data:
         return ""
     assert isinstance(data, tuple) or isinstance(data, list)
     import csv
     import io
+
     output = io.StringIO()
     writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
     writer.writerow(data)
-    return output.getvalue().strip() # remove new lines
+    return output.getvalue().strip()  # remove new lines
 
-def floatlist_to_csv(data, decimals = 3) -> str:
-    ''' converts an input list to a CSV stream  - returns a single row '''
+
+def floatlist_to_csv(data, decimals=3) -> str:
+    """converts an input list to a CSV stream  - returns a single row"""
     if not data:
         return ""
     assert isinstance(data, tuple) or isinstance(data, list)
     import csv
     import io
+
     output = io.StringIO()
     writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
-    writer.writerow([f'{x:.{decimals}f}' if isinstance(x, float) else x for x in data])
-    return output.getvalue().strip() # remove new lines
+    writer.writerow([f"{x:.{decimals}f}" if isinstance(x, float) else x for x in data])
+    return output.getvalue().strip()  # remove new lines
+
 
 def csv_to_list(value) -> list:
-    ''' converts a single row csv input to a list '''
+    """converts a single row csv input to a list"""
     if value:
         import csv
         import io
+
         input = io.StringIO(value)
         try:
-            reader = csv.reader(input, delimiter=',')
+            reader = csv.reader(input, delimiter=",")
             for row in reader:
                 return row
-        except:
+        except Exception:
             syslog.error(f"Unable to convert data stream {value} to a list")
     return []
 
+
 def csv_to_floatlist(value) -> list:
-    ''' converts a single row csv input to a list of floating point values '''
+    """converts a single row csv input to a list of floating point values"""
     if value:
         import csv
         import io
+
         input = io.StringIO(value)
         try:
-            reader = csv.reader(input, delimiter=',')
+            reader = csv.reader(input, delimiter=",")
             for row in reader:
                 values = [float(v) for v in row]
                 return values
-        except:
+        except Exception:
             syslog.error(f"Unable to convert data stream {value} to a list")
     return []
 
 
-def waitCursor():
-    ''' sets the app to a wait cursor '''
-    pushCursor()
-
-_cursor_push = 0
-_cursor_timer = None # timer to display hourglass
-_cursor_level = []
-_cursor_wait = False
-_qt_wait_cursor = None
-
-
-def pushCursor(immediate = False, callback : Callable = None, *args, **kwargs):
-    ''' displays an hourglass cursor.
-
-    If a callback is specified, a thread will be started and called so the UI thread remains responsive.
-    The callback will get an on_complete parameter to execute when the operation is complete.
-
-    A thread is not created for the callback if the cursor is already set to an hourglass.
-
-    :param immediate: if true, sets the cursor immediately instead of waiting for a short delay
-    :param callback: the function to call while the cursor is displayed
-    :param args: positional arguments for the callback
-    :param kwargs: keyword arguments for the callback
-    '''
-    global _cursor_push, _cursor_timer
-    
-    if _cursor_push == 0:
-        immediate = True
-        if immediate:
-            # syslog.info("PUSH CURSOR: show cursor timer [immediate]")
-            if callback is not None:
-                assert isinstance(callback, Callable),"invalid callback"
-                if not kwargs:
-                    # add completion callback
-                    kwargs = {"on_complete" : popCursor}
-                thread = threading.Thread(target = callback, args=args, kwargs=kwargs)
-            else:
-                thread = None
-            InvokeUiMethod(_pushCursor_ui, thread) # ensure on UI thread
-            QtWidgets.QApplication.processEvents()
-        else:
-            # syslog.info("PUSH CURSOR: show cursor timer [delay]")
-            if _cursor_timer:
-                _cursor_timer.cancel()
-            _cursor_timer = threading.Timer(1.0, _cursor_show_hourglass)
-            _cursor_timer.start()
-        _cursor_push += 1
-    else:
-        _cursor_push += 1
-        if callback is not None:
-            # run the callback immediately if the cursor is already changed
-            if not kwargs:
-                # add completion callback
-                kwargs = {"on_complete" : popCursor}
-            callback(*args, **kwargs)
-         
-    
-    
-    # allow other processing to happen
-    syslog.info(f"PUSH CURSOR: [{_cursor_push}]")
-
-
-
-  
-
-def _cursor_show_hourglass():
-    global _cursor_wait, _cursor_timer
-    _cursor_timer = None 
-    if not _cursor_wait:
-        # syslog.info("PUSH CURSOR: show cursor timer")
-        InvokeUiMethod(_pushCursor_ui) # ensure on UI thread
-        time.sleep(0.1)
-
-def _pushCursor_ui(thread = None):
-    global _cursor_push, _cursor_timer, _cursor_wait, _qt_wait_cursor
-    _cursor_timer = None
-    # syslog.info(f"PUSH CURSOR: [{_cursor_push}]")
-    if not _cursor_wait:
-        _cursor_wait = True
-  
-        if not _qt_wait_cursor:
-            # create a wait cursor
-            _qt_wait_cursor = QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor)
-
-
-        syslog.info("set hourglass")
-        win32gui.LoadCursor(None, win32con.IDC_WAIT)
-        QtWidgets.QApplication.setOverrideCursor(_qt_wait_cursor)
-        QtWidgets.QApplication.processEvents()
-
-        # cursor = QtWidgets.QApplication.overrideCursor()
-        # while cursor != _qt_wait_cursor:
-        #     time.sleep(0)
-        #     QtWidgets.QApplication.processEvents()
-        #     cursor = QtWidgets.QApplication.overrideCursor()
-
-
-        syslog.info("show hourglass")
-    # start the thread if provided
-    if thread:
-        # start the thread when hourglass is displayed
-        thread.start()
-
-
-    
-
-
-def popCursor(reset = False):
-    global _cursor_push, _cursor_timer, _cursor_wait
-    syslog.info(f"POP CURSOR: [{_cursor_push}]")
-    if _cursor_push > 0:
-        _cursor_push -= 1
-    if _cursor_push == 0 or reset:
-        if _cursor_timer is not None:
-            _cursor_timer.cancel()
-            _cursor_timer = None
-        if _cursor_wait or reset:
-            InvokeUiMethod(_popCursor_ui, reset)
-            time.sleep(0.1) # allow other processing to occur
-
-
-            
-def _popCursor_ui(force : bool = False):
-    ''' restores the normal cursor '''
-    global _cursor_wait, _qt_wait_cursor
-    if _cursor_wait or force:
-        _cursor_wait = False
-        # syslog.info("PUSH CURSOR: change to normal cursor")
-        # win32gui.LoadCursor(None, win32con.IDC_ARROW)
-               
-        QtWidgets.QApplication.restoreOverrideCursor()
-        QtWidgets.QApplication.processEvents()
-        syslog.info("hide hourglass")
-
-def isWaitCursor() -> bool:
-    ''' true if the cursor is an hourglass '''
-    global _cursor_push
-    return _cursor_push > 0
-
-def pushCursorLevel(pop = True):
-    ''' saves the cursor level '''
-    global _cursor_push, _cursor_level
-    _cursor_level.append(_cursor_push)
-    if pop:
-        popCursor(True)
-    time.sleep(0.01) # allow other processing to happen
-
-
-def popCursorLevel():
-    ''' restores the last saved cursor level '''
-    global _cursor_push, _cursor_level
-    if _cursor_level:
-        _cursor_push = _cursor_level.pop()
-        if _cursor_push > 0:
-            InvokeUiMethod(_pushCursor_ui)
-
-    time.sleep(0.01) # allow other processing to happen
-
-
-
-def popCursorTemporary_ui(pop = True):
-    ''' restore cursor temporarily without changing the stack - use for dialog boxes/prompt
-
-    :param pop: when true, restores the arrow, when false, shows the wait cursor if it was displayed
-
-    '''
-    global _cursor_push, _qt_wait_cursor
-    if _cursor_push > 0:
-        if pop:
-            _popCursor_ui()
-        else:
-            _pushCursor_ui()
-
-    time.sleep(0.01) # allow other processing to happen
-
-def popCursorTemporary(pop = True):
-    InvokeUiMethod(popCursorTemporary_ui, pop)
-    time.sleep(0.01) # allow other processing to happen
-
-def isCursorActive():
-    ''' true if the cursor stack is not empty '''
-    global _cursor_push
-    return _cursor_push > 0
-
-
 def compare_path(a, b):
-    ''' compare two paths '''
+    """compare two paths"""
     if a is None and b is None:
         return True
     if a is None:
         return False
     if b is None:
         return False
-    af = a.replace("\\","/").casefold().strip()
-    bf = b.replace("\\","/").casefold().strip()
+    af = a.replace("\\", "/").casefold().strip()
+    bf = b.replace("\\", "/").casefold().strip()
     return af == bf
+
 
 def fix_path(a):
     if a:
-        return a.replace("\\","/").casefold().strip()
+        return a.replace("\\", "/").casefold().strip()
     return a
 
-def compare_nocase(a : str, b : str):
-    ''' compares two strings - not case sensitive '''
+
+def compare_nocase(a: str, b: str):
+    """compares two strings - not case sensitive"""
     if a is None and b is None:
         return True
     if a == "" and b == "":
         return True
     return a.casefold() == b.casefold()
 
-def getSignal (oObject : QtCore.QObject, signal_name : str):
-    ''' gets a reference to an object signal  '''
+
+def getSignal(oObject: QtCore.QObject, signal_name: str):
+    """gets a reference to an object signal"""
     if oObject is None:
         return False
     oMetaObj = oObject.metaObject()
-    for i in range (oMetaObj.methodCount()):
+    for i in range(oMetaObj.methodCount()):
         oMetaMethod = oMetaObj.method(i)
         if not oMetaMethod.isValid():
             continue
-        if oMetaMethod.methodType () == QtCore.QMetaMethod.Signal and \
-            oMetaMethod.name() == signal_name:
+        if (
+            oMetaMethod.methodType() == QtCore.QMetaMethod.Signal
+            and oMetaMethod.name() == signal_name
+        ):
             return oMetaMethod
     return None
 
-def isSignalConnected(oObject : QtCore.QObject, signal_name : str):
-    ''' true if a signal is connected '''
+
+def isSignalConnected(oObject: QtCore.QObject, signal_name: str):
+    """true if a signal is connected"""
     if oObject is None:
         return False
     mm = getSignal(oObject, signal_name)
     return mm is not None and oObject.isSignalConnected(mm)
 
 
-
-
-def centerDialog(dialog : QtWidgets.QDialog, width : int = None, height : int = None, parent = None):
-    ''' centers the dialog on top of the UI '''
+def centerDialog(
+    dialog: QtWidgets.QDialog, width: int = None, height: int = None, parent=None
+):
+    """centers the dialog on top of the UI"""
     # Display the dialog centered in the middle of the UI
     import gremlin.shared_state
+
     if gremlin.shared_state.ui is None:
-        return # no UI yet
+        return  # no UI yet
     root = dialog
 
     if width is None:
@@ -1876,22 +1737,24 @@ def centerDialog(dialog : QtWidgets.QDialog, width : int = None, height : int = 
                 root = root.parent()
             geom = root.geometry()
 
-    dialog.move(geom.center()- dialog.rect().center())
+    dialog.move(geom.center() - dialog.rect().center())
 
 
-
-def swapext(path, ext = None, prefix= '', suffix = ''):
-    ''' replaces a file extension with a different one with an additional prefix / suffix'''
+def swapext(path, ext=None, prefix="", suffix=""):
+    """replaces a file extension with a different one with an additional prefix / suffix"""
     dirname, filename = os.path.split(path)
     base, old_ext = os.path.splitext(filename)
     if ext:
-        if ext != '' and not ext.startswith('.'):
+        if ext != "" and not ext.startswith("."):
             ext = "." + ext
     else:
         ext = old_ext
     if dirname:
-        return os.path.normpath(os.path.join(dirname, prefix + base + suffix + ext).casefold())
+        return os.path.normpath(
+            os.path.join(dirname, prefix + base + suffix + ext).casefold()
+        )
     return os.path.normpath((prefix + base + suffix + ext).casefold())
+
 
 def get_ext(path):
     # gets an extension
@@ -1901,16 +1764,19 @@ def get_ext(path):
         return ext.lower()
     return None
 
+
 def strip_ext(path):
     if path:
         tokens = path.split(".")
         return tokens[0]
-    return ''
+    return ""
 
-def swap_ext(path, ext = None, prefix= '', suffix = ''):
+
+def swap_ext(path, ext=None, prefix="", suffix=""):
     return swapext(path, ext, prefix, suffix)
 
-def get_next_file(path : str, max_index = 100, roundrobin : bool = True, delete = True):
+
+def get_next_file(path: str, max_index=100, roundrobin: bool = True, delete=True):
     if os.path.isfile(path):
         index = 1
         width = len(str(max_index))
@@ -1924,35 +1790,37 @@ def get_next_file(path : str, max_index = 100, roundrobin : bool = True, delete 
                 if roundrobin and file_list:
                     # get the oldest file
                     flist = [(fname, os.path.getmtime(fname)) for fname in file_list]
-                    flist.sort(key = lambda x: x[1]) # oldest first
+                    flist.sort(key=lambda x: x[1])  # oldest first
                     blitz, _ = flist[0]
                     if delete:
                         try:
                             os.unlink(blitz)
-                        except:
-                            syslog.error(f"NEXT: roundrobin: unable to delete file: {blitz}")
+                        except Exception:
+                            syslog.error(
+                                f"NEXT: roundrobin: unable to delete file: {blitz}"
+                            )
                             return None
                     return blitz
 
                 return None
             current = swap_ext(path, suffix=f".{index:0{width}}")
     else:
-        current = path # no index
+        current = path  # no index
     return current
 
 
-
 def display_file(path):
-    ''' opens a file in the current editor associated with the extension '''
-    import subprocess
+    """opens a file in the current editor associated with the extension"""
     import webbrowser
+
     if os.path.isfile(path):
         webbrowser.open(path)
     else:
         syslog.error(f"DISPLAYFILE: warning: file not found: {path}")
 
+
 def open_folder(path):
-    ''' opens the folder for a file or folder in explorer '''
+    """opens the folder for a file or folder in explorer"""
     path = os.path.normpath(path)
     if os.path.isfile(path):
         path = os.path.dirname(path)
@@ -1960,7 +1828,7 @@ def open_folder(path):
         os.startfile(path)
 
 
-def debug_pickle(instance, exception=None, string='', first_only=True):
+def debug_pickle(instance, exception=None, string="", first_only=True):
     """
     Recursively go through all attributes of instance and return a list of whatever
     can't be pickled.
@@ -1970,12 +1838,13 @@ def debug_pickle(instance, exception=None, string='', first_only=True):
     """
     problems = []
     import dill
+
     if isinstance(instance, tuple) or isinstance(instance, list):
         for k, v in enumerate(instance):
             try:
                 dill.dumps(v)
             except BaseException as e:
-                problems.extend(debug_pickle(v, e, string + f'[{k}]'))
+                problems.extend(debug_pickle(v, e, string + f"[{k}]"))
                 if first_only:
                     break
     elif isinstance(instance, dict):
@@ -1983,18 +1852,18 @@ def debug_pickle(instance, exception=None, string='', first_only=True):
             try:
                 dill.dumps(k)
             except BaseException as e:
-                problems.extend(debug_pickle(
-                    k, e, string + f'[key type={type(k).__name__}]'
-                ))
+                problems.extend(
+                    debug_pickle(k, e, string + f"[key type={type(k).__name__}]")
+                )
                 if first_only:
                     break
         for v in instance.values():
             try:
                 dill.dumps(v)
             except BaseException as e:
-                problems.extend(debug_pickle(
-                    v, e, string + f'[val type={type(v).__name__}]'
-                ))
+                problems.extend(
+                    debug_pickle(v, e, string + f"[val type={type(v).__name__}]")
+                )
                 if first_only:
                     break
     else:
@@ -2003,17 +1872,16 @@ def debug_pickle(instance, exception=None, string='', first_only=True):
                 try:
                     dill.dumps(v)
                 except BaseException as e:
-                    print (k)
-                    problems.extend(debug_pickle(v, e, string + '.' + k))
-        except:
+                    print(k)
+                    problems.extend(debug_pickle(v, e, string + "." + k))
+        except Exception:
             # ignore types that have no attributes
             pass
-
 
     # if we get here, it means pickling instance caused an exception (string is not
     # empty), yet no member was a problem (problems is empty), thus instance itself
     # is the problem.
-    if string != '' and not problems:
+    if string != "" and not problems:
         problems.append(
             string + f" (Type '{type(instance).__name__}' caused: {exception})"
         )
@@ -2021,34 +1889,46 @@ def debug_pickle(instance, exception=None, string='', first_only=True):
     return problems
 
 
-def is_close(a, b, tolerance = 0.0001):
-    ''' compares two floating point numbers with approximate precision '''
+def is_close(a, b, tolerance=0.0001):
+    """compares two floating point numbers with approximate precision"""
     if a is None and b is None:
         return True
     if a is None and b is not None:
         return False
     return math.isclose(a, b, abs_tol=tolerance)
 
-class InvokeUiMethod(QtCore.QObject):
-    ''' invokes a call on the UI thread as QT is not thread safe '''
-    _called = QtCore.Signal(object, object, object, object, object, object, object, object)
 
-    def __init__(self, method: Callable, p0 = None, p1 = None, p2 = None, p3 = None, p4 = None, p5 = None, p6 = None, p7 = None):
-    
-        ''' Invokes a method on the main ui thread.
+class InvokeUiMethod(QtCore.QObject):
+    """invokes a call on the UI thread as QT is not thread safe"""
+
+    _called = QtCore.Signal(
+        object, object, object, object, object, object, object, object
+    )
+
+    def __init__(
+        self,
+        method: Callable,
+        p0=None,
+        p1=None,
+        p2=None,
+        p3=None,
+        p4=None,
+        p5=None,
+        p6=None,
+        p7=None,
+    ):
+        """Invokes a method on the main ui thread.
 
         :params: method: lambda expression
 
-        '''
+        """
 
         super().__init__()
-        assert method is not None,"Method not provided"
+        assert method is not None, "Method not provided"
         current_thread = QtCore.QThread.currentThread()
         # keep an object reference to the parameters so they don't get garbage collected before the execution is scheduled
 
-
-        ui_thread = QtWidgets.QApplication.instance().thread() # QT thread
-        
+        ui_thread = QtWidgets.QApplication.instance().thread()  # QT thread
 
         if current_thread != ui_thread:
             # not on the QT UI thread, move it to the UI thread - because this is an indirect call
@@ -2066,18 +1946,26 @@ class InvokeUiMethod(QtCore.QObject):
             self.setParent(QtWidgets.QApplication.instance())
             self._called.connect(self._execute)
             self.method = method
-            self._waiting = True
+            #self._waiting = True
             # syslog.info("invoke: call start")
-            self._called.emit(self._p0, self._p1, self._p2, self._p3, self._p4, self._p5, self._p6, self._p7)
-            while self._waiting:
-                time.sleep(0)
+            self._called.emit(
+                self._p0,
+                self._p1,
+                self._p2,
+                self._p3,
+                self._p4,
+                self._p5,
+                self._p6,
+                self._p7,
+            )
+            # while self._waiting:
+            #     time.sleep(0)
             # syslog.info("invoke: call completed")
             self.deleteLater()
 
         else:
             # direct call
             self._exec(method, p0, p1, p2, p3, p4, p5, p6, p7)
-
 
     def _exec(self, method, p0, p1, p2, p3, p4, p5, p6, p7):
         sig = inspect.signature(method)
@@ -2091,99 +1979,93 @@ class InvokeUiMethod(QtCore.QObject):
             case 2:
                 method(p0, p1)
             case 3:
-                method(p0,p1,p2)
+                method(p0, p1, p2)
             case 4:
-                method(p0,p1,p2,p3)
+                method(p0, p1, p2, p3)
             case 5:
-                method(p0,p1,p2,p3,p4)
+                method(p0, p1, p2, p3, p4)
             case 6:
-                method(p0,p1,p2,p3,p4,p5)
+                method(p0, p1, p2, p3, p4, p5)
             case 7:
-                method(p0,p1,p2,p3,p4,p5,p6)
+                method(p0, p1, p2, p3, p4, p5, p6)
             case 8:
-                method(p0,p1,p2,p3,p4,p5,p6,p7)
-
-
-
+                method(p0, p1, p2, p3, p4, p5, p6, p7)
 
     @QtCore.Slot(object)
-    def _execute(self,
-                 p0 = None,
-                 p1 = None,
-                 p2 = None,
-                 p3 = None,
-                 p4 = None,
-                 p5 = None,
-                 p6 = None,
-                 p7 = None
-                 ):
+    def _execute(
+        self, p0=None, p1=None, p2=None, p3=None, p4=None, p5=None, p6=None, p7=None
+    ):
 
         self._exec(self.method, p0, p1, p2, p3, p4, p5, p6, p7)
 
         # trigger garbage collector
         self._called.disconnect(self._execute)
 
-
-        self._waiting = False
+        # self._waiting = False
 
 
 def is_ui_thread():
-    ''' true if the current thread is the UI thread '''
+    """true if the current thread is the UI thread"""
     current_thread = QtCore.QThread.currentThread()
-    ui_thread = QtWidgets.QApplication.instance().thread() # UI thread
+    ui_thread = QtWidgets.QApplication.instance().thread()  # UI thread
     return current_thread == ui_thread
 
+
 def assert_ui_thread():
-    ''' throws an assertion if not running on UI thread which is needed for QT '''
+    """throws an assertion if not running on UI thread which is needed for QT"""
     current_thread = QtCore.QThread.currentThread()
-    ui_thread = QtWidgets.QApplication.instance().thread() # UI thread
+    ui_thread = QtWidgets.QApplication.instance().thread()  # UI thread
     if current_thread != ui_thread:
-        assert False,"call not on UI thread"
+        assert False, "call not on UI thread"
 
 
-
-
-def highlight_qcolor(color : QColor, factor : float = 1.1) -> QColor:
-    '''
+def highlight_qcolor(color: QColor, factor: float = 1.1) -> QColor:
+    """
     computes a highlight color from a QT color object
 
     :param color: a QT color
     :param factor: optional, factor
     :returns: the new QColor object
 
-    '''
-    h,s,v,a = color.getHsv()
+    """
+    h, s, v, a = color.getHsv()
     v = clamp(v * factor, 0, 255)
     new_color = color.fromHsv(h, s, v, a)
     return new_color
 
 
-
-def highlight_color(hex_color:str, factor : float = 1.1):
-    ''''
+def highlight_color(hex_color: str, factor: float = 1.1):
+    """'
     computes a highlight color from a hex color
 
     :param hex_color: a hex color in the format "#aabbcc
     :param factor: optional, factor
     :returns: the new hex color as a string
-    '''
+    """
     import colorsys
-    hex_color = hex_color.lstrip('#')
-    r, g, b = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-    #luminance = 0.299 * r + 0.587 * g + 0.114 * b
+
+    hex_color = hex_color.lstrip("#")
+    r, g, b = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+    # luminance = 0.299 * r + 0.587 * g + 0.114 * b
     h, s, v = colorsys.rgb_to_hsv(r, g, b)
     v = v * factor
     r, g, b = colorsys.hsv_to_rgb(h, s, v)
     return f"#{r:02x}{g:02x}{b:02x}"
 
+
 a_90 = math.radians(90)
 a_45 = math.radians(45)
 
-def snap_to_grid(x : float, y: float, grid_size : int = 50,
-                 ref_x : float= None, ref_y : float = None,
-                 ) -> tuple[float, float]:
-    ''' snaps a coordinate 0 to 1 to a grid '''
-    spacing = 1/grid_size
+
+def snap_to_grid(
+    x: float,
+    y: float,
+    grid_size: int = 50,
+    ref_x: float = None,
+    ref_y: float = None,
+) -> tuple[float, float]:
+    """snaps a coordinate 0 to 1 to a grid"""
+    spacing = 1 / grid_size
     gx = spacing * round(x / spacing)
     gy = spacing * round(y / spacing)
 
@@ -2195,7 +2077,7 @@ def snap_to_grid(x : float, y: float, grid_size : int = 50,
         # reference point provided
         dx = x - ref_x
         dy = y - ref_y
-        d = math.dist([ref_x, ref_y],[x,y])
+        d = math.dist([ref_x, ref_y], [x, y])
         signed_a = math.atan2(dy, dx)
         a = abs(signed_a)
         factor = 1 if signed_a > 0 else -1
@@ -2215,26 +2097,23 @@ def snap_to_grid(x : float, y: float, grid_size : int = 50,
             sy = ref_y + d * math.sin(a_45) * factor
             sy = ref_x + d * math.cos(a_45) * factor
 
-
-    return (sx,sy)
-
+    return (sx, sy)
 
 
-
-def float_to_xml(value : float, decimals = 5) -> str:
-    ''' converts a float to a string for xml saving'''
+def float_to_xml(value: float, decimals=5) -> str:
+    """converts a float to a string for xml saving"""
     return f"{value:0.{decimals}f}"
 
 
 def is_binary_string(data):
-  ''' true if the string is a binary string '''
-  if data is None:
-      return False
-  return isinstance(data, bytes)
+    """true if the string is a binary string"""
+    if data is None:
+        return False
+    return isinstance(data, bytes)
 
 
 def getHostIp() -> list:
-    ''' gets the list of the current machine's IP address '''
+    """gets the list of the current machine's IP address"""
     import socket
 
     # get the local, non VPN, non loopback address
@@ -2244,60 +2123,68 @@ def getHostIp() -> list:
         hostname = socket.getfqdn()
         ip_list = socket.gethostbyname_ex(hostname)[2]
         return [ipa for ipa in ip_list if not ipa.startswith("127.")]
-    except:
+    except Exception:
         pass
     # use the old method
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(0)
     try:
-        s.connect(('10.254.254.254', 1)) # dummy address
+        s.connect(("10.254.254.254", 1))  # dummy address
         host_ip = s.getsockname()[0]
     except Exception:
-        host_ip= '127.0.0.1'
+        host_ip = "127.0.0.1"
     finally:
         s.close()
 
     return [host_ip]
 
+
 def getHostIpSingle():
     import gremlin.config
+
     host = gremlin.config.Configuration().broadcast_host_ip
     if host == "127.0.0.1":
-        if host == '127.0.0.1':
+        if host == "127.0.0.1":
             host = getHostIp()[0]
     return host
 
+
 def to_byte_string(source) -> tuple:
-    ''' converts a byte string or regular string to (string, bytestring) '''
+    """converts a byte string or regular string to (string, bytestring)"""
     if source is None:
         return (None, None)
     if isinstance(source, bytes):
         return (source.decode(), source)
-    return (source, source.encode('utf-8'))
+    return (source, source.encode("utf-8"))
+
 
 def _singleshot(callback):
-    ''' runs on Ui thread - waits for items to be processed '''
-    InvokeUiMethod(_singleshot_ui, callback) # run on UI thread
+    """runs on Ui thread - waits for items to be processed"""
+    InvokeUiMethod(_singleshot_ui, callback)  # run on UI thread
+
 
 def _singleshot_ui(callback):
     QtWidgets.QApplication.processEvents()
     callback()
 
+
 def _get_singleshot_callback(callback):
-    return lambda : _singleshot(callback)
+    return lambda: _singleshot(callback)
+
 
 def _create_singleshot_callback(callback):
     return lambda: _get_singleshot_callback(callback)
 
 
 def singleShot(callback):
-    ''' fires callback in a thread - returns immediately to caller '''
+    """fires callback in a thread - returns immediately to caller"""
 
     timer = threading.Timer(0.02, _create_singleshot_callback(callback))
     timer.start()
 
+
 def cubic_progression(num_points, start, end):
-    ''' computes a cubic progression between two numbers'''
+    """computes a cubic progression between two numbers"""
     progression = []
     for i in range(num_points):
         t = i / (num_points - 1)  # Normalized parameter from 0 to 1
@@ -2308,9 +2195,9 @@ def cubic_progression(num_points, start, end):
 
 
 class ResetTimer(threading.Thread):
-    ''' a reusable/resettable timer '''
+    """a reusable/resettable timer"""
 
-    def __init__(self, interval, target, args = None, kwargs = None):
+    def __init__(self, interval, target, args=None, kwargs=None):
         super().__init__()
         self.interval = interval
         self.function = target
@@ -2321,13 +2208,12 @@ class ResetTimer(threading.Thread):
         self._started = False
 
     def cancel(self):
-        ''' stops the timer '''
+        """stops the timer"""
         self.finished.set()
 
     @property
     def started(self) -> bool:
         return self._started
-
 
     def run(self):
         self._started = True
@@ -2341,7 +2227,7 @@ class ResetTimer(threading.Thread):
         self._started = False
 
     def reset(self, interval=None):
-        """ Reset the timer """
+        """Reset the timer"""
 
         if interval is not None:
             self.interval = interval
@@ -2351,30 +2237,29 @@ class ResetTimer(threading.Thread):
         self.finished.clear()
 
 
-
 def getPythonVersion() -> str:
-    ''' gets the python environment version as a string '''
+    """gets the python environment version as a string"""
     return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
 
 def decode(data) -> str:
-    ''' decodes data and handles invalid characters '''
+    """decodes data and handles invalid characters"""
     if data:
-        text = data.decode('ascii',errors='replace')
-        return text.replace('\ufffd','') # remove junk characters
-    return ''
+        text = data.decode("ascii", errors="replace")
+        return text.replace("\ufffd", "")  # remove junk characters
+    return ""
 
-def valueInRange(value : float, r1 : float, r2 : float, exclusive : bool = False) -> bool:
-    ''' true if the value is within bounds, inclusive of boundaries
+
+def valueInRange(value: float, r1: float, r2: float, exclusive: bool = False) -> bool:
+    """true if the value is within bounds, inclusive of boundaries
     :param value: the floating point value to compare
     :param r1: floating point value, first bound
     :param r2: floating point value, second bound
     :param exclusive: include the boundaries in the comparison or not
     :returns: true if in range, false if not
 
-    '''
+    """
     import gremlin.config
-
 
     if value is None or r1 is None or r2 is None:
         return False
@@ -2398,7 +2283,7 @@ def valueInRange(value : float, r1 : float, r2 : float, exclusive : bool = False
     if not decimals:
         return False
 
-    tolerance = 1/(10**decimals)
+    tolerance = 1 / (10**decimals)
     low = math.isclose(value, r1, abs_tol=tolerance)
     if low:
         return True
@@ -2406,30 +2291,31 @@ def valueInRange(value : float, r1 : float, r2 : float, exclusive : bool = False
     return high
 
 
-def validateIp(ip_address : str) -> bool:
+def validateIp(ip_address: str) -> bool:
     import ipaddress
+
     try:
-        ip = ipaddress.ip_address(ip_address)
+        _ip = ipaddress.ip_address(ip_address)
         return True
-    except:
+    except Exception:
         pass
     return False
 
 
 def create_folder(path) -> bool:
-    ''' creates a folder if it doesn't exist - returns True on ok'''
+    """creates a folder if it doesn't exist - returns True on ok"""
     if not os.path.isdir(path):
         try:
             os.makedirs(path)
         except OSError as err:
-            syslog.error('Error: Creating directory.' +  path,-1)
+            syslog.error("Error: Creating directory." + path, -1)
             syslog.error(">> {}".format(err))
             return False
     return True
 
 
 def str_to_bool(str_value) -> bool:
-    ''' converts a boolean string value to a bool because for some reason bool('false') returns True in python... '''
+    """converts a boolean string value to a bool because for some reason bool('false') returns True in python..."""
     if str_value:
         str_value = str_value.casefold()
         if str_value == "true":
@@ -2445,9 +2331,8 @@ def str_to_bool(str_value) -> bool:
     return False
 
 
-
 def isNumeric(input_string):
-    ''' since str.isnumeric is broken, borrowed this from : https://nextjournal.com/avidrucker/detecting-valid-number-strings-in-python '''
+    """since str.isnumeric is broken, borrowed this from : https://nextjournal.com/avidrucker/detecting-valid-number-strings-in-python"""
 
     def is_period(input_char):
         return input_char == "."
@@ -2466,110 +2351,126 @@ def isNumeric(input_string):
 
     is_digit = str.isdigit
 
-    if(input_string is None or len(input_string) == 0):
+    if input_string is None or len(input_string) == 0:
         return False
 
     for char in input_string:
-        if ((char != "-") and (char != ".") and (not char.isdigit())):
+        if (char != "-") and (char != ".") and (not char.isdigit()):
             return False
 
-
-    if (count_xs(is_hyphen, input_string) > 1):
+    if count_xs(is_hyphen, input_string) > 1:
         return False
 
-
-    if ((count_xs(is_hyphen, input_string) == 1) and (input_string[0] != "-")):
+    if (count_xs(is_hyphen, input_string) == 1) and (input_string[0] != "-"):
         return False
 
-
-    if (count_xs(is_digit, input_string) == 0): # post-refactor
+    if count_xs(is_digit, input_string) == 0:  # post-refactor
         return False
 
-
-    if((input_string[0] == ".") or (input_string[-1] == ".")):
+    if (input_string[0] == ".") or (input_string[-1] == "."):
         return False
 
-    if (count_xs(is_period, input_string) > 1):
+    if count_xs(is_period, input_string) > 1:
         return False
 
-    if((input_string[0] == "-") and (input_string[1] == ".")):
+    if (input_string[0] == "-") and (input_string[1] == "."):
         return False
 
-    if((len(input_string) > 1) and
-        (((input_string[0] == "0") and
-        (input_string[1] != ".")) # eg. "05" number starts with a zero and is followed by another digit (i.e. not a period)
-        or (len(input_string) > 2) and
-        ((input_string[0] == "-") and
-        (input_string[1] == "0") and
-        (input_string[2] != ".")))): # eg. -01 number starts with a hyphen, followed by a zero, followed by another digit (i.e. not a period)
+    if (
+        (len(input_string) > 1)
+        and (
+            (
+                (input_string[0] == "0") and (input_string[1] != ".")
+            )  # eg. "05" number starts with a zero and is followed by another digit (i.e. not a period)
+            or (len(input_string) > 2)
+            and (
+                (input_string[0] == "-")
+                and (input_string[1] == "0")
+                and (input_string[2] != ".")
+            )
+        )
+    ):  # eg. -01 number starts with a hyphen, followed by a zero, followed by another digit (i.e. not a period)
         return False
 
-
-    if((input_string[0] == "-") and (count_xs(is_digit, input_string) == count_xs(is_zero, input_string))):
+    if (input_string[0] == "-") and (
+        count_xs(is_digit, input_string) == count_xs(is_zero, input_string)
+    ):
         return False
-
 
     return True
 
-def get_guid(strip=True,no_brackets = False) -> str:
-    ''' generates a reasonably lowercase unique guid string '''
+
+def get_guid(strip=True, no_brackets=False) -> str:
+    """generates a reasonably lowercase unique guid string"""
     import uuid
+
     guid = f"{uuid.uuid4()}"
     if strip:
-        guid = guid.replace("-",'')
+        guid = guid.replace("-", "")
     if no_brackets:
-        guid = guid.replace("{",'').replace("}",'')
+        guid = guid.replace("{", "").replace("}", "")
     return guid
 
+
 def get_uuid() -> uuid.UUID:
-    ''' gets a unique ID '''
+    """gets a unique ID"""
     return uuid.uuid4()
 
-def is_guid(value):
-    ''' verifies the quantity is a valid GUID '''
 
+def is_guid(value):
+    """verifies the quantity is a valid GUID"""
 
     if value is None:
         return False
 
     value = normalize_guid(value)
 
-    if re.match(value, r'^[0-9a-fA-F]{32}$'):
+    if re.match(value, r"^[0-9a-fA-F]{32}$"):
         return True
     return False
 
+
 def idString(value):
-    ''' converts a value to an id string'''
+    """converts a value to an id string"""
     if not isinstance(value, str):
         value = str(value)
     value = value.casefold()
-    value = value.replace("-",'')
-    value = value.replace("{",'').replace("}",'')
+    value = value.replace("-", "")
+    value = value.replace("{", "").replace("}", "")
     return value
 
 
 def normalize_guid(device_guid) -> str:
-    ''' normalizes a device GUID to a string'''
+    """normalizes a device GUID to a string"""
     if device_guid is None:
         return None
     if not isinstance(device_guid, str):
         if hasattr(device_guid, "toId"):
             device_guid = device_guid.toId()
         else:
-            device_guid = str(device_guid).casefold().replace("-","").replace("{","").replace("}","")
+            device_guid = (
+                str(device_guid)
+                .casefold()
+                .replace("-", "")
+                .replace("{", "")
+                .replace("}", "")
+            )
     else:
         # string
-        device_guid = device_guid.casefold().replace("-","").replace("{","").replace("}","")
+        device_guid = (
+            device_guid.casefold().replace("-", "").replace("{", "").replace("}", "")
+        )
     return device_guid
 
+
 def to_guid(device_guid) -> uuid.UUID:
-    ''' converts a string GUID to a GUID'''
+    """converts a string GUID to a GUID"""
     if device_guid is None:
         return None
     if isinstance(device_guid, uuid.UUID):
         return device_guid
     if isinstance(device_guid, dinput.GUID):
-        return uuid.UUID(int = device_guid._guid_int)
+        return uuid.UUID(int=device_guid._guid_int)
     if hasattr(device_guid, "toId"):
         device_guid = device_guid.toId()
     if isinstance(device_guid, str):
@@ -2577,30 +2478,31 @@ def to_guid(device_guid) -> uuid.UUID:
     raise ValueError(f"Unable to convert [{device_guid}] to a GUID")
 
 
-
-
 def compare_guid(id1, id2) -> bool:
-    ''' compares two GUIDs and returns true if equal - the second parameter can be a list of IDs to check against '''
-    if id1 is None and id2 is None: return True
-    if id1 is None or id2 is None: return False
+    """compares two GUIDs and returns true if equal - the second parameter can be a list of IDs to check against"""
+    if id1 is None and id2 is None:
+        return True
+    if id1 is None or id2 is None:
+        return False
     if id1 == id2:
         return True
     nid1 = normalize_guid(id1)
-    assert not "-" in nid1 or "{" in nid1,f"Bad normalization [{id1}] -> [{nid1}]"
-    if not isinstance(id2, str) and hasattr(id2, '__iter__'):
+    assert "-" not in nid1 or "{" in nid1, f"Bad normalization [{id1}] -> [{nid1}]"
+    if not isinstance(id2, str) and hasattr(id2, "__iter__"):
         for id in id2:
             a = normalize_guid(id)
-            assert not "-" in a or "{" in id,f"Bad normalization [{id}] -> [{a}]"
+            assert "-" not in a or "{" in id, f"Bad normalization [{id}] -> [{a}]"
             if nid1 == a:
                 return True
         return False
     else:
         nid2 = normalize_guid(id2)
-        assert not "-" in nid2 or "{" in nid2,f"Bad normalization [{id2}] -> [{nid2}]"
+        assert "-" not in nid2 or "{" in nid2, f"Bad normalization [{id2}] -> [{nid2}]"
         return nid1 == nid2
 
-def getTemporaryFile(ext = None):
-    ''' gets a temporary file '''
+
+def getTemporaryFile(ext=None):
+    """gets a temporary file"""
     tmp_file = os.path.join(userprofile_path(), get_guid())
     if ext:
         if not ext.startswith("."):
@@ -2608,8 +2510,9 @@ def getTemporaryFile(ext = None):
         tmp_file += ext
     return tmp_file
 
-def compare_float_lists(l1 : list, l2 : list):
-    ''' compares two lists of floats - returns True if the lists are different '''
+
+def compare_float_lists(l1: list, l2: list):
+    """compares two lists of floats - returns True if the lists are different"""
     if l1 is None and l2 is None:
         return False
     if l1 is None or l2 is None:
@@ -2624,17 +2527,18 @@ def compare_float_lists(l1 : list, l2 : list):
             return True
     return False
 
+
 def decorate_filter(filter) -> str:
-    ''' wraps a filter with wildcards if not provided '''
+    """wraps a filter with wildcards if not provided"""
     if filter:
         filter = filter.casefold().strip()
-        if not "*" in filter and not "?" in filter:
-            filter = f"*{filter}*" # add wild cards
+        if "*" not in filter and "?" not in filter:
+            filter = f"*{filter}*"  # add wild cards
     return filter
 
 
 def xmlNodeDepth(node):
-    ''' gets the depth of a given xml node '''
+    """gets the depth of a given xml node"""
     return _xml_depth(node, 0)
 
 
@@ -2645,24 +2549,28 @@ def _xml_depth(node, depth) -> int:
     return d
 
 
-
 def _xml_paste_mode(node, extra_data) -> bool:
-    ''' true if the xml should be read in paste mode '''
+    """true if the xml should be read in paste mode"""
     return extra_data and "paste" in extra_data
 
 
 def find_executable(starts_with_name, exe_name):
-    '''
-        performs a windows registry search for the published name of an executable and the executable name
-        Warning: not exactly fast as every key is searched.
-        Useful when app is not in the search path
-    '''
+    """
+    performs a windows registry search for the published name of an executable and the executable name
+    Warning: not exactly fast as every key is searched.
+    Useful when app is not in the search path
+    """
 
     import winreg
+
     def find_hive(hive, flag, starts_with_name):
         aReg = winreg.ConnectRegistry(None, hive)
-        aKey = winreg.OpenKey(aReg, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-                            0, winreg.KEY_READ | flag)
+        aKey = winreg.OpenKey(
+            aReg,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            0,
+            winreg.KEY_READ | flag,
+        )
 
         count_subkey = winreg.QueryInfoKey(aKey)[0]
 
@@ -2677,53 +2585,62 @@ def find_executable(starts_with_name, exe_name):
                 syslog.info(name)
 
                 if name and name.casefold().startswith(starts_with_name):
-                    software['name'] = name
+                    software["name"] = name
                     try:
-                        software['version'] = winreg.QueryValueEx(asubkey, "DisplayVersion")[0]
+                        software["version"] = winreg.QueryValueEx(
+                            asubkey, "DisplayVersion"
+                        )[0]
                     except EnvironmentError:
-                        software['version'] = 'undefined'
+                        software["version"] = "undefined"
                     try:
-                        software['publisher'] = winreg.QueryValueEx(asubkey, "Publisher")[0]
+                        software["publisher"] = winreg.QueryValueEx(
+                            asubkey, "Publisher"
+                        )[0]
                     except EnvironmentError:
-                        software['publisher'] = 'undefined'
+                        software["publisher"] = "undefined"
                     try:
-                        software['path'] = winreg.QueryValueEx(asubkey, "InstallLocation")[0]
+                        software["path"] = winreg.QueryValueEx(
+                            asubkey, "InstallLocation"
+                        )[0]
                     except EnvironmentError:
-                        software['path'] = ''
+                        software["path"] = ""
                     software_list.append(software)
             except EnvironmentError:
                 continue
 
         return software_list
 
-
-    if starts_with_name == '' or exe_name == '':
+    if starts_with_name == "" or exe_name == "":
         return None
 
     starts_with_name = starts_with_name.casefold()
     # look in 64 bit stuff
-    software_list = find_hive(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY,starts_with_name)
+    software_list = find_hive(
+        winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY, starts_with_name
+    )
     if not len(software_list):
         # look in 32 bit stuff
-        software_list = find_hive(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY, starts_with_name)
+        software_list = find_hive(
+            winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY, starts_with_name
+        )
     if not len(software_list):
-        software_list = find_hive(winreg.HKEY_CURRENT_USER, 0,starts_with_name)
+        software_list = find_hive(winreg.HKEY_CURRENT_USER, 0, starts_with_name)
 
     if len(software_list):
-        path = software_list[0]['path']
-        exe = os.path.join(path,exe_name)
+        path = software_list[0]["path"]
+        exe = os.path.join(path, exe_name)
         if os.path.exists(exe):
             return exe
 
     return None
 
 
-def next_file(file_base, include_extension = True) -> str:
-    ''' gets the next file name
+def next_file(file_base, include_extension=True) -> str:
+    """gets the next file name
 
     :param file_base: input file with full path and optional extension
     :param include_extension: if true, the new file has an extension, if false, it does not.
-    '''
+    """
     if not file_base:
         no_ext_file = getTemporaryFile()
         extension = None
@@ -2744,11 +2661,11 @@ def next_file(file_base, include_extension = True) -> str:
 
 
 def save(file_name, text):
-    '''
+    """
     saves text to a file
     - file is overwritten if it exists
     - placed in the user profile folder if no folder is provided
-    '''
+    """
     if not text:
         syslog.warning("SAVE: nothing to write")
         return
@@ -2770,22 +2687,26 @@ def save(file_name, text):
     syslog.info(f"File written to: {file_name}")
     return file_name
 
+
 def save_xml(file_name, root):
     from lxml import etree
+
     dir_name = os.path.dirname(file_name)
     if not dir_name:
         file_name = os.path.join(userprofile_path(), file_name)
     if os.path.exists(file_name):
         os.unlink(file_name)
     tree = etree.ElementTree(root)
-    tree.write(file_name, pretty_print=True,xml_declaration=True,encoding="utf-8")
+    tree.write(file_name, pretty_print=True, xml_declaration=True, encoding="utf-8")
 
     syslog.info(f"File written to: {file_name}")
     return file_name
 
-def ansiText(value, color = None):
-    ''' converts a value to an ansi colored expression '''
+
+def ansiText(value, color=None):
+    """converts a value to an ansi colored expression"""
     import gremlin.ui.ui_common
+
     ansiReset = gremlin.ui.ui_common.Color.ansiReset()
     if not color and isinstance(value, bool):
         if value:
@@ -2798,10 +2719,10 @@ def ansiText(value, color = None):
 
 
 def triplets(items):
-    ''' returns triplets'''
+    """returns triplets"""
     t_list = []
     # pad to NULL
-    for t in [items[i:i+3] for i in range(0, len(items), 3)]:
+    for t in [items[i : i + 3] for i in range(0, len(items), 3)]:
         count = len(t)
         if count == 1:
             t.extend([None, None])
@@ -2811,12 +2732,12 @@ def triplets(items):
     return t_list
 
 
-def textWordsToUnderscore(text : str, word_count : int = 5):
-    ''' takes an arbitrary text string and return the specified word count as an underscored string - strips punctuation'''
+def textWordsToUnderscore(text: str, word_count: int = 5):
+    """takes an arbitrary text string and return the specified word count as an underscored string - strips punctuation"""
     if not text:
         return None
     source = text.strip().casefold()
-    words = re.findall(r'\w+', source)
+    words = re.findall(r"\w+", source)
     selected_words = words[:word_count]
     suggested_name = ""
     for word in selected_words:
@@ -2831,11 +2752,12 @@ class MONITORINFO(Structure):
         ("cbSize", c_long),
         ("rcMonitor", c_long * 4),
         ("rcWork", c_long * 4),
-        ("dwFlags", c_long)
+        ("dwFlags", c_long),
     ]
 
+
 def getMouseMonitorHandle():
-    ''' gets the handle of the monitor the mouse cursor is currently on '''
+    """gets the handle of the monitor the mouse cursor is currently on"""
     x, y = win32api.GetCursorPos()
     hwnd = win32api.MonitorFromPoint((x, y), win32con.MONITOR_DEFAULTTONEAREST)
     if hwnd is None:
@@ -2843,17 +2765,20 @@ def getMouseMonitorHandle():
 
     return hwnd
 
+
 def getMonitorOrientation(hwnd):
     info = win32api.GetMonitorInfo(hwnd)
     if info is not None:
-        device_name = info['Device']
-        settings = win32api.EnumDisplaySettings(device_name, win32con.ENUM_CURRENT_SETTINGS)
+        device_name = info["Device"]
+        settings = win32api.EnumDisplaySettings(
+            device_name, win32con.ENUM_CURRENT_SETTINGS
+        )
         orientation = settings.DisplayOrientation
         orientations = {
-                0: "Landscape (Normal)",
-                1: "Portrait (90 degrees)",
-                2: "Landscape (Flipped/Inverted)",
-                3: "Portrait (270 degrees)"
+            0: "Landscape (Normal)",
+            1: "Portrait (90 degrees)",
+            2: "Landscape (Flipped/Inverted)",
+            3: "Portrait (270 degrees)",
         }
 
         return orientation, orientations.get(orientation, "Unknown")
@@ -2861,30 +2786,32 @@ def getMonitorOrientation(hwnd):
 
 
 def timeit(callback, *args, **kwargs):
-    ''' times a call '''
+    """times a call"""
     start_time = time.perf_counter()
     callback(*args, **kwargs)
     end_time = time.perf_counter()
     elapsed = end_time - start_time
-    syslog.info(f"Perf: [{callback.__module__}] [{callback.__name__}] time: [{elapsed:.6f}]")
+    syslog.info(
+        f"Perf: [{callback.__module__}] [{callback.__name__}] time: [{elapsed:.6f}]"
+    )
+
 
 class TriggerDict(collections.UserDict):
-    ''' hashable dict that fires callbacks when data is changed '''
+    """hashable dict that fires callbacks when data is changed"""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._on_change_callbacks = []
-        self.id = uuid.uuid4() # unique ID of this dict
+        self.id = uuid.uuid4()  # unique ID of this dict
         self._suspend_stack = 0
         self._callback_pending = False
 
-
-
     def pushSuspend(self):
-        ''' suspends callbacks on change '''
+        """suspends callbacks on change"""
         self._suspend_stack += 1
 
-    def popSuspend(self, reset = False):
-        ''' restores callbacks on change '''
+    def popSuspend(self, reset=False):
+        """restores callbacks on change"""
         if reset:
             self._suspend_stack = 0
         if self._suspend_stack > 0:
@@ -2892,13 +2819,11 @@ class TriggerDict(collections.UserDict):
 
     def addCallback(self, callback: Callable):
         """Registers a function to run on changes."""
-        if callback and not callback in self._on_change_callbacks:
+        if callback and callback not in self._on_change_callbacks:
             self._on_change_callbacks.append(callback)
 
-    
-
     def clearCallbacks(self):
-        ''' clears any change callbacks'''
+        """clears any change callbacks"""
         self._on_change_callbacks.clear()
 
     def __setitem__(self, key, value):
@@ -2918,7 +2843,5 @@ class TriggerDict(collections.UserDict):
                 callback(self, key, old_value, None)
 
     def __hash__(self):
-        ''' make this dict hashable '''
+        """make this dict hashable"""
         return hash(frozenset(self.values()))
-
-

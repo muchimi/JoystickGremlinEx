@@ -33,29 +33,24 @@ import gremlin.ui.ui_common as ui_common
 import gremlin.shared_state
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
-import gremlin.shared_state
 
 import gremlin.base_profile
 import uuid
 from gremlin.singleton_decorator import SingletonDecorator
 import collections
-import logging
 import re
 import time
-from typing import overload, List, Union, Any, Generator, Tuple, Callable, Optional, DefaultDict, Iterator, Union, cast, Coroutine, NamedTuple
-import logging
-from typing import Any, Iterator, List, Union
+from typing import overload, List, Any, Tuple, Callable, Optional, Iterator, Union, cast, Coroutine, NamedTuple
 import asyncio
 from asyncio import BaseEventLoop
 import fnmatch
 import socketserver
 import socket
 from socket import socket as _socket
-import sys
 import os
 from collections.abc import Iterable
 import struct
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 
 import gremlin.ui.ui_common
 from gremlin.util import *
@@ -64,11 +59,7 @@ from lxml import etree as ElementTree
 import enum
 #from gremlin.base_classes import AbstractInputItem
 import gremlin.util
-import vjoy
-import vjoy.vjoy
-import psygnal
 from psygnal import Signal
-from gremlin.input_item import InputItemMappingWidget
 
 
 syslog = logging.getLogger("system")
@@ -166,8 +157,6 @@ class OscParseError(Exception):
     """Base exception for when a datagram parsing error occurs."""
 
 
-class OscBuildError(Exception):
-    """Base exception for when a datagram building error occurs."""
 
 
 # Constant for special ntp datagram sequences that represent an immediate time.
@@ -901,8 +890,6 @@ class OscBundle(object):
 # Shortcut to specify an immediate execution of messages in the bundle.
 
 
-class OscBuildError(Exception):
-    """Error raised when an error occurs building the bundle."""
 
 
 class OscBundleBuilder(object):
@@ -1612,13 +1599,15 @@ class OscClient():
         if self._server_ip == oi.hostIp and self._output_port == oi.hostPort:
             # loopback scenario
             self._loopback = True
-            if verbose: syslog.info(f"OSC loopback client: {self._name} starting {self._server_ip} port: {self._output_port}")
+            if verbose:
+                syslog.info(f"OSC loopback client: {self._name} starting {self._server_ip} port: {self._output_port}")
         else:
             # syslog = logging.getLogger("system")
             if self._server_ip is not None and self._output_port is not None:
                 self._client = UDPClient(self._server_ip, self._output_port)
                 self._started = True
-                if verbose: syslog.info(f"OSC client: {self._name} starting {self._server_ip} port: {self._output_port}")
+                if verbose:
+                    syslog.info(f"OSC client: {self._name} starting {self._server_ip} port: {self._output_port}")
             else:
                 syslog.error(f"OSC client: {self._name} Invalid OSC configuration, provide server IP and port #")
 
@@ -1631,12 +1620,14 @@ class OscClient():
             self._started = False
             if self._loopback:
                 self._loopback = False
-                if verbose: syslog.info(f"OSC: loopback client stop: ip: {self._server_ip} port: {self._output_port}")
+                if verbose:
+                    syslog.info(f"OSC: loopback client stop: ip: {self._server_ip} port: {self._output_port}")
             else:
                 self._client.stop() # stop UDP client
                 self._client = None
                 # syslog = logging.getLogger("system")
-                if verbose: syslog.info(f"OSC: client stop: ip: {self._server_ip} port: {self._output_port}")
+                if verbose:
+                    syslog.info(f"OSC: client stop: ip: {self._server_ip} port: {self._output_port}")
 
 
     def add_arg(self, builder, value):
@@ -1805,7 +1796,7 @@ class OscServer():
         '''
 
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_osc
+        _verbose = config.verbose_mode_osc
         if not config.osc_enabled:
             # disabled
             return
@@ -1916,12 +1907,14 @@ class OscInterface(QtCore.QObject):
         # find our current IP address
         if not host_ip:
             self._host_ip = gremlin.config.Configuration().hostIp
-            if verbose: syslog.info(f"OSC: last server IP: {host_ip}")
+            if verbose:
+                syslog.info(f"OSC: last server IP: {host_ip}")
 
         ip_list = gremlin.util.getHostIp()
         if ip_list:
             if host_ip in ip_list:
-                if verbose: syslog.info(f"OSC: last server IP found")
+                if verbose:
+                    syslog.info("OSC: last server IP found")
             else:
                 host_ip = ip_list[0]
                 if verbose:
@@ -1930,10 +1923,12 @@ class OscInterface(QtCore.QObject):
                     syslog.info(f"OSC: last server IP not found, defaulting to default host IP: {host_ip}")
         else:
             host_ip = "127.0.0.1"
-            if verbose: syslog.info(f"OSC: last server IP not found, no IP found, defaulting to locahost: {host_ip}")
+            if verbose:
+                syslog.info(f"OSC: last server IP not found, no IP found, defaulting to locahost: {host_ip}")
 
 
-        if verbose: syslog.info(f"OSC: input port: {self._input_port}")
+        if verbose:
+            syslog.info(f"OSC: input port: {self._input_port}")
 
         self._target_ip = config.osc_host
         self._target_port = config.osc_output_port
@@ -1942,7 +1937,8 @@ class OscInterface(QtCore.QObject):
         self._client_pool = {} # pool of clients keyed by (ip,port)
         self._client_map = {} # list of clients by client ID (str)
         self._osc_client = self.getClient("osc_interface", self._target_ip, self._target_port) # the default OSC client setup in the configuration file
-        if verbose: syslog.info(f"OSC: output IP: {self._target_ip} port: {self._output_port}")
+        if verbose:
+            syslog.info(f"OSC: output IP: {self._target_ip} port: {self._output_port}")
 
 
         self.setHostIp(host_ip)
@@ -1984,7 +1980,6 @@ class OscInterface(QtCore.QObject):
 
     @QtCore.Slot(bool)
     def _request_osc_state(self, state : bool):
-        from gremlin.input_types import InputType
 
         if state:
             self.start()
@@ -2034,7 +2029,7 @@ class OscInterface(QtCore.QObject):
             return None
 
         key = (server, port)
-        if not key in self._client_pool:
+        if key not in self._client_pool:
             client = OscClient(server, port, name)
             self._client_pool[key] = client
             verbose = gremlin.config.Configuration().verbose_mode_osc
@@ -2042,9 +2037,9 @@ class OscInterface(QtCore.QObject):
                 # syslog = logging.getLogger("system")
                 syslog.info(f"OSC: register client {key}")
 
-        if not key in self._client_map:
+        if key not in self._client_map:
             self._client_map[key] = []
-        if not client_id in self._client_map[key]:
+        if client_id not in self._client_map[key]:
             self._client_map[key].append(client_id)
 
         return self._client_pool[key]
@@ -2056,7 +2051,7 @@ class OscInterface(QtCore.QObject):
 
         if key in self._client_pool:
 
-            if not key in self._client_map:
+            if key not in self._client_map:
                 self._client_map[key] = []
 
             if client_id in self._client_map[key]:
@@ -2109,9 +2104,6 @@ class OscInterface(QtCore.QObject):
         for key, client in add_list:
             self._client_pool[key] = client
 
-    @property
-    def host_ip(self):
-        return self._host_ip
 
 
     @property
@@ -2164,7 +2156,8 @@ class OscInterface(QtCore.QObject):
     def _osc_message_handler(self, address, *args):
         ''' handles internal OSC messages'''
         verbose = gremlin.config.Configuration().verbose_mode_osc
-        if verbose: syslog.info(f"OSC: received: {address}: {args}")
+        if verbose:
+            syslog.info(f"OSC: received: {address}: {args}")
         address = address.casefold()
         if address == "/noop":
             # heartbeat
@@ -2274,7 +2267,7 @@ class OscInputItem(gremlin.input_item.InputItem):
 
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)
         table.addField("Message", self.message)
         table.addField("Mode", self.mode.name)
@@ -2299,14 +2292,6 @@ class OscInputItem(gremlin.input_item.InputItem):
 
         return table.to_html()
     
-    def to_xml(self):
-        node = etree.Element(InputType.to_string(self.input_type))
-        node.set("id", write_guid(self.id))
-        
-        child = self.input_id.to_xml()
-        if child is not None:
-            node.append(child)
-        return node
 
     def __deepcopy__(self, memo):
         return self
@@ -2566,7 +2551,8 @@ class OscInputItem(gremlin.input_item.InputItem):
                 if self._message_key:
                     osc_input.unregisterInput(self)
 
-                if self.verbose: syslog.info(f"OSC update message key from {self._message_key} to {value}")
+                if self.verbose:
+                    syslog.info(f"OSC update message key from {self._message_key} to {value}")
 
                 self._message_key = value
 
@@ -2735,17 +2721,20 @@ class OscInputItem(gremlin.input_item.InputItem):
 
     def __lt__(self, other):
         ''' used for sorting purposes '''
-        if other is None or not isinstance(other, OscInputItem): return False
+        if other is None or not isinstance(other, OscInputItem):
+            return False
         k1 = self.toSortKey()
         k2 = other.toSortKey()
         return k1 < k2
 
     def __eq__(self, other):
 
-        if other is None: return False
+        if other is None:
+            return False
         if isinstance(other, str):
             return gremlin.util.compare_guid(self.id, other)
-        if not isinstance(other, OscInputItem): return False
+        if not isinstance(other, OscInputItem):
+            return False
         k1 = self.toSortKey()
         k2 = other.toSortKey()
         return k1 == k2
@@ -3128,7 +3117,8 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                     widget = parent_widget.itemAt(index)
                     if not widget:
                         continue
-                    if index == self.index : continue # ignore self
+                    if index == self.index :
+                        continue # ignore self
                     # grab the input's configured osc message
                     other_input = widget.identifier.input_id
                     other_message = other_input.message
@@ -3161,14 +3151,14 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                     #     return
 
                     if self._min_range > self._max_range:
-                        self._validation_message_widget.setText(f"Min range must be less than max range")
+                        self._validation_message_widget.setText("Min range must be less than max range")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
                         icon_color= QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color=icon_color)
                         return
 
                     if self._min_range == self._max_range:
-                        self._validation_message_widget.setText(f"Min range cannot be the same as the max range")
+                        self._validation_message_widget.setText("Min range cannot be the same as the max range")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
                         icon_color= QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color=icon_color)
@@ -3179,7 +3169,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                         self._command_data = [0]
                     arg = self._command_data[0]
                     if not (isinstance(arg, int) or isinstance(arg, float)):
-                        self._validation_message_widget.setText(f"First data item must be a number for axis input")
+                        self._validation_message_widget.setText("First data item must be a number for axis input")
                         warning_color = gremlin.ui.ui_common.Color.warningColor()
                         icon_color= QtGui.QColor(warning_color)
                         self._validation_message_widget.setIcon("ph.shield-warning-fill",True, color=icon_color)
@@ -3276,7 +3266,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         if not Shiboken.isValid(self):
             return
 
-        if not index in self._data_widgets:
+        if index not in self._data_widgets:
             widget = gremlin.ui.ui_common.QDataLineEdit()
             widget.setReadOnly(True)
             widget.data = index
@@ -3346,10 +3336,10 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         if self._mode == OscInputItem.InputMode.Button:
             if self.input_item._trigger_autorelease:
-                msg = f"Autorelease mode.<br>The input will trigger a press action when a message is received, followed by a release when the delay has lapsed.<br>Use this mode to trigger a button press/release when an OSC message arrives."
+                msg = "Autorelease mode.<br>The input will trigger a press action when a message is received, followed by a release when the delay has lapsed.<br>Use this mode to trigger a button press/release when an OSC message arrives."
                 delay_enabled = True
             else:
-                msg = f"The input will trigger a press action when the first parameter value is not zero (0).<br>A value of zero (0) will trigger a release action.<br>Use this to mode to trigger button presses from OSC messages."
+                msg = "The input will trigger a press action when the first parameter value is not zero (0).<br>A value of zero (0) will trigger a release action.<br>Use this to mode to trigger button presses from OSC messages."
             self._container_mode_description_widget.setText(msg)
             if not self._mode_button_widget.isChecked():
                 with QtCore.QSignalBlocker(self._mode_button_widget):
@@ -3358,24 +3348,24 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
             parameters_visible = False
 
         elif self._mode == OscInputItem.InputMode.Axis:
-            self._container_mode_description_widget.setText(f"The input act as an axis input using the OSC value.<br>Use this mode if mapping to an axis output (OSC value messages only)")
+            self._container_mode_description_widget.setText("The input act as an axis input using the OSC value.<br>Use this mode if mapping to an axis output (OSC value messages only)")
             #self._command_mode = OscInputItem.CommandMode.Message # force message mode in axis as the value will determine the state
             with QtCore.QSignalBlocker(self._mode_axis_widget):
                 self._mode_axis_widget.setChecked(True)
             range_visible = True
 
         elif self._mode == OscInputItem.InputMode.OnChange:
-            self._container_mode_description_widget.setText(f"The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the OSC command value changes.")
+            self._container_mode_description_widget.setText("The input will trigger a button press on any value change<br>Use this mode to trigger a button or action whenever the OSC command value changes.")
             with QtCore.QSignalBlocker(self._mode_on_change_widget):
                 self._mode_on_change_widget.setChecked(True)
 
         if self._command_mode == OscInputItem.CommandMode.Message:
-            self._container_command_mode_description_widget.setText(f"The OSC message is the primary input (data ignored)")
+            self._container_command_mode_description_widget.setText("The OSC message is the primary input (data ignored)")
             with QtCore.QSignalBlocker(self._command_mode_message_widget):
                 self._command_mode_message_widget.setChecked(True)
                 self._data_container_widget.setEnabled(False) # disable the value area if in message only mode
         elif self._command_mode == OscInputItem.CommandMode.Data:
-            self._container_command_mode_description_widget.setText(f"The OSC message and arguments are used as the primary input")
+            self._container_command_mode_description_widget.setText("The OSC message and arguments are used as the primary input")
             with QtCore.QSignalBlocker(self._command_mode_data_widget):
                 self._command_mode_data_widget.setChecked(True)
             self._data_container_widget.setEnabled(True) # enable the value area if in message + data mode
@@ -3431,7 +3421,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         ''' listens to an inbound OSC message - runs on UI thread'''
 
         gremlin.util.assert_ui_thread()
-        config = gremlin.config.Configuration()
+        _config = gremlin.config.Configuration()
         self.listener_dialog = OscInputListenerWidget(self._capture_message)
 
         # Display the dialog centered in the middle of the UI
@@ -3629,7 +3619,7 @@ class  OscFilterWidget(QtWidgets.QWidget):
 
         plural = "s" if total > 1 else ""
         if total == 0:
-            msg = f"<i>(no inputs found)</i>"
+            msg = "<i>(no inputs found)</i>"
         elif filtered != total:
             msg = f"<i>({filtered:,} of {total:,} OSC input{plural})</i>"
         else:
@@ -3995,8 +3985,8 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def find_item(self, device_guid, input_type, input_id):
         ''' locates the input item, returns none if not found '''
         osc : OscInputItem
-        selected_index = None
-        item = None
+        _selected_index = None
+        _item = None
         model = self.inputItemListModel.dataModel()
         for index, osc in model.items():
             if osc.message == input_id:
@@ -4244,101 +4234,7 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._filter_widget.clearFilter()
         self.inputItemListModel.refresh()
 
-    # def _select_item_cb(self, index, force_update = False, emit = True):
-    #     """Handles the selection of an input item.
-
-    #     :param index the index of the selected item
-    #     """
-    #     import gremlin.ui.input_item
-    #     import gremlin.shared_state
-    #     import gremlin.util
-
-    #     if not Shiboken.isValid(self.inputItemListView):
-    #         return
-
-    #     # self._last_selected_index = index
-    #     input_item = None
-
-
-    #     if index == -1:
-    #         index = self._last_selected_index
-
-    #     if index == -1:
-    #         # select the first item
-    #         if self.inputItemListModel.rows():
-    #             input_item = self.inputItemListModel.data(0)
-    #             index = 0
-    #         else:
-    #             self._blank_input()
-    #             return
-    #     else:
-    #         input_item = self.inputItemListModel.data(index)
-
-
-    #     pop_cursor = False
-    #     try:
-
-    #         if force_update or self.inputCount > 0 and self.inputWidgetCount == 0:
-    #             if not pop_cursor:
-    #                 gremlin.util.pushCursor()
-    #                 pop_cursor = True
-    #             self.inputItemListModel.refresh()
-
-    #         device_guid = self.device_guid
-    #         input_id = input_item.input_id if input_item else None
-    #         input_type = InputType.OpenSoundControl
-
-    #         if input_item:
-
-    #             device_guid = self.device_guid
-    #             key = self.getWidgetKey(input_type, input_id)
-    #             widget = self.getRegisteredWidget(key)
-    #             if not widget:
-    #                 if not pop_cursor:
-    #                     gremlin.util.pushCursor()
-    #                     pop_cursor = True
-    #                 widget = InputItemMappingWidget(input_item = input_item, object_name=f"OSC: {input_item.display_name}")
-    #                 self.registerWidget(key, widget)
-    #                 change_cb = self._create_change_cb(index)
-    #                 widget._container_model.data_changed.connect(change_cb)
-    #                 widget.description_changed.connect(change_cb)
-                    
-
-    #             self.selectRegisteredWidget(key)
-
-
-    #         else:
-    #             profile = gremlin.shared_state.current_profile
-    #             device_guid = gremlin.shared_state.osc_tab_guid
-    #             device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Osc))
-    #             mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
-    #             input_item = OscInputItem(mode_object)
-    #             widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name="OSC Blank InputConfigItem (no item data)")
-    #             widget.redraw() # load the data
-
-    #         #self.setRightPanelWidget(widget)
-
-    #         self._last_selected_index = index
-    #         self._item_data = widget
-    #         self._last_selected_input_item = input_item
-
-
-    #         self.updateContainerViewBlankMessage(input_item, " OSC ")
-
-    #         # ensure visible
-
-    #     finally:
-    #         if pop_cursor:
-    #             gremlin.util.popCursor()
-
-    #     if emit:
-    #         el = gremlin.event_handler.EventListener()
-    #         el.select_input.emit(device_guid, input_type, input_id, False, True, False)
-    #         # el.input_selection_changed.emit(device_guid, input_type, input_id)
-
-
-
-
+    
 
     def _close_item_cb(self, widget, index, data):
         ''' called when the close button is clicked '''
@@ -4413,7 +4309,7 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                     conflicted_widgets.append(input_widget)
                     break
 
-        ok_widgets = [widget for widget in widgets if not widget in conflicted_widgets]
+        ok_widgets = [widget for widget in widgets if widget not in conflicted_widgets]
         for widget in ok_widgets:
             self._set_status(widget)
 
@@ -4596,8 +4492,6 @@ class InputOscClient(QtCore.QObject):
 
         '''
         import gremlin.execution_graph
-        import gremlin.input_devices
-        import gremlin.shared_state
 
 
         config = gremlin.config.Configuration()
@@ -4623,12 +4517,13 @@ class InputOscClient(QtCore.QObject):
                         syslog.info(f"\t{input_item.display_name}  key: [{input_item.message_key}] input mode: [{item_mode}]")
 
             if not self._started:
-                if verbose: syslog.info(f"OSC: Start")
+                if verbose:
+                    syslog.info("OSC: Start")
                 self.start()
             else:
-                syslog.info(f"OSC: Running")
+                syslog.info("OSC: Running")
         else:
-            syslog.info(f"OSC: no OSC mappings found - start skipped")
+            syslog.info("OSC: no OSC mappings found - start skipped")
 
     @QtCore.Slot(bool)
     def _request_osc_state(self, state : bool):
@@ -4647,10 +4542,10 @@ class InputOscClient(QtCore.QObject):
                 self._start()
 
             message_key = input_id.message_key
-            if not message_key in self._osc_map.keys():
+            if message_key not in self._osc_map.keys():
                 self._osc_map[message_key] = []
 
-            if not input_id in self._osc_map[message_key]:
+            if input_id not in self._osc_map[message_key]:
                 self._osc_map[message_key].append(input_id)
             verbose = gremlin.config.Configuration().verbose_mode_osc
             if  verbose:
@@ -4706,7 +4601,6 @@ class InputOscClient(QtCore.QObject):
 
     def _update_messages(self):
         ''' refresh OSC message we're listening to '''
-        from gremlin.ui.osc_device import OscInputItem
         self._osc_map = {}  # list of message keys
         profile = gremlin.shared_state.current_profile
         if profile:
@@ -4745,7 +4639,7 @@ class InputOscClient(QtCore.QObject):
         config = gremlin.config.Configuration()
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
         current_mode = gremlin.shared_state.current_mode
-        cache = tracker.getCache(OscDeviceTabWidget.device_guid, current_mode, InputType.OpenSoundControl)
+        _cache = tracker.getCache(OscDeviceTabWidget.device_guid, current_mode, InputType.OpenSoundControl)
         command = OscInputItem.CommandMode.Message
         # look for the the message
         message_key = OscInputItem.toMessageKey(command, message, args)
@@ -4765,7 +4659,8 @@ class InputOscClient(QtCore.QObject):
             else:
                 source_index = 0
 
-            if verbose: syslog.info(f"OSC: runtime: processing {message_key}  hit key: {hit_key}  source index: {source_index}")
+            if verbose:
+                syslog.info(f"OSC: runtime: processing {message_key}  hit key: {hit_key}  source index: {source_index}")
             input_item : OscInputItem
             for input_item in self._osc_map[hit_key]:
 
@@ -4782,7 +4677,8 @@ class InputOscClient(QtCore.QObject):
                     if index < len(args):
                         raw_value = args[input_item.source_index]
                         value = normalized_args[input_item.source_index]
-                        if verbose: syslog.info(f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}")
+                        if verbose:
+                            syslog.info(f"OSC: source index: {input_item.source_index}  value: {raw_value:0.3f}")
                     else:
                         syslog.error(f"OSC: command [{input_item.message}] : source index {index} specifies an invalid parameter index. Valid parameters received: {args}")
                         raw_value = args[0]

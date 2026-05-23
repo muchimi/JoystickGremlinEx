@@ -26,12 +26,11 @@ import gremlin.input_item
 import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget
 
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
-from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
 
 
 class ChainContainerWidget(AbstractContainerWidget):
@@ -110,27 +109,23 @@ class ChainContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            self.profile_data.add_action(action_item)
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        self.profile_data.add_action(action_item)
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+    
 
     def _paste_action(self, action, container):
         ''' pastes an action '''
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.profile_data)
-            self.profile_data.add_action(action_item)
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.profile_data)
+        self.profile_data.add_action(action_item)
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+    
 
     def _timeout_changed_cb(self, value):
         """Stores changes to the timeout element.

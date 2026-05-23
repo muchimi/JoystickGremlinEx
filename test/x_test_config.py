@@ -18,13 +18,11 @@
 import sys
 sys.path.append(".")
 
-import os
 import tempfile
 import pytest
 
 import gremlin.config
 import gremlin.error
-import gremlin.util
 import gremlin.types
 
 from gremlin.types import PropertyType

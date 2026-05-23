@@ -19,10 +19,7 @@ import sys
 sys.path.append(".")
 
 import pytest
-import uuid
-from lxml import etree as ElementTree
 
-import gremlin.error
 # import gremlin.plugin_manager
 # from gremlin.profile import Profile
 # import gremlin.types

@@ -26,11 +26,11 @@ import gremlin.ui.ui_common
 import gremlin.types
 import gremlin.input_item
 import gremlin.execution_graph
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActivationConditionWidget
 
 from shiboken6 import Shiboken
 import logging
-from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore
 from gremlin.util import safe_format, safe_read
 import threading
 
@@ -98,7 +98,8 @@ If the timer is set to 0, the actions get executed immediately if the condition 
         self.action_layout.addWidget(self.tab_widget)
 
         verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-        if verbose_ui: syslog.info("TriggerContainerWidget: create action UI start")
+        if verbose_ui:
+            syslog.info("TriggerContainerWidget: create action UI start")
         has_actions = False
         for action_set in self.profile_data.action_sets:
             if action_set:
@@ -141,13 +142,14 @@ If the timer is set to 0, the actions get executed immediately if the condition 
 
         # create the condition tab data 
         
-        widget = gremlin.ui.ui_activation_condition.ActivationConditionWidget(self.action_data.condition_data)
+        widget = ActivationConditionWidget(self.action_data.condition_data)
         self.condition_tab_layout.addWidget(widget)
         self.condition_tab_layout.addStretch()
         
 
 
-        if verbose_ui: syslog.info("TriggerContainerWidget: create action UI completed")
+        if verbose_ui:
+            syslog.info("TriggerContainerWidget: create action UI completed")
 
 
 
@@ -176,39 +178,29 @@ If the timer is set to 0, the actions get executed immediately if the condition 
         if action_data is None:
             return
         
-        gremlin.util.pushCursor()
+        if isinstance(action_data, str):
+            action_name = action_data
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        elif isinstance(action_data, Clipboard):
+            # paste operation
+            if action_data.is_action:
+                # verify the action in the clipboard is appropriate for this input
 
-        try:
+                action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
 
-            if isinstance(action_data, str):
-                action_name = action_data
-                plugin_manager = gremlin.plugin_manager.ActionPlugins()
-                action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            elif isinstance(action_data, Clipboard):
-                # paste operation
-                if action_data.is_action:
-                    # verify the action in the clipboard is appropriate for this input
-
-                    action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
-
-            self.profile_data.add_action(action_item)
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        self.profile_data.add_action(action_item)
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
 
     def _paste_action(self, action, container):
         ''' paste action'''
 
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.profile_data)
-            self.profile_data.add_action(action_item)
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.profile_data)
+        self.profile_data.add_action(action_item)
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -298,7 +290,6 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         ''' triggers when the timer runs out'''
         import gremlin.event_handler
         import gremlin.shared_state
-        import gremlin.config 
 
         # come up with our own trigger event
         event = gremlin.event_handler.Event(
@@ -341,7 +332,8 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
         if result:
             # conditions succeeded - run the functors 
-            if self.verbose: syslog.info("TRIGGER CONTAINER: trigger event")
+            if self.verbose:
+                syslog.info("TRIGGER CONTAINER: trigger event")
             self._execute(event, True, None)
                     
   

@@ -27,12 +27,7 @@ Implements the various tree functions to manipulate a profile using a graph data
 # from __future__ import annotations # deprecated with python 3.14+
 
 
-from collections import namedtuple
-import os
-import copy
 import logging
-import time
-from typing import Union, Any
 
 
 import gremlin.joystick_handling
@@ -42,53 +37,37 @@ from enum import auto
 import anytree
 from anytree import NodeMixin
 
-import gremlin.joystick_handling
 import gremlin.plugin_manager
 import gremlin.types
-import gremlin.ui
 import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
-from gremlin.singleton_decorator import SingletonDecorator
 
-import PySide6
-from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
+from PySide6 import QtCore, QtWidgets
 # from gremlin.util import *
-from gremlin.types import DeviceType, TabDeviceType
+from gremlin.types import DeviceType
 from gremlin.input_types import InputType
 import gremlin.util
 from gremlin.util import safe_read
 from gremlin.ui import ui_common
-from gremlin.clipboard import Clipboard
 # from gremlin.input_types import InputType
-import dinput
-import uuid
-import copy
 
-import dinput
 from dinput import DeviceSummary
-import gremlin.base_classes
 import gremlin.base_profile
 import gremlin.event_handler
 import gremlin.shared_state
-from vjoy import vjoy
 
 import gremlin.config
-from gremlin.ui import ui_common
-from gremlin.util import parse_guid, safe_format, safe_read, get_guid, write_guid, read_bool
+from gremlin.util import parse_guid, safe_format, get_guid, write_guid, read_bool
 
 #from xml.dom import minidom
-import lxml
 from lxml import etree
 from lxml.etree import _Element as Element
 
 from abc import ABC, abstractmethod
-import sys
-import psygnal
-from psygnal import Signal
 import html
 
 syslog = logging.getLogger("system")
@@ -181,7 +160,7 @@ class ProfileRootNode(ProfileBaseNode):
         # Parse each device
         self.devices = {}
         for child in node.iter("device"):
-            if not "type" in child.attrib:
+            if "type" not in child.attrib:
                 # not a device node we are looking for
                 continue
 
@@ -310,7 +289,7 @@ class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
 
 class DeviceRemapDialogUI(ui_common.BaseDialogUi):
     ''' dialog box to handle a profile remap between like devices '''
-    def __init__(self, graph : ProfileGraph, parent=None, device_guid = None):
+    def __init__(self, graph : ProfileGraph, parent=None, device_guid = None):  # noqa: F821
         super().__init__(self.__class__.__name__, parent)
 
         self._remap_map = {} # map of profile device node ID to RemapData object holding the configured mapping information
@@ -366,7 +345,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 
         self.update_ui(profile_node)
 
-        gremlin.util.popCursorTemporary(True)
+
 
 
     @QtCore.Slot()
@@ -384,8 +363,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         device_node: ProfileDeviceNode
         for device_node in self._device_nodes:
             device_node.enable_changed_callback = None
-
-        gremlin.util.popCursorTemporary()
+        
         return super().closeEvent(event)
 
     def _derive_source_device_data(self, profile_node : ProfileRootNode, device_guid = None):
@@ -562,7 +540,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         for device in device_nodes:
             device.enabled = False
 
-    def _enable_change_cb(self, device_node : ProfileDeviceNode):
+    def _enable_change_cb(self, device_node : ProfileDeviceNode):  # noqa: F821
         ''' callback when the device changes '''
         widget = self._enabled_widget_map[device_node]
         with QtCore.QSignalBlocker(widget):
@@ -576,7 +554,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         node = widget.data
         node.enabled = checked
 
-    def _populate_devices(self, widget : QtWidgets.QComboBox, device_node : ProfileDeviceNode):
+    def _populate_devices(self, widget : QtWidgets.QComboBox, device_node : ProfileDeviceNode):  # noqa: F821
         ''' populates available devices to map to '''
         widget.clear()
         selected_index = None
@@ -610,7 +588,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         source_device, device_node = widget.data
         target_device : DeviceSummary = widget.currentData() # the device being mapped
         target_id = target_device.device_id
-        source_id = source_device.device_id
+        _source_id = source_device.device_id
         node_id = device_node.id
 
         data = RemapData(source_device, target_device, device_node)
@@ -640,7 +618,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 
     def _dump(self):
         ''' dumps the graph '''
-        syslog.info(f"Profile Graph Tree:")
+        syslog.info("Profile Graph Tree:")
         root = self._graph.root
         if root:
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
@@ -650,7 +628,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         return self._graph.get_device_node(device_guid)
 
     def remap(self) -> bool:
-        gremlin.util.pushCursor()
+        
         data : RemapData
         has_changes = False
         self._dump()
@@ -685,13 +663,14 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
             if self._graph.to_xml(tmp_file):
                 # load it
                 config = gremlin.config.Configuration()
-                verbose =config.verbose_mode_extra and config.verbose
-                if verbose: gremlin.util.display_file(tmp_file)
+                verbose = config.verbose_mode_extra and config.verbose
+                if verbose:
+                    gremlin.util.display_file(tmp_file)
                 gremlin.shared_state.ui.registerTemporaryProfileLoadFile(tmp_file)
                 el = gremlin.event_handler.EventListener()
                 el.request_profile_reload.emit(tmp_file, True)
 
-        gremlin.util.popCursor()
+        
         return True
 
 
@@ -821,7 +800,7 @@ class ProfileDeviceNode(ProfileBaseNode):
             mode_node = ProfileModeNode(self)
             mode_node.from_xml(child, data)
             mode_name = mode_node.name
-            if not mode_name in self.modes:
+            if mode_name not in self.modes:
                 self.modes.append(mode_name)
 
 
@@ -906,7 +885,6 @@ class ProfileModeNode(ProfileBaseNode):
 
         :param node XML node to parse
         """
-        from gremlin.base_profile import InputItem
         name = safe_read(node, "name", str, "")
         name = name.strip()
         self.name = name
@@ -1051,7 +1029,7 @@ class ProfileInputNode(ProfileBaseNode):
                     for child in node:
                         if child.tag == "latched":
                             latched_key = Key(scan_code=safe_read(child,"id",int,0), is_extended= read_bool(child,"extended"))
-                            if not latched_key in key.latched_keys:
+                            if latched_key not in key.latched_keys:
                                 key.latched_keys.append(latched_key)
                 else:
                     # new style
@@ -1142,7 +1120,7 @@ class ProfileInputNode(ProfileBaseNode):
             if child.tag in ("latched", "input", "keylatched") or gremlin.input_item._is_curve_tag(child.tag):
                 # not a container
                 continue
-            if not "type" in child.attrib:
+            if "type" not in child.attrib:
                 syslog.error(f"XML {node.tag} is missing container 'type' attribute")
                 continue
             container_type = child.get("type")
@@ -1334,7 +1312,7 @@ class ProfileGraph():
 
     def _dump(self):
         ''' dumps the graph '''
-        syslog.info(f"Profile Graph Tree:")
+        syslog.info("Profile Graph Tree:")
         root = self._root
         if root:
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
@@ -1361,14 +1339,15 @@ class ProfileGraph():
 
         for device in active_devices:
             if not self.get_device_node(device.device_guid):
-                device_node = ProfileDeviceNode(device = device, parent = self._root)
+                ProfileDeviceNode(device = device, parent = self._root)
 
 
-        if verbose: self._dump()
+        if verbose:
+            self._dump()
 
         # # prompt for mapping if a device is not found
 
-        config = gremlin.config.Configuration()
+        _config = gremlin.config.Configuration()
 
 
     def to_xml(self, target_xml : str) -> bool:

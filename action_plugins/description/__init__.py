@@ -16,15 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
 from lxml import etree as ElementTree
 
 
 import gremlin.config
-from gremlin.input_types import InputType
 import gremlin.input_item
-from gremlin.util import safe_format, safe_read
-from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
+from PySide6 import QtCore, QtWidgets
 import logging
 from shiboken6 import Shiboken
 import html
@@ -143,7 +140,7 @@ Also see notes on actions and containers.
 
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4) 
         
         table.addField("Description", html.escape(self.description))

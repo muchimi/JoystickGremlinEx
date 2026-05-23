@@ -22,7 +22,7 @@ from typing import List, Optional, TYPE_CHECKING
 import uuid
 
 from PySide6 import QtCore, QtQml
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property, Slot
 
 from gremlin import error, plugin_manager, profile, tree, util
 from gremlin.profile import ActionTree, RootAction
@@ -30,7 +30,6 @@ from gremlin.profile import ActionTree, RootAction
 from gremlin.tree import TreeNode
 from gremlin.types import AxisButtonDirection, HatDirection
 from gremlin.input_types import InputType
-import psygnal
 from psygnal import Signal
 
 if TYPE_CHECKING:

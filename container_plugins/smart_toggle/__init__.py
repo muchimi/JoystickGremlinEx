@@ -17,9 +17,7 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 
-import copy
 import logging
-import threading
 import time
 from lxml import etree as ElementTree
 from gremlin.input_types import InputType
@@ -28,11 +26,9 @@ from PySide6 import QtWidgets, QtCore
 
 import gremlin
 import gremlin.config
-import gremlin.execution_graph
 import gremlin.ui.ui_common
-import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
-from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget
+from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
@@ -120,36 +116,32 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            if self.profile_data.action_sets[0] is None:
-                self.profile_data.action_sets[0] = []
-            self.profile_data.action_sets[0].append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        if self.profile_data.action_sets[0] is None:
+            self.profile_data.action_sets[0] = []
+        self.profile_data.action_sets[0].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+        
 
     def _paste_action(self, action, container):
         """Adds a new action to the container.
 
         :param action_name the name of the action to add
         """
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.profile_data)
-            if self.profile_data.action_sets[0] is None:
-                self.profile_data.action_sets[0] = []
-            self.profile_data.action_sets[0].append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-            if Shiboken.isValid(self):
-                self.container_modified.emit()        
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.profile_data)
+        if self.profile_data.action_sets[0] is None:
+            self.profile_data.action_sets[0] = []
+        self.profile_data.action_sets[0].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()        
+        
 
     def _delay_changed_cb(self, value):
         self.profile_data.delay = value / 1000 # in seconds
@@ -187,7 +179,7 @@ class SmartToggleContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFuncto
 
     """Executes the contents of the associated SmartToggle container."""
 
-    def __init__(self, action_data : SmartToggleContainer, parent = None):
+    def __init__(self, action_data : SmartToggleContainer, parent = None):  # noqa: F821
         super().__init__(action_data, parent)
         # self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
         #     action_data.action_sets[0], parent
@@ -241,7 +233,8 @@ class SmartToggleContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFuncto
             self.long_press_time = time.time() + self.delay
 
             if self.mode is None:
-                if verbose: syslog.info("press: normal")
+                if verbose:
+                    syslog.info("press: normal")
                 if self.shortPressMode:
                     
                     self.is_pressed = not self.is_pressed # toggle
@@ -252,16 +245,19 @@ class SmartToggleContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFuncto
                         self._execute(event.invert(), value.invert(), extra_data)
                         #self.action_set.process_event(event.invert(), value.invert(), extra_data)
 
-                    if verbose: syslog.info(f"press: toggle {'on' if self.is_pressed else 'off'}")
+                    if verbose:
+                        syslog.info(f"press: toggle {'on' if self.is_pressed else 'off'}")
                 else:
-                    if verbose: syslog.info("press: normal")
+                    if verbose:
+                        syslog.info("press: normal")
                     self._execute(event, value, extra_data)
                     #self.action_set.process_event(event, value, extra_data)
                     
         
             elif self.mode == "long":
                 # long press mode turn off and do not send input press event
-                if verbose: syslog.info("long press: send OFF")
+                if verbose:
+                    syslog.info("long press: send OFF")
                 if self.shortPressMode:
                     # release the press 
                     self._execute(event.invert(), value.invert(), extra_data)
@@ -283,14 +279,16 @@ class SmartToggleContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFuncto
             if self.long_press_time < time.time():
                 # long press detect
                 if self.shortPressMode:
-                    if verbose: syslog.info("long release: toggle OFF")
+                    if verbose:
+                        syslog.info("long release: toggle OFF")
                     #self.action_set.process_event(event, value, extra_data)
                     self._execute(event, value, extra_data)
                     self.mode = None
                     self.activation_time = 0.0
                     self.is_pressed = False
                 else:
-                    if verbose: syslog.info("long release: enable long press")
+                    if verbose:
+                        syslog.info("long release: enable long press")
                     self.mode = "long"
                     self.release_event = event.clone()
                     self.release_value = value
@@ -389,7 +387,7 @@ On long press the action receives a press input when the input is pressed, and a
     
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
 
         table = ReportTable(cellpadding=4)
         

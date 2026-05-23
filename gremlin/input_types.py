@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8; -*-
 
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
@@ -19,8 +18,8 @@
 # from __future__ import annotations # deprecated with python 3.14+
 import enum
 
-class InputType(enum.IntEnum):
 
+class InputType(enum.IntEnum):
     """Enumeration of possible input types."""
 
     NotSet = 0
@@ -30,13 +29,12 @@ class InputType(enum.IntEnum):
     JoystickHat = 4
     Mouse = 5
     VirtualButton = 6
-    KeyboardLatched = 7 # latched keyboard input
-    OpenSoundControl = 8 # open sound control button input
-    Midi = 9 # midi input
-    ModeControl = 10 # mode actions
-    State = 11 # state input
-    OctaviIfr1 = 12 # octavi IFR1
-
+    KeyboardLatched = 7  # latched keyboard input
+    OpenSoundControl = 8  # open sound control button input
+    Midi = 9  # midi input
+    ModeControl = 10  # mode actions
+    State = 11  # state input
+    OctaviIfr1 = 12  # octavi IFR1
 
     @staticmethod
     def to_string(value):
@@ -89,9 +87,10 @@ class InputType(enum.IntEnum):
             case _:
                 return f"Don't know how to handle {value}"
 
-
     @staticmethod
-    def to_list(include_notset = False, include_mouse = False, include_virtualbutton = False) -> list:
+    def to_list(
+        include_notset=False, include_mouse=False, include_virtualbutton=False
+    ) -> list:
         data = [it for it in InputType]
         if not include_notset:
             data.remove(InputType.NotSet)
@@ -117,7 +116,7 @@ class InputType(enum.IntEnum):
                 input_type = _InputType_to_enum_lookup[value]
                 return input_type
 
-        except:
+        except Exception:
             pass
         return None
 
@@ -133,7 +132,7 @@ _InputType_to_string_lookup = {
     InputType.KeyboardLatched: "keylatched",
     InputType.OpenSoundControl: "osc",
     InputType.Midi: "midi",
-    InputType.ModeControl : "modecontrol",
+    InputType.ModeControl: "modecontrol",
     InputType.State: "state",
     InputType.OctaviIfr1: "ifr1",
     InputType.Mouse: "mouse",
@@ -151,14 +150,14 @@ _InputType_to_display_lookup = {
     InputType.ModeControl: "Mode Control",
     InputType.State: "State",
     InputType.OctaviIfr1: "Octavi IFR1",
-    InputType.Mouse: "Mouse"
+    InputType.Mouse: "Mouse",
 }
 
 
 _InputType_to_enum_lookup = {
     "none": InputType.NotSet,
     "axis": InputType.JoystickAxis,
-    "mouse" : InputType.Mouse,
+    "mouse": InputType.Mouse,
     "button": InputType.JoystickButton,
     "hat": InputType.JoystickHat,
     "key": InputType.KeyboardLatched,
@@ -166,20 +165,19 @@ _InputType_to_enum_lookup = {
     "keylatched": InputType.KeyboardLatched,
     "osc": InputType.OpenSoundControl,
     "midi": InputType.Midi,
-    "modecontrol" : InputType.ModeControl,
-    "state" : InputType.State,
-    "ifr1" : InputType.OctaviIfr1,
+    "modecontrol": InputType.ModeControl,
+    "state": InputType.State,
+    "ifr1": InputType.OctaviIfr1,
     "NotSet": InputType.NotSet,
     "JoystickAxis": InputType.JoystickAxis,
-    "Mouse" : InputType.Mouse,
+    "Mouse": InputType.Mouse,
     "JoystickButton": InputType.JoystickButton,
     "JoystickHat": InputType.JoystickHat,
     "Keyboard": InputType.Keyboard,
     "KeyboardLatched": InputType.KeyboardLatched,
     "OpenSoundControl": InputType.OpenSoundControl,
     "Midi": InputType.Midi,
-    "ModeControl" : InputType.ModeControl,
-    "State" : InputType.State,
-    "OctaviIfr1" : InputType.OctaviIfr1
+    "ModeControl": InputType.ModeControl,
+    "State": InputType.State,
+    "OctaviIfr1": InputType.OctaviIfr1,
 }
-

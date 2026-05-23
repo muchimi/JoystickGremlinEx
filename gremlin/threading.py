@@ -17,8 +17,6 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 import threading
-from threading import Thread, Event, Timer
-import time
 import logging
 
 syslog = logging.getLogger("system")

@@ -143,19 +143,19 @@ def axis2(event, vjoy):
 
 
 @chfs_roll.axis(1)
-def axis2(event, vjoy):
+def axis2_roll(event, vjoy):
     vjoy[1].axis[AxisName.RX].value = event.value
 
 
 @chpp.axis(1)
-def left_pedal(event, vjoy):
+def left_pedal_axis(event, vjoy):
     global left_pedal
     left_pedal = event.value
     vjoy[1].axis[AxisName.RZ].value = pedal_position()
 
 
 @chpp.axis(2)
-def right_pedal(event, vjoy):
+def right_pedal_axis(event, vjoy):
     global right_pedal
     right_pedal = event.value
     vjoy[1].axis[AxisName.RZ].value = pedal_position()

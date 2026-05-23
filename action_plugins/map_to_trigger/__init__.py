@@ -4,35 +4,24 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 import logging
-import math
-import os
-import traceback
-import enum
 from lxml import etree as ElementTree
 
-from PySide6 import QtCore, QtWidgets, QtGui
+from PySide6 import QtCore
 
 import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
-from gremlin.types import SyncMode, HatDirection
-from gremlin.profile import read_bool, safe_read, safe_format
-import gremlin.ui.state_device
+from gremlin.types import HatDirection
+from gremlin.profile import safe_read, safe_format
 import gremlin.ui.ui_common
 import gremlin.input_item
 
-from gremlin import input_devices
-from gremlin.types import ButtonOutputMode
-import vjoy.vjoy
-from gremlin.remote import VjoyAction, remote_control
 import gremlin.joystick_handling
-from psygnal import Signal
 from shiboken6 import Shiboken
 
 import gremlin.util
 from gremlin.util import *
 
-from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 
 syslog = logging.getLogger("system")
@@ -459,7 +448,7 @@ class MapToTrigger(gremlin.base_profile.AbstractAction):
     
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)    
 
         table.addField("Map to Trigger", self.mode.name)

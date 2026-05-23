@@ -22,7 +22,6 @@ import typing
 
 from PySide6 import QtCharts, QtCore, QtQml
 from PySide6.QtCore import Property, Slot
-import psygnal
 from psygnal import Signal
 
 import dinput
@@ -91,7 +90,7 @@ class DeviceListModel(QtCore.QAbstractListModel):
 
     def update_model(self) -> None:
         """Updates the model if the connected devices change."""
-        old_count = len(self._devices)
+        _old_count = len(self._devices)
         self._devices = joystick_handling.all_joystick_devices()
         new_count = len(self._devices)
 
@@ -212,7 +211,7 @@ class Device(QtCore.QAbstractListModel):
     def _convert_index(self, index: int) -> typing.Tuple[InputType, int]:
         axis_count = self._device.axis_count
         button_count = self._device.button_count
-        hat_count = self._device.hat_count
+        _hat_count = self._device.hat_count
 
         if index < axis_count:
             return (

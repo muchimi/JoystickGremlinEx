@@ -63,10 +63,6 @@ class TabData:
 		''' gets the associated device GUID as a string'''
 		return self.device_id
 	
-	@property
-	def device(self) -> dinput.DeviceSummary:
-		''' gets the associated device'''
-		return self._device
 	
 	@property
 	def device_name(self) -> str:
@@ -155,7 +151,7 @@ class TabState():
 		'''
 		assert isinstance(device, dinput.DeviceSummary),"invalid device"
 		device_guid = gremlin.util.to_guid(device.device_guid)
-		if not device_guid in self._tab_map:
+		if device_guid not in self._tab_map:
 			data = TabData(position = position, tab_type=tab_type, device=device, filtered = filtered, locked = locked)
 			self._tab_map[device_guid] = data
 		

@@ -17,8 +17,7 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 
-from abc import abstractmethod, ABCMeta, ABC
-from collections import namedtuple
+from abc import abstractmethod, ABC
 import copy
 import logging
 import time
@@ -39,16 +38,12 @@ import gremlin.plugin_manager
 import gremlin.input_item
 import gremlin.shared_state
 import anytree
-import queue
 from enum import Enum,auto
 
 from gremlin.singleton_decorator import SingletonDecorator
 from PySide6 import QtCore
 from threading import Event
 
-import gremlin.types
-import gremlin.ui
-import psygnal
 import gremlin.gated_handler
 from psygnal import Signal
 
@@ -571,7 +566,8 @@ class ExecutionContext():
 
 
         verbose = gremlin.config.Configuration().verbose_mode_exec
-        if verbose: syslog.info("CONTEXT: reload")
+        if verbose:
+            syslog.info("CONTEXT: reload")
         if not gremlin.shared_state.current_profile:
             # no profile loaded
             return
@@ -600,7 +596,8 @@ class ExecutionContext():
 
         verbose = gremlin.config.Configuration().verbose_mode_exec
         verbose = True
-        if verbose: syslog.info("CONTEXT: rebuild")
+        if verbose:
+            syslog.info("CONTEXT: rebuild")
 
         self.used_items = {}  # nodes can only be used once
         self._build_error = False # true if a build error occurred
@@ -608,7 +605,8 @@ class ExecutionContext():
         assert len(self.graph.children) > 0
 
         self._is_built = result
-        if verbose: syslog.info(f"CONTEXT: rebuild {'Ok' if result else 'Failed'}")
+        if verbose:
+            syslog.info(f"CONTEXT: rebuild {'Ok' if result else 'Failed'}")
 
         if result:
             # tell the ui the execution context changed
@@ -630,7 +628,8 @@ class ExecutionContext():
     def _profile_start(self):
         ''' profile start - rebuild the execution tree '''
         verbose = gremlin.config.Configuration().verbose_mode_exec
-        if verbose: syslog.info("CONTEXT: rebuild on profile start")
+        if verbose:
+            syslog.info("CONTEXT: rebuild on profile start")
         self._rebuild()
 
 
@@ -643,7 +642,8 @@ class ExecutionContext():
         #self.reset()
         for functor in self._functors:
             functor.hook()
-        if config.verbose: syslog.info(f"CONTEXT: profile start with {len(self._functors):,} functors")
+        if config.verbose:
+            syslog.info(f"CONTEXT: profile start with {len(self._functors):,} functors")
 
     def _profile_started(self):
         ''' after profile start occurs '''
@@ -654,7 +654,8 @@ class ExecutionContext():
         for functor in self._functors:
             functor.unhook()
         config = gremlin.config.Configuration()
-        if config.verbose: syslog.info(f"CONTEXT: profile stopped {len(self._functors):,} functors")
+        if config.verbose:
+            syslog.info(f"CONTEXT: profile stopped {len(self._functors):,} functors")
 
         self._is_built = False # rebuild for next time
 
@@ -808,10 +809,12 @@ class ExecutionContext():
                 if not mode:
                     # reached the top level
                     break
-                if verbose: syslog.info(f"CONTEXT: Search callbacks for mode: [{mode}] key: [{key}]")
+                if verbose:
+                    syslog.info(f"CONTEXT: Search callbacks for mode: [{mode}] key: [{key}]")
                 callback_list = callbacks.get(mode, {}).get(key, [])
                 if callback_list:
-                    if verbose: syslog.info(f"\tFound callbacks for mode: [{mode}] key: [{key}]")
+                    if verbose:
+                        syslog.info(f"\tFound callbacks for mode: [{mode}] key: [{key}]")
                     break
                 # bump to parent node if not found
                 node = node.parent
@@ -948,14 +951,15 @@ class ExecutionContext():
     def dump(self, root = None, exclude_empty = True, conditions_only = False, input_tree = False):
         self.dumpModeTree()
         self.dumpExecTree(root, exclude_empty, conditions_only)
-        if input_tree: self.dumpInputTree()
+        if input_tree:
+            self.dumpInputTree()
 
     def dumpExecTree(self, root = None, exclude_empty = True, conditions_only = False):
         # dumps the execution tree
         # syslog = logging.getLogger("system")
         if root is None:
             root = self.graph
-        syslog.info(f"Execution Tree:")
+        syslog.info("Execution Tree:")
         if root:
             for pre, fill, node in anytree.RenderTree(root, style=anytree.AsciiStyle()):
                 if exclude_empty:
@@ -970,7 +974,7 @@ class ExecutionContext():
 
     def dumpInputTree(self):
         ''' dumps the input tree '''
-        syslog.info(f"Input Tree:")
+        syslog.info("Input Tree:")
         root = self.graph_input_root
         if root:
             node : ExecutionGraphNode
@@ -982,7 +986,7 @@ class ExecutionContext():
     def dumpActive(self):
         ''' dumps active execution nodes ONLY'''
         # syslog = logging.getLogger("system")
-        syslog.info(f"Execution Tree:")
+        syslog.info("Execution Tree:")
         if self.graph:
             for pre, fill, node in anytree.RenderTree(self.graph, style=anytree.AsciiStyle()):
                 if anytree.search.findall_by_attr(node, ExecutionGraphNodeType.Action, "nodeType"):
@@ -991,7 +995,7 @@ class ExecutionContext():
 
     def dumpModeTree(self):
         # syslog = logging.getLogger("system")
-        syslog.info(f"Mode Tree:")
+        syslog.info("Mode Tree:")
         if self.modeTree:
             for pre, fill, node in anytree.RenderTree(self.modeTree, style=anytree.AsciiStyle()):
                 syslog.info(f"{pre}{node.display} [{node.mode}]")
@@ -1115,9 +1119,9 @@ class ExecutionContext():
     def _register_condition(self, parent_node, node):
         ''' registers a condition in the condition map '''
         node_id = parent_node.id
-        if not node_id in self._condition_map:
+        if node_id not in self._condition_map:
             self._condition_map[node_id] = []
-        if not node in self._condition_map[node_id]:
+        if node not in self._condition_map[node_id]:
             self._condition_map[node_id].append(node)
         syslog.info(f"Register condition: {node_id} {parent_node.description} -> {node.description}")
 
@@ -1127,11 +1131,13 @@ class ExecutionContext():
         gremlin.shared_state.pushLog()
         try:
             logTabs = gremlin.shared_state.logTabs(True)
-            if self._verbose_detailed: syslog.info(f"{logTabs}EXEC: [{node.id}] {node.description}")
+            if self._verbose_detailed:
+                syslog.info(f"{logTabs}EXEC: [{node.id}] {node.description}")
             match node.nodeType:
                 case ExecutionGraphNodeType.Group:
                     # group node
-                    if self._verbose_detailed: syslog.info(f"{logTabs}\tGroup node")
+                    if self._verbose_detailed:
+                        syslog.info(f"{logTabs}\tGroup node")
                     group_functors = []
                     functors.append(group_functors)
                     for child in node.children:
@@ -1146,14 +1152,16 @@ class ExecutionContext():
                     # this node contains a bunch of conditions and non-conditions
                     # group the conditions together in a list for evaluation, then add the other functors normally
                     # so the list becomes
-                    if self._verbose_detailed: syslog.info(f"{logTabs}\tprocessing ANY rule")
+                    if self._verbose_detailed:
+                        syslog.info(f"{logTabs}\tprocessing ANY rule")
 
                     condition_nodes = [n for n in node.children if n.nodeType == ExecutionGraphNodeType.ActivationCondition]
                     other_nodes = [n for n in node.children if n.nodeType != ExecutionGraphNodeType.ActivationCondition]
                     any_functors = []
                     for child in condition_nodes:
                         self._traverse_node_functors(child, any_functors)
-                    if self._verbose_detailed: syslog.info(f"{logTabs}Added {len(any_functors)} condition functors")
+                    if self._verbose_detailed:
+                        syslog.info(f"{logTabs}Added {len(any_functors)} condition functors")
                     functors.append(any_functors)
                     for child in other_nodes:
                         # add to the functor chain after conditions
@@ -1168,7 +1176,8 @@ class ExecutionContext():
                         for condition in node.conditions:
                             if condition and container:
                                 if isinstance(condition, gremlin.input_item.BaseActivationCondition):
-                                    if self._verbose_detailed: syslog.info(f"{logTabs}\tprocessing ALL rule")
+                                    if self._verbose_detailed:
+                                        syslog.info(f"{logTabs}\tprocessing ALL rule")
                                     for child in node.children:
                                         self._traverse_node_functors(child, node_functors)
                                     functors.extend(node_functors)
@@ -1176,7 +1185,8 @@ class ExecutionContext():
                                     # done processing that branch
                                     return
                                 elif isinstance(condition, gremlin.input_item.BaseAbstractCondition):
-                                    if self._verbose_detailed: syslog.info(f"{logTabs}\tadding functor for condition: {str(condition)}")
+                                    if self._verbose_detailed:
+                                        syslog.info(f"{logTabs}\tadding functor for condition: {str(condition)}")
                                     functor = self._convert_condition(condition)
                                     node_functors.append(functor)
                                     functors.append([functors])
@@ -1234,7 +1244,8 @@ class ExecutionContext():
                             else:
                                 functor = self._convert_condition(condition)
                             logtabs = gremlin.shared_state.logTabs()
-                            if self._verbose_exec: syslog.info(f"{logtabs}\tAdding activation container condition: {str(condition)}")
+                            if self._verbose_exec:
+                                syslog.info(f"{logtabs}\tAdding activation container condition: {str(condition)}")
                             functors.append(functor)
 
             if n.nodeType == ExecutionGraphNodeType.InputItem:
@@ -1286,8 +1297,8 @@ class ExecutionContext():
         return functor
 
     def _get_gate_action_functor(self, action, node):
-        functor : gremlin.base_profile.AbstractFunctor = self._get_action_functor()
-        event = gremlin.event_handler.Event(
+        _functor : gremlin.base_profile.AbstractFunctor = self._get_action_functor()
+        _event = gremlin.event_handler.Event(
                     event_type= gremlin.input_types.InputType.VirtualButton,
                     device_guid = gremlin.shared_state.virtual_device_guid,
                     identifier = 1
@@ -1318,7 +1329,7 @@ class ExecutionContext():
             if not container.is_valid():
                 syslog.warning(f"Incomplete container ignored: container id: [{container.id}] returned validation FAIL")
                 if config.allow_exec_tree_container_validation_fail:
-                    syslog.warning(f"\tOverride allowed - build continuing...")
+                    syslog.warning("\tOverride allowed - build continuing...")
                 else:
                     return None
 
@@ -1326,7 +1337,8 @@ class ExecutionContext():
             # container IDs may be duplicated when a container was pasted or the xml was manually edited and the profile was not saved/reloaded since
             # as the load operation checks for duplicate IDs as well
             if container.id in self.used_items:
-                if verbose:  syslog.info(f"BUILD WARNING: Container already used: {container.id} - resetting ID - this is normal if the container was just pasted")
+                if verbose:
+                    syslog.info(f"BUILD WARNING: Container already used: {container.id} - resetting ID - this is normal if the container was just pasted")
                 container.setId(gremlin.util.get_guid())
             self.used_items[container.id] = container
 
@@ -1412,7 +1424,8 @@ class ExecutionContext():
                 for index, action in action_list:
 
                     if action.id in self.used_items:
-                        if verbose: syslog.info(f"{logtabs}BUILD WARNING: Action already used: {action.id} - setting up a new unique ID")
+                        if verbose:
+                            syslog.info(f"{logtabs}BUILD WARNING: Action already used: {action.id} - setting up a new unique ID")
                         action.setId(gremlin.util.get_guid())
 
                     self.used_items[action.id] = action
@@ -1574,7 +1587,7 @@ class ExecutionContext():
 
             # setup a map of input nodes by their callback keys so they are fast to locate - the key is unique by device_id, input_id and input_type
             input_key = input_item.callbackKey()
-            if not input_key in self.m_input_nodes:
+            if input_key not in self.m_input_nodes:
                 m_input_node = ExecutionGraphInputNode()
                 m_input_node.parent = self.graph_input_root
                 m_input_node.input_item = input_item
@@ -1651,11 +1664,12 @@ class ExecutionContext():
             mode_nodes[mode] = mode_item
 
         mode_tree = gremlin.shared_state.current_profile.modeTree()
-        if verbose: gremlin.shared_state.current_profile.dumpModeTree()
+        if verbose:
+            gremlin.shared_state.current_profile.dumpModeTree()
         tree_nodes = {}
         for node in anytree.PreOrderIter(mode_tree):
             mode_name = node.name
-            if not mode_name in tree_nodes:
+            if mode_name not in tree_nodes:
                 tree_node = ExecutionModeNode(mode_name)
                 tree_node.parent = self._mode_tree
                 tree_nodes[mode_name] = tree_node
@@ -1665,7 +1679,7 @@ class ExecutionContext():
             if mode_name and node.parent and node.parent.name:
                 parent_mode_name = node.parent.name
                 mode_nodes[mode_name].parent = mode_nodes[parent_mode_name]
-                if not parent_mode_name in tree_nodes:
+                if parent_mode_name not in tree_nodes:
                     parent_tree_node = ExecutionModeNode(parent_mode_name)
                     parent_tree_node.parent = self._mode_tree
                     tree_nodes[parent_mode_name] = parent_tree_node
@@ -1722,7 +1736,7 @@ class ExecutionContext():
 
                 for mode in device.modes.values():
                     mode_name = mode.name
-                    if not mode_name in mode_nodes:
+                    if mode_name not in mode_nodes:
                         syslog.error(f"Execution Tree: error: mode: {mode_name} is not found in the device node: {device_node.device.name}")
                         continue
 
@@ -1733,7 +1747,7 @@ class ExecutionContext():
                     mode_node.mode = mode_name
 
                     # build list of parent modes - contains the current mode if a root mode, or the list of current and parent modes if nested
-                    if not mode_name in self._mode_ancestors:
+                    if mode_name not in self._mode_ancestors:
                         self._mode_ancestors[mode_name] = current_profile.get_mode_ancestors(mode_name)
                         self._mode_descendants[mode_name] = current_profile.get_mode_descendants(mode_name)
 
@@ -1774,7 +1788,8 @@ class ExecutionContext():
         '''
 
         verbose = gremlin.config.Configuration().verbose
-        if verbose: syslog.info("Register callbacks in execution tree")
+        if verbose:
+            syslog.info("Register callbacks in execution tree")
         for device_guid in callbacks:
             for mode in callbacks[device_guid]:
                 for key in callbacks[device_guid][mode]:
@@ -1787,7 +1802,8 @@ class ExecutionContext():
                             syslog.warning(f"EXEC: cannot find execution node for callback: {callback}")
                             continue
 
-                        if self._verbose_exec: syslog.info(f"Looking for id: {id}")
+                        if self._verbose_exec:
+                            syslog.info(f"Looking for id: {id}")
                         node = next((n for n in anytree.PreOrderIter(self.graph) if  n.nodeType == ExecutionGraphNodeType.Container and n.id == id), None)
                         if node:
                             self.registerNode(node)
@@ -1883,7 +1899,7 @@ class ExecutionContext():
         ''' true if the input item has a defined action for the given mode '''
         key = input_item.callbackKey()
         if key in self.graph_input_map:
-            node = self.graph_input_map[key]
+            _node = self.graph_input_map[key]
 
 
     def execute_node(self, node : ExecutionGraphNode, event, value, extra_data : dict = None,  manual = False, visited = None) -> bool:
@@ -1915,7 +1931,8 @@ class ExecutionContext():
 
             # abort if the mode changed and the event was fired in a different mode
             if event.mode and event.mode != gremlin.shared_state.runtime_mode:
-                if verbose_exec: syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description} - ignoring event due to wrong mode {event.mode} current runtime: {gremlin.shared_state.runtime_mode} ")
+                if verbose_exec:
+                    syslog.info(f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description} - ignoring event due to wrong mode {event.mode} current runtime: {gremlin.shared_state.runtime_mode} ")
                 return False
 
             if node.latched_conditions:
@@ -2303,7 +2320,8 @@ class VirtualButtonProcess(ContainerCallback):
         # verify the virtual button should process based on the event
         result = self.virtual_button._do_process(event)
         if result:
-            if verbose: syslog.info("VIRTUALBUTTON: execute PASS")
+            if verbose:
+                syslog.info("VIRTUALBUTTON: execute PASS")
             extra_data["virtual_button"] = self.virtual_button
             # convert to a fake button
             event.fake_button(self.virtual_button.is_pressed) # issue press or release
@@ -2312,7 +2330,8 @@ class VirtualButtonProcess(ContainerCallback):
             return
         #self.virtual_button.process_event(event)
 
-        if verbose: syslog.info("VIRTUALBUTTON: execute FAIL")
+        if verbose:
+            syslog.info("VIRTUALBUTTON: execute FAIL")
 
 
 class AbstractExecutionGraph(QtCore.QObject):
@@ -2492,7 +2511,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
 
         # If container based conditions exist add them before any actions
 
-        condition_functor = None
+        _condition_functor = None
         if container.has_conditions:
 
             functor = self._create_activation_condition(container.activation_condition, container, is_container_condition = True)
@@ -2501,7 +2520,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
             container_plugins.register_functor(functor)
             sequence.append("ContainerCondition")
             node.sequence.append("ContainerCondition")
-            condition_functor = functor
+            _condition_functor = functor
 
 
 
@@ -2633,7 +2652,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             # Create default activation condition if needed
             has_input_action = self._contains_input_action_condition(action.activation_condition)
 
-            condition_functor = None
+            _condition_functor = None
             if add_default_activation and not has_input_action:
                 condition = gremlin.input_item.BaseInputActionCondition()
                 condition.comparison = ActionSetExecutionGraph.comparison_map[action.default_button_activation]
@@ -2644,7 +2663,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                 sequence.append("Condition")
                 nodes[action].functors.append(functor)
                 nodes[action].sequence.append("Condition")
-                condition_functor = functor
+                _condition_functor = functor
 
 
 

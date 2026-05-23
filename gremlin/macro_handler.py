@@ -16,19 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import collections
 import logging
 import os
 import pickle
-import time
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui
 import gremlin.config
 from gremlin.input_types import InputType
 from gremlin.remote import VjoyAction
-from gremlin.keyboard import key_from_code, key_from_name
 import gremlin.types
-import psygnal
-from psygnal import Signal
 
 
 syslog = logging.getLogger("system")
@@ -70,7 +65,7 @@ class MacroListModel(QtCore.QAbstractListModel):
     @staticmethod
     def _get_hat_value(value):
         import vjoy.vjoy
-        if not value in vjoy.vjoy.Hat.direction_to_name:
+        if value not in vjoy.vjoy.Hat.direction_to_name:
             value = (0,0)
         return vjoy.vjoy.Hat.direction_to_name[value]
 

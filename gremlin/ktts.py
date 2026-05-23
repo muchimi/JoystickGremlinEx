@@ -22,23 +22,10 @@
 import io
 import os
 import shutil
-from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
-from lxml import etree as ElementTree
-import qtawesome as qta
+from PySide6 import QtCore, QtWidgets
 import gremlin.util
-import gremlin.event_handler
 
-import gremlin.base_profile
-import gremlin.config
-from gremlin.input_types import InputType
-from gremlin.util import load_icon, userprofile_path
-import gremlin.input_item
-import gremlin.ui.ui_common
-import threading
-from shiboken6 import Shiboken
-from gremlin.util import safe_format, safe_read
 import logging
-from psygnal import Signal
 import gremlin.singleton_decorator
 import time
 import json
@@ -273,9 +260,9 @@ class KTTS():
         # pick a default speaker
         speakers = self.getSpeakers(True)
         if not speakers:
-            syslog.error(f"KTTS: unable to get speaker list.")
+            syslog.error("KTTS: unable to get speaker list.")
             return None
-        if not speaker or not speaker in speakers:
+        if not speaker or speaker not in speakers:
             speaker = speakers[0]
 
         # speaker to use
@@ -307,7 +294,7 @@ class KTTS():
             syslog.info(f"KTTS: TTS generated [{wav}]")
 
         else:
-            syslog.warning(f"KTTS: unable to generate TTS")
+            syslog.warning("KTTS: unable to generate TTS")
 
         return wav
     
@@ -339,7 +326,6 @@ class KTTS():
         '''
 
         from pydub import AudioSegment
-        import noisereduce as nr
         import soundfile as sf
         import pyrubberband as pyrb
         if tts_speed == 1.0:

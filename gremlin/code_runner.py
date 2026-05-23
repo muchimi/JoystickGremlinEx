@@ -21,9 +21,6 @@ import os
 import random
 import string
 import sys
-import time
-import threading
-import gc
 
 
 import dinput
@@ -33,7 +30,6 @@ import gremlin
 #     joystick_handling, macro, sendinput, user_plugin, util
 
 
-import gremlin.actions
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.keyboard
@@ -55,10 +51,7 @@ import gremlin.sendinput as sendinput
 import gremlin.execution_graph
 import gremlin.ui
 import gremlin.remote
-import anytree
 import traceback
-import psygnal
-from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
@@ -89,7 +82,7 @@ class CodeRunner:
 
 
     def _action_created_cb(self, action):
-        if not action in self._actions:
+        if action not in self._actions:
             self._actions.append(action)
 
 
@@ -318,7 +311,7 @@ class CodeRunner:
             for device in profile.devices.values():
                 device_info = gremlin.joystick_handling.getDevice(device.device_guid)
                 if not device_info:
-                    syslog.warning(f"CALLBACK: skipping a device: ID referenced in profile data is not currently found in the list of known devices:")
+                    syslog.warning("CALLBACK: skipping a device: ID referenced in profile data is not currently found in the list of known devices:")
                     syslog.warning(f"\t{str(device)}")
                     continue
 
@@ -328,7 +321,7 @@ class CodeRunner:
                     syslog.info(f"CALLBACK: device: {str(device)}")
 
                 for mode in device.modes.values():
-                    if not mode.name in mode_nodes:
+                    if mode.name not in mode_nodes:
                         # special mode or mode not present in profile
                         continue
                     mode_node = mode_nodes[mode.name]
@@ -342,7 +335,8 @@ class CodeRunner:
                                 #if verbose: syslog.info(f"\t\tno containers")
                                 continue
 
-                            if verbose: syslog.info(f"\t{input_item.display_name}")
+                            if verbose:
+                                syslog.info(f"\t{input_item.display_name}")
 
                             self.event_handler.registerInputItem(mode.name, input_item)
 
@@ -369,7 +363,7 @@ class CodeRunner:
                             for cb_data in callbacks:
                                 if cb_data.event is None:
                                     if verbose:
-                                        syslog.info(f"\t\tcallback: ")
+                                        syslog.info("\t\tcallback: ")
                                         if not hasattr(cb_data.callback,"execution_graph"):
                                             continue
                                         for functor in cb_data.callback.execution_graph.functors:
@@ -547,26 +541,31 @@ class CodeRunner:
 
             profile_numlock_off = profile.get_force_numlock()
             profile_numlock_on = profile.get_force_numlock_on()
-            if verbose: syslog.info(f"NumLock off state: global: {global_numlock_off}  profile off: {profile_numlock_off} profile on: {profile_numlock_on}")
+            if verbose:
+                syslog.info(f"NumLock off state: global: {global_numlock_off}  profile off: {profile_numlock_off} profile on: {profile_numlock_on}")
 
             numlock_off = global_numlock_off or profile_numlock_off
             numlock_on = not global_numlock_off and not profile_numlock_off and profile_numlock_on
 
             if numlock_on:
                 state = gremlin.keyboard.KeyMap.numlock_state()
-                if verbose: syslog.info(f"Numlock state: {state}")
+                if verbose:
+                    syslog.info(f"Numlock state: {state}")
                 if not state:
                     # toggle numlock on
-                    if verbose: syslog.info(f"Numlock state: Forcing On")
+                    if verbose:
+                        syslog.info("Numlock state: Forcing On")
                     gremlin.keyboard.KeyMap.toggle_numlock()
 
 
             elif numlock_off:
                 state = gremlin.keyboard.KeyMap.numlock_state()
-                if verbose: syslog.info(f"Numlock state: {state}")
+                if verbose:
+                    syslog.info(f"Numlock state: {state}")
                 if state:
                     # toggle numlock off
-                    if verbose: syslog.info(f"Numlock state: Forcing Off")
+                    if verbose:
+                        syslog.info("Numlock state: Forcing Off")
                     gremlin.keyboard.KeyMap.toggle_numlock()
 
 
@@ -615,7 +614,7 @@ class CodeRunner:
 
 
                 if mode:
-                    if not mode in mode_list:
+                    if mode not in mode_list:
                         syslog.error(f"Unable to restore profile mode: '{mode}' no longer exists - using '{start_mode}' instead.")
                         mode = start_mode
             else:
@@ -625,7 +624,7 @@ class CodeRunner:
             sendinput.MouseController().start()
 
 
-            if not mode in mode_list:
+            if mode not in mode_list:
                 syslog.error(f"Unable to select startup mode: '{mode}' no longer exists")
                 mode = profile.get_default_mode() # start the default mode instead
 
@@ -688,7 +687,7 @@ class CodeRunner:
 
 
 
-        except Exception as err:
+        except Exception:
             tb_msg = traceback.format_exc()
             # re-enable tabs
             self.enableUI()

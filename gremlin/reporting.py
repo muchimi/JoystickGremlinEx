@@ -28,12 +28,10 @@ import gremlin.gated_handler
 import anytree
 import logging
 import gremlin.execution_graph as eg
-from gremlin.input_types import InputType
 import enum
 import dinput
-from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets
 import gremlin.base_profile
-from collections import namedtuple
 import gremlin.input_item
 import traceback
 import html
@@ -125,7 +123,7 @@ class ReportRow():
             tr = "<TR>"
             cell_order = [index for index in self.cells]
             cell_order.sort()
-            current_index = 0
+            _current_index = 0
             for cell_index in cell_order:
                 # while cell_index > current_index:
                 #     tr += "<TD> </TD>\n" # cannot use </TD> in DOT
@@ -333,7 +331,7 @@ class ReportEngine():
 
         path = os.environ["PATH"]
         path = path.casefold()
-        if not "graphviz" in path and os.path.isfile(gp_exe):
+        if "graphviz" not in path and os.path.isfile(gp_exe):
             path+=  os.pathsep + gp
             os.environ["PATH"] = path
 
@@ -781,7 +779,7 @@ class ReportEngine():
 
 
         # g.write_dot(dot_file)
-        syslog.info(f"DOT FILE:")
+        syslog.info("DOT FILE:")
         syslog.info(dot_file)
 
 

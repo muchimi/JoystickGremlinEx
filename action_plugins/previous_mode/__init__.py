@@ -86,7 +86,7 @@ class PreviousMode(gremlin.base_profile.AbstractAction):
 
     def display_name(self):
         ''' returns a display string for the current configuration '''
-        return f"Previous Mode"
+        return "Previous Mode"
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"

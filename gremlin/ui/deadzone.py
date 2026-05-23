@@ -19,7 +19,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # from __future__ import annotations # deprecated with python 3.14+
-from PySide6 import QtWidgets, QtCore, QtGui #QtWebEngineWidgets
+from PySide6 import QtWidgets, QtCore #QtWebEngineWidgets
 from gremlin.ui import ui_common
 from gremlin.ui.qsliderwidget import QSliderWidget
 from gremlin.util import *
@@ -27,10 +27,7 @@ import gremlin.util
 from gremlin.types import *
 import gremlin.ui.ui_common 
 import enum
-from lxml import etree
 
-import psygnal
-from psygnal import Signal
 
 class DeadzonePreset(enum.IntEnum):
     center_zero = 0

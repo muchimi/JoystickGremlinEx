@@ -17,33 +17,18 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 import logging
-import math
-import os
 from lxml import etree as ElementTree
 
-from PySide6 import QtCore, QtWidgets, QtGui
+from PySide6 import QtCore, QtWidgets
 
 import gremlin.actions
 import gremlin.base_profile
-import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
-import gremlin.joystick_handling
-import gremlin.shared_state
-from gremlin.types import MouseButton
-from gremlin.profile import read_bool, safe_read, safe_format
-import gremlin.util
+from gremlin.profile import safe_read, safe_format
 import gremlin.ui.ui_common
 import gremlin.input_item
-import gremlin.sendinput
-from gremlin import input_devices
-import gremlin.ui.osc_device
-from gremlin.ui.osc_device import OscInterface, OscClient
-import logging
-import psygnal
-from psygnal import Signal
 from shiboken6 import Shiboken
-import gremlin.ui.octavi_device
 from gremlin.ui.octavi_device import OctaviButton, OctaviInterface
 
 syslog = logging.getLogger("system")
@@ -218,8 +203,7 @@ class MapToOctaviIfr1(gremlin.base_profile.AbstractAction):
     
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
-        import html
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)    
         
         table.addField("Function", f"{self.button}")

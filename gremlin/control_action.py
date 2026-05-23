@@ -17,7 +17,6 @@
 
 """Collection of actions that allow controlling JoystickGremlin."""
 
-import gremlin.base_profile
 import gremlin.event_handler
 import gremlin.shared_state
 

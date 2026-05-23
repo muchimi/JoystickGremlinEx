@@ -2,7 +2,7 @@
 import logging
 from lxml import etree as ElementTree
 
-from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtWidgets, QtCore
 import gremlin.actions
 import gremlin.base_profile
 import gremlin.config
@@ -11,12 +11,11 @@ import gremlin.joystick_handling
 import gremlin.shared_state
 import gremlin.base_profile
 from gremlin.input_types import InputType
-from gremlin.util import safe_format, safe_read, write_guid, read_guid
+from gremlin.util import safe_format, safe_read
 import gremlin.ui.ui_common
 import gremlin.input_item
 from gremlin.types import ControlAction
 from gremlin.util import *
-import psygnal
 
 from gremlin.types import SyncMode
 
@@ -146,7 +145,7 @@ class ControlWidget(gremlin.input_item.AbstractActionWidget):
                         #     data.device_type,
                         #     data.input_name
                         # )
-                        if not data in processed:  
+                        if data not in processed:  
                             if use_prefix and input_type not in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
                                 self.input_widget.addItem(f"[{mode}] {data.input_name}", data)
                             else:
@@ -262,29 +261,34 @@ class ControlFunctor(gremlin.base_profile.AbstractFunctor):
                     return True
                 case ControlAction.LocalDisable:
                     # disable local output
-                    if verbose: syslog.info("CONTROL: set local ENABLED")
+                    if verbose:
+                        syslog.info("CONTROL: set local ENABLED")
                     gremlin.remote.remote_control.setLocal(False)
                     return True
                 case ControlAction.LocalEnable:
                     # disable local output
-                    if verbose: syslog.info("CONTROL: set local DISABLED")
+                    if verbose:
+                        syslog.info("CONTROL: set local DISABLED")
                     gremlin.remote.remote_control.setLocal(True)
                     return True
                 case ControlAction.RemoteDisable:
                     # disable local output
-                    if verbose: syslog.info("CONTROL: set remote DISABLED")
+                    if verbose:
+                        syslog.info("CONTROL: set remote DISABLED")
                     gremlin.remote.remote_control.setRemote(False)
                     return True
                 case ControlAction.RemoteEnable:
                     # disable local output
-                    if verbose: syslog.info("CONTROL: set remote ENABLED")
+                    if verbose:
+                        syslog.info("CONTROL: set remote ENABLED")
                     gremlin.remote.remote_control.setRemote(True)
                     return True
                 case ControlAction.RemoteToggle:
                     # disable local output
                     gremlin.remote.remote_control.toggleRemote()
                     new_state = gremlin.remote.remote_control.is_remote
-                    if verbose: syslog.info(f"CONTROL: set remote TOGGLE -> new state {'ENABLED' if new_state else 'DISABLED'}")
+                    if verbose:
+                        syslog.info(f"CONTROL: set remote TOGGLE -> new state {'ENABLED' if new_state else 'DISABLED'}")
                     return True
 
 
@@ -306,14 +310,17 @@ class ControlFunctor(gremlin.base_profile.AbstractFunctor):
                             if item.input_id == input_id:
                                 match action:
                                     case ControlAction.DisableInput:
-                                        if verbose: syslog.info(f"Control: disable input {item.display_name}")
+                                        if verbose:
+                                            syslog.info(f"Control: disable input {item.display_name}")
                                         item.enabled = False
                                     case ControlAction.EnableInput:
-                                        if verbose: syslog.info(f"Control: enable input {item.display_name}")
+                                        if verbose:
+                                            syslog.info(f"Control: enable input {item.display_name}")
                                         item.enabled = True
                                     case ControlAction.ToggleInput:
                                         item.enabled = not item.enabled
-                                        if verbose: syslog.info(f"Control: toggle input {item.display_name} -> {item.enabled}")
+                                        if verbose:
+                                            syslog.info(f"Control: toggle input {item.display_name} -> {item.enabled}")
                                 return True
                             
             return True
@@ -395,8 +402,7 @@ class Control(gremlin.base_profile.AbstractAction):
 
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
-        import html
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)    
         table.addField("Control", f"{self.action.name}")
         if self.exec_on_press:

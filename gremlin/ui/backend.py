@@ -22,7 +22,7 @@ from typing import List
 import uuid
 
 from PySide6 import QtCore
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property, Slot
 
 from gremlin import code_runner, common, config, error, plugin_manager, \
     profile, shared_state, types
@@ -31,7 +31,6 @@ from gremlin import code_runner, common, config, error, plugin_manager, \
 from gremlin.ui.device import InputIdentifier
 from gremlin.ui.profile import ActionNodeModel, InputItemBindingModel, \
     InputItemModel
-import psygnal
 from psygnal import Signal
 
 syslog = logging.getLogger("system")
@@ -122,7 +121,7 @@ class Backend(QtCore.QObject):
             item.input_type = identifier.input_type
             item.setInputId(identifier.input_id)
             return len(item.action_configurations)
-        except error.ProfileError as e:
+        except error.ProfileError:
             return 0
 
     @Slot(InputIdentifier, result=InputItemModel)

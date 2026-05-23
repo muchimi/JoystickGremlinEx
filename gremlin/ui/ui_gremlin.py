@@ -316,15 +316,11 @@ class Ui_Gremlin(object):
 
     def _handle_convert_legacy(self):
         import gremlin.profile
-        import gremlin.event_handler
         profile_converter = gremlin.profile.ProfileConverter()
         profile = gremlin.shared_state.current_profile
         profile_converter.convert_legacy(profile.profile_file)
 
     def _handle_generate_tts(self):
-        import gremlin.util
-        import gremlin.profile
-        import gremlin.event_handler
         import gremlin.ktts
         import gremlin.shared_state
         import gremlin.sound
@@ -391,7 +387,7 @@ class Ui_Gremlin(object):
         import gremlin.config
         visible  = gremlin.config.Configuration().show_simconnect_options_on_toolbar
         if visible:
-            if not self.actionSimconnectOptionsToolbar in self.toolbar_options.actions():
+            if self.actionSimconnectOptionsToolbar not in self.toolbar_options.actions():
                 self.toolbar_options.addAction(self.actionSimconnectOptionsToolbar)
         else:
             if self.actionSimconnectOptionsToolbar in self.toolbar_options.actions():

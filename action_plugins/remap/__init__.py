@@ -22,20 +22,17 @@ import time
 from lxml import etree as ElementTree
 import traceback
 import gremlin.joystick_handling
-from gremlin.util import load_icon
 from PySide6 import QtWidgets
 
 from gremlin.input_types import InputType
 from gremlin import input_devices, joystick_handling, util
 from gremlin.error import ProfileError
-import gremlin.plugin_manager
 from gremlin.profile import safe_format, safe_read
 from gremlin.ui import ui_common
 import gremlin.input_item
 import os
 from gremlin.util import *
 import gremlin.event_handler
-import gremlin.util
 
 syslog = logging.getLogger("system")
 
@@ -239,7 +236,7 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
             self.save_changes()
         except Exception as err:
             util.display_error(
-                f"A needed vJoy device is not accessible:\n\n" +
+                "A needed vJoy device is not accessible:\n\n" +
                 "Default values have been set for the input, but they are "
                 "not what has been specified."
             )
@@ -253,14 +250,14 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
             # input_type_changed = \
             #     self.action_data.input_type != vjoy_data["input_type"]
 
-            current_id = self.action_data.vjoy_input_id
+            _current_id = self.action_data.vjoy_input_id
             vjoy_id = vjoy_data["device_id"]
 
             self.action_data.vjoy_id = vjoy_id
             self.action_data.vjoy_input_id = vjoy_data["input_id"]
             self.action_data.input_type = vjoy_data["input_type"]
 
-            new_id = vjoy_data["input_id"]
+            _new_id = vjoy_data["input_id"]
 
             if self.action_data.is_axis:
                 self.action_data.axis_mode = "absolute"
@@ -286,11 +283,13 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
 
                 if self._last_button_id != -1 and self._last_button_id != button_id:
                     # clear the old button if it was previously selected
-                    if verbose: syslog.info(f"LEGACY MAP: send button clear {vjoy_id} {self._last_button_id} {self.action_data.id}")
+                    if verbose:
+                        syslog.info(f"LEGACY MAP: send button clear {vjoy_id} {self._last_button_id} {self.action_data.id}")
                     el.set_vjoy_button_usage.emit(vjoy_id, self._last_button_id, False, self.action_data.id)
                 # send select
                 self._last_button_id = button_id
-                if verbose: syslog.info(f"LEGACY MAP: send button select {vjoy_id} {button_id} {self.action_data.id}")
+                if verbose:
+                    syslog.info(f"LEGACY MAP: send button select {vjoy_id} {button_id} {self.action_data.id}")
                 el.set_vjoy_button_usage.emit(vjoy_id, button_id, True, self.action_data.id)
 
 
@@ -669,7 +668,7 @@ Use Vjoy Remap instead.'''
 
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
 
         table = ReportTable(cellpadding=4)
         table.addField("Vjoy Device", self.vjoy_id)

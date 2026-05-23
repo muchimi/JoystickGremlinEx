@@ -6,7 +6,6 @@ VGamepad API (Windows)  adapted from Yann Boutellier's vgamepad libary and Nefar
 
 from . import vigem_commons as vcom
 from . import vigem_client as vcli
-import ctypes
 from ctypes import CFUNCTYPE, c_void_p, c_ubyte
 from abc import ABC, abstractmethod
 from inspect import signature  # Check if user defined callback function is legal
@@ -219,13 +218,6 @@ class VX360Gamepad(VGamepad):
         self.report.sThumbRX = x_value
         self.report.sThumbRY = y_value
 
-    def left_joystick_float(self, x_value_float, y_value_float):
-        """
-        Sets the values of the X and Y axis for the left joystick
-
-        :param: float between -1.0 and 1.0 (0 = neutral position)
-        """
-        self.left_joystick(round(x_value_float * 32767), round(y_value_float * 32767))
 
     def left_joystick_x_float(self, value_float):
         """

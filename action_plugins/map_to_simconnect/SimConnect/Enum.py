@@ -1,4 +1,4 @@
-from enum import IntEnum, IntFlag, Enum, auto
+from enum import IntEnum, IntFlag, auto
 from ctypes.wintypes import *
 from ctypes import *
 from .Constants import *

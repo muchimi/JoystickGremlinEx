@@ -25,7 +25,7 @@ from gremlin.input_types import InputType
 from gremlin.input_devices import CallbackActions
 
 from gremlin.profile import safe_format, safe_read
-from gremlin.keyboard import Key, key_from_name, key_from_code
+from gremlin.keyboard import Key
 from gremlin.ui.virtual_keyboard import *
 import gremlin.config
 import logging
@@ -38,7 +38,6 @@ from gremlin.types import *
 import gremlin.remote
 import vjoy.vjoy
 import gremlin.process
-import win32gui
 
 
 syslog = logging.getLogger("system")
@@ -251,7 +250,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
             key : gremlin.keyboard.Key
             for key in keys:
                 assert key.name,"Invalid key provided"
-                if not key in self.keys:
+                if key not in self.keys:
                     self._add_key(key)
                 
         else:
@@ -374,7 +373,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
         key_list = key if hasattr(key,"__iter__") else [key]
         
         for key in key_list:
-            if not key in self.keys:
+            if key not in self.keys:
                 self._add_key(key)
         
 
@@ -571,15 +570,19 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         if verbose:
             logtabs = gremlin.shared_state.logTabs(True)
             if self.use_macros:
-                if verbose:  syslog.info(f"{logtabs}KEY ACTION: DelayPressMacro:")
+                if verbose:
+                    syslog.info(f"{logtabs}KEY ACTION: DelayPressMacro:")
                 for key in action.keys:
-                    if verbose: syslog.info(f"{logtabs}\tPress: {key}")
+                    if verbose:
+                        syslog.info(f"{logtabs}\tPress: {key}")
                     self.delay_press_release.press(key)
                 if self.delay > 0:
-                    if verbose: syslog.info(f"{logtabs}\tPause: {self.delay}")
+                    if verbose:
+                        syslog.info(f"{logtabs}\tPause: {self.delay}")
                     self.delay_press_release.pause(self.delay)
                 for key in reversed(action.keys):
-                    if verbose: syslog.info(f"{logtabs}\tRelease: {key}")
+                    if verbose:
+                        syslog.info(f"{logtabs}\tRelease: {key}")
                     self.delay_press_release.release(key)
             else:
                 stub = "".join([f"{key.name}, " for key in self._press_keys])
@@ -682,7 +685,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
             case SyncMode.Ignore:
                 pass
             case SyncMode.Input:
-                if self.verbose: syslog.info(f"\t sync to input : {is_pressed}")
+                if self.verbose:
+                    syslog.info(f"\t sync to input : {is_pressed}")
                 event = gremlin.event_handler.Event(
                     input_type,
                     input_id,
@@ -704,7 +708,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 else:
                     is_local, is_remote = self.action_data.sendFlags()
                     for key in self._hold_keys:
-                        if verbose: syslog.info(f"send key release: {key}")
+                        if verbose:
+                            syslog.info(f"send key release: {key}")
                         gremlin.keyboard.send_key_up(key, is_local, is_remote, client_list = self.client_list, target_hwnd = self.target_hwnd, extra_data = self.extra_data)
                 self._hold_keys.clear()
 
@@ -756,7 +761,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         (is_local, is_remote) = self.action_data.sendFlags()
         
         for key in press_keys:
-            if self.verbose: syslog.info(f"Pulse ON [{key.debug_name}]")
+            if self.verbose:
+                syslog.info(f"Pulse ON [{key.debug_name}]")
             gremlin.keyboard.send_key_down(key, is_local, is_remote, client_list = self.client_list, target_hwnd = self.target_hwnd, extra_data = self.extra_data ) # handles local and remote and special mouse keys
 
     def _pulse_off(self, data):
@@ -766,31 +772,36 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         (is_local, is_remote) = self.action_data.sendFlags()
         
         for key in release_keys:
-            if self.verbose: syslog.info(f"Pulse OFF [{key.debug_name}]")
+            if self.verbose:
+                syslog.info(f"Pulse OFF [{key.debug_name}]")
             gremlin.keyboard.send_key_up(key, is_local, is_remote, client_list = self.client_list, target_hwnd = self.target_hwnd, extra_data = self.extra_data) # handles local and remote and special mouse keys
 
     def pulse_start(self, data : tuple, duration : float, interval : float):
         ''' pulse setup '''
-        if self.verbose: syslog.info(f"Pulse START keyboard [{self.id}] duration: {duration:0.3f} interval: {interval:0.3f}")
+        if self.verbose:
+            syslog.info(f"Pulse START keyboard [{self.id}] duration: {duration:0.3f} interval: {interval:0.3f}")
         key = self.id
         worker : gremlin.repeater.PulseWorker 
         if key in self.pulse_worker_map:
             worker = self.pulse_worker_map[key]
             if worker.is_running:
                 # worker already running - ignore pulse request
-                if self.verbose: syslog.info(f"\talready pulsing - ignored")
+                if self.verbose:
+                    syslog.info("\talready pulsing - ignored")
                 return
         else:
             args = data
             worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data = args)
             self.pulse_worker_map[key] = worker
 
-        if self.verbose: syslog.info(f"\tactivate")
+        if self.verbose:
+            syslog.info("\tactivate")
         worker.start()
 
     def pulse_stop(self):
         ''' request a pulse abort '''
-        if self.verbose: syslog.info(f"Pulse STOP keyboard [{self.id}]")
+        if self.verbose:
+            syslog.info(f"Pulse STOP keyboard [{self.id}]")
         key = self.id
         if key in self.pulse_worker_map:
             worker : gremlin.repeater.PulseWorker = self.pulse_worker_map[key]
@@ -843,12 +854,12 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
             match mode:
                 case KeyboardOutputMode.Release:
                     if verbose:
-                        syslog.info(f"MapToKeyboardEx: release")
+                        syslog.info("MapToKeyboardEx: release")
                     # kill off any auto-repeat as well
                     if not self.has_keys:
                         # clear autorepeat if no keys are provided 
                         if verbose:
-                            syslog.info(f"MapToKeyboardEx: clear autorepeat")
+                            syslog.info("MapToKeyboardEx: clear autorepeat")
                         eh = gremlin.event_handler.EventListener()
                         eh.autorepeat_clear.emit() # clear auto-repeats
                     else:
@@ -858,7 +869,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                             self.registerMacro(id)
                         else:
                              for key in self._release_keys:
-                                if verbose: syslog.info(f"KEYBOARD: press: send key release: {key}")
+                                if verbose:
+                                    syslog.info(f"KEYBOARD: press: send key release: {key}")
                                 if key.is_mouse:
                                     gremlin.macro._send_mouse_button(key.mouse_button, False, is_local, is_remote, wheel_factor=self.action_data.wheel_factor, client_list = self.client_list)
                                 else:
@@ -869,13 +881,14 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                     if self.has_keys:
                         self.is_pressed = True
                         if verbose:
-                            syslog.info(f"MapToKeyboardEx: press")
+                            syslog.info("MapToKeyboardEx: press")
                         if self.use_macros:
                             id = gremlin.macro.MacroManager().queue_macro(self.press_macro, is_local, is_remote, client_list = self.client_list)
                             self.registerMacro(id)
                         else:
                             for key in self._press_keys:
-                                if verbose: syslog.info(f"KEYBOARD: press: send key press: {key}")
+                                if verbose:
+                                    syslog.info(f"KEYBOARD: press: send key press: {key}")
                                 if key.is_mouse:
                                     gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote, wheel_factor=self.action_data.wheel_factor, client_list = self.client_list)
                                 else:
@@ -896,7 +909,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                                 # send direct
                                 key : gremlin.keyboard.Key
                                 for key in self._press_keys:
-                                    if verbose: syslog.info(f"KEYBOARD: hold: send key press: {key}")
+                                    if verbose:
+                                        syslog.info(f"KEYBOARD: hold: send key press: {key}")
                                     if key.is_mouse:
                                         gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote, wheel_factor=self.action_data.wheel_factor, client_list = self.client_list)
                                     else:
@@ -915,7 +929,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                             else:
                                 key : gremlin.keyboard.Key
                                 for key in self._release_keys:
-                                    if verbose: syslog.info(f"send key press (autorelease): {key}")
+                                    if verbose:
+                                        syslog.info(f"send key press (autorelease): {key}")
                                     if key.is_mouse:
                                         gremlin.macro._send_mouse_button(key.mouse_button, True, is_local, is_remote, wheel_factor=self.action_data.wheel_factor, client_list = self.client_list)
                                     else:
@@ -928,7 +943,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                     # make and break with delay
                     if self.has_keys:
                         if is_pressed:
-                            if verbose: syslog.info(f"MapToKeyboardEx: pulse")
+                            if verbose:
+                                syslog.info("MapToKeyboardEx: pulse")
                             repeat_interval = -1 # do not repeat
                             self.pulse_start((self._press_keys, self._release_keys), self.action_data.delay/1000, repeat_interval)
                         else:
@@ -939,7 +955,8 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                     if self.has_keys:
                         if is_pressed:
                             for key in self._press_keys:
-                                if verbose: syslog.info(f"MapToKeyboardEx: toggle")
+                                if verbose:
+                                    syslog.info("MapToKeyboardEx: toggle")
                                 el = gremlin.event_handler.EventListener()
                                 state = el.get_key_state(key)
                                 if key.is_mouse:
@@ -964,18 +981,21 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 match mode:
                     case KeyboardOutputMode.Hold:
                         if self.use_macros:
-                            if verbose: syslog.info(f"HOLD: send key releases (macro mode)")
+                            if verbose:
+                                syslog.info("HOLD: send key releases (macro mode)")
                             gremlin.macro.MacroManager().queue_macro(self.release)
                         else:
                             # not using macros
                             for key in self._release_keys:
-                                if verbose: syslog.info(f"HOLD: send key release: {key}")
+                                if verbose:
+                                    syslog.info(f"HOLD: send key release: {key}")
                                 gremlin.keyboard.send_key_up(key, is_local, is_remote, client_list = self.client_list, target_hwnd = self.target_hwnd, extra_data = self.extra_data)
 
                         self._hold_keys.clear()
 
                     case KeyboardOutputMode.AutoRepeat:
-                        if verbose: syslog.info(f"AUTOREPEAT: stop")
+                        if verbose:
+                            syslog.info("AUTOREPEAT: stop")
                         self.pulse_stop()
                         self._autorepeat_clear()
                     
@@ -1275,7 +1295,7 @@ Can also send mouse buttons, mouse wheel events.'''
     
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
 
         table = ReportTable(cellpadding=4)
 

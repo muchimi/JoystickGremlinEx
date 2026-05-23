@@ -23,8 +23,6 @@ import gremlin
 import gremlin.types
 from . import ui_common
 from gremlin.input_types import InputType
-import psygnal
-from psygnal import Signal
 
 syslog = logging.getLogger("system")
 

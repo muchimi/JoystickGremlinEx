@@ -17,22 +17,18 @@
 
 
 # from __future__ import annotations # deprecated with python 3.14+
-from ast import In
 
-from collections.abc import Callable
-from multiprocessing import Event
 import threading
 from typing import List, Optional
 
 from PySide6 import QtCore, QtQml
-from PySide6.QtCore import Property,  Slot
+from PySide6.QtCore import Property
 
 
 from gremlin import event_handler, input_devices, keyboard, shared_state,  windows_event_hook
 
 from gremlin.input_types import InputType
 import gremlin.keyboard
-import psygnal
 from psygnal import Signal
 
 QML_IMPORT_NAME = "Gremlin.Util"
@@ -125,15 +121,15 @@ class InputListenerModel(QtCore.QObject):
         el = event_handler.EventListener()
         try:
             el.keyboard_event.disconnect(self._kb_event_cb)
-        except RuntimeError as e:
+        except RuntimeError:
             pass
         try:
             el.joystick_event.disconnect(self._joy_event_cb)
-        except RuntimeError as e:
+        except RuntimeError:
             pass
         try:
             el.mouse_event.disconnect(self._mouse_event_cb)
-        except RuntimeError as e:
+        except RuntimeError:
             pass
 
         # Stop mouse hook in case it is running

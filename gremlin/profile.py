@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,42 +16,37 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # from __future__ import annotations # deprecated with python 3.14+
-from abc import abstractmethod, ABCMeta
-import codecs
-import collections
 import copy
 import logging
 import os
 import shutil
 import uuid
 
-#from xml.dom import minidom
+# from xml.dom import minidom
 import lxml
 from lxml import etree
-
 
 
 from PySide6 import QtCore
 
 import dinput
 import gremlin.config
-import gremlin.shared_state
-import gremlin.actions
 from gremlin.util import *
-from gremlin.input_types import InputType
 from . import error, joystick_handling
 
 
 syslog = logging.getLogger("system")
 
-def mode_list(profile = None):
+
+def mode_list(profile=None):
     """Returns a list of all modes based on the given node.
 
     :param node a node from a profile tree
-    :return list of modes in the profile 
+    :return list of modes in the profile
     """
     import gremlin.base_profile
-    profile : gremlin.base_profile.Profile
+
+    profile: gremlin.base_profile.Profile
     if not profile:
         profile = gremlin.shared_state.current_profile
     if profile:
@@ -60,14 +55,11 @@ def mode_list(profile = None):
     return []
 
 
-
 class TTSDialog(QtWidgets.QDialog):
-
-    def __init__(self, speaker : str = None, tts_speed : float = 1.0, parent = None):
-        super().__init__(parent = parent)
+    def __init__(self, speaker: str = None, tts_speed: float = 1.0, parent=None):
+        super().__init__(parent=parent)
 
         import gremlin.ui.ui_common
-        import gremlin.config
 
         self.setWindowTitle("TTS AI generation Options")
         self.setModal(True)
@@ -79,90 +71,97 @@ class TTSDialog(QtWidgets.QDialog):
         self.tts_speed = tts_speed
 
         # get a list of speakers
-        
-        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip = "Selected speaker for AI voice generation.")
-        self._update_speakers(initialize = True)
+
+        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(
+            auto_adjust=True, tooltip="Selected speaker for AI voice generation."
+        )
+        self._update_speakers(initialize=True)
         self.speaker_widget.setCallback(self._handle_speaker_changed)
 
-        refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(label=None, callback = self._handle_refresh_speakers,tooltip="Refresh available AI speakers")
+        refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(
+            label=None,
+            callback=self._handle_refresh_speakers,
+            tooltip="Refresh available AI speakers",
+        )
 
-        self.tts_speed_widget = gremlin.ui.ui_common.QFloatLineEdit(min_range = 0.1, max_range = 10.0, value = tts_speed, callback = self._handle_tts_speed_changed, tooltip = "Speed rate modifier for the generated audio.\n1.0 is the normal rate.")
-
-        
+        self.tts_speed_widget = gremlin.ui.ui_common.QFloatLineEdit(
+            min_range=0.1,
+            max_range=10.0,
+            value=tts_speed,
+            callback=self._handle_tts_speed_changed,
+            tooltip="Speed rate modifier for the generated audio.\n1.0 is the normal rate.",
+        )
 
         widgets = [
-                "Speaker:",
-                self.speaker_widget,
-                refresh_speaker_widget,
-                "TTS speed:",
-                self.tts_speed_widget,
-                ]
-        
+            "Speaker:",
+            self.speaker_widget,
+            refresh_speaker_widget,
+            "TTS speed:",
+            self.tts_speed_widget,
+        ]
+
         ai_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(ai_container)
-        
-        ok_button = gremlin.ui.ui_common.QDataPushButton("Ok", callback = self._handle_ok)
-        cancel_button = gremlin.ui.ui_common.QDataPushButton("Cancel", callback = self._handle_cancel)
 
-        widgets = ["||",ok_button, cancel_button,"||"]
+        ok_button = gremlin.ui.ui_common.QDataPushButton("Ok", callback=self._handle_ok)
+        cancel_button = gremlin.ui.ui_common.QDataPushButton(
+            "Cancel", callback=self._handle_cancel
+        )
+
+        widgets = ["||", ok_button, cancel_button, "||"]
         button_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(button_container)
 
-    def _handle_tts_speed_changed(self, value : float):
+    def _handle_tts_speed_changed(self, value: float):
         self.tts_speed = value
 
     def _handle_refresh_speakers(self):
-        self._update_speakers(initialize = True)
+        self._update_speakers(initialize=True)
 
     def _handle_ok(self, widget):
         self.accept()
 
     def _handle_cancel(self, widget):
         self.reject()
-    
+
     def _handle_speaker_changed(self, value):
         import gremlin.config
+
         self.speaker = value
         gremlin.config.Configuration().ai_tts_last_speaker = value
 
-    def _update_speakers(self, initialize = False):
+    def _update_speakers(self, initialize=False):
         config = gremlin.config.Configuration()
-        
+
         ktts = gremlin.ktts.KTTS()
-        try:
-            gremlin.util.pushCursor()
-            speakers = ktts.getSpeakers(initialize = initialize)
-            with QtCore.QSignalBlocker(self.speaker_widget):
-                self.speaker_widget.clear()
-            if speakers:
-                for speaker in speakers:
-                    self.speaker_widget.addItem(speaker, speaker)
-                if self.speaker:
-                    speaker = self.speaker
-                else:
-                    speaker = config.ai_tts_last_speaker
-                if speaker:
-                    index = self.speaker_widget.findText(speaker)
-                    if index != -1:
-                        self.speaker_widget.setCurrentIndex(index)
-                else:
-                    speaker = self.speaker_widget.currentText()
-                    config.ai_tts_last_speaker = speaker
-                    self.speaker = speaker
+
+        speakers = ktts.getSpeakers(initialize=initialize)
+        with QtCore.QSignalBlocker(self.speaker_widget):
+            self.speaker_widget.clear()
+        if speakers:
+            for speaker in speakers:
+                self.speaker_widget.addItem(speaker, speaker)
+            if self.speaker:
+                speaker = self.speaker
             else:
-                if self.action_data.speaker:
-                    speaker = self.action_data.speaker
-                    self.speaker_widget.addItem(speaker, speaker)
-            
-            self.speaker_widget.setEnabled(speakers is not None)
-        finally:
-            gremlin.util.popCursor()
-        
-            
-        
+                speaker = config.ai_tts_last_speaker
+            if speaker:
+                index = self.speaker_widget.findText(speaker)
+                if index != -1:
+                    self.speaker_widget.setCurrentIndex(index)
+            else:
+                speaker = self.speaker_widget.currentText()
+                config.ai_tts_last_speaker = speaker
+                self.speaker = speaker
+        else:
+            if self.action_data.speaker:
+                speaker = self.action_data.speaker
+                self.speaker_widget.addItem(speaker, speaker)
+
+        self.speaker_widget.setEnabled(speakers is not None)
+
 
 class ProfileConverter:
-
     """Handle converting and checking profiles."""
 
     # Current profile version number
@@ -185,17 +184,16 @@ class ProfileConverter:
             parser = etree.XMLParser(remove_blank_text=True, remove_comments=True)
             tree = etree.parse(fname, parser)
             root = tree.getroot()
-        except Exception as err:
+        except Exception:
             # error reading file
             syslog.error(f"CONVERT: XML error reading file {fname}")
             return True
-                    
 
         version = self._determine_version(root)
-        return version == ProfileConverter.current_version # or version == 9
-    
+        return version == ProfileConverter.current_version  # or version == 9
+
     def convert_to_ex(self, fname):
-        ''' applies the options and converts the profile '''
+        """applies the options and converts the profile"""
         import gremlin.util
 
         try:
@@ -204,8 +202,8 @@ class ProfileConverter:
 
             new_root = self._convert_to_ex(root, fname)
             tree = etree.tostring(new_root)
-            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-        except:
+            tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
+        except Exception:
             gremlin.util.m
 
     def convert_profile(self, fname):
@@ -250,23 +248,27 @@ class ProfileConverter:
         while old_version < ProfileConverter.current_version:
             if old_version in conversion_map:
                 convert = conversion_map[old_version]
-                if convert:                
+                if convert:
                     if new_root is None:
                         new_root = convert(root, fname=fname)
                     else:
                         new_root = convert(new_root, fname=fname)
                     converted = True
                 old_version += 1
-                    
+
             else:
                 # syslog = logging.getLogger("system")
-                syslog.warning(f"Unexpected version: {old_version} found in profile.  Some unsupported features may not have loaded correctly.")
+                syslog.warning(
+                    f"Unexpected version: {old_version} found in profile.  Some unsupported features may not have loaded correctly."
+                )
 
         if converted:
             if new_root is not None:
                 # Save converted version
                 tree = etree.ElementTree(root)
-                tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+                tree.write(
+                    fname, pretty_print=True, xml_declaration=True, encoding="utf-8"
+                )
             else:
                 raise error.ProfileError("Failed to convert profile")
 
@@ -281,9 +283,7 @@ class ProfileConverter:
         elif root.tag == "profile":
             return int(root.get("version"))
         else:
-            raise error.ProfileError(
-                "Invalid profile version encountered"
-            )
+            raise error.ProfileError("Invalid profile version encountered")
 
     def _convert_from_v1(self, root, fname=None):
         """Converts v1 profiles to v2 profiles.
@@ -298,8 +298,7 @@ class ProfileConverter:
         devices = etree.Element("devices")
         for node in root.iter("device"):
             # Modify each node to include the correct type attribute
-            if node.get("name") == "keyboard" and \
-                    int(node.get("windows_id")) == 0:
+            if node.get("name") == "keyboard" and int(node.get("windows_id")) == 0:
                 node.set("type", "keyboard")
             else:
                 node.set("type", "joystick")
@@ -333,29 +332,29 @@ class ProfileConverter:
                     device.set("id", str(device_name_map[device.get("name")]))
                 else:
                     syslog.warning(
-                        f"Device '{device.get("name")}' missing, no conversion performed, ID will be incorrect."
+                        f"Device '{device.get('name')}' missing, no conversion performed, ID will be incorrect."
                     )
         return new_root
 
     def _convert_from_v3(self, root, fname=None):
         """Converts v3 profiles to v4 profiles.
-        
+
         The following operations are performed in this conversion:
         - embed all actions in individual BasicContainer containers
         - remove button and keyboard conditions
         - move hat and axis condition from actions to containers
         - replace double macros for keyboard remaps with the new map to
           keyboard action
-        
+
         :param root the v3 profile
         :return v4 representation of the profile
         """
         import gremlin.input_item
+
         new_root = copy.deepcopy(root)
         new_root.set("version", "4")
         for mode in new_root.iter("mode"):
             for input_item in mode:
-
                 # Check if macros are used to create what is now a
                 # "map to keyboard" action
                 press_and_release = [False, False]
@@ -364,11 +363,13 @@ class ProfileConverter:
                     if input_item.tag == "button":
                         if action.tag == "macro":
                             if "on-press" in action.keys():
-                                press_and_release[0] = press_and_release[0] or \
-                                    parse_bool(action.get("on-press"))
+                                press_and_release[0] = press_and_release[
+                                    0
+                                ] or parse_bool(action.get("on-press"))
                             if "on-release" in action.keys():
-                                press_and_release[1] = press_and_release[1] or \
-                                    parse_bool(action.get("on-release"))
+                                press_and_release[1] = press_and_release[
+                                    1
+                                ] or parse_bool(action.get("on-release"))
 
                 # If this widget is purely a map to keyboard action then
                 # replace the two macro widgets with a single one
@@ -376,9 +377,7 @@ class ProfileConverter:
                     container = etree.Element("container")
                     container.set("type", "basic")
 
-                    container.append(
-                        self._p3_extract_map_to_keyboard(input_item)
-                    )
+                    container.append(self._p3_extract_map_to_keyboard(input_item))
                     for action in input_item[:]:
                         input_item.remove(action)
                     input_item.append(container)
@@ -398,8 +397,7 @@ class ProfileConverter:
                         if input_item.tag == "axis":
                             copy_condition = False
                             if action.tag == "remap":
-                                if "button" in action.keys() or \
-                                        "hat" in action.keys():
+                                if "button" in action.keys() or "hat" in action.keys():
                                     copy_condition = True
                             elif gremlin.input_tem._is_curve_tag(action.tag):
                                 pass
@@ -432,7 +430,7 @@ class ProfileConverter:
                                     ("on-s", "south"),
                                     ("on-sw", "south-west"),
                                     ("on-w", "west"),
-                                    ("on-nw", "north-west")
+                                    ("on-nw", "north-west"),
                                 ]
                                 for names in keys:
                                     if action.get(names[0]) == "True":
@@ -512,11 +510,12 @@ class ProfileConverter:
         """
         new_root = copy.deepcopy(root)
         new_root.set("version", "6")
-        search_list = [".[@type='basic']//remap[@axis]",
-                       ".[@type='basic']//response-curve",
-                       ".[@type='basic']//response-curve-ex",
-                       ".[@type='basic']//curve-data"
-                       ]
+        search_list = [
+            ".[@type='basic']//remap[@axis]",
+            ".[@type='basic']//response-curve",
+            ".[@type='basic']//response-curve-ex",
+            ".[@type='basic']//curve-data",
+        ]
         for axis in new_root.iter("axis"):
             has_remap = False
             has_curve = False
@@ -565,7 +564,9 @@ class ProfileConverter:
 
         root.attrib["version"] = "7"
         for module in root.findall("import/module"):
-            module.attrib["name"] = os.path.normpath(f"{base_path}\\{module.attrib["name"]}.py")
+            module.attrib["name"] = os.path.normpath(
+                f"{base_path}\\{module.attrib['name']}.py"
+            )
 
         return root
 
@@ -600,9 +601,9 @@ class ProfileConverter:
             node.set("motion_input", "True")
 
         return root
-    
-    def _convert_to_ex(self, root, fname = None):
-        ''' converts to the EX version '''
+
+    def _convert_to_ex(self, root, fname=None):
+        """converts to the EX version"""
 
         root.attrib["version"] = "100"
         # syslog = logging.getLogger("system")
@@ -611,16 +612,15 @@ class ProfileConverter:
         convert_response_curve = config.convert_response_curve
         convert_vjoy_remap = config.convert_vjoy_remap
 
-
         # convert all response-curve to response-curve EX
-        if convert_response_curve:        
+        if convert_response_curve:
             nodes = root.xpath("//response-curve")
             nodes.extend(root.xpath("//curve-data"))
             for node in nodes:
                 node.tag = "response-curve-ex"
 
         # convert all remap to vjoy remap if configured in options
-        
+
         if convert_vjoy_remap:
             nodes = root.xpath("//remap")
             for node in nodes:
@@ -628,8 +628,8 @@ class ProfileConverter:
 
         return root
 
-    def _convert_from_noop(self, root, fname = None):
-        ''' no op conversion '''
+    def _convert_from_noop(self, root, fname=None):
+        """no op conversion"""
         pass
 
     def _convert_from_v8(self, root, fname=None):
@@ -689,7 +689,6 @@ class ProfileConverter:
         # syslog = logging.getLogger("system")
 
         class GUIDConverter:
-
             """Simplifies conversion from old device identifiers to the new
             GUID ones."""
 
@@ -717,7 +716,9 @@ class ProfileConverter:
                     return linear_id
 
                 device = self.dev_info[device_guid]
-                if linear_id > device.axis_count or linear_id >= len(device.axismap_list):
+                if linear_id > device.axis_count or linear_id >= len(
+                    device.axismap_list
+                ):
                     syslog.error(
                         f"Invalid linear axis id received, {device.name} id = {linear_id}"
                     )
@@ -745,7 +746,7 @@ class ProfileConverter:
 
                 if hardware_id not in self.hwid_to_guid:
                     syslog.warn(
-                        f"GUID for device {"" if name is None else name} with hardware_id {hardware_id} is unknown."
+                        f"GUID for device {'' if name is None else name} with hardware_id {hardware_id} is unknown."
                     )
                     self.hwid_to_guid[hardware_id] = f"{{{uuid.uuid4()}}}"
 
@@ -763,15 +764,11 @@ class ProfileConverter:
                 try:
                     vjoy_id = int(vjoy_id)
                 except (ValueError, TypeError):
-                    syslog.warn(
-                        f"Cannot convert {vjoy_id} into a valid vjoy id"
-                    )
+                    syslog.warn(f"Cannot convert {vjoy_id} into a valid vjoy id")
                     return f"{{{uuid.uuid4()}}}"
 
                 if vjoy_id not in self.vjoy_to_guid:
-                    syslog.warn(
-                        f"GUID for vjoy {vjoy_id} is unknown"
-                    )
+                    syslog.warn(f"GUID for vjoy {vjoy_id} is unknown")
                     self.vjoy_to_guid[vjoy_id] = f"{{{uuid.uuid4()}}}"
 
                 return self.vjoy_to_guid[vjoy_id]
@@ -786,9 +783,8 @@ class ProfileConverter:
                 entry.set(
                     "device-guid",
                     uuid_converter.lookup(
-                        entry.attrib.get("id", None),
-                        entry.attrib.get("name", "")
-                    )
+                        entry.attrib.get("id", None), entry.attrib.get("name", "")
+                    ),
                 )
 
             # Remove the now obsolete id and windows id attributes
@@ -798,17 +794,17 @@ class ProfileConverter:
             for child in entry.findall("mode/axis"):
                 child.set(
                     "id",
-                    str(uuid_converter.axis_lookup(
-                        entry.attrib["device-guid"],
-                        int(child.attrib["id"])-1
-                    ))
+                    str(
+                        uuid_converter.axis_lookup(
+                            entry.attrib["device-guid"], int(child.attrib["id"]) - 1
+                        )
+                    ),
                 )
 
         for entry in root.findall("vjoy-devices/vjoy-device"):
             entry.set("vjoy-id", entry.attrib["id"])
             entry.set(
-                "device-guid",
-                uuid_converter.vjoy_lookup(int(entry.attrib["id"]))
+                "device-guid", uuid_converter.vjoy_lookup(int(entry.attrib["id"]))
             )
             del entry.attrib["id"]
             del entry.attrib["windows_id"]
@@ -818,7 +814,7 @@ class ProfileConverter:
                 ("scan_code", "scan-code"),
                 ("range_low", "range-low"),
                 ("range_high", "range-high"),
-                ("device_name", "device-name")
+                ("device_name", "device-name"),
             ]
             for rep in replacements:
                 if rep[0] in entry.keys():
@@ -827,7 +823,7 @@ class ProfileConverter:
             if "device_id" in entry.keys():
                 entry.set(
                     "device-guid",
-                    uuid_converter.lookup(entry.attrib.get("device_id", None))
+                    uuid_converter.lookup(entry.attrib.get("device_id", None)),
                 )
                 del entry.attrib["device_id"]
                 del entry.attrib["windows_id"]
@@ -841,7 +837,7 @@ class ProfileConverter:
         for entry in root.findall(".//macro/actions/joystick"):
             entry.set(
                 "device-guid",
-                uuid_converter.lookup(entry.attrib.get("device_id", None))
+                uuid_converter.lookup(entry.attrib.get("device_id", None)),
             )
             entry.set("input-type", entry.attrib["input_type"])
             entry.set("input-id", entry.attrib["input_id"])
@@ -869,8 +865,7 @@ class ProfileConverter:
 
         for entry in root.findall(".//merge-axis/lower"):
             entry.set(
-                "device-guid",
-                uuid_converter.lookup(entry.attrib.get("id", None))
+                "device-guid", uuid_converter.lookup(entry.attrib.get("id", None))
             )
             entry.set("axis-id", entry.attrib["axis"])
             del entry.attrib["id"]
@@ -879,8 +874,7 @@ class ProfileConverter:
 
         for entry in root.findall(".//merge-axis/upper"):
             entry.set(
-                "device-guid",
-                uuid_converter.lookup(entry.attrib.get("id", None))
+                "device-guid", uuid_converter.lookup(entry.attrib.get("id", None))
             )
             entry.set("axis-id", entry.attrib["axis"])
             del entry.attrib["id"]
@@ -924,12 +918,13 @@ class ProfileConverter:
 
         return root
 
-    def _convert_from_v10(self, root, fname = None):
-        ''' convert from V10 - looks for profile start/stop and move to new master mode '''
+    def _convert_from_v10(self, root, fname=None):
+        """convert from V10 - looks for profile start/stop and move to new master mode"""
         import gremlin.shared_state
+
         master_mode = gremlin.shared_state.master_mode
 
-        root.attrib["version"] = "11" # change version
+        root.attrib["version"] = "11"  # change version
 
         # look for mode control input nodes
         nodes = root.xpath("//device[@type='mode']")
@@ -941,47 +936,51 @@ class ProfileConverter:
             if nodes:
                 master_node = nodes[0]
                 # remove any empty profile start/stop nodes
-                nodes = master_node.xpath("modecontrol[not(*) and (@id='5' or @id='6')]")
+                nodes = master_node.xpath(
+                    "modecontrol[not(*) and (@id='5' or @id='6')]"
+                )
                 for node in nodes:
                     master_node.remove(node)
             else:
                 # create it
-                master_node = lxml.etree.Element("mode", name=master_mode, system='True')
+                master_node = lxml.etree.Element(
+                    "mode", name=master_mode, system="True"
+                )
                 device_node.append(master_node)
 
-            nodes = device_node.xpath("//modecontrol[@id='5' or @id='6']") # profile start or profile stop
+            nodes = device_node.xpath(
+                "//modecontrol[@id='5' or @id='6']"
+            )  # profile start or profile stop
             for node in nodes:
                 mode_node = node.getparent()
                 if mode_node != master_node:
                     # move the node to the correct parent
                     mode_node.remove(node)
                     master_node.append(node)
-                    
 
         return root
 
-
-    def _convert_from_v11(self, root, fname = None):
-        ''' convert from V11 - convert from state keys to state key and IDs '''
+    def _convert_from_v11(self, root, fname=None):
+        """convert from V11 - convert from state keys to state key and IDs"""
         import gremlin.ui.state_device
 
         id_map = {}
         state_map = {}
         map_to_state_map = {}
 
-        root.attrib["version"] = "12" # change version
+        root.attrib["version"] = "12"  # change version
 
         # calatog map to state nodes
         map_nodes = root.xpath("//map_to_state")
         for node in map_nodes:
             key = safe_read(node, "key", str, "")
             map_to_state_map[key] = node
-        
-        #root = node.getroottree().getroot()
+
+        # root = node.getroottree().getroot()
         state_nodes = root.xpath("//profile/states/state")
         for node in state_nodes:
-            id = safe_read(node,"id", str, "")
-            key = safe_read(node,"key", str, "")
+            id = safe_read(node, "id", str, "")
+            key = safe_read(node, "key", str, "")
             if key:
                 # state exists check for ID field
                 if not id:
@@ -991,8 +990,8 @@ class ProfileConverter:
                 state_map[key] = node
 
         # identify any missing states (states referenced in map to state but not in states )
-        missing_state_keys = [key for key in map_to_state_map if not key in state_map]
-        
+        missing_state_keys = [key for key in map_to_state_map if key not in state_map]
+
         # look for state nodes
         nodes = root.xpath("//profile/states")
         if nodes:
@@ -1004,15 +1003,13 @@ class ProfileConverter:
             state_root = ElementTree.Element("states")
             profile_root.append(state_root)
 
-        # add missing state keys 
+        # add missing state keys
         for key in missing_state_keys:
             state = gremlin.ui.state_device.StateInputItem(key)
             node = state.to_xml()
             state_root.append(node)
             state_map[key] = node
-            
 
-        
         # look for state entries under the states node
         for key in state_map:
             state = gremlin.ui.state_device.StateInputItem(key)
@@ -1022,27 +1019,24 @@ class ProfileConverter:
             id = id_map[key]
             if state.id != id:
                 state.id = id
-                
 
         # look for map to state entries in the profile
         # and add the ID attribute if needed
         for node in map_nodes:
-            key = safe_read(node,"key", str, "")
-            id = safe_read(node,"state-id", str, "")
+            key = safe_read(node, "key", str, "")
+            id = safe_read(node, "state-id", str, "")
             if not id:
                 # missing id in map to state - add it
                 id = id_map[key]
-                node.set("state-id",id)
-                
+                node.set("state-id", id)
+
         return root
 
-
-        
-
-    def _convert_from_v12(self, root, fname = None):
-        ''' convert from V12 to V13 - convert master mode GUID to new format  '''
+    def _convert_from_v12(self, root, fname=None):
+        """convert from V12 to V13 - convert master mode GUID to new format"""
         import gremlin.util
-        root.attrib["version"] = "13" # change version
+
+        root.attrib["version"] = "13"  # change version
 
         # calatog map to state nodes
         nodes = root.xpath("//mode")
@@ -1060,14 +1054,11 @@ class ProfileConverter:
                 id = node.get("device-guid")
                 node.set("device_guid", gremlin.util.normalize_guid(id))
 
-
-
         return root
-            
-    def _convert_from_v13(self, root, fname = None):
-        ''' convert from V13 to V14 - convert merge operation scale name changes '''
-        import gremlin.util
-        root.attrib["version"] = "14" # change version
+
+    def _convert_from_v13(self, root, fname=None):
+        """convert from V13 to V14 - convert merge operation scale name changes"""
+        root.attrib["version"] = "14"  # change version
 
         # calatog map to state nodes
         nodes = root.xpath("//merge-data")
@@ -1075,48 +1066,47 @@ class ProfileConverter:
             if "operation" in node.attrib:
                 operation = node.get("operation")
                 if operation == "scalehalf":
-                    node.set("operation","scalehalfc")
+                    node.set("operation", "scalehalfc")
                 elif operation == "scalefull":
-                    node.set("operation","scalefullc")
+                    node.set("operation", "scalefullc")
 
         return root
-            
-            
-    def _convert_from_v14(self, root, fname = None):
-        ''' convert from V14 to V15 - ensure modes are in the Mode section due to change in how modes are read for a profile  '''
+
+    def _convert_from_v14(self, root, fname=None):
+        """convert from V14 to V15 - ensure modes are in the Mode section due to change in how modes are read for a profile"""
         import gremlin.util
         import gremlin.base_profile
-        root.attrib["version"] = "15" # change version
 
-        # calatog all modes in the profile 
+        root.attrib["version"] = "15"  # change version
+
+        # calatog all modes in the profile
         mode_map = {}
         nodes = root.xpath("//profile/modes")
 
-
         if nodes:
             # exists already
-            return root # no changes 
-    
+            return root  # no changes
+
         # create
         mode_root = etree.Element("modes")
         root.append(mode_root)
 
         # add any mode in the devices
         mode_nodes = root.xpath("//device/mode")
-  
+
         for node_mode in mode_nodes:
             mode_name = node_mode.get("name")
             mode_object = gremlin.base_profile.ModeNode()
             mode_object.name = mode_name
-            if not mode_name in mode_map:
+            if mode_name not in mode_map:
                 if "inherit" in node_mode.attrib:
                     parent_mode_name = node_mode.get("inherit")
                     mode_object.parent_name = parent_mode_name
                 mode_map[mode_name] = mode_object
 
         # ensure the master mode exists
-        master_mode = gremlin.shared_state.master_mode                
-        if not master_mode in mode_map:
+        master_mode = gremlin.shared_state.master_mode
+        if master_mode not in mode_map:
             mode_object = gremlin.base_profile.ModeNode()
             mode_object.name = master_mode
             mode_map[master_mode] = mode_object
@@ -1131,13 +1121,11 @@ class ProfileConverter:
             # add the new node
             mode_root.append(mode_node)
 
-
         return root
 
-    def _convert_from_v15(self, root, fname = None):
-        ''' convert from V15 to V16 - convert macro button values from boolean to the new set to support toggle '''
-        import gremlin.util
-        root.attrib["version"] = "16" # change version
+    def _convert_from_v15(self, root, fname=None):
+        """convert from V15 to V16 - convert macro button values from boolean to the new set to support toggle"""
+        root.attrib["version"] = "16"  # change version
 
         syslog.info("PROFILE CONVERT: V16")
 
@@ -1155,13 +1143,11 @@ class ProfileConverter:
                 node.set("value", new_value)
 
         return root
-    
 
-    
-
-    def convert_tts(self, fname : str, speaker = None, tts_speed : float = 1.0, generate = True) -> bool:
+    def convert_tts(
+        self, fname: str, speaker=None, tts_speed: float = 1.0, generate=True
+    ) -> bool:
         # change value for button macro actions from boolean to actual action names
-
 
         import gremlin.util
         import gremlin.ui.ui_common
@@ -1170,41 +1156,45 @@ class ProfileConverter:
 
         config = gremlin.config.Configuration()
         if not speaker:
-            speaker = config.ai_tts_last_speaker # use the last speaker if none provided
+            speaker = (
+                config.ai_tts_last_speaker
+            )  # use the last speaker if none provided
 
         ui = gremlin.shared_state.ui
 
         if not fname or not os.path.isfile(fname):
-            gremlin.ui.ui_common.MessageBoxWarning(prompt = "Invalid profile file.\nEnsure profile is saved.")
+            gremlin.ui.ui_common.MessageBoxWarning(
+                prompt="Invalid profile file.\nEnsure profile is saved."
+            )
             return False
 
         if generate:
             ktts = gremlin.ktts.KTTS()
             if not ktts.is_available():
-                gremlin.ui.ui_common.MessageBoxWarning(prompt = "KTTS is not installed")
+                gremlin.ui.ui_common.MessageBoxWarning(prompt="KTTS is not installed")
                 return False
 
             # display dialog
-            dialog = TTSDialog(speaker, tts_speed, parent = ui)
+            dialog = TTSDialog(speaker, tts_speed, parent=ui)
             result = dialog.exec()
             if result != QtWidgets.QDialog.Accepted:
                 return False
-        
-        try:
 
+        try:
             parser = etree.XMLParser(remove_blank_text=True)
             root = etree.parse(fname, parser)
 
             nodes = root.xpath("//text-to-speech")
             count = len(nodes)
-            
-            progress_dialog = QtWidgets.QProgressDialog("Operation in progress...", "Cancel", 0, count, parent = ui)
+
+            progress_dialog = QtWidgets.QProgressDialog(
+                "Operation in progress...", "Cancel", 0, count, parent=ui
+            )
             progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
             progress_dialog.setAutoClose(True)
-            progress_dialog.setMinimumDuration(0) # Show immediately
-            time.sleep(0.05) 
-            QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
-
+            progress_dialog.setMinimumDuration(0)  # Show immediately
+            time.sleep(0.05)
+            QtWidgets.QApplication.processEvents()  # Process events to keep the UI responsive
 
             canceled = False
             index = 1
@@ -1214,29 +1204,28 @@ class ProfileConverter:
                 if "text" in node.attrib:
                     text = node.get("text")
                     if not text:
-                        continue # no text
+                        continue  # no text
                 else:
-                    continue # no text
+                    continue  # no text
 
                 progress_dialog.setLabelText(f"Processing {index} out of {count}...")
                 progress_dialog.setValue(index)
-                time.sleep(0.05) 
-                QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
+                time.sleep(0.05)
+                QtWidgets.QApplication.processEvents()  # Process events to keep the UI responsive
 
                 if progress_dialog.wasCanceled():
                     canceled = True
                     break
                 volume = safe_read(node, "volume", int, 50)
-                volume = gremlin.util.clamp(volume, 0, 100)    
+                volume = gremlin.util.clamp(volume, 0, 100)
                 rate = safe_read(node, "rate", int, 100)
                 if rate == 0:
-                    rate = 100 # default
+                    rate = 100  # default
 
-
-                clearQueue = safe_read(node,"clear-queue",bool, False)
-                abort = safe_read(node, "abort", bool, False)
-                exec_on_press = safe_read(node,"exec_on_press",bool, True)
-                exec_on_release = safe_read(node,"exec_on_release",bool, False)
+                clearQueue = safe_read(node, "clear-queue", bool, False)
+                _abort = safe_read(node, "abort", bool, False)
+                exec_on_press = safe_read(node, "exec_on_press", bool, True)
+                exec_on_release = safe_read(node, "exec_on_release", bool, False)
 
                 playback_ms = 0
                 save_on_generate = True
@@ -1244,8 +1233,8 @@ class ProfileConverter:
                 fadein_ms = 0
                 fadeout_ms = 0
                 stop_previous = clearQueue
-                mode = 'ktts'
-                
+                mode = "ktts"
+
                 # remove attribs
                 node.attrib.clear()
 
@@ -1256,23 +1245,23 @@ class ProfileConverter:
                 node.set("text", text)
                 if speaker:
                     node.set("speaker", speaker)
-                
+
                 node.set("mode", mode)
                 node.set("tts_speed", safe_format(tts_speed, float))
                 node.set("save", safe_format(save_on_generate, bool))
                 node.set("exec_on_press", safe_format(exec_on_press, bool))
-                node.set("exec_on_release", safe_format(exec_on_release, bool))  
-                node.set("loops", safe_format(loops,int))      
+                node.set("exec_on_release", safe_format(exec_on_release, bool))
+                node.set("loops", safe_format(loops, int))
                 node.set("playback-ms", safe_format(playback_ms, int))
                 node.set("fadein-ms", safe_format(fadein_ms, int))
                 node.set("fadeout-ms", safe_format(fadeout_ms, int))
                 node.set("stop-previous", safe_format(stop_previous, bool))
 
-                
-
                 if generate:
                     # generate the wav file
-                    progress_dialog.setLabelText(f"Generate voice file {index} out of {count}...")
+                    progress_dialog.setLabelText(
+                        f"Generate voice file {index} out of {count}..."
+                    )
 
                     wav = ktts.getNewWav()
                     if config.ai_tts_use_word_filenames:
@@ -1281,8 +1270,8 @@ class ProfileConverter:
                         suggested_name = gremlin.util.textWordsToUnderscore(text)
                         dir = os.path.dirname(wav)
                         suggested_file = os.path.join(dir, suggested_name)
-                        suggested_file = gremlin.util.swap_ext(suggested_file,ext)
-                        
+                        suggested_file = gremlin.util.swap_ext(suggested_file, ext)
+
                         if os.path.isfile(suggested_file):
                             # word file already exists
                             if config.ai_tts_overwrite_filenames:
@@ -1291,78 +1280,91 @@ class ProfileConverter:
                                 try:
                                     os.unlink(suggested_file)
                                 except Exception as e:
-                                    syslog.error(f"CONVERT: unable to remove file {suggested_file}")
+                                    syslog.error(
+                                        f"CONVERT: unable to remove file {suggested_file}"
+                                    )
                                     syslog.error(f"\tError: {str(e)}")
                                     return False
                             else:
                                 # don't reuse, find a unique file name by sequencing
                                 index = 1
-                                fname = gremlin.util.swap_ext(suggested_file,suffix = f"_{index}")
+                                fname = gremlin.util.swap_ext(
+                                    suggested_file, suffix=f"_{index}"
+                                )
                                 while os.path.isfile(fname):
                                     index += 1
-                                    fname = gremlin.util.swap_ext(suggested_file,suffix = f"_{index}")
+                                    fname = gremlin.util.swap_ext(
+                                        suggested_file, suffix=f"_{index}"
+                                    )
 
                                 target_file = fname
                         else:
-                            # use the generated file name 
+                            # use the generated file name
                             target_file = suggested_file
-                        
-                        
+
                     # generate on a temporary file
-                    wav = ktts.generateWav(tts_file = wav, text = text, speaker = speaker, tts_speed = tts_speed)
+                    wav = ktts.generateWav(
+                        tts_file=wav, text=text, speaker=speaker, tts_speed=tts_speed
+                    )
                     if wav:
                         # file was generated ok
                         if target_file != wav:
-                            # rename or overwrite the file 
+                            # rename or overwrite the file
                             if os.path.isfile(target_file):
                                 try:
                                     os.unlink(target_file)
                                 except Exception as e:
-                                    syslog.error(f"CONVERT: unable to remove file [{wav}] to [{target_file}]")
+                                    syslog.error(
+                                        f"CONVERT: unable to remove file [{wav}] to [{target_file}]"
+                                    )
                                     syslog.error(f"\tError: {str(e)}")
-                                    target_file = wav # do not rename
+                                    target_file = wav  # do not rename
 
                             # rename the generated file
                             try:
                                 shutil.copy(wav, target_file)
                                 os.unlink(wav)
                             except Exception as e:
-                                syslog.error(f"CONVERT: unable to save file [{wav}] to [{target_file}]")
+                                syslog.error(
+                                    f"CONVERT: unable to save file [{wav}] to [{target_file}]"
+                                )
                                 syslog.error(f"\tError: {str(e)}")
-                                target_file = wav # do not rename
+                                target_file = wav  # do not rename
 
                         node.set("tts_file", target_file)
 
-                time.sleep(0.05) 
-                QtWidgets.QApplication.processEvents() # Process events to keep the UI responsive
-              
+                time.sleep(0.05)
+                QtWidgets.QApplication.processEvents()  # Process events to keep the UI responsive
+
                 index += 1
-                    
 
             if canceled:
                 return False
-                    
+
             # Save converted version
             tree = root
             if os.path.isfile(fname):
                 try:
                     os.unlink(fname)
                 except Exception as e:
-                    syslog.error(f"CONVERT TTS: unable to delete existing profile file: {str(e)}")
+                    syslog.error(
+                        f"CONVERT TTS: unable to delete existing profile file: {str(e)}"
+                    )
                     return False
-            tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
             syslog.info(f"CONVERT TTS: saved data to : {fname}")
 
-            gremlin.ui.ui_common.MessageBoxInfo(prompt = f"Converted {count} TTS nodes\nProfile will now reload.", parent = ui)
-
+            gremlin.ui.ui_common.MessageBoxInfo(
+                prompt=f"Converted {count} TTS nodes\nProfile will now reload.",
+                parent=ui,
+            )
 
         except Exception as e:
             syslog.error(f"CONVERT TTS: unable to convert file: {str(e)}")
             return False
-        
+
         return True
-            
-    
+
     def _p3_extract_map_to_keyboard(self, input_item):
         """Converts an old macro setup to a map to keyboard action.
 
@@ -1387,23 +1389,30 @@ class ProfileConverter:
             break
 
         return node
-    
 
-    def convert_legacy(self, fname, convert_keyboard : bool = True, convert_remap : bool = True, save_legacy : bool = False):
-        ''' converts legacy actions 
-        
+    def convert_legacy(
+        self,
+        fname,
+        convert_keyboard: bool = True,
+        convert_remap: bool = True,
+        save_legacy: bool = False,
+    ):
+        """converts legacy actions
+
         remap -> vjoy remap
         keyboard -> keyboard ex
-        '''
+        """
         import gremlin.util
         import gremlin.ui.ui_common
 
         # backup
         if save_legacy:
-            legacy_fname = gremlin.util.swap_ext(fname,".xml",suffix = "_legacy")
+            legacy_fname = gremlin.util.swap_ext(fname, ".xml", suffix="_legacy")
             index = 1
             while os.path.isfile(legacy_fname):
-                legacy_fname = gremlin.util.swap_ext(fname,".xml",suffix = f"_legacy_{index}")
+                legacy_fname = gremlin.util.swap_ext(
+                    fname, ".xml", suffix=f"_legacy_{index}"
+                )
                 index += 1
             try:
                 shutil.copyfile(fname, legacy_fname)
@@ -1411,18 +1420,15 @@ class ProfileConverter:
                 syslog.error(f"Unable to write converted file: {fname}")
                 syslog.error(err)
                 return False
-        
-
-
 
         tree = etree.parse(fname)
         root = tree.getroot()
-        converted = False # true if something was converted
+        converted = False  # true if something was converted
         keyboard_count = 0
         remap_count = 0
 
         if convert_keyboard:
-            # convert legacy keyboard entries 
+            # convert legacy keyboard entries
             nodes = root.xpath("//map-to-keyboard")
             for node in nodes:
                 converted = True
@@ -1430,50 +1436,45 @@ class ProfileConverter:
                 node.tag = "map-to-keyboard-ex"
                 key_nodes = node.xpath("./key")
                 for key_node in key_nodes:
-                    scan_code = safe_read(key_node,"scan-code", int, 0)
-                    is_extended = safe_read(key_node,"extended", bool, False)
+                    scan_code = safe_read(key_node, "scan-code", int, 0)
+                    is_extended = safe_read(key_node, "extended", bool, False)
 
-                    # get virtual code 
+                    # get virtual code
                     key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                     virtual_code = key.virtual_code
 
-                    key_node.set("virtual-code", safe_format(virtual_code,int))
+                    key_node.set("virtual-code", safe_format(virtual_code, int))
                     key_node.set("description", key.name)
                     comment = f"virtual: 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
-                
+
                     node_comment = etree.Comment(comment)
                     key_node.append(node_comment)
-                
-        
+
         if convert_remap:
             # convert legacy remap entries
             nodes = root.xpath("//remap")
 
             for node in nodes:
-                
                 remap_count += 1
                 node.tag = "vjoyremap"
-                
+
                 if "axis" in node.attrib:
                     # axis convert
                     # <remap vjoy="1" axis="1" axis-type="absolute" axis-scaling="1.00000000" action_id="e63977277fdc4197b2d18b22297b6822" priority="9"/>
                     # <vjoyremap vjoy="1" axis="1" mode="VJoyAxis" exec_on_press="True" exec_on_release="False" sync-mode="0" axis-type="absolute" axis-scaling="1.00000000" axis_start_value="0.00000000" range_low="-1.00000000" range_high="1.00000000" output_range_low="-1.00000000" output_range_high="1.00000000" reverse="False" auto_release="False" ignore-release="False" target_value="0.00000000" target_relative="False" relative_value="0.20000000" use_relative_value="False" relative_pulse_delay="100" start_pressed="False" paired="False" grid_visible="False" input="1" action_id="3c52184dea784c49bfea9725a3e13501" priority="9"/>
-                    node.set("mode","vjoyaxis")
+                    node.set("mode", "vjoyaxis")
 
                 elif "button" in node.attrib:
-                    # button convert 
+                    # button convert
                     # <remap vjoy="1" button="1" action_id="880ef1913b484f9f966231e8807628fe" priority="9"/>
                     # <vjoyremap vjoy="1" button="1" mode="VJoyButton" exec_on_press="True" exec_on_release="False" sync-mode="0" auto_release="False" ignore-release="False" target_value="0.00000000" target_relative="False" relative_value="0.20000000" use_relative_value="False" relative_pulse_delay="100" start_pressed="False" paired="False" grid_visible="False" input="1" action_id="0dc0634806884999aa01f7a81b5239d6" priority="9"/>
-                    node.set("mode","vjoybutton")
+                    node.set("mode", "vjoybutton")
 
-
-                node.set("exec_on_press","True")
-                node.set("exec_on_release","False")
-                
+                node.set("exec_on_press", "True")
+                node.set("exec_on_release", "False")
 
         converted = keyboard_count + remap_count > 0
 
-        
         if not converted:
             # nothing converted, blitz the backup file
             if save_legacy:
@@ -1482,10 +1483,11 @@ class ProfileConverter:
                 except Exception as err:
                     syslog.error(f"Unable to remove backup file: {legacy_fname}")
                     syslog.error(err)
-            
+
             syslog.info("CONVERT: did not find any actions to convert")
-            gremlin.ui.ui_common.MessageBox(title = "Conversion Results",
-                prompt = "No actions converted.")
+            gremlin.ui.ui_common.MessageBox(
+                title="Conversion Results", prompt="No actions converted."
+            )
 
         else:
             # items were converted
@@ -1497,43 +1499,40 @@ class ProfileConverter:
             # save
             try:
                 tree = etree.ElementTree(root)
-                tree.write(target_fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
+                tree.write(
+                    target_fname,
+                    pretty_print=True,
+                    xml_declaration=True,
+                    encoding="utf-8",
+                )
             except Exception as err:
                 syslog.error(f"Unable to write converted file: {fname}")
                 syslog.error(err)
                 return False
-            syslog.info(f"CONVERT: converted {keyboard_count} keyboard actions and {remap_count} remap actions.")
-
+            syslog.info(
+                f"CONVERT: converted {keyboard_count} keyboard actions and {remap_count} remap actions."
+            )
 
             # output a message box
-            gremlin.ui.ui_common.MessageBox(title = "Conversion Results",
-                prompt = f"Converted {keyboard_count} keyboard actions and {remap_count} remap actions.")
-            
-            
+            gremlin.ui.ui_common.MessageBox(
+                title="Conversion Results",
+                prompt=f"Converted {keyboard_count} keyboard actions and {remap_count} remap actions.",
+            )
+
             el = gremlin.event_handler.EventListener()
-            
 
             if save_legacy:
                 # cleanup temporary file used to load the profile as new
                 el.request_profile_reload.emit(target_fname, False)
-                        
+
             else:
                 el.request_profile_reload.emit(target_fname, True)
                 os.unlink(target_fname)
 
-
         return converted
-
-                
-
-
-              
-
-
 
 
 class ProfileModifier:
-
     """Modifies profile contents and provides overview information."""
 
     def __init__(self, profile):
@@ -1549,6 +1548,7 @@ class ProfileModifier:
         :return list of devices used in the profile and information about them
         """
         import gremlin.input_item
+
         device_guids = []
         device_names = {}
         for guid, dev in self.profile.devices.items():
@@ -1564,13 +1564,15 @@ class ProfileModifier:
 
         device_info = []
         for device_guid in set(device_guids):
-            device_info.append(gremlin.base_profile.ProfileDeviceInformation(
-                device_guid,
-                device_names.get(device_guid, "Unknown"),
-                self.container_count(device_guid),
-                self.condition_count(device_guid),
-                self.merge_axis_count(device_guid)
-            ))
+            device_info.append(
+                gremlin.base_profile.ProfileDeviceInformation(
+                    device_guid,
+                    device_names.get(device_guid, "Unknown"),
+                    self.container_count(device_guid),
+                    self.condition_count(device_guid),
+                    self.merge_axis_count(device_guid),
+                )
+            )
 
         return device_info
 
@@ -1596,10 +1598,13 @@ class ProfileModifier:
         :return number of conditions associated with the given device
         """
         from gremlin.input_item import BaseJoystickCondition
+
         count = 0
         for cond in self.all_conditions():
-            if isinstance(cond, BaseJoystickCondition) and \
-                    cond.device_guid == device_guid:
+            if (
+                isinstance(cond, BaseJoystickCondition)
+                and cond.device_guid == device_guid
+            ):
                 count += 1
         return count
 
@@ -1627,9 +1632,7 @@ class ProfileModifier:
         """
 
         if source_guid == target_guid:
-            syslog.warning(
-                "Swap devices: Source and target device are identical"
-            )
+            syslog.warning("Swap devices: Source and target device are identical")
             return
 
         self.change_device_actions(source_guid, target_guid)
@@ -1647,9 +1650,7 @@ class ProfileModifier:
 
         # Can't move anything from a non-existent source device
         if source_dev is None:
-            syslog.warning(
-                "Swap devices: Specified a source device that doesn't exist"
-            )
+            syslog.warning("Swap devices: Specified a source device that doesn't exist")
             return
 
         # Retrieve target device information structure to get its name and
@@ -1664,9 +1665,7 @@ class ProfileModifier:
         # copying and deleting things.
         if target_dev is None:
             if target_hardware_device is None:
-                syslog.warning(
-                    "Swap devices: Empty target device configuration found"
-                )
+                syslog.warning("Swap devices: Empty target device configuration found")
                 return
             source_dev.device_guid = target_guid
             source_dev.name = target_hardware_device.name
@@ -1687,8 +1686,7 @@ class ProfileModifier:
 
                     if input_id not in target_mode.config[input_type]:
                         syslog.warning(
-                            "Swap devices: Source input id not present in "
-                            "target device"
+                            "Swap devices: Source input id not present in target device"
                         )
                         continue
 
@@ -1697,14 +1695,15 @@ class ProfileModifier:
 
                     for container in input_item.containers:
                         container.parent = target_input_item
-                        target_mode.config[input_type][input_id].containers.append(container)
+                        target_mode.config[input_type][input_id].containers.append(
+                            container
+                        )
 
                     # Remove all containers from the source device
                     input_item.containers.clear()
 
         # Remove the device entry completely
         del self.profile.devices[source_guid]
-
 
     def change_conditions(self, source_guid, target_guid):
         """Modifies conditions to use the target device instead of the
@@ -1715,6 +1714,7 @@ class ProfileModifier:
         """
         # TODO: Does not ensure conditions are valid, i.e. missing inputs
         import gremlin.input_item
+
         target_hardware_device = None
         for dev in joystick_handling.all_joystick_devices():
             if dev.device_guid == target_guid:
@@ -1745,6 +1745,7 @@ class ProfileModifier:
         :return mapping of hardware ids to device names
         """
         import gremlin.input_item
+
         name_map = {}
         for device in self.profile.devices.values():
             name_map[device.device_guid] = device.name
@@ -1780,8 +1781,9 @@ class ProfileModifier:
                 return device
         return None
 
+
 def parse_guid(value):
     # parses a GUID
     from gremlin.util import parse_guid
-    return parse_guid(value)
 
+    return parse_guid(value)

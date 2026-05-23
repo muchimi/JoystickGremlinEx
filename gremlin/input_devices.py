@@ -33,13 +33,11 @@ import gremlin.event_handler
 
 import gremlin.joystick_handling
 
-from gremlin.types import GamePadOutput
 
 import gremlin.keyboard
 
-from dinput import DILL, GUID, GUID_Invalid
+from dinput import DILL, GUID_Invalid
 
-from gremlin.util import get_guid
 import gremlin.input_types
 import gremlin.remote
 
@@ -47,7 +45,6 @@ import gremlin.remote
 from . import error
 
 
-import enum
 
 import gremlin.singleton_decorator
 
@@ -903,7 +900,8 @@ class CallbackActions():
 
         key = release_evt.callbackKey
         verbose = gremlin.config.Configuration().verbose_mode_outputs
-        if verbose: syslog.info(f"AUTORELEASE: register autorelease key: {key} event: {str(release_evt)}")
+        if verbose:
+            syslog.info(f"AUTORELEASE: register autorelease key: {key} event: {str(release_evt)}")
         if release_evt not in self._registry:
             self._registry[key] = []
             #self._registry_key_map[key] = release_evt
@@ -934,7 +932,7 @@ class CallbackActions():
 
         else:
             syslog.warning(
-                f"Attempted to use non existent button: " +
+                "Attempted to use non existent button: " +
                 f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}"
             )
 
@@ -949,7 +947,8 @@ class CallbackActions():
 
         if key in self._registry:
             verbose = gremlin.config.Configuration().verbose_mode_outputs
-            if verbose: syslog.info(f"AUTORELEASE: execute trigger : {key}")
+            if verbose:
+                syslog.info(f"AUTORELEASE: execute trigger : {key}")
             new_list = []
             for entry in self._registry[key]:
 
@@ -1227,7 +1226,7 @@ def gremlin_start():
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
-        vjoy = gremlin.joystick_handling.VJoyProxy()
+        _vjoy = gremlin.joystick_handling.VJoyProxy()
         start_registry.add(wrapper_fn)
 
         return wrapper_fn

@@ -16,20 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import enum
 import importlib
 import inspect
 import logging
 import os
 import random
 import string
-import uuid
 import sys
 
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 import dinput
-from gremlin import common, error, input_devices, joystick_handling, profile, shared_state
+from gremlin import error, joystick_handling, profile, shared_state
 import gremlin.ui.ui_common
 from gremlin.input_types import InputType
 import gremlin.types

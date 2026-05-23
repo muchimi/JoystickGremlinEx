@@ -22,58 +22,69 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 import gremlin.base_profile
 import gremlin.config
-import gremlin.config
 import gremlin.event_handler
-import gremlin.execution_graph
 import gremlin.gated_handler
 from gremlin.input_types import InputType
-from gremlin.input_devices import CallbackActions
-import gremlin.macro
-import gremlin.process
 import gremlin.shared_state
 import traceback
-import gremlin.shared_state
-import gremlin.shared_state
-import gremlin.singleton_decorator
+from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.ui.ui_common
 import gremlin.input_item
 import gremlin.input_devices
-#import gremlin.gated_handler
-import enum
+
+
+# import gremlin.gated_handler
 from gremlin.profile import safe_format, safe_read
 import gremlin.util
-from .SimConnectManager import *
+from .SimConnectManager import (
+    SimConnectManager,
+    SimConnectCommandType,
+    SimConnectActionMode,
+    SimConnectTriggerMode,
+    RangeEvent,
+    SimConnectBlock,
+    SimConnectEventCategory,
+)
+
+from .SimConnect.SimConnect import SimConnectEventHandler
+
 import re
 from lxml import etree
-from lxml import etree as ElementTree
-#from gremlin.gated_handler import *
+
+# from gremlin.gated_handler import *
 from gremlin.ui.qdatawidget import QDataWidget
 import gremlin.config
 import gremlin.joystick_handling
 import gremlin.actions
 import gremlin.curve_handler
-from gremlin.input_types import InputType
-from action_plugins.map_to_simconnect.SimConnectManager import SimConnectManager
-import psygnal
 from psygnal import Signal
 from shiboken6 import Shiboken
 import gremlin.repeater
+import logging
+from . import SimConnect
+
+import threading
+import time
+
+
+from enum import auto, Enum, IntEnum
 
 syslog = logging.getLogger("system")
 
+
 class QHLine(QtWidgets.QFrame):
-    def __init__(self, parent = None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         self.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
 
 
 class CommandValidator(QtGui.QValidator):
-    ''' validator for command selection '''
+    """validator for command selection"""
+
     def __init__(self):
         super().__init__()
         self.commands = SimConnectManager().get_command_name_list()
-
 
     def validate(self, value, pos):
         clean_value = value.upper().strip()
@@ -85,13 +96,15 @@ class CommandValidator(QtGui.QValidator):
             r = re.compile(clean_value + "*")
             for _ in filter(r.match, self.commands):
                 return QtGui.QValidator.State.Intermediate
-        except:
+        except Exception:  # noqa: E722
             # invalid regex - probably a special char
             pass
         return QtGui.QValidator.State.Intermediate
 
+
 class LvarValidator(QtGui.QValidator):
-    ''' validator for lvars selection '''
+    """validator for lvars selection"""
+
     def __init__(self):
         super().__init__()
         self.manager = SimConnectManager()
@@ -106,7 +119,7 @@ class LvarValidator(QtGui.QValidator):
             r = re.compile(clean_value + "*", re.IGNORECASE)
             for _ in filter(r.match, self.manager.lvars):
                 return QtGui.QValidator.State.Intermediate
-        except:
+        except Exception:  # noqa: E722
             # invalid regex - probably a special char
             pass
         return QtGui.QValidator.State.Intermediate
@@ -124,11 +137,11 @@ class SimconnectSortMode(Enum):
     ModelDescending = auto()
     Mode = auto()
 
-class SimConnectCommandMode(Enum):
-    Simvar = 0 # simvar command mode
-    Calculator = 1 # lvar command mode
-    CalculatorParam = 2 # expression with parameter (axis)
 
+class SimConnectCommandMode(Enum):
+    Simvar = 0  # simvar command mode
+    Calculator = 1  # lvar command mode
+    CalculatorParam = 2  # expression with parameter (axis)
 
     @staticmethod
     def to_string(value) -> str:
@@ -146,40 +159,37 @@ class SimConnectCommandMode(Enum):
     def to_description(value) -> str:
         return _simconnect_command_mode_to_description[value]
 
+
 _simconnect_command_mode_to_display = {
-    SimConnectCommandMode.Simvar : "SimVar",
-    SimConnectCommandMode.Calculator : "Calculator",
-    SimConnectCommandMode.CalculatorParam : "Calculator (value)",
+    SimConnectCommandMode.Simvar: "SimVar",
+    SimConnectCommandMode.Calculator: "Calculator",
+    SimConnectCommandMode.CalculatorParam: "Calculator (value)",
 }
 
 _simconnect_command_mode_to_description = {
-    SimConnectCommandMode.Simvar : "Regular simVar",
-    SimConnectCommandMode.Calculator : "Evaluated RPN expression and calculator code",
-    SimConnectCommandMode.CalculatorParam : "Evaluated RPN expression and calculator code with axis parameter - use {#} to specify where the value is substituted.\nIf not using {#}, the value is prepended to the output expression.",
+    SimConnectCommandMode.Simvar: "Regular simVar",
+    SimConnectCommandMode.Calculator: "Evaluated RPN expression and calculator code",
+    SimConnectCommandMode.CalculatorParam: "Evaluated RPN expression and calculator code with axis parameter - use {#} to specify where the value is substituted.\nIf not using {#}, the value is prepended to the output expression.",
 }
 
 _simconnect_command_mode_to_string = {
-    SimConnectCommandMode.Simvar : "simvar",
-    SimConnectCommandMode.Calculator : "rpn",
-    SimConnectCommandMode.CalculatorParam : "rpnparam",
+    SimConnectCommandMode.Simvar: "simvar",
+    SimConnectCommandMode.Calculator: "rpn",
+    SimConnectCommandMode.CalculatorParam: "rpnparam",
 }
 
 _simconnect_command_mode_to_enum = {
-    "simvar" : SimConnectCommandMode.Simvar,
-    "lvar" : SimConnectCommandMode.Calculator,
-    "rpn" : SimConnectCommandMode.Calculator,
-    "rpnparam" : SimConnectCommandMode.CalculatorParam,
+    "simvar": SimConnectCommandMode.Simvar,
+    "lvar": SimConnectCommandMode.Calculator,
+    "rpn": SimConnectCommandMode.Calculator,
+    "rpnparam": SimConnectCommandMode.CalculatorParam,
 }
 
 
+class SimconnectManualDefinition:
+    """holds a manual entry for a mode"""
 
-class SimconnectManualDefinition():
-    ''' holds a manual entry for a mode '''
-    def __init__(self,
-                 id = None,
-                 sim_name = None,
-                 mode = None,
-                 manual = False):
+    def __init__(self, id=None, sim_name=None, mode=None, manual=False):
 
         self.id = id if id else gremlin.util.get_guid()
         self.sim_name = sim_name
@@ -187,7 +197,7 @@ class SimconnectManualDefinition():
         self.manual = manual
 
         # runtime item (not saved or loaded)
-        self.selected = False # for UI interation - selected mode
+        self.selected = False  # for UI interation - selected mode
         self.error_status = None
 
     @property
@@ -201,26 +211,28 @@ class SimconnectManualDefinition():
         return ""
 
 
+class SimconnectAicraftDefinition:
+    """holds the data entry for a single aicraft from the MSFS config data"""
 
-
-class SimconnectAicraftDefinition():
-    ''' holds the data entry for a single aicraft from the MSFS config data '''
     class EntryType(IntEnum):
-        Scan = 0 # entry is coming from the manual scan of the community folder
-        Sim = 1 # entry is coming from the sim
-    def __init__(self, id = None,
-                 mode = None, # attached GremlinEx mode for this aicraft
-                 icao_type = None,
-                 icao_manufacturer = None,
-                 icao_model = None,
-                 titles = [],
-                 path = None,
-                 community_path = None,
-                 aircraft_path = None,
-                 state_folder = None,
-				 sim_name = None,
-                 entry_type = None,
-                 ):
+        Scan = 0  # entry is coming from the manual scan of the community folder
+        Sim = 1  # entry is coming from the sim
+
+    def __init__(
+        self,
+        id=None,
+        mode=None,  # attached GremlinEx mode for this aicraft
+        icao_type=None,
+        icao_manufacturer=None,
+        icao_model=None,
+        titles=[],
+        path=None,
+        community_path=None,
+        aircraft_path=None,
+        state_folder=None,
+        sim_name=None,
+        entry_type=None,
+    ):
         self.icao_type = icao_type
         self.icao_manufacturer = icao_manufacturer
         self.icao_model = icao_model
@@ -230,29 +242,28 @@ class SimconnectAicraftDefinition():
         self.mode = mode
         self.sim_name = sim_name
         self.id = id if id else gremlin.util.get_guid()
-        self.entry_type = SimconnectAicraftDefinition.EntryType.Scan if entry_type is None else entry_type
+        self.entry_type = (
+            SimconnectAicraftDefinition.EntryType.Scan
+            if entry_type is None
+            else entry_type
+        )
         self.community_path = None
         self.aircraft_path = None
         if self.entry_type == SimconnectAicraftDefinition.EntryType.Scan:
-            assert community_path and aircraft_path,"Community path and Aircraft path are primary keys and cannot be NULL"
+            assert community_path and aircraft_path, (
+                "Community path and Aircraft path are primary keys and cannot be NULL"
+            )
             self.community_path = community_path.casefold().strip()  # AP
-            self.aircraft_path = aircraft_path.casefold().strip() # CP
+            self.aircraft_path = aircraft_path.casefold().strip()  # CP
 
         # runtime item (not saved or loaded)
-        self.selected = False # for UI interation - selected mode
+        self.selected = False  # for UI interation - selected mode
         self.error_status = None
 
-
     @property
     def is_scanned(self) -> bool:
-        ''' true if the entry was scanned from the community folder '''
-        return self.entry_type == SimconnectAicraftDefinition.EntryType.Scan
-    @property
-    def is_scanned(self) -> bool:
-        ''' true if the entry came from msfs user flyable data '''
+        """true if the entry came from msfs user flyable data"""
         return self.entry_type == SimconnectAicraftDefinition.EntryType.Sim
-
-
 
     @property
     def display_name(self):
@@ -262,7 +273,7 @@ class SimconnectAicraftDefinition():
 
     @property
     def key(self):
-        ''' key for this item (CP = community path, AP = aircraft path)'''
+        """key for this item (CP = community path, AP = aircraft path)"""
         match self.entry_type:
             case SimconnectAicraftDefinition.EntryType.Scan:
                 return (self.community_path, self.aircraft_path)
@@ -270,10 +281,9 @@ class SimconnectAicraftDefinition():
                 return self.sim_name
         return None
 
-
     @property
     def valid(self):
-        ''' true if the item contains valid data '''
+        """true if the item contains valid data"""
         match self.entry_type:
             case SimconnectAicraftDefinition.EntryType.Scan:
                 return not self.error_status and self.aircraft_path and self.mode
@@ -284,40 +294,42 @@ class SimconnectAicraftDefinition():
     def __hash__(self):
         return hash(self.id)
 
-@gremlin.singleton_decorator.SingletonDecorator
-class SimconnectOptions():
 
-    ''' holds simconnect mapper options for all actions '''
-    def __init__(self, manager : SimConnectManager):
-        self._manager : SimConnectManager = manager
+@gremlin.singleton_decorator.SingletonDecorator
+class SimconnectOptions:
+    """holds simconnect mapper options for all actions"""
+
+    def __init__(self, manager: SimConnectManager):
+        self._manager: SimConnectManager = manager
 
         el = gremlin.event_handler.EventListener()
-        el.profile_loaded.connect(self._profile_loaded) # trap profile load to update modes
-        el.profile_start.connect(self._profile_edit_mode_changed) # trap profile start to update modes
+        el.profile_loaded.connect(
+            self._profile_loaded
+        )  # trap profile load to update modes
+        el.profile_start.connect(
+            self._profile_edit_mode_changed
+        )  # trap profile start to update modes
         # el.edit_mode_changed.connect(self._profile_edit_mode_changed) # trap edit mode mode changes to update UI
-        el.shutdown.connect(self.save) # save configuration on shutdown
+        el.shutdown.connect(self.save)  # save configuration on shutdown
 
         self._handler = SimConnectEventHandler()
-        self._handler.simconnect_AircraftLiveriesReceived.connect(self._aircraft_list_loaded)
-
-
-
+        self._handler.simconnect_AircraftLiveriesReceived.connect(
+            self._aircraft_list_loaded
+        )
 
         # configuration file stored in the user's GremlinEx profile
         base_file = "simconnect_config.xml"
         user_source = os.path.join(gremlin.shared_state.data_path, base_file)
         self._xml_source = user_source
 
-
-        self._aircraft_definition_map = {} # holds definitions by aircraft container name, [name] = SimconnectAicraftDefinition
-        self._aircraft_manual_definition_map = {} # holds manual aicraft entries
+        self._aircraft_definition_map = {}  # holds definitions by aircraft container name, [name] = SimconnectAicraftDefinition
+        self._aircraft_manual_definition_map = {}  # holds manual aicraft entries
         self._titles = []
 
-        self._base_community_folder = None # base of community folder
-        self._local_state_folder = None # local state folder for streaming data
+        self._base_community_folder = None  # base of community folder
+        self._local_state_folder = None  # local state folder for streaming data
         self._community_folder = gremlin.shared_state.community_folder
         self._update_folders()
-
 
         # last command mode for the UI
         self._last_command_mode = SimConnectCommandMode.Simvar
@@ -330,10 +342,9 @@ class SimconnectOptions():
 
         self.parse_xml()
 
-
     @property
     def definitions(self) -> dict:
-        ''' gets automatic and manual definition '''
+        """gets automatic and manual definition"""
         return self._aircraft_definition_map | self._aircraft_manual_definition_map
 
     @property
@@ -341,7 +352,7 @@ class SimconnectOptions():
         return self._aircraft_manual_definition_map
 
     def validateEntries(self) -> bool:
-        ''' validates the manual entries to make sure they are unique '''
+        """validates the manual entries to make sure they are unique"""
         sim_names = []
         for item in self._aircraft_manual_definition_map.values():
             if item.sim_name and item.sim_name in sim_names:
@@ -349,32 +360,27 @@ class SimconnectOptions():
             sim_names.append(item.sim_name)
         return True
 
-
-
-
-
     @QtCore.Slot(dict)
     def _aircraft_list_loaded(self, data):
-        ''' triggered when simconnect sends aircraft data '''
+        """triggered when simconnect sends aircraft data"""
         name_list = [name for name in data.keys()]
-        name_list.sort(key = lambda x: x.casefold().strip()) # sort case insensitive
+        name_list.sort(key=lambda x: x.casefold().strip())  # sort case insensitive
         emit = False
-        model = None # not yet supported by the SDK as the return data
+        model = None  # not yet supported by the SDK as the return data
         for aircraft in name_list:
-
-            emit = emit or self.ensure_definition(aircraft, model, emit = False)
+            emit = emit or self.ensure_definition(aircraft, model, emit=False)
         if emit:
             # fire the event the data changed
             self._handler.AircraftDefinitionsChanged.emit()
 
-    def ensure_definition(self, name : str, model: str = None, emit = True) -> bool:
-        ''' ensures an aicraft definition exists for the current aircraft title
+    def ensure_definition(self, name: str, model: str = None, emit=True) -> bool:
+        """ensures an aicraft definition exists for the current aircraft title
         :param name: aircraft title to add
         :returns: true if added
 
         cannot use the model yet because the SDK aircraft livery list does not include this information so we have to go by the individual name only
 
-        '''
+        """
         name = name.casefold().strip()
         # if model:
         #     model = model.casefold().strip()
@@ -390,14 +396,16 @@ class SimconnectOptions():
         #         item.icao_model = model
         #         self._aircraft_definition_map[model] = item
 
-        if not name in self._aircraft_definition_map:
-            item = SimconnectAicraftDefinition(sim_name = name,
-                                               #icao_model = model,
-                                               entry_type=SimconnectAicraftDefinition.EntryType.Sim,
-                                               )
+        if name not in self._aircraft_definition_map:
+            item = SimconnectAicraftDefinition(
+                sim_name=name,
+                # icao_model = model,
+                entry_type=SimconnectAicraftDefinition.EntryType.Sim,
+            )
             self._aircraft_definition_map[name] = item
             verbose = gremlin.config.Configuration().verbose_mode_simconnect
-            if verbose: syslog.info(f"SIMCONNECT: add sim user aircraft: {name}")
+            if verbose:
+                syslog.info(f"SIMCONNECT: add sim user aircraft: {name}")
             if emit:
                 self._handler.AircraftDefinitionsChanged.emit()
 
@@ -405,16 +413,14 @@ class SimconnectOptions():
 
         return False
 
-
-
     @QtCore.Slot()
     def _profile_loaded(self):
-        ''' profile is loaded '''
+        """profile is loaded"""
         self._mode_list = self.profile.get_modes()
 
     @QtCore.Slot()
     def _profile_edit_mode_changed(self):
-        ''' profile modes changed '''
+        """profile modes changed"""
         self._mode_list = self.profile.get_modes()
 
     @property
@@ -432,6 +438,7 @@ class SimconnectOptions():
     @property
     def community_folder(self) -> str:
         return self._community_folder
+
     @community_folder.setter
     def community_folder(self, value):
         if os.path.isdir(value) and value != self._community_folder:
@@ -443,9 +450,8 @@ class SimconnectOptions():
     def local_state_folder(self) -> str:
         return self._local_state_folder
 
-
     def _update_folders(self):
-        ''' updates the folders from the community folder '''
+        """updates the folders from the community folder"""
         community_folder = self._community_folder
         if community_folder and os.path.isdir(community_folder):
             basedir = os.path.dirname(community_folder)
@@ -461,20 +467,22 @@ class SimconnectOptions():
                 self._base_community_folder = base_folder
 
                 # setup the local state folder
-                local_state_folder = os.path.join(base_folder, "MSFS2024 LocalState", "StreamedPackages")
+                local_state_folder = os.path.join(
+                    base_folder, "MSFS2024 LocalState", "StreamedPackages"
+                )
                 if os.path.isdir(local_state_folder):
                     self._local_state_folder = local_state_folder
-
 
     @property
     def last_command_mode(self) -> SimConnectCommandMode:
         return self._last_command_mode
+
     @last_command_mode.setter
     def last_command_mode(self, value: SimConnectCommandMode):
         self._last_command_mode = value
 
     def validate(self):
-        ''' validates options are ok '''
+        """validates options are ok"""
         a_list = []
         valid = True
         for item in self._aircraft_definition_map.values():
@@ -485,35 +493,35 @@ class SimconnectOptions():
                 continue
             a_list.append(item.key)
             if not item.mode:
-                item.error_status = f"Mode not selected"
+                item.error_status = "Mode not selected"
                 valid = False
                 continue
-            if not item.mode in self._mode_list:
+            if item.mode not in self._mode_list:
                 item.error_status = f"Invalid mode {item.mode}"
                 valid = False
                 continue
             if not item.display_name:
-                item.error_status = f"Aircraft name cannot be blank"
+                item.error_status = "Aircraft name cannot be blank"
                 valid = False
 
         return valid
 
     def find_definition_by_state(self, state_string):
-        ''' gets an item based on the state data which is a partial subfolder '''
+        """gets an item based on the state data which is a partial subfolder"""
 
         # example: SimObjects\\Airplanes\\FNX_320_IAE\\aircraft.CFG
         stub = os.path.dirname(state_string.casefold().strip())
 
-        item : SimconnectAicraftDefinition
-        print (stub)
+        item: SimconnectAicraftDefinition
+        print(stub)
         for item in self._aircraft_definition_map.values():
-            print (item.path)
+            print(item.path)
             if item.path.endswith(stub):
                 return item
         return None
 
     def dump(self):
-        ''' dumps current data to the log file '''
+        """dumps current data to the log file"""
         # syslog = logging.getLogger("system")
         syslog.info("Scanned entry mode configurations:")
         for item in self._aircraft_definition_map.values():
@@ -523,13 +531,13 @@ class SimconnectOptions():
         for item in self._aircraft_manual_definition_map.values():
             syslog.info(f"\t{item.display_name} {item.sim_name} mode: {item.mode}")
 
-
     def find_definition_by_sim_name(self, name):
-        ''' gets an item based on the state data which is a partial subfolder - key = sim title of the aircraft '''
+        """gets an item based on the state data which is a partial subfolder - key = sim title of the aircraft"""
         if name:
             key = name.casefold().strip()
             verbose = gremlin.config.Configuration().verbose_mode_details
-            if verbose: self.dump()
+            if verbose:
+                self.dump()
             # lookup scanned entries
             if key in self._aircraft_definition_map:
                 return self._aircraft_definition_map[key]
@@ -537,13 +545,11 @@ class SimconnectOptions():
                 return self._aircraft_manual_definition_map[key]
         return None
 
-
     def find_definition_by_aicraft(self, aircraft) -> SimconnectAicraftDefinition:
-        ''' gets an item by aircraft name (not case sensitive)'''
+        """gets an item by aircraft name (not case sensitive)"""
         if not aircraft:
             return None
         key = aircraft.casefold().strip()
-        item : SimconnectAicraftDefinition
         if key in self._aircraft_definition_map:
             return self._aircraft_definition_map[key]
         if key in self._aircraft_manual_definition_map:
@@ -551,81 +557,105 @@ class SimconnectOptions():
         return None
 
     def find_definition_by_title(self, title) -> SimconnectAicraftDefinition:
-        ''' finds aircraft data by the loaded aircraft title '''
+        """finds aircraft data by the loaded aircraft title"""
         if not title:
             return None
-        item = next((n for n in self._aircraft_definition_map.values() if n.title in item.titles), None)
+
+        item = next(
+            (
+                n
+                for n in self._aircraft_definition_map.values()
+                if n.title in self._titles
+            ),
+            None,
+        )
         if not item:
-            item = next((n for n in self._aircraft_manual_definition_map.values() if n.title in item.titles), None)
+            item = next(
+                (
+                    n
+                    for n in self._aircraft_manual_definition_map.values()
+                    if n.title in item.titles
+                ),
+                None,
+            )
         return item
 
     def find_definition_by_aicraft_folder(self, folder) -> SimconnectAicraftDefinition:
-        ''' gets an item by aircraft name (not case sensitive)'''
+        """gets an item by aircraft name (not case sensitive)"""
         if not folder:
             return None
         key = folder.casefold().strip()
-        item : SimconnectAicraftDefinition
-        item = next((n for n in self._aircraft_definition_map.values() if n.aircraft_path == key), None)
+        item: SimconnectAicraftDefinition
+        item = next(
+            (
+                n
+                for n in self._aircraft_definition_map.values()
+                if n.aircraft_path == key
+            ),
+            None,
+        )
         return item
-
 
     @property
     def auto_mode_select(self):
-        ''' true if automatic mode selection for aicraft is enabled '''
+        """true if automatic mode selection for aicraft is enabled"""
         return gremlin.config.Configuration().simconnect_auto_mode_select
+
     @auto_mode_select.setter
     def auto_mode_select(self, value):
         gremlin.config.Configuration().simconnect_auto_mode_select
 
     @property
     def auto_mode_lock(self):
-        ''' true if mode locking is enabled '''
+        """true if mode locking is enabled"""
         lock = gremlin.config.Configuration().simconnect_auto_mode_lock
-        return lock and self.auto_mode_select # both must be enabled to lock a profile
+        return lock and self.auto_mode_select  # both must be enabled to lock a profile
 
     @auto_mode_lock.setter
     def auto_mode_lock(self, value):
         gremlin.config.Configuration().simconnect_auto_mode_lock = value
 
-
-
-
-
-
-
     def save(self):
-        ''' saves the configuration data '''
+        """saves the configuration data"""
         self.to_xml()
 
-    def parse_xml(self, data = None):
+    def parse_xml(self, data=None):
         xml_source = self._xml_source
         if not os.path.isfile(xml_source):
             # options not saved yet - ignore
             return
 
-
         self._titles = []
         self._aircraft_manual_definition_map.clear()
         self._aircraft_definition_map.clear()
-
 
         try:
             parser = etree.XMLParser(remove_blank_text=True)
             root = etree.parse(xml_source, parser)
 
-            nodes = root.xpath('//options')
+            nodes = root.xpath("//options")
+            node: etree.Element
             for node in nodes:
                 if "community_folder" in node.attrib:
-                    self._community_folder = safe_read(node,"community_folder", str, "")
+                    self._community_folder = safe_read(
+                        node, "community_folder", str, ""
+                    )
                 if "sort" in node.attrib:
                     try:
-                        sort_mode = safe_read(node,"sort",int, SimconnectSortMode.NotSet.value)
+                        sort_mode = safe_read(
+                            node, "sort", int, SimconnectSortMode.NotSet.value
+                        )
                         self._sort_mode = SimconnectSortMode(sort_mode)
-                    except:
+                    except Exception as e:
+                        syslog.warning(
+                            f"error reading sort mode: {sort_mode} offending line {node.source_line}: {e}"
+                        )
                         self._sort_mode = SimconnectSortMode.NotSet
 
                 if "last_command_mode" in node.attrib:
-                    self._last_command_mode = SimConnectCommandMode.to_enum(node.get("last_command_mode"))
+                    self._last_command_mode = SimConnectCommandMode.to_enum(
+                        node.get("last_command_mode")
+                    )
                 break
 
             # reference items scanned from MSFS
@@ -638,24 +668,24 @@ class SimconnectOptions():
             default_mode = profile.get_default_mode() if profile else None
             if node_items is not None:
                 for node in node_items:
-                    icao_model = safe_read(node,"model", str, "")
-                    icao_manufacturer = safe_read(node,"manufacturer", str, "")
-                    icao_type = safe_read(node,"type", str, "")
-                    path = safe_read(node,"path", str, "")
-                    key = safe_read(node,"key", str, "")
+                    icao_model = safe_read(node, "model", str, "")
+                    icao_manufacturer = safe_read(node, "manufacturer", str, "")
+                    icao_type = safe_read(node, "type", str, "")
+                    path = safe_read(node, "path", str, "")
+                    key = safe_read(node, "key", str, "")
 
                     if "mode" in node.attrib:
                         mode = node.get("mode")
                     else:
                         mode = default_mode
 
-                    id = safe_read(node,"id", str, "")
-                    entry_type_int = safe_read(node,"entry_type",int,0)
+                    id = safe_read(node, "id", str, "")
+                    entry_type_int = safe_read(node, "entry_type", int, 0)
                     entry_type = SimconnectAicraftDefinition.EntryType(entry_type_int)
 
-                    state_folder = safe_read(node,"state_folder",str,"")
-                    community_path = safe_read(node,"community_path",str,"")
-                    aircraft_path = safe_read(node,"aircraft_path",str,"")
+                    state_folder = safe_read(node, "state_folder", str, "")
+                    community_path = safe_read(node, "community_path", str, "")
+                    aircraft_path = safe_read(node, "aircraft_path", str, "")
                     sim_name = None
                     if "sim_name" in node.attrib:
                         sim_name = node.get("sim_name")
@@ -673,34 +703,36 @@ class SimconnectOptions():
                         for child in node_titles:
                             titles.append(child.text)
 
-                    item = SimconnectAicraftDefinition(id = id,
-                                                        icao_model = icao_model,
-                                                        icao_manufacturer = icao_manufacturer,
-                                                        icao_type = icao_type,
-                                                        titles = titles,
-                                                        path = path,
-                                                        mode = mode,
-                                                        community_path=community_path,
-                                                        aircraft_path=aircraft_path,
-                                                        state_folder = state_folder,
-                                                        sim_name = sim_name,
-                                                        entry_type = entry_type)
-                    if not key in self._aircraft_definition_map:
+                    item = SimconnectAicraftDefinition(
+                        id=id,
+                        icao_model=icao_model,
+                        icao_manufacturer=icao_manufacturer,
+                        icao_type=icao_type,
+                        titles=titles,
+                        path=path,
+                        mode=mode,
+                        community_path=community_path,
+                        aircraft_path=aircraft_path,
+                        state_folder=state_folder,
+                        sim_name=sim_name,
+                        entry_type=entry_type,
+                    )
+                    if key not in self._aircraft_definition_map:
                         self._aircraft_definition_map[key] = item
-
 
             node_user_items = root.xpath("//user_items/item")
             verbose = gremlin.config.Configuration().verbose_mode_details
             for node in node_user_items:
-                mode = safe_read(node,"mode", str, "")
-                id = safe_read(node,"id", str, "")
-                sim_name = safe_read(node,"sim_name", str, "")
-                item =SimconnectManualDefinition(id, sim_name, mode, manual = True)
+                mode = safe_read(node, "mode", str, "")
+                id = safe_read(node, "id", str, "")
+                sim_name = safe_read(node, "sim_name", str, "")
+                item = SimconnectManualDefinition(id, sim_name, mode, manual=True)
                 key = sim_name.casefold().strip()
                 self._aircraft_manual_definition_map[key] = item
-                if verbose: syslog.info (f"SIMCONNECT: manual: read mode: {mode} for item: {sim_name}")
-
-
+                if verbose:
+                    syslog.info(
+                        f"SIMCONNECT: manual: read mode: {mode} for item: {sim_name}"
+                    )
 
             node_titles = None
             nodes = root.xpath("//titles")
@@ -718,14 +750,13 @@ class SimconnectOptions():
             # sort the entries according to the current sort mode
             self.sort()
 
-
         except Exception as err:
             syslog.error(f"Simconnect Config: XML read error: {xml_source}")
             syslog.error(f"{err}\n{traceback.format_exc()}")
             return False
 
     def to_xml(self):
-        ''' writes the simconnect options to the xml configuration file '''
+        """writes the simconnect options to the xml configuration file"""
 
         root = etree.Element("simconnect_config")
 
@@ -736,19 +767,22 @@ class SimconnectOptions():
             node_options.set("community_folder", self._community_folder)
         node_options.set("sort", str(self._sort_mode.value))
 
-        node_options.set("last_command_mode", SimConnectCommandMode.to_string(self._last_command_mode))
+        node_options.set(
+            "last_command_mode",
+            SimConnectCommandMode.to_string(self._last_command_mode),
+        )
 
         # scanned aicraft titles (local content)
         if self._aircraft_definition_map:
-            node_items = etree.SubElement(root,"items")
+            node_items = etree.SubElement(root, "items")
             for sim_name, item in self._aircraft_definition_map.items():
-                node = etree.SubElement(node_items,"item")
+                node = etree.SubElement(node_items, "item")
                 if item.icao_model:
                     node.set("model", item.icao_model)
                 if item.icao_manufacturer:
                     node.set("manufacturer", item.icao_manufacturer)
                 if item.icao_type:
-                    node.set("type",item.icao_type)
+                    node.set("type", item.icao_type)
                 if item.path:
                     node.set("path", item.path)
                 node.set("id", item.id)
@@ -759,7 +793,6 @@ class SimconnectOptions():
                 if item.sim_name:
                     node.set("sim_name", item.sim_name)
                 node.set("key", sim_name)
-
 
                 if item.community_path:
                     node.set("community_path", item.community_path)
@@ -775,12 +808,12 @@ class SimconnectOptions():
 
         # manual entries (usually for streamed entries) - this only has name and mode as we don't have any other info
         if self._aircraft_manual_definition_map:
-            node_items = etree.SubElement(root,"user_items")
+            node_items = etree.SubElement(root, "user_items")
             for item in self._aircraft_manual_definition_map.values():
-                node = etree.SubElement(node_items,"item")
+                node = etree.SubElement(node_items, "item")
                 node.set("id", item.id)
                 if item.sim_name:
-                   node.set("sim_name", item.sim_name)
+                    node.set("sim_name", item.sim_name)
                 else:
                     node.set("sim_name", "")
 
@@ -789,21 +822,25 @@ class SimconnectOptions():
                 else:
                     node.set("mode", "")
 
-
         try:
             # save the file
             tree = etree.ElementTree(root)
-            tree.write(self._xml_source, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            tree.write(
+                self._xml_source,
+                pretty_print=True,
+                xml_declaration=True,
+                encoding="utf-8",
+            )
         except Exception as err:
-            syslog.error(f"SimconnectData: unable to create XML simvars: {self._xml_source}:")
+            syslog.error(
+                f"SimconnectData: unable to create XML simvars: {self._xml_source}:"
+            )
             syslog.error(f"{err}\n{traceback.format_exc()}")
 
     def get_community_folder(self):
-        ''' looks for the community folder '''
+        """looks for the community folder"""
         dir = QtWidgets.QFileDialog.getExistingDirectory(
-            None,
-            "Select Community Folder",
-            dir = self.community_folder
+            None, "Select Community Folder", dir=self.community_folder
         )
         if dir and os.path.isdir(dir):
             self.community_folder = dir
@@ -811,49 +848,59 @@ class SimconnectOptions():
         return None
 
     def _getCommunityFolder(self):
-        ''' gets the active community folder - this is user configured in options as there can be multiple installs and versions '''
-        from gremlin.ui import ui_common
+        """gets the active community folder - this is user configured in options as there can be multiple installs and versions"""
         if not self._community_folder or not os.path.isdir(self._community_folder):
             folder = self.get_community_folder()
             if os.path.isdir(folder):
-               folder = None
+                folder = None
 
             self._community_folder = folder
 
         return self._community_folder
 
-
-    def addManualEntry(self, sim_name: str, mode : str = None):
-        ''' adds a manual entry '''
+    def addManualEntry(self, sim_name: str, mode: str = None):
+        """adds a manual entry"""
         assert sim_name
         if not mode:
             mode = gremlin.shared_state.current_profile.get_default_mode()
         key = sim_name.casefold().strip()
-        item = SimconnectManualDefinition(sim_name = sim_name, mode = mode)
+        item = SimconnectManualDefinition(sim_name=sim_name, mode=mode)
         self._aircraft_manual_definition_map[key] = item
 
     def removeEntry(self, item):
-        ''' deletes an entry, scanned or manual - returns True if the entry was deleted'''
+        """deletes an entry, scanned or manual - returns True if the entry was deleted"""
         if item:
-            if isinstance(item, SimconnectAicraftDefinition) and item in self._aircraft_definitions:
+            if (
+                isinstance(item, SimconnectAicraftDefinition)
+                and item in self._aircraft_definitions
+            ):
                 self._aircraft_definitions.remove(item)
                 return True
-            if isinstance(item, SimconnectManualDefinition) and item in self._aircraft_manual_definition_map:
+            if (
+                isinstance(item, SimconnectManualDefinition)
+                and item in self._aircraft_manual_definition_map
+            ):
                 self._aircraft_manual_definition_map.remove(item)
                 return True
         return False
 
     def removeManualEntry(self, sim_name: str):
-        ''' removes a manual entry '''
+        """removes a manual entry"""
         assert sim_name
         sim_name = sim_name.casefold().strip()
-        item = next((item for item in self._aircraft_manual_definition_map if item.sim_name == sim_name), None)
+        item = next(
+            (
+                item
+                for item in self._aircraft_manual_definition_map
+                if item.sim_name == sim_name
+            ),
+            None,
+        )
         if item:
             self._aircraft_manual_definition_map.remove(item)
 
-
     def scan_entry(self, folder):
-        ''' scans a single aicraft folder entry '''
+        """scans a single aicraft folder entry"""
 
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
@@ -867,12 +914,13 @@ class SimconnectOptions():
         item = self._read_aicraft_config(aicraft_folder)
         if item:
             if verbose:
-                syslog.error(f"SIMCONNECT: added aircraft definition: {item.display_name}")
+                syslog.error(
+                    f"SIMCONNECT: added aircraft definition: {item.display_name}"
+                )
         return item
 
-
     def _fix_entry(self, value):
-        if "\"" in value:
+        if '"' in value:
             # remove double quotes
             matches = re.findall('"(.*?)"', value)
             if matches:
@@ -887,19 +935,20 @@ class SimconnectOptions():
         return value.strip()
 
     def _read_aicraft_config(self, aircraft_cfg):
-        ''' reads a configuration folder and extracts a configuration object '''
+        """reads a configuration folder and extracts a configuration object"""
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
         if not aircraft_cfg or not os.path.isfile(aircraft_cfg):
-            syslog.error(f"SIMCONNECT: aicraft configuration file not found: {aircraft_cfg}")
+            syslog.error(
+                f"SIMCONNECT: aicraft configuration file not found: {aircraft_cfg}"
+            )
             return
 
-        cmp_icao_type =  r'(?i)icao_type_designator\s*=\s*\"?(.*?)\"?$'
-        cmp_icao_manuf =  r'(?i)icao_manufacturer\s*=\s*\"?(.*?)\"?$'
-        cmp_icao_model =  r'(?i)icao_model\s*=\s*\"?(.*?)\"?$'
+        cmp_icao_type = r"(?i)icao_type_designator\s*=\s*\"?(.*?)\"?$"
+        cmp_icao_manuf = r"(?i)icao_manufacturer\s*=\s*\"?(.*?)\"?$"
+        cmp_icao_model = r"(?i)icao_model\s*=\s*\"?(.*?)\"?$"
         cmp_title = r"(?i)title\s*=\s*\"?(.*?)\"?$"
-
 
         titles = []
         icao_type = None
@@ -931,16 +980,17 @@ class SimconnectOptions():
         # extract the root folder in the community folder
 
         aircraft_path = os.path.dirname(aircraft_cfg)
-        airplane_path =  os.path.dirname(aircraft_path)
+        airplane_path = os.path.dirname(aircraft_path)
         simobject_path = os.path.dirname(airplane_path)
         community_path = os.path.dirname(simobject_path)
 
         # rebuild the state folder returned by the sim when it has an active aicraft
-        state_folder = os.path.join(community_path, simobject_path, airplane_path, aircraft_path, "aicraft.cfg")
+        state_folder = os.path.join(
+            community_path, simobject_path, airplane_path, aircraft_path, "aicraft.cfg"
+        )
 
         aircraft_name = os.path.basename(aircraft_path)
         community_name = os.path.basename(community_path)
-
 
         sim_name = None
         work_cfg = aircraft_cfg.replace("/", os.sep).casefold().strip()
@@ -948,15 +998,14 @@ class SimconnectOptions():
         max_index = len(splits)
         index = 0
         while splits[index] != "simobjects" and index < max_index:
-            index+=1
-        index+=1
+            index += 1
+        index += 1
         if index < max_index:
             while splits[index] != "airplanes" and index < max_index:
-                index+=1
-        index+=1
+                index += 1
+        index += 1
         if index < max_index:
             sim_name = splits[index]
-
 
         if titles:
             titles = list(set(titles))
@@ -964,37 +1013,41 @@ class SimconnectOptions():
             titles.sort()
         if icao_model and icao_type and icao_manuf:
             path = os.path.dirname(aircraft_cfg)
-            item = SimconnectAicraftDefinition(icao_type=icao_type,
-                                                icao_manufacturer= icao_manuf,
-                                                icao_model= icao_model,
-                                                titles= titles,
-                                                path = path,
-                                                community_path = community_name,
-                                                aircraft_path = aircraft_name,
-                                                state_folder = state_folder,
-                                                sim_name = sim_name
-                                                )
+            item = SimconnectAicraftDefinition(
+                icao_type=icao_type,
+                icao_manufacturer=icao_manuf,
+                icao_model=icao_model,
+                titles=titles,
+                path=path,
+                community_path=community_name,
+                aircraft_path=aircraft_name,
+                state_folder=state_folder,
+                sim_name=sim_name,
+            )
 
             return item
 
         return None
 
-
     def scan_aircraft_config(self, owner):
-        ''' scans MSFS folders for the list of aircraft names '''
+        """scans MSFS folders for the list of aircraft names"""
 
-
-        #options = SimconnectOptions()
+        # options = SimconnectOptions()
 
         community_folder = self.community_folder
         if not community_folder:
             return
 
-
         # scan for lvars
-        #self._scan_lvars()
-        ui = gremlin.shared_state.ui
-        progress = QtWidgets.QProgressDialog(parent = owner, labelText ="Scanning folders... (this can take a while)", cancelButtonText = "Cancel", minimum = 0, maximum= 100) #, flags = QtCore.Qt.FramelessWindowHint)
+        # self._scan_lvars()
+        _ui = gremlin.shared_state.ui
+        progress = QtWidgets.QProgressDialog(
+            parent=owner,
+            labelText="Scanning folders... (this can take a while)",
+            cancelButtonText="Cancel",
+            minimum=0,
+            maximum=100,
+        )  # , flags = QtCore.Qt.FramelessWindowHint)
         progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
         progress.setValue(0)
         progress.show()
@@ -1006,10 +1059,9 @@ class SimconnectOptions():
         for root_folder in search_folders:
             folders = gremlin.util.find_folders(root_folder)
 
-
             for folder in folders:
                 # only process simobjects
-                ac_root = os.path.join(folder, "SimObjects","Airplanes")
+                ac_root = os.path.join(folder, "SimObjects", "Airplanes")
                 if not os.path.isdir(ac_root):
                     continue
                 ac_folders = gremlin.util.find_folders(ac_root)
@@ -1019,10 +1071,6 @@ class SimconnectOptions():
                     if os.path.isfile(ac_cfg) and os.path.isfile(cp_cfg):
                         # valid configuration folder because it has an aicraft.cfg and is a player playable plane because it also has a cockpit.cfg
                         source_files.append(ac_cfg)
-
-
-
-
 
         file_count = len(source_files)
 
@@ -1036,20 +1084,20 @@ class SimconnectOptions():
         if verbose:
             syslog.info(f"SIMCONNECT: Processing {len(source_files):,}...")
         for count, ac_file in enumerate(source_files):
-
-
             progress.setValue(int(100 * count / file_count))
             if progress.wasCanceled():
-                is_canceled  = True
+                is_canceled = True
                 break
 
             item = self._read_aicraft_config(ac_file)
-            if item and not item.key in keys:
+            if item and item.key not in keys:
                 # avoid duplicate entries
                 items.append(item)
                 keys.append(item.key)
                 if verbose:
-                    syslog.info(f"\tFound: {item.display_name}  folder: {item.community_path} ac: {item.aircraft_path}")
+                    syslog.info(
+                        f"\tFound: {item.display_name}  folder: {item.community_path} ac: {item.aircraft_path}"
+                    )
 
         if not is_canceled:
             # update modes that exist already so they are preserved between scans
@@ -1070,33 +1118,34 @@ class SimconnectOptions():
         self.save()
         progress.close()
 
-        #gremlin.util.popCursor()
-
     def sort(self):
-        ''' sorts definitions '''
+        """sorts definitions"""
         if self._sort_mode == SimconnectSortMode.AicraftAscending:
-            self._aircraft_definitions.sort(key = lambda x: x.key)
-            self._aircraft_manual_definition_map.sort(key = lambda x: x.key)
+            self._aircraft_definitions.sort(key=lambda x: x.key)
+            self._aircraft_manual_definition_map.sort(key=lambda x: x.key)
         elif self._sort_mode == SimconnectSortMode.AircraftDescending:
-            self._aircraft_definitions.sort(key = lambda x: x.key, reverse = True)
-            self._aircraft_manual_definition_map.sort(key = lambda x: x.key)
+            self._aircraft_definitions.sort(key=lambda x: x.key, reverse=True)
+            self._aircraft_manual_definition_map.sort(key=lambda x: x.key)
         elif self._sort_mode == SimconnectSortMode.Mode:
-            self._aircraft_definitions.sort(key = lambda x: (x.mode.casefold(), x.key))
-            self._aircraft_manual_definition_map.sort(key = lambda x: (x.mode.casefold(), x.key))
+            self._aircraft_definitions.sort(key=lambda x: (x.mode.casefold(), x.key))
+            self._aircraft_manual_definition_map.sort(
+                key=lambda x: (x.mode.casefold(), x.key)
+            )
+
 
 @SingletonDecorator
-class SimConnectMonitor():
-    ''' simconnect monitor
+class SimConnectMonitor:
+    """simconnect monitor
 
 
     Monitors current aircraft for profile mode changes
 
 
 
-    '''
+    """
+
     def __init__(self):
         # syslog = logging.getLogger("system")
-
 
         self._manager = SimConnectManager()
         self._handler = SimConnectEventHandler()
@@ -1104,8 +1153,7 @@ class SimConnectMonitor():
         msg = "listening" if enabled else "Simconnect is disabled"
         syslog.info(f"SCMonitor: {msg}")
 
-
-        #self._manager.sim_aircraft_loaded.connect(self._sim_aircraft_loaded)
+        # self._manager.sim_aircraft_loaded.connect(self._sim_aircraft_loaded)
         self._manager.sim_start.connect(self._sim_start)
         # self._manager.sim_stop.connect(self._sim_stop)
         self._manager.registerAircraftChangeCallback(self._sim_aircraft_loaded)
@@ -1114,54 +1162,56 @@ class SimConnectMonitor():
         # look for disconnects
         self._handler.simconnect_disconnected.connect(self._sim_stop)
 
-
-        self._options_visible = False # true if the options UI is visible
-
-
+        self._options_visible = False  # true if the options UI is visible
 
         self._started = False
         self._startup_mode = {}
-        self._profile_key_map = {} # map of aircraft name to profile key
+        self._profile_key_map = {}  # map of aircraft name to profile key
 
         self._verbose = gremlin.config.Configuration().verbose_mode_simconnect
         self._verbose_detailed = gremlin.config.Configuration().verbose_mode_details
         self._options = SimconnectOptions(self._manager)
-        el= gremlin.event_handler.EventListener()
-        el.profile_started.connect(self._profile_start) # trap profile start
-        el.profile_stop.connect(self.stop) # trap profile stop
+        el = gremlin.event_handler.EventListener()
+        el.profile_started.connect(self._profile_start)  # trap profile start
+        el.profile_stop.connect(self.stop)  # trap profile stop
         el.abort.connect(self.stop)
-        el.shutdown.connect(self._shutdown) # trap application shutdown
+        el.shutdown.connect(self._shutdown)  # trap application shutdown
         el.simconnect_show_options.connect(self.showOptionsDialog)
 
         eh = gremlin.event_handler.EventHandler()
         eh.registerModeChangeCallback(self._validate_mode_change)
 
-        #el.runtime_mode_changed.connect(self._mode_changed) # trap runtime mode changes - these occur post validation
-        self._last_loaded_aircraft = None # last aicraft loaded
-        self._auto_reconnect_event = threading.Event() # controls reconnect thread exit
-        self._enabled = False # default, not enabled - set by profile start event
-        self._last_mode = None # last aircraft mode
+        # el.runtime_mode_changed.connect(self._mode_changed) # trap runtime mode changes - these occur post validation
+        self._last_loaded_aircraft = None  # last aicraft loaded
+        self._auto_reconnect_event = threading.Event()  # controls reconnect thread exit
+        self._enabled = False  # default, not enabled - set by profile start event
+        self._last_mode = None  # last aircraft mode
 
         self._dialog_options = None
         self._dialog_mode_map = None
 
-        self._request_running = False # true if a request is running to get data from simconnect
-        self._request_aircraft_name = None # name of the returned aircraft from the simconnect call
-        self._request_lock = threading.Lock() # interlock for threads
-
+        self._request_running = (
+            False  # true if a request is running to get data from simconnect
+        )
+        self._request_aircraft_name = (
+            None  # name of the returned aircraft from the simconnect call
+        )
+        self._request_lock = threading.Lock()  # interlock for threads
 
     def showOptionsDialog(self):
-        gremlin.util.InvokeUiMethod(self._showOptionsDialog_ui) # ensure on Ui thread
+        gremlin.util.InvokeUiMethod(self._showOptionsDialog_ui)  # ensure on Ui thread
 
     def _showOptionsDialog_ui(self):
-        ''' shows the options UI '''
+        """shows the options UI"""
         if self._dialog_options:
             # already visible
             return
         profile = gremlin.shared_state.current_profile
         profile_file = profile.profile_file
         if not profile_file or not os.path.isfile(profile_file):
-            gremlin.ui.ui_common.MessageBox(prompt="Please save the current profile before accessing Simconnect options.")
+            gremlin.ui.ui_common.MessageBox(
+                prompt="Please save the current profile before accessing Simconnect options."
+            )
             return
         self._dialog_options = SimconnectOptionsUi(SimConnectManager().simconnect)
         self._dialog_options.closed.connect(self._handle_options_closed)
@@ -1170,17 +1220,16 @@ class SimConnectMonitor():
     def _handle_options_closed(self):
         self._dialog_options = None
 
-    def hasStartupMode(self, name: str = None, model : str = None) -> bool:
-        ''' checks if the aicraft is in the mapping database
+    def hasStartupMode(self, name: str = None, model: str = None) -> bool:
+        """checks if the aicraft is in the mapping database
         model param is ignored for now because it is not consistent and add-on dependent so is not reliable
 
-        '''
+        """
         if name:
             name = name.casefold()
 
         if name in self._profile_key_map:
-            return True # cached already so found
-
+            return True  # cached already so found
 
         model = None
 
@@ -1189,7 +1238,9 @@ class SimConnectMonitor():
             name = self.getCurrentAircraft()
             name = name.casefold()
         if not name:
-            syslog.warning("SDMONITOR: unable to get current aircraft in hasStartupMode()")
+            syslog.warning(
+                "SDMONITOR: unable to get current aircraft in hasStartupMode()"
+            )
             return False
 
         item = self._options.find_definition_by_sim_name(name)
@@ -1206,29 +1257,32 @@ class SimConnectMonitor():
             self._profile_key_map[name] = key
         return found
 
-    def getCurrentAircraft(self, timeout_seconds = 10) -> str:
-        ''' gets the aircraft from Simconnect - blocks while the call is running '''
+    def getCurrentAircraft(self, timeout_seconds=10) -> str:
+        """gets the aircraft from Simconnect - blocks while the call is running"""
 
         if not self._manager.simconnect_enabled:
             # not enabled
             return None
 
         if not self._request_running:
-
             if not self._manager.connected:
                 self._manager.connect()
                 if not self._manager.connected:
-                    syslog.warning("SCMONITOR: warning - unable to get current aircraft - not connected")
+                    syslog.warning(
+                        "SCMONITOR: warning - unable to get current aircraft - not connected"
+                    )
                     return None
 
-            self._request_timeout = time.time() + timeout_seconds # timeout in seconds
+            self._request_timeout = time.time() + timeout_seconds  # timeout in seconds
             self._request_running = True
             self._request_aircraft_name = None
-            self._request_thread = threading.Thread(target = self._request_loaded_aircraft_runner)
+            self._request_thread = threading.Thread(
+                target=self._request_loaded_aircraft_runner
+            )
             self._request_thread.name = "SCMonitor Aircraft name runner"
-            if self._verbose: syslog.info("SCMONITOR: requesting current aircraft name")
+            if self._verbose:
+                syslog.info("SCMONITOR: requesting current aircraft name")
             self._request_thread.start()
-
 
         # block while the aircraft request is processed
         while self._request_running:
@@ -1237,9 +1291,8 @@ class SimConnectMonitor():
         # found value or None on timeout
         return self._request_aircraft_name
 
-
     def _request_loaded_aircraft_runner(self):
-        ''' waits for the local aircraft name to come back '''
+        """waits for the local aircraft name to come back"""
         # make the request to simconnect
         self._manager.request_loaded_aircraft(self._handle_request_aircraft_changed)
         while self._request_running and time.time() < self._request_timeout:
@@ -1252,22 +1305,19 @@ class SimConnectMonitor():
                 self._request_running = False
                 self._request_thread = None
 
-    def _handle_request_aircraft_changed(self, name : str):
-        ''' handles the callback when the aircraft request came through '''
+    def _handle_request_aircraft_changed(self, name: str):
+        """handles the callback when the aircraft request came through"""
         self._request_aircraft_name = name
-        if self._verbose: syslog.info(f"SCMONITOR: received aircraft name: [{name}]")
+        if self._verbose:
+            syslog.info(f"SCMONITOR: received aircraft name: [{name}]")
         with self._request_lock:
             self._request_running = False
         self._request_thread.join()
         self._request_thread = None
         self._update_status_bar(name)
 
-
-
-
-
-    def getStartupMode(self, name : str = None, model : str = None):
-        ''' gets the startup mode for the current aicraft (profile mode)'''
+    def getStartupMode(self, name: str = None, model: str = None):
+        """gets the startup mode for the current aicraft (profile mode)"""
         if not self._manager.simconnect_enabled:
             # disabled
             return None
@@ -1276,12 +1326,12 @@ class SimConnectMonitor():
 
         if not name:
             if self._manager.connected:
-                name = self.getCurrentAircraft() # none on timeout
+                name = self.getCurrentAircraft()  # none on timeout
             if not name:
-                syslog.warning("SCMONITOR: startup mode: unable to get current aicraft because sim is not running/no connection.")
+                syslog.warning(
+                    "SCMONITOR: startup mode: unable to get current aicraft because sim is not running/no connection."
+                )
                 return None
-
-
 
         if name in self._profile_key_map:
             key = self._profile_key_map[name]
@@ -1306,19 +1356,24 @@ class SimConnectMonitor():
             mode = profile.get_default_mode()
         return mode
 
-    def setStartupMode(self, name : str, mode : str):
-        ''' sets the start mode for the current item '''
+    def setStartupMode(self, name: str, mode: str):
+        """sets the start mode for the current item"""
         if name:
-            if self._verbose: syslog.info(f"SimConnect: save start mode: aircraft: [{name}] mode: [{mode}]")
+            if self._verbose:
+                syslog.info(
+                    f"SimConnect: save start mode: aircraft: [{name}] mode: [{mode}]"
+                )
             model = None
             item = self._options.find_definition_by_sim_name(name)
             if item is None:
                 # not found - add an entry for it
-                if self._verbose: syslog.info(f"\tNew record")
+                if self._verbose:
+                    syslog.info("\tNew record")
                 self._options.ensure_definition(name, model)
                 item = self._options.find_definition_by_sim_name(name)
             else:
-                if self._verbose: syslog.info(f"Update existing record")
+                if self._verbose:
+                    syslog.info("Update existing record")
 
             # found the aicraft entry
             key = item.key
@@ -1328,20 +1383,18 @@ class SimConnectMonitor():
             self._startup_mode[name] = mode
             profile.save()
 
-
     @QtCore.Slot()
     def _profile_start(self):
-        ''' occurs when a profile starts '''
+        """occurs when a profile starts"""
         enabled = gremlin.shared_state.getSimConnectEnabled()
-        self._startup_mode = {} # reset the mode cache
+        self._startup_mode = {}  # reset the mode cache
         self._enabled = enabled
 
-        self._last_loaded_aircraft = None # force an aircraft reload
-        self._last_mode = None # force a mode check
+        self._last_loaded_aircraft = None  # force an aircraft reload
+        self._last_mode = None  # force a mode check
 
         if enabled:
-            syslog.info(f"SCMONITOR: Start")
-
+            syslog.info("SCMONITOR: Start")
 
             if self._last_mode:
                 # revert to the last mode
@@ -1355,46 +1408,44 @@ class SimConnectMonitor():
 
             self.start()
 
-
         else:
-            self.stop() # stop monitoring if it was
-            syslog.info(f"SCMONITOR: no simconnect mappings found - start skipped")
-
+            self.stop()  # stop monitoring if it was
+            syslog.info("SCMONITOR: no simconnect mappings found - start skipped")
 
     def _validate_mode_change(self, new_mode: str, current_mode: str) -> bool:
-        ''' called on mode change - returns False if mode should not be changed '''
+        """called on mode change - returns False if mode should not be changed"""
         if not self._started:
             return True
         if self._enabled:
             success = self._last_mode == new_mode
             if success:
                 return True
-            syslog.info(f"SCMONITOR: simconnect mode change validation failed for mode [{new_mode}] - required aircraft mode: [{self._last_mode}]")
+            syslog.info(
+                f"SCMONITOR: simconnect mode change validation failed for mode [{new_mode}] - required aircraft mode: [{self._last_mode}]"
+            )
         return False
 
-
-
-    def _handle_aircraft_changed(self, title : str):
-        ''' called when the aicraft has changed - change the profile mode if appropriate '''
+    def _handle_aircraft_changed(self, title: str):
+        """called when the aicraft has changed - change the profile mode if appropriate"""
         if not gremlin.shared_state.is_running:
-            return # nothing to do
+            return  # nothing to do
 
         name = title
         model = None
         if name:
             if self._last_loaded_aircraft is None or self._last_loaded_aircraft != name:
-                syslog.info(f"MAP TO SIMCONNECT: detected aircraft change to: [{name}] model: [{model}] : profile mode update")
+                syslog.info(
+                    f"MAP TO SIMCONNECT: detected aircraft change to: [{name}] model: [{model}] : profile mode update"
+                )
                 self._last_loaded_aircraft = name
                 self.changeModeForAicraft(name, model)
 
         else:
             if not name:
-                self._manager.request_loaded_aircraft() # this will also request the model
-
-
+                self._manager.request_loaded_aircraft()  # this will also request the model
 
     def start(self):
-        ''' starts monitoring for aicraft changes '''
+        """starts monitoring for aicraft changes"""
         if self._started:
             return
 
@@ -1403,12 +1454,13 @@ class SimConnectMonitor():
         eh.abort.connect(self.stop)
 
         # start the reconnect thread
-        self._auto_reconnect_thread = threading.Thread(target = self._auto_reconnect_loop, daemon=False)
+        self._auto_reconnect_thread = threading.Thread(
+            target=self._auto_reconnect_loop, daemon=False
+        )
         self._auto_reconnect_thread.name = "SCMONITOR: auto-reconnect"
         self._auto_reconnect_event.clear()
         self._auto_reconnect_thread.start()
         self._started = True
-
 
         self._manager.sim_connect()
         if self._options.auto_mode_select:
@@ -1417,9 +1469,8 @@ class SimConnectMonitor():
 
         # get the current mode
 
-
     def stop(self):
-        ''' stop monitoring aircraft changes  '''
+        """stop monitoring aircraft changes"""
         if not self._started:
             return
         self._auto_reconnect_event.set()
@@ -1430,8 +1481,6 @@ class SimConnectMonitor():
             self._manager.sim_aircraft_loaded.disconnect(self._sim_aircraft_loaded)
         self._started = False
 
-
-
     def _auto_reconnect_loop(self):
         # in case the sim got restarted or we lost connection
         while not self._auto_reconnect_event.is_set():
@@ -1439,19 +1488,16 @@ class SimConnectMonitor():
                 self._manager.ensure_running()
             time.sleep(1)
 
-
     def _get_aircraft_list(self):
-        ''' requests the current list of aircraft known to the sim'''
+        """requests the current list of aircraft known to the sim"""
         self._manager.request_aircraft_list()
 
     def _get_aircraft(self):
-        ''' updates the current player aircraft in the sim'''
+        """updates the current player aircraft in the sim"""
         self._manager.request_loaded_aircraft()
 
-
-
     def _shutdown(self):
-        ''' program exit - cleanup monitoring '''
+        """program exit - cleanup monitoring"""
         # syslog = logging.getLogger("system")
         syslog.info("SCMONITOR: shutdown")
 
@@ -1470,18 +1516,18 @@ class SimConnectMonitor():
         self._manager = None
 
     @QtCore.Slot(str, str, str)
-    def _sim_aircraft_loaded(self, folder : str, name : str, title : str):
-        ''' called when a new aicraft has been detected '''
+    def _sim_aircraft_loaded(self, folder: str, name: str, title: str):
+        """called when a new aicraft has been detected"""
         # syslog = logging.getLogger("system")
         if title:
-            if self._verbose: syslog.info(f"SCMONITOR: Aircraft loaded: [{title}]")
+            if self._verbose:
+                syslog.info(f"SCMONITOR: Aircraft loaded: [{title}]")
             model = self._manager.aircraft_model
             self.changeModeForAicraft(title, model)
             self._update_status_bar(title)
 
-
-    def changeModeForAicraft(self, title : str, model : str = None):
-        ''' changes the mode for the current aircraft '''
+    def changeModeForAicraft(self, title: str, model: str = None):
+        """changes the mode for the current aircraft"""
 
         self._update_status_bar(title)
 
@@ -1490,109 +1536,111 @@ class SimConnectMonitor():
             self._request_user_input(title, model)
             return None
         else:
-            mode = self.getStartupMode(title, model) # get the mode to use for this profile
+            mode = self.getStartupMode(
+                title, model
+            )  # get the mode to use for this profile
             if mode and gremlin.shared_state.runtime_mode != mode:
                 # suitable mode found - if this is the current mode - change_mode will do nothing
-                if self._verbose: syslog.info(f"SCMONITOR: Change aicraft: [{title}]  profile mode: [{mode}]")
+                if self._verbose:
+                    syslog.info(
+                        f"SCMONITOR: Change aicraft: [{title}]  profile mode: [{mode}]"
+                    )
                 self.change_mode(mode)
                 self._last_mode = mode
             return mode
 
+    def _request_user_input(self, name: str, model: str = None):
+        gremlin.util.InvokeUiMethod(
+            self._request_user_input_ui, name, model
+        )  # ensure on UI thread
 
-
-    def _request_user_input(self, name : str, model : str = None):
-        gremlin.util.InvokeUiMethod(self._request_user_input_ui, name, model) # ensure on UI thread
-
-    def _request_user_input_ui(self, name : str, model : str = None):
-        ''' asks for user input on the mode to use for the given aircraft name '''
+    def _request_user_input_ui(self, name: str, model: str = None):
+        """asks for user input on the mode to use for the given aircraft name"""
         if self._dialog_options:
-            return # don't show this if the options dialog is visible
+            return  # don't show this if the options dialog is visible
 
         self._dialog_mode_map = SimconnectModeSelectDialog(name)
         self._dialog_mode_map.accepted.connect(self._handle_user_input_accepted)
         self._dialog_mode_map.show()
 
-
     def _handle_user_input_accepted(self):
-        ''' handles user input ok '''
+        """handles user input ok"""
         mode = self._dialog_mode_map.mode()
         name = self._dialog_mode_map.aircraft()
-        self.setStartupMode(name, mode) # save the entry
+        self.setStartupMode(name, mode)  # save the entry
 
-        if self._verbose: syslog.info(f"SCMONITOR: Change aicraft: [{name}]  profile mode: [{mode}]")
+        if self._verbose:
+            syslog.info(f"SCMONITOR: Change aicraft: [{name}]  profile mode: [{mode}]")
         self.change_mode(mode)
         self._last_mode = mode
 
-
-
-    def _update_status_bar(self, name : str = None):
+    def _update_status_bar(self, name: str = None):
         # updates or clears UI status bar with the aicraft name
         el = gremlin.event_handler.EventListener()
         if name:
             icon = gremlin.ui.ui_common.Icons.aircraftIcon()
-            el.module_state_register.emit("simconnect_aicraft",name, icon, None)
+            el.module_state_register.emit("simconnect_aicraft", name, icon, None)
         else:
             # no aircraft = clear status
-            el.module_state_register.emit("simconnect_aicraft","",None, None)
-
+            el.module_state_register.emit("simconnect_aicraft", "", None, None)
 
     def _sim_start(self):
-        ''' sim started event '''
+        """sim started event"""
         # syslog = logging.getLogger("system")
-        if self._verbose: syslog.info(f"SCMONITOR: sim start")
-
-
+        if self._verbose:
+            syslog.info("SCMONITOR: sim start")
 
     def _sim_stop(self):
-        ''' sim stop event '''
-        if self._verbose: syslog.info(f"SCMONITOR: sim stop")
+        """sim stop event"""
+        if self._verbose:
+            syslog.info("SCMONITOR: sim stop")
         self._manager.disconnect()
-        if gremlin.shared_state.is_running and gremlin.config.Configuration().simconnect_stop_profile_on_sim_stop:
+        if (
+            gremlin.shared_state.is_running
+            and gremlin.config.Configuration().simconnect_stop_profile_on_sim_stop
+        ):
             el = gremlin.event_handler.EventListener()
             el.request_profile_stop.emit("Sim Stop")
 
         self._update_status_bar()
 
-
-
-
-
-
-
     def _mode_change_validator(self, new_mode) -> bool:
-        ''' hook called when a request for a mode change is made.
-            this checks to see if the mode is locked by option '''
+        """hook called when a request for a mode change is made.
+        this checks to see if the mode is locked by option"""
         if not gremlin.shared_state.is_running:
             # allow mode change while at edit/design time
             return True
 
         # syslog = logging.getLogger("system")
-        if self._verbose: syslog.info(f"SCMONITOR: Profile mode change request to: {new_mode}")
+        if self._verbose:
+            syslog.info(f"SCMONITOR: Profile mode change request to: {new_mode}")
         mode = self.getStartupMode()
         if mode and mode != new_mode and self._options.auto_mode_lock:
             # not allowed
-            if self._verbose: syslog.warning(f"SCMONITOR: per option request denied - aicraft mode lock is enabled and locked to mode [{mode}]")
+            if self._verbose:
+                syslog.warning(
+                    f"SCMONITOR: per option request denied - aicraft mode lock is enabled and locked to mode [{mode}]"
+                )
             return False
 
         # allowed
         return True
 
     def change_mode(self, mode):
-        ''' force a mode change
+        """force a mode change
         This only changes the mode if we're not already in the mode and the mode exists.
-        '''
+        """
         eh = gremlin.event_handler.EventHandler()
-        eh.change_mode(mode, validate = False)
-
-
-
+        eh.change_mode(mode, validate=False)
 
 
 class SimconnectModeSelectDialog(gremlin.ui.ui_common.QRememberDialog):
-    ''' pops ups a dialog for profile mode selection when a new aircraft is detected '''
-    def __init__(self, name : str = None,  parent=None):
+    """pops ups a dialog for profile mode selection when a new aircraft is detected"""
+
+    def __init__(self, name: str = None, parent=None):
         from gremlin.ui import ui_common
-        super().__init__(self.__class__.__name__, parent = parent)
+
+        super().__init__(self.__class__.__name__, parent=parent)
 
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self.setWindowTitle("New Aircraft Mode Selector")
@@ -1611,7 +1659,9 @@ class SimconnectModeSelectDialog(gremlin.ui.ui_common.QRememberDialog):
         self.current_aircraft_widget.setMinimumWidth(line_entry_width)
         self.current_aircraft_widget.setText(current_aircraft)
 
-        widget = gremlin.ui.ui_common.getHContainer(self.current_aircraft_widget,"Aircraft:", widget_only = True)
+        widget = gremlin.ui.ui_common.getHContainer(
+            self.current_aircraft_widget, "Aircraft:", widget_only=True
+        )
         main_layout.addWidget(widget)
 
         mode = self._monitor.getStartupMode(current_aircraft)
@@ -1621,13 +1671,15 @@ class SimconnectModeSelectDialog(gremlin.ui.ui_common.QRememberDialog):
         self._mode_selector_widget.setMode(mode)
         self._mode_selector_widget.modeChanged.connect(self._handle_mode_changed)
 
-        widget = gremlin.ui.ui_common.getHContainer(self._mode_selector_widget,"Profile Mode:", widget_only = True)
+        widget = gremlin.ui.ui_common.getHContainer(
+            self._mode_selector_widget, "Profile Mode:", widget_only=True
+        )
         main_layout.addWidget(widget)
 
-        msg = '''
+        msg = """
 GremlinEx detected a new aicraft with no mode mapping.
 Please select the mode for this aicraft:
-'''
+"""
 
         widget = gremlin.ui.ui_common.QInfoBox(msg)
         main_layout.addWidget(widget)
@@ -1639,24 +1691,27 @@ Please select the mode for this aicraft:
         ok_button_widget = QtWidgets.QPushButton("Ok")
         ok_button_widget.clicked.connect(self._ok_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer([ok_button_widget, cancel_button_widget], left_stretch=True, widget_only = True)
+        widget = gremlin.ui.ui_common.getHContainer(
+            [ok_button_widget, cancel_button_widget],
+            left_stretch=True,
+            widget_only=True,
+        )
         main_layout.addWidget(widget)
 
-
     def _handle_mode_changed(self, mode):
-        ''' assigns a profile to the current aircraft'''
+        """assigns a profile to the current aircraft"""
         pass
 
     def aircraft(self) -> str:
         return self.current_aircraft_widget.text()
 
-    def setAircraft(self, name : str):
+    def setAircraft(self, name: str):
         self.current_aircraft_widget.setText(name)
 
     def mode(self) -> str:
         return self._mode_selector_widget.mode()
 
-    def setMode(self, mode : str) -> bool:
+    def setMode(self, mode: str) -> bool:
         return self._mode_selector_widget.setMode(mode)
 
     @QtCore.Slot()
@@ -1669,19 +1724,21 @@ Please select the mode for this aicraft:
         self.reject()
         self.close()
 
-class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
-    """UI to set individual simconnect  settings """
-    closed = QtCore.Signal() # fires when we close this dialog
 
-    def __init__(self, simconnect : SimConnect, parent=None):
+class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
+    """UI to set individual simconnect  settings"""
+
+    closed = QtCore.Signal()  # fires when we close this dialog
+
+    def __init__(self, simconnect: SimConnect, parent=None):
         from gremlin.ui import ui_common
-        super().__init__(self.__class__.__name__, parent = parent)
+
+        super().__init__(self.__class__.__name__, parent=parent)
 
         # make modal
         self.setWindowModality(QtCore.Qt.ApplicationModal)
 
         self.config = gremlin.config.Configuration()
-
 
         self._manager = SimConnectManager()
         enabled = self._manager.simconnect_enabled
@@ -1693,15 +1750,15 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._verbose = self.config.verbose_mode_simconnect
 
         self.options = SimconnectOptions(simconnect)
-        self._data = None # sorted list of aircraft definitions
+        self._data = None  # sorted list of aircraft definitions
 
         self._handler = SimConnectEventHandler()
 
         self._handler.AircraftDefinitionsChanged.connect(self._aircraft_list_loaded)
 
-        self._current_page = 0 # page number displayed
-        self._page_size = 25 # how many entries to display at a time
-        self._page_count = 0 # number of pages available
+        self._current_page = 0  # page number displayed
+        self._page_size = 25  # how many entries to display at a time
+        self._page_count = 0  # number of pages available
         self._start_index = 0
         self._end_index = 0
         self._page_number = 1
@@ -1713,28 +1770,29 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self._content_widget = gremlin.ui.ui_common.QContentWidget()
         self._content_widget.resized.connect(self._content_resized)
-        self._content_widget.setContentsMargins(0,0,0,0)
+        self._content_widget.setContentsMargins(0, 0, 0, 0)
 
-        self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, self._content_widget)
+        self._splitter = QtWidgets.QSplitter(
+            QtCore.Qt.Orientation.Vertical, self._content_widget
+        )
 
         self._top_panel_widget = QtWidgets.QWidget()
-        self._top_panel_widget.setContentsMargins(0,0,0,0)
+        self._top_panel_widget.setContentsMargins(0, 0, 0, 0)
         self._top_panel_widget.setMinimumWidth(200)
 
         self._bottom_panel_widget = QtWidgets.QWidget()
-        self._bottom_panel_widget.setContentsMargins(0,0,0,0)
+        self._bottom_panel_widget.setContentsMargins(0, 0, 0, 0)
 
         self._top_panel_layout = QtWidgets.QVBoxLayout(self._top_panel_widget)
-        self._top_panel_layout.setContentsMargins(0,0,0,0)
+        self._top_panel_layout.setContentsMargins(0, 0, 0, 0)
 
         self._bottom_panel_layout = QtWidgets.QVBoxLayout(self._bottom_panel_widget)
-        self._bottom_panel_layout.setContentsMargins(0,0,0,0)
+        self._bottom_panel_layout.setContentsMargins(0, 0, 0, 0)
 
         self._splitter.addWidget(self._top_panel_widget)
         self._splitter.addWidget(self._bottom_panel_widget)
-        self._splitter.setStretchFactor(0,1)
-        self._splitter.setStretchFactor(1,1)
-
+        self._splitter.setStretchFactor(0, 1)
+        self._splitter.setStretchFactor(1, 1)
 
         self._splitter.setCollapsible(0, False)
         self._splitter.setCollapsible(1, False)
@@ -1744,50 +1802,67 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.setMinimumWidth(600)
 
         self.mode_list = []
-        self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        self.profile: gremlin.base_profile.Profile = (
+            gremlin.shared_state.current_profile
+        )
         self.mode_list = self.profile.get_modes()
 
-
         # display name to mode pair list
-        self.mode_pair_list =  self.profile.get_mode_display_list()
+        self.mode_pair_list = self.profile.get_mode_display_list()
 
         is_dark = gremlin.shared_state.is_dark_theme
 
-
         self.setWindowTitle("Simconnect Options")
-        self.installEventFilter(self) # trap some events
+        self.installEventFilter(self)  # trap some events
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self._auto_mode_switch = QtWidgets.QCheckBox("Change profile mode based on active aicraft")
-        self._auto_mode_switch.setToolTip("When enabled, the profile mode will automatically change based on the mode associated with the active player aircraft in Flight Simulator")
+        self._auto_mode_switch = QtWidgets.QCheckBox(
+            "Change profile mode based on active aicraft"
+        )
+        self._auto_mode_switch.setToolTip(
+            "When enabled, the profile mode will automatically change based on the mode associated with the active player aircraft in Flight Simulator"
+        )
         self._auto_mode_switch.setChecked(self.options.auto_mode_select)
         self._auto_mode_switch.clicked.connect(self._auto_mode_select_cb)
 
-        self._auto_mode_lock = QtWidgets.QCheckBox("Lock the mode to the active aicraft")
-        self._auto_mode_lock.setToolTip("When enabled, the profile mode mapped to the aircraft will stay locked in that mode and other mode changes will be ignored.\nThis prevents inadvertent loss of control due to other GremlinEx actions.")
+        self._auto_mode_lock = QtWidgets.QCheckBox(
+            "Lock the mode to the active aicraft"
+        )
+        self._auto_mode_lock.setToolTip(
+            "When enabled, the profile mode mapped to the aircraft will stay locked in that mode and other mode changes will be ignored.\nThis prevents inadvertent loss of control due to other GremlinEx actions."
+        )
         self._auto_mode_lock.setChecked(self.options.auto_mode_lock)
         self._auto_mode_lock.clicked.connect(self._auto_mode_lock_cb)
 
-
-        self._msfs_path_widget = ui_common.QPathLineItem(header="MSFS Community Folder", text = self.options.community_folder, dir_mode=True)
+        self._msfs_path_widget = ui_common.QPathLineItem(
+            header="MSFS Community Folder",
+            text=self.options.community_folder,
+            dir_mode=True,
+        )
         self._msfs_path_widget.pathChanged.connect(self._community_folder_changed_cb)
         self._msfs_path_widget.open.connect(self._community_folder_open_cb)
 
-        self._mode_from_aircraft_button_widget = QtWidgets.QPushButton("Mode from Aicraft")
-        self._mode_from_aircraft_button_widget.clicked.connect(self._mode_from_aircraft_button_cb)
+        self._mode_from_aircraft_button_widget = QtWidgets.QPushButton(
+            "Mode from Aicraft"
+        )
+        self._mode_from_aircraft_button_widget.clicked.connect(
+            self._mode_from_aircraft_button_cb
+        )
 
         # enabled box
 
-
         self._simconnect_enabled_widget = QtWidgets.QCheckBox("Enable SimConnect")
         self._simconnect_enabled_widget.setChecked(enabled)
-        self._simconnect_enabled_widget.clicked.connect(self._handle_simconnect_enabled_changed)
+        self._simconnect_enabled_widget.clicked.connect(
+            self._handle_simconnect_enabled_changed
+        )
         self.main_layout.addWidget(self._simconnect_enabled_widget)
 
-
         # toolbar for map
-        self.container_bar_widget, self.container_bar_layout = gremlin.ui.ui_common.getHContainer()
+        self.container_bar_widget, self.container_bar_layout = (
+            gremlin.ui.ui_common.getHContainer()
+        )
 
         self.edit_mode_widget = QtWidgets.QPushButton()
 
@@ -1795,7 +1870,6 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.edit_mode_widget.setIcon(ui_common.load_icon(manage_modes_icon))
         self.edit_mode_widget.clicked.connect(self._manage_modes_cb)
         self.edit_mode_widget.setToolTip("Manage Modes")
-
 
         # self.scan_aircraft_widget = QtWidgets.QPushButton("Scan Aircraft")
         # self.scan_aircraft_widget.setIcon(gremlin.util.load_icon("mdi.magnify-scan"))
@@ -1807,7 +1881,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.current_aircraft_widget = ui_common.QDataLineEdit()
         self.current_aircraft_widget.setReadOnly(True)
         self.current_aircraft_widget.setMinimumWidth(line_entry_width)
-        current_aircraft = self._monitor.getCurrentAircraft() # inline aircraft request
+        current_aircraft = self._monitor.getCurrentAircraft()  # inline aircraft request
         self.current_aircraft_widget.setText(current_aircraft)
 
         self._mode_selector_widget = gremlin.ui.ui_common.ModeSelectorWidget()
@@ -1815,25 +1889,32 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         el = gremlin.event_handler.EventListener()
         el.profile_modes_changed.connect(self._handle_profile_modes_modified)
 
-
         mode = self._monitor.getStartupMode(current_aircraft)
         if not mode:
             mode = gremlin.shared_state.current_profile.get_default_mode()
         self._mode_selector_widget.setMode(mode)
         self._mode_selector_widget.modeChanged.connect(self._handle_mode_changed)
 
+        self.current_aircraft_folder = (
+            None  # holds the active aircraft data folder (from the sim)
+        )
+        self.current_aircraft_title = (
+            None  # holds the active aicraft title (from the sim)
+        )
+        self.current_aircraft_name = (
+            None  # holds the active aicraft name (from the sim)
+        )
 
-        self.current_aircraft_folder = None # holds the active aircraft data folder (from the sim)
-        self.current_aircraft_title = None # holds the active aicraft title (from the sim)
-        self.current_aircraft_name = None # holds the active aicraft name (from the sim)
-
-        self.refresh_current_aircraft_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(callback = self._refresh_aircraft_cb)
+        self.refresh_current_aircraft_widget = (
+            gremlin.ui.ui_common.Buttons.getRefreshWidget(
+                callback=self._refresh_aircraft_cb
+            )
+        )
         # self.refresh_current_aircraft_widget = QtWidgets.QPushButton("Get Current Aircraft")
         # self.refresh_current_aircraft_widget.clicked.connect(self._refresh_aircraft_cb)
         # self.refresh_current_aircraft_widget.setIcon(gremlin.util.load_icon("ei.refresh"))
         # self.refresh_current_aircraft_widget.setToolTip("Queries the current aircraft loaded in the sim")
         # self.refresh_current_aircraft_widget.setMaximumWidth(24)
-
 
         # self.add_current_aircraft_widget = QtWidgets.QPushButton("Add Current Aircraft")
         # self.add_current_aircraft_widget.clicked.connect(self._add_current_aircraft_cb)
@@ -1843,22 +1924,26 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         # self.add_manual_entry_widget.setToolTip("Adds a manual entry")
         # self.add_manual_entry_widget.clicked.connect(self.add_entry_cb)
 
-        self.paginator_widget = gremlin.ui.ui_common.QPaginator(page_size = self._page_size)
+        self.paginator_widget = gremlin.ui.ui_common.QPaginator(
+            page_size=self._page_size
+        )
         self.paginator_widget.pageChanged.connect(self._handle_paginator)
 
-
-        row_widgets = [QtWidgets.QLabel("Current Aircraft:"),
-                       self.current_aircraft_widget,
-                       self._mode_selector_widget,
-                       self.edit_mode_widget,
-                       self.refresh_current_aircraft_widget,
+        row_widgets = [
+            QtWidgets.QLabel("Current Aircraft:"),
+            self.current_aircraft_widget,
+            self._mode_selector_widget,
+            self.edit_mode_widget,
+            self.refresh_current_aircraft_widget,
         ]
 
-        widget = gremlin.ui.ui_common.getGridContainer(row_widgets, widget_only = True)
+        widget = gremlin.ui.ui_common.getGridContainer(row_widgets, widget_only=True)
         self.main_layout.addWidget(widget)
 
         self.filter_widget = QtWidgets.QLineEdit()
-        self.filter_widget.returnPressed.connect(self._handle_search) # on enter, do the search
+        self.filter_widget.returnPressed.connect(
+            self._handle_search
+        )  # on enter, do the search
         self.filter_widget.setMinimumWidth(line_entry_width)
 
         self.apply_filter_widget = QtWidgets.QPushButton("Search")
@@ -1869,33 +1954,41 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.clear_filter_widget.clicked.connect(self._handle_clear_search)
         self.clear_filter_widget.setToolTip("Clears the search filter")
 
-        self.filter_current_widget  = QtWidgets.QPushButton("Search Current")
+        self.filter_current_widget = QtWidgets.QPushButton("Search Current")
         self.filter_current_widget.clicked.connect(self._handle_current_search)
         self.filter_current_widget.setToolTip("Search for current aircraft")
 
         self.refresh_aircraft_list_widget = QtWidgets.QPushButton("Refresh All")
-        self.refresh_aircraft_list_widget.setToolTip("Refresh the available aircraft list from MSFS")
+        self.refresh_aircraft_list_widget.setToolTip(
+            "Refresh the available aircraft list from MSFS"
+        )
         self.refresh_aircraft_list_widget.setIcon(gremlin.util.load_icon("ei.refresh"))
-        self.refresh_aircraft_list_widget.clicked.connect(self._handle_refresh_aircraft_list)
+        self.refresh_aircraft_list_widget.clicked.connect(
+            self._handle_refresh_aircraft_list
+        )
 
-        row_widgets = [QtWidgets.QLabel("Filter:"),
-                        self.filter_widget,
-                        self.apply_filter_widget,
-                        self.clear_filter_widget,
-                        self.filter_current_widget,
-                        self.refresh_aircraft_list_widget
-                       ]
+        row_widgets = [
+            QtWidgets.QLabel("Filter:"),
+            self.filter_widget,
+            self.apply_filter_widget,
+            self.clear_filter_widget,
+            self.filter_current_widget,
+            self.refresh_aircraft_list_widget,
+        ]
 
         widget, layout = gremlin.ui.ui_common.getGridContainer(row_widgets)
         self.container_navigation_widget = widget
         self.container_navigation_layout = layout
 
-        self.grid_sync_widgets = [self.container_navigation_widget, self.container_bar_widget]
+        self.grid_sync_widgets = [
+            self.container_navigation_widget,
+            self.container_bar_widget,
+        ]
 
         page_sizes = [10, 25, 50, 100]
         widgets = [self.paginator_widget]
         for size in page_sizes:
-            widget = ui_common.QDataPushButton(str(size),size)
+            widget = ui_common.QDataPushButton(str(size), size)
             widget.clicked.connect(self._handle_page_size)
             widgets.append(widget)
 
@@ -1907,7 +2000,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         self.container_map_widget = QtWidgets.QWidget()
         self.container_map_layout = QtWidgets.QVBoxLayout(self.container_map_widget)
-        self.container_map_layout.setContentsMargins(0,0,0,0)
+        self.container_map_layout.setContentsMargins(0, 0, 0, 0)
 
         # add aircraft map items
         self.scroll_area = QtWidgets.QScrollArea()
@@ -1917,34 +2010,31 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         # Configure the widget holding the layout with all the buttons
         self.scroll_widget.setLayout(self.scroll_layout)
         self.scroll_widget.setSizePolicy(
-            QtWidgets.QSizePolicy.Expanding,
-            QtWidgets.QSizePolicy.Expanding
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
         )
         self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         # Configure the scroll area
-        #self.scroll_area.setMinimumWidth(300)
+        # self.scroll_area.setMinimumWidth(300)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_widget)
 
         self.map_widget = QtWidgets.QWidget()
         self.map_layout = QtWidgets.QGridLayout(self.map_widget)
-        self.map_layout.setContentsMargins(0,0,0,0)
+        self.map_layout.setContentsMargins(0, 0, 0, 0)
 
         self.manual_map_widget = QtWidgets.QWidget()
         self.manual_map_layout = QtWidgets.QGridLayout(self.manual_map_widget)
-        self.manual_map_layout.setContentsMargins(0,0,0,0)
+        self.manual_map_layout.setContentsMargins(0, 0, 0, 0)
 
         self.scroll_layout.addWidget(self.map_widget)
-        self.scroll_layout.setContentsMargins(6,0,6,0)
+        self.scroll_layout.setContentsMargins(6, 0, 6, 0)
         self.scroll_layout.addStretch()
-
 
         self.container_map_layout.addWidget(self.scroll_area)
 
         # end scrolling container widget definition
-
 
         self.close_button_widget = QtWidgets.QPushButton("Close")
         self.close_button_widget.clicked.connect(self.close_button_cb)
@@ -1952,7 +2042,6 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         # disables as MSFS 2024 doesn't have flight save/flight load in a working state currently
         # self.save_flight_widget = QtWidgets.QPushButton("Save Flight")
         # self.save_flight_widget.clicked.connect(self._handle_save_flight)
-
 
         # self.load_flight_widget = QtWidgets.QPushButton("Load Flight")
         # self.load_flight_widget.clicked.connect(self._handle_load_flight)
@@ -1972,43 +2061,40 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         top_bar_container_layout.addWidget(self._auto_mode_lock)
         top_bar_container_layout.addStretch()
 
-
-
-
-
-
         self._top_panel_layout.addWidget(self.container_map_widget)
         self._top_panel_layout.addWidget(self.container_paginator_widget)
-        #self._bottom_panel_layout.addWidget(self.manual_container_map_widget)
-
+        # self._bottom_panel_layout.addWidget(self.manual_container_map_widget)
 
         warning_container = QtWidgets.QWidget()
         warning_layout = QtWidgets.QHBoxLayout(warning_container)
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self.warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Error goes here", use_wrap=False)
+        self.warning_widget = gremlin.ui.ui_common.QIconLabel(
+            "ph.shield-warning-fill",
+            use_qta=True,
+            icon_color=QtGui.QColor(warning_color),
+            text="Error goes here",
+            use_wrap=False,
+        )
         self.warning_widget.setVisible(False)
         warning_layout.addWidget(self.warning_widget)
         warning_layout.addStretch()
 
-
-        widgets = [top_bar_container_widget,
-                   self._msfs_path_widget,
-                   self.container_bar_widget,
-                   self.container_navigation_widget,
-                   self._content_widget
+        widgets = [
+            top_bar_container_widget,
+            self._msfs_path_widget,
+            self.container_bar_widget,
+            self.container_navigation_widget,
+            self._content_widget,
         ]
 
-
-        self._containers_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
+        self._containers_widget = gremlin.ui.ui_common.getVContainer(
+            widgets, widget_only=True
+        )
         self.main_layout.addWidget(self._containers_widget)
 
         self.main_layout.addWidget(warning_container)
 
         self.main_layout.addWidget(button_bar_widget)
-
-
-
-
 
         # figure out the size of the header part of the control so things line up
         lbl = QtWidgets.QLabel("w")
@@ -2016,21 +2102,20 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         headers = ["Aicraft:"]
         width = 0
         for header in headers:
-            width = max(width, char_width*(len(header)))
+            width = max(width, char_width * (len(header)))
 
         self._width = width
         self._char_width = char_width
 
         if self._manager.simconnect_enabled:
             self._manager.activate()
-            self._update_current_aircraft() # refresh sim data
-        self._update_data() # update display
+            self._update_current_aircraft()  # refresh sim data
+        self._update_data()  # update display
 
         self._update_ui()
 
-
     @QtCore.Slot(bool)
-    def _handle_simconnect_enabled_changed(self, checked : bool):
+    def _handle_simconnect_enabled_changed(self, checked: bool):
         self.config.simconnect_enabled = checked
         if checked:
             self._manager.activate()
@@ -2045,43 +2130,43 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._containers_widget.setEnabled(enabled)
 
     def mode(self) -> str:
-        ''' current mode in drop down '''
+        """current mode in drop down"""
         return self._mode_selector_widget.currentData()
 
-    def setMode(self, mode : str):
+    def setMode(self, mode: str):
         index = self._mode_selector_widget.findData(mode)
         if index != -1:
             self._mode_selector_widget.setCurrentIndex(index)
 
-
     def _handle_profile_modes_modified(self):
-        gremlin.util.InvokeUiMethod(self._handle_profile_modes_modified_ui) # ensure on UI thread
+        gremlin.util.InvokeUiMethod(
+            self._handle_profile_modes_modified_ui
+        )  # ensure on UI thread
 
     def _handle_profile_modes_modified_ui(self):
-        ''' called when profile modes changed '''
+        """called when profile modes changed"""
         name = self.current_aircraft_widget.text()
         with QtCore.QSignalBlocker(self._mode_selector_widget):
             mode = self._mode_selector_widget.mode()
-            self._mode_selector_widget.refresh(mode) # will select the default mode if no longer valid
+            self._mode_selector_widget.refresh(
+                mode
+            )  # will select the default mode if no longer valid
             mode = self._mode_selector_widget.mode()
             self._monitor.setStartupMode(name, mode)
-
 
     def _handle_mode_changed(self, mode):
-        ''' assigns a profile to the current aircraft'''
+        """assigns a profile to the current aircraft"""
         name = self.current_aircraft_widget.text()
         with QtCore.QSignalBlocker(self._mode_selector_widget):
             self._monitor.setStartupMode(name, mode)
 
-
     def _profile_edit_mode_changed(self):
-        ''' called when profile modes have been edited or changed '''
+        """called when profile modes have been edited or changed"""
         self.mode_pair_list = gremlin.ui.ui_common.get_mode_list(self.profile)
         self._populate_ui()
 
-
-    def _set_warning(self, message = None):
-        ''' displays a warning in the UI, set to None to clear'''
+    def _set_warning(self, message=None):
+        """displays a warning in the UI, set to None to clear"""
         if message:
             self.warning_widget.setText(message)
             self.warning_widget.setVisible(True)
@@ -2089,8 +2174,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self.warning_widget.setVisible(False)
 
     @QtCore.Slot(QtCore.QSize)
-    def _content_resized(self, size : QtCore.QSize):
-        ''' called when the container object is resized '''
+    def _content_resized(self, size: QtCore.QSize):
+        """called when the container object is resized"""
 
         # resize the splitter to the container's size as it doesn't happen by itself for some reason
         width = self._content_widget.frameGeometry().width()
@@ -2102,12 +2187,13 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
     @QtCore.Slot()
     def _manage_modes_cb(self):
         import gremlin.shared_state
+
         gremlin.shared_state.ui.manage_modes()
         self._populate_ui()
 
     @QtCore.Slot(object)
     def _community_folder_open_cb(self, widget):
-        ''' opens the profile list '''
+        """opens the profile list"""
         dir = self.options.get_community_folder()
         if dir:
             with QtCore.QSignalBlocker(widget):
@@ -2118,9 +2204,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         if os.path.isdir(text):
             self.options.community_folder = text
 
-
     def closeEvent(self, event):
-        ''' occurs on window close '''
+        """occurs on window close"""
         self.options.save()
         profile = gremlin.shared_state.current_profile
         if profile:
@@ -2129,15 +2214,14 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         super().closeEvent(event)
 
     @QtCore.Slot(bool)
-    def _auto_mode_select_cb(self, checked : bool):
-        ''' auto mode changed'''
+    def _auto_mode_select_cb(self, checked: bool):
+        """auto mode changed"""
         self.options.auto_mode_select = checked
 
     @QtCore.Slot(bool)
-    def _auto_mode_lock_cb(self, checked : bool):
-        ''' auto mode lock changed'''
+    def _auto_mode_lock_cb(self, checked: bool):
+        """auto mode lock changed"""
         self.options.auto_mode_lock = checked
-
 
     @QtCore.Slot()
     def _scan_aircraft_cb(self):
@@ -2150,10 +2234,10 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         if not self._manager.connected:
             gremlin.ui.ui_common.MessageBox(prompt="Unable to attach to Simconnect")
             return
-        self._manager.request_aircraft_list() # get aircraft list
+        self._manager.request_aircraft_list()  # get aircraft list
 
     def _update_current_aircraft(self):
-        ''' request an update from simconnect on the current aircraft '''
+        """request an update from simconnect on the current aircraft"""
         if not self._manager.simconnect_enabled:
             # disabled
             return
@@ -2165,49 +2249,47 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             gremlin.ui.ui_common.MessageBox(prompt="Unable to attach to Simconnect")
             return
 
-        self._manager.request_aircraft_title() # request_loaded_aircraft() # will trigger the aircraft loaded callback
+        self._manager.request_aircraft_title()  # request_loaded_aircraft() # will trigger the aircraft loaded callback
 
     def _update_aircraft_list(self):
         if not self._manager.connected:
             self._manager.activate()
         if self._manager.connected:
-            self._manager.request_aircraft_list() # get aircraft list
-
+            self._manager.request_aircraft_list()  # get aircraft list
 
     @QtCore.Slot()
     def _refresh_aircraft_cb(self):
-        ''' refreshes the current aircraft '''
+        """refreshes the current aircraft"""
         self._update_current_aircraft()
-
 
     @QtCore.Slot()
     def _add_current_aircraft_cb(self):
-        ''' adds the current simconnect aircraft to the mode list '''
+        """adds the current simconnect aircraft to the mode list"""
         name = self.current_aircraft_widget.text()
         folder = self.current_aircraft_folder
-        mode = self.mode
+        _mode = self.mode
         default_mode = gremlin.shared_state.current_profile.get_default_mode()
         if folder and os.path.isdir(folder):
             # local entry
             if not self.options.find_definition_by_sim_name(name):
                 self.options.scan_entry(folder)
             else:
-                self.options.addManualEntry(name, mode = default_mode) # add a manual
+                self.options.addManualEntry(name, mode=default_mode)  # add a manual
 
-                #gremlin.ui.ui_common.MessageBox(title = "Duplicate Entry", prompt = f"Entry {name} already exists")
+                # gremlin.ui.ui_common.MessageBox(title = "Duplicate Entry", prompt = f"Entry {name} already exists")
         else:
             # manual entry
             item = self.options.find_definition_by_sim_name(name)
             if not item:
                 # only add it if not there
-                self.options.addManualEntry(name, mode = default_mode)
+                self.options.addManualEntry(name, mode=default_mode)
 
-        self._update_data() # refresh the data
+        self._update_data()  # refresh the data
         self._populate_ui()
 
     @QtCore.Slot()
     def _remove_current_aircraft_cb(self):
-        ''' remove button '''
+        """remove button"""
         widget = self.sender()
         item, _ = widget.data
 
@@ -2218,24 +2300,27 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 self._populate_ui()
 
     def _validate_entries(self):
-        ''' ensures the manual entries are unique '''
+        """ensures the manual entries are unique"""
         valid = self.options.validateEntries()
         if not valid:
-            self._set_warning("Warning: duplicate manual aicraft entries detected.  The first entry will be used.")
+            self._set_warning(
+                "Warning: duplicate manual aicraft entries detected.  The first entry will be used."
+            )
         else:
             self._set_warning()
 
     @QtCore.Slot(str)
-    def _aircraft_title_changed(self, title : str):
-        ''' triggered when aircraft title changed (loaded aircraft )'''
-        if self._verbose: syslog.info(f"SCUI: got title change: {title}")
+    def _aircraft_title_changed(self, title: str):
+        """triggered when aircraft title changed (loaded aircraft )"""
+        if self._verbose:
+            syslog.info(f"SCUI: got title change: {title}")
         self._update_title(title)
         self.current_aircraft_folder = None
         self.current_aircraft_name = None
 
-    @QtCore.Slot(str,str,str)
+    @QtCore.Slot(str, str, str)
     def _aircraft_loaded(self, folder, name, title):
-        ''' triggered when simconnect sends aircraft data '''
+        """triggered when simconnect sends aircraft data"""
         if title:
             self._update_title(title)
             self.current_aircraft_folder = folder
@@ -2252,10 +2337,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         add_enabled = True if title else False
         self.add_current_aircraft_widget.setEnabled(add_enabled)
 
-
     @QtCore.Slot()
     def _aircraft_list_loaded(self):
-        ''' triggered when simconnect sends aircraft data '''
+        """triggered when simconnect sends aircraft data"""
         self._update_data()
 
     @QtCore.Slot()
@@ -2264,9 +2348,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         count = widget.data
         self.paginator_widget.setPageSize(count)
 
-
     def _update_data(self):
-        ''' re-index the data '''
+        """re-index the data"""
         definitions = self.options.definitions
         item_count = len(definitions)
         if self.paginator_widget.itemCount != item_count:
@@ -2275,17 +2358,14 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
         data = [item for item in definitions.values()]
 
-
         # sort the data
-        data.sort(key = lambda x: x.sim_name)
+        data.sort(key=lambda x: x.sim_name)
         self._data = data
         self._populate_ui()
 
-
-
     @QtCore.Slot(int, float, str)
     def _sim_state(self, int_data, float_data_, str_data):
-        ''' triggered on state requests '''
+        """triggered on state requests"""
         # the data will be returned as a partial subfolder so we need to match it to the actual aircraft
 
         item = self.options.find_definition_by_state(str_data)
@@ -2298,51 +2378,50 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.options._aircraft_manual_definitions.append(item)
         self._update_manual_list()
 
-
-
     @QtCore.Slot()
     def close_button_cb(self):
-        ''' called when close button clicked '''
+        """called when close button clicked"""
         self.close()
 
     @QtCore.Slot()
     def _handle_save_flight(self):
         pass
-        #self._manager.save_flight("c:\\gremlinex_test_flight.flt","test save","test description")
+        # self._manager.save_flight("c:\\gremlinex_test_flight.flt","test save","test description")
 
     @QtCore.Slot()
     def _handle_load_flight(self):
         pass
-        #self._manager.load_flight("c:\\gremlinex_test_flight.flt")
-
+        # self._manager.load_flight("c:\\gremlinex_test_flight.flt")
 
     @QtCore.Slot()
     def _handle_clear_search(self):
-        ''' clears the filter '''
+        """clears the filter"""
         self.filter_widget.setText("")
         self._update_data()
 
     @QtCore.Slot()
     def _handle_refresh_aircraft_list(self):
-        ''' refresh the list of aircraft '''
+        """refresh the list of aircraft"""
         self._update_aircraft_list()
 
     @QtCore.Slot()
     def _handle_current_search(self):
-        ''' search on current aircraft entry '''
+        """search on current aircraft entry"""
         filter = self.current_aircraft_widget.text()
         self.filter_widget.setText(filter)
         self._search(filter)
 
-    def _search(self, filter : str):
-        ''' handles the search '''
+    def _search(self, filter: str):
+        """handles the search"""
         if not filter:
             self._update_data()
         else:
-            pattern = re.compile(filter,re.IGNORECASE)
+            pattern = re.compile(filter, re.IGNORECASE)
             definitions = self.options.definitions
-            data = [item for item in definitions.values() if pattern.search(item.sim_name)]
-            data.sort(key = lambda x: x.sim_name)
+            data = [
+                item for item in definitions.values() if pattern.search(item.sim_name)
+            ]
+            data.sort(key=lambda x: x.sim_name)
             item_count = len(data)
             if self.paginator_widget.itemCount != item_count:
                 self.paginator_widget.setItemCount(item_count, False)
@@ -2350,20 +2429,13 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             self._data = data
             self._populate_ui()
 
-
-
-
     @QtCore.Slot()
     def _handle_search(self):
-        ''' handles a search '''
+        """handles a search"""
         filter = self.filter_widget.text()
         self._search(filter)
 
-
-
-
-
-    @QtCore.Slot(int,int,int)
+    @QtCore.Slot(int, int, int)
     def _handle_paginator(self, page_number, start_index, end_index):
         self._start_index = start_index
         self._end_index = end_index
@@ -2371,192 +2443,201 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._populate_ui()
 
     def _update_scanned_list(self):
-        ''' updates the regular scanned or sim list '''
-
+        """updates the regular scanned or sim list"""
 
         # clear the widgets
         gremlin.ui.ui_common.clear_layout(self.map_layout)
 
         # display one row per aicraft found
         if not self._data:
-             missing = QtWidgets.QLabel("No mappings found.")
-             missing.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-             self.map_layout.addWidget(missing)
-             return
+            missing = QtWidgets.QLabel("No mappings found.")
+            missing.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+            self.map_layout.addWidget(missing)
+            return
 
-        gremlin.util.pushCursor()
-        try:
+        item: SimconnectAicraftDefinition
 
-            item : SimconnectAicraftDefinition
+        self._mode_selector_map = {}
+        self._selected_cb_map = {}
+        self._manual_mode_selector_map = {}
+        self._manual_selected_cb_map = {}
 
-            self._mode_selector_map = {}
-            self._selected_cb_map = {}
-            self._manual_mode_selector_map = {}
-            self._manual_selected_cb_map = {}
+        row = 0
+        display_width = self._width
 
-            row = 0
-            display_width = self._width
+        # current profile
+        profile = gremlin.shared_state.current_profile
+        default_mode = profile.get_default_mode()
 
-            # current profile
-            profile = gremlin.shared_state.current_profile
-            default_mode = profile.get_default_mode()
+        _icon_color = gremlin.ui.ui_common.Color.normalColor()
 
-            icon_color = gremlin.ui.ui_common.Color.normalColor()
+        create_mode_icon = gremlin.ui.ui_common.Icons.addIcon()
 
-            create_mode_icon = gremlin.ui.ui_common.Icons.addIcon()
+        start_index = self.paginator_widget.startIndex
+        end_index = self.paginator_widget.endIndex
+        for item in self._data[start_index:end_index]:
+            # header row
+            if row == 0:
+                select_widget = QtWidgets.QCheckBox()
+                select_widget.clicked.connect(self._global_selected_changed_cb)
+                select_widget.setToolTip("Select/Deselect All")
 
-            start_index = self.paginator_widget.startIndex
-            end_index = self.paginator_widget.endIndex
-            for item in self._data[start_index:end_index]:
+                display_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(
+                    callback=self._sort_display_up_cb, tooltip="Sort aircraft ascending"
+                )
+                display_sort_up_widget.setMaximumWidth(20)
+                display_sort_up_widget.setStyleSheet("border: none;")
 
-                # header row
-                if row == 0:
+                display_sort_down_widget = (
+                    gremlin.ui.ui_common.Buttons.getSortDownWidget(
+                        callback=self._sort_display_down_cb,
+                        tooltip="Sort aircraft descending",
+                    )
+                )
+                display_sort_down_widget.setMaximumWidth(20)
+                display_sort_down_widget.setStyleSheet("border: none;")
 
-                    select_widget = QtWidgets.QCheckBox()
-                    select_widget.clicked.connect(self._global_selected_changed_cb)
-                    select_widget.setToolTip("Select/Deselect All")
+                # model_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_model_up_cb, tooltip="Sort model ascending")
+                # model_sort_up_widget.setMaximumWidth(20)
+                # model_sort_up_widget.setStyleSheet("border: none;")
 
-                    display_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_display_up_cb, tooltip="Sort aircraft ascending")
-                    display_sort_up_widget.setMaximumWidth(20)
-                    display_sort_up_widget.setStyleSheet("border: none;")
+                # model_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_model_down_cb, tooltip="Sort model descending")
+                # model_sort_down_widget.setMaximumWidth(20)
+                # model_sort_down_widget.setStyleSheet("border: none;")
 
-                    display_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_display_down_cb, tooltip="Sort aircraft descending")
-                    display_sort_down_widget.setMaximumWidth(20)
-                    display_sort_down_widget.setStyleSheet("border: none;")
+                mode_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(
+                    callback=self._sort_mode_up_cb, tooltip="Sort by mode"
+                )
+                mode_sort_up_widget.setMaximumWidth(20)
+                mode_sort_up_widget.setStyleSheet("border: none;")
 
-                    # model_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_model_up_cb, tooltip="Sort model ascending")
-                    # model_sort_up_widget.setMaximumWidth(20)
-                    # model_sort_up_widget.setStyleSheet("border: none;")
+                # mode_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_mode_down_cb, tooltip="Sort by mode descending")
+                # mode_sort_down_widget.setMaximumWidth(20)
+                # mode_sort_down_widget.setStyleSheet("border: none;")
 
-                    # model_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_model_down_cb, tooltip="Sort model descending")
-                    # model_sort_down_widget.setMaximumWidth(20)
-                    # model_sort_down_widget.setStyleSheet("border: none;")
+                aircraft_display_widget = gremlin.ui.ui_common.getHContainer(
+                    ["||", display_sort_up_widget, display_sort_down_widget],
+                    "Aircraft:",
+                    widget_only=True,
+                )
 
-                    mode_sort_up_widget = gremlin.ui.ui_common.Buttons.getSortUpWidget(callback = self._sort_mode_up_cb, tooltip="Sort by mode")
-                    mode_sort_up_widget.setMaximumWidth(20)
-                    mode_sort_up_widget.setStyleSheet("border: none;")
+                mode_header_widget = gremlin.ui.ui_common.getHContainer(
+                    ["||", mode_sort_up_widget], "Mode:", widget_only=True
+                )
 
-                    # mode_sort_down_widget = gremlin.ui.ui_common.Buttons.getSortDownWidget(callback = self._sort_mode_down_cb, tooltip="Sort by mode descending")
-                    # mode_sort_down_widget.setMaximumWidth(20)
-                    # mode_sort_down_widget.setStyleSheet("border: none;")
-
-
-                    aircraft_display_widget = gremlin.ui.ui_common.getHContainer(["||", display_sort_up_widget, display_sort_down_widget],"Aircraft:", widget_only = True)
-
-                    mode_header_widget = gremlin.ui.ui_common.getHContainer(["||", mode_sort_up_widget],"Mode:", widget_only = True)
-
-                    row_selector = gremlin.ui.ui_common.QRowSelectorFrame()
-                    row_selector.setSelectable(False)
-                    spacer = QDataWidget()
-                    spacer.setMinimumWidth(3)
-                    self.map_layout.addWidget(row_selector, 0, 0, 1, -1)
-
-                    col = 1
-                    self.map_layout.addWidget(spacer, row, col)
-                    col+=1
-                    self.map_layout.addWidget(select_widget, 0, col)
-                    col+=1
-                    self.map_layout.addWidget(aircraft_display_widget, 0, col)
-                    # col+=1
-                    # self.map_layout.addWidget(aircraft_model_widget, 0, col)
-                    col+=1
-                    self.map_layout.addWidget(QtWidgets.QLabel(" "), 0, col) # mode add button
-                    col+=1
-                    self.map_layout.addWidget(mode_header_widget, 0, col)
-                    row+=1
-
-
-
-                # selector
-                row_selector = gremlin.ui.ui_common.QRowSelectorFrame(selected = item.selected)
-                row_selector.setMinimumHeight(30)
-                row_selector.selected_changed.connect(self._row_selector_clicked_cb)
-                selected_widget = gremlin.ui.ui_common.QDataCheckbox(data = (item, row_selector))
-                selected_widget.setChecked(item.selected)
-                selected_widget.checkStateChanged.connect(self._selected_changed_cb)
-                row_selector.data = ((item, selected_widget))
-
-                # aicraft display
-                display_header_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-                display_header_widget.setReadOnly(True)
-                display_header_widget.setText(item.display_name)
-                display_header_widget.setToolTip(item.display_name)
-                display_header_widget.installEventFilter(self)
-                w = len(item.display_name)* self._char_width
-                if w > display_width:
-                    display_width = w
-
-                # model_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
-                # model_widget.setReadOnly(True)
-                # if item.icao_model:
-                #     model_widget.setText(item.icao_model)
-                # model_widget.installEventFilter(self)
-
-                # mode drop down
-                mode_selector = gremlin.ui.ui_common.QDataComboBox(data = (item, selected_widget), wheel_enabled=False)
-
-                for display_mode, mode in self.mode_pair_list:
-                    mode_selector.addItem(display_mode, mode)
-
-                mode = profile.getSimconnectMode(item.key)
-                if not mode:
-                    mode = item.mode
-                if not mode:
-                    mode = default_mode
-
-                index = mode_selector.findData(mode)
-                mode_selector.setCurrentIndex(index)
-                mode_selector.currentIndexChanged.connect(self._mode_selector_changed_cb)
-                self._mode_selector_map[item] = mode_selector
-                self._selected_cb_map[item] = selected_widget
-
-
-                create_mode_widget = gremlin.ui.ui_common.QDataPushButton()
-                create_mode_widget.setIcon(create_mode_icon)
-                create_mode_widget.data = (item, select_widget)
-                create_mode_widget.setMaximumWidth(24)
-                create_mode_widget.clicked.connect(self._create_mode_cb)
-                create_mode_widget.setToolTip(f"Create mode {item.sim_name}")
-
-
-                self.map_layout.addWidget(row_selector, row ,0 , 1, -1)
-
+                row_selector = gremlin.ui.ui_common.QRowSelectorFrame()
+                row_selector.setSelectable(False)
                 spacer = QDataWidget()
                 spacer.setMinimumWidth(3)
-                spacer.installEventFilter(self)
+                self.map_layout.addWidget(row_selector, 0, 0, 1, -1)
 
                 col = 1
                 self.map_layout.addWidget(spacer, row, col)
-                col +=1
-                self.map_layout.addWidget(selected_widget, row, col)
-                col +=1
-                self.map_layout.addWidget(display_header_widget, row, col)
-                # col +=1
-                # self.map_layout.addWidget(model_widget, row, col)
-                col +=1
-                self.map_layout.addWidget(create_mode_widget, row, col)
-                col +=1
-                self.map_layout.addWidget(mode_selector, row, col)
-                col +=1
-
-                spacer = QDataWidget()
-                spacer.installEventFilter(self)
-                spacer.setMinimumWidth(6)
-                self.map_layout.addWidget(spacer, row, 8)
-
-
+                col += 1
+                self.map_layout.addWidget(select_widget, 0, col)
+                col += 1
+                self.map_layout.addWidget(aircraft_display_widget, 0, col)
+                # col+=1
+                # self.map_layout.addWidget(aircraft_model_widget, 0, col)
+                col += 1
+                self.map_layout.addWidget(
+                    QtWidgets.QLabel(" "), 0, col
+                )  # mode add button
+                col += 1
+                self.map_layout.addWidget(mode_header_widget, 0, col)
                 row += 1
 
+            # selector
+            row_selector = gremlin.ui.ui_common.QRowSelectorFrame(
+                selected=item.selected
+            )
+            row_selector.setMinimumHeight(30)
+            row_selector.selected_changed.connect(self._row_selector_clicked_cb)
+            selected_widget = gremlin.ui.ui_common.QDataCheckbox(
+                data=(item, row_selector)
+            )
+            selected_widget.setChecked(item.selected)
+            selected_widget.checkStateChanged.connect(self._selected_changed_cb)
+            row_selector.data = (item, selected_widget)
 
-            self.map_layout.setColumnStretch(3,2)
-            display_width = min(display_width, 250)
-            self.map_layout.setColumnMinimumWidth(3, display_width)
-        finally:
-            gremlin.util.popCursor()
+            # aicraft display
+            display_header_widget = gremlin.ui.ui_common.QDataLineEdit(
+                data=(item, selected_widget)
+            )
+            display_header_widget.setReadOnly(True)
+            display_header_widget.setText(item.display_name)
+            display_header_widget.setToolTip(item.display_name)
+            display_header_widget.installEventFilter(self)
+            w = len(item.display_name) * self._char_width
+            if w > display_width:
+                display_width = w
 
+            # model_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
+            # model_widget.setReadOnly(True)
+            # if item.icao_model:
+            #     model_widget.setText(item.icao_model)
+            # model_widget.installEventFilter(self)
+
+            # mode drop down
+            mode_selector = gremlin.ui.ui_common.QDataComboBox(
+                data=(item, selected_widget), wheel_enabled=False
+            )
+
+            for display_mode, mode in self.mode_pair_list:
+                mode_selector.addItem(display_mode, mode)
+
+            mode = profile.getSimconnectMode(item.key)
+            if not mode:
+                mode = item.mode
+            if not mode:
+                mode = default_mode
+
+            index = mode_selector.findData(mode)
+            mode_selector.setCurrentIndex(index)
+            mode_selector.currentIndexChanged.connect(self._mode_selector_changed_cb)
+            self._mode_selector_map[item] = mode_selector
+            self._selected_cb_map[item] = selected_widget
+
+            create_mode_widget = gremlin.ui.ui_common.QDataPushButton()
+            create_mode_widget.setIcon(create_mode_icon)
+            create_mode_widget.data = (item, select_widget)
+            create_mode_widget.setMaximumWidth(24)
+            create_mode_widget.clicked.connect(self._create_mode_cb)
+            create_mode_widget.setToolTip(f"Create mode {item.sim_name}")
+
+            self.map_layout.addWidget(row_selector, row, 0, 1, -1)
+
+            spacer = QDataWidget()
+            spacer.setMinimumWidth(3)
+            spacer.installEventFilter(self)
+
+            col = 1
+            self.map_layout.addWidget(spacer, row, col)
+            col += 1
+            self.map_layout.addWidget(selected_widget, row, col)
+            col += 1
+            self.map_layout.addWidget(display_header_widget, row, col)
+            # col +=1
+            # self.map_layout.addWidget(model_widget, row, col)
+            col += 1
+            self.map_layout.addWidget(create_mode_widget, row, col)
+            col += 1
+            self.map_layout.addWidget(mode_selector, row, col)
+            col += 1
+
+            spacer = QDataWidget()
+            spacer.installEventFilter(self)
+            spacer.setMinimumWidth(6)
+            self.map_layout.addWidget(spacer, row, 8)
+
+            row += 1
+
+        self.map_layout.setColumnStretch(3, 2)
+        display_width = min(display_width, 250)
+        self.map_layout.setColumnMinimumWidth(3, display_width)
 
     def _update_manual_list(self):
-        ''' updates the manual user entries '''
+        """updates the manual user entries"""
 
         # manual entries
         # clear the widgets
@@ -2577,10 +2658,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         delete_icon = gremlin.ui.ui_common.Icons.trashIcon()
         row = 0
         for item in self.options._aircraft_manual_definitions:
-
             if row == 0:
-
-
                 row_selector = gremlin.ui.ui_common.QRowSelectorFrame()
                 row_selector.setSelectable(False)
                 spacer = QDataWidget()
@@ -2590,10 +2668,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 select_widget.clicked.connect(self._global_selected_changed_cb)
                 select_widget.setToolTip("Select/Deselect All")
 
-
                 sim_name_widget = QtWidgets.QLabel("Manual Entry Sim Name")
                 mode_widget = QtWidgets.QLabel("Mode")
-
 
                 self.manual_map_layout.addWidget(row_selector, 0, 0, 1, -1)
 
@@ -2603,19 +2679,20 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                 self.manual_map_layout.addWidget(sim_name_widget, 0, col)
                 col += 2
                 self.manual_map_layout.addWidget(mode_widget, 0, col)
-                row +=1
-
-
-
+                row += 1
 
             # selector
-            row_selector = gremlin.ui.ui_common.QRowSelectorFrame(selected = item.selected)
+            row_selector = gremlin.ui.ui_common.QRowSelectorFrame(
+                selected=item.selected
+            )
             row_selector.setMinimumHeight(30)
             row_selector.selected_changed.connect(self._row_selector_clicked_cb)
-            selected_widget = gremlin.ui.ui_common.QDataCheckbox(data = (item, row_selector))
+            selected_widget = gremlin.ui.ui_common.QDataCheckbox(
+                data=(item, row_selector)
+            )
             selected_widget.setChecked(item.selected)
             selected_widget.checkStateChanged.connect(self._selected_changed_cb)
-            row_selector.data = ((item, selected_widget))
+            row_selector.data = (item, selected_widget)
 
             # name_widget = gremlin.ui.ui_common.QDataLineEdit(data = (item, selected_widget))
             # if item.sim_name:
@@ -2630,13 +2707,12 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             delete_widget.clicked.connect(self._remove_current_aircraft_cb)
 
             # mode drop down
-            mode_selector = gremlin.ui.ui_common.QDataComboBox(data = (item, selected_widget))
-
+            mode_selector = gremlin.ui.ui_common.QDataComboBox(
+                data=(item, selected_widget)
+            )
 
             for display_mode, mode in self.mode_pair_list:
                 mode_selector.addItem(display_mode, mode)
-
-
 
             mode = profile.getSimconnectMode(item.key)
             if not mode:
@@ -2646,7 +2722,6 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
 
             index = mode_selector.findData(mode)
             mode_selector.setCurrentIndex(index)
-
 
             mode_selector.currentIndexChanged.connect(self._mode_selector_changed_cb)
             self._manual_mode_selector_map[item] = mode_selector
@@ -2663,20 +2738,20 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             spacer.setMinimumWidth(3)
             spacer.installEventFilter(self)
 
-            self.manual_map_layout.addWidget(row_selector, row , 0 , 1, -1)
+            self.manual_map_layout.addWidget(row_selector, row, 0, 1, -1)
             col = 1
             self.manual_map_layout.addWidget(spacer, row, col)
-            col +=1
+            col += 1
             self.manual_map_layout.addWidget(selected_widget, row, col)
-            col +=1
+            col += 1
             # self.manual_map_layout.addWidget(name_widget, row, col)
             # col +=1
             self.manual_map_layout.addWidget(create_mode_widget, row, col)
-            col +=1
+            col += 1
             self.manual_map_layout.addWidget(mode_selector, row, col)
-            col +=1
+            col += 1
             self.manual_map_layout.addWidget(delete_widget, row, col)
-            col +=1
+            col += 1
 
             self._selected_cb_map[item] = selected_widget
 
@@ -2695,12 +2770,9 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self._validate_entries()
 
     def _populate_ui(self):
-        ''' populates the map of aircraft to profile modes '''
+        """populates the map of aircraft to profile modes"""
 
-        from gremlin.ui import ui_common
         self.options.validate()
-
-        gremlin.util.pushCursor()
 
         self._update_scanned_list()
 
@@ -2710,8 +2782,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         # sync the grids
         gremlin.ui.ui_common.synchronize_grids(self.grid_sync_widgets)
 
-        gremlin.util.popCursor(True)
-
+        
 
     @QtCore.Slot()
     def _sort_display_up_cb(self):
@@ -2719,7 +2790,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.options._sort_mode = SimconnectSortMode.AicraftAscending
         self.options.sort()
         self._populate_ui()
-        self.scroll_area.ensureVisible(0,0)
+        self.scroll_area.ensureVisible(0, 0)
 
     @QtCore.Slot()
     def _sort_display_down_cb(self):
@@ -2727,7 +2798,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.options._sort_mode = SimconnectSortMode.AircraftDescending
         self.options.sort()
         self._populate_ui()
-        self.scroll_area.ensureVisible(0,0)
+        self.scroll_area.ensureVisible(0, 0)
 
     @QtCore.Slot()
     def _sort_model_up_cb(self):
@@ -2735,7 +2806,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.options._sort_mode = SimconnectSortMode.ModelAscending
         self.options.sort()
         self._populate_ui()
-        self.scroll_area.ensureVisible(0,0)
+        self.scroll_area.ensureVisible(0, 0)
 
     @QtCore.Slot()
     def _sort_model_down_cb(self):
@@ -2743,7 +2814,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.options._sort_mode = SimconnectSortMode.ModelDescending
         self.options.sort()
         self._populate_ui()
-        self.scroll_area.ensureVisible(0,0)
+        self.scroll_area.ensureVisible(0, 0)
 
     @QtCore.Slot()
     def _sort_mode_up_cb(self):
@@ -2751,26 +2822,22 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.options._sort_mode = SimconnectSortMode.Mode
         self.options.sort()
         self._populate_ui()
-        self.scroll_area.ensureVisible(0,0)
-
-
+        self.scroll_area.ensureVisible(0, 0)
 
     @QtCore.Slot(bool)
-    def _global_selected_changed_cb(self, checked : bool):
+    def _global_selected_changed_cb(self, checked: bool):
         for item in self._selected_cb_map.keys():
             self._selected_cb_map[item].setChecked(checked)
 
-
     def _get_selected(self):
-        ''' gets the items that are selected '''
+        """gets the items that are selected"""
         return [item for item in self._data if item.selected]
 
-
     @QtCore.Slot(bool)
-    def _selected_changed_cb(self, state : bool):
+    def _selected_changed_cb(self, state: bool):
         widget = self.sender()
         item, row_selector = widget.data
-        checked = widget.isChecked() # param is an enum - ignore
+        checked = widget.isChecked()  # param is an enum - ignore
         item.selected = checked
         row_selector.selected = checked
 
@@ -2783,15 +2850,13 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         with QtCore.QSignalBlocker(selector_widget):
             selector_widget.setChecked(checked)
 
-
-
     def eventFilter(self, widget, event):
-        ''' ensure line changes are saved '''
+        """ensure line changes are saved"""
         t = event.type()
         if t == QtCore.QEvent.Type.MouseButtonPress and hasattr(widget, "data"):
             item, selected_widget = widget.data
             selected_widget.setChecked(not selected_widget.isChecked())
-            return True # handled
+            return True  # handled
 
         elif t == QtCore.QEvent.Type.KeyPress:
             key = event.key()
@@ -2800,13 +2865,12 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                     widget.returnPressed.emit()
                 elif widget == self._msfs_path_widget:
                     self._community_folder_open_cb()
-            return True # handled
+            return True  # handled
         return super().eventFilter(widget, event)
-
 
     @QtCore.Slot()
     def _create_mode_cb(self):
-        ''' create a mode in the profile for the aircraft '''
+        """create a mode in the profile for the aircraft"""
         widget = self.sender()
         item, _ = widget.data
         profile = gremlin.shared_state.current_profile
@@ -2818,18 +2882,19 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             dialog.setWindowModality(QtCore.Qt.ApplicationModal)
             dialog.show()
         else:
-            gremlin.ui.ui_common.MessageBox(prompt=f"Mode {item.sim_name} already exists in the profile.")
-
+            gremlin.ui.ui_common.MessageBox(
+                prompt=f"Mode {item.sim_name} already exists in the profile."
+            )
 
     @QtCore.Slot(int)
     def _mode_selector_changed_cb(self, selected_index):
-        ''' occurs when the mode is changed on an entry '''
+        """occurs when the mode is changed on an entry"""
         profile = gremlin.shared_state.current_profile
         widget = self.sender()
         mode = widget.currentData()
         item, _ = widget.data
         items = self._get_selected()
-        if not item in items:
+        if item not in items:
             # include the current item if not in the selection
             items.append(item)
         mode_index = None
@@ -2843,9 +2908,8 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
                     selector.setCurrentIndex(mode_index)
                 item.mode = mode
                 profile.setSimconnectMode(key, mode)
-                if self._verbose: syslog.info(f"SCUI: set mode [{mode}] for [{item.sim_name}]")
-
-
+                if self._verbose:
+                    syslog.info(f"SCUI: set mode [{mode}] for [{item.sim_name}]")
 
     @QtCore.Slot()
     def _active_button_cb(self):
@@ -2857,26 +2921,17 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             item = widget.data
             item.aircraft = aircraft
 
-
     @QtCore.Slot()
     def _mode_from_aircraft_button_cb(self):
-        ''' mode from aicraft button '''
+        """mode from aicraft button"""
         aircraft, model, title = self._sm_data.get_aircraft_data()
-        if self._verbose: syslog.info(f"Aircraft: {aircraft} model: {model} title: {title}")
-        if not title in self._mode_list:
+        if self._verbose:
+            syslog.info(f"Aircraft: {aircraft} model: {model} title: {title}")
+        if title not in self._mode_list:
             self.profile.add_mode(title)
 
 
-
-
-
-
-
-
-
-
 class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
-
     """UI widget for mapping inputs to keyboard key combinations - adds extra functionality to the base module ."""
 
     def __init__(self, action_data, parent=None):
@@ -2889,13 +2944,11 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         # call super last because it will call create_ui and populate_ui so the vars must exist
         super().__init__(action_data, parent=parent)
 
-
     def _create(self, action_data):
-        '''' initialize before createUI() '''
+        """' initialize before createUI()"""
 
-        self.action_data : MapToSimConnect = action_data
+        self.action_data: MapToSimConnect = action_data
         self.action_data.events.range_changed.connect(self._action_range_changed)
-
 
         self._simconnect = SimConnectManager().simconnect
 
@@ -2903,31 +2956,37 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self.curve_update_handler = None
         self.input_type = self.action_data.hardware_input_type
         self._is_axis = self.action_data.input_is_axis()
-        self._current_value = 0 # value of the current axis input for the repeater
+        self._current_value = 0  # value of the current axis input for the repeater
 
         self.manager = SimConnectManager()
         self.manager.lvars_updated.connect(self._lvars_udpated_cb)
 
-
-
     @QtCore.Slot()
     def _action_range_changed(self):
-        ''' occurs when the range update to the action data caused another update '''
+        """occurs when the range update to the action data caused another update"""
         self._update_ui()
 
     def _create_ui(self):
         """Creates the UI components."""
-        #import gremlin.gated_handler
+        # import gremlin.gated_handler
         if not Shiboken.isValid(self):
             return
 
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         # syslog = logging.getLogger("system")
         if verbose:
-            syslog.info(f"Simconnect UI for: {self.action_data.hardware_input_type_name}  {self.action_data.hardware_device_name} input: {self.action_data.hardware_input_id}")
+            syslog.info(
+                f"Simconnect UI for: {self.action_data.hardware_input_type_name}  {self.action_data.hardware_device_name} input: {self.action_data.hardware_input_id}"
+            )
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        self._warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Parameter Calculation requires a {#} marker in the expression where the output value goes.", use_wrap=False)
+        self._warning_widget = gremlin.ui.ui_common.QIconLabel(
+            "ph.shield-warning-fill",
+            use_qta=True,
+            icon_color=QtGui.QColor(warning_color),
+            text="Parameter Calculation requires a {#} marker in the expression where the output value goes.",
+            use_wrap=False,
+        )
 
         # if the input is chained
         self.chained_input = self.action_data.input_item.is_action
@@ -2938,29 +2997,31 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._options_button_widget.setIcon(icon)
         self._options_button_widget.clicked.connect(self._show_options_dialog_cb)
 
-
-
-
         # holds type options - visible for manual entries
         self._type_container_widget = QtWidgets.QWidget()
-        self._type_container_widget.setContentsMargins(0,0,0,0)
+        self._type_container_widget.setContentsMargins(0, 0, 0, 0)
         self._type_container_layout = QtWidgets.QHBoxLayout(self._type_container_widget)
-        self._type_container_layout.setContentsMargins(0,0,0,0)
-
+        self._type_container_layout.setContentsMargins(0, 0, 0, 0)
 
         # holds data entry mode options
-        data = [(SimConnectCommandMode.to_display(mode),
-                 mode,
-                 SimConnectCommandMode.to_description(mode)
-                 ) for mode in SimConnectCommandMode]
+        data = [
+            (
+                SimConnectCommandMode.to_display(mode),
+                mode,
+                SimConnectCommandMode.to_description(mode),
+            )
+            for mode in SimConnectCommandMode
+        ]
 
-        self._mode_container_widget, self._mode_container_layout = gremlin.ui.ui_common.getRadioContainer(data,
-                                                                                self._command_mode_changed_cb,
-                                                                                default =self.action_data.command_mode,
-                                                                                label="Simconnect mode:")
+        self._mode_container_widget, self._mode_container_layout = (
+            gremlin.ui.ui_common.getRadioContainer(
+                data,
+                self._command_mode_changed_cb,
+                default=self.action_data.command_mode,
+                label="Simconnect mode:",
+            )
+        )
         self._mode_container_layout.addWidget(self._options_button_widget)
-
-
 
         # type options
         self._type_is_calculator_widget = QtWidgets.QCheckBox("RPN (Calculator) code")
@@ -2978,73 +3039,93 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._type_container_layout.addWidget(self._type_units_widget)
         self._type_container_layout.addStretch()
 
-
-
         # command selector
         self._command_container_widget = QtWidgets.QWidget()
-        self._command_container_widget.setContentsMargins(0,0,0,0)
-        self._command_container_layout = QtWidgets.QVBoxLayout(self._command_container_widget)
-        self._command_container_layout.setContentsMargins(0,0,0,0)
-
+        self._command_container_widget.setContentsMargins(0, 0, 0, 0)
+        self._command_container_layout = QtWidgets.QVBoxLayout(
+            self._command_container_widget
+        )
+        self._command_container_layout.setContentsMargins(0, 0, 0, 0)
 
         # actions elector
         self._action_selector_widget = QtWidgets.QWidget()
-        self._action_selector_widget.setContentsMargins(0,0,0,0)
-        self._action_selector_layout = QtWidgets.QHBoxLayout(self._action_selector_widget)
-        self._action_selector_layout.setContentsMargins(0,0,0,0)
-
+        self._action_selector_widget.setContentsMargins(0, 0, 0, 0)
+        self._action_selector_layout = QtWidgets.QHBoxLayout(
+            self._action_selector_widget
+        )
+        self._action_selector_layout.setContentsMargins(0, 0, 0, 0)
 
         # calculator selector
         self._calculator_container_widget = QtWidgets.QWidget()
-        self._calculator_container_widget.setContentsMargins(0,0,0,0)
-        self._calculator_container_layout = QtWidgets.QVBoxLayout(self._calculator_container_widget)
-        self._calculator_container_layout.setContentsMargins(0,0,0,0)
+        self._calculator_container_widget.setContentsMargins(0, 0, 0, 0)
+        self._calculator_container_layout = QtWidgets.QVBoxLayout(
+            self._calculator_container_widget
+        )
+        self._calculator_container_layout.setContentsMargins(0, 0, 0, 0)
 
         # calculator release selector
         self._calculator_release_container_widget = QtWidgets.QWidget()
-        self._calculator_release_container_widget.setContentsMargins(0,0,0,0)
-        self._calculator_release_container_layout = QtWidgets.QVBoxLayout(self._calculator_release_container_widget)
-        self._calculator_release_container_layout.setContentsMargins(0,0,0,0)
+        self._calculator_release_container_widget.setContentsMargins(0, 0, 0, 0)
+        self._calculator_release_container_layout = QtWidgets.QVBoxLayout(
+            self._calculator_release_container_widget
+        )
+        self._calculator_release_container_layout.setContentsMargins(0, 0, 0, 0)
 
         # list of possible events to trigger
         self._command_selector_widget = gremlin.ui.ui_common.QDataComboBox()
         self._command_list = self.action_data._manager.get_command_name_list()
         self._command_selector_widget.setEditable(True)
         self._command_selector_widget.addItems(self._command_list)
-        self._command_selector_widget.currentIndexChanged.connect(self._command_changed_cb)
+        self._command_selector_widget.currentIndexChanged.connect(
+            self._command_changed_cb
+        )
         self._command_selector_widget.setValidator(CommandValidator())
         self._command_selector_widget.setMinimumWidth(200)
 
         # setup auto-completer for the command
-        self._command_completer = QtWidgets.QCompleter(self._command_selector_widget.validator().commands, self)
-        self._command_completer.setCaseSensitivity(QtGui.Qt.CaseSensitivity.CaseInsensitive)
+        self._command_completer = QtWidgets.QCompleter(
+            self._command_selector_widget.validator().commands, self
+        )
+        self._command_completer.setCaseSensitivity(
+            QtGui.Qt.CaseSensitivity.CaseInsensitive
+        )
         self._command_completer.setFilterMode(QtCore.Qt.MatchFlag.MatchContains)
         self._command_selector_widget.setCompleter(self._command_completer)
 
-        data = [("Block",SimConnectCommandType.SimVar),
-                ("LVAR",SimConnectCommandType.LVar)]
-        self._simvar_mode_container_widget = gremlin.ui.ui_common.getRadioContainer(data, self._command_type_changed, default = self.action_data.command_type,label="Simvar mode:", widget_only = True)
+        data = [
+            ("Block", SimConnectCommandType.SimVar),
+            ("LVAR", SimConnectCommandType.LVar),
+        ]
+        self._simvar_mode_container_widget = gremlin.ui.ui_common.getRadioContainer(
+            data,
+            self._command_type_changed,
+            default=self.action_data.command_type,
+            label="Simvar mode:",
+            widget_only=True,
+        )
 
         self._lvar_command_widget = QtWidgets.QLineEdit()
         self._lvar_command_widget.setText(self.action_data.command)
         self._lvar_command_widget.textChanged.connect(self._lvar_changed_cb)
-        self._lvar_container_widget = gremlin.ui.ui_common.getHContainer(self._lvar_command_widget,"Set LVAR:", widget_only = True)
+        self._lvar_container_widget = gremlin.ui.ui_common.getHContainer(
+            self._lvar_command_widget, "Set LVAR:", widget_only=True
+        )
 
         self._command_container_layout.addWidget(self._simvar_mode_container_widget)
         self._command_container_layout.addWidget(self._action_selector_widget)
         self._command_container_layout.addWidget(self._lvar_container_widget)
 
-
         # lvar lookup container
         self._lvar_lookup_container_widget = QtWidgets.QWidget()
-        self._lvar_lookup_container_widget.setContentsMargins(0,0,0,0)
-        self._lvar_lookup_container_layout = QtWidgets.QHBoxLayout(self._lvar_lookup_container_widget)
-        self._lvar_lookup_container_layout.setContentsMargins(0,0,0,0)
+        self._lvar_lookup_container_widget.setContentsMargins(0, 0, 0, 0)
+        self._lvar_lookup_container_layout = QtWidgets.QHBoxLayout(
+            self._lvar_lookup_container_widget
+        )
+        self._lvar_lookup_container_layout.setContentsMargins(0, 0, 0, 0)
 
         self._refresh_lvar_widget = QtWidgets.QPushButton("Lvars")
         self._refresh_lvar_widget.setIcon(gremlin.util.load_icon("ei.refresh"))
         self._refresh_lvar_widget.clicked.connect(self._refresh_lvar_cb)
-
 
         # list of possible lvars to trigger
         self._lvar_selector_widget = gremlin.ui.ui_common.QDataComboBox()
@@ -3055,11 +3136,17 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._lvar_selector_widget.setMinimumWidth(200)
         self._lvar_selector_widget.setToolTip("LVAR lookup")
 
-        self._lvar_button_widget = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip = "Adds to the calculator expression", callback = self._lvar_selected_cb)
+        self._lvar_button_widget = gremlin.ui.ui_common.Buttons.getAddWidget(
+            tooltip="Adds to the calculator expression", callback=self._lvar_selected_cb
+        )
 
         # setup auto-completer for the lvar
-        self._lvar_completer = QtWidgets.QCompleter(self._lvar_selector_widget.validator().lvars, self)
-        self._lvar_completer.setCaseSensitivity(QtGui.Qt.CaseSensitivity.CaseInsensitive)
+        self._lvar_completer = QtWidgets.QCompleter(
+            self._lvar_selector_widget.validator().lvars, self
+        )
+        self._lvar_completer.setCaseSensitivity(
+            QtGui.Qt.CaseSensitivity.CaseInsensitive
+        )
         self._lvar_completer.setFilterMode(QtCore.Qt.MatchFlag.MatchContains)
 
         self._lvar_selector_widget.setCompleter(self._lvar_completer)
@@ -3070,90 +3157,111 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._lvar_lookup_container_layout.addWidget(self._refresh_lvar_widget)
         self._lvar_lookup_container_layout.addStretch()
 
-
         # calculator entry
         self._calculator_entry_widget = QtWidgets.QTextEdit()
         self._calculator_entry_widget.setAcceptRichText(False)
-        self._calculator_entry_widget.setToolTip("RPN calculator expression sent to MSFS")
+        self._calculator_entry_widget.setToolTip(
+            "RPN calculator expression sent to MSFS"
+        )
         self._calculator_entry_widget.setMinimumWidth(200)
         self._calculator_entry_widget.setPlainText(self.action_data.command)
         self._calculator_entry_widget.textChanged.connect(self._expression_changed_cb)
 
         self._calculator_release_entry_widget = QtWidgets.QTextEdit()
         self._calculator_release_entry_widget.setAcceptRichText(False)
-        self._calculator_release_entry_widget.setToolTip("RPN calculator expression sent to MSFS on input release")
+        self._calculator_release_entry_widget.setToolTip(
+            "RPN calculator expression sent to MSFS on input release"
+        )
         self._calculator_release_entry_widget.setMinimumWidth(200)
-        self._calculator_release_entry_widget.setPlainText(self.action_data.command_release)
-        self._calculator_release_entry_widget.textChanged.connect(self._expression_release_changed_cb)
+        self._calculator_release_entry_widget.setPlainText(
+            self.action_data.command_release
+        )
+        self._calculator_release_entry_widget.textChanged.connect(
+            self._expression_release_changed_cb
+        )
 
         self._calculator_container_layout.addWidget(QtWidgets.QLabel("RPN Expression:"))
         self._calculator_container_layout.addWidget(self._calculator_entry_widget)
 
-
-        self._calculator_release_container_layout.addWidget(QtWidgets.QLabel("RPN Expression on release:"))
-        self._calculator_release_container_layout.addWidget(self._calculator_release_entry_widget)
-
+        self._calculator_release_container_layout.addWidget(
+            QtWidgets.QLabel("RPN Expression on release:")
+        )
+        self._calculator_release_container_layout.addWidget(
+            self._calculator_release_entry_widget
+        )
 
         self._autorepeat_container_widget = QtWidgets.QWidget()
-        self._autorepeat_container_layout = QtWidgets.QHBoxLayout(self._autorepeat_container_widget)
-
+        self._autorepeat_container_layout = QtWidgets.QHBoxLayout(
+            self._autorepeat_container_widget
+        )
 
         self._autorepeat_widget = QtWidgets.QCheckBox("Pulse")
         self._autorepeat_widget.setChecked(self.action_data.auto_repeat)
         self._autorepeat_widget.clicked.connect(self._auto_repeat_state_changed)
-        self._autorepeat_widget.setToolTip("When enabled, the command will repeat at set interval while the input is pressed")
+        self._autorepeat_widget.setToolTip(
+            "When enabled, the command will repeat at set interval while the input is pressed"
+        )
 
-        self._autorepeat_delay_widget = gremlin.ui.ui_common.QDelayWidget(self.action_data.auto_repeat_interval, callback = self._auto_repeat_delay_changed, label = "Interval (ms)")
+        self._autorepeat_delay_widget = gremlin.ui.ui_common.QDelayWidget(
+            self.action_data.auto_repeat_interval,
+            callback=self._auto_repeat_delay_changed,
+            label="Interval (ms)",
+        )
 
-        self._release_command_widget = QtWidgets.QCheckBox("Separate Release Expression")
-        self._release_command_widget.setToolTip("If enabled, a separate expression will be sent on input release")
+        self._release_command_widget = QtWidgets.QCheckBox(
+            "Separate Release Expression"
+        )
+        self._release_command_widget.setToolTip(
+            "If enabled, a separate expression will be sent on input release"
+        )
         self._release_command_widget.setChecked(self.action_data.is_release_command)
         self._release_command_widget.clicked.connect(self._is_release_command_changed)
 
-
         self._calculator_container_layout.addWidget(self._release_command_widget)
-
 
         self._autorepeat_container_layout.addWidget(self._autorepeat_widget)
         self._autorepeat_container_layout.addWidget(self._autorepeat_delay_widget)
         self._autorepeat_container_layout.addStretch()
 
-
-        #self.action_selector_layout.addWidget(self.category_widget)
+        # self.action_selector_layout.addWidget(self.category_widget)
         self._action_selector_layout.addWidget(QtWidgets.QLabel("Selected command:"))
         self._action_selector_layout.addWidget(self._command_selector_widget)
         self._action_selector_layout.addStretch()
 
-
-        self._action_selector_widget.setContentsMargins(0,0,0,0)
-
+        self._action_selector_widget.setContentsMargins(0, 0, 0, 0)
 
         self._output_mode_container_widget = QtWidgets.QWidget()
-        self._output_mode_container_widget.setContentsMargins(0,0,0,0)
-        self._output_mode_container_layout = QtWidgets.QHBoxLayout(self._output_mode_container_widget)
-        self._output_mode_container_layout.setContentsMargins(0,0,0,0)
+        self._output_mode_container_widget.setContentsMargins(0, 0, 0, 0)
+        self._output_mode_container_layout = QtWidgets.QHBoxLayout(
+            self._output_mode_container_widget
+        )
+        self._output_mode_container_layout.setContentsMargins(0, 0, 0, 0)
         self._output_mode_readonly_widget = QtWidgets.QRadioButton("Read/Only")
         self._output_mode_readonly_widget.setEnabled(False)
-
 
         # set range of values output mode (axis input only)
         self._output_mode_ranged_widget = QtWidgets.QRadioButton("Ranged")
         self._output_mode_ranged_widget.clicked.connect(self._mode_ranged_cb)
-        self._output_mode_ranged_widget.setToolTip("Sets the output as a linear axis to the simconnect command.<br>The output is scaled to the specified output range as defined by the command or manually.")
+        self._output_mode_ranged_widget.setToolTip(
+            "Sets the output as a linear axis to the simconnect command.<br>The output is scaled to the specified output range as defined by the command or manually."
+        )
 
         # trigger output mode (event trigger only)
         self._output_mode_trigger_widget = QtWidgets.QRadioButton("Trigger")
         self._output_mode_trigger_widget.clicked.connect(self._mode_trigger_cb)
-        self._output_mode_trigger_widget.setToolTip("Triggers a simconnect command (for momentary inputs only like a button or a hat)")
+        self._output_mode_trigger_widget.setToolTip(
+            "Triggers a simconnect command (for momentary inputs only like a button or a hat)"
+        )
 
         self._output_mode_description_widget = QtWidgets.QLabel()
         self._output_mode_container_layout.addWidget(QtWidgets.QLabel("Output mode:"))
 
-
         # set value output mode (output value only)
         self._output_mode_set_value_widget = QtWidgets.QRadioButton("Value")
         self._output_mode_set_value_widget.clicked.connect(self._mode_value_cb)
-        self._output_mode_set_value_widget.setToolTip("Sends a single value to the simconnect command regardless of the input.")
+        self._output_mode_set_value_widget.setToolTip(
+            "Sends a single value to the simconnect command regardless of the input."
+        )
 
         self._output_mode_container_layout.addWidget(self._output_mode_readonly_widget)
         self._output_mode_container_layout.addWidget(self._output_mode_trigger_widget)
@@ -3165,65 +3273,72 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._output_mode_container_layout.addWidget(self.output_readonly_status_widget)
 
         self._button_mode_container_widget = QtWidgets.QWidget()
-        self._button_mode_container_layout = QtWidgets.QHBoxLayout(self._button_mode_container_widget)
+        self._button_mode_container_layout = QtWidgets.QHBoxLayout(
+            self._button_mode_container_widget
+        )
 
         self._trigger_on_release_widget = QtWidgets.QCheckBox("Trigger on release")
-        self._trigger_on_release_widget.setToolTip("When enabled, the action will trigger when the input is released.")
+        self._trigger_on_release_widget.setToolTip(
+            "When enabled, the action will trigger when the input is released."
+        )
         self._trigger_on_release_widget.clicked.connect(self._trigger_on_release_cb)
 
         self._trigger_on_press_widget = QtWidgets.QCheckBox("Trigger on press")
-        self._trigger_on_press_widget.setToolTip("When enabled, the action will trigger when the input is released.")
+        self._trigger_on_press_widget.setToolTip(
+            "When enabled, the action will trigger when the input is released."
+        )
         self._trigger_on_press_widget.clicked.connect(self._trigger_on_press_cb)
-
 
         self._button_mode_container_layout.addWidget(self._trigger_on_press_widget)
         self._button_mode_container_layout.addWidget(self._trigger_on_release_widget)
         self._button_mode_container_layout.addStretch()
 
-
-
-
         # output data type UI
         self._output_data_type_widget = QtWidgets.QWidget()
-        self._output_data_type_widget.setContentsMargins(0,0,0,0)
-        self._output_data_type_layout = QtWidgets.QHBoxLayout(self._output_data_type_widget)
+        self._output_data_type_widget.setContentsMargins(0, 0, 0, 0)
+        self._output_data_type_layout = QtWidgets.QHBoxLayout(
+            self._output_data_type_widget
+        )
         self._output_data_2_type_widget = QtWidgets.QWidget()
-        self._output_data_2_type_widget.setContentsMargins(0,0,0,0)
-        self._output_data_2_type_layout = QtWidgets.QHBoxLayout(self._output_data_2_type_widget)
+        self._output_data_2_type_widget.setContentsMargins(0, 0, 0, 0)
+        self._output_data_2_type_layout = QtWidgets.QHBoxLayout(
+            self._output_data_2_type_widget
+        )
 
-
-        self._output_data_type_layout.setContentsMargins(0,0,0,0)
+        self._output_data_type_layout.setContentsMargins(0, 0, 0, 0)
 
         self._output_data_type_label_widget = QtWidgets.QLabel("Not Set")
-
-
 
         self._output_data_type_layout.addWidget(self._output_data_type_label_widget)
         self._output_data_type_layout.addWidget(self._output_mode_description_widget)
         self._output_data_type_layout.addStretch()
 
-        self._output_data_2_type_layout.addWidget(QtWidgets.QLabel("<b>Output type:</b>"))
+        self._output_data_2_type_layout.addWidget(
+            QtWidgets.QLabel("<b>Output type:</b>")
+        )
         self._output_data_2_type_layout.addStretch()
-
-
 
         # output range UI
         self._output_range_container_widget = QtWidgets.QWidget()
-        self._output_range_container_widget.setContentsMargins(0,0,0,0)
-        self._output_range_container_layout = QtWidgets.QVBoxLayout(self._output_range_container_widget)
-        self._output_range_container_layout.setContentsMargins(0,0,0,0)
+        self._output_range_container_widget.setContentsMargins(0, 0, 0, 0)
+        self._output_range_container_layout = QtWidgets.QVBoxLayout(
+            self._output_range_container_widget
+        )
+        self._output_range_container_layout.setContentsMargins(0, 0, 0, 0)
 
         # output value widget - displays a min/max range or a fixed value
-        self._value_widget = gremlin.ui.ui_common.QJoystickRangeWidget(show_mode_change=False,
-                                                                       min_norm= self.action_data.normalized_min_range,
-                                                                       max_norm= self.action_data.normalized_max_range,
-                                                                       min_cmd= self.action_data.command_min_range,
-                                                                       max_cmd= self.action_data.command_max_range,
-                                                                       min_range=-16383,
-                                                                       max_range=16384,
-                                                                       step = 1.0,
-                                                                       inverted=self.action_data.inverted,
-                                                                       parent = self)
+        self._value_widget = gremlin.ui.ui_common.QJoystickRangeWidget(
+            show_mode_change=False,
+            min_norm=self.action_data.normalized_min_range,
+            max_norm=self.action_data.normalized_max_range,
+            min_cmd=self.action_data.command_min_range,
+            max_cmd=self.action_data.command_max_range,
+            min_range=-16383,
+            max_range=16384,
+            step=1.0,
+            inverted=self.action_data.inverted,
+            parent=self,
+        )
         self._value_widget.valueChanged.connect(self._value_changed)
         self._value_widget.rangeChanged.connect(self._range_changed)
         self._value_widget.invertChanged.connect(self._inverted_changed)
@@ -3235,10 +3350,11 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
         self._output_range_ref_text_widget = QtWidgets.QLabel()
         self._output_range_container_layout.addWidget(self._value_widget)
-        self._output_range_container_layout.addWidget(self._range_button_container_widget)
+        self._output_range_container_layout.addWidget(
+            self._range_button_container_widget
+        )
 
         w = gremlin.ui.ui_common.get_text_width("0000000.0000")
-
 
         self._reset_range_widget = QtWidgets.QPushButton("Reset")
         self._reset_range_widget.setToolTip("Reset the range to -1 +1")
@@ -3246,14 +3362,19 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
         # output axis repeater
         self.container_repeater_widget = QtWidgets.QWidget()
-        self.container_repeater_layout = QtWidgets.QHBoxLayout(self.container_repeater_widget)
-
+        self.container_repeater_layout = QtWidgets.QHBoxLayout(
+            self.container_repeater_widget
+        )
 
         self.curve_button_widget = QtWidgets.QPushButton("Output Curve")
         active_color = gremlin.ui.ui_common.Color.activeColor()
         normal_color = gremlin.ui.ui_common.Color.normalColor()
-        self.curve_icon_inactive = gremlin.util.load_icon("mdi.chart-bell-curve",qta_color=normal_color)
-        self.curve_icon_active = gremlin.util.load_icon("mdi.chart-bell-curve",qta_color=active_color)
+        self.curve_icon_inactive = gremlin.util.load_icon(
+            "mdi.chart-bell-curve", qta_color=normal_color
+        )
+        self.curve_icon_active = gremlin.util.load_icon(
+            "mdi.chart-bell-curve", qta_color=active_color
+        )
 
         self.curve_button_widget.setToolTip("Curve output")
         self.curve_button_widget.clicked.connect(self._curve_button_cb)
@@ -3264,7 +3385,9 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self.curve_clear_widget.setToolTip("Removes the curve output")
         self.curve_clear_widget.clicked.connect(self._curve_delete_button_cb)
 
-        self._axis_repeater_widget = gremlin.ui.ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
+        self._axis_repeater_widget = gremlin.ui.ui_common.QHookedProgressBar(
+            orientation=QtCore.Qt.Orientation.Horizontal
+        )
         self._axis_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self._axis_value_widget.setRange(-16383, 16384)
         self._axis_value_widget.setReadOnly(True)
@@ -3274,12 +3397,10 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._calculator_value_widget = QtWidgets.QPlainTextEdit()
         self._calculator_value_widget.setReadOnly(True)
 
-
         self.container_repeater_layout.addWidget(self.curve_button_widget)
         self.container_repeater_layout.addWidget(self.curve_clear_widget)
         self.container_repeater_layout.addWidget(self._axis_repeater_widget)
-        #self.container_repeater_layout.addWidget(self._axis_alt_repeater_widget)
-
+        # self.container_repeater_layout.addWidget(self._axis_alt_repeater_widget)
 
         self.container_repeater_layout.addWidget(QtWidgets.QLabel("SimConnect Output:"))
         self.container_repeater_layout.addWidget(self._axis_value_widget)
@@ -3287,61 +3408,61 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self.container_repeater_layout.addStretch()
         self._update_curve_icon()
 
-
         if self.action_data.input_type == InputType.JoystickAxis:
             self._update_axis_widget()
 
-
         self._range_button_container_layout.addWidget(QtWidgets.QLabel("Presets:"))
 
-
-        widget = gremlin.ui.ui_common.QDataPushButton("Percent", data = (0, 100))
+        widget = gremlin.ui.ui_common.QDataPushButton("Percent", data=(0, 100))
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
-
-        widget = gremlin.ui.ui_common.QDataPushButton("-16K..+16K", data = (-16383, 16384))
+        widget = gremlin.ui.ui_common.QDataPushButton(
+            "-16K..+16K", data=(-16383, 16384)
+        )
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
-
-        widget = gremlin.ui.ui_common.QDataPushButton("0..16K", data = (0, 16384))
+        widget = gremlin.ui.ui_common.QDataPushButton("0..16K", data=(0, 16384))
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
         # airbus detent data
         # sets up output gates
 
-
-        widget = gremlin.ui.ui_common.QDataPushButton("Reverse Detent", data = (-16383 + int(16383 * 0.1), 16384))
+        widget = gremlin.ui.ui_common.QDataPushButton(
+            "Reverse Detent", data=(-16383 + int(16383 * 0.1), 16384)
+        )
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
-        widget = gremlin.ui.ui_common.QDataPushButton("Min Detent", data = (-16383 + int(16383 * 0.1), 16384))
+        widget = gremlin.ui.ui_common.QDataPushButton(
+            "Min Detent", data=(-16383 + int(16383 * 0.1), 16384)
+        )
         widget.clicked.connect(self._set_command_range)
         self._range_button_container_layout.addWidget(widget)
 
         self._range_button_container_layout.addStretch()
 
-
-
-
         self._output_value_description_widget = QtWidgets.QLabel()
 
         self.command_header_container_widget = QtWidgets.QWidget()
-        self.command_header_container_layout = QtWidgets.QVBoxLayout(self.command_header_container_widget)
-
+        self.command_header_container_layout = QtWidgets.QVBoxLayout(
+            self.command_header_container_widget
+        )
 
         self.command_text_widget = QtWidgets.QLabel()
-        self.command_header_container_layout.addWidget(QtWidgets.QLabel("<b>Command:</b>"))
+        self.command_header_container_layout.addWidget(
+            QtWidgets.QLabel("<b>Command:</b>")
+        )
         self.command_header_container_layout.addWidget(self.command_text_widget)
 
-
         self.description_text_widget = QtWidgets.QLabel()
-        self.command_header_container_layout.addWidget(QtWidgets.QLabel("<b>Description</b>"))
+        self.command_header_container_layout.addWidget(
+            QtWidgets.QLabel("<b>Description</b>")
+        )
         self.command_header_container_layout.addWidget(self.description_text_widget)
-        self.command_header_container_layout.setContentsMargins(0,0,0,0)
-
+        self.command_header_container_layout.setContentsMargins(0, 0, 0, 0)
 
         self.command_header_container_layout.addWidget(self._output_data_type_widget)
         self.command_header_container_layout.addWidget(self._output_data_2_type_widget)
@@ -3350,12 +3471,15 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
         self._output_trigger_description_widget = QtWidgets.QLabel()
 
-
         self._output_trigger_bool_noop_widget = QtWidgets.QRadioButton("Trigger Only")
-        self._output_trigger_bool_noop_widget.clicked.connect(self._trigger_noop_changed_cb)
+        self._output_trigger_bool_noop_widget.clicked.connect(
+            self._trigger_noop_changed_cb
+        )
 
         self._output_trigger_bool_toggle_widget = QtWidgets.QRadioButton("Toggle")
-        self._output_trigger_bool_toggle_widget.clicked.connect(self._trigger_toggle_changed_cb)
+        self._output_trigger_bool_toggle_widget.clicked.connect(
+            self._trigger_toggle_changed_cb
+        )
 
         self._output_trigger_bool_on_widget = QtWidgets.QRadioButton("On")
         self._output_trigger_bool_on_widget.clicked.connect(self._trigger_turnon_cb)
@@ -3363,51 +3487,71 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._output_trigger_bool_off_widget = QtWidgets.QRadioButton("Off")
         self._output_trigger_bool_off_widget.clicked.connect(self._trigger_turnoff_cb)
 
-        self._output_trigger_bool_input_value_widget = QtWidgets.QRadioButton("Input Value")
-        self._output_trigger_bool_input_value_widget.clicked.connect(self._trigger_input_value_cb)
-
+        self._output_trigger_bool_input_value_widget = QtWidgets.QRadioButton(
+            "Input Value"
+        )
+        self._output_trigger_bool_input_value_widget.clicked.connect(
+            self._trigger_input_value_cb
+        )
 
         self._output_trigger_bool_container_widget = QtWidgets.QWidget()
-        self._output_trigger_bool_container_widget.setContentsMargins(0,0,0,0)
-        self._output_trigger_bool_container_layout = QtWidgets.QHBoxLayout(self._output_trigger_bool_container_widget)
-        self._output_trigger_bool_container_layout.setContentsMargins(0,0,0,0)
+        self._output_trigger_bool_container_widget.setContentsMargins(0, 0, 0, 0)
+        self._output_trigger_bool_container_layout = QtWidgets.QHBoxLayout(
+            self._output_trigger_bool_container_widget
+        )
+        self._output_trigger_bool_container_layout.setContentsMargins(0, 0, 0, 0)
 
-        self._output_trigger_bool_container_layout.addWidget(QtWidgets.QLabel("Trigger Mode:"))
-        self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_noop_widget)
-        self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_input_value_widget)
-        self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_toggle_widget)
-        self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_on_widget)
-        self._output_trigger_bool_container_layout.addWidget(self._output_trigger_bool_off_widget)
-        self._output_trigger_bool_container_layout.addWidget(self._output_trigger_description_widget)
+        self._output_trigger_bool_container_layout.addWidget(
+            QtWidgets.QLabel("Trigger Mode:")
+        )
+        self._output_trigger_bool_container_layout.addWidget(
+            self._output_trigger_bool_noop_widget
+        )
+        self._output_trigger_bool_container_layout.addWidget(
+            self._output_trigger_bool_input_value_widget
+        )
+        self._output_trigger_bool_container_layout.addWidget(
+            self._output_trigger_bool_toggle_widget
+        )
+        self._output_trigger_bool_container_layout.addWidget(
+            self._output_trigger_bool_on_widget
+        )
+        self._output_trigger_bool_container_layout.addWidget(
+            self._output_trigger_bool_off_widget
+        )
+        self._output_trigger_bool_container_layout.addWidget(
+            self._output_trigger_description_widget
+        )
         self._output_trigger_bool_container_layout.addStretch()
 
         # status widget
         self.status_text_widget = gremlin.ui.ui_common.QIconLabel()
-
-
-
-
 
         # output options container - shows below selector - visible when a command is selected and changes with the active mode
         widget, layout = gremlin.ui.ui_common.getVContainer()
         self._output_container_widget = widget
         self._output_container_layout = layout
 
-
         self._output_container_layout.addWidget(self.command_header_container_widget)
         self._output_container_layout.addWidget(QHLine())
         self._output_container_layout.addWidget(self._output_mode_container_widget)
         self._output_container_layout.addWidget(self._output_range_container_widget)
-        self._output_container_layout.addWidget(self._output_trigger_bool_container_widget)
+        self._output_container_layout.addWidget(
+            self._output_trigger_bool_container_widget
+        )
         self._output_container_layout.addWidget(self.status_text_widget)
         self._output_container_layout.addStretch()
 
-
-
-        #self.main_layout.addWidget(self._toolbar_container_widget)
+        # self.main_layout.addWidget(self._toolbar_container_widget)
 
         warning_color = gremlin.ui.ui_common.Color.warningColor()
-        warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="This function is experimental and still in development, and not necessary feature complete", use_wrap=False)
+        warning_widget = gremlin.ui.ui_common.QIconLabel(
+            "ph.shield-warning-fill",
+            use_qta=True,
+            icon_color=QtGui.QColor(warning_color),
+            text="This function is experimental and still in development, and not necessary feature complete",
+            use_wrap=False,
+        )
         self.main_layout.addWidget(warning_widget)
 
         self.main_layout.addWidget(self._mode_container_widget)
@@ -3423,7 +3567,6 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self._button_mode_container_widget)
         self.main_layout.addWidget(self.container_repeater_widget)
 
-
         # hook the inputs and profile
         el = gremlin.event_handler.EventListener()
         el.custom_joystick_event.connect(self._joystick_event_handler)
@@ -3438,7 +3581,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._update_ui()
 
     def _handle_edit_mode_changed(self):
-        gremlin.util.InvokeUiMethod(self._populate_ui) # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._populate_ui)  # ensure on UI thread
 
     @QtCore.Slot()
     def _set_command_range(self):
@@ -3460,7 +3603,6 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             self.curve_button_widget.setIcon(self.curve_icon_inactive)
             self.curve_clear_widget.setEnabled(False)
 
-
     @QtCore.Slot()
     def _command_type_changed(self):
         widget = self.sender()
@@ -3469,14 +3611,13 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._update_ui()
 
     @QtCore.Slot(bool)
-    def _auto_repeat_state_changed(self, checked : bool):
+    def _auto_repeat_state_changed(self, checked: bool):
         self.action_data.auto_repeat = checked
 
     @QtCore.Slot(bool)
-    def _is_release_command_changed(self, checked : bool):
+    def _is_release_command_changed(self, checked: bool):
         self.action_data.is_release_command = checked
         self._update_visible()
-
 
     @QtCore.Slot()
     def _auto_repeat_delay_changed(self):
@@ -3487,8 +3628,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         widget = self.sender()
         mode = widget.data
         self.action_data.command_mode = mode
-        SimconnectOptions().last_command_mode = mode # remember for next time
-
+        SimconnectOptions().last_command_mode = mode  # remember for next time
 
         self._update_visible()
 
@@ -3500,27 +3640,37 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
     @QtCore.Slot()
     def _expression_changed_cb(self):
-        ''' expression changed '''
+        """expression changed"""
         self.action_data.command = self._calculator_entry_widget.toPlainText()
-        warning_visible = self.action_data.command_mode == SimConnectCommandMode.CalculatorParam and not self.action_data._is_value_command()
+        warning_visible = (
+            self.action_data.command_mode == SimConnectCommandMode.CalculatorParam
+            and not self.action_data._is_value_command()
+        )
         self._warning_widget.setVisible(warning_visible)
 
     @QtCore.Slot()
     def _expression_release_changed_cb(self):
-        ''' expression changed '''
-        self.action_data.command_release = self._calculator_release_entry_widget.toPlainText()
-        warning_visible = self.action_data.command_mode == SimConnectCommandMode.CalculatorParam and not self.action_data._is_value_command()
+        """expression changed"""
+        self.action_data.command_release = (
+            self._calculator_release_entry_widget.toPlainText()
+        )
+        warning_visible = (
+            self.action_data.command_mode == SimConnectCommandMode.CalculatorParam
+            and not self.action_data._is_value_command()
+        )
         self._warning_widget.setVisible(warning_visible)
 
     QtCore.Slot()
+
     def _reset_range(self):
         with QtCore.QSignalBlocker(self.action_data.events):
             self.action_data.output_min_range = -1.0
             self.action_data.output_max_range = 1.0
-        self._value_widget.setRange(-1,1)
+        self._value_widget.setRange(-1, 1)
         self._update_repeater()
 
     QtCore.Slot(object)
+
     def _value_changed(self, data):
         # normalized value (-1 to +1)
         verbose = gremlin.config.Configuration().verbose
@@ -3528,41 +3678,46 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             min_value, max_value = data
             self.action_data.normalized_min_range = min_value
             self.action_data.normalized_max_range = max_value
-            if verbose: syslog.info (f"Range Value (normalized): {min_value:0.3f} {max_value:0.3f}")
+            if verbose:
+                syslog.info(
+                    f"Range Value (normalized): {min_value:0.3f} {max_value:0.3f}"
+                )
         else:
             # single mode
             min_value = data
             max_value = self.action_data.limit_max_range
             self.action_data.normalized_min_range = min_value
 
-            if verbose: syslog.info(f"Single value (normalized): {min_value:0.3f}")
+            if verbose:
+                syslog.info(f"Single value (normalized): {min_value:0.3f}")
 
         self._update_repeater()
 
-
     QtCore.Slot(object)
+
     def _range_changed(self, data):
         verbose = gremlin.config.Configuration().verbose
         if self._value_widget.isRange:
             min_cmd, max_cmd = data
             self.action_data.command_min_range = min_cmd
             self.action_data.command_max_range = max_cmd
-            if verbose: syslog.info (f"Set Range Value (command): {min_cmd:0.3f} {max_cmd:0.3f}")
+            if verbose:
+                syslog.info(f"Set Range Value (command): {min_cmd:0.3f} {max_cmd:0.3f}")
         else:
             # single mode
             value = data
             self.action_data.command_min_range = value
-            if verbose: syslog.info(f"Set single value (command): {value:0.3f}")
+            if verbose:
+                syslog.info(f"Set single value (command): {value:0.3f}")
 
         # update the computed output value
         self._update_repeater()
 
-
     QtCore.Slot()
+
     def _inverted_changed(self):
         self.action_data.inverted = self._value_widget.inverted
         self._update_repeater()
-
 
     @QtCore.Slot(object)
     def _command_range_changed(self, data):
@@ -3573,10 +3728,16 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             self._update_repeater()
 
     QtCore.Slot()
+
     def _curve_button_cb(self):
         if not self.action_data.curve_data:
             curve_data = gremlin.curve_handler.AxisCurveData()
-            curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+            curve_data.calibration = (
+                gremlin.ui.axis_calibration.CalibrationManager().getCalibration(
+                    self.action_data.hardware_device_guid,
+                    self.action_data.hardware_input_id,
+                )
+            )
             curve_data.curve_update()
             self.action_data.curve_data = curve_data
 
@@ -3593,95 +3754,88 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
         self._update_curve_icon()
 
-
-
     QtCore.Slot()
+
     def _curve_delete_button_cb(self):
-        ''' removes the curve data '''
+        """removes the curve data"""
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Confirmation")
         message_box.setInformativeText("Delete curve data for this output?")
         message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok |
-            QtWidgets.QMessageBox.StandardButton.Cancel
+            QtWidgets.QMessageBox.StandardButton.Ok
+            | QtWidgets.QMessageBox.StandardButton.Cancel
         )
         message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(message_box)
-        is_cursor = gremlin.util.isCursorActive()
-        if is_cursor:
-            gremlin.util.popCursor()
         response = message_box.exec()
-        if is_cursor:
-            gremlin.util.pushCursor()
+
         if response == QtWidgets.QMessageBox.StandardButton.Ok:
             self.action_data.curve_data = None
             self._update_curve_icon()
 
-
     def _profile_start(self):
-        ''' called when the profile starts '''
+        """called when the profile starts"""
         el = gremlin.event_handler.EventListener()
         el.custom_joystick_event.disconnect(self._joystick_event_handler)
         if not self.chained_input:
             el.joystick_event.disconnect(self._joystick_event_handler)
 
     def _profile_stop(self):
-        ''' called when the profile stops'''
+        """called when the profile stops"""
         self._update_axis_widget()
         el = gremlin.event_handler.EventListener()
         el.custom_joystick_event.connect(self._joystick_event_handler)
         if not self.chained_input:
             el.joystick_event.connect(self._joystick_event_handler)
 
-
     def _joystick_event_handler(self, event):
-        ''' handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time '''
+        """handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time"""
         if gremlin.shared_state.is_running:
             return
 
         if not event.is_axis:
             return
 
-        #value = None
+        # value = None
 
         if event.device_guid != self.action_data.hardware_device_guid:
             return
         if event.identifier != self.action_data.hardware_input_id:
             return
-        #if event.is_custom:
+        # if event.is_custom:
 
         value = event.value
 
         self._update_axis_widget(value)
 
-
-
     def _current_input_axis(self):
-        ''' gets the current input axis value '''
-        return gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid,
-                                                  self.action_data.hardware_input_id)
+        """gets the current input axis value"""
+        return gremlin.joystick_handling.get_curved_axis(
+            self.action_data.hardware_device_guid, self.action_data.hardware_input_id
+        )
 
+    def _update_axis_widget(self, value: float = None):
+        gremlin.util.InvokeUiMethod(
+            self._update_axis_widget_ui, value
+        )  # flip to UI thread
 
-    def _update_axis_widget(self, value : float = None):
-        gremlin.util.InvokeUiMethod(self._update_axis_widget_ui, value) # flip to UI thread
-
-    def _update_axis_widget_ui(self, value : float = None):
-        ''' updates the axis output repeater with the value
+    def _update_axis_widget_ui(self, value: float = None):
+        """updates the axis output repeater with the value
 
         :param value: the floating point normalized input value, if None uses the cached value -1 to +1 range
 
-        '''
+        """
         # always read the current input as the value could be from another device for merged inputs
 
-        if not Shiboken.isValid(self._axis_value_widget) or not Shiboken.isValid(self._calculator_value_widget):
-            return # garbage collected
+        if not Shiboken.isValid(self._axis_value_widget) or not Shiboken.isValid(
+            self._calculator_value_widget
+        ):
+            return  # garbage collected
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui
 
-
         if self.input_type == InputType.JoystickAxis:
-
             raw_value = self.action_data.get_raw_axis_value()
             if value is None:
                 # filter and merge the data
@@ -3693,40 +3847,56 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             normalized = filtered_value
             value = filtered_value
 
-
             min_range = self.action_data.command_min_range
             max_range = self.action_data.command_max_range
 
-
             # if the output is ranged apply that range
             match self.action_data.mode:
-                case  SimConnectActionMode.Ranged:
+                case SimConnectActionMode.Ranged:
                     # scale up to apply the block range
                     filtered_value = self.action_data.get_filtered_axis_value(value)
 
-                    raw = filtered_value # -1 to +1
+                    raw = filtered_value  # -1 to +1
                     normalized = raw
 
                     # apply local curve to the range -1 to + 1
                     curved = self.action_data.get_local_curve_value(normalized)
 
                     # compute the output value based on the range setup
-                    percent = gremlin.util.scale_to_range(curved, target_min = 0, target_max = 100)
-                    output_value = gremlin.util.scale_to_range(curved, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
+                    percent = gremlin.util.scale_to_range(
+                        curved, target_min=0, target_max=100
+                    )
+                    output_value = gremlin.util.scale_to_range(
+                        curved,
+                        target_min=min_range,
+                        target_max=max_range,
+                        invert=self.action_data.inverted,
+                    )
 
-                    if verbose: syslog.info(f"SIMCONNECT UI: {value:0.3f} output range: [{self.action_data.output_min_range:0.3f}, {self.action_data.output_max_range:0.3f}] normalized range: [{self.action_data.normalized_min_range:0.4f}, {self.action_data.normalized_max_range:0.4f}] normalized {normalized:0.4f} curved {curved:0.3f} percent: {percent:0.3f} output: {output_value}")
+                    if verbose:
+                        syslog.info(
+                            f"SIMCONNECT UI: {value:0.3f} output range: [{self.action_data.output_min_range:0.3f}, {self.action_data.output_max_range:0.3f}] normalized range: [{self.action_data.normalized_min_range:0.4f}, {self.action_data.normalized_max_range:0.4f}] normalized {normalized:0.4f} curved {curved:0.3f} percent: {percent:0.3f} output: {output_value}"
+                        )
 
                 case SimConnectActionMode.SetValue:
-                    output_value = self.action_data.value # value to set
-                    percent = gremlin.util.scale_to_range(output_value,
-                                                          source_min = self.action_data.output_min_range,
-                                                          source_max = self.action_data.output_max_range,
-                                                          target_min = 0,
-                                                          target_max = 100)
+                    output_value = self.action_data.value  # value to set
+                    percent = gremlin.util.scale_to_range(
+                        output_value,
+                        source_min=self.action_data.output_min_range,
+                        source_max=self.action_data.output_max_range,
+                        target_min=0,
+                        target_max=100,
+                    )
 
                 case _:
                     output_value = value
-                    percent = gremlin.util.scale_to_range(value, source_min = self.action_data.output_min_range, source_max = self.action_data.output_max_range, target_min=0, target_max=100) # convert to percent
+                    percent = gremlin.util.scale_to_range(
+                        value,
+                        source_min=self.action_data.output_min_range,
+                        source_max=self.action_data.output_max_range,
+                        target_min=0,
+                        target_max=100,
+                    )  # convert to percent
 
             if self.action_data.curve_data is not None:
                 # curve the data
@@ -3743,7 +3913,10 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
                 self._calculator_value_widget.setVisible(False)
             else:
                 # calculator mode
-                if self.action_data.mode in (SimConnectActionMode.Ranged, SimConnectActionMode.SetValue):
+                if self.action_data.mode in (
+                    SimConnectActionMode.Ranged,
+                    SimConnectActionMode.SetValue,
+                ):
                     command = self.action_data._get_value_command(output_value)
                 else:
                     command = self.action_data.command
@@ -3755,41 +3928,37 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
                 # update curve dialog if it's open
                 self.curve_update_handler(normalized)
 
-
-
     @QtCore.Slot()
     def _show_options_dialog_cb(self):
-        ''' displays the simconnect options dialog'''
+        """displays the simconnect options dialog"""
         el = gremlin.event_handler.EventListener()
         el.simconnect_show_options.emit()
 
-
     @QtCore.Slot()
     def _refresh_lvar_cb(self):
-        ''' refreshes the list of lvars from the sim '''
+        """refreshes the list of lvars from the sim"""
         self.manager.refreshLvars()
-
 
     @QtCore.Slot(object)
     def _lvars_udpated_cb(self, lvars):
-        ''' called when new LVARs are received '''
+        """called when new LVARs are received"""
         with QtCore.QSignalBlocker(self._lvar_selector_widget):
             self._lvar_selector_widget.clear()
             self._lvar_selector_widget.addItems(self.manager.lvars)
 
-
-
     def _output_normalized_value_changed_cb(self):
         normalized = self._output_value_normalized_widget.value()
         if normalized:
-            scaled = gremlin.util.scale_to_range(normalized, target_min = -16368, target_max = 16367)
+            scaled = gremlin.util.scale_to_range(
+                normalized, target_min=-16368, target_max=16367
+            )
             value = int(scaled)
             with QtCore.QSignalBlocker(self._output_value_widget):
                 self._output_value_widget.setValue(value)
             self._update_output_value(normalized)
 
     def _output_value_changed_cb(self):
-        ''' occurs when the output value has changed '''
+        """occurs when the output value has changed"""
         value = self._output_value_widget.value()
         if value is not None:
             normalized = gremlin.util.scale_to_range(value, -16368, 16367)
@@ -3797,21 +3966,22 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
                 self._output_value_normalized_widget.setValue(normalized)
             self._update_output_value(normalized)
 
-
     def _update_output_value(self, value):
         # store to profile
         self.action_data.value = value
-        percent = gremlin.util.scale_to_range(value, target_min = 0.0, target_max = 100.0)
+        percent = gremlin.util.scale_to_range(value, target_min=0.0, target_max=100.0)
         with QtCore.QSignalBlocker(self._output_value_percent_widget):
             self._output_value_percent_widget.setValue(percent)
 
-
-
     def _update_repeater(self):
-        gremlin.util.InvokeUiMethod(self._update_repeater_ui) # flip to UI thread if needed
+        gremlin.util.InvokeUiMethod(
+            self._update_repeater_ui
+        )  # flip to UI thread if needed
 
     def _update_repeater_ui(self):
-        value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+        value = gremlin.joystick_handling.get_axis(
+            self.action_data.hardware_device_guid, self.action_data.hardware_input_id
+        )
         self._update_axis_widget(value)
 
     def _update_max_range(self, value):
@@ -3819,31 +3989,31 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         assert value >= -1.0 and value <= 1.0
         self.action_data.output_max_range = value
 
-        percent = gremlin.util.scale_to_range(value, target_min = 0.0, target_max = 100.0)
+        percent = gremlin.util.scale_to_range(value, target_min=0.0, target_max=100.0)
         with QtCore.QSignalBlocker(self._output_max_percent_range_widget):
             self._output_max_percent_range_widget.setValue(percent)
 
     @QtCore.Slot(bool)
-    def _output_invert_axis_cb(self, checked : bool):
+    def _output_invert_axis_cb(self, checked: bool):
         self.action_data.inverted = checked
         self._axis_repeater_widget.setReverse(checked)
         # update the repeater
 
     @QtCore.Slot(bool)
-    def _trigger_on_release_cb(self, checked : bool):
+    def _trigger_on_release_cb(self, checked: bool):
         self.action_data.trigger_on_release = checked
 
     @QtCore.Slot(bool)
-    def _trigger_on_press_cb(self, checked : bool):
+    def _trigger_on_press_cb(self, checked: bool):
         self.action_data.trigger_on_press = checked
 
-
     def _command_changed_cb(self, index):
-        ''' called when selected command changes '''
+        """called when selected command changes"""
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         command = self._command_selector_widget.currentText()
-        if verbose: syslog.info(f"Command changed to: {command}")
+        if verbose:
+            syslog.info(f"Command changed to: {command}")
         if command:
             self.action_data.command = command
             self._update_ui()
@@ -3853,19 +4023,19 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         command = self._lvar_command_widget.text()
-        if verbose: syslog.info(f"Command changed to: {command}")
+        if verbose:
+            syslog.info(f"Command changed to: {command}")
         self.action_data.command = command
 
-
-
     def _update_ui(self):
-        ''' updates the UI with a data block '''
+        """updates the UI with a data block"""
 
         with QtCore.QSignalBlocker(self._trigger_on_release_widget):
-            self._trigger_on_release_widget.setChecked(self.action_data.trigger_on_release)
+            self._trigger_on_release_widget.setChecked(
+                self.action_data.trigger_on_release
+            )
         with QtCore.QSignalBlocker(self._trigger_on_press_widget):
             self._trigger_on_press_widget.setChecked(self.action_data.trigger_on_press)
-
 
         # enabled = self.action_data._command_type == SimConnectCommandType.SimVar
         # self._action_selector_widget.setEnabled(enabled)
@@ -3880,32 +4050,23 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             self.description_text_widget.setText(block.description)
 
         else:
-
             self.description_text_widget.setText("No description found")
 
-
-
-
         output_mode = self.action_data.mode
-        min_range = self.action_data.output_min_range
-        max_range = self.action_data.output_max_range
-        min_command_range = self.action_data.command_min_range
-        max_command_range = self.action_data.command_max_range
-
+        _min_range = self.action_data.output_min_range
+        _max_range = self.action_data.output_max_range
+        _min_command_range = self.action_data.command_min_range
+        _max_command_range = self.action_data.command_max_range
 
         value = self.action_data.value
-        inverted = self.action_data.inverted
+        _inverted = self.action_data.inverted
         trigger_mode = self.action_data.trigger_mode
-
-
-
-
-
-
 
         # calculator mode
         with QtCore.QSignalBlocker(self._type_is_calculator_widget):
-            self._type_is_calculator_widget.setChecked(self.action_data._command_type == SimConnectCommandType.Calculator)
+            self._type_is_calculator_widget.setChecked(
+                self.action_data._command_type == SimConnectCommandType.Calculator
+            )
 
         # settable flag
         with QtCore.QSignalBlocker(self._type_is_settable_widget):
@@ -3917,19 +4078,14 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self._type_units_widget):
             self._type_units_widget.setText(self.action_data.units)
 
-
-
         match output_mode:
-
             case SimConnectActionMode.Ranged:
-
                 with QtCore.QSignalBlocker(self._output_mode_ranged_widget):
                     self._output_mode_ranged_widget.setChecked(True)
 
                 with QtCore.QSignalBlocker(self._value_widget):
                     self._value_widget.isRange = True
                 self._update_repeater()
-
 
             case SimConnectActionMode.SetValue:
                 with QtCore.QSignalBlocker(self._output_mode_set_value_widget):
@@ -3939,10 +4095,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
                     self._value_widget.isRange = False
                 self._update_repeater()
 
-
-
             case SimConnectActionMode.Trigger:
-
                 with QtCore.QSignalBlocker(self._output_mode_trigger_widget):
                     self._output_mode_trigger_widget.setChecked(True)
 
@@ -3966,13 +4119,10 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self._output_trigger_bool_on_widget):
                     self._output_trigger_bool_noop_widget.setChecked(True)
             case SimConnectTriggerMode.InputValue:
-                with QtCore.QSignalBlocker(self._output_trigger_bool_input_value_widget):
+                with QtCore.QSignalBlocker(
+                    self._output_trigger_bool_input_value_widget
+                ):
                     self._output_trigger_bool_input_value_widget.setChecked(True)
-
-
-
-
-
 
         input_desc = ""
         input_type = self.action_data.input_type
@@ -3987,7 +4137,6 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             input_desc = "key"
         elif input_type in (InputType.Midi, InputType.OpenSoundControl):
             input_desc = "button or slider"
-
 
         match output_mode:
             case SimConnectActionMode.Ranged:
@@ -4017,11 +4166,13 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             self._output_mode_ranged_widget.setVisible(False)
             self._trigger_on_release_widget.setVisible(True)
 
-
-
             self._output_container_widget.setVisible(True)
             self._output_mode_readonly_widget.setVisible(self.action_data.is_readonly)
-            self.output_readonly_status_widget.setText("Block: read/only" if self.action_data.is_readonly else "Block: read/write")
+            self.output_readonly_status_widget.setText(
+                "Block: read/only"
+                if self.action_data.is_readonly
+                else "Block: read/write"
+            )
 
             # display range information if the command is a ranged command
             self._output_range_container_widget.setVisible(self.action_data.is_ranged)
@@ -4030,36 +4181,37 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             eh = SimConnectEventHandler()
             eh.range_changed.connect(self._range_changed_cb)
 
-
-
             # update UI based on block information ``
             self._output_data_type_label_widget.setText(self.action_data.data_type)
 
             self._update_visible()
 
         if not self.action_data.command:
-
             # clear the data
             self._output_container_widget.setVisible(False)
             self.status_text_widget.setText("Please select a command")
 
         if self.action_data.input_type == InputType.JoystickAxis:
-            value = gremlin.joystick_handling.get_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
+            value = gremlin.joystick_handling.get_axis(
+                self.action_data.hardware_device_guid,
+                self.action_data.hardware_input_id,
+            )
             self._update_axis_widget(value)
 
         # update visibility
         self._update_visible()
 
-
     def _update_visible(self):
-        ''' updates the UI based on the output mode selected '''
+        """updates the UI based on the output mode selected"""
 
         mode = self.action_data.command_mode
         calc_visible = mode != SimConnectCommandMode.Simvar
         simvar_visible = not calc_visible
-        warning_visible = mode == SimConnectCommandMode.CalculatorParam and not self.action_data._is_value_command()
+        warning_visible = (
+            mode == SimConnectCommandMode.CalculatorParam
+            and not self.action_data._is_value_command()
+        )
         block_visible = mode == SimConnectCommandMode.Simvar
-
 
         release_command_visible = self.action_data.is_release_command
 
@@ -4079,19 +4231,26 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._lvar_lookup_container_widget.setVisible(lvar_lookup_visible)
         self._calculator_container_widget.setVisible(calc_visible)
 
-        self._type_container_widget.setVisible(False) # disable for now as it doesn't serve a value until we have an edit / entry mode
+        self._type_container_widget.setVisible(
+            False
+        )  # disable for now as it doesn't serve a value until we have an edit / entry mode
         self._command_container_widget.setVisible(simvar_visible)
-        self._calculator_release_container_widget.setVisible(release_command_visible and calc_visible)
+        self._calculator_release_container_widget.setVisible(
+            release_command_visible and calc_visible
+        )
 
-
-        #self._button_mode_container_widget.setVisible(simvar_visible) # always visible
+        # self._button_mode_container_widget.setVisible(simvar_visible) # always visible
 
         input_type = self.action_data.input_type
         repeater_visible = False
         output_mode = self.action_data.mode
         trigger_visible = output_mode == SimConnectActionMode.Trigger
         if input_type == InputType.JoystickAxis:
-            range_visible = output_mode in (SimConnectActionMode.Ranged, SimConnectActionMode.SetValue) or mode == SimConnectCommandMode.CalculatorParam
+            range_visible = (
+                output_mode
+                in (SimConnectActionMode.Ranged, SimConnectActionMode.SetValue)
+                or mode == SimConnectCommandMode.CalculatorParam
+            )
             repeater_visible = True
 
         else:
@@ -4104,7 +4263,6 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._output_range_container_widget.setVisible(simvar_visible or range_visible)
         self._output_trigger_bool_container_widget.setVisible(trigger_visible)
 
-
         self.container_repeater_widget.setVisible(repeater_visible)
 
         output_mode_enabled = not self.action_data.is_readonly
@@ -4114,67 +4272,59 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self._output_mode_trigger_widget.setEnabled(output_mode_enabled)
         self._output_data_type_label_widget.setText(self.action_data.data_type)
 
-        self.output_readonly_status_widget.setText("(command is Read/Only)" if self.action_data.is_readonly else '')
+        self.output_readonly_status_widget.setText(
+            "(command is Read/Only)" if self.action_data.is_readonly else ""
+        )
         self.command_header_container_widget.setVisible(block_visible)
         self.output_readonly_status_widget.setVisible(block_visible)
 
-
         self._warning_widget.setVisible(warning_visible)
 
-
-
     @QtCore.Slot(bool)
-    def _trigger_noop_changed_cb(self, checked : bool):
+    def _trigger_noop_changed_cb(self, checked: bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.NoOp
 
-
     @QtCore.Slot(bool)
-    def _trigger_toggle_changed_cb(self, checked : bool):
+    def _trigger_toggle_changed_cb(self, checked: bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.Toggle
 
-
     @QtCore.Slot(bool)
-    def _trigger_turnon_cb(self, checked : bool):
+    def _trigger_turnon_cb(self, checked: bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.TurnOn
 
-
     @QtCore.Slot(bool)
-    def _trigger_turnoff_cb(self, checked : bool):
+    def _trigger_turnoff_cb(self, checked: bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.TurnOff
 
     @QtCore.Slot(bool)
-    def _trigger_pulse_cb(self, checked : bool):
+    def _trigger_pulse_cb(self, checked: bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.Pulse
 
-
     @QtCore.Slot(bool)
-    def _trigger_input_value_cb(self, checked : bool):
+    def _trigger_input_value_cb(self, checked: bool):
         if checked:
             self.action_data.trigger_mode = SimConnectTriggerMode.InputValue
 
-
-
     @QtCore.Slot(object, object)
-    def _range_changed_cb(self, block, event : RangeEvent):
-        ''' called when range information changes on the current simconnect command block '''
+    def _range_changed_cb(self, block, event: RangeEvent):
+        """called when range information changes on the current simconnect command block"""
         if block == self.action_data.block:
             self._output_min_range_widget.setValue(event.min)
             self._output_max_range_widget.setValue(event.max)
             self._output_min_range_widget.setValue(event.min_custom)
             self._output_max_range_widget.setValue(event.max_custom)
 
-
     @QtCore.Slot(bool)
     def _mode_ranged_cb(self, value):
         if value:
             self.action_data.output_mode = SimConnectActionMode.Ranged
             self.action_data.mode = SimConnectActionMode.Ranged
-            self._value_widget.isRange = True # enable ranged mode
+            self._value_widget.isRange = True  # enable ranged mode
             self._update_visible()
             self._update_repeater()
 
@@ -4184,7 +4334,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
             if self.action_data.block:
                 self.action_data.block.output_mode = SimConnectActionMode.SetValue
             self.action_data.mode = SimConnectActionMode.SetValue
-            self._value_widget.isRange = False # disable ranged mode
+            self._value_widget.isRange = False  # disable ranged mode
             self._update_visible()
             self._update_axis_widget(self._value_widget.getValue())
 
@@ -4199,7 +4349,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
     def _readonly_cb(self):
         if not Shiboken.isValid(self):
             return
-        block : SimConnectBlock
+        block: SimConnectBlock
         block = self.action_data.block
 
         readonly = block is not None and block.is_readonly
@@ -4223,17 +4373,16 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
 
 
 class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor):
-
     # macro_manager = gremlin.macro.MacroManager()
 
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
 
         super().__init__(action, parent)
-        self.action_data : MapToSimConnect = action
-        self.command = action.command # the command to execute
-        self.value = action.value # the value to send (None if no data to send)
-        self.manager : SimConnectManager = SimConnectManager()
-        self.monitor : SimConnectMonitor = SimConnectMonitor()
+        self.action_data: MapToSimConnect = action
+        self.command = action.command  # the command to execute
+        self.value = action.value  # the value to send (None if no data to send)
+        self.manager: SimConnectManager = SimConnectManager()
+        self.monitor: SimConnectMonitor = SimConnectMonitor()
         self.valid = False
         self._significant = gremlin.input_devices.JoystickInputSignificant()
         self._profile_started = False
@@ -4257,15 +4406,10 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         self.valid = True
 
-
-
-
     def profile_start(self):
-        ''' occurs when the profile starts '''
-
+        """occurs when the profile starts"""
 
         if not self._profile_started:
-
             self._profile_started = True
             self.reconnect_timeout = 5
             self.last_reconnect_time = None
@@ -4273,12 +4417,11 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             self.manager.activate()
             self.pulse_worker_map = {}
 
-
     def profile_stop(self):
-        ''' occurs wen the profile stops'''
+        """occurs wen the profile stops"""
         if self._profile_started:
             self._profile_started = False
-            #self._auto_repeat_event.set()
+            # self._auto_repeat_event.set()
             # if self._auto_repeat_thread:
             #     # clear any running autorepeat
             #     if self._auto_repeat_thread.is_alive():
@@ -4290,11 +4433,10 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
             eh = SimConnectEventHandler()
             eh.request_disconnect.emit()
 
-
-
-
-    def process_event(self, event, action_value : gremlin.actions.Value, extra_data = None) -> bool:
-        ''' runs when a joystick event occurs like a button press or axis movement when a profile is running '''
+    def process_event(
+        self, event, action_value: gremlin.actions.Value, extra_data=None
+    ) -> bool:
+        """runs when a joystick event occurs like a button press or axis movement when a profile is running"""
 
         if not gremlin.shared_state.is_running or gremlin.shared_state.abort:
             return False
@@ -4305,8 +4447,6 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         # if self._last_event and self._last_event == event:
         #     return False
         # self._last_event = event
-
-
 
         if not self.manager.is_running:
             # sim is not running - attempt to reconnect every few seconds
@@ -4319,10 +4459,10 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
         return self._process_event(event, action_value, extra_data)
 
-
-
-    def _process_event(self, event, action_value : gremlin.actions.Value, extra_data = None):
-        ''' handles default input data '''
+    def _process_event(
+        self, event, action_value: gremlin.actions.Value, extra_data=None
+    ):
+        """handles default input data"""
 
         # execute the nested functors for this action
         super().process_event(event, action_value)
@@ -4330,25 +4470,29 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         verbose = config.verbose_mode_simconnect
         verbose_details = verbose and config.verbose_mode_extra
         verbose_exec = config.verbose_mode_exec
-        #verbose = True
-        manager : SimConnectManager = self.manager
+        # verbose = True
+        manager: SimConnectManager = self.manager
 
-
-        #syslog.info(f"event: {str(event)} node: {extra_data["node"]}")
+        # syslog.info(f"event: {str(event)} node: {extra_data["node"]}")
 
         if not self.manager.is_running:
             # sim is not running
-            if verbose: syslog.warning(f"Simconnect Functor: event ignored, simconnect not connected")
+            if verbose:
+                syslog.warning(
+                    "Simconnect Functor: event ignored, simconnect not connected"
+                )
             return False
 
         if not self.manager.is_bridge_alive:
             # sim is not running
-            if verbose: syslog.warning(f"Simconnect Functor: event ignored, simconnect bridge not connected")
+            if verbose:
+                syslog.warning(
+                    "Simconnect Functor: event ignored, simconnect bridge not connected"
+                )
             return False
 
         comment = ""
         if verbose_details:
-
             if extra_data:
                 if "node" in extra_data:
                     node = extra_data["node"]
@@ -4359,29 +4503,36 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         # if self.action_data.command == "THROTTLE1_AXIS_SET_EX1":
         #     pass
 
-
         block = self.action_data.block
         output_mode = self.action_data.mode
 
         command_mode = self.action_data.command_mode
         command_type = self.action_data.command_type
 
-
         gate_trigger = None
         if extra_data:
             if "trigger" in extra_data:
                 # use the trigger value
-                gate_trigger : gremlin.gated_handler.TriggerData = extra_data["trigger"]
-                if verbose_details: comment += " Using Trigger:  Range description: " + gate_trigger.range.description
+                gate_trigger: gremlin.gated_handler.TriggerData = extra_data["trigger"]
+                if verbose_details:
+                    comment += (
+                        " Using Trigger:  Range description: "
+                        + gate_trigger.range.description
+                    )
 
+        trigger = (
+            self.action_data.trigger_on_press
+            and event.is_pressed
+            or self.action_data.trigger_on_release
+            and not event.is_pressed
+        )
 
-
-        trigger = self.action_data.trigger_on_press and event.is_pressed or self.action_data.trigger_on_release and not event.is_pressed
-
-        if command_mode in (SimConnectCommandMode.Calculator, SimConnectCommandMode.CalculatorParam):
+        if command_mode in (
+            SimConnectCommandMode.Calculator,
+            SimConnectCommandMode.CalculatorParam,
+        ):
             # RPN modes
             if event.is_axis:
-
                 if not self.action_data.command:
                     # nothing to calculate
                     return True
@@ -4393,18 +4544,25 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                         if self.action_data.mode == SimConnectActionMode.SetValue:
                             value = self.action_data.value
                             command = self.action_data._get_value_command(value)
-                        else: # ranged
+                        else:  # ranged
                             min_range = self.action_data.command_min_range
                             max_range = self.action_data.command_max_range
                             input_value = event.value
-                            value = gremlin.util.scale_to_range(input_value, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
+                            value = gremlin.util.scale_to_range(
+                                input_value,
+                                target_min=min_range,
+                                target_max=max_range,
+                                invert=self.action_data.inverted,
+                            )
                             command = self.action_data._get_value_command(value)
                             if verbose:
-                                syslog.info(f"SIMCONNECT: calc parameter: input: {input_value:0.3f} derived: {value:0.3f} command range: [{min_range:0.3f},{max_range:0.3f}] output expression: [{command}]")
+                                syslog.info(
+                                    f"SIMCONNECT: calc parameter: input: {input_value:0.3f} derived: {value:0.3f} command range: [{min_range:0.3f},{max_range:0.3f}] output expression: [{command}]"
+                                )
                     elif command_mode == SimConnectCommandMode.Calculator:
                         command = self.action_data.command
                     if command:
-                        self.manager.calculate(command) # run RPN script
+                        self.manager.calculate(command)  # run RPN script
                 return True
 
             else:
@@ -4412,7 +4570,12 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 if self.action_data.auto_repeat:
                     pulse_data = {}
                     pulse_data["command"] = self.action_data.command
-                    self.pulse_start("calc", -1, self.action_data.auto_repeat_interval/1000, data = pulse_data)
+                    self.pulse_start(
+                        "calc",
+                        -1,
+                        self.action_data.auto_repeat_interval / 1000,
+                        data=pulse_data,
+                    )
                 else:
                     # not executed
                     if self.action_data.auto_repeat:
@@ -4430,16 +4593,19 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     # regular calculate
                     command = self.action_data.command
                     if command:
-                        if verbose_details: syslog.info(f"Simconnect: {comment} calc: execute press command: {command}")
-                        manager.calculate(command) # run RPN script
+                        if verbose_details:
+                            syslog.info(
+                                f"Simconnect: {comment} calc: execute press command: {command}"
+                            )
+                        manager.calculate(command)  # run RPN script
                 else:
                     # release calculate auto repeat
-                        # if self.action_data.auto_repeat and self._auto_repeat_thread:
-                        #     # released
-                        #     if verbose_details: syslog.info(f"auto repeat stopping...")
-                        #     # self._auto_repeat_event.set()
-                        #     # self._auto_repeat_thread.join()
-                        #     if verbose_details: syslog.info(f"auto repeat stopped")
+                    # if self.action_data.auto_repeat and self._auto_repeat_thread:
+                    #     # released
+                    #     if verbose_details: syslog.info(f"auto repeat stopping...")
+                    #     # self._auto_repeat_event.set()
+                    #     # self._auto_repeat_thread.join()
+                    #     if verbose_details: syslog.info(f"auto repeat stopped")
                     if self.action_data.auto_repeat:
                         self.pulse_stop("calc")
 
@@ -4447,54 +4613,80 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                         # execute release command
                         command = self.action_data.command_release
                         if command:
-                            if verbose_details: syslog.info(f"Simconnect: {comment} calc: execute release command: {command}")
-                            manager.calculate(command) # run RPN script
+                            if verbose_details:
+                                syslog.info(
+                                    f"Simconnect: {comment} calc: execute release command: {command}"
+                                )
+                            manager.calculate(command)  # run RPN script
 
-
-        else: # command_mode == SimConnectCommandMode.Simvar
+        else:  # command_mode == SimConnectCommandMode.Simvar
             # non calc modes
 
             if command_type == SimConnectCommandType.SimVar:
                 if block is None:
-                    if verbose_details: syslog.warning(f"SIMCONNECT: {comment} Error: Simvar Block not set")
+                    if verbose_details:
+                        syslog.warning(
+                            f"SIMCONNECT: {comment} Error: Simvar Block not set"
+                        )
                     return True
                 if not block.valid:
                     # invalid command
-                    syslog.warning(f"SIMCONNECT: {comment}  Error: invalid block: {block.command} type: {block.command_type}")
+                    syslog.warning(
+                        f"SIMCONNECT: {comment}  Error: invalid block: {block.command} type: {block.command_type}"
+                    )
                     return True
 
-            if event.is_axis and output_mode in (SimConnectActionMode.Ranged, SimConnectActionMode.Gated):
+            if event.is_axis and output_mode in (
+                SimConnectActionMode.Ranged,
+                SimConnectActionMode.Gated,
+            ):
                 # value = self.action_data.get_filtered_axis_value(action_value.current)
                 # process input options and any merge and curve operation
 
-                process_input = True # self._significant.should_process_axis(event, 0.001)
+                process_input = (
+                    True  # self._significant.should_process_axis(event, 0.001)
+                )
                 if process_input:
-
-
                     if gate_trigger:
                         v1 = gate_trigger.range.range_min
                         v2 = gate_trigger.range.range_max
-                        normalized = gremlin.util.scale_to_range(action_value.raw, source_min= v1, source_max = v2) # returns a rebased value -1 to +1 within the range
-                        if verbose_details and verbose_exec: syslog.info(f"Normalized: {normalized: 0.3f}  trigger: {gate_trigger.value:0.3f}")
+                        normalized = gremlin.util.scale_to_range(
+                            action_value.raw, source_min=v1, source_max=v2
+                        )  # returns a rebased value -1 to +1 within the range
+                        if verbose_details and verbose_exec:
+                            syslog.info(
+                                f"Normalized: {normalized: 0.3f}  trigger: {gate_trigger.value:0.3f}"
+                            )
                     else:
                         normalized = action_value.current
-                        if verbose_details and verbose_exec: syslog.info(f"Normalized: {normalized: 0.3f}")
+                        if verbose_details and verbose_exec:
+                            syslog.info(f"Normalized: {normalized: 0.3f}")
 
                     command = self.action_data.command
                     min_range = self.action_data.command_min_range
                     max_range = self.action_data.command_max_range
 
-                    output_value = gremlin.util.scale_to_range(normalized, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
-
+                    output_value = gremlin.util.scale_to_range(
+                        normalized,
+                        target_min=min_range,
+                        target_max=max_range,
+                        invert=self.action_data.inverted,
+                    )
 
                     if verbose:
                         if verbose_details:
-                            syslog.info(f"SIMCONNECT: {comment} send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
+                            syslog.info(
+                                f"SIMCONNECT: {comment} send ({command_type.name}) (axis): {command} input: {action_value.current:0.3f} scaled: {normalized:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}"
+                            )
                         else:
-                            syslog.info(f"SIMCONNECT: send {comment} {command} {output_value:0.3f}")
+                            syslog.info(
+                                f"SIMCONNECT: send {comment} {command} {output_value:0.3f}"
+                            )
 
                     if command_type == SimConnectCommandType.LVar:
-                        request = manager.registerRequest(command, "number", settable = True)
+                        request = manager.registerRequest(
+                            command, "number", settable=True
+                        )
                         request.value = output_value
                         request.transmit()
                     else:
@@ -4502,27 +4694,46 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
 
             elif output_mode == SimConnectActionMode.Trigger:
                 if not event.is_axis:
-                    value = 1 if self.action_data.trigger_mode != SimConnectTriggerMode.InputValue else action_value.current
-                    trigger = (self.action_data.trigger_on_press and event.is_pressed) or \
-                            (self.action_data.trigger_on_release and not event.is_pressed)
+                    value = (
+                        1
+                        if self.action_data.trigger_mode
+                        != SimConnectTriggerMode.InputValue
+                        else action_value.current
+                    )
+                    trigger = (
+                        self.action_data.trigger_on_press and event.is_pressed
+                    ) or (self.action_data.trigger_on_release and not event.is_pressed)
                     if trigger:
                         pulse_data = {}
                         pulse_data["command_type"] = command_type
                         pulse_data["value"] = value
                         if command_type == SimConnectCommandType.LVar:
-                            if verbose: syslog.info(f"SIMCONNECT: {comment} Trigger singleton {self.action_data.command}")
-                            request = manager.registerRequest(self.action_data.command, "number", settable = True)
+                            if verbose:
+                                syslog.info(
+                                    f"SIMCONNECT: {comment} Trigger singleton {self.action_data.command}"
+                                )
+                            request = manager.registerRequest(
+                                self.action_data.command, "number", settable=True
+                            )
                             request.value = value
                             request.transmit()
                             pulse_data["request"] = request
 
                         else:
-                            if verbose: syslog.info(f"SIMCONNECT: {comment} Trigger singleton {block.command}")
+                            if verbose:
+                                syslog.info(
+                                    f"SIMCONNECT: {comment} Trigger singleton {block.command}"
+                                )
                             block.execute(value)
                             pulse_data["block"] = block
 
                         if self.action_data.auto_repeat:
-                            self.pulse_start("trigger", -1, self.action_data.auto_repeat_interval/1000, data = pulse_data)
+                            self.pulse_start(
+                                "trigger",
+                                -1,
+                                self.action_data.auto_repeat_interval / 1000,
+                                data=pulse_data,
+                            )
                     else:
                         # not executed
                         if self.action_data.auto_repeat:
@@ -4535,7 +4746,7 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 # normalized = gate_trigger.value = gate_trigger.value if gate_trigger else self.action_data.value
                 # min_range = self.action_data.command_min_range
                 # max_range = self.action_data.command_max_range
-                #output_value = gremlin.util.scale_to_range(normalized, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
+                # output_value = gremlin.util.scale_to_range(normalized, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
                 output_value = self.action_data.value
 
                 command = self.action_data.command
@@ -4543,18 +4754,29 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 if event.is_axis:
                     trigger = True
                 else:
-                    trigger = (self.action_data.trigger_on_press and event.is_pressed) or \
-                                self.action_data.trigger_on_release and not event.is_pressed
+                    trigger = (
+                        (self.action_data.trigger_on_press and event.is_pressed)
+                        or self.action_data.trigger_on_release
+                        and not event.is_pressed
+                    )
                 if trigger:
                     if command_type == SimConnectCommandType.LVar:
-                        if verbose: syslog.info(f"SIMCONNECT: {comment} send lvar fixed value (trigger): {command} {output_value:0.3f}")
-                        request = manager.registerRequest(self.action_data.command, "number", settable = True)
+                        if verbose:
+                            syslog.info(
+                                f"SIMCONNECT: {comment} send lvar fixed value (trigger): {command} {output_value:0.3f}"
+                            )
+                        request = manager.registerRequest(
+                            self.action_data.command, "number", settable=True
+                        )
                         request.value = output_value
                         request.transmit()
                     else:
                         if output_value == -9800:
                             pass
-                        if verbose: syslog.info(f"SIMCONNECT: {comment} send block: {block.command} fixed value: {output_value:0.3f}")
+                        if verbose:
+                            syslog.info(
+                                f"SIMCONNECT: {comment} send block: {block.command} fixed value: {output_value:0.3f}"
+                            )
                         block.execute(output_value)
                 else:
                     # fail
@@ -4565,9 +4787,17 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                 min_range = self.action_data.command_min_range
                 max_range = self.action_data.command_max_range
                 value = gate_trigger.value if gate_trigger else action_value.current
-                output_value = gremlin.util.scale_to_range(value, target_min = min_range, target_max = max_range, invert = self.action_data.inverted)
+                output_value = gremlin.util.scale_to_range(
+                    value,
+                    target_min=min_range,
+                    target_max=max_range,
+                    invert=self.action_data.inverted,
+                )
 
-                if verbose: syslog.info(f"SIMCONNECT: {comment} send block trigger: {block.command} input: {value:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}")
+                if verbose:
+                    syslog.info(
+                        f"SIMCONNECT: {comment} send block trigger: {block.command} input: {value:0.3f} min: {self.action_data.output_min_range:0.3f} max: {self.action_data.output_max_range:0.3f} -> scaled: {output_value:0.3f}"
+                    )
                 block.execute(output_value)
 
             else:
@@ -4586,14 +4816,13 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
     #     # syslog = logging.getLogger("system")
     #     if verbose_details: syslog.info("autorepeat: thread stop")
 
-
-
     def _pulse_on(self, data):
-        ''' called when pulse is on '''
+        """called when pulse is on"""
         key, pulse_data = data
         if not pulse_data:
             return
-        if self.verbose: syslog.info(f"Pulse ON")
+        if self.verbose:
+            syslog.info("Pulse ON")
         match key:
             case "trigger":
                 # sngle command auto repeat
@@ -4608,18 +4837,27 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
                     block.execute(value)
 
                 if self.action_data.auto_repeat:
-                    self.pulse_start(key, None, self.action_data.auto_repeat_interval/1000, data = pulse_data)
+                    self.pulse_start(
+                        key,
+                        None,
+                        self.action_data.auto_repeat_interval / 1000,
+                        data=pulse_data,
+                    )
             case "calc":
                 # calculator auto repeat
                 command = pulse_data["command"]
                 self.manager.calculate(command)
 
                 if self.action_data.auto_repeat:
-                    self.pulse_start(key, None, self.action_data.auto_repeat_interval/1000, data = pulse_data)
-
+                    self.pulse_start(
+                        key,
+                        None,
+                        self.action_data.auto_repeat_interval / 1000,
+                        data=pulse_data,
+                    )
 
     def _pulse_off(self, data):
-        ''' called when pulse is off '''
+        """called when pulse is off"""
 
         # ignore
         pass
@@ -4629,54 +4867,52 @@ class MapToSimConnectFunctor(gremlin.base_profile.AbstractContainerActionFunctor
         #     case "trigger":
         #         pass
 
-
-    def pulse_start(self, key : str, duration : float, interval : float, data = None):
-        ''' pulse setup '''
-        worker : gremlin.repeater.PulseWorker
+    def pulse_start(self, key: str, duration: float, interval: float, data=None):
+        """pulse setup"""
+        worker: gremlin.repeater.PulseWorker
         if key in self.pulse_worker_map:
             worker = self.pulse_worker_map[key]
             if worker.is_running:
                 # worker already running - ignore pulse request
                 return
         else:
-            worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data = (key, data))
+            worker = gremlin.repeater.PulseWorker(
+                duration, interval, self._pulse_on, self._pulse_off, data=(key, data)
+            )
             self.pulse_worker_map[key] = worker
 
-        if self.verbose: syslog.info(f"\tactivate")
+        if self.verbose:
+            syslog.info("\tactivate")
         worker.start()
 
     def pulse_stop(self, key: str):
-        ''' request a pulse abort '''
-        if self.verbose: syslog.info(f"Pulse STOP {key}")
+        """request a pulse abort"""
+        if self.verbose:
+            syslog.info(f"Pulse STOP {key}")
         if key in self.pulse_worker_map:
-            worker : gremlin.repeater.PulseWorker = self.pulse_worker_map[key]
+            worker: gremlin.repeater.PulseWorker = self.pulse_worker_map[key]
             worker.stop()
             del self.pulse_worker_map[key]
 
 
-
-
 class MapToSimConnectHelper(QtCore.QObject):
-    range_changed = Signal() # indicates the range was updated
+    range_changed = Signal()  # indicates the range was updated
+
     def __init__(self):
         super().__init__()
 
 
-
 class MapToSimConnect(gremlin.base_profile.AbstractContainerAction):
-
     """Action data for the map to keyboard action.
 
     Map to keyboard presses and releases a set of keys in sync with another
     physical input being pressed or released.
     """
 
-
-
     name = "Map to SimConnect"
     tag = "map-to-simconnect"
-    hint = '''Sends commands to Microsoft Flight Simulator
-via the SimConnect SDK.  Supports simvars and calculator expressions.'''
+    hint = """Sends commands to Microsoft Flight Simulator
+via the SimConnect SDK.  Supports simvars and calculator expressions."""
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
@@ -4691,14 +4927,12 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
     functor = MapToSimConnectFunctor
     widget = MapToSimConnectWidget
 
-
     def __init__(self, parent):
         """Creates a new instance.
 
         :param parent the container this action is part of
         """
 
-        import gremlin.shared_state
         import gremlin.config
 
         super().__init__(parent)
@@ -4707,8 +4941,9 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         self.events = MapToSimConnectHelper()
         self._verbose = gremlin.config.Configuration().verbose_mode_details
 
-        #eh = SimConnectEventHandler()
+        # eh = SimConnectEventHandler()
         from .SimConnectManager import SimConnectManager
+
         self._manager = SimConnectManager()
 
         options = SimconnectOptions()
@@ -4718,47 +4953,54 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         self._command_type = SimConnectCommandType.SimVar
         self.units = "Number"
         self.data_type = "int"
-        self.is_ranged = False # true if ranged data
+        self.is_ranged = False  # true if ranged data
 
         # the current command category if the command is an event
         self.category = SimConnectEventCategory.NotSet
 
         # the current command name
         self._command = None
-        self._command_release = None # command on release if any provided
+        self._command_release = None  # command on release if any provided
         self._command_mode = options.last_command_mode
-        self.is_release_command = False # true if the action has a command to execute on release
+        self.is_release_command = (
+            False  # true if the action has a command to execute on release
+        )
 
         self.auto_repeat = False
-        self.auto_repeat_interval = 250 # how often to repeat the command while pressed in ms
-        self.auto_repeat_delay = 250 # delay between pulses in ms
-
+        self.auto_repeat_interval = (
+            250  # how often to repeat the command while pressed in ms
+        )
+        self.auto_repeat_delay = 250  # delay between pulses in ms
 
         # the value to output if any
 
-        self._output_min_range = -16383 # min range for ranged output
-        self._output_max_range = 16384 # max range for ranged output
-        self._normalized_min_range = -1 # normalized range min (-1 to +1)
-        self._normalized_max_range = 1 # normalized range max (-1 to +1)
-        self._command_min_range = -16383 # simconnect min range for the command (if known - can be manually input)
-        self._command_max_range = 16384 # simconnect max range for the command (if known - can be manually input)
+        self._output_min_range = -16383  # min range for ranged output
+        self._output_max_range = 16384  # max range for ranged output
+        self._normalized_min_range = -1  # normalized range min (-1 to +1)
+        self._normalized_max_range = 1  # normalized range max (-1 to +1)
+        self._command_min_range = (
+            -16383
+        )  # simconnect min range for the command (if known - can be manually input)
+        self._command_max_range = 16384  # simconnect max range for the command (if known - can be manually input)
         self._percent_min_range = 0
         self._percent_max_range = 100
         self._limit_min_range = -16383
         self._limit_max_range = 16384
 
-        self.inverted = False # inversion flag
-        self.trigger_mode = SimConnectTriggerMode.NoOp # trigger only
+        self.inverted = False  # inversion flag
+        self.trigger_mode = SimConnectTriggerMode.NoOp  # trigger only
 
-        self.trigger_on_press = True # true if the action is triggered on a button press
-        self.trigger_on_release = False # true if the action is triggered on a button release
-
+        self.trigger_on_press = (
+            True  # true if the action is triggered on a button press
+        )
+        self.trigger_on_release = (
+            False  # true if the action is triggered on a button release
+        )
 
         # curve data applied to a simconnect axis output
-        self.curve_data = None # present if curve data is needed
+        self.curve_data = None  # present if curve data is needed
 
-
-        self._block = None # block loaded based on the command
+        self._block = None  # block loaded based on the command
 
         # output mode
         if self.input_type == InputType.JoystickAxis:
@@ -4772,7 +5014,7 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         self.is_readonly = False
 
     def _get_value_command(self, value):
-        ''' gets a value expression for the current command '''
+        """gets a value expression for the current command"""
         command = self.command
         if command:
             if "{#}" in command:
@@ -4782,7 +5024,7 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         return command
 
     def _is_value_command(self):
-        ''' true if the command is a valid value expression '''
+        """true if the command is a valid value expression"""
         command = self.command
         if command:
             result = "{#}" in command
@@ -4793,29 +5035,32 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
             return result
         return False
 
-
     @property
     def command_min_range(self) -> float:
         return self._command_min_range
+
     @command_min_range.setter
     def command_min_range(self, value: float):
         self._command_min_range = value
-        if self._verbose: syslog.info(f"set command min: {value:0.3f}")
+        if self._verbose:
+            syslog.info(f"set command min: {value:0.3f}")
 
     @property
     def command_max_range(self) -> float:
         return self._command_max_range
+
     @command_max_range.setter
     def command_max_range(self, value: float):
         self._command_max_range = value
-        if self._verbose: syslog.info(f"set command max: {value:0.3f}")
+        if self._verbose:
+            syslog.info(f"set command max: {value:0.3f}")
 
     @property
     def command_mode(self) -> SimConnectCommandMode:
         return self._command_mode
 
     @command_mode.setter
-    def command_mode(self, value : SimConnectCommandMode):
+    def command_mode(self, value: SimConnectCommandMode):
         self._command_mode = value
 
     @property
@@ -4823,12 +5068,12 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         return self._command_type
 
     @command_type.setter
-    def command_type(self, value : SimConnectCommandType):
+    def command_type(self, value: SimConnectCommandType):
         self._command_type = value
 
     @property
     def command(self):
-        ''' active simconnect command for this action '''
+        """active simconnect command for this action"""
         return self._command
 
     @command.setter
@@ -4841,13 +5086,12 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
 
     @property
     def command_release(self):
-        ''' active simconnect command for this action '''
+        """active simconnect command for this action"""
         return self._command_release
 
     @command_release.setter
     def command_release(self, value):
         self._command_release = value
-
 
     @property
     def command_description(self) -> str:
@@ -4855,43 +5099,48 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
             return self.block.display_block_type
         return ""
 
-
     def scale_output(self, value):
-        ''' scales a NORMALIZED output value from a value -1 to +1 '''
-        return gremlin.util.scale_to_range(value, target_min = self.command_min_range, target_max = self.command_max_range, invert=self.inverted)
+        """scales a NORMALIZED output value from a value -1 to +1"""
+        return gremlin.util.scale_to_range(
+            value,
+            target_min=self.command_min_range,
+            target_max=self.command_max_range,
+            invert=self.inverted,
+        )
 
-
-
-    def get_filtered_axis_value(self, value : float = None) -> float:
-        ''' computes the output value for the current configuration  '''
+    def get_filtered_axis_value(self, value: float = None) -> float:
+        """computes the output value for the current configuration"""
 
         if value is None:
             # filter input
-            value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid,
-                                                        self.hardware_input_id)
+            value = gremlin.joystick_handling.get_curved_axis(
+                self.hardware_device_guid, self.hardware_input_id
+            )
 
         return value
 
-    def get_local_curve_value(self, value : float) -> float:
+    def get_local_curve_value(self, value: float) -> float:
         # apply local curve if any
         if self.curve_data:
             verbose = gremlin.config.Configuration().verbose_mode_curve
             curved = self.curve_data.curve_value(value)
-            if verbose: syslog.info(f"SIMCONNECT CURVE: apply curve source {value:0.3f} -> {curved:0.3f}")
+            if verbose:
+                syslog.info(
+                    f"SIMCONNECT CURVE: apply curve source {value:0.3f} -> {curved:0.3f}"
+                )
             return curved
         return value
 
-
     def get_raw_axis_value(self):
         if self.input_is_hardware():
-            return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+            return gremlin.joystick_handling.get_curved_axis(
+                self.hardware_device_guid, self.hardware_input_id
+            )
         return self.hardware_input_id.axis_value
 
-
     def display_name(self):
-        ''' returns a string for this action for display purposes '''
+        """returns a string for this action for display purposes"""
         return f"Simconnect: ({self.command_mode.name}) command: [{self._command}] range: [{self._command_min_range}, {self._command_max_range}"
-
 
     def icon(self):
         """Returns the icon to use for this action.
@@ -4900,19 +5149,17 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         """
         return "mdi.airplane"
 
-
-
     def update_block(self):
-        ''' updates the data block with the current command '''
+        """updates the data block with the current command"""
         if self._command is None:
             self._command = self._default_command()
-        block : SimConnectBlock = self._manager.block(self._command)
+        block: SimConnectBlock = self._manager.block(self._command)
         if block and not block.command_type:
-            block.command_type = self.command_type # SimConnectCommandType.Event
+            block.command_type = self.command_type  # SimConnectCommandType.Event
         self._block = block
         if block:
             # set data
-            #self.command = block.command
+            # self.command = block.command
             # self.command_min_range = block.min_range
             # self.command_max_range = block.max_range
             self.category = block.category
@@ -4920,11 +5167,9 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
             self.is_ranged = block.is_ranged
             self._is_axis = block.is_axis
 
-
-
     @property
     def block(self):
-        ''' returns the current data block '''
+        """returns the current data block"""
         if self._block is None:
             # create it for the current command
             self.update_block()
@@ -4934,6 +5179,7 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
     @property
     def limit_min_range(self) -> float:
         return self._limit_min_range
+
     @property
     def limit_max_range(self) -> float:
         return self._limit_max_range
@@ -4943,76 +5189,84 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         min_norm = self.normalized_min_range
         min_range = self.command_min_range
         max_range = self.command_max_range
-        value = gremlin.util.scale_to_range(min_norm, target_min = min_range, target_max = max_range, invert = self.inverted)
+        value = gremlin.util.scale_to_range(
+            min_norm, target_min=min_range, target_max=max_range, invert=self.inverted
+        )
         return value
-
 
     @property
     def output_min_range(self) -> float:
         return self._output_min_range
+
     @output_min_range.setter
-    def output_min_range(self, value : float):
+    def output_min_range(self, value: float):
         self._output_min_range = value
-        if self._verbose: syslog.info(f"set output min: {value:0.3f}")
+        if self._verbose:
+            syslog.info(f"set output min: {value:0.3f}")
 
     @property
     def output_max_range(self) -> float:
         return self._output_max_range
+
     @output_max_range.setter
-    def output_max_range(self, value : float):
+    def output_max_range(self, value: float):
         self._output_max_range = value
-        if self._verbose: syslog.info(f"set output max: {value:0.3f}")
+        if self._verbose:
+            syslog.info(f"set output max: {value:0.3f}")
 
     @property
     def normalized_min_range(self) -> float:
         return self._normalized_min_range
 
-    def setNormalized(self, min_value : float, max_value : float, update = False):
-        ''' set normalized values '''
+    def setNormalized(self, min_value: float, max_value: float, update=False):
+        """set normalized values"""
         self._normalized_min_range = min_value
         self._normalized_max_range = max_value
         if update:
             self._update_from_normalized()
 
-        if self._verbose: syslog.info(f"set norm min max: {min_value:0.3f} {max_value:0.3f}")
-
+        if self._verbose:
+            syslog.info(f"set norm min max: {min_value:0.3f} {max_value:0.3f}")
 
     @normalized_min_range.setter
-    def normalized_min_range(self, value : float):
-        ''' normalized output min -1 to +1 '''
+    def normalized_min_range(self, value: float):
+        """normalized output min -1 to +1"""
         self._normalized_min_range = value
-        if self._verbose: syslog.info(f"set norm min: {value:0.3f}")
+        if self._verbose:
+            syslog.info(f"set norm min: {value:0.3f}")
 
     @property
     def normalized_max_range(self) -> float:
         return self._normalized_max_range
 
     @normalized_max_range.setter
-    def normalized_max_range(self, value : float):
-        ''' normalized output max -1 to +1 '''
+    def normalized_max_range(self, value: float):
+        """normalized output max -1 to +1"""
         self._normalized_max_range = value
-        if self._verbose: syslog.info(f"set norm min: {value:0.3f}")
+        if self._verbose:
+            syslog.info(f"set norm min: {value:0.3f}")
 
     @property
     def percent_min_range(self) -> float:
-        ''' percent output min 0 to 100 '''
+        """percent output min 0 to 100"""
         return self._percent_min_range
 
     @percent_min_range.setter
-    def percent_min_range(self, value : float):
+    def percent_min_range(self, value: float):
         self._percent_min_range = value
-        if self._verbose: syslog.info(f"set percent min: {value:0.3f}")
+        if self._verbose:
+            syslog.info(f"set percent min: {value:0.3f}")
 
     @property
     def percent_max_range(self) -> float:
-        ''' percent output max 0 to 100 '''
+        """percent output max 0 to 100"""
         return self._percent_max_range
 
     @percent_max_range.setter
-    def percent_max_range(self, value : float):
+    def percent_max_range(self, value: float):
         self._percent_max_range = value
-        if self._verbose: syslog.info(f"set percent max: {value:0.3f}")
-
+        if self._verbose:
+            syslog.info(f"set percent max: {value:0.3f}")
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.
@@ -5022,91 +5276,136 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         """
         return False
 
-
     def _update_from_percent(self):
-        ''' updates output data from percent min/max'''
-        self.normalized_min_range =  gremlin.util.scale_to_range(self._normalized_min_range, source_min = 0, source_max = 100)
-        self.normalized_max_range =  gremlin.util.scale_to_range(self._normalized_min_range, source_min = 0, source_max = 100)
+        """updates output data from percent min/max"""
+        self.normalized_min_range = gremlin.util.scale_to_range(
+            self._normalized_min_range, source_min=0, source_max=100
+        )
+        self.normalized_max_range = gremlin.util.scale_to_range(
+            self._normalized_min_range, source_min=0, source_max=100
+        )
         self._update_from_normalized()
 
-
     def _update_percent(self):
-        ''' updates percent range from normalized data '''
-        self.percent_min_range = gremlin.util.scale_to_range(self._normalized_min_range, target_min=0, target_max = 100)
-        self.percent_max_range = gremlin.util.scale_to_range(self._normalized_max_range, target_min=0, target_max = 100)
+        """updates percent range from normalized data"""
+        self.percent_min_range = gremlin.util.scale_to_range(
+            self._normalized_min_range, target_min=0, target_max=100
+        )
+        self.percent_max_range = gremlin.util.scale_to_range(
+            self._normalized_max_range, target_min=0, target_max=100
+        )
 
     def _update_from_normalized(self):
-        ''' updates output data from normalized min/max'''
-        self.output_min_range = gremlin.util.scale_to_range(self._normalized_min_range, source_min = self._normalized_min_range, source_max = self._normalized_max_range, target_min=self._command_min_range, target_max = self._command_max_range)
-        self.output_max_range = gremlin.util.scale_to_range(self._normalized_max_range, source_min = self._normalized_min_range, source_max = self._normalized_max_range, target_min=self._command_min_range, target_max = self._command_max_range)
+        """updates output data from normalized min/max"""
+        self.output_min_range = gremlin.util.scale_to_range(
+            self._normalized_min_range,
+            source_min=self._normalized_min_range,
+            source_max=self._normalized_max_range,
+            target_min=self._command_min_range,
+            target_max=self._command_max_range,
+        )
+        self.output_max_range = gremlin.util.scale_to_range(
+            self._normalized_max_range,
+            source_min=self._normalized_min_range,
+            source_max=self._normalized_max_range,
+            target_min=self._command_min_range,
+            target_max=self._command_max_range,
+        )
         self._update_percent()
 
     def _update_from_output(self):
-        ''' updates normalized range from the output range '''
-        self.normalized_min_range = gremlin.util.scale_to_range(self._output_min_range, source_min = self._output_min_range, source_max = self._output_max_range)
-        self.normalized_max_range = gremlin.util.scale_to_range(self._output_max_range, source_min = self._output_min_range, source_max = self._output_max_range)
+        """updates normalized range from the output range"""
+        self.normalized_min_range = gremlin.util.scale_to_range(
+            self._output_min_range,
+            source_min=self._output_min_range,
+            source_max=self._output_max_range,
+        )
+        self.normalized_max_range = gremlin.util.scale_to_range(
+            self._output_max_range,
+            source_min=self._output_min_range,
+            source_max=self._output_max_range,
+        )
         self._update_percent()
 
-
-
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         """Reads the contents of an XML node to populate this instance.
 
         :param node the node whose content should be used to populate this
             instance
         """
 
-
-
         default_command = self._default_command()
-        self._command = safe_read(node,"command",str, default_command)
-        self._command_release = safe_read(node,"command_release",str, "")
-        self.is_release_command = safe_read(node,"has_release", bool, False)
+        self._command = safe_read(node, "command", str, default_command)
+        self._command_release = safe_read(node, "command_release", str, "")
+        self.is_release_command = safe_read(node, "has_release", bool, False)
         self._block = SimConnectManager().block(self._command)
-
 
         update_from_output = False
         if "min_range" in node.attrib:
             # old profile
-            self.output_min_range = safe_read(node,"min_range", float, -1.0)
+            self.output_min_range = safe_read(node, "min_range", float, -1.0)
             update_from_output = True
         else:
-            self.output_min_range = safe_read(node,"output_min_range", float, -16383) if "output_min_range" in node.attrib else -16383
-
-
+            self.output_min_range = (
+                safe_read(node, "output_min_range", float, -16383)
+                if "output_min_range" in node.attrib
+                else -16383
+            )
 
         if "max_range" in node.attrib:
             # old profile
-            self.output_max_range = safe_read(node,"max_range", float, 1.0)
+            self.output_max_range = safe_read(node, "max_range", float, 1.0)
             update_from_output = True
         else:
-            self.output_max_range = safe_read(node,"output_max_range", float, 16384) if "output_max_range" in node.attrib else 16384
+            self.output_max_range = (
+                safe_read(node, "output_max_range", float, 16384)
+                if "output_max_range" in node.attrib
+                else 16384
+            )
 
         if update_from_output:
             # old profile
             self._update_from_output()
         else:
             # read data
-            norm_min = safe_read(node,"norm_min_range", float, -1.0) if "norm_min_range" in node.attrib else -1.0
-            norm_max = safe_read(node,"norm_max_range", float, 1.0) if "norm_max_range" in node.attrib else 1.0
+            norm_min = (
+                safe_read(node, "norm_min_range", float, -1.0)
+                if "norm_min_range" in node.attrib
+                else -1.0
+            )
+            norm_max = (
+                safe_read(node, "norm_max_range", float, 1.0)
+                if "norm_max_range" in node.attrib
+                else 1.0
+            )
 
-            if norm_min == norm_max or \
-                not gremlin.util.valueInRange(norm_min,-1,1) or \
-                not gremlin.util.valueInRange(norm_max,-1,1):
+            if (
+                norm_min == norm_max
+                or not gremlin.util.valueInRange(norm_min, -1, 1)
+                or not gremlin.util.valueInRange(norm_max, -1, 1)
+            ):
                 # reset bad data
-                syslog.error(f"RANGE ERROR: values for min {norm_min:0.3f} and max {norm_max:0.3f} range are identical - reset to -1,+1")
+                syslog.error(
+                    f"RANGE ERROR: values for min {norm_min:0.3f} and max {norm_max:0.3f} range are identical - reset to -1,+1"
+                )
                 norm_min = -1
                 norm_max = +1
 
             self._normalized_min_range = norm_min
             self._normalized_max_range = norm_max
 
-
-        min_value = safe_read(node,"command_min_range", float, -16383) if "command_min_range" in node.attrib else -16383
-        max_value = safe_read(node,"command_max_range", float, 16384) if "command_max_range" in node.attrib else 16384
+        min_value = (
+            safe_read(node, "command_min_range", float, -16383)
+            if "command_min_range" in node.attrib
+            else -16383
+        )
+        max_value = (
+            safe_read(node, "command_max_range", float, 16384)
+            if "command_max_range" in node.attrib
+            else 16384
+        )
         self.command_min_range = min_value
         self.command_max_range = max_value
-
 
         s_mode = safe_read(node, "mode", str, "")
         if s_mode:
@@ -5119,31 +5418,28 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
             self._command_type = SimConnectCommandType.to_enum(node.get("type"))
 
         if "inverted" in node.attrib:
-            self.inverted = safe_read(node,"inverted",bool, False)
-
+            self.inverted = safe_read(node, "inverted", bool, False)
 
         if "trigger" in node.attrib:
-            s_trigger = safe_read(node,"trigger",str,"")
+            s_trigger = safe_read(node, "trigger", str, "")
             self.trigger_mode = SimConnectTriggerMode.to_enum(s_trigger)
 
         if "units" in node.attrib:
-            self.units = safe_read(node,"units",str,"Number")
+            self.units = safe_read(node, "units", str, "Number")
 
         if "data_type" in node.attrib:
-            self.data_type= safe_read(node,"data_type",str,"int")
+            self.data_type = safe_read(node, "data_type", str, "int")
 
         if "delay" in node.attrib:
             self.auto_repeat_interval = safe_read(node, "delay", int, 250)
 
-
         if "autorepeat" in node.attrib:
-            self.auto_repeat = safe_read(node,"autorepeat", bool, False)
+            self.auto_repeat = safe_read(node, "autorepeat", bool, False)
 
-        self.trigger_on_release = safe_read(node,"trigger_on_release", bool, False)
-        self.trigger_on_press = safe_read(node,"trigger_on_press", bool, True)
+        self.trigger_on_release = safe_read(node, "trigger_on_release", bool, False)
+        self.trigger_on_press = safe_read(node, "trigger_on_press", bool, True)
 
-
-        node_block =gremlin.util.get_xml_child(node,"block")
+        node_block = gremlin.util.get_xml_child(node, "block")
         if node_block is not None:
             if not self._block:
                 self._block = SimConnectBlock()
@@ -5153,23 +5449,26 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         self.update_block()
 
         # curve data
-        curve_node = gremlin.util.get_xml_child(node,"response-curve-ex")
+        curve_node = gremlin.util.get_xml_child(node, "response-curve-ex")
         if curve_node is not None:
             self.curve_data = gremlin.curve_handler.AxisCurveData()
             self.curve_data._parse_xml(curve_node)
             self.curve_data.curve_update()
 
-
     def _default_command(self):
-        ''' default command'''
-        return "AXIS_THROTTLE_SET" if self.hardware_input_type == InputType.JoystickAxis else "LIGHT_BEACON"
+        """default command"""
+        return (
+            "AXIS_THROTTLE_SET"
+            if self.hardware_input_type == InputType.JoystickAxis
+            else "LIGHT_BEACON"
+        )
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
 
         :return XML node containing the information of this  instance
         """
-        node = ElementTree.Element(MapToSimConnect.tag)
+        node = etree.Element(MapToSimConnect.tag)
         if self.block:
             node_block = self.block.to_xml()
             node.append(node_block)
@@ -5177,8 +5476,8 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         command = self._command if self._command else ""
         command_release = self._command_release if self._command_release else ""
 
-        node.set("command",safe_format(command, str))
-        node.set("command_release",safe_format(command_release, str))
+        node.set("command", safe_format(command, str))
+        node.set("command_release", safe_format(command_release, str))
         node.set("mode", SimConnectActionMode.to_string(self.mode))
         node.set("command_mode", SimConnectCommandMode.to_string(self._command_mode))
         node.set("has_release", safe_format(self.is_release_command, bool))
@@ -5199,10 +5498,9 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         node.set("inverted", safe_format(self.inverted, bool))
 
         if self.curve_data is not None:
-            curve_node =  self.curve_data._generate_xml()
+            curve_node = self.curve_data._generate_xml()
             curve_node.tag = "response-curve-ex"
             node.append(curve_node)
-
 
         if self.is_ranged:
             comment = f"Computed range values: [{self.output_min_range:0.3f}, {self.output_max_range:0.3f}]  percentage: [{self.percent_min_range:0.3f}, {self.percent_max_range:0.3f}]"
@@ -5220,16 +5518,15 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         """
         return True
 
-
     def __getstate__(self):
-        ''' serialization override '''
+        """serialization override"""
         state = self.__dict__.copy()
         # sm is not serialized, remove it
         del state["smd"]
         return state
 
     def __setstate__(self, state):
-        ''' serialization override '''
+        """serialization override"""
         self.__dict__.update(state)
         # sm is not serialized, add it
         eh = SimConnectEventHandler()
@@ -5239,19 +5536,20 @@ via the SimConnect SDK.  Supports simvars and calculator expressions.'''
         return f"MapToSimConnect: command: {self.command} mode: {self.command_mode}"
 
     def to_html(self) -> str:
-        ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        """returns reporting graphviz data for this action"""
+        from gremlin.reporting import ReportTable
         import html
 
         table = ReportTable(cellpadding=4)
         table.addField("Type", self._command_type.name)
-        table.addField("Command", html.escape(self.command) ) # ensure the text does not interfere with DOT commands
+        table.addField(
+            "Command", html.escape(self.command)
+        )  # ensure the text does not interfere with DOT commands
 
         if self.trigger_on_press:
             table.addField("Exec (press)", "Yes")
         if self.trigger_on_release:
             table.addField("Exec (release)", "Yes")
-
 
         return table.to_html()
 

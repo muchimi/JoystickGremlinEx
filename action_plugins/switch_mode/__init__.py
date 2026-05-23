@@ -16,25 +16,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import os
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtCore
 from lxml import etree as ElementTree
 
 import gremlin.base_profile
 import gremlin.event_handler
 import gremlin.execution_graph
 from gremlin.input_types import InputType
-import gremlin.profile
 import gremlin.shared_state
 import gremlin.input_item
 import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.shared_state
-import gremlin.config
-import anytree
 import logging
-import psygnal
-from psygnal import Signal
 from shiboken6 import Shiboken
 from gremlin.profile import safe_format, safe_read
 
@@ -136,7 +130,7 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self.mode_selector_widget):
             current_mode = self.action_data.mode # current mode
             self.mode_selector_widget.clear()
-            edit_mode = gremlin.shared_state.edit_mode
+            _edit_mode = gremlin.shared_state.edit_mode
             
 
             # remove the current mode so we cannot switch to ourselves
@@ -167,7 +161,7 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
         #     syslog.error(f"Invalid mode selected: {mode} selected mode cannot be the current mode")
         #     return
         if not mode:
-            syslog.error(f"Invalid mode selected: selected mode cannot be NULL")
+            syslog.error("Invalid mode selected: selected mode cannot be NULL")
             return
         
         self.action_data.mode = mode
@@ -223,10 +217,12 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
                 
             switch = self._last_mode is None or new_mode != self._last_mode or current_mode != new_mode
             if switch:
-                if verbose: syslog.info(f"\tswitch to [{new_mode}]")
+                if verbose:
+                    syslog.info(f"\tswitch to [{new_mode}]")
                 gremlin.control_action.switch_mode(new_mode)
             else:
-                if verbose: syslog.info(f"\tno action")
+                if verbose:
+                    syslog.info("\tno action")
 
             self._last_mode = new_mode
                 
@@ -339,7 +335,7 @@ To change the mode temporarily, use the temporary mode switch action.'''
   
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)    
 
         table.addField("Switch To Mode", self.mode)

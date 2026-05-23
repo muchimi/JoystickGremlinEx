@@ -16,14 +16,12 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 from PySide6 import QtWidgets, QtCore, QtGui
-import gremlin
 import gremlin.config
 import gremlin.joystick_handling
 import gremlin.util
 from gremlin.util import parse_guid, safe_read, safe_format
 from . import ui_common
 from gremlin.input_types import InputType
-from typing import cast
 
 import gremlin.event_handler
 import gremlin.shared_state
@@ -33,14 +31,8 @@ from lxml import etree
 import os
 import logging
 import gremlin.singleton_decorator
-import psygnal
-from psygnal import Signal
 import gremlin.ui.ui_common
 from shiboken6 import Shiboken
-import gremlin.threading
-import queue
-import time
-import copy
 
 
 syslog = logging.getLogger("system")
@@ -555,7 +547,7 @@ class CalibrationData:
     def from_xml(self, node, data = None, extra_data = None):
         ''' reads data from XML'''
 
-        if not "device-guid" in node.attrib:
+        if "device-guid" not in node.attrib:
             return # no calibration data
         device_guid = node.get("device-guid")
         if not device_guid or device_guid == 'None':
@@ -666,9 +658,9 @@ class CalibrationManager():
         device_guid = gremlin.util.normalize_guid(device_guid)
   
 
-        if not device_guid in self.calibration_map:
+        if device_guid not in self.calibration_map:
             self.calibration_map[device_guid] = {}
-        if not input_id in self.calibration_map[device_guid]:
+        if input_id not in self.calibration_map[device_guid]:
             calibration = CalibrationData()
             calibration.device_guid = device_guid
             calibration.input_id = input_id
@@ -680,10 +672,10 @@ class CalibrationManager():
     def saveCalibration(self, calibration : CalibrationData, to_global = True, to_local = False, callback = None):
         ''' saves calibration data '''
         device_guid =  gremlin.util.normalize_guid(calibration.device_guid)
-        device = gremlin.joystick_handling.getDevice(device_guid)
+        _device = gremlin.joystick_handling.getDevice(device_guid)
 
         input_id = calibration.input_id
-        if not device_guid in self.calibration_map:
+        if device_guid not in self.calibration_map:
             self.calibration_map[device_guid] = {}
         
         self.calibration_map[device_guid][input_id] = calibration
@@ -756,11 +748,11 @@ class CalibrationManager():
                         data.from_xml(node)
                         device_guid = gremlin.util.normalize_guid(data.device_guid)
                         input_id = data.input_id
-                        if not device_guid in device_map:
+                        if device_guid not in device_map:
                             # not seen
                             device_map[device_guid] = {}
                         
-                        if not input_id in device_map[device_guid]:
+                        if input_id not in device_map[device_guid]:
                             if verbose:  
                                 device = gremlin.joystick_handling.getDevice(device_guid)    
                                 if device:
@@ -768,7 +760,7 @@ class CalibrationManager():
                                 else:
                                     syslog.info(f"CALIB: loading calibration data for unknown [{device_guid}] axis [{input_id}] from {source}")
 
-                            if not device_guid in self.calibration_map:
+                            if device_guid not in self.calibration_map:
                                 self.calibration_map[device_guid] = {}
 
                             device_map[device_guid][input_id] = data
@@ -805,7 +797,8 @@ class CalibrationManager():
                     node = data.to_xml()
                     root.append(node)
             else:
-                if verbose: syslog.info(f"Device: {device_guid} not found during saving of calibration data")
+                if verbose:
+                    syslog.info(f"Device: {device_guid} not found during saving of calibration data")
         
         tree = etree.ElementTree(root)
 
@@ -823,7 +816,8 @@ class CalibrationManager():
                     if os.path.isfile(fname):
                         os.unlink(fname)
                     tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
-                    if verbose: syslog.info(f"Calibration data saved to [{fname}]")
+                    if verbose:
+                        syslog.info(f"Calibration data saved to [{fname}]")
                 except Exception as ex:
                     syslog.error(f"Error saving calibration: {ex}")
                     if callback:
@@ -856,7 +850,7 @@ class CalibrationListenerWidget(QtWidgets.QFrame):
         # Create and configure the ui overlay
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.addWidget(
-            QtWidgets.QLabel(f"""<center>Move the axis to its extreme positions.<br/><br/>Press a button or click Ok to accept.<br/>.Press Esc abort.</center>""")
+            QtWidgets.QLabel("""<center>Move the axis to its extreme positions.<br/><br/>Press a button or click Ok to accept.<br/>.Press Esc abort.</center>""")
         )
         
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -1351,7 +1345,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
     def _reset_calibration(self, widget):
         ''' reset calibration for the axis '''
         self.action_data.reset()
-        value = self.action_data.hasData
+        _value = self.action_data.hasData
         self._update_ui()
         self._status_widget.setText("Reset")
         gremlin.ui.ui_common.MessageBoxInfo(prompt = "Calibration reset.", informative_text = "Remember to save the data.", parent = self)        
@@ -1388,9 +1382,9 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         
 
         gremlin.util.assert_ui_thread()
-        config = gremlin.config.Configuration()
+        _config = gremlin.config.Configuration()
         device_guid = self.action_data.device_guid
-        input_type = InputType.JoystickAxis
+        _input_type = InputType.JoystickAxis
         input_id = self.action_data.input_id
         self.calibrate_dialog = CalibrationListenerWidget(device_guid = device_guid, input_id = input_id, callback = self._capture_calibration)
 

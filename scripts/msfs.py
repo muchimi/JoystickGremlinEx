@@ -1,15 +1,9 @@
 import gremlin
-from gremlin.user_plugin import PhysicalInputVariable
-import time
-import uuid
-import atexit
 from gremlin.spline import CubicSpline
-from gremlin.input_devices import Keyboard
-from vjoy.vjoy import AxisName
 from configuration import * # load constants defining the devices connected to this PC
 from util import *
 from hardware import *
-from gremlin.macro import Macro, MacroManager
+from gremlin.macro import Macro
 from gremlin.util import parse_guid
 
 gremlin.util.log("Custom MSFS module enabled")
@@ -338,7 +332,7 @@ def hat_1_up(event, vjoy):
 
 # hat 1 right
 @left_vpc.button(15)
-def hat_1_up(event, vjoy):
+def hat_1_right(event, vjoy):
     global hat_state
     value = 1 if event.is_pressed else 0
     hat_state[HAT_INDEX_ONE][0] = value
@@ -346,7 +340,7 @@ def hat_1_up(event, vjoy):
 
 # hat 1 down
 @left_vpc.button(16)
-def hat_1_up(event, vjoy):
+def hat_1_down(event, vjoy):
     global hat_state
     value = -1 if event.is_pressed else 0
     hat_state[HAT_INDEX_ONE][1] = value
@@ -354,7 +348,7 @@ def hat_1_up(event, vjoy):
 
 # hat 1 left
 @left_vpc.button(17)
-def hat_1_up(event, vjoy):
+def hat_1_left(event, vjoy):
     global hat_state
     value = -1 if event.is_pressed else 0
     hat_state[HAT_INDEX_ONE][0] = value

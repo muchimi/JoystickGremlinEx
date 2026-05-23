@@ -17,7 +17,6 @@
 import importlib
 import logging
 import os
-import copy
 
 from . import common, error
 from gremlin.util import *
@@ -38,7 +37,6 @@ class ContainerPlugins:
 
     def reset(self):
         ''' resets the plugins '''
-        import gremlin.event_handler
         self._plugins = {}
         self._discover_plugins()
 
@@ -59,7 +57,7 @@ class ContainerPlugins:
 
     def register_functor(self, functor):
         ''' registers a functor for latching purposes'''
-        if not functor in self._functors:
+        if functor not in self._functors:
             self._functors.append(functor)
 
     @property
@@ -85,13 +83,13 @@ class ContainerPlugins:
         return None
 
     def set_container_data(self, item_data, container):
-        if not item_data in self._input_data_container_map.keys():
+        if item_data not in self._input_data_container_map.keys():
             self._input_data_container_map[item_data] = []
-        if not container in self._input_data_container_map[item_data]:
+        if container not in self._input_data_container_map[item_data]:
             self._input_data_container_map[item_data].append(container)
 
     def get_container(self, item_data):
-        if not item_data in self._input_data_container_map.keys():
+        if item_data not in self._input_data_container_map.keys():
             return []
         return self._input_data_container_map[item_data]
 
@@ -359,12 +357,11 @@ class ActionPlugins:
         from lxml import etree
         from gremlin.clipboard import Clipboard, ObjectEncoder, EncoderType
         import gremlin.plugin_manager
-        import gremlin.base_profile
         import gremlin.shared_state
         clipboard = Clipboard()
         action_list = []
         if container is None and input_item is None or input_item.parent is None:
-            syslog.warning(f"FromClipboard: invalid container and input data")
+            syslog.warning("FromClipboard: invalid container and input data")
             return None
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
         if isinstance(clipboard.data, ObjectEncoder):

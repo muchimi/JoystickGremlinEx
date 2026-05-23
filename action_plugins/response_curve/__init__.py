@@ -18,7 +18,6 @@
 
 import enum
 import logging
-import os
 import time
 from PySide6 import QtCore, QtGui, QtWidgets
 from lxml import etree as ElementTree
@@ -1579,7 +1578,7 @@ If needing a separate curve mapper, use the more advanced Response Curve Ex acti
     
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4) 
         
         table.addField("Mode", self.symmetry_mode.name)

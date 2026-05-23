@@ -17,9 +17,7 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 import os
-from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
-from lxml import etree as ElementTree
-import qtawesome as qta
+from PySide6 import QtCore, QtMultimedia, QtWidgets
 import gremlin.util
 import gremlin.event_handler
 
@@ -27,14 +25,11 @@ import gremlin.event_handler
 import gremlin.config
 
 
-from gremlin.util import load_icon, userprofile_path
 
 import gremlin.ui.ui_common
 import threading
 
-from gremlin.util import safe_format, safe_read
 import logging
-from psygnal import Signal
 
 import gremlin.singleton_decorator
 import queue
@@ -50,8 +45,6 @@ USE_PG = False # use pygame for playback
 if USE_PG:
     import pygame
     
-import scipy
-import scipy._cyutility
 
 if USE_SD:
     import sounddevice as sd # for sound playback
@@ -164,7 +157,8 @@ class Sound():
                     api_name = api['name']
                     samplerate = device['default_samplerate']
 
-                    if verbose: syslog.info(f"API: [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
+                    if verbose:
+                        syslog.info(f"API: [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
                     if api_name == 'Windows WASAPI':
                         # only use wasapi as that has the lowest latency
                         # other choices are 'MME'
@@ -177,7 +171,7 @@ class Sound():
             # get the default device
             device = sd.query_devices(kind='output')
             name = device['name']
-            if not name in self.device_name_to_id_map:
+            if name not in self.device_name_to_id_map:
                 # different API - match by starting name
                 for device_name in self.device_name_to_id_map:
                     if device_name.startswith(name):
@@ -237,7 +231,7 @@ class Sound():
             if not pygame.mixer.get_init():
                 try:
                     if not self._playback_device_name:
-                        syslog.error(f"SOUND: Unable to initialize sound: device not selected.")
+                        syslog.error("SOUND: Unable to initialize sound: device not selected.")
                         return False
                     
                     pygame.mixer.pre_init(self._playback_device_name)
@@ -388,7 +382,7 @@ class Sound():
         ''' trims the task list of completed tasks '''
         if self._sound_tasks:
             done_list = [t for t in self._sound_tasks if t.done()]
-            self._sound_tasks = [t for t in self._sound_tasks if not t in done_list]
+            self._sound_tasks = [t for t in self._sound_tasks if t not in done_list]
         
 
 
@@ -430,7 +424,7 @@ class Sound():
             fade_in = options.fadein_ms # fade in duration
             fade_out = options.fadeout_ms # fade out duration
             duration = options.playback_ms # max duration of the sample to play back
-            verbose = gremlin.config.Configuration().verbose_mode_sound
+            _verbose = gremlin.config.Configuration().verbose_mode_sound
 
             fade_in = 0
             fade_out = 0
@@ -503,7 +497,7 @@ class Sound():
 
             # cache the playback data
             
-            if not filename in self.running_data:
+            if filename not in self.running_data:
                 self.running_data[filename] = {}
 
 
@@ -554,7 +548,7 @@ class Sound():
         if os.path.isfile(sound_file):
             sound_file = sound_file.casefold()
             if USE_PG:
-                if not sound_file in self.sound_file_map:
+                if sound_file not in self.sound_file_map:
                     key = gremlin.util.get_guid() # self._next_key
                     self.sound_file_map[sound_file] = key
                 else:
@@ -622,7 +616,8 @@ class Sound():
                 continue
 
             event : SoundEvent = self._event_queue.get()
-            if verbose: syslog.info(f"SOUNDLISTEN: DEQUEUE event {event.action.name}  QUEUE size: {self._event_queue.qsize():,}")		
+            if verbose:
+                syslog.info(f"SOUNDLISTEN: DEQUEUE event {event.action.name}  QUEUE size: {self._event_queue.qsize():,}")
             if USE_PG:
                 if pygame.mixer.get_init() is None:
                     if self._playback_device_name:
@@ -632,13 +627,14 @@ class Sound():
                 case SoundAction.Play:
                     # play item
                     key = event.key
-                    if verbose: syslog.info(f"\tplay [{key}]")
+                    if verbose:
+                        syslog.info(f"\tplay [{key}]")
                     data : PlaybackOptions = event.data
                     if USE_SD:
                         self.play(key, data)
                     elif USE_PG:
                         if key in self.sound_map:
-                            audio_file = self.sound_audio_file_map[key]
+                            _audio_file = self.sound_audio_file_map[key]
                             sound = pygame.mixer.Sound(self.sound_audio_file_map[key])
                             #sound : pygame.mixer.Sound = self.sound_map[key]
                             if data.stop_previous:
@@ -656,7 +652,8 @@ class Sound():
                     if USE_PG:
                         key = event.key
                         if key in self.sound_map:
-                            if verbose: syslog.info(f"\tset volume [{key}] volume: {event.data:0.3f}")
+                            if verbose:
+                                syslog.info(f"\tset volume [{key}] volume: {event.data:0.3f}")
                             sound : pygame.mixer.Sound = self.sound_map[key]
                             volume = event.data
                             self.sound_volume_map[key] = volume
@@ -668,7 +665,8 @@ class Sound():
 
 
                         if current_device_name != device_name:
-                            if verbose: syslog.info(f"\tchange device [{device_name}]")
+                            if verbose:
+                                syslog.info(f"\tchange device [{device_name}]")
                             self.setPlaybackDevice(device_name)
                             current_device_name = device_name
                             self._playback_device_name = device_name
@@ -676,7 +674,8 @@ class Sound():
 
                 case SoundAction.Stop:
                     # clear the queue and stop playback
-                    if verbose: syslog.info(f"\tstop")
+                    if verbose:
+                        syslog.info("\tstop")
                     if USE_PG:
                         pygame.mixer.stop()
                     elif USE_SD:
@@ -776,31 +775,28 @@ class TTSGeneratorDialog(QtWidgets.QDialog):
             self.speaker = last_speaker
 
         ktts = gremlin.ktts.KTTS()
-        try:
-            gremlin.util.pushCursor()
-            speakers = ktts.getSpeakers(initialize = initialize)
-            with QtCore.QSignalBlocker(self.speaker_widget):
-                self.speaker_widget.clear()
-            if speakers:
-                # we have a list of speakers
-                for speaker in speakers:
-                    self.speaker_widget.addItem(speaker, speaker)
-                if self.speaker:
-                    speaker = self.speaker
-                else:
-                    speaker = config.ai_tts_last_speaker
-                if speaker:
-                    index = self.speaker_widget.findText(speaker)
-                    if index != -1:
-                        self.speaker_widget.setCurrentIndex(index)
+
+        speakers = ktts.getSpeakers(initialize = initialize)
+        with QtCore.QSignalBlocker(self.speaker_widget):
+            self.speaker_widget.clear()
+        if speakers:
+            # we have a list of speakers
+            for speaker in speakers:
+                self.speaker_widget.addItem(speaker, speaker)
+            if self.speaker:
+                speaker = self.speaker
             else:
-                if self.speaker:
-                    speaker = self.speaker
-                    self.speaker_widget.addItem(speaker, speaker)
-            
-            self.speaker_widget.setEnabled(speakers is not None)
-        finally:
-            gremlin.util.popCursor()
+                speaker = config.ai_tts_last_speaker
+            if speaker:
+                index = self.speaker_widget.findText(speaker)
+                if index != -1:
+                    self.speaker_widget.setCurrentIndex(index)
+        else:
+            if self.speaker:
+                speaker = self.speaker
+                self.speaker_widget.addItem(speaker, speaker)
+        
+        self.speaker_widget.setEnabled(speakers is not None)
 
 
         if self.speaker:

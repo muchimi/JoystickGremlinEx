@@ -17,8 +17,6 @@
 
 
 import logging
-import math
-import os
 from lxml import etree as ElementTree
 
 from PySide6 import QtCore, QtWidgets
@@ -28,28 +26,20 @@ import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 
-from gremlin.profile import read_bool, safe_read, safe_format
-from gremlin.util import rad2deg
+from gremlin.profile import safe_read
 import gremlin.ui.ui_common
 import gremlin.input_item
-import gremlin.sendinput
 import gremlin.gamepad_handling
-from gremlin import input_devices
 from gremlin.types import GamePadOutput
 from gremlin.input_devices import CallbackActions
-import psygnal
-from psygnal import Signal
-import html
 import gremlin.remote
 
 
 # import vigem.vigem_gamepad as vg
 import vigem.vigem_commons as vc
 
-from enum import Enum, auto
 
 import gremlin.util
-from gremlin.types import GamePadOutput
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
@@ -160,7 +150,8 @@ class MapToGamepadWidget(gremlin.input_item.AbstractActionWidget):
     def _output_mode_changed(self):
         self.action_data.output_mode = self.output_selector.currentData()
         verbose = gremlin.config.Configuration().verbose
-        if verbose: syslog.info(f"OUTPUT MODE: changed to {self.action_data.output_mode}")
+        if verbose:
+            syslog.info(f"OUTPUT MODE: changed to {self.action_data.output_mode}")
 
     @QtCore.Slot()
     def _device_changed(self):
@@ -186,20 +177,22 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
     def process_event(self, event, value, extra_data = None):
 
         verbose = gremlin.config.Configuration().verbose_mode_outputs
-        if verbose: syslog.error(f"VIGEM: event: {str(event)}")
+        if verbose:
+            syslog.error(f"VIGEM: event: {str(event)}")
 
         
         (is_local, is_remote) = self.action_data.sendFlags()
         if event.force_remote:
             # force remote mode on if specified in the event
-            is_remote = True
+            _is_remote = True
             is_local = False
 
         if is_local:
 
             vigem = gremlin.gamepad_handling.getGamepad(self.action_data.device_index)
             if vigem is None:
-                if verbose: syslog.error(f"VIGEM: no device found index: {self.action_data.device_index}")
+                if verbose:
+                    syslog.error(f"VIGEM: no device found index: {self.action_data.device_index}")
                 return False
             
             
@@ -211,23 +204,29 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
             if is_local:
                 vscaled = value.current
                 if output_mode == GamePadOutput.LeftStickX:
-                    if verbose: syslog.error(f"VIGEM: left X: {vscaled}")
+                    if verbose:
+                        syslog.error(f"VIGEM: left X: {vscaled}")
                     vigem.left_joystick_float_x(vscaled)
                 elif output_mode == GamePadOutput.LeftStickY:
-                    if verbose: syslog.error(f"VIGEM: left Y: {vscaled}")
+                    if verbose:
+                        syslog.error(f"VIGEM: left Y: {vscaled}")
                     vigem.left_joystick_float_y(vscaled)
                 if output_mode == GamePadOutput.RightStickX:
-                    if verbose: syslog.error(f"VIGEM: right X: {vscaled}")
+                    if verbose:
+                        syslog.error(f"VIGEM: right X: {vscaled}")
                     vigem.right_joystick_float_x(vscaled)
                 elif output_mode == GamePadOutput.RightStickY:
-                    if verbose: syslog.error(f"VIGEM: right Y: {vscaled}")
+                    if verbose:
+                        syslog.error(f"VIGEM: right Y: {vscaled}")
                     vigem.right_joystick_float_y(vscaled)
                 if output_mode == GamePadOutput.LeftTrigger:
                     vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
-                    if verbose: syslog.error(f"VIGEM: left trigger: {vscaled}")
+                    if verbose:
+                        syslog.error(f"VIGEM: left trigger: {vscaled}")
                     vigem.left_trigger_float(vscaled)
                 if output_mode == GamePadOutput.RightTrigger:
-                    if verbose: syslog.error(f"VIGEM: right trigger: {vscaled}")
+                    if verbose:
+                        syslog.error(f"VIGEM: right trigger: {vscaled}")
                     vscaled = gremlin.util.scale_to_range(value.current,target_min=0.0, target_max=1.0)
                     vigem.right_trigger_float(vscaled)
             else:
@@ -273,7 +272,8 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                 if is_pressed:
                     auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] 
                     if auto_release:
-                        if verbose: syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
+                        if verbose:
+                            syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
                         event_release = event.clone()               
                         event_release.is_pressed = False
                         callback = lambda : self.process_event(event_release, value)
@@ -281,10 +281,12 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
 
                 if is_local:
                     if is_pressed:
-                        if verbose: syslog.error(f"VIGEM: button {button.name}: press")
+                        if verbose:
+                            syslog.error(f"VIGEM: button {button.name}: press")
                         vigem.press_button(button)
                     else:
-                        if verbose: syslog.error(f"VIGEM: button {button.name}: release")
+                        if verbose:
+                            syslog.error(f"VIGEM: button {button.name}: release")
                         vigem.release_button(button)
                 else:
                     gremlin.remote.remote_client.send_gamepad_button(self.action_data.device_index, button, value.is_pressed)
@@ -399,8 +401,7 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
 
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
-        import html
+        from gremlin.reporting import ReportTable
         table = ReportTable(cellpadding=4)    
         table.addField("Function", f"{GamePadOutput.to_display_name(self.output_mode)}")
         return table.to_html()

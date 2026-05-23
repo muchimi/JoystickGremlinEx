@@ -16,28 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # from __future__ import annotations # deprecated with python 3.14+
-import enum
 import logging
-import os
-import time
-from PySide6 import QtCore, QtGui, QtWidgets
-from lxml import etree as ElementTree
+from PySide6 import QtCore
 
-import gremlin
+import gremlin as gremlin
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
-import gremlin.joystick_handling
-import gremlin.ui.axis_calibration
-from gremlin.ui.ui_common import DynamicDoubleSpinBox, DualSlider, get_text_width
 import gremlin.input_item
 import gremlin.ui.ui_common
-import gremlin.util
 import gremlin.shared_state
 import gremlin.curve_handler
-import gremlin.input_devices
-import gremlin.spline
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
@@ -135,15 +125,18 @@ class ResponseCurveExFunctor(gremlin.base_profile.AbstractFunctor):
             verbose = gremlin.config.Configuration().verbose_mode_joystick
             if event.curve_value is not None:
                 value = event.curve_value
-                if verbose: source = "curve value"
+                if verbose:
+                    source = "curve value"
                     
             else:
                 value = action_value.current
-                if verbose: source = "action current"
+                if verbose:
+                    source = "action current"
                 
             curved_value = self.curve_data.curve_value(value)
 
-            if verbose: syslog.info(f"CURVE: using input from [{source}] value {value:0.3f} -> curved: {curved_value:0.3f}")
+            if verbose:
+                syslog.info(f"CURVE: using input from [{source}] value {value:0.3f} -> curved: {curved_value:0.3f}")
                 
             event.curve_value = curved_value
             action_value.current = curved_value
@@ -237,7 +230,6 @@ If applying a curve to an output axis, use VJOY Remap instead for improved perfo
 
     def to_html(self) -> str:    
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
         return self.curve_data.to_html()
 
 

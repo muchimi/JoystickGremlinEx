@@ -32,7 +32,6 @@ import time
 
 from gremlin.types import MouseButton
 # from gremlin.singleton_decorator import SingletonDecorator
-import gremlin.config
 
 user32 = ctypes.WinDLL("user32")
 syslog = logging.getLogger("system")
@@ -400,10 +399,6 @@ class Key():
 
 
 
-    @property
-    def is_latched(self):
-        ''' returns true if the key has latched components '''
-        return len(self._latched_keys) > 0
 
     @property
     def state(self):
@@ -679,7 +674,8 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, ta
 
 
     if is_local:
-        if verbose: syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
+        if verbose:
+            syslog.info(f"OUTPUT: (local) keydown {key.debug_name}")
         process_name = extra_data['process_name'] if extra_data and 'process_name' in extra_data else None
         if target_hwnd == 0 and process_name:
             target_hwnd = win32gui.FindWindow(process_name) # find the process handle, 0 if not found
@@ -714,7 +710,8 @@ def send_key_down(key, is_local : bool, is_remote : bool, client_list = None, ta
                 syslog.info(f"SENDKEY DOWN vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
             # win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0) # keybd_event is deprecated by win32
     if is_remote:
-        if verbose: syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
+        if verbose:
+            syslog.info(f"OUTPUT: (remote) keydown {key.debug_name}")
         gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, client_list, extra_data = extra_data)
 
 
@@ -727,7 +724,6 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, targ
     """
 
     import gremlin.macro
-    import gremlin.process
 
     key: gremlin.keyboard.Key
     config = gremlin.config.Configuration()
@@ -744,7 +740,8 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, targ
 
 
     if is_local:
-        if verbose: syslog.info(f"OUTPUT: (local) keyup {key.debug_name}")
+        if verbose:
+            syslog.info(f"OUTPUT: (local) keyup {key.debug_name}")
         process_name = extra_data['process_name'] if extra_data and 'process_name' in extra_data else None
         if target_hwnd == 0 and process_name:
             target_hwnd = win32gui.FindWindow(process_name) # find the process handle, 0 if not found
@@ -779,7 +776,8 @@ def send_key_up(key, is_local : bool, is_remote : bool, client_list = None, targ
                 syslog.info(f"SENDKEY UP vk: [{key.virtual_code:x}] scancode: [{key.scan_code}] flags: [{flags:x}]")
             #win32api.keybd_event(key.virtual_code, key.scan_code, flags, 0) # keybd_event is deprecated by win32
     if is_remote:
-        if verbose: syslog.info(f"OUTPUT: (remote) keyup {key.debug_name}")
+        if verbose:
+            syslog.info(f"OUTPUT: (remote) keyup {key.debug_name}")
         gremlin.remote.remote_client.send_key(key.virtual_code, key.scan_code, flags, client_list, extra_data = extra_data)
 
 def mouse_from_name(name):
@@ -1124,11 +1122,11 @@ class KeyMap:
             return # already registered (by special mapping)
 
         if key.virtual_code > 0:
-            if not key.virtual_code in KeyMap._g_virtual_code_to_key:
+            if key.virtual_code not in KeyMap._g_virtual_code_to_key:
                 KeyMap._g_virtual_code_to_key[key.virtual_code] = key
 
         index = (key.scan_code, key.is_extended)
-        if not index in KeyMap._g_scan_code_to_key.keys():
+        if index not in KeyMap._g_scan_code_to_key.keys():
             KeyMap._g_scan_code_to_key[index] = key
             if key.name:
                 name = key.lookup_name.lower().replace(" ", "")
@@ -1143,7 +1141,7 @@ class KeyMap:
         lookup = (scan_code, is_extended)
         if lookup in KeyMap._g_map:
             return KeyMap._g_map[lookup].duplicate()
-        if not lookup in KeyMap._g_scan_code_to_key.keys():
+        if lookup not in KeyMap._g_scan_code_to_key.keys():
             # see if we can add it
             key = KeyMap.get_key(scan_code, is_extended)
             if key:
@@ -1736,7 +1734,7 @@ for enum_code_value in scan_codes:
     is_extended = False
     if code_value << 8 & 0xE0 or code_value << 8 & 0xE1:
         is_extended = True
-    if not (scan_code, is_extended) in KeyMap._g_scan_code_to_key:
+    if (scan_code, is_extended) not in KeyMap._g_scan_code_to_key:
         virtual_code = KeyMap.scan_code_to_virtual_code(scan_code, is_extended)
         if virtual_code > 0:
             # only store keys that have a virtual key code

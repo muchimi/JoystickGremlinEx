@@ -17,22 +17,20 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 
-import copy
 import logging
 import threading
 import time
 from lxml import etree as ElementTree
 from gremlin.input_types import InputType
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtWidgets
 
 
 import gremlin
 import gremlin.config
 import gremlin.ui.ui_common
-import gremlin.event_handler
 
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
-from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget
+from gremlin.util import safe_format, safe_read, write_guid
 from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
@@ -180,36 +178,32 @@ class RepeatContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            if self.profile_data.action_sets[0] is None:
-                self.profile_data.action_sets[0] = []
-            self.profile_data.action_sets[0].append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        if self.profile_data.action_sets[0] is None:
+            self.profile_data.action_sets[0] = []
+        self.profile_data.action_sets[0].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
+        
 
     def _paste_action(self, action, container):
         """Adds a new action to the container.
 
         :param action_name the name of the action to add
         """
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.profile_data)
-            if self.profile_data.action_sets[0] is None:
-                self.profile_data.action_sets[0] = []
-            self.profile_data.action_sets[0].append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-            if Shiboken.isValid(self):
-                self.container_modified.emit()        
-        finally:
-            gremlin.util.popCursor()
+        
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.profile_data)
+        if self.profile_data.action_sets[0] is None:
+            self.profile_data.action_sets[0] = []
+        self.profile_data.action_sets[0].append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
+        if Shiboken.isValid(self):
+            self.container_modified.emit()        
+        
 
     def _delay_changed_cb(self, value):
         self.profile_data.delay = value / 1000 # in seconds
@@ -247,7 +241,7 @@ class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     """Executes the contents of the associated Repeat container."""
 
-    def __init__(self, action_data : RepeatContainer, parent = None):
+    def __init__(self, action_data : RepeatContainer, parent = None):  # noqa: F821
         super().__init__(action_data, parent)
         self.pulse_worker_map = {}  # map of (device_id, input_id) to pulse worker object
         self.action_data : RepeatContainer = action_data
@@ -276,26 +270,30 @@ class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
     def pulse_start(self, args, duration : float, interval : float):
         ''' pulse setup '''
-        if self.verbose: syslog.info(f"Pulse START repeat container [{self.id}] duration: {duration:0.3f} interval: {interval:0.3f}")
+        if self.verbose:
+            syslog.info(f"Pulse START repeat container [{self.id}] duration: {duration:0.3f} interval: {interval:0.3f}")
         key = self.id
         worker : gremlin.repeater.PulseWorker 
         if key in self.pulse_worker_map:
             worker = self.pulse_worker_map[key]
             if worker.is_running:
                 # worker already running - ignore pulse request
-                if self.verbose: syslog.info(f"\talready pulsing - ignored")
+                if self.verbose:
+                    syslog.info("\talready pulsing - ignored")
                 return
         else:
             count = self._repeat_count
             worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data = args, count = count)
             self.pulse_worker_map[key] = worker
 
-        if self.verbose: syslog.info(f"\tactivate")
+        if self.verbose:
+            syslog.info("\tactivate")
         worker.start()
 
     def pulse_stop(self):
         ''' request a pulse abort '''
-        if self.verbose: syslog.info(f"Pulse STOP repeat container [{self.id}]")
+        if self.verbose:
+            syslog.info(f"Pulse STOP repeat container [{self.id}]")
         key = self.id
         if key in self.pulse_worker_map:
             worker : gremlin.repeater.PulseWorker = self.pulse_worker_map[key]
@@ -367,7 +365,8 @@ class RepeatContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
             delay = self.action_data.initial_pulse_delay
 
-            if verbose: syslog.info("Repeat: initial press")
+            if verbose:
+                syslog.info("Repeat: initial press")
 
             # create a fake button press from the source input 
             self._press_event = event.fake_button()
@@ -483,7 +482,7 @@ class RepeatContainer(AbstractContainer):
         node.set("repeat-count", safe_format(self.repeat_count, int))
 
         as_node = ElementTree.Element("action-set")
-        as_node.set("id", write_guid(action_sets[0].id))
+        as_node.set("id", write_guid(self.action_sets[0].id))
         for action in self.action_sets[0]:
             as_node.append(action.to_xml())
         node.append(as_node)
@@ -498,7 +497,7 @@ class RepeatContainer(AbstractContainer):
     
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
 
         table = ReportTable(cellpadding=4)
         

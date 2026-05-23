@@ -18,7 +18,6 @@
 import sys
 sys.path.append(".")
 
-import os
 import pytest
 import uuid
 from lxml import etree as ElementTree

@@ -19,21 +19,19 @@ from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets
 
-import dinput
 
 import gremlin
 import gremlin.ui.ui_common
 from gremlin.input_types import InputType
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSet
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget
 from gremlin.base_profile import AbstractTriggerFunctor
 import gremlin.base_classes
 import gremlin.execution_graph
-import gremlin.config
-from gremlin.util import safe_format, safe_read, write_guid, get_guid, read_guid
+from gremlin.util import safe_format, safe_read, write_guid
 import logging
 from shiboken6 import Shiboken
 import vjoy.vjoy
-from PySide6 import QtCore, QtGui, QtWidgets, QtMultimedia
+from PySide6 import QtCore
 
 syslog = logging.getLogger("system")
 
@@ -200,41 +198,30 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         if action is None:
             return
         
-        gremlin.util.pushCursor()
+        if isinstance(action, str):
+            action_name = action
+            plugin_manager = gremlin.plugin_manager.ActionPlugins()
+            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        elif isinstance(action, Clipboard):
+            # paste operation
+            if action.is_action:
+                # verify the action in the clipboard is appropriate for this input
 
-        try:
+                action_item = plugin_manager.duplicate(action.data, self.profile_data)
 
-            if isinstance(action, str):
-                action_name = action
-                plugin_manager = gremlin.plugin_manager.ActionPlugins()
-                action_item = plugin_manager.get_class(action_name)(self.profile_data)
-            elif isinstance(action, Clipboard):
-                # paste operation
-                if action.is_action:
-                    # verify the action in the clipboard is appropriate for this input
-
-                    action_item = plugin_manager.duplicate(action.data, self.profile_data)
-
-            self.profile_data.add_action(action_item, index)
-            if Shiboken.isValid(self):
-                self.container_modified.emit()
-        finally:
-            gremlin.util.popCursor()
+        self.profile_data.add_action(action_item, index)
+        if Shiboken.isValid(self):
+            self.container_modified.emit()
 
 
     def _paste_action(self, direction, action):
         ''' paste action'''
 
-        gremlin.util.pushCursor()
-        try:
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.duplicate(action, self.profile_data)
-            action_set = self.profile_data.getActionSet(direction)
-            action_set.append(action_item)
-            self.profile_data.create_or_delete_virtual_button()
-        finally:
-            gremlin.util.popCursor()
-
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        action_item = plugin_manager.duplicate(action, self.profile_data)
+        action_set = self.profile_data.getActionSet(direction)
+        action_set.append(action_item)
+        self.profile_data.create_or_delete_virtual_button()
 
 
     def _handle_interaction(self, widget, action):
@@ -320,7 +307,7 @@ class HatButtonsContainerFunctor(AbstractTriggerFunctor):
         for action_set in action_sets:
             #nodes = [node for node in self.action_nodes if node.id ]
             direction = action_set.data
-            if not direction in self.action_set_lookup:
+            if direction not in self.action_set_lookup:
                 self.action_set_lookup[direction] = []
             for action in action_set:
                 action_node = [node for node in self.action_set_nodes if node.containsActionId(action.id)]
@@ -436,7 +423,7 @@ class HatButtonsContainer(AbstractContainer):
             if not position:
                 syslog.error(f"HATBUTTONCONTAINER: invalid position: {position} found.")
                 return None
-        if not position in self.action_set_position_map:
+        if position not in self.action_set_position_map:
             self.action_set_position_map[position] = gremlin.base_classes.DataList(position)
         return self.action_set_position_map[position]
     

@@ -322,7 +322,7 @@ def raw_input_wnd_proc(hwnd, msg, wparam, lparam):
 def registerHook(callback):
     ''' registers a raw mouse input callback hook '''
     global _raw_input_hooked, _raw_input_hwnd, _raw_input_thread, _raw_input_running, _raw_input_callbacks
-    if callback and not callback in _raw_input_callbacks:
+    if callback and callback not in _raw_input_callbacks:
         _raw_input_callbacks.append(callback)
 
     if not _raw_input_callbacks:
@@ -334,7 +334,8 @@ def registerHook(callback):
         return
     
     verbose = gremlin.config.Configuration().verbose_mode_remote
-    if verbose: syslog.info("KVM: start")
+    if verbose:
+        syslog.info("KVM: start")
     
     # start the message loop if not started
     _raw_input_hooked = True
@@ -394,7 +395,8 @@ def rawInputShutdown():
         win32api.PostThreadMessage(_raw_input_thread_id, win32con.WM_QUIT, 0, 0)
         # # win32gui.DestroyWindow(_raw_input_hwnd)
         verbose = gremlin.config.Configuration().verbose_mode_remote
-        if verbose: syslog.info("KVM: shutdown")
+        if verbose:
+            syslog.info("KVM: shutdown")
 
         # wait for the dispatch to finish
         if _raw_input_thread.is_alive():

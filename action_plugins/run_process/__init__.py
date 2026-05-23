@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,23 +20,20 @@ import os
 from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
 import gremlin.base_profile
-import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.ui.dialogs
 import gremlin.input_item
 import gremlin.ui.ui_common
 import gremlin.util
-from gremlin.util import safe_read, safe_format
+from gremlin.util import safe_read
 import subprocess
 import logging
-import psygnal
-from psygnal import Signal
 from shiboken6 import Shiboken
+
 syslog = logging.getLogger("system")
 
 
 class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
-
     """Widget which allows the configuration of TTS actions."""
 
     def __init__(self, action_data, parent=None):
@@ -46,9 +43,10 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
     def _create_ui(self):
         if not Shiboken.isValid(self):
             return
-        
-        
-        self.process_widget = gremlin.ui.ui_common.QPathLineItem("Process:",self.action_data.process, self.action_data)
+
+        self.process_widget = gremlin.ui.ui_common.QPathLineItem(
+            "Process:", self.action_data.process, self.action_data
+        )
         self.process_widget.pathChanged.connect(self._process_changed_cb)
         self.process_widget.open.connect(self._process_open_cb)
         self.process_widget.installEventFilter(self)
@@ -58,44 +56,47 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
         self.args_widget.textChanged.connect(self._args_changed_cb)
         self.args_widget.installEventFilter(self)
 
-
-      
         self.run_widget = QtWidgets.QPushButton("Test")
-        self.run_widget.setIcon(gremlin.util.load_icon("ei.play",qta_color = gremlin.ui.ui_common.Color.activeColor()))
+        self.run_widget.setIcon(
+            gremlin.util.load_icon(
+                "ei.play", qta_color=gremlin.ui.ui_common.Color.activeColor()
+            )
+        )
         self.run_widget.setToolTip("Runs the process")
         self.run_widget.clicked.connect(self._run_process)
 
         self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
         self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
-        self.chkb_exec_on_release.setToolTip("Execute the command on input release instead of input press")
+        self.chkb_exec_on_release.setToolTip(
+            "Execute the command on input release instead of input press"
+        )
         self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
 
-        
         self.options_container_widget = QtWidgets.QWidget()
-        self.options_container_widget.setContentsMargins(0,0,0,0)
-        self.options_container_layout = QtWidgets.QHBoxLayout(self.options_container_widget)
-        self.options_container_layout.setContentsMargins(0,0,0,0)
+        self.options_container_widget.setContentsMargins(0, 0, 0, 0)
+        self.options_container_layout = QtWidgets.QHBoxLayout(
+            self.options_container_widget
+        )
+        self.options_container_layout.setContentsMargins(0, 0, 0, 0)
 
-        
         self.args_by_line_widget = QtWidgets.QCheckBox("Argument per line")
         self.args_by_line_widget.setChecked(self.action_data.args_per_line)
-        self.args_by_line_widget.setToolTip("When enabled, each line in the argument list will be passed as a separate argument to the process")
+        self.args_by_line_widget.setToolTip(
+            "When enabled, each line in the argument list will be passed as a separate argument to the process"
+        )
         self.args_by_line_widget.clicked.connect(self._args_per_line_changed)
 
         self.options_container_layout.addWidget(QtWidgets.QLabel("Arguments:"))
         self.options_container_layout.addStretch()
         self.options_container_layout.addWidget(self.args_by_line_widget)
-        
 
         self.container_widget = QtWidgets.QWidget()
         self.container_layout = QtWidgets.QHBoxLayout(self.container_widget)
-        
 
         self.container_layout.addWidget(self.run_widget)
         self.container_layout.addWidget(self.chkb_exec_on_release)
 
         self.container_layout.addStretch()
-
 
         self.main_layout.addWidget(self.process_widget)
         self.main_layout.addWidget(self.options_container_widget)
@@ -105,7 +106,7 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
         self._update_ui()
 
     def _process_open_cb(self, widget):
-        ''' opens the process executable '''
+        """opens the process executable"""
         fname = widget.data.process
         self.executable_dialog = gremlin.ui.dialogs.ProcessWindow(fname)
         self.executable_dialog.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -114,7 +115,9 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
         self.executable_dialog.show()
 
     def _select_executable(self, widget, fname):
-        gremlin.util.InvokeUiMethod(self._select_executable_ui, widget, fname) # ensure on UI thread
+        gremlin.util.InvokeUiMethod(
+            self._select_executable_ui, widget, fname
+        )  # ensure on UI thread
 
     def _select_executable_ui(self, widget, fname):
         """Adds the provided executable to the list of configurations.
@@ -127,16 +130,16 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
             widget.setText(fname)
         self.action_data.process = fname
         self._update_ui()
-        
+
     @QtCore.Slot(bool)
-    def _args_per_line_changed(self, checked : bool):
+    def _args_per_line_changed(self, checked: bool):
         self.action_data.args_per_line = checked
 
-    def _exec_on_release_changed(self, checked : bool):
+    def _exec_on_release_changed(self, checked: bool):
         self.action_data.exec_on_release = checked
 
     @QtCore.Slot(object, str)
-    def _process_changed_cb(self, widget, text : str):
+    def _process_changed_cb(self, widget, text: str):
         self.action_data.process = text
         self._update_ui()
 
@@ -148,12 +151,12 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
             elif widget == self.process_widget:
                 self._update_ui()
         return False
-    
+
     def _update_ui(self):
         text = self.process_widget.text()
-        if "\"" or "\\" in text:
+        if '"' or "\\" in text:
             # convert windows format to python format
-            text = text.replace("\"","").replace("\\","/")
+            text = text.replace('"', "").replace("\\", "/")
             with QtCore.QSignalBlocker(self.process_widget):
                 self.process_widget.setText(text)
             self.action_data.process = text
@@ -164,11 +167,8 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
     def _args_changed_cb(self):
         self.action_data.arguments = self.args_widget.toPlainText()
 
-
     def _populate_ui(self):
         pass
-
-
 
     @QtCore.Slot()
     def _run_process(self):
@@ -176,15 +176,11 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
 
 
 class RunProcessFunctor(gremlin.base_profile.AbstractFunctor):
-    
-    
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
         self.action_data = action
 
-    
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         execute = False
         if self.action_data.exec_on_release and not event.is_pressed:
             execute = True
@@ -193,13 +189,10 @@ class RunProcessFunctor(gremlin.base_profile.AbstractFunctor):
         if execute:
             self.action_data.execute()
 
-            
         return True
-        
 
 
 class RunProcess(gremlin.base_profile.AbstractAction):
-
     """Action representing a single TTS entry."""
 
     name = "Run Process"
@@ -216,8 +209,8 @@ class RunProcess(gremlin.base_profile.AbstractAction):
     #     InputType.Keyboard
     # ]
     input_types = [
-         InputType.JoystickButton,
-         InputType.JoystickHat,
+        InputType.JoystickButton,
+        InputType.JoystickHat,
     ]
 
     functor = RunProcessFunctor
@@ -226,33 +219,28 @@ class RunProcess(gremlin.base_profile.AbstractAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.process = "" # process to run
-        self.arguments = "" # args to send
-        self.args_per_line = True # one arg per line
-        self.exec_on_release = False # exec on release vs press
-
+        self.process = ""  # process to run
+        self.arguments = ""  # args to send
+        self.args_per_line = True  # one arg per line
+        self.exec_on_release = False  # exec on release vs press
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
-        return f"Run Process: [{self.process}]  Args: [{self.arguments}]" 
+        """returns a display string for the current configuration"""
+        return f"Run Process: [{self.process}]  Args: [{self.arguments}]"
 
     def icon(self):
         return "fa6s.bolt"
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         if "process" in node.attrib:
             self.process = node.get("process")
         if "args" in node.attrib:
             self.arguments = node.get("args")
-        self.args_per_line = safe_read(node,"line_per_arg",bool, True)
-        self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
-            
+        self.args_per_line = safe_read(node, "line_per_arg", bool, True)
+        self.exec_on_release = safe_read(node, "exec_on_release", bool, False)
 
     def _generate_xml(self):
         node = ElementTree.Element(self.tag)
@@ -264,9 +252,9 @@ class RunProcess(gremlin.base_profile.AbstractAction):
 
     def _is_valid(self):
         return len(self.process) and os.path.isfile(self.process)
-    
+
     def execute(self):
-        ''' executes the process '''
+        """executes the process"""
         try:
             if self.args_per_line:
                 args = self.arguments.splitlines()
@@ -274,7 +262,9 @@ class RunProcess(gremlin.base_profile.AbstractAction):
                 args = self.arguments
             cmd_list = [self.process]
             cmd_list.extend(arg for arg in args)
-            process = subprocess.Popen(cmd_list,stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = subprocess.Popen(
+                cmd_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
             out, err = process.communicate()
             syslog.info(f"PROC: execute process: {self.process} {args}")
             if out:
@@ -282,22 +272,24 @@ class RunProcess(gremlin.base_profile.AbstractAction):
             if err:
                 syslog.warning(f"\terror: {err.decode()}")
 
-        except:
+        except Exception:
             pass
 
     def to_html(self) -> str:
-        ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        """returns reporting graphviz data for this action"""
+        from gremlin.reporting import ReportTable
         import html
-        table = ReportTable(cellpadding=4)    
+
+        table = ReportTable(cellpadding=4)
         table.addField("Process", html.escape(self.process))
         for index, arg in self.arguments:
-            table.addField(f"Arg [{index+1}", html.escape(arg))
+            table.addField(f"Arg [{index + 1}", html.escape(arg))
 
         if self.exec_on_release:
-            table.addField("Exec on release","Yes")
-            
+            table.addField("Exec on release", "Yes")
+
         return table.to_html()
+
 
 version = 1
 name = "run-process"

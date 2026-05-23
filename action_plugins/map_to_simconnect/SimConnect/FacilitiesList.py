@@ -19,7 +19,7 @@ class FacilitiesHelper:
 	def subscribe(self, _cbfunc):
 		if self.item < SIMCONNECT_FACILITY_LIST_TYPE.SIMCONNECT_FACILITY_LIST_TYPE_COUNT:
 			self.cb = _cbfunc
-			hr = self.sm.dll.SubscribeToFacilities(
+			_hr = self.sm.dll.SubscribeToFacilities(
 				self.sm.hSimConnect,
 				SIMCONNECT_FACILITY_LIST_TYPE(self.item),
 				self.REQUEST_ID.value
@@ -27,7 +27,7 @@ class FacilitiesHelper:
 
 	def unsubscribe(self):
 		self.cb = None
-		hr = self.sm.dll.UnsubscribeToFacilities(
+		_hr = self.sm.dll.UnsubscribeToFacilities(
 			self.sm.hSimConnect,
 			SIMCONNECT_FACILITY_LIST_TYPE(self.item)
 		)
@@ -35,7 +35,7 @@ class FacilitiesHelper:
 	def get(self):
 		# Get the current cached list of airports, waypoints, etc, as the item indicates
 		if self.item < SIMCONNECT_FACILITY_LIST_TYPE.SIMCONNECT_FACILITY_LIST_TYPE_COUNT:
-			hr = self.sm.dll.RequestFacilitiesList(
+			_hr = self.sm.dll.RequestFacilitiesList(
 				self.sm.hSimConnect,
 				SIMCONNECT_FACILITY_LIST_TYPE(self.item),
 				self.REQUEST_ID.value

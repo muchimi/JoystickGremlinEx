@@ -21,8 +21,6 @@
 from typing import Any, Dict, Optional
 
 from PySide6 import QtCore, QtQml
-import psygnal
-from psygnal import Signal
 
 import gremlin.config
 from gremlin.types import PropertyType

@@ -17,8 +17,6 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 import logging
-import math
-import os
 from lxml import etree as ElementTree
 import sys
 
@@ -31,18 +29,12 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
 import gremlin.shared_state
-from gremlin.types import MouseButton
-from gremlin.profile import read_bool, safe_read, safe_format
+from gremlin.profile import safe_read, safe_format
 import gremlin.util
 import gremlin.ui.ui_common
 import gremlin.input_item
-import gremlin.sendinput
-from gremlin import input_devices
-import gremlin.ui.osc_device
-from gremlin.ui.osc_device import OscInterface, OscClient
-import psygnal
+from gremlin.ui.osc_device import OscInterface
 from psygnal import Signal
-import logging
 from shiboken6 import Shiboken
 import html
 
@@ -274,7 +266,7 @@ class OscArg(QtCore.QObject):
             if "value-press" in node.attrib:
                 value_press = safe_read(node,"value-press", str, '')
         elif node_type == "float":
-            value = safe_read(node, "value", float, 1.0)
+            _value = safe_read(node, "value", float, 1.0)
             if "value-release" in node.attrib:
                 value_release = safe_read(node,"value-release", float, 0)
             if "value" in node.attrib:
@@ -283,7 +275,7 @@ class OscArg(QtCore.QObject):
                 value_press = safe_read(node,"value-press", float, 1.0)
             is_number = True
         elif node_type == "int":
-            value = safe_read(node, "value", int, 1)
+            _value = safe_read(node, "value", int, 1)
             if "value-release" in node.attrib:
                 value_release = safe_read(node,"value-release", int, 0)
             if "value" in node.attrib:
@@ -293,7 +285,7 @@ class OscArg(QtCore.QObject):
 
             is_number = True
         elif node_type == "bool":
-            value = safe_read(node, "value", bool, True)
+            _value = safe_read(node, "value", bool, True)
             if "value-release" in node.attrib:
                 value_release = safe_read(node,"value-release", bool, False)
             if "value" in node.attrib:
@@ -1217,7 +1209,7 @@ class MapToOscExWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _reset_server(self):
         ''' reset IP and port to configured defaults '''
-        result = gremlin.ui.ui_common.ConfirmBox(f"Reset server data to defaults?")
+        result = gremlin.ui.ui_common.ConfirmBox("Reset server data to defaults?")
         if result:
             config = gremlin.config.Configuration()
             self._server_ip_widget.setText(config.osc_host) # also updates action_data
@@ -1236,7 +1228,7 @@ class MapToOscExWidget(gremlin.input_item.AbstractActionWidget):
     def _clear_args(self):
         ''' removes all args '''
         if self.action_data.args:
-            result = gremlin.ui.ui_common.ConfirmBox(f"Remove arguments?")
+            result = gremlin.ui.ui_common.ConfirmBox("Remove arguments?")
             if result:
                 self.action_data.args.clear()
                 self._update()
@@ -1365,7 +1357,7 @@ class MapToOscExFunctor(gremlin.base_profile.AbstractFunctor):
                 if arg_device_id == device_id and input_id == arg_input_id:
                     continue
                 latch_pair = (arg_device_id, InputType.JoystickAxis, arg_input_id)
-                if not latch_pair in latched_list:
+                if latch_pair not in latched_list:
                     latched_list.append(latch_pair)
 
         return latched_list
@@ -1767,7 +1759,7 @@ class MapToOscEx(gremlin.base_profile.AbstractAction):
     
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
 
         table = ReportTable(cellpadding=4)
         table.addField("Message", html.escape(self.command))

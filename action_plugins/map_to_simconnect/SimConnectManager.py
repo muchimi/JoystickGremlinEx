@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,50 +20,53 @@ import os
 import shutil
 from lxml import etree
 import traceback
-from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6 import QtCore
 
 
 from .SimConnect import *
 from .SimConnect.SimConnect import *
 from .SimConnect.Enum import *
-#from .SimConnect.MobiFlight import *
+
+# from .SimConnect.MobiFlight import *
 from .SimConnect.SimConnectBridge import *
 from gremlin.singleton_decorator import SingletonDecorator
 import enum
 import time
 import threading
-import psygnal
 from psygnal import Signal
 
 
 syslog = logging.getLogger("system")
 
+
 class DataThreadingEvent(threading.Event):
-    ''' a threading event that can support a data value'''
+    """a threading event that can support a data value"""
+
     def __init__(self):
         super().__init__()
         self.data = None
 
 
 class SimconnectCommand(enum.IntEnum):
-    ''' internal commands '''
-    SyncAircraftMode = auto() # synchronizes the profile mode with the current aircraft 
+    """internal commands"""
+
+    SyncAircraftMode = auto()  # synchronizes the profile mode with the current aircraft
 
     @staticmethod
     def to_enum(value):
         return _simconnect_command_to_enum[value]
-    
+
     @staticmethod
     def to_string(value):
         return _simconnect_command_to_string[value]
-    
+
     @staticmethod
     def to_display_name(value):
         return _simconnect_command_description[value]
-   
+
 
 _simconnect_command_to_enum = {
-    "sync_aicraft" : SimconnectCommand.SyncAircraftMode,
+    "sync_aicraft": SimconnectCommand.SyncAircraftMode,
 }
 
 _simconnect_command_description = {
@@ -75,104 +78,107 @@ _simconnect_command_to_string = {
 }
 
 
-''' full axis range commands -16883 to + 16383 '''
+""" full axis range commands -16883 to + 16383 """
 _simconnect_full_range = [
-                        "AXIS_THROTTLE_SET",
-                        "AXIS_THROTTLE1_SET",
-                        "AXIS_THROTTLE2_SET",
-                        "AXIS_THROTTLE3_SET",
-                        "AXIS_THROTTLE4_SET",
-                        "AXIS_LEFT_BRAKE_SET",
-                        "AXIS_RIGHT_BRAKE_SET",
-                        "AXIS_MIXTURE_SET",
-                        "AXIS_MIXTURE1_SET",
-                        "AXIS_MIXTURE2_SET",
-                        "AXIS_MIXTURE3_SET",
-                        "AXIS_MIXTURE4_SET",
-                        "AXIS_PROPELLER_SET",
-                        "AXIS_PROPELLER1_SET",
-                        "AXIS_PROPELLER2_SET",
-                        "AXIS_PROPELLER3_SET",
-                        "AXIS_PROPELLER4_SET",
-                        "AXIS_ELEVATOR_SET",
-                        "AXIS_AILERONS_SET",
-                        "AXIS_RUDDER_SET",
-                        "AXIS_ELEV_TRIM_SET",
-                        "AXIS_SPOILER_SET",
-                        "AXIS_FLAPS_SET",
-                        "AXIS_SLEW_AHEAD_SET",
-                        "AXIS_SLEW_SIDEWAYS_SET",
-                        "AXIS_SLEW_HEADING_SET",
-                        "AXIS_SLEW_ALT_SET",
-                        "AXIS_SLEW_BANK_SET",
-                        "AXIS_SLEW_PITCH_SET",
-                        "AXIS_PAN_PITCH",
-                        "AXIS_PAN_HEADING",
-                        "AXIS_PAN_TILT",
+    "AXIS_THROTTLE_SET",
+    "AXIS_THROTTLE1_SET",
+    "AXIS_THROTTLE2_SET",
+    "AXIS_THROTTLE3_SET",
+    "AXIS_THROTTLE4_SET",
+    "AXIS_LEFT_BRAKE_SET",
+    "AXIS_RIGHT_BRAKE_SET",
+    "AXIS_MIXTURE_SET",
+    "AXIS_MIXTURE1_SET",
+    "AXIS_MIXTURE2_SET",
+    "AXIS_MIXTURE3_SET",
+    "AXIS_MIXTURE4_SET",
+    "AXIS_PROPELLER_SET",
+    "AXIS_PROPELLER1_SET",
+    "AXIS_PROPELLER2_SET",
+    "AXIS_PROPELLER3_SET",
+    "AXIS_PROPELLER4_SET",
+    "AXIS_ELEVATOR_SET",
+    "AXIS_AILERONS_SET",
+    "AXIS_RUDDER_SET",
+    "AXIS_ELEV_TRIM_SET",
+    "AXIS_SPOILER_SET",
+    "AXIS_FLAPS_SET",
+    "AXIS_SLEW_AHEAD_SET",
+    "AXIS_SLEW_SIDEWAYS_SET",
+    "AXIS_SLEW_HEADING_SET",
+    "AXIS_SLEW_ALT_SET",
+    "AXIS_SLEW_BANK_SET",
+    "AXIS_SLEW_PITCH_SET",
+    "AXIS_PAN_PITCH",
+    "AXIS_PAN_HEADING",
+    "AXIS_PAN_TILT",
 ]
 
-''' half axis range commands 0..16384'''
-_simconnect_half_range = ["THROTTLE1_SET",
-                      "THROTTLE2_SET",
-                      "THROTTLE3_SET",
-                      "THROTTLE4_SET",
-                      "AXIS_THROTTLE_SET",
-                      "THROTTLE_SET",
-                      "MIXTURE1_SET",
-                      "MIXTURE2_SET",
-                      "MIXTURE3_SET",
-                      "MIXTURE4_SET",
-                      "PROP_PITCH1_SET",
-                      "PROP_PITCH2_SET",
-                      "PROP_PITCH3_SET",
-                      "PROP_PITCH4_SET",
-                      "SPOILERS_SET",
-                      "FLAPS_SET",
-                      "ELEVATOR_TRIM_SET",
-                      ]
-
-''' angle range commands 0..360'''
-_simconnect_angle_range = ["VOR1_SET",
-                           "VOR2_SET",
-                           "ADF_CARD_SET",
-                           "KEY_TUG_HEADING",
-                           ]
-
-''' EGT range comamnds 0..32767 '''
-_simconnect_egt_range = ["EGT1_SET",
-                         "EGT2_SET",
-                         "EGT3_SET",
-                         "EGT4_SET",
-                         "EGT_SET"
+""" half axis range commands 0..16384"""
+_simconnect_half_range = [
+    "THROTTLE1_SET",
+    "THROTTLE2_SET",
+    "THROTTLE3_SET",
+    "THROTTLE4_SET",
+    "AXIS_THROTTLE_SET",
+    "THROTTLE_SET",
+    "MIXTURE1_SET",
+    "MIXTURE2_SET",
+    "MIXTURE3_SET",
+    "MIXTURE4_SET",
+    "PROP_PITCH1_SET",
+    "PROP_PITCH2_SET",
+    "PROP_PITCH3_SET",
+    "PROP_PITCH4_SET",
+    "SPOILERS_SET",
+    "FLAPS_SET",
+    "ELEVATOR_TRIM_SET",
 ]
+
+""" angle range commands 0..360"""
+_simconnect_angle_range = [
+    "VOR1_SET",
+    "VOR2_SET",
+    "ADF_CARD_SET",
+    "KEY_TUG_HEADING",
+]
+
+""" EGT range comamnds 0..32767 """
+_simconnect_egt_range = ["EGT1_SET", "EGT2_SET", "EGT3_SET", "EGT4_SET", "EGT_SET"]
+
 
 class SimConnectActionMode(enum.Enum):
-    ''' simconnect action output mode  '''
-    NotSet = 0,
-    Ranged = 1, # output varies with input axis
-    Trigger = 2, # output is a trigger (no value sent)
-    SetValue = 3, # output sets a number value
-    Gated = 4, # output of axis is gated - the position of the axis is not linear
-    GetValue = 4, # gets a value from simconnect
+    """simconnect action output mode"""
+
+    NotSet = (0,)
+    Ranged = (1,)  # output varies with input axis
+    Trigger = (2,)  # output is a trigger (no value sent)
+    SetValue = (3,)  # output sets a number value
+    Gated = (4,)  # output of axis is gated - the position of the axis is not linear
+    GetValue = (4,)  # gets a value from simconnect
 
     @staticmethod
     def to_string(value):
         if value in _simconnect_action_mode_to_string_lookup.keys():
             return _simconnect_action_mode_to_string_lookup[value]
         return "none"
+
     @staticmethod
-    def to_enum(value, validate = True):
+    def to_enum(value, validate=True):
         if value is None or value.casefold() == "none":
             return SimConnectActionMode.NotSet
         if value in _simconnect_action_mode_to_enum_lookup.keys():
             return _simconnect_action_mode_to_enum_lookup[value]
         if validate:
-            raise gremlin.error.GremlinError(f"Invalid type in action mode lookup: {value}")
+            raise gremlin.error.GremlinError(
+                f"Invalid type in action mode lookup: {value}"
+            )
         return SimConnectActionMode.NotSet
 
     @staticmethod
     def to_display(value):
         return _simconnect_action_mode_to_display_lookup[value]
+
 
 _simconnect_action_mode_to_display_lookup = {
     SimConnectActionMode.NotSet: "N/A",
@@ -180,26 +186,29 @@ _simconnect_action_mode_to_display_lookup = {
     SimConnectActionMode.Ranged: "Ranged",
     SimConnectActionMode.Trigger: "Trigger",
     SimConnectActionMode.SetValue: "SetValue",
-    SimConnectActionMode.GetValue: "GetValue"
+    SimConnectActionMode.GetValue: "GetValue",
 }
 
+
 class SimConnectTriggerMode(enum.Enum):
-    ''' trigger modes for boolean actions '''
-    NotSet = 0 # not set
-    TurnOn = 1 # enable or turn on
-    TurnOff = 2 # disable or turn off
-    Toggle = 3 # toggle
-    NoOp = 4 # send nothing (trigger command only)
-    InputValue = 5 # send value as the parameter (used for buttons)
-    Pulse = 6 # pulse the command
+    """trigger modes for boolean actions"""
+
+    NotSet = 0  # not set
+    TurnOn = 1  # enable or turn on
+    TurnOff = 2  # disable or turn off
+    Toggle = 3  # toggle
+    NoOp = 4  # send nothing (trigger command only)
+    InputValue = 5  # send value as the parameter (used for buttons)
+    Pulse = 6  # pulse the command
 
     @staticmethod
     def to_string(value):
         if value in _trigger_mode_to_string.keys():
             return _trigger_mode_to_string[value]
         return "none"
+
     @staticmethod
-    def to_enum(value, validate = True):
+    def to_enum(value, validate=True):
         if value in _trigger_mode_to_enum.keys():
             return _trigger_mode_to_enum[value]
         if validate:
@@ -210,122 +219,118 @@ class SimConnectTriggerMode(enum.Enum):
     def to_display(value):
         return _trigger_mode_to_display[value]
 
+
 _trigger_mode_to_string = {
-    SimConnectTriggerMode.NotSet : "none",
-    SimConnectTriggerMode.Toggle : "toggle",
-    SimConnectTriggerMode.TurnOff : "off",
-    SimConnectTriggerMode.TurnOn : "on",
+    SimConnectTriggerMode.NotSet: "none",
+    SimConnectTriggerMode.Toggle: "toggle",
+    SimConnectTriggerMode.TurnOff: "off",
+    SimConnectTriggerMode.TurnOn: "on",
     SimConnectTriggerMode.NoOp: "noop",
-    SimConnectTriggerMode.InputValue: "input_value"
+    SimConnectTriggerMode.InputValue: "input_value",
 }
 
 
 _trigger_mode_to_display = {
-    SimConnectTriggerMode.NotSet : "N/A",
-    SimConnectTriggerMode.Toggle : "Toggle",
-    SimConnectTriggerMode.TurnOff : "Off",
-    SimConnectTriggerMode.TurnOn : "On",
+    SimConnectTriggerMode.NotSet: "N/A",
+    SimConnectTriggerMode.Toggle: "Toggle",
+    SimConnectTriggerMode.TurnOff: "Off",
+    SimConnectTriggerMode.TurnOn: "On",
     SimConnectTriggerMode.NoOp: "NoOp",
-    SimConnectTriggerMode.InputValue: "Input Value"
-
+    SimConnectTriggerMode.InputValue: "Input Value",
 }
 
 _trigger_mode_to_enum = {
-    "none" : SimConnectTriggerMode.NotSet,
-    "toggle" : SimConnectTriggerMode.Toggle,
-    "off" : SimConnectTriggerMode.TurnOff,
-    "on" : SimConnectTriggerMode.TurnOn,
-    "noop" : SimConnectTriggerMode.NoOp,
-    "input_value": SimConnectTriggerMode.InputValue
+    "none": SimConnectTriggerMode.NotSet,
+    "toggle": SimConnectTriggerMode.Toggle,
+    "off": SimConnectTriggerMode.TurnOff,
+    "on": SimConnectTriggerMode.TurnOn,
+    "noop": SimConnectTriggerMode.NoOp,
+    "input_value": SimConnectTriggerMode.InputValue,
 }
-
 
 
 class SimConnectCommandType(enum.Enum):
     NotSet = 0
-    Event = 1 # request event
-    Request = 2 # request data
-    SimVar = 3 # set simvar
-    Calculator = 4 # RPN expression via the bridge
-    LVar = 5 # LVAR command via simconnect (floating point data only)
+    Event = 1  # request event
+    Request = 2  # request data
+    SimVar = 3  # set simvar
+    Calculator = 4  # RPN expression via the bridge
+    LVar = 5  # LVAR command via simconnect (floating point data only)
 
     @staticmethod
-    def to_string(value : SimConnectCommandType) -> str:
+    def to_string(value: SimConnectCommandType) -> str:
         if value in _command_type_to_string_map.keys():
             return _command_type_to_string_map[value]
         return None
+
     @staticmethod
-    def to_enum(value : str) -> SimConnectCommandType:
+    def to_enum(value: str) -> SimConnectCommandType:
         if value in _command_type_to_enum_map:
             return _command_type_to_enum_map[value]
         return None
 
-_command_type_to_string_map = {
-    SimConnectCommandType.NotSet : "notset", 
-    SimConnectCommandType.Event : "event",
-    SimConnectCommandType.Request: "request",
-    SimConnectCommandType.SimVar : "simvar",
-    SimConnectCommandType.Calculator: "rpn",
-    SimConnectCommandType.LVar : "lvar",
 
+_command_type_to_string_map = {
+    SimConnectCommandType.NotSet: "notset",
+    SimConnectCommandType.Event: "event",
+    SimConnectCommandType.Request: "request",
+    SimConnectCommandType.SimVar: "simvar",
+    SimConnectCommandType.Calculator: "rpn",
+    SimConnectCommandType.LVar: "lvar",
 }
 
 _command_type_to_enum_map = {
     "notset": SimConnectCommandType.NotSet,
     "event": SimConnectCommandType.Event,
-    "request" : SimConnectCommandType.Request,
+    "request": SimConnectCommandType.Request,
     "lvar": SimConnectCommandType.Calculator,
-    "rpn" : SimConnectCommandType.Calculator,
+    "rpn": SimConnectCommandType.Calculator,
     "avar": SimConnectCommandType.Calculator,
-    "simvar" : SimConnectCommandType.SimVar,
-    "lvar": SimConnectCommandType.LVar
+    "simvar": SimConnectCommandType.SimVar,
+    "lvar": SimConnectCommandType.LVar,
 }
-
-
-
-
-
-
 
 
 _simconnect_action_mode_to_string_lookup = {
-    SimConnectActionMode.NotSet : "none",
-    SimConnectActionMode.Ranged : "ranged",
-    SimConnectActionMode.Trigger : "trigger",
-    SimConnectActionMode.SetValue : "value",
-    SimConnectActionMode.Gated : "gated",
+    SimConnectActionMode.NotSet: "none",
+    SimConnectActionMode.Ranged: "ranged",
+    SimConnectActionMode.Trigger: "trigger",
+    SimConnectActionMode.SetValue: "value",
+    SimConnectActionMode.Gated: "gated",
 }
 
 _simconnect_action_mode_to_enum_lookup = {
-    "none" : SimConnectActionMode.NotSet,
-    "ranged" : SimConnectActionMode.Ranged,
-    "trigger" : SimConnectActionMode.Trigger,
-    "value" :SimConnectActionMode.SetValue ,
-    "gated" : SimConnectActionMode.Gated,
+    "none": SimConnectActionMode.NotSet,
+    "ranged": SimConnectActionMode.Ranged,
+    "trigger": SimConnectActionMode.Trigger,
+    "value": SimConnectActionMode.SetValue,
+    "gated": SimConnectActionMode.Gated,
 }
 
+
 class SimConnectEventCategory(enum.Enum):
-    ''' command categories for events '''
-    NotSet = 0,
-    Engine = 1,
-    FlightControls = 2,
-    AutoPilot = 3,
-    FuelSystem = 4,
-    FuelSelection = 5,
-    Instruments = 6,
-    Lights = 7,
-    Failures = 8,
-    MiscellaneousSystems = 9,
-    NoseWheelSteering = 10,
-    CabinPressure = 11,
-    Catapult = 12,
-    Helicopter = 13,
-    SlingsAndHoists = 14,
-    SlewSystem = 15,
-    ViewSystem = 16,
-    FreezingPosition = 17,
-    MissionKeys = 18,
-    ATC = 19,
+    """command categories for events"""
+
+    NotSet = (0,)
+    Engine = (1,)
+    FlightControls = (2,)
+    AutoPilot = (3,)
+    FuelSystem = (4,)
+    FuelSelection = (5,)
+    Instruments = (6,)
+    Lights = (7,)
+    Failures = (8,)
+    MiscellaneousSystems = (9,)
+    NoseWheelSteering = (10,)
+    CabinPressure = (11,)
+    Catapult = (12,)
+    Helicopter = (13,)
+    SlingsAndHoists = (14,)
+    SlewSystem = (15,)
+    ViewSystem = (16,)
+    FreezingPosition = (17,)
+    MissionKeys = (18,)
+    ATC = (19,)
     Multiplayer = 20
 
     @staticmethod
@@ -336,7 +341,7 @@ class SimConnectEventCategory(enum.Enum):
             raise gremlin.error.GremlinError(f"Invalid type in lookup: {value}")
 
     @staticmethod
-    def to_enum(value, validate = True):
+    def to_enum(value, validate=True):
         if value in _simconnect_event_category_to_enum_lookup.keys():
             return _simconnect_event_category_to_enum_lookup[value]
         if validate:
@@ -345,60 +350,63 @@ class SimConnectEventCategory(enum.Enum):
 
     @staticmethod
     def to_list():
-        ''' generates all categories as a list '''
+        """generates all categories as a list"""
         return [item for item in SimConnectEventCategory]
 
     @staticmethod
     def to_list_tuple():
-        return [(SimConnectEventCategory.to_string(item), item) for item in SimConnectEventCategory]
+        return [
+            (SimConnectEventCategory.to_string(item), item)
+            for item in SimConnectEventCategory
+        ]
 
 
 _simconnect_event_category_to_string_lookup = {
-    SimConnectEventCategory.NotSet : "None",
-    SimConnectEventCategory.Engine : "Engine",
-    SimConnectEventCategory.FlightControls : "Flight Controls",
-    SimConnectEventCategory.AutoPilot : "Autopilot",
-    SimConnectEventCategory.FuelSystem : "Fuel System",
-    SimConnectEventCategory.FuelSelection : "Fuel Selection",
-    SimConnectEventCategory.Instruments : "Instruments",
-    SimConnectEventCategory.Lights : "Lights",
+    SimConnectEventCategory.NotSet: "None",
+    SimConnectEventCategory.Engine: "Engine",
+    SimConnectEventCategory.FlightControls: "Flight Controls",
+    SimConnectEventCategory.AutoPilot: "Autopilot",
+    SimConnectEventCategory.FuelSystem: "Fuel System",
+    SimConnectEventCategory.FuelSelection: "Fuel Selection",
+    SimConnectEventCategory.Instruments: "Instruments",
+    SimConnectEventCategory.Lights: "Lights",
     SimConnectEventCategory.Failures: "Failures",
     SimConnectEventCategory.MiscellaneousSystems: "Miscellaneous Systems",
     SimConnectEventCategory.NoseWheelSteering: "Nosewheel Steering",
-    SimConnectEventCategory.CabinPressure : "Cabin Pressure",
-    SimConnectEventCategory.Catapult : "Catapult",
-    SimConnectEventCategory.Helicopter : "Helicopter",
-    SimConnectEventCategory.SlingsAndHoists : "Slings and Hoists",
-    SimConnectEventCategory.SlewSystem : "Slew System",
-    SimConnectEventCategory.ViewSystem : "View System",
-    SimConnectEventCategory.FreezingPosition : "Freezing Position",
-    SimConnectEventCategory.MissionKeys : "Mission Keys",
-    SimConnectEventCategory.ATC : "ATC",
-    SimConnectEventCategory.Multiplayer :"Multiplayer",
+    SimConnectEventCategory.CabinPressure: "Cabin Pressure",
+    SimConnectEventCategory.Catapult: "Catapult",
+    SimConnectEventCategory.Helicopter: "Helicopter",
+    SimConnectEventCategory.SlingsAndHoists: "Slings and Hoists",
+    SimConnectEventCategory.SlewSystem: "Slew System",
+    SimConnectEventCategory.ViewSystem: "View System",
+    SimConnectEventCategory.FreezingPosition: "Freezing Position",
+    SimConnectEventCategory.MissionKeys: "Mission Keys",
+    SimConnectEventCategory.ATC: "ATC",
+    SimConnectEventCategory.Multiplayer: "Multiplayer",
 }
 
 _simconnect_event_category_to_enum_lookup = {
-    "None" : SimConnectEventCategory.NotSet,
-    "Engine" :SimConnectEventCategory.Engine  ,
-    "Flight Controls" : SimConnectEventCategory.FlightControls,
-    "Autopilot" : SimConnectEventCategory.AutoPilot,
-    "Fuel System" : SimConnectEventCategory.FuelSystem,
-    "Fuel Selection" : SimConnectEventCategory.FuelSelection,
-    "Instruments" : SimConnectEventCategory.Instruments,
-    "Lights" : SimConnectEventCategory.Lights,
-    "Failures" : SimConnectEventCategory.Failures,
-    "Miscellaneous Systems" : SimConnectEventCategory.MiscellaneousSystems,
-    "Nosewheel Steering" : SimConnectEventCategory.NoseWheelSteering,
-    "Cabin Pressure" : SimConnectEventCategory.CabinPressure,
-    "Catapult" : SimConnectEventCategory.Catapult,
-    "Helicopter" : SimConnectEventCategory.Helicopter,
-    "Slings and Hoists" : SimConnectEventCategory.SlingsAndHoists,
-    "Slew System" : SimConnectEventCategory.SlewSystem,
-    "View System" : SimConnectEventCategory.ViewSystem,
-    "Freezing Position" : SimConnectEventCategory.FreezingPosition,
-    "Mission Keys" : SimConnectEventCategory.MissionKeys,
-    "ATC" : SimConnectEventCategory.ATC ,
-    "Multiplayer" : SimConnectEventCategory.Multiplayer
+    "None": SimConnectEventCategory.NotSet,
+    "Engine": SimConnectEventCategory.Engine,
+    "Flight Controls": SimConnectEventCategory.FlightControls,
+    "Autopilot": SimConnectEventCategory.AutoPilot,
+    "Fuel System": SimConnectEventCategory.FuelSystem,
+    "Fuel Selection": SimConnectEventCategory.FuelSelection,
+    "Instruments": SimConnectEventCategory.Instruments,
+    "Lights": SimConnectEventCategory.Lights,
+    "Failures": SimConnectEventCategory.Failures,
+    "Miscellaneous Systems": SimConnectEventCategory.MiscellaneousSystems,
+    "Nosewheel Steering": SimConnectEventCategory.NoseWheelSteering,
+    "Cabin Pressure": SimConnectEventCategory.CabinPressure,
+    "Catapult": SimConnectEventCategory.Catapult,
+    "Helicopter": SimConnectEventCategory.Helicopter,
+    "Slings and Hoists": SimConnectEventCategory.SlingsAndHoists,
+    "Slew System": SimConnectEventCategory.SlewSystem,
+    "View System": SimConnectEventCategory.ViewSystem,
+    "Freezing Position": SimConnectEventCategory.FreezingPosition,
+    "Mission Keys": SimConnectEventCategory.MissionKeys,
+    "ATC": SimConnectEventCategory.ATC,
+    "Multiplayer": SimConnectEventCategory.Multiplayer,
 }
 
 
@@ -417,7 +425,7 @@ _simconnect_event_category_to_enum_lookup = {
 #     feet = auto()
 #     yard = auto()
 #     miles = auto()
-#     # select temperature 
+#     # select temperature
 #     celcius = auto()
 #     fahrenheit = auto()
 #     # selected angle
@@ -430,64 +438,63 @@ _simconnect_event_category_to_enum_lookup = {
 #     mach = auto()
 
 
-
-
-
-
-
-
 @SingletonDecorator
 class SimConnectManager(QtCore.QObject):
-    ''' holds simconnect data and manages simconnect '''
+    """holds simconnect data and manages simconnect"""
 
-    
-    sim_start = Signal() # fires when the sim starts
-    sim_stop = Signal() # fires when the sim stops
-    sim_running = Signal(bool) # fires when the sim is running
-    sim_paused = Signal(bool) # fires when sim is paused or unpaused (state = pause state)
-    lvars_updated = Signal(object) # triggers when LVARs are updated (after the request to get LVARs)
-    alive = Signal() # fires when the bridge is connected and alive
-    sim_state = Signal(int, float, str) # fires when sim state data changes (depends on the state )
-    sim_aircraft_changed = Signal(str) # fires when the aircraft title changes
-    sim_aircraft_loaded = Signal(str, str, str) # fires when aircraft title changes (folder, name, title)
-    _aircraft_loaded_internal = Signal(str, str) # fires when aircraft (folder, name)
-    sim_aircraft_info_changed = Signal() # fires when aircraft info changes
+    sim_start = Signal()  # fires when the sim starts
+    sim_stop = Signal()  # fires when the sim stops
+    sim_running = Signal(bool)  # fires when the sim is running
+    sim_paused = Signal(
+        bool
+    )  # fires when sim is paused or unpaused (state = pause state)
+    lvars_updated = Signal(
+        object
+    )  # triggers when LVARs are updated (after the request to get LVARs)
+    alive = Signal()  # fires when the bridge is connected and alive
+    sim_state = Signal(
+        int, float, str
+    )  # fires when sim state data changes (depends on the state )
+    sim_aircraft_changed = Signal(str)  # fires when the aircraft title changes
+    sim_aircraft_loaded = Signal(
+        str, str, str
+    )  # fires when aircraft title changes (folder, name, title)
+    _aircraft_loaded_internal = Signal(str, str)  # fires when aircraft (folder, name)
+    sim_aircraft_info_changed = Signal()  # fires when aircraft info changes
 
     def __init__(self) -> None:
-        ''' manages simconnect connections and interactions 
-        
+        """manages simconnect connections and interactions
+
         :param handler: handler that responds to simconnect events
         :param force_update: flag to update the default data if it has been modified
-        
-        '''
+
+        """
         QtCore.QObject.__init__(self)
 
         el = gremlin.event_handler.EventListener()
-        el.shutdown.connect(self._shutdown) # trap application shutdown
-        el.abort.connect(self._abort) # trap abort
-        el.profile_stop.connect(self._profile_stop) # trap profile stop
-        el.profile_start.connect(self._profile_start) # trap profile start
-        el.request_profile_stop.connect(self._profile_stop) # trap profile stop request
+        el.shutdown.connect(self._shutdown)  # trap application shutdown
+        el.abort.connect(self._abort)  # trap abort
+        el.profile_stop.connect(self._profile_stop)  # trap profile stop
+        el.profile_start.connect(self._profile_start)  # trap profile start
+        el.request_profile_stop.connect(self._profile_stop)  # trap profile stop request
 
         self.verbose = gremlin.config.Configuration().verbose_mode_simconnect
         self._aircraft_change_callbacks = []
-        
+
         self._connect_in_progress = False
         self._sm = None
-        
 
         handler = SimConnectEventHandler()
 
-   
         self._connect_warning_issued = False
-        sm = SimConnect(handler, auto_connect = False)
-        self._sm : SimConnect = sm
-        
+        sm = SimConnect(handler, auto_connect=False)
+        self._sm: SimConnect = sm
+
         self._bridge_alive = False
         self.bridge = SimConnectBridge(sm)
         self.bridge.alive.connect(self._bridge_alive_cb)
 
-        self._lvars = [] # list of lvars
+        self._lvars = []  # list of lvars
         self._ar_title = None
 
         handler.simconnect_aircraft_loaded.connect(self._aicraft_loaded_cb)
@@ -499,36 +506,33 @@ class SimConnectManager(QtCore.QObject):
         handler.simconnect_sim_running.connect(self._running_cb)
         handler.simconnect_sim_start.connect(self._start_cb)
         handler.simconnect_sim_stop.connect(self._stop_cb)
-        handler.status_callback_clicked.connect(self._status_callback_cb) # called when status is clicked on the UI
-
-        
-        
+        handler.status_callback_clicked.connect(
+            self._status_callback_cb
+        )  # called when status is clicked on the UI
 
         self._aircraft_events = AircraftEvents(self._sm)
         self._aircraft_requests = AircraftRequests(self._sm)
         self._aircraft_loaded_internal.connect(self._aircraft_loaded_internal_cb)
 
-        self._aircraft_lvar_request = {} # map of lvars to their requests
-        
+        self._aircraft_lvar_request = {}  # map of lvars to their requests
 
+        self._aircraft_title = None  # current title from aircraft.cfg
+        self._aircraft_name = None  # current name from aicraft cfg path
+        self._aircraft_atc_id = None  # ATC registration for the aircraft
+        self._aircraft_atc_model = None  # ATC model for the aircraft
+        self._aircraft_atc_type = None  # ATC type for the aircraft
 
-        self._aircraft_title = None # current title from aircraft.cfg
-        self._aircraft_name = None # current name from aicraft cfg path
-        self._aircraft_atc_id = None # ATC registration for the aircraft
-        self._aircraft_atc_model = None # ATC model for the aircraft
-        self._aircraft_atc_type = None # ATC type for the aircraft
-
-        self._simvars_xml =  os.path.join(gremlin.shared_state.data_path, "simconnect_simvars.xml")
-        self._ensure_simvar_xml() # make srue the simvars file exists
+        self._simvars_xml = os.path.join(
+            gremlin.shared_state.data_path, "simconnect_simvars.xml"
+        )
+        self._ensure_simvar_xml()  # make srue the simvars file exists
 
         # https://docs.flightsimulator.com/html/Programming_Tools/SimConnect/API_Reference/Events_And_Data/SimConnect_AddToDataDefinition.htm
-        self._lvars_xml = os.path.join(gremlin.shared_state.data_path, "simconnect_lvars.xml")
+        self._lvars_xml = os.path.join(
+            gremlin.shared_state.data_path, "simconnect_lvars.xml"
+        )
 
-
-
-
-        self._connect_attempts = 3 # number of connection attempts before giving up
-
+        self._connect_attempts = 3  # number of connection attempts before giving up
 
         self._is_started = False
         self._is_paused = False
@@ -537,16 +541,15 @@ class SimConnectManager(QtCore.QObject):
         self._aircraft_folder = None
         self._aircraft_title = None
 
-        self._request_abort = False # true if processing should stop
+        self._request_abort = False  # true if processing should stop
 
         self._registered_feed_blocks = {}
         self._registered_requests = {}
         self._registered_events = {}
-        
+
         self._reset_aircraft()
-        
+
         self.sim_aircraft_info_changed.connect(self._dump_current_aircraft)
-        
 
         # load simconnect data
         self.reload()
@@ -560,16 +563,16 @@ class SimConnectManager(QtCore.QObject):
         self._ar_aircraft_atc_model = None
         self._ar_aircraft_atc_type = None
 
-
     @property
     def aircraft_title(self) -> str:
         return self._aircraft_title
+
     @property
     def aircraft_model(self) -> str:
         return self._aircraft_atc_model
 
     def registerAircraftChangeCallback(self, callback):
-        if not callback in self._aircraft_change_callbacks:
+        if callback not in self._aircraft_change_callbacks:
             self._aircraft_change_callbacks.append(callback)
 
     def _ensure_simvar_xml(self):
@@ -580,9 +583,10 @@ class SimConnectManager(QtCore.QObject):
                 try:
                     shutil.copy(master_xml, self._simvars_xml)
                 except Exception as err:
-                    syslog.error("SIMMCONNECT: error placing master simvars to user profile")
+                    syslog.error(
+                        "SIMMCONNECT: error placing master simvars to user profile"
+                    )
                     syslog.error(f"{err}\n{traceback.format_exc()}")
-
 
     @QtCore.Slot()
     def _bridge_alive_cb(self):
@@ -601,15 +605,15 @@ class SimConnectManager(QtCore.QObject):
         if self.connected:
             self._stop()
             syslog.info("SIMCONNECT: shutdown")
-        
+
     @QtCore.Slot()
     def _profile_stop(self):
-        
+
         self._stop()
 
     @QtCore.Slot()
     def _profile_start(self):
-        ''' occurs on profile start '''
+        """occurs on profile start"""
 
         enabled = gremlin.shared_state.getSimConnectEnabled()
         if not enabled:
@@ -618,7 +622,7 @@ class SimConnectManager(QtCore.QObject):
             return False
 
         # reset loaded aircraft data
-        self._reset_aircraft()                
+        self._reset_aircraft()
         # reset abort code to try again
         self._request_abort = False
         self.activate()
@@ -628,7 +632,6 @@ class SimConnectManager(QtCore.QObject):
         if self.connected:
             self._stop()
             syslog.info("SIMCONNECT: abort")
-                
 
     def _stop(self):
         if self.connected:
@@ -638,23 +641,17 @@ class SimConnectManager(QtCore.QObject):
             self.sim_disconnect()
             self._request_abort = True
 
-
-
     def start_bridge(self):
-        ''' starts the bridge '''
+        """starts the bridge"""
         if not self._bridge_alive:
             self.bridge.start()
 
-        
-
-
     def load_internal(self):
-        ''' loads GremlinEx simconnect internal commands '''
+        """loads GremlinEx simconnect internal commands"""
         self.reload()
 
-
-    def reload(self, force_update = False):
-                # if the data file doesn't exist, create it in the user's profile folder from the built-in data
+    def reload(self, force_update=False):
+        # if the data file doesn't exist, create it in the user's profile folder from the built-in data
 
         # list of all commands
         self._commands = []
@@ -662,17 +659,15 @@ class SimConnectManager(QtCore.QObject):
         # list of command blocks
         self._block_map = {}
 
-        self._ensure_simvar_xml() # make sure the simvars file exists
-                
+        self._ensure_simvar_xml()  # make sure the simvars file exists
+
         # if force_update and os.path.isfile(self._simvars_xml):
         #     os.unlink(self._simvars_xml)
 
         # if not os.path.isfile(self._simvars_xml):
         #     self._write_default_xml(self._simvars_xml)
 
-
         self._block_map = {}
-        
 
         # load the data - including any user modifications/additions
         if os.path.isfile(self._simvars_xml):
@@ -681,7 +676,7 @@ class SimConnectManager(QtCore.QObject):
         # load any LVAR definitions defined by the user
         if not os.path.isfile(self._lvars_xml):
             # create an lvar sample file
-            xml = '''<?xml version='1.0' encoding='UTF-8'?>
+            xml = """<?xml version='1.0' encoding='UTF-8'?>
 <commands>
 	<command value="L:A32NX_FCU_EFIS_L_DISPLAY_BARO_MODE" type="lvar" datatype="int" units="Number" category="none" settable="true" axis="false" indexed="false">
 		<description value="Flybywire A320 neo set left FCU baro position STD 0 QNH 1 QFE 2"/> 
@@ -689,9 +684,9 @@ class SimConnectManager(QtCore.QObject):
 	<command value="L:A32NX_FCU_EFIS_R_DISPLAY_BARO_MODE" type="lvar" datatype="int" units="Number" category="none" settable="true" axis="false" indexed="false">
 		<description value="Flybywire A320 neo set right FCU baro position STD 0 QNH 1 QFE 2"/> 
 	</command>
-</commands>'''
+</commands>"""
             try:
-                with open(self._lvars_xml,"w") as f:
+                with open(self._lvars_xml, "w") as f:
                     f.write(xml)
                     f.flush()
             except Exception as err:
@@ -707,101 +702,91 @@ class SimConnectManager(QtCore.QObject):
                     lvar = node.get("value")
                     self._lvars.append(lvar)
 
-
-
-            
-
-
-
-        
-
-
         if len(self._block_map) > 0:
             # process lists
-            #b = SimConnectBlock
+            # b = SimConnectBlock
             self._commands = [b.command for b in self._block_map.values()]
             self._commands.sort()
 
-
-
     def _register_feed(self, command):
-        if not command in self._registered_feed_blocks:
+        if command not in self._registered_feed_blocks:
             block = SimConnectBlock()
             block.command = command
             block.command_type = SimConnectCommandType.Request
             block.is_periodic = True
             self._registered_feed_blocks[command] = block
-            
+
     def _enable_feed(self):
-        ''' enables the data feed '''
-        block : SimConnectBlock
+        """enables the data feed"""
+        block: SimConnectBlock
         for block in self._registered_feed_blocks.values():
             block.execute()
 
     def _disable_feed(self):
-        ''' disable the data feed '''
-        block : SimConnectBlock
+        """disable the data feed"""
+        block: SimConnectBlock
         for block in self._registered_feed_blocks.values():
             block.stop()
         self._registered_feed_blocks = {}
 
     def RegisterFeed(self, command):
-        ''' registers a data feed '''
+        """registers a data feed"""
         self._register_feed(command)
 
     def _init_feed(self):
-        ''' setup the default data feed events, if any '''
+        """setup the default data feed events, if any"""
         pass
         # self._register_feed("AIRSPEED_INDICATED")
         # self._register_feed("PLANE_ALT_ABOVE_GROUND")
         # self._register_feed("BRAKE_PARKING_INDICATOR")
 
     def setFeedEnabled(self, enabled):
-        ''' enables or disables data feed '''
+        """enables or disables data feed"""
         if enabled:
             self._init_feed()
             self._enable_feed()
         else:
             self._disable_feed()
 
-    def registerRequest(self, command : str, datatype : str, settable : bool = False, callback = None, key = None) -> Request:
-        ''' registers a request 
+    def registerRequest(
+        self,
+        command: str,
+        datatype: str,
+        settable: bool = False,
+        callback=None,
+        key=None,
+    ) -> Request:
+        """registers a request
         :param command: the command (variable name or expression)
         :param datatype: the MSFS simconnect datatype such as "number" "percent"
-        '''
+        """
 
         # see if the request is already registered
         s_command, b_command = gremlin.util.to_byte_string(command)
         _, b_datatype = gremlin.util.to_byte_string(datatype)
         if not key:
             key = s_command.casefold()
-        if not key in self._registered_requests:
-            request = Request(definitions = (b_command, b_datatype), sm = self.sm, settable = settable, callback=callback)
+        if key not in self._registered_requests:
+            request = Request(
+                definitions=(b_command, b_datatype),
+                sm=self.sm,
+                settable=settable,
+                callback=callback,
+            )
             request._ensure_def()
             self._registered_requests[key] = request
-        
-        return self._registered_requests[key]
-        
-    def findRequest(self, command):
-        ''' returns a registered request if it was registered before '''
-        key = command.casefold()
-        if key in self._registered_requests[key]:
-            return self._registered_requests[key]
-        return None
 
+        return self._registered_requests[key]
 
     def setSimvar(self, command, datatype, value):
-        ''' sets a simvar without using a data block '''
+        """sets a simvar without using a data block"""
         self.activate()
         request = self.registerRequest(command, datatype, True)
         request.value = value
         request.transmit()
 
-
-
-
     def sendEvent(self, command):
-        ''' sends an event to Simconnect '''
+        """sends an event to Simconnect"""
         if command in self._block_map:
             self.activate()
             block = self._block_map[command]
@@ -809,14 +794,12 @@ class SimConnectManager(QtCore.QObject):
             return block.execute()
         syslog.error(f"SIMCONNECT: event not found: {command}")
 
-
-
     def calculate(self, command):
         if self.bridge.connected:
             self.bridge.execute_calculator_code(command)
 
     def refreshLvars(self):
-        ''' refreshes the list of lvars from the sim '''
+        """refreshes the list of lvars from the sim"""
         if self.bridge.connected:
             self.bridge.get_lvars()
 
@@ -827,7 +810,7 @@ class SimConnectManager(QtCore.QObject):
 
     @QtCore.Slot(object)
     def _lvars_updated_cb(self, lvars):
-        ''' gets the list of lvars when they are available '''
+        """gets the list of lvars when they are available"""
         self._lvars = lvars
         # syslog = logging.getLogger("system")
         # save the lvars
@@ -845,9 +828,8 @@ class SimConnectManager(QtCore.QObject):
                 root.remove(node)
 
             for node in root.xpath("//command"):
-                if not "value" in node.attrib:
+                if "value" not in node.attrib:
                     root.remove(node)
-
 
             for lvar in self._lvars:
                 lvar_name = lvar
@@ -855,25 +837,26 @@ class SimConnectManager(QtCore.QObject):
                 if nodes is not None and len(nodes) > 0:
                     node = nodes[0]
                 else:
-                    node = etree.Element("command") # rpn
+                    node = etree.Element("command")  # rpn
 
                 node.set("value", lvar)
-                node.set("type", SimConnectCommandType.to_string(SimConnectCommandType.Calculator))
+                node.set(
+                    "type",
+                    SimConnectCommandType.to_string(SimConnectCommandType.Calculator),
+                )
                 node.set("datatype", "float")
                 node.set("units", "Number")
-                node.set("category","none")
+                node.set("category", "none")
                 node.set("settable", str(True))
                 node.set("axis", str(False))
                 node.set("indexed", str(False))
 
-                
                 root.append(node)
 
-
             tree = etree.ElementTree(root)
-            tree.write(xml_source, pretty_print=True,xml_declaration=True,encoding="utf-8")
-
-        
+            tree.write(
+                xml_source, pretty_print=True, xml_declaration=True, encoding="utf-8"
+            )
 
         except Exception as err:
             syslog.error(f"SimconnectData: XML simvars read error: {xml_source}:")
@@ -883,22 +866,19 @@ class SimConnectManager(QtCore.QObject):
         # indicate new data is available
         self.lvars_updated.emit(self._lvars)
 
-
-
     def get_lvar_name_list(self) -> list:
-        ''' returns the list of known lvars '''
+        """returns the list of known lvars"""
         return self._lvars
-    
+
     @property
     def lvars(self):
         return self._lvars
-
 
     @QtCore.Slot()
     def _connected_cb(self):
         self._is_connected = True
         if self.verbose:
-            syslog.info(f"Simconnect Event: connected")
+            syslog.info("Simconnect Event: connected")
 
         self.setFeedEnabled(True)
 
@@ -906,7 +886,7 @@ class SimConnectManager(QtCore.QObject):
     def _disconnected_cb(self):
         self._is_connected = False
         if self.verbose:
-            syslog.info(f"Simconnect Event: disconnected")
+            syslog.info("Simconnect Event: disconnected")
 
         self.setFeedEnabled(False)
 
@@ -919,18 +899,18 @@ class SimConnectManager(QtCore.QObject):
     def _paused_cb(self):
         self._is_paused = True
         if self.verbose:
-            syslog.info(f"Simconnect Event: paused")
+            syslog.info("Simconnect Event: paused")
 
     @QtCore.Slot()
     def _unpaused_cb(self):
         if self.verbose:
             self._is_paused = False
-            syslog.info(f"Simconnect Event: unpaused")
+            syslog.info("Simconnect Event: unpaused")
 
     @QtCore.Slot()
     def _start_cb(self):
         if self.verbose:
-            syslog.info(f"Simconnect Event: started")
+            syslog.info("Simconnect Event: started")
             self._is_started = True
             self.sim_start.emit()
             # update the aircraft
@@ -940,7 +920,7 @@ class SimConnectManager(QtCore.QObject):
     @QtCore.Slot()
     def _stop_cb(self):
         if self.verbose:
-            syslog.info(f"Simconnect Event: stopped")
+            syslog.info("Simconnect Event: stopped")
         self._is_started = False
         self.sim_stop.emit()
 
@@ -952,9 +932,7 @@ class SimConnectManager(QtCore.QObject):
             title = self._aircraft_title
             self._dump_current_aircraft()
             self.sim_aircraft_loaded.emit(folder, name, title)
-            self._run_loaded_callbacks(folder,name,title)
-            
-            
+            self._run_loaded_callbacks(folder, name, title)
 
     @QtCore.Slot(bool)
     def _running_cb(self, state: bool):
@@ -967,11 +945,10 @@ class SimConnectManager(QtCore.QObject):
             else:
                 self.sim_stop.emit()
 
-
     @property
     def is_connected(self):
         return self._is_connected
-    
+
     @property
     def is_mobi_connected(self):
         return self.mobi.connected
@@ -979,30 +956,29 @@ class SimConnectManager(QtCore.QObject):
     @property
     def is_started(self):
         return self._is_started
-    
+
     @property
     def is_paused(self):
         return self._is_paused
-    
+
     @property
     def current_aircraft_title(self):
-        ''' currently loaded aircraft - TITLE from the aircraft.cfg file '''
+        """currently loaded aircraft - TITLE from the aircraft.cfg file"""
         return self._aircraft_title
-    
+
     @property
     def current_aircraft_sim_name(self):
-        ''' currently loaded aircraft - TITLE from the aircraft.cfg file '''
+        """currently loaded aircraft - TITLE from the aircraft.cfg file"""
         return self._aircraft_name
-    
+
     @property
     def current_aircraft_folder(self):
-        ''' returns the path to the currently loaded folder '''
-        return self._aircraft_folder    
-
+        """returns the path to the currently loaded folder"""
+        return self._aircraft_folder
 
     @property
     def is_running(self):
-        ''' true if the sim state is running '''
+        """true if the sim state is running"""
         return self._is_running
 
     def _sim_paused_cb(self, arg):
@@ -1012,57 +988,74 @@ class SimConnectManager(QtCore.QObject):
         self._is_running = state
 
     def _aicraft_loaded_cb(self, folder, name):
-        ''' called when a new aircraft is loaded '''
-        self._aircraft_loaded_internal.emit(folder, name)  # fires self.sim_aircraft_loaded.emit(name)
-            
+        """called when a new aircraft is loaded"""
+        self._aircraft_loaded_internal.emit(
+            folder, name
+        )  # fires self.sim_aircraft_loaded.emit(name)
 
     def _state_data_cb(self, int_data, float_data, str_data):
-        ''' occurs when state data is requested '''
+        """occurs when state data is requested"""
         if gremlin.util.is_binary_string(str_data):
-            str_data = str_data.decode('utf-8')
+            str_data = str_data.decode("utf-8")
         str_data = str_data.casefold()
         if "aircraft.cfg" in str_data:
             self._aircraft_folder = str_data
-            #self.sim_aircraft_loaded.emit(str_data,None)
+            # self.sim_aircraft_loaded.emit(str_data,None)
 
         self.sim_state.emit(int_data, float_data, str_data)
 
     def get_loaded_aircraft(self):
-        ''' gets the loaded aircraft '''
-        return self._aircraft_title # use title as the name is meaningless in MSFS 2024 due to streaming AC
-    
+        """gets the loaded aircraft"""
+        return (
+            self._aircraft_title
+        )  # use title as the name is meaningless in MSFS 2024 due to streaming AC
 
-    def request_aircraft_title(self, callback = None):
-        if self.verbose: syslog.info("SIMCONNECT: request aircraft title")
+    def request_aircraft_title(self, callback=None):
+        if self.verbose:
+            syslog.info("SIMCONNECT: request aircraft title")
         self._callback_on_title = callback
         if not self._ar_aircraft_title:
-            self._ar_aircraft_title = self._get_aicraft_title_request(self._aircraft_title_changed)
+            self._ar_aircraft_title = self._get_aicraft_title_request(
+                self._aircraft_title_changed
+            )
         self._ar_aircraft_title.trigger()
 
     def request_aircraft_atc_id(self):
-        ''' get the ATC ID for the loaded aircraft '''
-        if self.verbose: syslog.info("SIMCONNECT: request aircraft ATC ID")
+        """get the ATC ID for the loaded aircraft"""
+        if self.verbose:
+            syslog.info("SIMCONNECT: request aircraft ATC ID")
         if not self._ar_aircraft_atc_id:
-            self._ar_aircraft_atc_id = self._get_aicraft_atc_id_request(self._aircraft_atc_id_changed)
+            self._ar_aircraft_atc_id = self._get_aicraft_atc_id_request(
+                self._aircraft_atc_id_changed
+            )
         self._ar_aircraft_atc_id.trigger()
 
     def request_aircraft_atc_model(self):
-        ''' get the ATC model for the loaded aircraft '''
-        if self.verbose: syslog.info("SIMCONNECT: request aircraft ATC ID")
+        """get the ATC model for the loaded aircraft"""
+        if self.verbose:
+            syslog.info("SIMCONNECT: request aircraft ATC ID")
         if not self._ar_aircraft_atc_model:
-            self._ar_aircraft_atc_model = self._get_aicraft_atc_model_request(self._aircraft_atc_model_changed)
+            self._ar_aircraft_atc_model = self._get_aicraft_atc_model_request(
+                self._aircraft_atc_model_changed
+            )
         self._ar_aircraft_atc_model.trigger()
 
     def request_aircraft_atc_type(self):
-        ''' get the ATC model for the loaded aircraft '''
-        if self.verbose: syslog.info("SIMCONNECT: request aircraft ATC ID")
+        """get the ATC model for the loaded aircraft"""
+        if self.verbose:
+            syslog.info("SIMCONNECT: request aircraft ATC ID")
         if not self._ar_aircraft_atc_type:
-            self._ar_aircraft_atc_type = self._get_aicraft_atc_type_request(self._aircraft_atc_type_changed)
-        self._ar_aircraft_atc_type.trigger()        
-        
-    def _aircraft_title_changed(self, request : Request):
+            self._ar_aircraft_atc_type = self._get_aicraft_atc_type_request(
+                self._aircraft_atc_type_changed
+            )
+        self._ar_aircraft_atc_type.trigger()
+
+    def _aircraft_title_changed(self, request: Request):
         title = request.buffer
-        if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft title: {title.decode() if title else '[FAILED]'}")
+        if self.verbose:
+            syslog.info(
+                f"SIMCONNECT: received new aircraft title: {title.decode() if title else '[FAILED]'}"
+            )
         if title:
             title = title.decode()
             self._aircraft_title = title
@@ -1074,57 +1067,64 @@ class SimConnectManager(QtCore.QObject):
                 self.sim_aircraft_changed.emit(title)
                 self.sim_aircraft_info_changed.emit()
 
-
-    def _aircraft_atc_id_changed(self, request : Request):
+    def _aircraft_atc_id_changed(self, request: Request):
         data = request.buffer
-        if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft atc id: {data.decode() if data else '[FAILED]'}")
+        if self.verbose:
+            syslog.info(
+                f"SIMCONNECT: received new aircraft atc id: {data.decode() if data else '[FAILED]'}"
+            )
         if data:
             self._aircraft_atc_id = data.decode()
             self.sim_aircraft_info_changed.emit()
 
-    def _aircraft_atc_model_changed(self, request : Request):
+    def _aircraft_atc_model_changed(self, request: Request):
         data = request.buffer
-        if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft atc model: {data.decode() if data else '[FAILED]'}")
+        if self.verbose:
+            syslog.info(
+                f"SIMCONNECT: received new aircraft atc model: {data.decode() if data else '[FAILED]'}"
+            )
         if data:
-            self._aircraft_atc_model = data.decode()            
+            self._aircraft_atc_model = data.decode()
             self.sim_aircraft_info_changed.emit()
 
-    def _aircraft_atc_type_changed(self, request : Request):
+    def _aircraft_atc_type_changed(self, request: Request):
         data = request.buffer
-        if self.verbose: syslog.info(f"SIMCONNECT: received new aircraft atc type: {data.decode() if data else '[FAILED]'}")
+        if self.verbose:
+            syslog.info(
+                f"SIMCONNECT: received new aircraft atc type: {data.decode() if data else '[FAILED]'}"
+            )
         if data:
-            self._aircraft_atc_type = data.decode()         
-            self.sim_aircraft_info_changed.emit()  
+            self._aircraft_atc_type = data.decode()
+            self.sim_aircraft_info_changed.emit()
 
-    
     def _aircraft_title_cb(self):
-        ''' callback for the aircraft title '''
-    
-    def request_loaded_aircraft(self, callback = None):
-        ''' gets the current player aircraft in the sim '''
+        """callback for the aircraft title"""
+
+    def request_loaded_aircraft(self, callback=None):
+        """gets the current player aircraft in the sim"""
         try:
             if self._sm.ok:
-                #self._sm.requestAircraftLoaded()
+                # self._sm.requestAircraftLoaded()
                 self.request_aircraft_title(callback)
-                #self.request_aircraft_atc_id()
-                #self.request_aircraft_atc_model()
-                #self.request_aircraft_atc_type()
-        except:
+                # self.request_aircraft_atc_id()
+                # self.request_aircraft_atc_model()
+                # self.request_aircraft_atc_type()
+        except Exception:
             pass
 
     def request_aircraft_list(self):
-        ''' requests user flyable aircraft data '''
+        """requests user flyable aircraft data"""
         try:
             if self._sm.ok:
                 self._sm.requestSimObjectsAndLiveries()
-        except:
+        except Exception:
             pass
 
     def get_aircraft_list(self) -> list[str]:
-        ''' retrieves the list of user flyable objects from simconnect '''
+        """retrieves the list of user flyable objects from simconnect"""
         return self._sm.getSimObjects()
 
-    def _aircraft_loaded_internal_cb(self, folder : str, name : str):
+    def _aircraft_loaded_internal_cb(self, folder: str, name: str):
         # decode the data into useful bits
         # syslog = logging.getLogger("system")
         title = self.request_aircraft_title()
@@ -1139,58 +1139,47 @@ class SimConnectManager(QtCore.QObject):
         # self._aircraft_atc_type = atc_type
         self._dump_current_aircraft()
         self.sim_aircraft_loaded.emit(folder, name, title)
-        self._run_loaded_callbacks(folder,name,title)
-
+        self._run_loaded_callbacks(folder, name, title)
 
     def _run_loaded_callbacks(self, folder, name, title):
         for callback in self._aircraft_change_callbacks:
             try:
                 callback(folder, name, title)
-            except:
+            except Exception:
                 pass
-
 
     def _dump_current_aircraft(self):
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         if verbose:
-            syslog.info(f"SIMCONNECT: aircraft info changed: folder: [{self._aircraft_folder}] name: [{self._aircraft_name}] title: [{self._aircraft_title}]") # atc id: [{self._aircraft_atc_id}] atc model: [{self._aircraft_atc_model}] type: [{self._aircraft_atc_type}]")
+            syslog.info(
+                f"SIMCONNECT: aircraft info changed: folder: [{self._aircraft_folder}] name: [{self._aircraft_name}] title: [{self._aircraft_title}]"
+            )  # atc id: [{self._aircraft_atc_id}] atc model: [{self._aircraft_atc_model}] type: [{self._aircraft_atc_type}]")
 
     def reset(self):
-        ''' resets the connection '''
+        """resets the connection"""
         self._sm.reset()
         self._connect_attempts = 5
         self._request_abort = False
-        
 
-
-
-    @property
-    def ok(self):
-        if not self._sm.ok:
-            # attempt to reconnect
-            self.activate(True)
-        return self._sm.ok
-    
     @property
     def connected(self) -> bool:
-        ''' true if GremlinEx is connected to the simulator '''
+        """true if GremlinEx is connected to the simulator"""
         if not self.simconnect_enabled:
             return False
         return self._sm.ok
 
     @property
     def simconnect(self) -> SimConnect:
-        ''' returns the simconnect interface instance'''
+        """returns the simconnect interface instance"""
         return self._sm
-    
+
     @property
     def simconnect_enabled(self) -> bool:
-        ''' true if simconnect is enabled in GremlinEx'''
+        """true if simconnect is enabled in GremlinEx"""
         return gremlin.config.Configuration().simconnect_enabled
-    
 
-    def activate(self, force_retry = False):
-        ''' connect to simconnect if not connected '''
+    def activate(self, force_retry=False):
+        """connect to simconnect if not connected"""
         if not self.simconnect_enabled:
             # not enabled
             return
@@ -1203,21 +1192,20 @@ class SimConnectManager(QtCore.QObject):
         if self._request_abort and not force_retry:
             # abort requested
             return
-        
+
         self._connect_in_progress = True
-        
+
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
 
-        if verbose: syslog.info(f"SIMCONNECT MGR: reconnect...")
+        if verbose:
+            syslog.info("SIMCONNECT MGR: reconnect...")
 
         try:
-            
             self._bridge_alive = False
             self._connect_attempts = 2
             self._connect_warning_issued = False
             self._request_abort = False
 
-         
             if not self._sm.ok:
                 try:
                     attempt_count = 1
@@ -1226,16 +1214,19 @@ class SimConnectManager(QtCore.QObject):
                             self._connect_attempts -= 1
                             self._sm.connect()
                             if self._sm.ok:
-                                # connect is ok 
+                                # connect is ok
                                 break
                             time.sleep(0.5)
-                            if verbose: syslog.info(f"SIMCONNECT: connect attempt {attempt_count}")
+                            if verbose:
+                                syslog.info(
+                                    f"SIMCONNECT: connect attempt {attempt_count}"
+                                )
 
-                except:
+                except Exception:
                     pass
 
                 if not self._sm.ok:
-                    syslog.error(f"SIMCONNECT: connect failed")
+                    syslog.error("SIMCONNECT: connect failed")
                     el = gremlin.event_handler.EventListener()
                     if gremlin.shared_state.is_running:
                         if not self._connect_warning_issued:
@@ -1243,55 +1234,54 @@ class SimConnectManager(QtCore.QObject):
                             syslog.error(msg)
                             self._connect_warning_issued = True
                             # request the profile to stop
-                            el.module_state_change.emit("simconnect",False)
+                            el.module_state_change.emit("simconnect", False)
                             el.request_profile_stop.emit(msg)
                             self._request_abort = True
                             self._connect_warning_issued = True
-                            gremlin.shared_state.profile_state = False # indicate a profile start error occured
-                            gremlin.shared_state.profile_message_issued = True # indicate the profile error box was issued
+                            gremlin.shared_state.profile_state = (
+                                False  # indicate a profile start error occured
+                            )
+                            gremlin.shared_state.profile_message_issued = (
+                                True  # indicate the profile error box was issued
+                            )
                     return False
-                
+
                 else:
                     syslog.info("Simconnect: connected to simulator")
-            
 
             if not self._request_abort:
                 self._is_running = True
                 self.bridge.start()
-                return True # connected  
-            
+                return True  # connected
+
             return False
         finally:
             self._connect_in_progress = False
             self._request_abort = False
-            
 
     def clearRequests(self):
-        ''' unregisters all requests '''
+        """unregisters all requests"""
         if self._sm.ok:
             for request in self._registered_requests.values():
                 self._sm.clear(request)
         self._registered_requests.clear()
 
-
     def sim_connect(self):
-        ''' connects to the sim (has to be different from connect() due to event processing )'''
-        
+        """connects to the sim (has to be different from connect() due to event processing )"""
+
         if self._sm.is_connected() and self._bridge_alive:
             return True
         self.reset()
         return self.activate()
-    
-    
+
     def disconnect(self):
-        ''' called when sim is stopped'''
+        """called when sim is stopped"""
         self.sim_disconnect
 
     def sim_disconnect(self):
-        ''' disconnect request '''
+        """disconnect request"""
         if self.bridge.connect:
             self.bridge.stop()
-
 
         if self._sm.ok:
             for request in self._registered_requests.values():
@@ -1301,11 +1291,11 @@ class SimConnectManager(QtCore.QObject):
 
     @property
     def valid(self):
-        ''' true if block maps are valid '''
+        """true if block maps are valid"""
         return len(self._block_map) > 0
 
-    def block(self, command, clone = True) -> SimConnectBlock:
-        ''' gets the command block for a given Simconnect command '''
+    def block(self, command, clone=True) -> SimConnectBlock:
+        """gets the command block for a given Simconnect command"""
         s_command, b_command = gremlin.util.to_byte_string(command)
         if s_command:
             key = s_command.casefold()
@@ -1316,23 +1306,22 @@ class SimConnectManager(QtCore.QObject):
                         if clone:
                             return block.clone()
                         return block
-            
 
         return None
 
     def get_aircraft_data(self):
-        ''' returns the current aircraft information
-            (aircraft, model, title)
-        '''
+        """returns the current aircraft information
+        (aircraft, model, title)
+        """
         ar = self._aircraft_requests
         trigger = ar.find("ATC_TYPE")
         aircraft_type = trigger.get()
         if aircraft_type:
-            aircraft_type = aircraft_type.decode() # binary string to regular string
+            aircraft_type = aircraft_type.decode()  # binary string to regular string
         trigger = ar.find("ATC_MODEL")
         aircraft_model = trigger.get()
         if aircraft_model:
-            aircraft_model = aircraft_model.decode()# binary string to regular string
+            aircraft_model = aircraft_model.decode()  # binary string to regular string
         trigger = ar.find("TITLE")
         title = trigger.get()
         if title:
@@ -1340,7 +1329,7 @@ class SimConnectManager(QtCore.QObject):
         return (aircraft_type, aircraft_model, title)
 
     def get_aircraft(self):
-        ''' gets the aircraft title '''
+        """gets the aircraft title"""
 
         ar = self._aircraft_requests
         trigger = ar.find("TITLE")
@@ -1348,66 +1337,68 @@ class SimConnectManager(QtCore.QObject):
         if title:
             title = title.decode()
         return title
-    
 
     def get_aicraft_position(self):
-        ''' gets the aircraft position data block '''
+        """gets the aircraft position data block"""
 
-    
-        definitions = [("SIM ON GROUND", "Bool", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_INT32),
-                        ("PLANE LATITUDE", "Degrees", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
-                        ("PLANE LONGITUDE", "Degrees", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
-                        ("PLANE ALTITUDE", "Feet", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
-                        ("TITLE", "String", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRING128)
+        definitions = [
+            ("SIM ON GROUND", "Bool", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_INT32),
+            (
+                "PLANE LATITUDE",
+                "Degrees",
+                SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64,
+            ),
+            (
+                "PLANE LONGITUDE",
+                "Degrees",
+                SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64,
+            ),
+            ("PLANE ALTITUDE", "Feet", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_FLOAT64),
+            ("TITLE", "String", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRING128),
         ]
 
         request = Request(definitions, self._sm)
-        
-        return request
-    
-    def _get_aicraft_title_request(self, callback = None):
-        ''' gets the aircraft aircraft title'''
 
-        #definitions = [("TITLE", "String", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRING128)]
-        request = self.registerRequest("title","string", False, callback=callback)
-        return request
-    
-    def _get_aicraft_atc_id_request(self, callback = None):
-        ''' gets the aircraft ATC ID'''
-        
-        request = self.registerRequest("ATC ID","string", False, callback=callback)
-        return request
-    
-    
-    def _get_aicraft_atc_model_request(self, callback = None):
-        ''' gets the aircraft ATC model'''
-        
-        request = self.registerRequest("ATC MODEL","string", False, callback=callback)
-        return request
-    
-    def _get_aicraft_atc_type_request(self, callback = None):
-        ''' gets the aircraft ATC type '''
-        
-        request = self.registerRequest("ATC TYPE","string", False, callback=callback)
         return request
 
-    def save_flight(self, the_path : str, title : str = "", description : str = ""):
-        ''' requests to save the flight data '''
+    def _get_aicraft_title_request(self, callback=None):
+        """gets the aircraft aircraft title"""
+
+        # definitions = [("TITLE", "String", SIMCONNECT_DATATYPE.SIMCONNECT_DATATYPE_STRING128)]
+        request = self.registerRequest("title", "string", False, callback=callback)
+        return request
+
+    def _get_aicraft_atc_id_request(self, callback=None):
+        """gets the aircraft ATC ID"""
+
+        request = self.registerRequest("ATC ID", "string", False, callback=callback)
+        return request
+
+    def _get_aicraft_atc_model_request(self, callback=None):
+        """gets the aircraft ATC model"""
+
+        request = self.registerRequest("ATC MODEL", "string", False, callback=callback)
+        return request
+
+    def _get_aicraft_atc_type_request(self, callback=None):
+        """gets the aircraft ATC type"""
+
+        request = self.registerRequest("ATC TYPE", "string", False, callback=callback)
+        return request
+
+    def save_flight(self, the_path: str, title: str = "", description: str = ""):
+        """requests to save the flight data"""
         if self._sm.ok:
-
             # get the current aircraft position
-
 
             self._sm.save_flight(the_path, title, description)
 
-
-    def load_flight(self, the_path : str):
+    def load_flight(self, the_path: str):
         if self._sm.ok:
             self._sm.load_flight(the_path)
-        
 
     def _write_default_xml(self, xml_file):
-        ''' writes a default XML file from the base data in the simconnect module '''
+        """writes a default XML file from the base data in the simconnect module"""
 
         # list of aircraft names
         aircraft_events_description_map = {}
@@ -1464,20 +1455,17 @@ class SimConnectManager(QtCore.QObject):
             else:
                 continue
 
-
-
             category_commands[category] = []
             for b_command, description, scope in source:
-                command = b_command.decode('ascii')
+                command = b_command.decode("ascii")
                 aircraft_events_description_map[command] = description
                 aircraft_events_scope_map[command] = scope
                 data = (b_command, command, description, scope)
                 category_commands[category].append(data)
-                #commands.append(data)
+                # commands.append(data)
                 aircraft_events_description_map[command] = description
                 command_category_map[command] = category
                 command_map[command] = ("e", data)
-
 
             # build request commands
             for data in self._aircraft_requests.list:
@@ -1490,12 +1478,14 @@ class SimConnectManager(QtCore.QObject):
         for command in commands:
             data = command_map[command]
 
-            command_node = etree.SubElement(root,"command", value = command)
+            command_node = etree.SubElement(root, "command", value=command)
 
-            value_types = ["(0","16383"]
+            value_types = ["(0", "16383"]
             units = ""
-            is_range = False # assume command has no range specified
-            is_toggle = False # true if range is a toggle range (either value of the range)
+            is_range = False  # assume command has no range specified
+            is_toggle = (
+                False  # true if range is a toggle range (either value of the range)
+            )
             min_range = 0
             max_range = 0
             if data[0] == "e":
@@ -1537,13 +1527,13 @@ class SimConnectManager(QtCore.QObject):
             elif data[0] == "r":
                 simvar_type = "simvar"
                 description = data[1][0]
-                units = data[1][2].decode('ascii')
-                settable = data[1][3] == 'Y'
+                units = data[1][2].decode("ascii")
+                settable = data[1][3] == "Y"
 
-            command_category =self.get_command_category(command)
+            command_category = self.get_command_category(command)
             if command_category is None:
                 command_category = SimConnectEventCategory.NotSet
-            category =  SimConnectEventCategory.to_string(command_category)
+            category = SimConnectEventCategory.to_string(command_category)
             is_axis = "AXIS_" in command
             if is_axis:
                 min_range = -16383
@@ -1553,16 +1543,18 @@ class SimConnectManager(QtCore.QObject):
 
             # simvar index : https://docs.flightsimulator.com/html/Programming_Tools/SimVars/Simulation_Variables.htm#h
 
-            command_node.attrib['type'] = simvar_type
+            command_node.attrib["type"] = simvar_type
             command_node.attrib["datatype"] = "int"
             command_node.attrib["units"] = units
             command_node.attrib["category"] = category
             command_node.attrib["settable"] = str(settable)
             command_node.attrib["axis"] = str(is_axis)
             command_node.attrib["indexed"] = str(is_indexed)
-            description_node = etree.SubElement(command_node,"description", value = description)
+            _description_node = etree.SubElement(
+                command_node, "description", value=description
+            )
             if is_range:
-                range_node = etree.SubElement(command_node,"range")
+                range_node = etree.SubElement(command_node, "range")
                 range_node.attrib["min"] = str(min_range)
                 range_node.attrib["max"] = str(max_range)
                 range_node.attrib["toggle"] = str(is_toggle)
@@ -1570,49 +1562,67 @@ class SimConnectManager(QtCore.QObject):
         try:
             # save the file
             tree = etree.ElementTree(root)
-            tree.write(xml_file, pretty_print=True,xml_declaration=True,encoding="utf-8")
+            tree.write(
+                xml_file, pretty_print=True, xml_declaration=True, encoding="utf-8"
+            )
         except Exception as err:
-            syslog.error(f"SimconnectData: unable to create XML simvars: {xml_file}: {err}")
+            syslog.error(
+                f"SimconnectData: unable to create XML simvars: {xml_file}: {err}"
+            )
 
     def _load_xml(self, xml_source):
-        ''' loads blocks from the XML file '''
+        """loads blocks from the XML file"""
 
-        def get_attribute(node : etree._Element, attr, default = '', throw_on_missing = False) -> bool:
-            ''' gets a node attribute checking for validity '''
+        def get_attribute(
+            node: etree._Element, attr, default="", throw_on_missing=False
+        ) -> bool:
+            """gets a node attribute checking for validity"""
             if attr in node.attrib:
                 return node.attrib[attr]
             elif throw_on_missing:
-                raise ValueError(f"Bad or missing boolean XML attribute {attr} on node {node}")
+                raise ValueError(
+                    f"Bad or missing boolean XML attribute {attr} on node {node}"
+                )
             return str(default)
 
-        def get_bool_attribute(node : etree._Element, attr, default = False, throw_on_missing = False) -> bool:
-            ''' gets a node attribute checking for validity '''
+        def get_bool_attribute(
+            node: etree._Element, attr, default=False, throw_on_missing=False
+        ) -> bool:
+            """gets a node attribute checking for validity"""
             value = get_attribute(node, attr, throw_on_missing).lower()
-            if value in ("t","true","1","-1"):
+            if value in ("t", "true", "1", "-1"):
                 return True
-            if value in ("f","false","0"):
+            if value in ("f", "false", "0"):
                 return False
             return default
 
-        def get_int_attribute(node : etree._Element, attr, default = 0, throw_on_missing = False) -> int:
+        def get_int_attribute(
+            node: etree._Element, attr, default=0, throw_on_missing=False
+        ) -> int:
             value = get_attribute(node, attr).lower()
-            if value != '':
+            if value != "":
                 try:
                     return int(value)
-                except:
+                except Exception:
                     if throw_on_missing:
-                        raise ValueError(f"Bad or missing int XML attribute {attr} on node {node}")
+                        raise ValueError(
+                            f"Bad or missing int XML attribute {attr} on node {node}"
+                        )
 
             return default
 
-        def get_float_attribute(node : etree._Element, attr, default = 0.0, throw_on_missing = False) -> float:
+        def get_float_attribute(
+            node: etree._Element, attr, default=0.0, throw_on_missing=False
+        ) -> float:
             value = get_attribute(node, attr).lower()
-            if value != '':
+            if value != "":
                 try:
                     return float(value)
-                except:
+                except Exception:
                     if throw_on_missing:
-                        raise ValueError(f"Bad or missing float XML attribute {attr} on node {node}")
+                        raise ValueError(
+                            f"Bad or missing float XML attribute {attr} on node {node}"
+                        )
 
             return default
 
@@ -1624,9 +1634,8 @@ class SimConnectManager(QtCore.QObject):
             parser = etree.XMLParser(remove_blank_text=True)
             root = etree.parse(xml_source, parser)
 
-            nodes = root.xpath('//command')
+            nodes = root.xpath("//command")
             for node in nodes:
-                
                 max_range = 0
                 min_range = 0
                 is_toggle = False
@@ -1638,25 +1647,30 @@ class SimConnectManager(QtCore.QObject):
                 if "type" in node.attrib:
                     node_type = node.get("type")
                     is_lvar = node_type.casefold() == "lvar"
-               
-                simvar = get_attribute(node,"value")
-                simvar_type = get_attribute(node,"type",throw_on_missing=True)
-                units = get_attribute(node,"units",throw_on_missing=True)
-                category = get_attribute(node,"category")
-                settable = get_bool_attribute(node,"settable")
-                axis = get_bool_attribute(node,"axis")
-                indexed = get_bool_attribute(node,"indexed")
-                invert =get_bool_attribute(node,"invert")
+
+                simvar = get_attribute(node, "value")
+                simvar_type = get_attribute(node, "type", throw_on_missing=True)
+                units = get_attribute(node, "units", throw_on_missing=True)
+                category = get_attribute(node, "category")
+                settable = get_bool_attribute(node, "settable")
+                axis = get_bool_attribute(node, "axis")
+                indexed = get_bool_attribute(node, "indexed")
+                invert = get_bool_attribute(node, "invert")
 
                 description = ""
                 for child in node.getchildren():
                     if child.tag == "description":
-                        description = get_attribute(child,"value")
+                        description = get_attribute(child, "value")
                     elif child.tag == "range":
-                        
-                        is_toggle = get_bool_attribute(child,"toggle",throw_on_missing=True)
-                        min_range = get_int_attribute(child,"min",throw_on_missing=True)
-                        max_range = get_int_attribute(child,"max",throw_on_missing=True)
+                        is_toggle = get_bool_attribute(
+                            child, "toggle", throw_on_missing=True
+                        )
+                        min_range = get_int_attribute(
+                            child, "min", throw_on_missing=True
+                        )
+                        max_range = get_int_attribute(
+                            child, "max", throw_on_missing=True
+                        )
 
                 block = SimConnectBlock()
                 s_simvar, b_simvar = gremlin.util.to_byte_string(simvar)
@@ -1672,15 +1686,21 @@ class SimConnectManager(QtCore.QObject):
                 block._description = description
                 block._invert = invert
                 block.is_lvar = is_lvar
-                
+
                 block._min_range = min_range  # can be modified by the user
                 block._max_range = max_range  # can be modified by the user
-                block._command_min_range = min_range # original range - cannot be modified
-                block._command_max_range = max_range # original range - cannot be modified
+                block._command_min_range = (
+                    min_range  # original range - cannot be modified
+                )
+                block._command_max_range = (
+                    max_range  # original range - cannot be modified
+                )
                 block.is_toggle = is_toggle
                 key = s_simvar.casefold()
                 if key in self._block_map.keys():
-                    syslog.error(f"SimconnectData: duplicate definition found: {s_simvar} in  {xml_source}")
+                    syslog.error(
+                        f"SimconnectData: duplicate definition found: {s_simvar} in  {xml_source}"
+                    )
                     self._block_map = {}
                     return False
                 self._block_map[key] = block
@@ -1701,7 +1721,7 @@ class SimConnectManager(QtCore.QObject):
             return False
 
     def findRequest(self, command):
-        ''' gets the request object'''
+        """gets the request object"""
         request = self._aircraft_requests.find(command)
         if not request:
             command = command.casefold()
@@ -1710,123 +1730,129 @@ class SimConnectManager(QtCore.QObject):
         return None
 
     def get_event_description(self, command):
-        ''' maps the description to the given simconnect command name '''
+        """maps the description to the given simconnect command name"""
         if command in self._aircraft_events_description_map.keys():
             return self._aircraft_events_description_map[command]
         return "Not found"
-    
+
     def get_command_type(self, command) -> SimConnectCommandType:
-        ''' maps to the type of command'''
+        """maps to the type of command"""
         if self._aircraft_events.find(command):
             return SimConnectCommandType.Event
         if self._aircraft_requests.find(command):
             return SimConnectCommandType.SimVar
         return SimConnectCommandType.NotSet
 
-
     @property
     def AircraftEvents(self):
-        ''' gets a list of aicraft events '''
+        """gets a list of aicraft events"""
         return self._aircraft_events
 
     @property
     def ok(self) -> bool:
-        ''' true if simconnect is ok '''
+        """true if simconnect is ok"""
         return self._sm.ok
 
     @property
     def running(self) -> bool:
-        ''' true if sim is running '''
+        """true if sim is running"""
         return self._sm.running
 
     @property
     def paused(self) -> bool:
-        ''' true if sim is paused '''
+        """true if sim is paused"""
         return self._sm.paused
 
     @property
     def sm(self) -> SimConnect:
-        ''' simconnect object'''
+        """simconnect object"""
         return self._sm
 
     def ensure_running(self):
-        ''' ensure simconnect is connected '''
+        """ensure simconnect is connected"""
         return self._sm.is_connected()
 
     def get_category_list(self):
-        ''' returns the list of supported command categories '''
+        """returns the list of supported command categories"""
         categories = self._command_category_map.keys()
         categories.sort()
         return categories
 
     def get_command_name_list(self):
-        ''' gets all possible command names '''
+        """gets all possible command names"""
         return self._commands
 
     def get_default_command(self):
-        ''' gets the default command '''
+        """gets the default command"""
         if self.valid:
             return self._block_map[0].command
         return None
 
     def get_command_category(self, command):
-        ''' for a given command, find the category of that command '''
+        """for a given command, find the category of that command"""
 
         if self.valid and command in self._block_map.keys():
             block = self._block_map[command]
             return block.category
         return SimConnectEventCategory.NotSet
-    
+
     def get_command_block(self, command):
         if self.valid:
             command = command.casefold()
             if command in self._block_map:
                 return self._block_map[command]
         return None
-    
 
-    def sendReadbackEvent(self, command, value, readback_command, readback_value, timeout = 4):
-        ''' sends an event and waits for a return value to match the readback value, or timeout '''
-        
+    def sendReadbackEvent(
+        self, command, value, readback_command, readback_value, timeout=4
+    ):
+        """sends an event and waits for a return value to match the readback value, or timeout"""
+
         # simconnect events have to be in byte strings
         s_command, b_command = gremlin.util.to_byte_string(command)
         _, b_readback = gremlin.util.to_byte_string(readback_command)
-        
+
         key = s_command.casefold()
-        if not key in self._registered_events:
+        if key not in self._registered_events:
             self._registered_events[key] = self._sm.map_to_sim_event(b_command)
-        
+
         if key in self._registered_events:
             event_id = self._registered_events[key]
             if event_id == 0:
                 syslog.error(f"Simconnect: unable to register event for {s_command}")
-                return False # bad event
+                return False  # bad event
 
         # send event and wait for readback value or a timeout
         event = DataThreadingEvent()
-        thread = threading.Thread(target=self._send_readback_event_worker(event, event_id, value, b_readback, readback_value, timeout), daemon=False)
+        thread = threading.Thread(
+            target=self._send_readback_event_worker(
+                event, event_id, value, b_readback, readback_value, timeout
+            ),
+            daemon=False,
+        )
         thread.name = "SIMCONNECT readback"
         thread.start()
         event.wait()
 
-        if event.data and self.verbose: syslog.info(f"SimConnect: event readback completed OK {command} value: {value}")
-        return event.data # data contains the return code
-        
+        if event.data and self.verbose:
+            syslog.info(
+                f"SimConnect: event readback completed OK {command} value: {value}"
+            )
+        return event.data  # data contains the return code
 
-    def _send_readback_event_worker(self, event, event_id, value, readback, readback_value, timeout):
-        ''' readback worker to send the event, then compare the expected value to the return value within the timeout period '''
-        
-        
+    def _send_readback_event_worker(
+        self, event, event_id, value, readback, readback_value, timeout
+    ):
+        """readback worker to send the event, then compare the expected value to the return value within the timeout period"""
+
         # send the event
         retval = self._sm.send_event(event_id, value)
 
         # read the data back to confirm it was processed
         retval = False
-        
+
         block = self.block(readback)
         if block:
-       
-
             value = block.read()
             if value == readback_value:
                 retval = True
@@ -1841,24 +1867,27 @@ class SimConnectManager(QtCore.QObject):
                     time.sleep(0.250)
                     value = block.read()
         else:
-            syslog.error(f"Simconnect: event readback FAILED: readback command {readback} not found")
-    
-        # done    
+            syslog.error(
+                f"Simconnect: event readback FAILED: readback command {readback} not found"
+            )
+
+        # done
         event.data = retval
         event.set()
 
-class SimConnectBlock():
-    ''' holds simconnect block information '''
+
+class SimConnectBlock:
+    """holds simconnect block information"""
 
     def __init__(self):
-        ''' creates a simconnect block object
+        """creates a simconnect block object
 
         the block auto-configures itself based on the command, and determines
         range, values and options, and what type of command it is.
 
         :param simconnect The simconnect object
 
-        '''
+        """
 
         self._command_type = SimConnectCommandType.NotSet
         self._description = None
@@ -1866,75 +1895,79 @@ class SimConnectBlock():
         self._category = SimConnectEventCategory.NotSet
         self._output_data_type = "Number"
         self._output_mode = SimConnectActionMode.NotSet
-        self._command = None # the command text
-        self._is_set_value = False # true if the item can set a value
-        self._readonly = False # if readonly - the request cannot be triggered
-        self._is_axis = False # true if the output is an axis variable
-        self._is_indexed = False # true if the output is indexed using the :index
-        self._min_range = -16383 # user modifieable range
+        self._command = None  # the command text
+        self._is_set_value = False  # true if the item can set a value
+        self._readonly = False  # if readonly - the request cannot be triggered
+        self._is_axis = False  # true if the output is an axis variable
+        self._is_indexed = False  # true if the output is indexed using the :index
+        self._min_range = -16383  # user modifieable range
         self._max_range = 16383
-        self._command_min_range = -16383 # command range (cannot be modified)
+        self._command_min_range = -16383  # command range (cannot be modified)
         self._command_max_range = 16383
-        self._trigger_mode = SimConnectTriggerMode.NoOp # default for on/off type blocks
-        self._invert = False # true if the axis output should be inverted
-        self._value = 0 # output value
-        self._is_value = False # true if the command supports an output value
-        
-        self._is_toggle = False # true if the range valuers are either mix or max
-        self._notify_enabled_count = 0 # true if notifications are enabled
+        self._trigger_mode = (
+            SimConnectTriggerMode.NoOp
+        )  # default for on/off type blocks
+        self._invert = False  # true if the axis output should be inverted
+        self._value = 0  # output value
+        self._is_value = False  # true if the command supports an output value
+
+        self._is_toggle = False  # true if the range valuers are either mix or max
+        self._notify_enabled_count = 0  # true if notifications are enabled
         self._command = None
         self._units = ""
-        self._is_axis = False # true if the block is axis output enabled
-        self._is_periodic = False # true if we're requesting period data from the sim when the data changes
-        self.is_lvar = False # true if the entry is an lvar entry
-        self._request : Request = None # holds any current aircraft request (request commands only )
+        self._is_axis = False  # true if the block is axis output enabled
+        self._is_periodic = False  # true if we're requesting period data from the sim when the data changes
+        self.is_lvar = False  # true if the entry is an lvar entry
+        self._request: Request = (
+            None  # holds any current aircraft request (request commands only )
+        )
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_simconnect
         self.verbose_detailed = config.verbose_mode_detailed
 
     @property
     def sm(self) -> SimConnect:
-        ''' simconnect object '''
+        """simconnect object"""
 
         return SimConnectManager().sm
-    
+
     @property
     def request(self):
-        ''' gets any active aicraft request '''
+        """gets any active aicraft request"""
         if not self._request:
             # create a request for this block
             self.register()
 
         return self._request
 
-    def enable_notifications(self, force = False):
-        ''' enables data notifications from this block '''
+    def enable_notifications(self, force=False):
+        """enables data notifications from this block"""
         if self._notify_enabled_count > 0:
             self._notify_enabled_count -= 1
         if force:
             self._notify_enabled_count = 0
 
     def disable_notifications(self):
-        ''' disables data notifications from this block '''
+        """disables data notifications from this block"""
         self._notify_enabled_count -= 1
 
     @property
     def notifications_enabled(self):
-        ''' true if notifications are enabled'''
+        """true if notifications are enabled"""
         return self._notify_enabled_count == 0
-    
+
     @property
     def is_periodic(self) -> bool:
-        ''' determines if the data should be sent when it changes (true) or just one time (false)'''
+        """determines if the data should be sent when it changes (true) or just one time (false)"""
         return self._is_periodic
-    
+
     @is_periodic.setter
     def is_periodic(self, value: bool):
         self._is_periodic = value
 
     @property
     def command(self):
-        ''' the block command'''
+        """the block command"""
         return self._command
 
     @command.setter
@@ -1943,35 +1976,29 @@ class SimConnectBlock():
             self._command = value
             # update flags
             self.is_axis = value in _simconnect_full_range
-            
-
-
-    @property
-    def is_axis(self):
-        ''' true if the command supports axis output '''
-        return self._is_axis
 
     @property
     def is_request(self) -> bool:
-        ''' true if the block is a request '''
+        """true if the block is a request"""
         return self._command_type == SimConnectCommandType.Request
 
     @property
     def is_event(self) -> bool:
-        ''' true if the block is an event '''
+        """true if the block is an event"""
         return self._command_type == SimConnectCommandType.Event
 
     @property
     def is_value(self):
-        ''' true if the command supports a value output to simconnect '''
+        """true if the command supports a value output to simconnect"""
         return self._is_value
 
     @property
     def command_type(self) -> SimConnectCommandType:
-        ''' returns the command type '''
+        """returns the command type"""
         return self._command_type
+
     @command_type.setter
-    def command_type(self, value : SimConnectCommandType):
+    def command_type(self, value: SimConnectCommandType):
         if isinstance(value, str):
             value = SimConnectCommandType.to_string(value)
         elif isinstance(value, int):
@@ -1980,26 +2007,26 @@ class SimConnectBlock():
 
     @property
     def display_block_type(self) -> str:
-        ''' returns the display string for the block type '''
+        """returns the display string for the block type"""
 
         if self._command_type == SimConnectCommandType.Request:
             return "Simconnect Request"
         elif self._command_type == SimConnectCommandType.Event:
             return "Simconnect Event"
-        return F"Unknown command type: {self._command_type}"
+        return f"Unknown command type: {self._command_type}"
 
     @property
     def output_mode(self) -> SimConnectActionMode:
-        ''' output mode '''
+        """output mode"""
         return self._output_mode
 
     @output_mode.setter
-    def output_mode(self, value : SimConnectActionMode):
+    def output_mode(self, value: SimConnectActionMode):
         self._output_mode = value
 
     @property
     def output_data_type(self) -> str:
-        ''' block output data type'''
+        """block output data type"""
         return self._output_data_type
 
     @output_data_type.setter
@@ -2008,15 +2035,16 @@ class SimConnectBlock():
 
     @property
     def category(self) -> str:
-        ''' command category '''
+        """command category"""
         return self._category
+
     @category.setter
     def category(self, value):
         self._category = value
 
     @property
     def is_readonly(self) -> bool:
-        ''' true if readonly - based on the command type '''
+        """true if readonly - based on the command type"""
         return self._readonly
 
     @is_readonly.setter
@@ -2025,7 +2053,7 @@ class SimConnectBlock():
 
     @property
     def is_axis(self) -> bool:
-        ''' true if axis - based on the command type '''
+        """true if axis - based on the command type"""
         return self._axis
 
     @is_axis.setter
@@ -2034,7 +2062,7 @@ class SimConnectBlock():
 
     @property
     def is_indexed(self) -> bool:
-        ''' true if readonly - based on the command type '''
+        """true if readonly - based on the command type"""
         return self._is_indexed
 
     @is_indexed.setter
@@ -2043,8 +2071,9 @@ class SimConnectBlock():
 
     @property
     def units(self) -> str:
-        ''' given units '''
+        """given units"""
         return self._units
+
     @units.setter
     def units(self, value):
         self._units = value
@@ -2052,19 +2081,19 @@ class SimConnectBlock():
     @property
     def display_data_type(self) -> str:
         return self._value_type
-        
 
     @property
     def invert_axis(self):
-        ''' inverts output (axis input only) '''
+        """inverts output (axis input only)"""
         return self._invert
+
     @invert_axis.setter
     def invert_axis(self, value):
         self._invert = value
 
     @property
     def min_range(self):
-        ''' current min range '''
+        """current min range"""
         return self._min_range
 
     @min_range.setter
@@ -2073,7 +2102,7 @@ class SimConnectBlock():
 
     @property
     def max_range(self):
-        ''' current max range '''
+        """current max range"""
         return self._max_range
 
     @max_range.setter
@@ -2082,42 +2111,40 @@ class SimConnectBlock():
 
     @property
     def command_min_range(self):
-        ''' current min range '''
+        """current min range"""
         return self._command_min_range
-
 
     @property
     def command_max_range(self):
-        ''' current max range '''
+        """current max range"""
         return self._command_max_range
-
 
     @property
     def trigger_mode(self) -> SimConnectTriggerMode:
-        ''' block trigger mode if the action mode is in trigger mode  '''
+        """block trigger mode if the action mode is in trigger mode"""
         return self._trigger_mode
 
     @trigger_mode.setter
-    def trigger_mode(self, value : SimConnectTriggerMode):
+    def trigger_mode(self, value: SimConnectTriggerMode):
         self._trigger_mode = value
 
     @property
     def is_toggle(self):
-        ''' true if the range output is only two values - min or max'''
+        """true if the range output is only two values - min or max"""
         return self._is_toggle
+
     @is_toggle.setter
     def is_toggle(self, value):
         self._is_toggle = value
 
     def custom_range_sync(self):
-        ''' makes custom range the same as the default range '''
+        """makes custom range the same as the default range"""
         self._min_range_custom = self._min_range
         self._max_range_custom = self._max_range_custom
         self._notify_range_update()
 
-
     def _notify_range_update(self):
-        ''' fires a range changed event '''
+        """fires a range changed event"""
 
         if self.notifications_enabled:
             event = RangeEvent()
@@ -2129,14 +2156,13 @@ class SimConnectBlock():
             eh = SimConnectEventHandler()
             eh.range_changed.emit(self, event)
 
-
     @property
     def value(self):
         return self._value
 
     @value.setter
     def value(self, number):
-        ''' sets the output value'''
+        """sets the output value"""
         if number != self._value:
             self._value = number
             if self.notifications_enabled:
@@ -2145,12 +2171,12 @@ class SimConnectBlock():
 
     @property
     def is_ranged(self):
-        ''' true if the command is a ranged command (suitable for a range of values)'''
+        """true if the command is a ranged command (suitable for a range of values)"""
         return self._output_mode == SimConnectActionMode.Ranged
-    
+
     @property
     def description(self) -> str:
-        ''' returns the command description'''
+        """returns the command description"""
         return self._description
 
     @description.setter
@@ -2163,8 +2189,8 @@ class SimConnectBlock():
 
     @property
     def display_name(self) -> str:
-        ''' returns a readable form of the block '''
-        stub =  f"Command:{self.command} Mode: {SimConnectActionMode.to_display(self.output_mode)}"
+        """returns a readable form of the block"""
+        stub = f"Command:{self.command} Mode: {SimConnectActionMode.to_display(self.output_mode)}"
         if self.output_mode == SimConnectActionMode.SetValue:
             stub += f" Value: {self.value}"
         elif self.output_mode == SimConnectActionMode.Ranged:
@@ -2175,26 +2201,25 @@ class SimConnectBlock():
 
         return stub
 
-
     def _set_range(self):
-        ''' sets the data range from the current command '''
-        
+        """sets the data range from the current command"""
+
         if self._command in _simconnect_half_range:
             min_range = 0
             max_range = 16383
-            
+
         elif self._command in _simconnect_angle_range:
             min_range = 0
             max_range = 360
-            
+
         elif self._command in _simconnect_egt_range:
             min_range = 0
             max_range = 32767
-            
+
         elif self.command in _simconnect_full_range:
             min_range = -16383
             max_range = 16383
-            
+
         else:
             # default
             min_range = -16383
@@ -2207,35 +2232,34 @@ class SimConnectBlock():
         if self._max_range != max_range:
             self._max_range = max_range
             changed = True
-        
+
         if changed:
             self._notify_range_update()
 
     def map_range(self, value: float) -> int:
-        ''' maps the input float value -1 to +1 to the command's range '''
-        if value < -1.0: value = -1.0
-        if value > 1.0: value = 1.0
+        """maps the input float value -1 to +1 to the command's range"""
+        if value < -1.0:
+            value = -1.0
+        if value > 1.0:
+            value = 1.0
         r_min = self._min_range
         r_max = self._max_range
-        return round(r_min + (value + 1.0)*((r_max - r_min)/2.0))
-
+        return round(r_min + (value + 1.0) * ((r_max - r_min) / 2.0))
 
     @staticmethod
     def from_command(self, command):
-        ''' '''
+        """ """
         block = SimConnectBlock(command)
         return block
-    
 
     def register(self):
-        ''' registers a block command '''
+        """registers a block command"""
         if not self.sm.is_connected():
             # not connectedkl
             return False
 
         if self._command:
-            
-            if self._command_type ==  SimConnectCommandType.Event:
+            if self._command_type == SimConnectCommandType.Event:
                 ae = AircraftEvents(self.sm)
                 trigger = ae.find(self._command)
                 if trigger:
@@ -2247,14 +2271,19 @@ class SimConnectBlock():
                 ar = AircraftRequests(self.sm, time=2000)
                 self._request = ar.request(self._command)
                 if self.verbose:
-                    syslog.info(f"Simconnect: register simvar: '{self._command}' mode: {self.output_mode}")
+                    syslog.info(
+                        f"Simconnect: register simvar: '{self._command}' mode: {self.output_mode}"
+                    )
                 return True
 
-            elif self._command_type == SimConnectCommandType.Request and not self._readonly:
+            elif (
+                self._command_type == SimConnectCommandType.Request
+                and not self._readonly
+            ):
                 ar = AircraftRequests(self.sm, time=2000)
                 self._request = ar.request(self._command)
                 if self._request:
-                    self._request._ensure_def()    
+                    self._request._ensure_def()
                     self._request.callback = self.request_changed_callback
                     if self.is_periodic:
                         self.sm._request_periodic_data(self._request)
@@ -2266,170 +2295,202 @@ class SimConnectBlock():
                     syslog.error(f"Simmconnect: unknown command '{self._command}'")
                 return True
 
-        return False        
+        return False
 
     def read(self):
-        ''' gets a value from simconnect '''
+        """gets a value from simconnect"""
         if not self.sm.is_connected():
             # not connected
             return None
-        return self.execute(mode = SimConnectActionMode.GetValue)
+        return self.execute(mode=SimConnectActionMode.GetValue)
 
-    def execute(self, value = None, mode : SimConnectActionMode = None):
-        ''' executes the command '''
+    def execute(self, value=None, mode: SimConnectActionMode = None):
+        """executes the command"""
 
         if not self.sm.is_connected():
             # not connected
-            syslog.warning(f"SIMCONNECT: trigger failed - not connected ({self._command})")
+            syslog.warning(
+                f"SIMCONNECT: trigger failed - not connected ({self._command})"
+            )
             return False
-        
+
         mgr = SimConnectManager()
         verbose = gremlin.config.Configuration().verbose_mode_details
 
-        if verbose: syslog.info(f"SIMCONNECT: block execute: ({self._command})  value: ({value})")
+        if verbose:
+            syslog.info(
+                f"SIMCONNECT: block execute: ({self._command})  value: ({value})"
+            )
 
         if self._command:
             if self._command_type == SimConnectCommandType.Event:
-                if verbose: syslog.info(f"\tcommand type: event")
+                if verbose:
+                    syslog.info("\tcommand type: event")
                 ae = AircraftEvents(self.sm)
                 trigger = ae.find(self._command)
                 if trigger:
                     if self.is_readonly:
                         # no param to set
-                        if verbose: syslog.info(f"\ttrigger event (single) readonly")
+                        if verbose:
+                            syslog.info("\ttrigger event (single) readonly")
                         trigger()
                     else:
-                        if verbose: syslog.info(f"\ttrigger event value")
+                        if verbose:
+                            syslog.info("\ttrigger event value")
                         trigger(value)
                     return True
                 else:
                     syslog.error(f"SIMCONNECT: event: '{self._command}' not found")
             elif self._command_type == SimConnectCommandType.SimVar:
                 # set simvar
-                if verbose: syslog.info(f"\tcommand type: simvar")
+                if verbose:
+                    syslog.info("\tcommand type: simvar")
                 ae = AircraftEvents(self.sm)
                 request = mgr.findRequest(self._command)
                 if not request:
-                    
                     trigger = ae.find(self._command)
                     if trigger:
                         if self.is_readonly:
                             # no param to set
-                            if verbose: syslog.info(f"\ttrigger event (single): {self._command}")
+                            if verbose:
+                                syslog.info(
+                                    f"\ttrigger event (single): {self._command}"
+                                )
                             trigger()
                         else:
-                            if verbose: syslog.info(f"\ttrigger event value: {self._command} {value}")
+                            if verbose:
+                                syslog.info(
+                                    f"\ttrigger event value: {self._command} {value}"
+                                )
                             trigger(value)
                         return True
-                
+
                 if not request:
                     # register it
-                    if verbose: syslog.info(f"\tregistering request...")
-                    request = mgr.registerRequest(self._command, self._units, self._value)
+                    if verbose:
+                        syslog.info("\tregistering request...")
+                    request = mgr.registerRequest(
+                        self._command, self._units, self._value
+                    )
                 if not request:
-                    syslog.error(f"\trequest: '{self._command}' not found or could not be registered.")
+                    syslog.error(
+                        f"\trequest: '{self._command}' not found or could not be registered."
+                    )
                     return False
 
-                if verbose:  syslog.info(f"\tset simvar: '{self._command}' mode: {self.output_mode}")
+                if verbose:
+                    syslog.info(
+                        f"\tset simvar: '{self._command}' mode: {self.output_mode}"
+                    )
                 if mode is None:
                     mode = self.output_mode
                 ar = AircraftRequests()
                 if mode == SimConnectActionMode.Trigger:
                     trigger_mode = self.trigger_mode
-                    if verbose: syslog.info(f"\taircraft request trigger mode")
+                    if verbose:
+                        syslog.info("\taircraft request trigger mode")
                     match trigger_mode:
-                        case  SimConnectTriggerMode.Toggle:
+                        case SimConnectTriggerMode.Toggle:
                             # get the current state and flip it
                             if request:
                                 state = ar.get(self._command)
                                 value = 1 if state == 0 else 0
-                                if self.verbose: syslog.info(f"\t\tToggle state: {state} -> {value}")
+                                if self.verbose:
+                                    syslog.info(f"\t\tToggle state: {state} -> {value}")
                         case SimConnectTriggerMode.TurnOff:
-                            
                             value = 0
-                            if verbose: syslog.info(f"\t\tTrigger Turn off: {value}")
+                            if verbose:
+                                syslog.info(f"\t\tTrigger Turn off: {value}")
                         case SimConnectTriggerMode.TurnOn:
                             value = 1
-                            if verbose: syslog.info(f"\t\tTrigger Turn on: {value}")
+                            if verbose:
+                                syslog.info(f"\t\tTrigger Turn on: {value}")
                         case SimConnectTriggerMode.NoOp:
                             value = 1
-                            if verbose: syslog.info(f"\t\tTrigger No op: {value}")
-                            
+                            if verbose:
+                                syslog.info(f"\t\tTrigger No op: {value}")
+
                         case SimConnectTriggerMode.InputValue:
                             if isinstance(value, bool):
                                 value = 1 if value else 0
-                            if verbose: syslog.info(f"\t\tTrigger InputValue: {value}")
-                    
+                            if verbose:
+                                syslog.info(f"\t\tTrigger InputValue: {value}")
+
                     # regular request
                     request.set(value)
 
                 elif mode == SimConnectActionMode.SetValue:
-                    if verbose: syslog.info(f"\tset value mode:")
+                    if verbose:
+                        syslog.info("\tset value mode:")
                     ar.set(self._command, value)
-                    if verbose: syslog.info(f"\t\tSet value: {value}")
+                    if verbose:
+                        syslog.info(f"\t\tSet value: {value}")
                 elif mode == SimConnectActionMode.GetValue:
                     value = ar.get(self._command)
-                    if verbose: syslog.info(f"\t\tGet value: {value}")
+                    if verbose:
+                        syslog.info(f"\t\tGet value: {value}")
                     return value
 
                 return True
 
-
-
-
-
-            elif self._command_type == SimConnectCommandType.Request and not self._readonly:
-                if verbose: syslog.info(f"\tcommand type: request")
+            elif (
+                self._command_type == SimConnectCommandType.Request
+                and not self._readonly
+            ):
+                if verbose:
+                    syslog.info("\tcommand type: request")
                 ar = AircraftRequests(self.sm, time=2000)
                 self._request = ar.request(self._command)
                 if self._request:
-                    self._request._ensure_def()    
+                    self._request._ensure_def()
                     self._request.callback = self.request_changed_callback
                     if self.is_periodic:
                         self.sm._request_periodic_data(self._request)
                     else:
                         self.sm._request_data(self._request)
-                    if verbose: syslog.info(f"\tset request {self._command} {value}")
+                    if verbose:
+                        syslog.info(f"\tset request {self._command} {value}")
                 else:
                     syslog.error(f"\tError: unknown command '{self._command}'")
                 return True
 
         return False
-    
+
     def request_changed_callback(self):
-        ''' called when the request receives data '''
+        """called when the request receives data"""
         sh = SimConnectEventHandler()
         if self.verbose_detailed:
-            syslog.info(f"Simconnect block: {self._command}  Received data: {self._request.buffer}  data type: {type(self._request.buffer).__name__}")
+            syslog.info(
+                f"Simconnect block: {self._command}  Received data: {self._request.buffer}  data type: {type(self._request.buffer).__name__}"
+            )
         event = SimConnectEvent(self._command, self._request.buffer)
         sh.simconnect_event.emit(event)
-    
+
     def stop(self):
-        ''' stops a periodic request '''
+        """stops a periodic request"""
         request = self._request
-        if request is not None: # request was made
-            if self.is_periodic: # request is periodic 
-                self.sm.stop_periodic_data(request) # tell the sim to stop sending data 
-            self.sm.clear(request) # remove the definition
+        if request is not None:  # request was made
+            if self.is_periodic:  # request is periodic
+                self.sm.stop_periodic_data(request)  # tell the sim to stop sending data
+            self.sm.clear(request)  # remove the definition
 
     def to_xml(self):
-        ''' writes to an xml node block '''
+        """writes to an xml node block"""
 
         if self.is_lvar:
             # LVAR format (anything that is handled internally by the sim via calculator code)
 
-            node = etree.Element("command") # rpn
+            node = etree.Element("command")  # rpn
             node.set("type", SimConnectCommandType.to_string(self.command_type))
             if self.output_data_type:
                 node.set("datatype", self.output_data_type)
             node.set("units", self.units)
-            node.set("category","none")
+            node.set("category", "none")
             node.set("settable", str(not self._readonly))
             node.set("axis", str(self.is_axis))
             node.set("indexed", str(self.is_indexed))
 
         else:
-
             node = etree.Element("block")
 
             node.set("command", gremlin.util.safe_format(self.command, str))
@@ -2443,47 +2504,45 @@ class SimConnectBlock():
 
         return node
 
-    def from_xml(self, node, data = None, extra_data = None):
-        ''' reads from an xml node block or command '''
+    def from_xml(self, node, data=None, extra_data=None):
+        """reads from an xml node block or command"""
 
         if node.tag == "command":
             # lvar type
-            self.command = gremlin.util.safe_read(node,"command", str, "")
+            self.command = gremlin.util.safe_read(node, "command", str, "")
             self.type = SimConnectCommandType.to_enum(node.get("type"))
             if "datatype" in node.attrib:
                 self.output_data_type = node.get("datatype")
             self.units = node.get("units")
             self.category = node.get("category")
-            self.is_readonly = not gremlin.util.safe_read(node,"settable", bool, True)
-            self.axis = gremlin.util.safe_read(node,"axis", bool, False)
-            self.is_indexed = gremlin.util.safe_read(node,"indexed", bool, False)
-            
-        elif node.tag == "block":
+            self.is_readonly = not gremlin.util.safe_read(node, "settable", bool, True)
+            self.axis = gremlin.util.safe_read(node, "axis", bool, False)
+            self.is_indexed = gremlin.util.safe_read(node, "indexed", bool, False)
 
-            command = gremlin.util.safe_read(node,"command", str, "")
+        elif node.tag == "block":
+            command = gremlin.util.safe_read(node, "command", str, "")
             if not command:
                 command = SimConnectManager().get_default_command()
             self.command = command
-            self.value = gremlin.util.safe_read(node,"value", float, 0)
-            mode = gremlin.util.safe_read(node,"mode", str, "none")
+            self.value = gremlin.util.safe_read(node, "value", float, 0)
+            mode = gremlin.util.safe_read(node, "mode", str, "none")
             output_mode = SimConnectActionMode.to_enum(mode)
             if output_mode is None:
                 output_mode = SimConnectActionMode.NotSet
             self.output_mode = output_mode
 
             # trigger mode for singleton vars
-            trigger_mode = gremlin.util.safe_read(node,"trigger", str, "none")
+            trigger_mode = gremlin.util.safe_read(node, "trigger", str, "none")
             self.trigger_mode = SimConnectTriggerMode.to_enum(trigger_mode)
 
             # axis inversion
-            self.invert_axis = gremlin.util.safe_read(node,"invert", bool, False)
+            self.invert_axis = gremlin.util.safe_read(node, "invert", bool, False)
 
-            self.min_range = gremlin.util.safe_read(node,"min_range", float, -16383)
-            self.max_range = gremlin.util.safe_read(node,"max_range", float, 16383)
-        
+            self.min_range = gremlin.util.safe_read(node, "min_range", float, -16383)
+            self.max_range = gremlin.util.safe_read(node, "max_range", float, 16383)
 
+        """ updates missing values """
 
-        ''' updates missing values '''
     def update(self):
         if self._command_type == SimConnectCommandType.NotSet:
             sm = SimConnectManager()
@@ -2492,9 +2551,9 @@ class SimConnectBlock():
 
     def clone(self):
         import copy
+
         # return a clone
         return copy.deepcopy(self)
 
 
-
-_manager = SimConnectManager() 
+_manager = SimConnectManager()

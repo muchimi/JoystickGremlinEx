@@ -20,11 +20,8 @@ import sys
 from gremlin import event_handler
 sys.path.append(".")
 
-import pytest
-import uuid
 from lxml import etree as ElementTree
 
-import gremlin.error as error
 import gremlin.types as types
 import gremlin.util as util
 

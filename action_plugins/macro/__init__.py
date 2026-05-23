@@ -41,8 +41,6 @@ import gremlin.input_devices
 import gremlin.config
 import gremlin.macro_handler
 import gremlin.types
-import psygnal
-from psygnal import Signal
 from shiboken6 import Shiboken
 import html
 
@@ -672,7 +670,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
             MacroActionEditor.locked = True
             
-            if not "vjoy_selector" in self.ui_elements:
+            if "vjoy_selector" not in self.ui_elements:
                 # vJoy input selection
                 self.ui_elements["vjoy_selector"] = gremlin.ui.ui_common.VJoySelector(
                     self._modify_vjoy,
@@ -797,7 +795,7 @@ class MacroActionEditor(QtWidgets.QWidget):
                 
 
             elif action.input_type == InputType.JoystickButton:
-                if not "button_press" in self.ui_elements.keys():
+                if "button_press" not in self.ui_elements.keys():
                     self.ui_elements["button_press"] = gremlin.ui.ui_common.QDataRadioButton("Press", data = "press", callbackEx = self._modify_button_state)
                     self.ui_elements["button_release"] = gremlin.ui.ui_common.QDataRadioButton("Release", data = "release", callbackEx = self._modify_button_state)
                     self.ui_elements["button_toggle"] = gremlin.ui.ui_common.QDataRadioButton("Toggle", data = "toggle", callbackEx = self._modify_button_state)
@@ -824,7 +822,7 @@ class MacroActionEditor(QtWidgets.QWidget):
 
 
             elif action.input_type == InputType.JoystickHat:
-                if not "hat_direction" in self.ui_elements.keys():
+                if "hat_direction" not in self.ui_elements.keys():
                     self.ui_elements["hat_direction"] = gremlin.ui.ui_common.QDataComboBox()
                     directions = [
                         "Center", "North", "North East", "East", "South East",
@@ -985,7 +983,8 @@ class MacroActionEditor(QtWidgets.QWidget):
         action, state = self.state_selector.currentData() # data field contains the MacroAction the state applies to, and the state
         self.setStateDescription(state.description)
         action.state = state
-        if verbose: syslog.info(f"MACRO: set state [{state.key}] for entry [{action.id}]")
+        if verbose:
+            syslog.info(f"MACRO: set state [{state.key}] for entry [{action.id}]")
         self._update_model()
 
 
@@ -1453,7 +1452,6 @@ class MacroWidget(gremlin.input_item.AbstractActionWidget):
     """Widget which allows creating and editing of macros."""
     
 
-    from gremlin.util import get_icon_path
 
     rightPanelResize = QtCore.Signal(int) # occurs when right panel content should resize
 
@@ -1857,7 +1855,7 @@ class MacroWidget(gremlin.input_item.AbstractActionWidget):
         add_new_entry = True
         if event.event_type == InputType.JoystickAxis:
             cur_index = self.list_view.currentIndex().row()
-            entry = self.model.get_entry(cur_index)
+            _entry = self.model.get_entry(cur_index)
 
             if event in self._recording_times:
                 if time.time() - self._recording_times[event] < self._polling_rate:
@@ -2023,7 +2021,7 @@ class MacroWidget(gremlin.input_item.AbstractActionWidget):
         if indices:
 
             # warn box 
-            result = gremlin.ui.ui_common.ConfirmBox(f"Delete selected entries?")
+            result = gremlin.ui.ui_common.ConfirmBox("Delete selected entries?")
             if result:
                 rows = [idx.row() for idx in indices]
                 keep = []
@@ -2092,7 +2090,8 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         verbose = config.verbose_mode_macro
 
         
-        if verbose: syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} {str(event)}")        
+        if verbose:
+            syslog.info(f"MACROFUNCTOR: {self.action_data.comment if self.action_data.comment else ''} {str(event)}")
 
 
         if not event.is_pressed:
@@ -2103,7 +2102,8 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
             # do not execute
             return True
         
-        if verbose: syslog.info(f"\texecute")
+        if verbose:
+            syslog.info("\texecute")
         
         if self.action_data.auto_restart and self.macro.state == gremlin.macro.MacroState.Running:
             MacroFunctor.manager.terminate_macro(self.macro) # terminate existing running macro for restart
@@ -2164,7 +2164,7 @@ To send complex sequences, please look at the sequence container.'''
         ''' returns a display string for the current configuration '''
         stub = ""
         if self.repeat:
-            stub = f" (repeat)"
+            stub = " (repeat)"
         return f"Macro sequence: steps: [{len(self.sequence)}] exclusive: [{self.exclusive}] EOR: [{self.execute_on_release}] AutoRestart: [{self.auto_restart}] AutoStop: [{self.auto_stop}]{stub}"
 
     def icon(self):
@@ -2455,7 +2455,7 @@ To send complex sequences, please look at the sequence container.'''
         
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
-        from gremlin.reporting import ReportTable, ReportRow, ReportCell
+        from gremlin.reporting import ReportTable
 
 
         table = ReportTable(cellpadding=4)
