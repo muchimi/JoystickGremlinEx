@@ -47,7 +47,14 @@ class Configuration(QtCore.QObject):
 
     def get_config(self) -> str:
         """local config file (version based)"""
-        return os.path.join(self.data_path(), "config.json")
+        if __debug__:
+            dev_config_file = os.path.join(self.data_path(), "dev_config.json")
+            config_file = os.path.join(self.data_path(), "config.json")
+            if os.path.isfile(config_file) and not os.path.isfile(dev_config_file):
+                shutil.copy(config_file, dev_config_file)
+            
+        config_file = dev_config_file if __debug__ else config_file
+        return config_file
 
     def get_backup_config(self) -> str:
         import gremlin.util
@@ -813,7 +820,7 @@ class Configuration(QtCore.QObject):
         :param value Flag indicating whether or not to enable / disable the
             feature
         """
-        if type(value) == bool:
+        if isinstance(value, bool):
             self._data["autoload_profiles"] = value
             self.save()
             el = gremlin.event_handler.EventListener()
@@ -968,7 +975,7 @@ class Configuration(QtCore.QObject):
 
     @enable_remote_control.setter
     def enable_remote_control(self, value):
-        if type(value) == bool:
+        if isinstance(value, bool):
             self._set_data("allow_remote_control", value)
 
     @property
@@ -980,7 +987,7 @@ class Configuration(QtCore.QObject):
     def enable_remote_broadcast(self, value):
         """remote broadcast master switch enable"""
         if (
-            type(value) == bool
+            isinstance(value, bool)
             and self._get_data("enable_remote_broadcast", False) != value
         ):
             self._set_data("enable_remote_broadcast", value)
@@ -1016,12 +1023,12 @@ class Configuration(QtCore.QObject):
 
     @server_port.setter
     def server_port(self, value):
-        if type(value) == float:
+        if isinstance(value, float):
             value = int(value)
-        elif type(value) == str and value.isnumeric():
+        elif isinstance(value, str) and value.isnumeric():
             value = int(value)
 
-        if type(value) == int:
+        if isinstance(value, int):
             self._set_data("server_port", value)
 
     @property

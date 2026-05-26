@@ -2383,7 +2383,7 @@ class AxisCurveData:
         table.addField("Deadzone Ctr High", f"{self.deadzone[2]}")
         table.addField("Deadzone High", f"{self.deadzone[3]}")
         table.addField("Filtered", "Yes" if self.isFiltered else "No")
-        if self.isFiltered:
+        if self.isincluded:
             table.addField("Filter Samples", f"{self.filterSamples:,}")
             table.addField("Filter Window", f"{self.filterWindow:,}")
             table.addField("Filter PolyOrder", f"{self.filterOrder}")
@@ -2564,7 +2564,7 @@ class AxisCurveData:
 
     def filter_update(self):
         """updates the curve filter"""
-        if self.isFiltered:
+        if self.isincluded:
             if not self.curve_filter:
                 self.curve_filter = SmoothingFilter(
                     self.filterSamples, self.filterWindow, self.filterOrder

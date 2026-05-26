@@ -2,11 +2,6 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "type": "austin",
-            "file": "C:\\JoystickGremlin-develop\\gremlinEx.py",
-            "label": "profile with austin gremlinEx",
-        },
-        {
             "type": "flamegraph",
             "file": "C:\\JoystickGremlin-develop\\gremlinEx.py",
             "label": "Flamegraph: profile gremlinex"

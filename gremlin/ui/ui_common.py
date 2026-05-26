@@ -4711,28 +4711,15 @@ class QDataPushButton(QtWidgets.QPushButton):
 
         self._callback = callback
         self._callback_ex = callbackEx
-        self._enhanced = enhanced
+        self._enhanced = enhanced or callbackEx is not None
 
         if enabled is not None:
             self.setEnabled(enabled)
         if clicked:
             self.clicked.connect(clicked)
 
-        if enhanced:
-            self.installEventFilter(self)
+        self.installEventFilter(self)
 
-    def setEnhanced(self, value: bool):
-        """enable enhanced shift states and double click tracking on/off"""
-        if self._enhanced != value:
-            self._enhanced = value
-            if value:
-                self.installEventFilter(self)
-            else:
-                self.removeEventFilter(self)
-
-    def enhanced(self) -> bool:
-        """gets the enhanced state for tracking states and double click"""
-        return self._enhanced
 
     def _handle_callback(self):
         if self._callback:
@@ -5993,7 +5980,8 @@ class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
     def _do_hook(self):
         global _hook_registry
         if self._hook_requested and not self._hooked:
-            verbose = gremlin.config.Configuration().verbose_mode_hooks
+            config = gremlin.config.Configuration()
+            verbose = config.verbose_mode_hooks or config.verbose_mode_ui
 
             if (
                 self._hook_id
@@ -6141,7 +6129,7 @@ class ButtonStateWidget(QtWidgets.QWidget):
     ):
         self._description = (
             description
-            or f"repeater (button): [{gremlin.joystick_handling.getDeviceName(self.device_guid)}] input id: [{self.input_id}]"
+            or f"repeater (button): [{gremlin.joystick_handling.getDeviceName(device_guid)}] input id: [{input_id}]"
         )
         changed = False
         if self._hook_id != hook_id:
@@ -10692,14 +10680,11 @@ class QRememberMainWindow(QtWidgets.QMainWindow):
     def __init__(self, key: str, parent=None):
         super().__init__(parent)
 
-        self._resize_count = 0
         assert key, "unique key must be provided"
         self._window_key = key
-        self._position = None  # saved window position
-        self._size = None  # saved window size
-
-        self.active_screen = QtWidgets.QApplication.screenAt(self.pos())
+        self.active_screen = self.getActiveScreen()
         self._apply_window_settings()
+        
 
     def _apply_window_settings(self):
         """Restores the stored window geometry settings."""
@@ -10715,13 +10700,13 @@ class QRememberMainWindow(QtWidgets.QMainWindow):
 
     def getActiveScreen(self):
         """gets the screen the application is on"""
-        pos = self.frameGeometry()  # save the position
+        pos = self.frameGeometry().topLeft()  # save the position
         return QtWidgets.QApplication.screenAt(pos)
 
     def closeEvent(self, event):
         # save the window position
         config = gremlin.config.Configuration()
-        pos = self.frameGeometry()  # save the position
+        pos = self.frameGeometry().topLeft()  # save the position
 
         if pos is not None:
             # save position information
@@ -10848,8 +10833,9 @@ class QRememberDialog(QtWidgets.QDialog):
         if window_size:
             size = QtCore.QSize(window_size[0], window_size[1])
             return size.expandedTo(hint_size)
-        else:
-            hint_size
+        
+        return hint_size
+        
 
     def showEvent(self, event):
         """occurs when window is displayed (made visible)"""
@@ -13584,7 +13570,7 @@ class QJoystickInputWidget(QtWidgets.QWidget):
                 total_count = device.axis_count + device.button_count + device.hat_count
                 tooltip = f"Showing {visible_count} out of {total_count} inputs"
                 label = QtWidgets.QLabel(
-                    f"<span style='color: {fcolor}; font-weight: bold;'>{visible_count}</span>/{total_count}"
+                    f"(<span style='color: {fcolor}; font-weight: bold;'>{visible_count}</span>/{total_count})"
                 )
                 label.setToolTip(tooltip)
                 widgets.append(label)

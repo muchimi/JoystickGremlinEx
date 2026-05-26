@@ -26,6 +26,8 @@ import threading
 import time
 import shutil
 import uuid
+import json
+import hashlib
 import dinput
 import win32api
 import win32con
@@ -762,9 +764,6 @@ def find_folders(root_folder, source_pattern="*") -> list:
     return [os.path.join(root_folder, folder) for folder in folders]
 
 
-
-
-
 @gremlin.singleton_decorator.SingletonDecorator
 class SearchCache:
     """file search cache service"""
@@ -1425,7 +1424,8 @@ def get_xml_input_data(node, extra_data=None):
     return (device_guid, input_type, input_id, mode)
 
 
-def parse_guid(value) -> uuid.UUID:
+
+def parse_guid(value) -> dinput.GUID:
     """Reads a string GUID representation into the internal data format.
 
     This transforms a GUID of the form {B4CA5720-11D0-11E9-8002-444553540000}
@@ -1438,11 +1438,11 @@ def parse_guid(value) -> uuid.UUID:
 
     if value is None or value == "None" or not value:
         return None
-    if isinstance(value, str) and len(value) < 32:
+    elif isinstance(value, str) and len(value) < 32:
         return None
-    if isinstance(value, dinput.GUID):
+    elif isinstance(value, dinput.GUID):
         return uuid.UUID(int=value._guid_int)
-    if isinstance(value, uuid.UUID):
+    elif isinstance(value, uuid.UUID):
         return value
     try:
         tmp = uuid.UUID(value)
@@ -1453,10 +1453,13 @@ def parse_guid(value) -> uuid.UUID:
         for i in range(8):
             raw_guid.Data4[i] = tmp.bytes[8 + i]
 
-        return dinput.GUID(raw_guid)
+        value =  dinput.GUID(raw_guid)
+        assert isinstance(value, dinput.GUID)
+        return value
     except Exception:
         syslog.error(f"Failed parsing GUID from value [{value}]")
-        return None
+        raise ValueError(f"Failed parsing GUID from value [{value}]")
+        
 
 
 def parse_bool(value, default_value=False):
@@ -1946,7 +1949,7 @@ class InvokeUiMethod(QtCore.QObject):
             self.setParent(QtWidgets.QApplication.instance())
             self._called.connect(self._execute)
             self.method = method
-            #self._waiting = True
+            # self._waiting = True
             # syslog.info("invoke: call start")
             self._called.emit(
                 self._p0,
@@ -2463,7 +2466,16 @@ def normalize_guid(device_guid) -> str:
     return device_guid
 
 
-def to_guid(device_guid) -> uuid.UUID:
+def to_guid(device_guid) -> dinput.GUID:
+    ''' converts a device guid in whatever form to a dinput GUID'''
+    if device_guid is None:
+        return None
+    if isinstance(device_guid, dinput.GUID):
+        return device_guid
+    return dinput.GUID(device_guid)
+    
+
+def to_uuid(device_guid) -> uuid.UUID:
     """converts a string GUID to a GUID"""
     if device_guid is None:
         return None
@@ -2475,7 +2487,7 @@ def to_guid(device_guid) -> uuid.UUID:
         device_guid = device_guid.toId()
     if isinstance(device_guid, str):
         return uuid.UUID(device_guid)
-    raise ValueError(f"Unable to convert [{device_guid}] to a GUID")
+    raise ValueError(f"Unable to convert [{device_guid}] to a UUID")
 
 
 def compare_guid(id1, id2) -> bool:
@@ -2845,3 +2857,30 @@ class TriggerDict(collections.UserDict):
     def __hash__(self):
         """make this dict hashable"""
         return hash(frozenset(self.values()))
+
+
+def sortDict(d: dict):
+    """sorts a dictionary by value"""
+    if not isinstance(d, dict):
+        return d
+    # Sort keys of the current dict and apply recursively to values
+    return {k: sortDict(v) for k, v in sorted(d.items())}
+
+
+class jsonDictEncoder(json.JSONEncoder):
+    """custom json encoder for dictionaries with unique types that need converted"""
+
+    def default(self, obj):
+        if isinstance(obj, dinput.GUID):
+            return ("dinput.GUID", obj._guid_int)
+        if isinstance(obj, uuid.UUID):
+            return ("uuid.UUID", obj.int)
+        return super().default(obj)()
+
+
+def hashDict(d: dict):
+    """computes a hash of a dictionary - all keys and items in the dict must be json serializable"""
+    dump = json.dumps(d, sort_keys=True).encode(
+        "utf-8"
+    )  # sort keys so they are in the same sequence between dictionaries
+    return hash(dump)

@@ -2762,7 +2762,7 @@ class StateFilterWidget(QtWidgets.QWidget):
         if total == 0:
             msg = "<i>(no states found)</i>"
         elif filtered != total:
-            msg = f"<i>({filtered:,} of {total:,} state{plural})</i>"
+            msg = f"<i>({included:,} of {total:,} state{plural})</i>"
         else:
             msg = f"<i>({total:,} state{plural})</i>"
         self._count_widget.setText(msg)

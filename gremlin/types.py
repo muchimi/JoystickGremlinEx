@@ -221,7 +221,6 @@ _control_action_display = {
 }
 
 
-        
 
 class DeviceType(IntEnum):
 

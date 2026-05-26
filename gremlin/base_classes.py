@@ -28,19 +28,23 @@ import uuid
 import dinput
 from gremlin.util import TriggerDict
 import _collections_abc
+import gremlin.joystick_handling
+
 
 syslog = logging.getLogger("system")
 
+
 def _get_input_item(parent):
-    ''' gets the InputItem parent hierarchy if it exists '''
+    """gets the InputItem parent hierarchy if it exists"""
     import gremlin.input_item
     import gremlin.profile_graph
+
     while parent is not None:
         if isinstance(parent, gremlin.input_item.InputItem):
             break
         if isinstance(parent, gremlin.profile_graph.ProfileInputNode):
             return parent.input_item
-        if hasattr(parent,"parent"):
+        if hasattr(parent, "parent"):
             parent = parent.parent
         else:
             parent = None
@@ -51,17 +55,16 @@ def _get_input_item(parent):
 
 
 def _is_curve_tag(tag):
-     ''' true if a curve tag'''
-     if tag:
-        return tag.casefold() in ("curve-data","response-curve","response-curve-ex")
-     return False
-
+    """true if a curve tag"""
+    if tag:
+        return tag.casefold() in ("curve-data", "response-curve", "response-curve-ex")
+    return False
 
 
 class TraceableList(MutableSequence):
-    ''' implements a custom list that can be traced when it changes  '''
+    """implements a custom list that can be traced when it changes"""
 
-    def __init__(self, initlist=None, callback = None):
+    def __init__(self, initlist=None, callback=None):
         MutableSequence.__init__(self)
 
         self.data = []
@@ -78,26 +81,25 @@ class TraceableList(MutableSequence):
             else:
                 self.data = list(initlist)
 
-    def add_callback(self, callback : Callable):
-        ''' adds a callback - signature (action: str, index: int, value [optional object])'''
+    def add_callback(self, callback: Callable):
+        """adds a callback - signature (action: str, index: int, value [optional object])"""
         assert callable(callback), "Callback must be a callable method"
         if callback not in self._callbacks:
             self._callbacks.append(callback)
 
-    def remove_callback(self, callback : Callable):
-        ''' removes a callback '''
+    def remove_callback(self, callback: Callable):
+        """removes a callback"""
         assert callable(callback), "Callback must be a callable method"
         if callback in self._callbacks:
             self._callbacks.remove(callback)
 
     def clear_callbacks(self):
-        ''' removes all callbacks '''
+        """removes all callbacks"""
         self._callbacks.clear()
 
-    def _trigger(self, action, index = None, value = None):
+    def _trigger(self, action, index=None, value=None):
         for callback in self._callbacks:
             callback(self, action, index, value)
-
 
     def __repr__(self):
         return """<{} data: {}>""".format(self.__class__.__name__, repr(self.data))
@@ -197,17 +199,16 @@ class TraceableList(MutableSequence):
     def append(self, value):
         self.data.append(value)
         if self._callbacks:
-            self._trigger("append",value)
-
+            self._trigger("append", value)
 
     def insert(self, idx, value):
         if self._callbacks:
-            self._trigger("insert",value)
+            self._trigger("insert", value)
         self.data.insert(idx, value)
 
     def pop(self, idx=-1):
         if self._callbacks:
-            self._trigger("pop",idx)
+            self._trigger("pop", idx)
         return self.data.pop(idx)
 
     def remove(self, value):
@@ -238,21 +239,26 @@ class TraceableList(MutableSequence):
     def extend(self, other):
         data = other.data if isinstance(other, TraceableList) else other
         self.data.extend(data)
-        self._trigger("extend", value = data)
+        self._trigger("extend", value=data)
 
     def to_list(self):
         return self.data
 
+
 def empty_copy(obj):
     class Empty(obj.__class__):
-        def __init__(self): pass
-    newcopy = Empty(  )
+        def __init__(self):
+            pass
+
+    newcopy = Empty()
     newcopy.__class__ = obj.__class__
     return newcopy
 
+
 class DataList(list):
-    ''' a list if a data member to track information about the list '''
-    def __init__(self, data = None):
+    """a list if a data member to track information about the list"""
+
+    def __init__(self, data=None):
         super().__init__()
         self.data = data
 
@@ -261,49 +267,51 @@ class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
     pass
 
 
-
 class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
+    """base class for input items for MIDI, OSC, KEYBOARD and STATE items"""
 
-    ''' base class for input items for MIDI, OSC, KEYBOARD and STATE items '''
+    input_type_change = Signal(
+        object
+    )  # fires when an input item needs to refresh the output mapping due to input type changed
 
-    input_type_change = Signal(object) # fires when an input item needs to refresh the output mapping due to input type changed
-
-    def __init__(self, mode : str | object, device_guid):
+    def __init__(self, mode: str | object, device_guid):
 
         super().__init__()
-        self._id =  uuid.uuid4() # GUID (unique) if loaded from XML - will reload that one
-        self._guid = str(self.id).replace("-","")
+        self._id = (
+            uuid.uuid4()
+        )  # GUID (unique) if loaded from XML - will reload that one
+        self._guid = str(self.id).replace("-", "")
         self._device_guid = device_guid
-        self._input_id : int | any = None # input Id on the hardware (can be a int or a class)
-        self._input_type : InputType = InputType.NotSet
-        self._display_name : str = None
-        self._description : str = None
-        self._input_description : str = None
-        self._axis_value : float = None
-        self._button_value : bool = False # true if the equivalent of "pressed"
-        self._is_action : bool = False
-        self._is_axis : bool = False
-        self._is_button : bool = True
-        self._input_type : InputType = None
+        self._input_id: int | any = (
+            None  # input Id on the hardware (can be a int or a class)
+        )
+        self._input_type: InputType = InputType.NotSet
+        self._display_name: str = None
+        self._description: str = None
+        self._input_description: str = None
+        self._axis_value: float = None
+        self._button_value: bool = False  # true if the equivalent of "pressed"
+        self._is_action: bool = False
+        self._is_axis: bool = False
+        self._is_button: bool = True
+        self._input_type: InputType = None
         if isinstance(mode, str):
-            self._profile_mode : str = mode # profile mode
+            self._profile_mode: str = mode  # profile mode
         else:
             # using Mode object
             self._profile_mode = mode.name
-        self._sort_index : int = None # sorting index (int)
-        self._input_id_callback = None # optional callback
+        self._sort_index: int = None  # sorting index (int)
+        self._input_id_callback = None  # optional callback
 
-
-    def setInputIdCallback(self, callback : Callable):
-        ''' callback to use (optional) to get the input id '''
+    def setInputIdCallback(self, callback: Callable):
+        """callback to use (optional) to get the input id"""
         if callback is not None:
             assert callable(callback), "Callback must be a callable method"
         self._input_id_callback = callback
 
-
     @property
     def descriptionReadOnly(self) -> bool:
-        ''' true if description is readonly'''
+        """true if description is readonly"""
         return self._description_readonly
 
     @descriptionReadOnly.setter
@@ -312,25 +320,26 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     @property
     def guid(self):
-        ''' id in string format '''
+        """id in string format"""
         return self._guid
 
     @property
     def id(self):
         return self._id
+
     # has no setter by design
 
     def setId(self, value):
-        assert isinstance(value, uuid.UUID),"Invalid ID - must be a UUID"
+        assert isinstance(value, uuid.UUID), "Invalid ID - must be a UUID"
         self._id = value
-        self._guid = str(value).replace("-","")
+        self._guid = str(value).replace("-", "")
 
     @property
     def display_name(self):
-        ''' display name for this input '''
+        """display name for this input"""
         return self._display_name
 
-    def setDisplayName(self, value : str):
+    def setDisplayName(self, value: str):
         self._display_name = value
 
     @property
@@ -341,27 +350,25 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     def description(self, value) -> str:
         self._description = value
 
-    def setDescription(self, value : str):
+    def setDescription(self, value: str):
         if value != self._description:
             self._description = value
 
     @property
     def input_description(self) -> str:
-        ''' gets the description for this input if any '''
+        """gets the description for this input if any"""
         return self._input_description
 
-
-    def setInputType(self, value : InputType):
-        ''' force a different input type '''
+    def setInputType(self, value: InputType):
+        """force a different input type"""
         self._input_type = value
 
-    def setInputDescription(self, value : str):
+    def setInputDescription(self, value: str):
         self._input_description = value
-
 
     @property
     def axis_value(self) -> float:
-        ''' gets the current axis value '''
+        """gets the current axis value"""
         return self.getAxisValue()
 
     def getAxisValue(self):
@@ -369,16 +376,15 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
             return 0.0
         return self._axis_value
 
-    def setAxisValue(self, value : float):
-        ''' sets the axis value and triggers a joystick input event
+    def setAxisValue(self, value: float):
+        """sets the axis value and triggers a joystick input event
 
         :param value: the floating point value to set (-1 to +1)
         :param emit: flag to trigger a joystick event if the value is set
 
-        '''
+        """
         if self.axis_value is None or value != self._axis_value:
             self._axis_value = value
-
 
     def getOverrideInputType(self):
         # override input type
@@ -393,29 +399,30 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     @property
     def is_action(self) -> bool:
-        ''' true if the item is action '''
+        """true if the item is action"""
         return self._is_action
+
     @is_action.setter
-    def is_action(self, value : bool):
+    def is_action(self, value: bool):
         self._is_action = value
 
     @property
     def is_axis(self) -> bool:
-        ''' true if this item is setup as an axis input (linear) '''
+        """true if this item is setup as an axis input (linear)"""
         return self._is_axis or self._input_type == InputType.JoystickAxis
+
     @is_axis.setter
-    def is_axis(self, value : bool):
+    def is_axis(self, value: bool):
         self._is_axis = value
 
     @property
     def is_button(self) -> bool:
-        ''' true if this item is setup as an axis input (momentary) '''
+        """true if this item is setup as an axis input (momentary)"""
         return not self.is_axis
-
 
     @property
     def message_key(self):
-        assert False,"message_key property must be implemented by subclass"
+        assert False, "message_key property must be implemented by subclass"
 
     @property
     def input_id(self):
@@ -429,75 +436,79 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     def setInputId(self, value):
         if value != self._input_id:
-            assert isinstance(value, int) or isinstance(value, AbstractInputItem),f"Invalid input id: {value}"
-            assert isinstance(value, _collections_abc.Hashable),f"Invalid input id - must be hashable:  {value} "
+            assert isinstance(value, int) or isinstance(value, AbstractInputItem), (
+                f"Invalid input id: {value}"
+            )
+            assert isinstance(value, _collections_abc.Hashable), (
+                f"Invalid input id - must be hashable:  {value} "
+            )
 
             self._input_id = value
 
-
     @property
     def input_type(self) -> InputType:
-        ''' input type '''
+        """input type"""
         return self._input_type
 
     @input_type.setter
-    def input_type(self, value : InputType):
+    def input_type(self, value: InputType):
         self._input_type = value
 
     @property
     def device_guid(self):
-        ''' device guid '''
+        """device guid"""
         return self._device_guid
 
     @property
     def profile_mode(self) -> str:
         return self._profile_mode
+
     @profile_mode.setter
-    def profile_mode(self, mode : str):
+    def profile_mode(self, mode: str):
         self._profile_mode = mode
 
     @property
     def index(self) -> int:
-        ''' input index within the mode and input type '''
+        """input index within the mode and input type"""
         if self._sort_index is None:
             # index not set
             if isinstance(self._input_id, int):
                 # use input ID if the index is numeric
                 return self._input_id
-            return -1 # not set
+            return -1  # not set
         return self._sort_index
 
     @index.setter
-    def index(self, value : int):
+    def index(self, value: int):
         self._sort_index = value
-
 
     @abstractmethod
     def to_xml(self):
-        ''' must implement '''
+        """must implement"""
         pass
 
     @abstractmethod
-    def parse_xml(self, data = None):
-        ''' must implement '''
+    def parse_xml(self, data=None):
+        """must implement"""
         pass
 
     def __getstate__(self):
-        ''' manual pickle to XML '''
+        """manual pickle to XML"""
         return self.to_xml()
 
     def __setstate__(self, data):
-        ''' manual unpickle '''
+        """manual unpickle"""
         self.parse_xml(data)
 
     def __hash__(self):
         # unique ID
         return hash((self._device_guid, self._input_type, self._input_id))
-        #return hash(self._id)
+        # return hash(self._id)
 
 
 class SpecialInputItem(AbstractInputItem):
-    ''' specialized input item '''
+    """specialized input item"""
+
     def __init__(self, name):
         super().__init__()
         self._display_name = name
@@ -513,33 +524,35 @@ class SpecialInputItem(AbstractInputItem):
 
 pickle_targets = {}
 
-class PickleTarget():
-    ''' helper class to pickle objects that don't want to be pickled
+
+class PickleTarget:
+    """helper class to pickle objects that don't want to be pickled
 
     The way this works is we store the object to pickle in a local cache, give it a unique ID, and use that as the pickled value because the ID does pickle.
     When the object is unpickled, we retrieve the object from the cache, remove it from the cache and return the original.
 
     Pickling is automatic and occurs when cloning objects for example.
 
-    '''
+    """
 
     def __init__(self, item):
         self._item = item
 
     def __getstate__(self):
-        ''' pickle '''
+        """pickle"""
         from gremlin.util import get_guid
+
         id = get_guid()
         pickle_targets[id] = self.item
         self.id = id
-        #print (f"pickled to id: {id}")
+        # print (f"pickled to id: {id}")
         return self.id
 
     def __setstate__(self, id):
-        ''' unpickle '''
-        #print (f"pickled from id: {id}")
+        """unpickle"""
+        # print (f"pickled from id: {id}")
         if id in pickle_targets:
-            #print ("target found")
+            # print ("target found")
             self.item = pickle_targets[id]
             del pickle_targets[id]
         return self
@@ -553,12 +566,9 @@ class PickleTarget():
         self._item = value
 
 
-from gremlin.input_types import InputType
-import gremlin.joystick_handling
-
 
 class BaseCallbacks(QtCore.QObject):
-    ''' base class implementing callback functionality'''
+    """base class implementing callback functionality"""
 
     def __init__(self):
         super().__init__()
@@ -576,19 +586,16 @@ class BaseCallbacks(QtCore.QObject):
         self._callbacks.clear()
 
     def DoCallbacks(self):
-        ''' runs the callbacks '''
+        """runs the callbacks"""
         for callback in self._callbacks:
             callback(self)
+
 
 class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
     pass
 
 
-
-
-
 class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
-
     """Base class for all items holding profile data.
 
     This is primarily used for containers and actions to represent their
@@ -605,10 +612,11 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         assert parent is not None
         self.code = None
         self._id = gremlin.util.get_guid(no_brackets=True)
-        self._input_item : gremlin.input_item.InputItem = gremlin.input_item._get_input_item(parent)
+        self._input_item: gremlin.input_item.InputItem = (
+            gremlin.input_item._get_input_item(parent)
+        )
 
-
-        generic_icon = os.path.join(os.path.dirname(__file__),"generic.png")
+        generic_icon = os.path.join(os.path.dirname(__file__), "generic.png")
         if os.path.isfile(generic_icon):
             self._generic_icon = generic_icon
         else:
@@ -622,14 +630,13 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
             self.override_input_type = None
             self.override_input_id = None
 
-
     def icon(self):
-        ''' gets the default icon'''
+        """gets the default icon"""
         from gremlin.util import get_generic_icon
+
         return get_generic_icon()
 
-
-    def from_xml(self, node, data = None, extra_data = None):
+    def from_xml(self, node, data=None, extra_data=None):
         """Initializes this node's values based on the provided XML node.
 
         :param node the XML node to use to populate this instance
@@ -662,7 +669,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         return None
 
     def get_input_id(self):
-        ''' gets the input id'''
+        """gets the input id"""
         if self.override_input_id is not None:
             return self.override_input_id
         if self._input_item is not None:
@@ -670,17 +677,15 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         return None
 
     def get_input_item(self):
-        ''' gets the input item '''
+        """gets the input item"""
         return self._input_item
 
-
     def update_inputs(self, item_data):
-        ''' updates inputs from another profile entry '''
+        """updates inputs from another profile entry"""
         self._input_item.setInputId(item_data.input_id)
         self._input_item.device_guid = item_data.device_guid
         self._input_item.device_name = item_data.device_name
         self._input_item.device_type = item_data.device_type
-
 
     def get_mode(self):
         """Returns the Mode this data entry belongs to.
@@ -713,17 +718,15 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         return None
 
     def get_device_name(self):
-        ''' returns the name of the currently attached device '''
+        """returns the name of the currently attached device"""
         if self._input_item is not None:
             return self._input_item.device_name
         return None
 
     @property
     def input_display_name(self):
-        ''' gets a config display string for the input '''
+        """gets a config display string for the input"""
         return f"{gremlin.shared_state.get_device_name(self.get_device_guid())} {InputType.to_display_name(self.get_input_type())} {self.get_input_id()}"
-
-
 
     def get_settings(self):
         """Returns the Settings data of the profile.
@@ -738,17 +741,14 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         #     item = item.parent
         # return item.settings
 
-
     @property
     def input_item(self):
         return self._input_item
 
-
-
     @property
     def hardware_device(self):
-        ''' gets the hardware device attached to this action or container '''
-        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        """gets the hardware device attached to this action or container"""
+        profile: gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         device_guid = self.hardware_device_guid
         if device_guid in profile.devices:
             return profile.devices[device_guid]
@@ -756,7 +756,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
 
     @property
     def hardware_input_id(self):
-        ''' gets the input id on the hardware device attached to this '''
+        """gets the input id on the hardware device attached to this"""
         if self.override_input_id is not None:
             return self.override_input_id
         return self.input_item.input_id if self.input_item else None
@@ -766,8 +766,8 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         return self._input_item.input_type if self._input_item else None
 
     @property
-    def hardware_input_type(self) -> InputType :
-        ''' gets the type of hardware device attached to this '''
+    def hardware_input_type(self) -> InputType:
+        """gets the type of hardware device attached to this"""
         if self._input_item:
             input_id = self._input_item.input_id
             input_type = None
@@ -779,38 +779,33 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
             return self.override_input_type
         return self._input_item.input_type if self._input_item else None
 
-
     @property
     def hardware_input_type_name(self) -> str:
-        ''' gets the type name of hardware device attached to this '''
+        """gets the type name of hardware device attached to this"""
         return InputType.to_display_name(self.hardware_input_type)
-
-
-
 
     @property
     def profile_mode(self) -> str:
-        ''' gets the mode of this action '''
+        """gets the mode of this action"""
         return self.get_mode()
 
     @property
     def hardware_device_guid(self) -> dinput.GUID:
-        ''' gets the currently attached hardware GUID '''
+        """gets the currently attached hardware GUID"""
         return self.input_item.device_guid if self.input_item else None
-
 
     @property
     def hardware_device_id(self) -> str:
-        ''' gets the currently attached hardware GUID '''
+        """gets the currently attached hardware GUID"""
         return str(self.input_item.device_guid) if self.input_item else None
 
     @property
     def hardware_device_name(self) -> str:
-        ''' gets the currently attached hardware name '''
+        """gets the currently attached hardware name"""
         return self.get_device_name()
 
     @abstractmethod
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         """Implementation of the XML parsing.
 
         :param node the XML node to use to populate this instance
@@ -833,22 +828,19 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         """
         pass
 
-    #@abstractmethod
+    # @abstractmethod
     def _sanitize(self):
         pass
 
 
-
 class AbstractModel(QtCore.QAbstractItemModel):
-
     """Base class for MVC models."""
 
     data_changed = QtCore.Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.id = uuid.uuid4() # unique ID of this model
-
+        self.id = uuid.uuid4()  # unique ID of this model
 
     def rows(self):
         """Returns the number of rows in the model.
@@ -859,12 +851,12 @@ class AbstractModel(QtCore.QAbstractItemModel):
 
     def count(self):
         return self.rows()
-    
+
     def __iter__(self):
-        ''' generator '''
+        """generator"""
         assert False, "method must be implemented in the derived class"
 
-    def data(self, index : int):
+    def data(self, index: int):
         """Returns the data entry stored at the provided index.
 
         :param index the index for which to return data
@@ -873,7 +865,7 @@ class AbstractModel(QtCore.QAbstractItemModel):
         assert False, "method must be implemented in the derived class"
 
     def add(self, data):
-        """Adds a new entry to the model. """
+        """Adds a new entry to the model."""
         assert False, "method must be implemented in the derived class"
 
     def remove(self, data):
@@ -884,36 +876,37 @@ class AbstractModel(QtCore.QAbstractItemModel):
         """Removes all the given entry from the model."""
         assert False, "method must be implemented in the derived class"
 
-    def refresh(self, force = False, emit = True):
+    def refresh(self, force=False, emit=True):
         """
         Refreshes the model, triggering a data changed event if the model data was changed and not emitted yet
-        """ 
+        """
         assert False, "method must be implemented in the derived class"
 
     def modelChanged(self) -> bool:
-        ''' true if the model changed since the last change event was fired '''
+        """true if the model changed since the last change event was fired"""
         assert False, "method must be implemented in the derived class"
 
-     
 
 class AbstractCallbackModel(AbstractModel):
-    ''' adds callbacks and propagation on change to a regular model
-     
-        supports filtered model data to show a subset of items in the model
-       
-    '''
+    """adds callbacks and propagation on change to a regular model
 
-    
+    supports filtered model data to show a subset of items in the model
 
-    def __init__(self,
-                 change_callback : Callable = None,
-                 filter_callback : Callable[[object],bool] = None,
-                 sort_callback: Callable[[_collections_abc.Iterable],_collections_abc.Iterable] = None,
-                 added_callback: Callable[[object], (object, int, int)] = None, 
-                 removed_callback: Callable[[object]] = None, 
-                 allowed_types : tuple = None, 
-                 model_description : str = None):
-        ''' callback enabled model
+    """
+
+    def __init__(
+        self,
+        change_callback: Callable = None,
+        filter_callback: Callable[[object], bool] = None,
+        sort_callback: Callable[
+            [_collections_abc.Iterable], _collections_abc.Iterable
+        ] = None,
+        added_callback: Callable[[object], (object, int, int)] = None,
+        removed_callback: Callable[[object]] = None,
+        allowed_types: tuple = None,
+        model_description: str = None,
+    ):
+        """callback enabled model
         :param callback: optional initial callback
         :param filter_callback: optional filtering callback for models that are filtered, takes in an object and returns True if the item should be included in the filter
         :param sort_callback: optional sorting callback for models that need sorted data - sends the list of items in the model and the return should be a list of indices for each item in the order of appearance
@@ -921,30 +914,43 @@ class AbstractCallbackModel(AbstractModel):
         :param removed_callback: optional callback when an item is removed from the model (unfiltered)
         :param allowable types: optiona list of allowable types in the model
 
-        '''
+        """
         super().__init__()
-        self._old_hash = None # last change hash
+        self._old_hash = None  # last change hash
         self._data_changed_callbacks = []
 
-        self._index_map = TriggerDict() # map of input_id to index
-        self._index_map.addCallback(self._handle_data_changed) # only track one of the two maps as a change in one also changes the other
-        self._item_map = TriggerDict() # map of input_id to index
+        self._index_map = TriggerDict()  # map of input_id to index
+        self._index_map.addCallback(
+            self._handle_data_changed
+        )  # only track one of the two maps as a change in one also changes the other
+        self._item_map = TriggerDict()  # map of input_id to index
 
         # assume no filters
         self._filtered_item_map = self._index_map
         self._filtered_index_map = self._item_map
 
-        self._filtered_callback : Callable = None
-        self._sort_callback : Callable = None
-        self._filtered_enabled : bool = None
-        self._sort_enabled : bool = None
-        
+        self._filtered_callback: Callable = None
+        self._sort_callback: Callable = None
+        self._filtered_enabled: bool = None
+        self._sort_enabled: bool = None
 
-        assert isinstance(change_callback, callable) if change_callback is not None else True, "Invalid change callback"
-        assert isinstance(allowed_types, tuple) if allowed_types is not None else True, "allowed types must be a tuple"
+        assert (
+            isinstance(change_callback, callable)
+            if change_callback is not None
+            else True
+        ), "Invalid change callback"
+        assert (
+            isinstance(allowed_types, tuple) if allowed_types is not None else True
+        ), "allowed types must be a tuple"
 
-        assert isinstance(added_callback, callable) if added_callback is not None else True, "Invalid add callback"
-        assert isinstance(removed_callback, callable) if removed_callback is not None else True, "Invalid remove callback"
+        assert (
+            isinstance(added_callback, callable) if added_callback is not None else True
+        ), "Invalid add callback"
+        assert (
+            isinstance(removed_callback, callable)
+            if removed_callback is not None
+            else True
+        ), "Invalid remove callback"
 
         self._add_callback = added_callback
         self._remove_callback = removed_callback
@@ -953,63 +959,68 @@ class AbstractCallbackModel(AbstractModel):
         self.setFilterCallback(filter_callback)
 
         self._show_filtered_only = False
-        
-        assert model_description,"model description not provided"
+
+        assert model_description, "model description not provided"
         self._model_description = model_description
-        
+
         self._allowed_types = allowed_types
-        self._suspend_stack = 0 # tracks suspension of change events
-        self._change_pending = False # true if a change is pending
-        
+        self._suspend_stack = 0  # tracks suspension of change events
+        self._change_pending = False  # true if a change is pending
+
         if change_callback:
             self.addCallback(change_callback)
 
     def setSortCallback(self, callback):
-        ''' changes or clears the sort callback '''
-        assert isinstance(callback, Callable) if callback is not None else True, "Invalid sort callback"
-        self._sort_callback = callback 
+        """changes or clears the sort callback"""
+        assert isinstance(callback, Callable) if callback is not None else True, (
+            "Invalid sort callback"
+        )
+        self._sort_callback = callback
         if self._sort_enabled is None:
             # not set
             self._sort_enabled = callback is not None
 
-    def setSortEnabled(self, value : bool):
-            self._sort_enabled = value
+    def setSortEnabled(self, value: bool):
+        self._sort_enabled = value
 
     def setFilterCallback(self, callback):
-        ''' changes or clears the filter callback '''
-        assert isinstance(callback, Callable) if callback is not None else True, "Invalid filter callback"
+        """changes or clears the filter callback"""
+        assert isinstance(callback, Callable) if callback is not None else True, (
+            "Invalid filter callback"
+        )
         self._filtered_callback = callback
         if self._filtered_enabled is None:
-            self._filtered_enabled = callback is not None # filter enabled by default if a filtering callback is provided
+            self._filtered_enabled = (
+                callback is not None
+            )  # filter enabled by default if a filtering callback is provided
 
-    def setFilterEnabled(self, value : bool):
-        ''' enables or disables filtering '''
+    def setFilterEnabled(self, value: bool):
+        """enables or disables filtering"""
         self._filtered_enabled = value
 
     def __iter__(self):
-        ''' iterator - gets an iterator to the contents '''
+        """iterator - gets an iterator to the contents"""
         return iter(self._filtered_item_map.values())
-    
+
     def __len__(self):
-        ''' number of items in the model '''
+        """number of items in the model"""
         return len(self._filtered_item_map)
-    
+
     def __getitem__(self, index):
-        ''' subscribtable '''
+        """subscribtable"""
         if index in self._filtered_item_map:
             return self._filtered_item_map[index]
         raise IndexError
-    
-    
+
     def append(self, item) -> int:
-        '''
+        """
         Appends an item to the model
         :param item: the item to append to the model
         :returns int: inserted position
-        '''
+        """
         return self.add(item)
 
-    def add(self, item : object) -> int:
+    def add(self, item: object) -> int:
         """
         Adds (appends) a new entry to the model, returns the position inserted
         :param item: the item to append to the model
@@ -1018,8 +1029,10 @@ class AbstractCallbackModel(AbstractModel):
         """
         if self._allowed_types:
             if not isinstance(item, self._allowed_types):
-                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
-        assert isinstance(item, _collections_abc.Hashable),"item must be hashable"
+                raise ValueError(
+                    f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}"
+                )
+        assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
         if item not in self._index_map:
             self.markDirty()
             index = len(self._item_map)
@@ -1028,74 +1041,75 @@ class AbstractCallbackModel(AbstractModel):
             self.applyFilter()
             self._fireChanged()
 
-
-    def insert(self, i, item, emit = True):            
-        ''' inserts an item
+    def insert(self, i, item, emit=True):
+        """inserts an item
         :param i: index to place the item at (other items are shifted)
         :param item: the item to append to the model
-        :param callback: optional, filtering callback, takes an item as a parameter and returns true if the item should be included in the filtered data         
-            '''
+        :param callback: optional, filtering callback, takes an item as a parameter and returns true if the item should be included in the filtered data
+        """
         if self._allowed_types:
             if not isinstance(item, self._allowed_types):
-                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
+                raise ValueError(
+                    f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}"
+                )
         if i in self._index_map:
             # bump all the items down 1
             start_index = i
             stop_index = len(self._index_map)
-            for index in range(stop_index, start_index, step = -1):
+            for index in range(stop_index, start_index, step=-1):
                 data = self._index_map[index]
-                self._index_map[index+1] = data
-                self._item_map[data] = index +1
+                self._index_map[index + 1] = data
+                self._item_map[data] = index + 1
 
         # insert the item
         self._index_map[i] = item
         self._item_map[item] = i
 
-        self.applyFilter(emit = emit)
+        self.applyFilter(emit=emit)
         if emit:
             self._fireChanged()
 
-    def place(self, item, index : int, apply_filter = True, emit = True):
-        ''' places an item at a given index - no checking '''
+    def place(self, item, index: int, apply_filter=True, emit=True):
+        """places an item at a given index - no checking"""
         if item in self._item_map:
             i = self._index_map[index]
             if i == index:
                 # already there
-                return 
+                return
             # remove the old entry from the model
             del self._index_map[i]
         self._index_map[index] = item
         self._item_map[item] = index
         if apply_filter:
-            self.applyFilter(emit = emit)
+            self.applyFilter(emit=emit)
         if emit:
             self._fireChanged()
 
-    def remove(self, item, emit = True):
+    def remove(self, item, emit=True):
         """Removes the given entry from the model."""
         if item in self._item_map:
             index = self._item_map[item]
-            if hasattr(item,"_cleanup"):
+            if hasattr(item, "_cleanup"):
                 item._cleanup()
             del self._item_map[item]
             del self._index_map[index]
-            self.applyFilter(emit = emit)
+            self.applyFilter(emit=emit)
             if emit:
                 self._fireChanged()
 
-    def removeAt(self, index : int, emit = True):
-        ''' removes the entry at the given model index '''
+    def removeAt(self, index: int, emit=True):
+        """removes the entry at the given model index"""
         if index in self._index_map:
             item = self._index_map[index]
-            if hasattr(item,"_cleanup"):
+            if hasattr(item, "_cleanup"):
                 item._cleanup()
             del self._item_map[item]
             del self._index_map[index]
-            self.applyFilter(emit = emit)
+            self.applyFilter(emit=emit)
             if emit:
                 self._fireChanged()
 
-    def clear(self, emit = True):
+    def clear(self, emit=True):
         """Removes all the given entry from the model."""
         if self._item_map:
             self.pushSuspend()
@@ -1107,61 +1121,58 @@ class AbstractCallbackModel(AbstractModel):
             if emit:
                 self._fireChanged()
 
-    def data(self, index : int):
-        ''' returns the item stored at the given index, None if not found
+    def data(self, index: int):
+        """returns the item stored at the given index, None if not found
         :param index: the index
-        '''
-        if index in self._index_map:
-            return self._index_map[index]
-        return None
-    
-    def itemAt(self, index: int):
-        ''' gets the filtered item at the given index if it exists '''
-        return self.data(index)
-    
-    def filteredItemAt(self, index : int):
-        ''' gets the filtered item at the given index if it exists '''
-        return self.data(index)
-    
-    def unfilteredItemAt(self, index : int):
-        ''' gets the item at the given index of the unfiltered model, returns None if not found '''
+        """
         if index in self._index_map:
             return self._index_map[index]
         return None
 
-    
+    def itemAt(self, index: int):
+        """gets the filtered item at the given index if it exists"""
+        return self.data(index)
+
+    def filteredItemAt(self, index: int):
+        """gets the filtered item at the given index if it exists"""
+        return self.data(index)
+
+    def unfilteredItemAt(self, index: int):
+        """gets the item at the given index of the unfiltered model, returns None if not found"""
+        if index in self._index_map:
+            return self._index_map[index]
+        return None
+
     def indexOf(self, item) -> int:
-        ''' returns the index of the item (filtered model), -1 if not found'''
+        """returns the index of the item (filtered model), -1 if not found"""
         if item in self._filtered_item_map:
             return self._filtered_item_map[item]
         return -1
-    
+
     def unfilteredIndexOf(self, item) -> int:
-        ''' returns the index of the item (unfiltered model), -1 if not found'''
+        """returns the index of the item (unfiltered model), -1 if not found"""
         if item in self._item_map:
             return self._item_map[item]
         return -1
-        
-    def rows(self) -> int:
-        ''' returns the size of the unfiltered model'''
-        return len(self._index_map)    
-    
-    def unfilteredCount(self)->int:
-        ''' returns the size of the unfiltered model'''
-        return len(self._index_map)    
-    
-    def count(self) -> int:
-        ''' returns the size of the filtered model'''
-        return len(self._filtered_index_map)
-    
-    def filteredCount(self) -> int:
-        ''' returns the size of the filtered model'''
-        return len(self._filtered_index_map)
-    
 
-    
+    def rows(self) -> int:
+        """returns the size of the unfiltered model"""
+        return len(self._index_map)
+
+    def unfilteredCount(self) -> int:
+        """returns the size of the unfiltered model"""
+        return len(self._index_map)
+
+    def count(self) -> int:
+        """returns the size of the filtered model"""
+        return len(self._filtered_index_map)
+
+    def filteredCount(self) -> int:
+        """returns the size of the filtered model"""
+        return len(self._filtered_index_map)
+
     def clearFilter(self):
-        ''' clears any filters '''
+        """clears any filters"""
         if self._filtered_index_map.id != self._index_map.id:
             self._filtered_index_map.clearCallbacks()
             self._filtered_item_map.clearCallbacks()
@@ -1170,20 +1181,19 @@ class AbstractCallbackModel(AbstractModel):
 
     @property
     def allowedInputTypes(self) -> tuple:
-        ''' gets the allowed input types in the model, if any'''
+        """gets the allowed input types in the model, if any"""
         return self._allowed_types
 
-
-    def applyFilter(self, sort = True, emit = True):
-        ''' Applies the filter to the source data 
+    def applyFilter(self, sort=True, emit=True):
+        """Applies the filter to the source data
         :param callback: the evaluation callback that passes each item to determine inclusion, true to include, false to exclude
         :param sort: true to sort the data after filtering (only has effect if a sorting callback was provided)
         :param emit: true to emit a data changed signal after filtering
-        '''
+        """
         if not self._can_filter():
             # model is not filtered
             return
-        
+
         if not self._filtered_enabled:
             if self._filtered_index_map.id != self._index_map.id:
                 # reset filters if previously enabled
@@ -1199,7 +1209,7 @@ class AbstractCallbackModel(AbstractModel):
             syslog.info(f"MODEL INPUT FILTER: for [{device.name}]")
             if "left" in device.name.casefold():
                 pass
-        
+
         # filtering enabled
 
         new_index_map = TriggerDict()
@@ -1213,18 +1223,15 @@ class AbstractCallbackModel(AbstractModel):
                     syslog.info(f"\t{item.display_name} -> ON")
                 new_index_map[new_index] = item
                 new_item_map[item] = new_index
-                new_index +=1
+                new_index += 1
         if verbose and new_index == 0:
             syslog.info("\tall inputs are filtered for this device")
 
-
-        is_filtered = self._compare_maps(self._index_map, new_index_map)
-        if is_filtered:
-
+        is_included = self._compare_maps(self._index_map, new_index_map)
+        if is_included:
             self._filtered_index_map = new_index_map
             self._filtered_index_map.addCallback(self._handle_data_changed)
             self._filtered_item_map = new_item_map
-            
 
         else:
             self._filtered_index_map = self._index_map
@@ -1233,26 +1240,26 @@ class AbstractCallbackModel(AbstractModel):
         # resort the data
         self.applySort(False)
 
-        if is_filtered and emit:
+        if is_included and emit:
             self._fireChanged()
 
-    def setItemFiltered(self, item : object, value : bool, emit = True) -> int:
-        ''' sets an item filtered or not filtered (no effect if the model is not filtered)
+    def setItemFiltered(self, item: object, value: bool, emit=True) -> int:
+        """sets an item filtered or not filtered (no effect if the model is not filtered)
         :param item: the object to change (must be in the model)
         :param value: filtered state
         :param emit: true if a change trigger should fire on change
         :returns int: the index, or -1 if not found
-        '''
+        """
 
         if self._can_filter() and item and item in self._item_map:
             # item is in the model
             if not self.isFiltered():
                 # create a filtered set if model is not yet filtered
-                self.applyFilter(emit = False)
-                
+                self.applyFilter(emit=False)
+
             if value:
                 if item in self._filtered_item_map:
-                    return self._filtered_item_map[item] # already filtered
+                    return self._filtered_item_map[item]  # already filtered
                 index = len(self._filtered_index_map)
                 self.pushSuspend()
                 self._filtered_index_map[index] = item
@@ -1272,74 +1279,78 @@ class AbstractCallbackModel(AbstractModel):
                     if emit:
                         self._fireChanged()
 
-                
         return -1
-            
 
-    def applySort(self, emit = True):
-        ''' sorts the model based on the callback '''
+    def applySort(self, emit=True):
+        """sorts the model based on the callback"""
         if not self._can_sort():
             # nothing to do
-            return  
-        items = self._filtered_item_map.keys() # iterable
+            return
+        items = self._filtered_item_map.keys()  # iterable
         indices = self._sort_callback(items)
         if indices is None:
-            # callback returning nothing means no 
+            # callback returning nothing means no
             return
         if __debug__:
-            # check the data 
+            # check the data
             if not indices:
-                return # nothing to do
-            unique = set(indices) # ensure unique
+                return  # nothing to do
+            unique = set(indices)  # ensure unique
             # ensure unduplicated
             count = len(self._filtered_item_map)
-            
+
             if len(unique) != count:
                 # invalid list
-                syslog.warning(f"ModelSort: sorted data has incorrect indices, expecting [{count}] got [{len(unique)}]")
-                return 
+                syslog.warning(
+                    f"ModelSort: sorted data has incorrect indices, expecting [{count}] got [{len(unique)}]"
+                )
+                return
             # verify each index is valid
             invalid = (i for i in indices if i < 0 or i >= count)
             if invalid:
                 # invalid list
-                syslog.warning("ModelSort: sorted data has incorrect indices, indices are missing")
-                return 
+                syslog.warning(
+                    "ModelSort: sorted data has incorrect indices, indices are missing"
+                )
+                return
         # valid
         for item, index in zip(items, indices):
             self._filtered_index_map[index] = item
             self._filtered_item_map[item] = index
         if emit:
             self._fireChanged()
-  
-    def setFilteredEnabled(self, value : bool, emit = True):
-        ''' enables or disables the filter - has no effect is no filtering is setup '''
+
+    def setFilteredEnabled(self, value: bool, emit=True):
+        """enables or disables the filter - has no effect is no filtering is setup"""
         if self._filtered_callback and self._filtered_enabled != value:
             self._filtered_enabled = value
             self.applyFilter(emit)
 
     def isFilteredEnabled(self) -> bool:
-        ''' true if filtering is enabled '''
+        """true if filtering is enabled"""
         return self._filtered_enabled
-    
+
     def _can_filter(self) -> bool:
-        ''' true if filtering can happen '''
+        """true if filtering can happen"""
         return self._filtered_enabled and self._filtered_callback is not None
-    
+
     def _can_sort(self) -> bool:
-        ''' true if sorting can happen '''
+        """true if sorting can happen"""
         return self._sort_enabled and self._sort_callback is not None
 
-
     def isFiltered(self) -> bool:
-        ''' true if the model is currently filtered '''
-        return self._filtered_enabled and self._filtered_callback is not None and self._compare_maps(self._index_map, self._filtered_index_map)
-    
+        """true if the model is currently filtered"""
+        return (
+            self._filtered_enabled
+            and self._filtered_callback is not None
+            and self._compare_maps(self._index_map, self._filtered_index_map)
+        )
+
     def getFilterCallback(self) -> Callable:
-        ''' gets the model's filtering callback '''
+        """gets the model's filtering callback"""
         return self._filtered_callback
 
-        
-    def _compare_maps(self, m1 : TriggerDict, m2: TriggerDict):
+    def _compare_maps(self, m1: TriggerDict, m2: TriggerDict):
         # look for differences in the stored values
         if m1.id == m2.id:
             # same map = no filter applied
@@ -1349,42 +1360,41 @@ class AbstractCallbackModel(AbstractModel):
             return True
         # same count = compare actual contents
         return hash(m1) != hash(m2)
-        
 
     def getFilteredIndices(self):
-        ''' returns the list of indices currently visible in the model '''
+        """returns the list of indices currently visible in the model"""
         return [index for index in self._filtered_index_map]
-    
+
     def getUnfilteredIndices(self):
-        ''' returns the list of indices currently visible in the model '''
+        """returns the list of indices currently visible in the model"""
         return [index for index in self._index_map]
 
     def getFilteredItems(self):
-        ''' returns the list of filtered items '''
+        """returns the list of filtered items"""
         return self._filtered_index_map.values()
-    
+
     def getUnfilteredItems(self):
-        ''' returns the list of unfiltered items '''
+        """returns the list of unfiltered items"""
         return self._index_map.values()
-    
+
     def getFilteredMap(self):
-        ''' gets index,input_item tuples for all filtered items in the model '''
+        """gets index,input_item tuples for all filtered items in the model"""
         return self._filtered_index_map.items()
-    
+
     def getUnfilteredMap(self):
-        ''' gets index,input_item tuples for all unfiltered items in the model '''
+        """gets index,input_item tuples for all unfiltered items in the model"""
         return self._index_map.items()
 
     def refresh(self, emit=True):
-        ''' trigger a data change if the model has changed - use this to prevent updates if the data didn't change'''
-        self._fireChanged(emit = emit)
-    
-    def trigger(self, force = True, emit = True):
-        ''' trigers a model change manually - use this to force a reload even if the data didn't change '''
-        self._fireChanged(force = force, emit = True)
+        """trigger a data change if the model has changed - use this to prevent updates if the data didn't change"""
+        self._fireChanged(emit=emit)
+
+    def trigger(self, force=True, emit=True):
+        """trigers a model change manually - use this to force a reload even if the data didn't change"""
+        self._fireChanged(force=force, emit=True)
 
     def pushSuspend(self):
-        ''' suspends change notifications '''
+        """suspends change notifications"""
         if self._suspend_stack == 0:
             self._item_map.pushSuspend()
             self._index_map.pushSuspend()
@@ -1392,74 +1402,71 @@ class AbstractCallbackModel(AbstractModel):
                 self._filtered_index_map.pushSuspend()
                 self._filtered_item_map.pushSuspend()
         self._suspend_stack += 1
-        
 
-    def popSuspend(self, reset = False, emit = True):
-        ''' restores change notifications '''
+    def popSuspend(self, reset=False, emit=True):
+        """restores change notifications"""
         if reset and self._suspend_stack > 0:
             self._suspend_stack = 0
         if self._suspend_stack > 0:
-            self._suspend_stack-= 1
+            self._suspend_stack -= 1
         if self._suspend_stack == 0:
             self._item_map.popSuspend(reset)
             self._index_map.popSuspend(reset)
             if self._item_map.id != self._filtered_item_map.id:
                 self._filtered_index_map.popSuspend(reset)
                 self._filtered_item_map.popSuspend(reset)
-            self._fireChanged(force = self._change_pending, emit = emit)
+            self._fireChanged(force=self._change_pending, emit=emit)
 
     def resetChanges(self):
-        ''' resets any changes to the model '''
+        """resets any changes to the model"""
         self._suspend_stack = 0
         self._change_pending = False
 
-
-    def addCallback(self, callback : Callable):
-        ''' adds a callback to be called when the model data changes '''
+    def addCallback(self, callback: Callable):
+        """adds a callback to be called when the model data changes"""
         if __debug__ and callback is not None and not callable(callback):
             raise TypeError("Callback must be callable")
         if callback not in self._data_changed_callbacks:
             self._data_changed_callbacks.append(callback)
 
-    def removeCallback(self, callback : Callable):
-        ''' removes a callback from the list of callbacks to be called when the model data changes '''
+    def removeCallback(self, callback: Callable):
+        """removes a callback from the list of callbacks to be called when the model data changes"""
         if callback in self._data_changed_callbacks:
             self._data_changed_callbacks.remove(callback)
 
     def modelChanged(self) -> bool:
-        ''' true if data has changed  '''
+        """true if data has changed"""
         return self._change_pending or hash(self) != self._old_hash
-    
+
     def _handle_data_changed(self, source, index, old_value, new_value):
-        ''' called when a storage data is changed '''
+        """called when a storage data is changed"""
         if source.id == self._filtered_index_map.id:
             # notify on filtered items only
             if new_value is None and old_value is not None and self._remove_callback:
                 # delete operation received
                 self._remove_callback(old_value, index)
-            
+
             if new_value is not None and self._add_callback:
                 # add operation received
                 self._add_callback(new_value, index)
 
         self._change_pending = True
-            
 
     @property
     def modelDescription(self) -> str:
         return self._model_description
-    
+
     def markDirty(self):
         # mark the model changed for the next update
         self._change_pending = True
 
     @property
     def debug_name(self) -> str:
-        ''' gets a debug string for the model contents '''
-        return f"[{self.modelDescription} items: [{len(self._index_map)}] filtered: [{len(self._filtered_index_map)}] callbacks: [{len(self._data_changed_callbacks)}]"
+        """gets a debug string for the model contents"""
+        return f"[{self.modelDescription} items: [{len(self._index_map)}] included: [{len(self._filtered_index_map)}] callbacks: [{len(self._data_changed_callbacks)}]"
 
-    def _fireChanged(self, force = False, emit = False):
-        ''' fires a data changed signal if the data has changed or if force is true '''
+    def _fireChanged(self, force=False, emit=False):
+        """fires a data changed signal if the data has changed or if force is true"""
         if self._change_pending and not force:
             return
         new_hash = hash(self)
@@ -1467,24 +1474,23 @@ class AbstractCallbackModel(AbstractModel):
             # firing changes currently suspended
             self._change_pending = new_hash != self._old_hash
             return
-        
+
         if new_hash != self._old_hash or force or self._change_pending:
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_ui
             if verbose:
                 syslog.info(f"MODEL CHANGE TRIGGER: {self.debug_name} ")
-                
+
             self._old_hash = new_hash
 
             for callback in self._data_changed_callbacks:
                 callback()
 
             if emit:
-                self.data_changed.emit() # indicate the model changed
+                self.data_changed.emit()  # indicate the model changed
 
             self._change_pending = False
 
-
     def __hash__(self):
-        ''' unique hash value of model contents '''
+        """unique hash value of model contents"""
         return hash((self.id, frozenset(self._index_map.values())))

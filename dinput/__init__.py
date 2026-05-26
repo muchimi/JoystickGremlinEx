@@ -147,11 +147,11 @@ class GUID:
         if isinstance(guid, str):
             try:
                 guid = uuid.UUID(guid)
+                guid_int = guid.int    
+                guid = _GUID(guid_int)  # convert to internal _GUID
             except Exception:
                 syslog.error(f"GUID: Unable to convert ID {guid} to UUID")
                 return None
-            guid = _GUID(guid.int)  # convert to internal _GUID
-            guid_int = guid.int
         elif isinstance(guid, int):
             guid = _GUID(guid)
             guid_int = guid.int
@@ -161,8 +161,7 @@ class GUID:
             guid = _GUID(guid_int)  # convert to internal _GUID
 
         elif isinstance(guid, GUID):
-            guid = guid
-            guid_int = guid.int
+            guid_int = guid._guid_int
         else:
             assert isinstance(guid, _GUID)
             guid_int = guid.toInt()
@@ -438,7 +437,8 @@ class DeviceSummary:
         self.linear_id_map = {}  # map of linear ID to axis ID
         self.input_enabled = False
         self.vjoy_id = -1
-        self.vendor_id = 0
+        self.vendor_id = 0 # vendor ID
+        self.product_id = 0 # product ID
         self.name = None
         self.is_special = False
         self._device_type = gremlin.types.DeviceType.NotSet
@@ -902,6 +902,9 @@ class DILL:
                 os._exit(1)
 
             DILL.initalized = True
+
+
+
 
     @staticmethod
     def reset():
