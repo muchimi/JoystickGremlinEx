@@ -49,7 +49,7 @@ class Ui_Gremlin(object):
         
         #self.tab_content_widget.setStyleSheet(css)
 
-        self.device_widget = QtWidgets.QStackedWidget() # holds the split tab widgets for each device 
+        self.device_widget = QtWidgets.QStackedWidget() # holds the device widgets for each device - the index changes with the tab
         #self.device_widget.setStyleSheet(css)
         layout.addWidget(self.device_widget)
                 

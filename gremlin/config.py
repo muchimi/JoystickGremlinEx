@@ -28,7 +28,8 @@ import gremlin.config
 import gremlin.input_types
 
 import gremlin.shared_state
-from gremlin.types import VerboseMode
+from gremlin.types import VerboseMode, DeviceType
+from gremlin.input_types import InputType
 from psygnal import Signal
 
 from collections import deque
@@ -52,7 +53,7 @@ class Configuration(QtCore.QObject):
             config_file = os.path.join(self.data_path(), "config.json")
             if os.path.isfile(config_file) and not os.path.isfile(dev_config_file):
                 shutil.copy(config_file, dev_config_file)
-            
+
         config_file = dev_config_file if __debug__ else config_file
         return config_file
 
@@ -394,11 +395,14 @@ class Configuration(QtCore.QObject):
         if self._lock:
             # ignore concurrent save requests (technically not necessary due to UI thread placement)
             return
+        tmp = gremlin.util.getTemporaryFile(".json")
+        is_error = False
         try:
             self._lock = True
             if not fname:
                 fname = self.get_config()
-            with open(fname, "w") as hdl:
+            # get a temp file name
+            with open(tmp, "w") as hdl:
                 encoder = json.JSONEncoder(sort_keys=True, indent=4)
                 hdl.write(encoder.encode(self._data))
                 hdl.flush()
@@ -406,7 +410,18 @@ class Configuration(QtCore.QObject):
         except Exception as ex:
             syslog.error(f"CONFIG: unable to save file: {fname}")
             syslog.error(ex)
+            is_error = True
         finally:
+            if not is_error:
+                try:
+                    if os.path.isfile(fname):
+                        os.unlink(fname)
+                    shutil.copy(tmp, fname)
+                    os.unlink(tmp)
+                except Exception as ex:
+                    syslog.error(f"CONFIG: unable to overwrite file: {fname}")
+                    syslog.error(ex)
+
             self._lock = False
 
     def save_profile(self):
@@ -1384,7 +1399,8 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_ui(self):
         """true if verbose mode is in UI mode"""
-        # return True
+        if __debug__:
+            return True
         return self.verbose and VerboseMode.UI in self.verbose_mode
 
     @property
@@ -1818,8 +1834,8 @@ class Configuration(QtCore.QObject):
 
     @property
     def vigem_device_count(self):
-        """count of gamepads to create for VIGEM - default is 1"""
-        return self._get_data("vigem_device_count", 1)
+        """count of gamepads to create for VIGEM - default is 0 (not enabled)"""
+        return self._get_data("vigem_device_count", 0)
 
     @vigem_device_count.setter
     def vigem_device_count(self, value):
@@ -1881,7 +1897,7 @@ class Configuration(QtCore.QObject):
     def set_last_input(
         self,
         device_guid,
-        input_type: gremlin.input_types.InputType,
+        input_type: InputType,
         input_id,
         mode=None,
     ):
@@ -1905,7 +1921,7 @@ class Configuration(QtCore.QObject):
 
         verbose = self.verbose_mode_inputs
 
-        if input_type != gremlin.input_types.InputType.ModeControl and isinstance(
+        if input_type != InputType.ModeControl and isinstance(
             input_id, gremlin.base_classes.AbstractInputItem
         ):
             # convert to an ID we can use
@@ -1935,7 +1951,7 @@ class Configuration(QtCore.QObject):
             )
             input_id = None
 
-        input_type = gremlin.input_types.InputType.convert(input_type)
+        input_type = InputType.convert(input_type)
         if input_type is not None:
             data[device_guid] = (input_type, input_id)
 
@@ -1943,9 +1959,7 @@ class Configuration(QtCore.QObject):
             self._profile_data["last_device_guid"] = device_guid
 
             self._data["last_device_guid"] = device_guid
-            self._data["last_input_type"] = gremlin.input_types.InputType.to_string(
-                input_type
-            )
+            self._data["last_input_type"] = InputType.to_string(input_type)
             self._data["last_input_id"] = input_id
             self._data["last_input_mode"] = mode
 
@@ -1954,7 +1968,7 @@ class Configuration(QtCore.QObject):
                     device_guid
                 )
                 syslog.info(
-                    f"CONFIG: SetLastInput(): {device_name} {gremlin.input_types.InputType.to_string(input_type)} {input_id}"
+                    f"CONFIG: SetLastInput(): {device_name} {InputType.to_string(input_type)} {input_id}"
                 )
 
             self.save_profile()
@@ -1984,79 +1998,75 @@ class Configuration(QtCore.QObject):
         #     return (None, None, None)
 
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
-        if device_type in (
-            gremlin.types.DeviceType.Joystick,
-            gremlin.types.DeviceType.VJoy,
-        ):
-            device_info = gremlin.joystick_handling.getDevice(dinput_device_guid)
-            if device_info:
-                if device_info.axis_count > 0:
-                    input_type = gremlin.input_types.InputType.JoystickAxis
-                    if input_id is None or input_id > device_info.axis_count:
-                        input_id = 1
-                elif device_info.button_count > 0:
-                    input_type = gremlin.input_types.InputType.JoystickButton
-                    if input_id is None or input_id > device_info.button_count:
-                        input_id = 1
-                elif device_info.hat_count > 0:
-                    input_type = gremlin.input_types.InputType.JoystickHat
-                    if input_id is None or input_id > device_info.hat_count:
-                        input_id = 1
+        match device_type:
+            case DeviceType.Joystick | DeviceType.VJoy:
+                device_info = gremlin.joystick_handling.getDevice(dinput_device_guid)
+                if device_info:
+                    if device_info.axis_count > 0:
+                        input_type = InputType.JoystickAxis
+                        if input_id is None or input_id > device_info.axis_count:
+                            input_id = 1
+                    elif device_info.button_count > 0:
+                        input_type = InputType.JoystickButton
+                        if input_id is None or input_id > device_info.button_count:
+                            input_id = 1
+                    elif device_info.hat_count > 0:
+                        input_type = InputType.JoystickHat
+                        if input_id is None or input_id > device_info.hat_count:
+                            input_id = 1
 
-        elif device_type in (
-            gremlin.types.DeviceType.Keyboard,
-            gremlin.types.DeviceType.Midi,
-            gremlin.types.DeviceType.Osc,
-        ):
-            # grab the tab widget
-            if device_type == gremlin.types.DeviceType.Keyboard:
-                input_type = gremlin.input_types.InputType.KeyboardLatched
-            elif device_type == gremlin.types.DeviceType.Midi:
-                input_type = gremlin.input_types.InputType.Midi
-            elif device_type == gremlin.types.DeviceType.Osc:
-                input_type = gremlin.input_types.InputType.OpenSoundControl
+            case DeviceType.Keyboard | DeviceType.Midi | DeviceType.Osc:
+                # grab the tab widget
+                if device_type == DeviceType.Keyboard:
+                    input_type = InputType.KeyboardLatched
+                elif device_type == DeviceType.Midi:
+                    input_type = InputType.Midi
+                elif device_type == DeviceType.Osc:
+                    input_type = InputType.OpenSoundControl
 
-            widget = gremlin.shared_state.ui.getRegisteredWidget(dinput_device_guid)
-            # if dinput_device_guid in gremlin.ui._widget_device_index_map: # gremlin.shared_state.device_widget_map:
-            #     widget = gremlin.shared_state.device_widget_map[dinput_device_guid]
-            if widget:
-                if input_id is None:
-                    item = widget.getFilteredInputItemAt(0)
-                    if item is not None:
-                        save_input_id = item.identifier.guid
-                else:
-                    count = widget.inputItemListModel.rows()
-                    found = False
-                    save_input_id = input_id
+                widget = gremlin.shared_state.ui.getRegisteredWidget(dinput_device_guid)
+                # if dinput_device_guid in gremlin.ui._widget_device_index_map: # gremlin.shared_state.device_widget_map:
+                #     widget = gremlin.shared_state.device_widget_map[dinput_device_guid]
+                if widget:
+                    if input_id is None:
+                        item = widget.itemAt(0)
+                        if item is not None:
+                            save_input_id = item.identifier.guid
+                    else:
+                        count = widget.inputItemListModel.rows()
+                        found = False
+                        save_input_id = input_id
 
-                    items = list(widget.inputItemListModel.getItems())
-                    for item in items:
-                        if item.guid == input_id:
+                        items = list(widget.inputItemListModel.getItems())
+                        for item in items:
+                            if item.guid == input_id:
+                                input_id = item
+                                save_input_id = input_id.guid
+                                found = True
+                                break
+                        if not found and count > 0:
+                            item = items[0]
                             input_id = item
                             save_input_id = input_id.guid
-                            found = True
-                            break
-                    if not found and count > 0:
-                        item = items[0]
-                        input_id = item
-                        save_input_id = input_id.guid
-        elif device_type == gremlin.types.DeviceType.ModeControl:
-            save_input_id = input_id
-            input_type = gremlin.input_types.InputType.ModeControl
-        elif device_type == gremlin.types.DeviceType.Settings:
-            input_type = gremlin.input_types.InputType.NotSet
-            input_id = None
-            save_input_id = None
-        elif device_type == gremlin.types.DeviceType.NotSet:
-            # settings or other non input type page
-            input_type = gremlin.input_types.InputType.NotSet
-            save_input_id = None
-            input_id = None
-
-        else:
-            assert False, (
-                f"Config: GetInputId() Don't know how to handle device type: {device_type}  {device_name}"
-            )
+            case DeviceType.ModeControl:
+                save_input_id = input_id
+                input_type = InputType.ModeControl
+            case DeviceType.Settings:
+                input_type = InputType.NotSet
+                input_id = None
+                save_input_id = None
+            case DeviceType.OctaviIFR1:
+                save_input_id = input_id
+                input_type = InputType.OctaviIfr1
+            case DeviceType.NotSet:
+                # settings or other non input type page
+                input_type = InputType.NotSet
+                save_input_id = None
+                input_id = None
+            case _:
+                assert False, (
+                    f"Config: GetInputId() Don't know how to handle device type: {device_type}  {device_name}"
+                )
 
         if input_type is None or input_id is None:
             # syslog.warning(f"Config: get last input: Unable to determine input type for device {dinput_device_guid} {device_name}")
@@ -2083,7 +2093,7 @@ class Configuration(QtCore.QObject):
             device_guid = self._get_data("last_device_guid", None)
             input_type = self._get_data("last_input_type", None)
             if input_type:
-                input_type = gremlin.input_types.InputType.to_enum(input_type)
+                input_type = InputType.to_enum(input_type)
             input_id = self._get_data("last_input_id", None)
 
             if (
@@ -2127,12 +2137,12 @@ class Configuration(QtCore.QObject):
             input_type, input_id = data[device_guid]
 
             try:
-                input_type = gremlin.input_types.InputType.to_enum(input_type)
+                input_type = InputType.to_enum(input_type)
             except Exception:
                 syslog.error(
                     f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type"
                 )
-                input_type = gremlin.input_types.InputType.NotSet
+                input_type = InputType.NotSet
 
             if input_id is not None and isinstance(input_id, int):
                 if return_mode:
@@ -2161,12 +2171,12 @@ class Configuration(QtCore.QObject):
                     )
 
                 try:
-                    input_type = gremlin.input_types.InputType.to_enum(input_type)
+                    input_type = InputType.to_enum(input_type)
                 except Exception:
                     syslog.error(
                         f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type"
                     )
-                    input_type = gremlin.input_types.InputType.NotSet
+                    input_type = InputType.NotSet
                 if return_mode:
                     return (device_guid, input_type, input_id, mode)
                 return (device_guid, input_type, input_id)

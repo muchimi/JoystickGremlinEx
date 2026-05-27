@@ -1998,13 +1998,7 @@ class InvokeUiMethod(QtCore.QObject):
     def _execute(
         self, p0=None, p1=None, p2=None, p3=None, p4=None, p5=None, p6=None, p7=None
     ):
-
         self._exec(self.method, p0, p1, p2, p3, p4, p5, p6, p7)
-
-        # trigger garbage collector
-        self._called.disconnect(self._execute)
-
-        # self._waiting = False
 
 
 def is_ui_thread():
@@ -2492,25 +2486,10 @@ def to_uuid(device_guid) -> uuid.UUID:
 
 def compare_guid(id1, id2) -> bool:
     """compares two GUIDs and returns true if equal - the second parameter can be a list of IDs to check against"""
-    if id1 is None and id2 is None:
-        return True
-    if id1 is None or id2 is None:
-        return False
-    if id1 == id2:
-        return True
+    nid2 = normalize_guid(id2)
     nid1 = normalize_guid(id1)
-    assert "-" not in nid1 or "{" in nid1, f"Bad normalization [{id1}] -> [{nid1}]"
-    if not isinstance(id2, str) and hasattr(id2, "__iter__"):
-        for id in id2:
-            a = normalize_guid(id)
-            assert "-" not in a or "{" in id, f"Bad normalization [{id}] -> [{a}]"
-            if nid1 == a:
-                return True
-        return False
-    else:
-        nid2 = normalize_guid(id2)
-        assert "-" not in nid2 or "{" in nid2, f"Bad normalization [{id2}] -> [{nid2}]"
-        return nid1 == nid2
+    return nid2 == nid1
+
 
 
 def getTemporaryFile(ext=None):

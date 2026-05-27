@@ -627,11 +627,11 @@ def getPhysicalDevices() -> list[dinput.DeviceSummary]:
 def getDevice(device_guid : int | str | dinput.GUID, show_error = False) -> dinput.DeviceSummary:
     ''' gets the device for the given ID - issues error message if not found '''
     global _all_devices_map
-    original_guid = device_guid
-    if not isinstance(device_guid, dinput.GUID):
-        device_guid = gremlin.util.to_guid(device_guid) # ensure a dinput.GUID
-    if device_guid in _all_devices_map:
-        return _all_devices_map[device_guid]
+    if device_guid:
+        if not isinstance(device_guid, dinput.GUID):
+            device_guid = gremlin.util.to_guid(device_guid) # ensure a dinput.GUID
+        if device_guid in _all_devices_map:
+            return _all_devices_map[device_guid]
     return None
     
     

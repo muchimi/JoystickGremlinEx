@@ -33,12 +33,14 @@ import uuid
 import traceback
 import threading
 from threading import Lock
+from typing import Callable
 
 import webbrowser
 import dinput
 from dinput import DeviceSummary
 import PySide6
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtCore import QThread
 from gremlin.types import TabDeviceType, DeviceType
 from shiboken6 import Shiboken
 import gremlin.tabstate
@@ -840,6 +842,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         :param: index = the index of the tab that was selected
 
         """
+        if index == -1:
+            # not a valid tab
+            return
 
         if self.ui.devices.moveInProgress:
             # ignore if the tab is being dragged
@@ -851,23 +856,35 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             syslog.info(f"TAB CHANGED: selected : {index}")
 
         device_guid = self.getDeviceGuidForTabIndex(index)
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        assert device is not None, "invalid device"
 
-        if device_guid is not None:
-            if verbose:
-                device_name = self._get_device_name(device_guid)
-                syslog.info(
-                    f"TAB CHANGED:  new tab [{index}] {self.ui.devices.tabText(index)} - device {device_guid} {device_name}"
-                )
-            self.last_tab_index = index
+        if verbose:
+            syslog.info(
+                f"TAB CHANGED:  new tab [{index}] {self.ui.devices.tabText(index)} - device [{device.name}] id [{device.device_id}]"
+            )
+        self.last_tab_index = index
 
-            wm = WorkManager()
-            wm.submit(callback=self._tab_selected_worker, args=(device_guid,))
+        wm = WorkManager()
 
-    def _tab_selected_worker(self, *args, **kwargs):
-        device_guid = args[0]
+        wm.submit(callback=self._tab_selected_worker, args=device_guid)
+
+    def _tab_selected_worker(self, args):
+        device_guid = args
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        assert device is not None, "invalid device"
+
+        self._tab_selection_completed = False
+
         _, restore_input_type, restore_input_id = self.config.get_last_input(
             device_guid
         )
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose:
+            syslog.info(
+                f"TabSelectedWorker: select device [{device.name}] id [{device.device_id}]"
+            )
+
         self._select_input(
             device_guid=device_guid,
             input_type=restore_input_type,
@@ -875,9 +892,21 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             force_update=True,
             force_switch=True,
             tab_changed=True,
+            extra_data={
+                "completion_callback": self._tab_selection_complete,
+                "source":"tab_selected"
+                }
+            
         )
-        # verify the data is being populated
-        self.ensureTabLoaded()
+
+        # wait for the tab selection to complete
+        while not self._tab_selection_completed:
+            QThread.sleep(0)
+
+        syslog.info("tab selection worker complete")
+
+    def _tab_selection_complete(self, *args):
+        self._tab_selection_completed = True
 
     def add_custom_tools_menu(self, menuTools):
         """adds custom tools to the menu"""
@@ -1667,7 +1696,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         wm = WorkManager()
         wm.submit(callback=self._new_profile_worker)
 
-    def _new_profile_worker(self, *args, **kwargs):
+    def _new_profile_worker(self, args):
         """Creates a new empty profile."""
         # Disable Gremlin if active before opening a new profile
         if not self._save_changes_request():
@@ -2436,9 +2465,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # index of new tab
         index = self.getTabIndexForDevice(device_guid)
+        if index is None or index == -1:
+            # nothing to do
+            return
+
         # index of old tab
         current_index = self.ui.devices.currentIndex()
-        if index is not None and current_index != index:
+
+        if current_index != index:
             # indicate the old tab is being deselected
             td: gremlin.tabstate.TabData = self.ui.devices.tabData(current_index)
             old_device_guid = td.device_guid
@@ -2459,20 +2493,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 if verbose:
                     syslog.info(f"TAB SELECT: {device_name}")
 
-            el.tab_selected.emit(device_guid)
+            # el.tab_selected.emit(device_guid)
 
-        # index = self.selectRegisteredWidget(device_guid)
-        # if index != -1:
+            # select the current tab
+            with QtCore.QSignalBlocker(self.ui.devices):
+                self.ui.devices.setCurrentIndex(index)
 
-        #     if not isinstance(device_guid, str):
-        #         device_guid = gremlin.util.normalize_guid(device_guid)
-        #     # tell ui a new device tab was selected
-        #     gremlin.shared_state.current_tab_device_guid = device_guid
-        #     device_name = self._get_device_name(device_guid)
-
-        #     verbose = gremlin.config.Configuration().verbose_mode_extra
-        #     if verbose: syslog.info(f"TAB SELECT: {device_name}")
-        #     el.tab_selected.emit(device_guid)
+        # ensure the widget is displayed
+        widget = self.getWidgetByTabIndex(index)
+        if widget is not None:
+            index = self.ui.device_widget.indexOf(widget)
+            assert index != -1, "device widget not found in the UI"
+            if index != self.ui.device_widget.currentIndex():
+                self.ui.device_widget.setCurrentIndex(index)
 
     def getActiveTabWidget(self) -> gremlin.ui.ui_common.QSplitTabWidget:
         """gets the current tab widget"""
@@ -2482,10 +2515,20 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """gets the current tab index"""
         return self.ui.devices.currentIndex()
 
+    def getActiveTabDeviceGuid(self):
+        """gets the active device GUID"""
+        index = self.ui.devices.currentIndex()
+        if index != -1:
+            data: gremlin.tabstate.TabData = self.ui.devices.tabData(index)
+            return data.device_guid
+        return None
+
     def getActiveTabType(self) -> TabDeviceType:
         index = self.ui.devices.currentIndex()
-        data: gremlin.input_item.TabData = self.ui.devices.tabData(index)
-        return TabDeviceType(data.tab_type)
+        if index != -1:
+            data: gremlin.tabstate.TabData = self.ui.devices.tabData(index)
+            return TabDeviceType(data.tab_type)
+        return None
 
     def _mapping_changed(self, item_data: gremlin.input_item.InputItem):
         """called when mapping changes"""
@@ -2587,8 +2630,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         verbose = self.config.verbose_mode_ui
         verbose_detailed = verbose and self.config.verbose_mode_detailed
         tab_map = self.config.tab_list
-        tab_map = None
-        current_tab_map = self._get_tab_map()
 
         # physical joysticks
         physical_devices = [
@@ -2608,10 +2649,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # add special devices
         sd = gremlin.joystick_handling.getSpecialDevices()
-        special_devices = [
-            (dev.device_id, dev.name)
-            for dev in sd
-        ]
+        special_devices = [(dev.device_id, dev.name) for dev in sd]
 
         # derive missing devices found in the profile, but not currently connected
         graph: gremlin.profile_graph.ProfileGraph = (
@@ -2628,19 +2666,23 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             and dev.device_type == gremlin.types.DeviceType.Joystick
         ]
 
+        # default sort is by device name
         physical_devices.extend(missing_physical_devices)
         physical_devices = sorted(physical_devices, key=lambda x: x[1])
 
         vjoy_devices = sorted(vjoy_devices, key=lambda x: x[1])
 
-        # sorted list - physical devices first
+        # final default sorted list - physical devices first, followed by vjoy followed by special
+        # this excludes disabled or disconnected devices
         sorted_devices = physical_devices.copy()
         sorted_devices.extend(vjoy_devices)
         sorted_devices.extend(special_devices)
 
+        # build the tab list using existing tab order or default tab order if an existing isn't set
         id_list = []
+        has_changes = False
         if tab_map:
-            # device order configuration data found
+            # existing device order configuration data found
             ctm = {}
             for index, (id, name, a, b) in tab_map.items():
                 assert isinstance(id, str)
@@ -2671,10 +2713,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 id_list.append(id)
                 ctm[index] = (id, name, a, b)
         else:
-            # no tab map - create a default map
-            id_list = [id for id,_ in physical_devices]
-            id_list.extend([id for id,_ in vjoy_devices])
-            id_list.extend([id for id,_ in special_devices])
+            # no sorting data found - create a default map
+            id_list = [id for id, _ in physical_devices]
+            id_list.extend([id for id, _ in vjoy_devices])
+            id_list.extend([id for id, _ in special_devices])
+            has_changes = True
 
         # re-sort the sorted list based on the new list
         sorted_ids = {dev_id for dev_id, _ in sorted_devices}
@@ -2694,32 +2737,53 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         special_ids = list({id for id, _ in special_devices})
         count_special = len(special_ids)
 
+        if verbose:
+            tab_sequence = []
+            physical_sequence = []
+            vjoy_sequence = []
+            special_sequence = []
+
         for index, id in enumerate(sorted_ids):
             if id in id_list:
                 id_index = id_list.index(id)
                 device = gremlin.joystick_handling.getDevice(id)
                 self._map_insert(slots, id_index, count, device)
-                syslog.info(f"saved tab sequence: [{id_index}] -> [{device.name}]")
+                if verbose:
+                    tab_sequence.append(
+                        f"tab sequence: [{id_index}] -> [{device.name}]"
+                    )
 
             if id in physical_ids:
                 id_index = physical_ids.index(id)
                 device = gremlin.joystick_handling.getDevice(id)
                 self._map_insert(sorted_physical, id_index, count_physical, device)
-                syslog.info(f"saved physical sequence: [{id_index}] -> [{device.name}]")
+                if verbose:
+                    physical_sequence.append(
+                        f"physical sequence: [{id_index}] -> [{device.name}]"
+                    )
+
             if id in vjoy_ids:
                 id_index = vjoy_ids.index(id)
                 device = gremlin.joystick_handling.getDevice(id)
                 self._map_insert(sorted_vjoy, id_index, count_vjoy, device)
-                syslog.info(f"saved vjoy sequence: [{id_index}] -> [{device.name}]")
+                if verbose:
+                    vjoy_sequence.append(
+                        f"vjoy sequence: [{id_index}] -> [{device.name}]"
+                    )
 
             if id in special_ids:
                 id_index = special_ids.index(id)
                 device = gremlin.joystick_handling.getDevice(id)
                 assert device is not None, "unable to retrieve special device "
                 self._map_insert(sorted_special, id_index, count_special, device)
-                syslog.info(f"saved special sequence: [{id_index}] -> [{device.name}]")
+                if verbose:
+                    special_sequence.append(
+                        f"special sequence: [{id_index}] -> [{device.name}]"
+                    )
 
-        assert len(slots) == count, "invalid map generated"
+        assert len(slots) <= count, (
+            "invalid map generated"
+        )  # possible for slots to be less because some devices may be hidden
 
         # update the new sorted list
         sorted_slots = dict(sorted(slots.items(), key=lambda x: x[0]))  # sort by index
@@ -2737,20 +2801,21 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         sorted_devices = list(sorted_slots.values())
 
         if verbose:
+            syslog.info("tab sequence:")
+            for item in tab_sequence:
+                syslog.info(f"\t{item}")
+            syslog.info("physical sequence:")
+            for item in physical_sequence:
+                syslog.info(f"\t{item}")
+            syslog.info("vjoy sequence:")
+            for item in vjoy_sequence:
+                syslog.info(f"\t{item}")
+            syslog.info("special sequence:")
+            for item in special_sequence:
+                syslog.info(f"\t{item}")
+            syslog.info("final tab sequence:")
             for index, dev in enumerate(sorted_devices):
-                syslog.info(f"generated tab sequence: [{index}] -> [{dev.name}]")
-
-        # # add any missing physical devices
-        # sorted_physical.extend([dev for dev in physical_devices if dev not in sorted_devices])
-        # physical_devices = sorted_physical
-
-        # # add any missing vjoy devices
-        # sorted_vjoy.extend([dev for dev in vjoy_devices if dev not in sorted_vjoy])
-        # vjoy_devices = sorted_vjoy
-
-        # # add any missing special devices
-        # sorted_special.extend([dev for dev in special_devices if dev not in sorted_special])
-        # special_devices = sorted_special
+                syslog.info(f"\t[{index}] -> [{dev.name}]")
 
         # update new tab map
         device: dinput.DeviceSummary
@@ -2759,54 +2824,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             tab_type = self._get_tab_type_from_device(device)
             tab_map[index] = (device.device_id, device.name, tab_type, index)
 
-        # tab_map = list(config_tab_map.values())
-        # # list of (device_guid, device_name, data.tab_type, index)
-
-        # current_tab_guids = [
-        #     device_guid for device_guid, _, _, _ in current_tab_map.values()
-        # ]
-
-        # config_tab_guids = (
-        #     [device_guid for device_guid, _, _, _ in config_tab_map.values()]
-        #     if config_tab_map
-        #     else []
-        # )
-        # missing_tab_guids = [
-        #     device_guid
-        #     for device_guid in current_tab_guids
-        #     if device_guid not in config_tab_guids
-        # ]
-        # missing_data = []
-
-        # for device_guid in missing_tab_guids:
-        #     device = gremlin.joystick_handling.getDevice(device_guid)
-        #     index = self._get_tab_index(device_guid)
-        #     tab_type = self._get_tab_type(index)
-        #     missing_data.append((device_guid, tab_type))
-        #     tab_map.append((device_guid, device.name, tab_type, index))
-
-        # tab_map.sort(key=lambda x: x[3])
+        if has_changes:
+            # persist to config
+            self.config.tab_list = tab_map
 
         if verbose_detailed:
-            syslog.info("UI: Current device tabs ----------")
-            self._dump_tab_map(current_tab_map)
             syslog.info("UI: Stored device tabs ----------")
             self._dump_tab_map(tab_map)
-            # if missing_tab_guids:
-            #     syslog.info(
-            #         f"Found {len(missing_data)} devices from the saved ordered list:"
-            #     )
-            # for device_guid, tab_type in missing_data:
-            #     device_name = self._get_device_name(device_guid)
-            #     syslog.info(f"\t{device_name} {device_guid}")
 
-            # syslog.info("UI: Final reordered tabs ----------")
-            # for device_guid, _, tab_type, index in tab_map:
-            #     device_name = self._get_device_name(device_guid)
-            #     syslog.info(
-            #         f"\t[{index}] {device_name} {device_guid} {tab_type}"
-            #     )
-
+        # build return data block
         data = {}
         data["sorted"] = sorted_devices
         data["physical"] = [
@@ -2822,7 +2848,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         data["special"] = [
             gremlin.joystick_handling.getDevice(id) for id, _ in special_devices
         ]
-        # data["missing_tab_guids"] = missing_tab_guids
+
         data["tab_map"] = tab_map
 
         return data
@@ -2932,21 +2958,24 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # get the last device selected to determine which tab should be active
             active_device_guid = config.last_device_guid
-            active_device: DeviceSummary = gremlin.joystick_handling.getDevice(
-                active_device_guid
+            active_device: DeviceSummary = (
+                gremlin.joystick_handling.getDevice(active_device_guid)
+                if active_device_guid
+                else None
             )
             if not active_device:
                 # not found - pick the first one by tab order
 
                 active_device = sorted_devices[0]
                 active_device_guid = active_device.device_guid
+                gremlin.shared_state.setActiveDeviceGuid(active_device_guid)
+
             if verbose:
                 syslog.info(
                     f"TABS: active device: [{active_device.name}] id: [{active_device.device_id}]"
                 )
 
             # remember which tab should be active (it may not be the selected tab just yet)
-            gremlin.shared_state.active_device_guid = active_device_guid
 
             # if not reset:
             #     # compare existing tabs and remove any that are no longer connected
@@ -3484,7 +3513,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     config.get_last_input()
                 )
 
-                device = gremlin.joystick_handling.getDevice(last_device_guid)
+                device = (
+                    gremlin.joystick_handling.getDevice(last_device_guid)
+                    if last_device_guid
+                    else None
+                )
                 if not device:
                     # does not exist anymore
                     last_input_id = None
@@ -3521,7 +3554,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                     widget.refresh()
 
-                    self.ui.devices.setCurrentIndex(index)
+                    # self.ui.devices.setCurrentIndex(index)
                     self._select_input(
                         last_device_guid,
                         last_input_type,
@@ -3539,6 +3572,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             gremlin.shared_state.pop_suspend_save_input()
 
             if verbose:
+                selected_device_guid = self.getActiveTabDeviceGuid()
                 syslog.info("Tab recreated:")
                 for index in range(self.ui.devices.count()):
                     device_guid = self.ui.devices.tabData(index).device_guid
@@ -3546,8 +3580,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         device_name = self._get_device_name(device_guid)
                     else:
                         device_name = "(unknown)"
+
+                    stub = "[SELECTED]" if device_guid == selected_device_guid else ""
                     syslog.info(
-                        f"\t[{index}] {self.ui.devices.tabText(index)} {device_name}  {device_guid}"
+                        f"\t[{index}] {self.ui.devices.tabText(index)} {device_name}  {device_guid} {stub}"
                     )
 
             if verbose_detailed:
@@ -3650,7 +3686,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # print (f"select last tab: {self.config.last_tab_guid}")
         device_guid, input_type, input_id = self.config.get_last_input()
         el = gremlin.event_handler.EventListener()
-        el.select_input.emit(device_guid, input_type, input_id, False, True, False)
+        el.select_input.emit(
+            device_guid, input_type, input_id, False, True, False, None
+        )
 
     @QtCore.Slot()
     def _ui_ready(self):
@@ -3697,12 +3735,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # enable highlighting
         self.pop_highlighting(True)
 
-    def _select_last_input(self):
+    def _select_last_input(self, extra_data : dict = None,):
         # if there is a last input - select that input as well
         device_guid, input_type, input_id = self.config.get_last_input()
         if input_type and input_id:
             eh = gremlin.event_handler.EventListener()
-            eh.select_input.emit(device_guid, input_type, input_id, False, True, False)
+            eh.select_input.emit(
+                device_guid, input_type, input_id, False, True, False, extra_data
+            )
 
     def _get_last_input(self, device_guid: str) -> tuple:
         """Gets the last input selection for the given device
@@ -3798,13 +3838,32 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         force_update=False,
         force_switch=False,
         tab_changed=False,
+        extra_data : dict = None,
     ):
         if gremlin.shared_state.is_input_selection_suspended:
             return  # skip if disabled
-        el = gremlin.event_handler.EventListener()
-        el.select_input.emit(
-            device_guid, input_type, input_id, force_update, force_switch, tab_changed
+        
+        args =  (
+            device_guid,
+            input_type,
+            input_id,
+            force_update,
+            force_switch,
+            tab_changed,
+            extra_data
         )
+        
+        gremlin.util.InvokeUiMethod(self._select_input_handler_ui, args)
+        # el = gremlin.event_handler.EventListener()
+        # el.select_input.emit(
+        #     device_guid,
+        #     input_type,
+        #     input_id,
+        #     force_update,
+        #     force_switch,
+        #     tab_changed,
+        #     extra_data
+        # )
 
     def _config_changed_cb(self):
         self.refresh()
@@ -3830,36 +3889,45 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         force_update: bool = False,
         force_switch=False,
         tab_changed=False,
+        extra_data :dict = None,
     ):
-        gremlin.util.InvokeUiMethod(
-            self._select_input_handler_ui,
+        args = (
             device_guid,
             restore_input_type,
             restore_input_id,
             force_update,
             force_switch,
             tab_changed,
+            extra_data
         )
+        gremlin.util.InvokeUiMethod(self._select_input_handler_ui, args)
 
-    def _select_input_handler_ui(
-        self,
-        device_guid: dinput.GUID,
-        restore_input_type: gremlin.input_types.InputType = None,
-        restore_input_id=None,
-        force_update: bool = False,
-        force_switch=False,
-        tab_changed=False,
-    ):
-        """Selects a specific input on the given tab
+    def _select_input_handler_ui(self, args):
+        """Selects a specific input on the given tab.
         The tab is changed if different from the current tab.
-
-        :params:
-        device_guid = the device ID as a string or a Dinput GUID
-        input_type = InputType enum or none to auto determine
-        input_id = id of the input, none to auto determine
-
-
         """
+
+        restore_device_guid: dinput.GUID
+        restore_input_type: gremlin.input_types.InputType = None
+        restore_input_id = None
+        force_update: bool = False
+        force_switch = False
+        tab_changed = False
+        extra_data : dict = None
+
+        (
+            restore_device_guid,
+            restore_input_type,
+            restore_input_id,
+            force_update,
+            force_switch,
+            tab_changed,
+            extra_data,
+        ) = args
+
+
+
+
 
         import gremlin.config
         import gremlin.event_handler
@@ -3868,345 +3936,370 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         import gremlin.shared_state
         import gremlin.joystick_handling
 
-        if self._change_input_lock.locked():
-            return
+        completion_callback = None
+        if extra_data:
+            if "completion_callback" in extra_data:
+                completion_callback = extra_data["completion_callback"]
+                assert isinstance(completion_callback, Callable),"invalid completion callback"
+            pass
 
-        verbose = gremlin.config.Configuration().verbose_mode_select
+        try:
+            device_guid = None
+            input_type = None
+            input_id = None
+            if self._change_input_lock.locked():
+                return
 
-        widget = None
-        _push_cursor = False
+            verbose = gremlin.config.Configuration().verbose_mode_select
 
-        with self._change_input_lock:
-            try:
-                if gremlin.shared_state.is_input_selection_suspended:
-                    return  # skip if disabled
+            widget = None
+            _push_cursor = False
 
-                el = gremlin.event_handler.EventListener()
+            with self._change_input_lock:
+                try:
+                    if gremlin.shared_state.is_input_selection_suspended:
+                        return  # skip if disabled
 
-                if not device_guid:
-                    # no device selected - ignore
-                    return
-
-                if not gremlin.util.compare_guid(
-                    device_guid, gremlin.shared_state.active_device_guid
-                ):
-                    # looking to select an input that isn't visible
-                    return
-
-                device_guid = gremlin.util.normalize_guid(device_guid)
-
-                # avoid spamming
-                if (
-                    not force_update
-                    and self._last_input_change_timestamp + self._input_delay
-                    > time.time()
-                ):
-                    # delay not occured yet
-                    return
-
-                self._last_input_change_timestamp = time.time()
-
-                # syslog = logging.getLogger("system")
-                input_id = restore_input_id
-                input_type = restore_input_type
-
-                switch_input = (
-                    force_switch  # true if inputs are switched or forcing refresh
-                )
-
-                switch_enabled = self.is_highligthing_enabled
-                if (
-                    not force_switch
-                    and gremlin.shared_state.current_tab_device_guid != device_guid
-                    and not switch_enabled
-                ):
-                    if verbose:
-                        syslog.info(
-                            f"SELECT INPUT: event: {device_guid} {self._get_device_name(device_guid)} disabled: highlight switch is disabled)"
-                        )
-                    return
-
-                # index of current device tab
-                index = self.ui.devices.currentIndex()
-                if index == -1:
-                    # no current index
-                    return
-                tabdata = self.ui.devices.tabData(index)
-                if not tabdata:
-                    # no current data
-                    return
-
-                current_device_guid = tabdata.device_guid
-                current_input_type, current_input_id = self._get_last_input(
-                    current_device_guid
-                )
-
-                # refresh the input list view for that tab if needed
-
-                # guid of current device tab
-                switch_tabs = False
-                index = self._find_tab_index(device_guid)
-                if (
-                    current_device_guid != device_guid or index == -1
-                ):  # device changed or not found
-                    # change tab if not on the correct device tab
-                    if verbose:
-                        syslog.info("Tab change requested")
-                    # validate the requested device exists (this could be because the device is disconnected for example)
-
-                    if index == -1:
-                        # not found
-                        device = gremlin.joystick_handling.getDevice(device_guid)
-                        if device:
-                            if device.is_virtual:
-                                # use the current tab if the VJOY device is not visible
-                                last_device_guid, last_input_type, input_id = (
-                                    self.config.get_last_input(device_guid)
-                                )
-                                index = self._find_tab_index(device_guid)
-
-                            else:
-                                # not virtual
-                                syslog.warning(
-                                    f"SELECT INPUT: tab not found for device {gremlin.util.normalize_guid(device_guid)} - device does not exist - selecting default"
-                                )
-                                # change to the first
-                                device: DeviceSummary = (
-                                    gremlin.joystick_handling.default_device()
-                                )
-                                if not device:
-                                    syslog.warning(
-                                        "SELECT INPUT: no default device to select found - aborting selection"
-                                    )
-                                    return
-                                device_guid = device.device_guid
-                                # get a default input for that device (first axis or first button)
-                                if device.axis_count:
-                                    input_id = device.getAxisInputId(0)
-                                elif device.button_count:
-                                    input_item = self._get_input_item(device_guid, 0)
-                                else:
-                                    syslog.warning(
-                                        "SELECT INPUT: default device has no default input - aborting selection"
-                                    )
-                                    return
-
-                                switch_input = True
-
-                                index = self._find_tab_index(device_guid)
-
-                    if index is None:
-                        syslog.warning(
-                            f"SELECT INPUT: default device not found in device tabs: {str(device)} - aborting selection"
-                        )
+                    if not restore_device_guid:
+                        # no device selected - ignore
                         return
 
-                    with QtCore.QSignalBlocker(self.ui.devices):
-                        self.ui.devices.setCurrentIndex(index)
+                    if not force_update and not force_switch:
+                        if not gremlin.util.compare_guid(
+                            restore_device_guid, gremlin.shared_state.active_device_guid
+                        ):
+                            # looking to select an input that isn't visible
+                            return
 
-                        gremlin.shared_state.current_tab_device_guid = device_guid
+                    device_guid = gremlin.util.normalize_guid(restore_device_guid)
 
-                    if verbose:
-                        syslog.info(
-                            f"Tab change complete: device {gremlin.util.normalize_guid(device_guid)}"
-                        )
-                    switch_tabs = True  # we are switching tabs
-                    switch_input = True  # we are switching inputs
+                    # avoid spamming
+                    if (
+                        not force_update
+                        and self._last_input_change_timestamp + self._input_delay
+                        > time.time()
+                    ):
+                        # delay not occured yet
+                        return
 
-                if switch_tabs and not force_switch and not config.highlight_autoswitch:
-                    if verbose:
-                        syslog.info(
-                            "SELECT INPUT: Tab change ignored: auto tab switching is disabled"
-                        )
-                    return
+                    self._last_input_change_timestamp = time.time()
 
-                # validate the current device widget first
-                widget: gremlin.input_item.BaseDeviceTabWidget = (
-                    self.getRegisteredWidget(device_guid)
-                )
-                if widget is None:
-                    return
-                widget.ensureLoaded()
-                if not widget.isLoaded():
-                    return
+                    # syslog = logging.getLogger("system")
+                    input_id = restore_input_id
+                    input_type = restore_input_type
 
-                input_count = widget.inputCount
-                input_widget_count = widget.inputWidgetCount
-                if verbose:
-                    syslog.info(
-                        f"Device widget: input count: {input_count:,}  widget count: {input_widget_count}"
+                    switch_input = (
+                        force_switch  # true if inputs are switched or forcing refresh
                     )
 
-                if input_count and input_widget_count == 0:
-                    # widget not loaded, load it
-                    widget.refresh(emit=False)
+                    switch_enabled = self.is_highligthing_enabled
+                    if (
+                        not force_switch
+                        and gremlin.shared_state.current_tab_device_guid != device_guid
+                        and not switch_enabled
+                    ):
+                        if verbose:
+                            syslog.info(
+                                f"SELECT INPUT: event: {device_guid} {self._get_device_name(device_guid)} disabled: highlight switch is disabled)"
+                            )
+                        return
+
+                    # index of current device tab
+                    index = self.ui.devices.currentIndex()
+                    if index == -1:
+                        # no current index
+                        return
+
+                    tabdata = self.ui.devices.tabData(index)
+                    assert tabdata is not None, "invalid tab data"
+
+                    current_device_guid = tabdata.device_guid
+                    current_input_type, current_input_id = self._get_last_input(
+                        current_device_guid
+                    )
+
+                    # refresh the input list view for that tab if needed
+
+                    # guid of current device tab
+                    switch_tabs = False
+                    index = self._find_tab_index(device_guid)
+                    if (
+                        current_device_guid != device_guid or index == -1
+                    ):  # device changed or not found
+                        # change tab if not on the correct device tab
+                        if verbose:
+                            syslog.info("Tab change requested")
+                        # validate the requested device exists (this could be because the device is disconnected for example)
+
+                        if index == -1:
+                            # not found
+                            device = gremlin.joystick_handling.getDevice(device_guid)
+                            if device:
+                                if device.is_virtual:
+                                    # use the current tab if the VJOY device is not visible
+                                    last_device_guid, last_input_type, input_id = (
+                                        self.config.get_last_input(device_guid)
+                                    )
+                                    index = self._find_tab_index(device_guid)
+
+                                else:
+                                    # not virtual
+                                    syslog.warning(
+                                        f"SELECT INPUT: tab not found for device {gremlin.util.normalize_guid(device_guid)} - device does not exist - selecting default"
+                                    )
+                                    # change to the first
+                                    device: DeviceSummary = (
+                                        gremlin.joystick_handling.default_device()
+                                    )
+                                    if not device:
+                                        syslog.warning(
+                                            "SELECT INPUT: no default device to select found - aborting selection"
+                                        )
+                                        return
+                                    device_guid = device.device_guid
+                                    # get a default input for that device (first axis or first button)
+                                    if device.axis_count:
+                                        input_id = device.getAxisInputId(0)
+                                    elif device.button_count:
+                                        input_item = self._get_input_item(
+                                            device_guid, 0
+                                        )
+                                    else:
+                                        syslog.warning(
+                                            "SELECT INPUT: default device has no default input - aborting selection"
+                                        )
+                                        return
+
+                                    switch_input = True
+
+                                    index = self._find_tab_index(device_guid)
+
+                        if index is None:
+                            syslog.warning(
+                                f"SELECT INPUT: default device not found in device tabs: {str(device)} - aborting selection"
+                            )
+                            return
+
+                        with QtCore.QSignalBlocker(self.ui.devices):
+                            self.ui.devices.setCurrentIndex(index)
+
+                            gremlin.shared_state.current_tab_device_guid = device_guid
+
+                        if verbose:
+                            syslog.info(
+                                f"Tab change complete: device {gremlin.util.normalize_guid(device_guid)}"
+                            )
+                        switch_tabs = True  # we are switching tabs
+                        switch_input = True  # we are switching inputs
+
+                    if (
+                        switch_tabs
+                        and not force_switch
+                        and not config.highlight_autoswitch
+                    ):
+                        if verbose:
+                            syslog.info(
+                                "SELECT INPUT: Tab change ignored: auto tab switching is disabled"
+                            )
+                        return
+
+                    # validate the current device widget first
+                    widget: gremlin.input_item.BaseDeviceTabWidget = (
+                        self.getRegisteredWidget(device_guid)
+                    )
+                    assert widget is not None, (
+                        f"error retrieving widget for device [{device.name}] id:[{device.device_id}]"
+                    )
+                    widget.ensureLoaded()
+
+                    if not widget.isLoaded():
+                        return
+
+                    input_count = widget.inputCount
                     input_widget_count = widget.inputWidgetCount
                     if verbose:
                         syslog.info(
-                            f"Post refresh: Device widget: input count: {input_count:,}  widget count: {input_widget_count}"
+                            f"Device widget: input count: {input_count:,}  widget count: {input_widget_count}"
                         )
 
-                has_inputs = gremlin.util.compare_guid(
-                    device_guid,
-                    (
-                        gremlin.shared_state.settings_tab_guid,
-                        gremlin.shared_state.plugins_tab_guid,
-                    ),
-                )  # settings and plugins tabs don't have inputs
-
-                if verbose:
-                    syslog.info(
-                        f"SELECT INPUT: current input: {current_device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(current_input_type)} input ID: {current_input_id} current mode: {gremlin.shared_state.current_mode}"
-                    )
-
-                # make the content visible
-                self.selectTabWidget(device_guid)
-
-                has_containers = False
-
-                # see if the request input is found
-                input_item = self._find_input_item(device_guid, input_type, input_id)
-                if input_item is None:
-                    # not found
-                    input_item = self._get_input_item(device_guid, 0)
-
-                if input_item:
-                    input_type = input_item.input_type
-                    input_id = input_item.input_id
-                    has_containers = len(input_item.containers) > 0
-                    switch_input = (
-                        not input_item.selected or not has_containers
-                    )  # switch inputs if the input is not currently selected
-
-                if verbose:
-                    syslog.info(
-                        f"SELECT INPUT: new input: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}  current mode: {gremlin.shared_state.current_mode}"
-                    )
-
-                if input_id is None and has_inputs:
-                    # get the default item to select
-
-                    if verbose:
-                        syslog.info(
-                            f"SELECT INPUT: last input ID {input_id} not found - selecting default input ID"
-                        )
-                    last_device_guid, last_input_type, input_id = (
-                        self.config.get_last_input(device_guid)
-                    )
-                    if verbose:
-                        syslog.info(
-                            f"SELECT INPUT: found {last_device_guid} {last_input_type} {input_id} "
-                        )
-                    if input_id is None:
-                        input_item = self._get_input_item(device_guid, 0)
-                        if input_item and self._last_input_item != input_item:
-                            input_id = input_item.input_id
-                            input_type = input_item.input_type
-                            last_device_guid = device_guid
-                            last_input_type = input_type
-                            has_containers = len(input_item.containers) > 0
-                            if verbose:
-                                syslog.info(
-                                    f"SELECT INPUT: defaulting to first item on list {last_device_guid} {last_input_type} {input_id} "
-                                )
-
-                            self._last_input_item = input_item
-                    switch_input = True  # we are switching inputs
-
-                self._update_highlight_toolbar_enabled()
-
-                if not switch_input:
-                    if widget and isinstance(
-                        widget, gremlin.input_item.BaseDeviceTabWidget
-                    ):
-                        current_input_id = widget.getContentInputId()
-                        if current_input_id:
-                            switch_input = current_input_id != input_id
-
-                if input_id is not None and switch_input:
-                    # select a particular input within a tab
-
-                    if widget:
-                        if isinstance(
-                            widget, gremlin.input_item.BaseDeviceTabWidget
-                        ):  # some tabs are not the standard widget - ignore those as they have no inputs
-                            self.selectRegisteredWidget(device_guid)
-                            if verbose:
-                                syslog.info(
-                                    f"SELECT INPUT: select widget {input_type} {input_id}"
-                                )
-                            if tab_changed or not hasattr(
-                                widget, "input_item_list_view"
-                            ):
-                                widget.refresh(emit=False)
-                            if not force_update:
-                                force_update = (
-                                    current_input_id != input_id
-                                    or current_input_type != current_input_id
-                                    or gremlin.util.compare_guid(
-                                        current_device_guid, device_guid
-                                    )
-                                )
-
-                            _emit = (
-                                gremlin.shared_state.profile_loading
-                            )  # True #not has_containers
-
-                            # widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = emit)
-                            # index = widget.input_item_list_view.current_index
-                            index = widget.indexOf(input_item)
-
-                            # widget.input_item_list_view.redraw_index(index)
-                            widget.selectInputItemIndex(index)
-                            # widget.refresh(False)
-
-                            # widget.select_item(index)
-                            widget.setContentWidget(input_type, input_id)
-
-                            # el.sync_input.emit(input_item)
-
-                            input_item_widget = widget.inputItemListView.widget(index)
-                            if input_item_widget:
-                                if not input_item_widget.selected:
-                                    input_item_widget.setSelected(True, emit=False)
-
-                                # input_widget.ensureStyle()
-
-                            if verbose:
-                                syslog.info(
-                                    f"SELECT INPUT: selected widget {input_type.name} {input_id}"
-                                )
-
-                            # ensure the input is highlighted
-
-                    # remember the last input id
-                    self._current_tab_input_id = input_id
-
-                elif not has_inputs:
-                    # special tabs
-                    widget = self.getRegisteredWidget(device_guid)
-                    if widget:
-                        self.selectRegisteredWidget(device_guid)
+                    if input_count and input_widget_count == 0:
+                        # widget not loaded, load it
                         widget.refresh(emit=False)
+                        input_widget_count = widget.inputWidgetCount
+                        if verbose:
+                            syslog.info(
+                                f"Post refresh: Device widget: input count: {input_count:,}  widget count: {input_widget_count}"
+                            )
 
-                # save settings as the last input
-                el.input_selection_changed.emit(device_guid, input_type, input_id)
-                el.update_input_state.emit(device_guid)
+                    has_inputs = gremlin.util.compare_guid(
+                        device_guid,
+                        (
+                            gremlin.shared_state.settings_tab_guid,
+                            gremlin.shared_state.plugins_tab_guid,
+                        ),
+                    )  # settings and plugins tabs don't have inputs
 
-                self._last_selected_device_guid = device_guid
-                self._last_selected_input_type = input_type
-                self._last_selected_input_id = input_id
+                    if verbose:
+                        syslog.info(
+                            f"SELECT INPUT: current input: {current_device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(current_input_type)} input ID: {current_input_id} current mode: {gremlin.shared_state.current_mode}"
+                        )
 
-            except Exception as err:
-                # something went south with the selection
-                syslog.error(
-                    "TabIndex generic unhandled error occured in _select_input_handler_ui():"
-                )
-                syslog.error(f"{err}\n{traceback.format_exc()}")
+                    has_containers = False
 
-            finally:
-                # allow UI to refresh / update
-                self.ensureTabLoaded()
+                    # see if the request input is found
+                    input_item = self._find_input_item(
+                        device_guid, input_type, input_id
+                    )
+                    if input_item is None:
+                        # not found
+                        input_item = self._get_input_item(device_guid, 0)
+
+                    if input_item:
+                        input_type = input_item.input_type
+                        input_id = input_item.input_id
+                        has_containers = len(input_item.containers) > 0
+                        switch_input = (
+                            not input_item.selected or not has_containers
+                        )  # switch inputs if the input is not currently selected
+
+                    if verbose:
+                        syslog.info(
+                            f"SELECT INPUT: new input: {device_guid} {self._get_device_name(device_guid)} input: {InputType.to_display_name(input_type)} input ID: {input_id}  current mode: {gremlin.shared_state.current_mode}"
+                        )
+
+                    if input_id is None and has_inputs:
+                        # get the default item to select
+
+                        if verbose:
+                            syslog.info(
+                                f"SELECT INPUT: last input ID {input_id} not found - selecting default input ID"
+                            )
+                        last_device_guid, last_input_type, input_id = (
+                            self.config.get_last_input(device_guid)
+                        )
+                        if verbose:
+                            syslog.info(
+                                f"SELECT INPUT: found {last_device_guid} {last_input_type} {input_id} "
+                            )
+                        if input_id is None:
+                            input_item = self._get_input_item(device_guid, 0)
+                            if input_item and self._last_input_item != input_item:
+                                input_id = input_item.input_id
+                                input_type = input_item.input_type
+                                last_device_guid = device_guid
+                                last_input_type = input_type
+                                has_containers = len(input_item.containers) > 0
+                                if verbose:
+                                    syslog.info(
+                                        f"SELECT INPUT: defaulting to first item on list {last_device_guid} {last_input_type} {input_id} "
+                                    )
+
+                                self._last_input_item = input_item
+                        switch_input = True  # we are switching inputs
+
+                    self._update_highlight_toolbar_enabled()
+
+                    if not switch_input:
+                        if widget and isinstance(
+                            widget, gremlin.input_item.BaseDeviceTabWidget
+                        ):
+                            current_input_id = widget.getContentInputId()
+                            if current_input_id:
+                                switch_input = current_input_id != input_id
+
+                    if input_id is not None and switch_input:
+                        # select a particular input within a tab
+
+                        if widget:
+                            if isinstance(
+                                widget, gremlin.input_item.BaseDeviceTabWidget
+                            ):  # some tabs are not the standard widget - ignore those as they have no inputs
+                                self.selectRegisteredWidget(device_guid)
+                                if verbose:
+                                    syslog.info(
+                                        f"SELECT INPUT: select widget {input_type} {input_id}"
+                                    )
+                                if tab_changed or not hasattr(
+                                    widget, "input_item_list_view"
+                                ):
+                                    widget.refresh(emit=False)
+                                if not force_update:
+                                    force_update = (
+                                        current_input_id != input_id
+                                        or current_input_type != current_input_id
+                                        or gremlin.util.compare_guid(
+                                            current_device_guid, device_guid
+                                        )
+                                    )
+
+                                _emit = (
+                                    gremlin.shared_state.profile_loading
+                                )  # True #not has_containers
+
+                                # widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = emit)
+                                # index = widget.input_item_list_view.current_index
+                                index = widget.indexOf(input_item)
+
+                                # widget.input_item_list_view.redraw_index(index)
+                                widget.selectInputItemIndex(index)
+                                # widget.refresh(False)
+
+                                # widget.select_item(index)
+                                widget.setContentWidget(input_type, input_id)
+
+                                input_item_widget = widget.inputItemListView.widget(
+                                    index
+                                )
+                                if input_item_widget:
+                                    if not input_item_widget.selected:
+                                        input_item_widget.setSelected(True, emit=False)
+
+                                    # input_widget.ensureStyle()
+
+                                if verbose:
+                                    syslog.info(
+                                        f"SELECT INPUT: selected widget {input_type.name} {input_id}"
+                                    )
+
+                                # ensure the input is highlighted
+
+                        # remember the last input id
+                        self._current_tab_input_id = input_id
+
+                    elif not has_inputs:
+                        # special tabs
+                        widget = self.getRegisteredWidget(device_guid)
+                        if widget:
+                            self.selectRegisteredWidget(device_guid)
+                            widget.refresh(emit=False)
+
+                    # save settings as the last input
+                    el = gremlin.event_handler.EventListener()
+                    el.input_selection_changed.emit(device_guid, input_type, input_id)
+                    el.update_input_state.emit(device_guid)
+
+                    self._last_selected_device_guid = device_guid
+                    self._last_selected_input_type = input_type
+                    self._last_selected_input_id = input_id
+
+                except Exception as err:
+                    # something went south with the selection
+                    syslog.error(
+                        "TabIndex generic unhandled error occured in _select_input_handler_ui():"
+                    )
+                    syslog.error(f"{err}\n{traceback.format_exc()}")
+
+                finally:
+                    gremlin.shared_state.setActiveDeviceGuid(device_guid)
+                    # allow UI to refresh / update
+                    self.ensureTabLoaded()
+
+                    # ensure content is visible
+                    self.selectTabWidget(device_guid)
+        finally:
+            if completion_callback:
+                # fire the callback on completion
+                completion_callback(device_guid, input_type, input_id)
 
     def ensureTabLoaded(self):
         """ensures a tab device UI is loaded/refreshed"""
@@ -4337,7 +4430,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             widget.refresh()
 
     def _sort_tabs(self):
+        ''' sorts device tabs '''
+        wm = WorkManager()
+        wm.submit(self._sort_tabs_worker )
+
+
+    def _sort_tabs_worker(self, args):
         """sorts device tabs by default order name"""
+
+
+        self._tab_sorted_flag = False
 
         # sorted list of item GUIDs
         guid_list = []
@@ -4369,10 +4471,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         for device_guid in self._vjoy_input_device_guids:
             guid_list.append(self._find_tab_data_guid(device_guid))
 
-        # # add the output vjoy
-        # for device_guid in self._vjoy_output_device_guids:
-        #     guid_list.append(self._find_tab_data_guid(device_guid))
-
         # add the settings tab
         guid_list.append(
             self._find_tab_data_guid(gremlin.shared_state.settings_tab_guid)
@@ -4400,7 +4498,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._dump_tab_map(tab_map)
 
         self._select_last_tab()
-        self._select_last_input()
+        self._select_last_input(extra_data={
+            "completion_callback" : self._handle_tabs_sorted_completed
+        })
+
+        while not self._tab_sorted_flag:
+            QThread.sleep(0)
+
+
+    def _handle_tabs_sorted_completed(self, *args):
+        self._tab_sorted_flag = True
+
+
+
 
     def _setup_icons(self):
         """Sets the icons of all QAction items."""
@@ -4621,6 +4731,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose:
             syslog.info(f"UI: tab move detected {tab_from} {tab_to}")
+        wm = WorkManager()
+        wm.submit(self._tab_move_worker)
+      
+
+    def _tab_move_worker(self, args):
+        ''' worker thread to process tab move '''
+
+        syslog.info("tab move start")
         # rebuild the tab order
         self._reindex_tabs()
         # update new order
@@ -4630,13 +4748,29 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         _, restore_input_type, restore_input_id = self.config.get_last_input(
             device_guid
         )
+        syslog.info("tab move selecting")
+        self._tab_move_completed_flag = False
         self._select_input(
             device_guid=device_guid,
             input_type=restore_input_type,
             input_id=restore_input_id,
             force_update=True,
             force_switch=True,
+            extra_data={
+                "completion_callback": self._handle_tab_move_completed,
+                "source":"tab_move"
+                }
         )
+
+        syslog.info("tab move waiting for selection complete")
+        while not self._tab_move_completed_flag:
+            QThread.sleep(0)
+
+        syslog.info("tab move finished")
+
+    def _handle_tab_move_completed(self, *args):
+        syslog.info("tab move completed event")
+        self._tab_move_completed_flag = True
 
     def _edit_mode_selector_changed(self, new_mode):
         """Updates the current mode to the provided one.

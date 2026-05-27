@@ -780,7 +780,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     #     if emit:
     #         el = gremlin.event_handler.EventListener()
-    #         el.select_input.emit(device_guid, input_type, input_id, False, True, False)
+    #         el.select_input.emit(device_guid, input_type, input_id, False, True, False, None)
     #         # el.input_selection_changed.emit(device_guid, input_type, input_id)
 
     def _index_for_key(self, key_or_index):

@@ -744,7 +744,7 @@ class EventListener:
 
     # selection event - tells the UI to show a different input
     select_input = Signal(
-        object, object, object, bool, bool, bool
+        object, object, object, bool, bool, bool, Callable
     )  # selects a particular input (device_guid, input_type, input_id,  force_update, force_switch, tab_changed)
     select_input_completed = Signal(
         object, object, object
@@ -1102,6 +1102,8 @@ class EventListener:
         """queues a list of joystick events"""
         verbose = self._verbose_queue
         # verbose = True
+        jp = JoystickEventProcessor()
+        jp.queueJoystickEventList(event_list)
         for event in event_list:
             if event.device_guid in self._valid_device_map:
                 if verbose:
@@ -1794,7 +1796,7 @@ class EventListener:
         verbose_extra = self._verbose_dinput_extra
 
         event = dinput.InputEvent(data)
-        device = gremlin.joystick_handling.getDevice(event.device_guid)
+        device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(event.device_guid)
 
         if device is None:
             if verbose:
@@ -1802,6 +1804,11 @@ class EventListener:
                     f"DINPUT EVENT: device not found: [{str(event.device_guid)}]: {event}"
                 )
             return
+        
+        if device.vendor_id == 0x31e3 and event.input_type.value[0] == 2 and event.input_index > 16:
+            # wooting keyboard button spam filter
+            return
+            
 
         if verbose:
             syslog.info(f"DINPUT EVENT: device [{device.name}] data: {event}")
@@ -3231,7 +3238,7 @@ class EventHandler(QtCore.QObject):
                 )
                 if input_type and input_id:
                     el.select_input.emit(
-                        device_guid, input_type, input_id, False, True, False
+                        device_guid, input_type, input_id, False, True, False, None
                     )
 
                 # fire the UI update on change mode
@@ -4723,6 +4730,10 @@ class JoystickEventProcessor:
         )  # holds the queue of events waiting to be processed
         self._ui_event_queue = JoystickEventQueue("ui event dispatcher queue")
 
+        self._listener_callbacks = {} # map of repeater callbacks [device_guid:dinput.GUID][input_type][input_id] -> callback(event)
+        self._callback_map = {} # map of callback to the registered device
+        self._event_cache = {} # cache of prior values
+
         self._count = 0  # number of items in the fire queue
         self._callback_count = 0  # number of registered callbacks
         self._event_thread = None
@@ -4740,6 +4751,61 @@ class JoystickEventProcessor:
         self.handle_config_changed()  # setup verbose flags
         self.exe = concurrent.futures.ThreadPoolExecutor()
         self.start()
+
+    def registerListenerCallback(self, device_guid : str | dinput.GUID , input_type : InputType, input_id : int, callback : Callable):
+        ''' register a joystick listener '''
+        if not device_guid:
+            # nothing to do
+            return 
+        if not isinstance(device_guid, dinput.GUID):
+            device_guid = gremlin.util.to_guid(device_guid)
+        if device_guid not in self._listener_callbacks:
+            self._listener_callbacks[device_guid] = {}
+        if input_type not in self._listener_callbacks[device_guid]:
+            self._listener_callbacks[device_guid][input_type] = {}
+        if input_id not in self._listener_callbacks:
+            self._listener_callbacks[device_guid][input_type][input_id] = []
+        if callback not in self._listener_callbacks[device_guid][input_type][input_id]:
+            self._listener_callbacks[device_guid][input_type][input_id].append(callback)
+            if callback not in self._callback_map:
+                self._callback_map[callback] = []
+            data = (device_guid, input_type, input_id)
+            if data not in self._callback_map[callback]:
+                self._callback_map[callback].append(data)
+
+        self.start() # ensure started
+        
+    def unregisterListenerCallback(self, callback):
+        ''' removes a registered callback '''
+        if callback in self._callback_map:
+            for device_guid, input_type, input_id in self._callback_map:
+                self._listener_callbacks[device_guid][input_type][input_id].remove(callback)
+            del self._callback_map[callback]
+
+    def _fireCallbacks(self, event: Event):            
+        ''' first all the callbacks on the UI thread'''
+        gremlin.util.InvokeUiMethod(self._fireCallbacks_ui, event)
+
+    def _fireCallbacks_ui(self, event: Event):
+        ''' fires all the callbacks (ui thread)'''
+    
+        device_guid = event.device_guid
+        input_type = event.event_type
+        input_id = event.identifier
+        # device = gremlin.joystick_handling.getDevice(device_guid)
+        # syslog.info(f"JEP: got event: [{device.name}] [{event.event_type.name}] input: [{event.identifier}] value: [{event.value:0.3f}]")
+        if device_guid in self._listener_callbacks:
+            if input_type in self._listener_callbacks[device_guid]:
+                if input_id in self._listener_callbacks[device_guid][input_type]:
+                    for callback in self._listener_callbacks[device_guid][input_type][input_id]:
+                        callback(event)
+
+
+
+        
+
+
+    
 
     def handle_config_changed(self):
         config = gremlin.config.Configuration()
@@ -4952,12 +5018,15 @@ class JoystickEventProcessor:
 
             # build the event list by ui or non-ui
             is_running = gremlin.shared_state.is_running
+
+
             for event in events:
                 # get axis values
 
                 device_guid = event.device_guid
                 input_type = event.event_type
                 input_id = event.identifier
+                fire_event = False
 
                 is_axis = event.is_axis  # or input_type == InputType.JoystickAxis
                 if is_axis:
@@ -4970,6 +5039,23 @@ class JoystickEventProcessor:
                     else:
                         values = event.value
 
+                if device_guid not in self._event_cache:
+                    self._event_cache[device_guid] = {}
+                if input_type not in self._event_cache[device_guid]:
+                    self._event_cache[device_guid][input_type] = {}
+                if input_id not in self._event_cache[device_guid][input_type]:
+                    fire_event = True
+                else:
+                    fire_event = self._event_cache[device_guid][input_type][input_id] != values                        
+                    
+
+                if fire_event:
+                    self._event_cache[device_guid][input_type][input_id] = values                        
+                    if self._listener_callbacks:
+                        self._fireCallbacks(event)
+
+
+         
                 key = self.getCallbackKey(
                     device_guid, event.event_type, event.identifier
                 )

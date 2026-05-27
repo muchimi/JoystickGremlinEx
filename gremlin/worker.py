@@ -64,8 +64,7 @@ class WorkManager(QObject):
         self,
         callback: Callable = None,
         complete_callback: Callable = None,
-        *args,
-        **kwargs,
+        args = None,
     ):
         """executes work and displays an hourglass cursor while doing it
 
@@ -93,11 +92,12 @@ class WorkManager(QObject):
                 else True
             ), "completed callback must be a callable"
 
-            worker = WorkTask(callback, *args, **kwargs)
+            worker = WorkTask(callback, args = args)
             worker.setCompletedCallback(complete_callback)
             worker.signals.finished.connect(self._handle_worker_finish)
             syslog.info(f"starting task: [{callback.__name__}]")
             self._threadpool.start(worker)
+
 
     def _handle_worker_finish(self):
         self.popCursor()
@@ -310,12 +310,11 @@ class WorkManager(QObject):
 
 class WorkTask(QRunnable):
 
-    def __init__(self, callback: Callable, *args, **kwargs):
+    def __init__(self, callback: Callable, args = None):
         super().__init__()
         self.signals = WorkerSignals()
         self._callback = callback
         self._args = args
-        self._kwargs = kwargs
         self._completed_callback = None
         self._name = f"Worker: {self._callback.__name__}"
 
@@ -333,9 +332,9 @@ class WorkTask(QRunnable):
        
         QThread.currentThread().setObjectName(self._name)
         syslog.info(f"executing task: [{self._name}]")
-        result = self._callback(self._args, self._kwargs)
+        result = self._callback(self._args)
         syslog.info(f"callback complete: [{self._name}]")
         if self._completed_callback:
-            self._completed_callback(result, self._args, self._kwargs)
+            self._completed_callback(result, self._args)
         self.signals.finished.emit()
         

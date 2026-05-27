@@ -170,9 +170,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             show_filtered_only=True,
         )
 
-        syslog.info("DEVICEWIDGET: joystick device set input model")
         self.setInputItemListModel(model)
-
         model.addCallback(self._handle_model_changed)  # listen to model changes
 
         # Handle vJoy as input and vJoy as output devices properly
@@ -596,7 +594,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_mode
         if verbose:
-            syslog.info(f"DeviceWidget: {self.device_name} change mode: [{mode}]")
+            syslog.info(f"DeviceTabWidget: {self.device_name} change mode: [{mode}]")
         self.update_curve_icons()
 
     def update_curve_icons(self):

@@ -457,7 +457,7 @@ def set_last_input_id(device_guid, input_type, input_id):
         if current_profile:
             current_profile.setLastInput(device_guid, input_type, input_id)
 
-active_device_guid : uuid.UUID = None # guid of the active device, None if not set
+
 
 def get_last_input_id():
     import gremlin.config
@@ -613,6 +613,16 @@ def _is_input_selection_suspended()->bool:
     global _input_selection_suspend_count
     return _input_selection_suspend_count > 0
 
+_active_device_guid_value : uuid.UUID = None # guid of the active device, None if not set
+@module_property
+def _active_device_guid():
+    ''' gets the active device id'''
+    global _active_device_guid_value
+    return _active_device_guid_value
+
+def setActiveDeviceGuid(device_guid):
+    global _active_device_guid_value
+    _active_device_guid_value = device_guid
 
 _get_root_path()
 

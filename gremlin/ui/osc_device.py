@@ -3757,6 +3757,7 @@ class OscFilterWidget(QtWidgets.QWidget):
                     False,
                     True,
                     False,
+                    None
                 )
             else:
                 gremlin.ui.ui_common.MessageBox(prompt="Term not found")

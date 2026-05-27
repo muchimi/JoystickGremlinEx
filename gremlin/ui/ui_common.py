@@ -4720,7 +4720,6 @@ class QDataPushButton(QtWidgets.QPushButton):
 
         self.installEventFilter(self)
 
-
     def _handle_callback(self):
         if self._callback:
             self._callback(self)
@@ -5883,6 +5882,57 @@ class QProgressBar(QtWidgets.QWidget):
 
 _hook_registry = {}  # registers hook list [hook_id]
 
+
+class QAxisRepeaterProgressbar(QProgressBar):
+    """axis repeater"""
+
+    def __init__(self, device_guid, input_id):
+        super().__init__(orientation=Qt.Orientation.Horizontal)
+        import gremlin.event_handler
+        import dinput
+
+        jp = gremlin.event_handler.JoystickEventProcessor()
+        jp.registerListenerCallback(
+            device_guid, InputType.JoystickAxis, input_id, self._handle_update_ui
+        )
+
+        assert isinstance(device_guid, dinput.GUID),'invalid device'
+        assert isinstance(input_id, int), "invalid input"
+        self._device_guid = device_guid
+        self._input_id = input_id
+
+    def _handle_update_ui(self, event):
+        import gremlin.event_handler
+        assert gremlin.util.is_ui_thread()
+        # update values
+        if event.event_type == InputType.JoystickAxis:
+            astate = gremlin.event_handler.AxisState()
+            data : gremlin.event_handler.AxisData = astate.getAxisData(event.device_guid, event.identifier)
+            if data:
+                values = data.getAxisValues(event.value)
+                self._set_value_ui(values, emit=False)
+
+    def triggerUpdate(self):
+        ''' update the widget '''
+        gremlin.util.InvokeUiMethod(self._trigger_update_ui)
+
+    def _trigger_update_ui(self):
+        import gremlin.event_handler
+        import gremlin.joystick_handling
+        astate = gremlin.event_handler.AxisState()
+        data : gremlin.event_handler.AxisData = astate.getAxisData(self._device_guid, self._input_id)
+
+        if data:
+            value = gremlin.joystick_handling.get_axis(self._device_guid, self._input_id)
+            values = data.getAxisValues(value)
+            self._set_value_ui(values, emit=False)
+
+
+    def _cleanup_ui(self):
+        ''' widget is being deleted '''
+        import gremlin.event_handler
+        jp = gremlin.event_handler.JoystickEventProcessor()
+        jp.unegisterListenerCallback(self._handle_update_ui)
 
 class QHookedProgressBar(QProgressBar, gremlin.event_handler.JoystickHook):
     """hooked progress bar to a hardware input"""
@@ -10684,7 +10734,6 @@ class QRememberMainWindow(QtWidgets.QMainWindow):
         self._window_key = key
         self.active_screen = self.getActiveScreen()
         self._apply_window_settings()
-        
 
     def _apply_window_settings(self):
         """Restores the stored window geometry settings."""
@@ -10833,9 +10882,8 @@ class QRememberDialog(QtWidgets.QDialog):
         if window_size:
             size = QtCore.QSize(window_size[0], window_size[1])
             return size.expandedTo(hint_size)
-        
+
         return hint_size
-        
 
     def showEvent(self, event):
         """occurs when window is displayed (made visible)"""
@@ -13489,10 +13537,10 @@ class QJoystickInputWidget(QtWidgets.QWidget):
 
     def _update_ui(
         self,
-        filtered_axis : int =None,
-        filtered_button : int =None,
-        filtered_hat: int =None,
-        visible_count: int =None,
+        filtered_axis: int = None,
+        filtered_button: int = None,
+        filtered_hat: int = None,
+        visible_count: int = None,
     ):
         if not Shiboken.isValid(self):
             return

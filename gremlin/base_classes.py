@@ -1289,12 +1289,12 @@ class AbstractCallbackModel(AbstractModel):
         items = self._filtered_item_map.keys()  # iterable
         indices = self._sort_callback(items)
         if indices is None:
-            # callback returning nothing means no
+            # callback returning nothing means no sort - skip
             return
         if __debug__:
             # check the data
             if not indices:
-                return  # nothing to do
+                return  # no data = nothing to do
             unique = set(indices)  # ensure unique
             # ensure unduplicated
             count = len(self._filtered_item_map)
@@ -1306,7 +1306,7 @@ class AbstractCallbackModel(AbstractModel):
                 )
                 return
             # verify each index is valid
-            invalid = (i for i in indices if i < 0 or i >= count)
+            invalid = [i for i in indices if i < 0 or i >= count]
             if invalid:
                 # invalid list
                 syslog.warning(

@@ -2867,6 +2867,7 @@ class StateFilterWidget(QtWidgets.QWidget):
                     False,
                     True,
                     False,
+                    None,
                 )
 
 

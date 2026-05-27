@@ -3042,7 +3042,7 @@ class Mapper:
                 # update the selection
                 # device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
                 # if input_type and input_id:
-                #     el.select_input.emit(device_guid, input_type, input_id, True, False, False)
+                #     el.select_input.emit(device_guid, input_type, input_id, True, False, False, None)
             finally:
                 # el.update_action_icons.emit() # asks all inputs to refresh their action icons
                 el.request_ui_refresh.emit()
