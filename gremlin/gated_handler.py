@@ -28,8 +28,8 @@ import gremlin.input_item
 
 
 import gremlin.util
-from gremlin.util import *
-from gremlin.types import *
+from gremlin.util import safe_format, safe_read, get_guid, load_icon
+# from gremlin.types import i
 
 from enum import Enum, auto
 import gremlin.singleton_decorator
@@ -44,7 +44,10 @@ import gremlin.joystick_handling
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
-
+import threading
+import time
+import html
+import logging
 
 syslog = logging.getLogger("system")
 MAX_UNDO = 20  # number of steps on the UNDO stack
@@ -335,7 +338,7 @@ class GateInfo:
         self.parent: GateData = parent
 
         assert value is not None, "Gate must have a value"
-        self._id = get_guid() if id is None else id
+        self._id = gremlin.util.get_guid() if id is None else id
 
         assert isinstance(self._id, str)
         value = gremlin.util.clamp(value, -1, 1)
@@ -460,7 +463,7 @@ class GateInfo:
         self._used = value
 
     @staticmethod
-    def copy_from(other: GateInfo):
+    def copy_from(other: GateInfo):  # noqa: F821
         gi = GateInfo(
             value=other.value,
             condition=other.condition,
@@ -758,7 +761,7 @@ class RangeInfo:
                 return True
         return False
 
-    def copy_from(self, other: RangeInfo):
+    def copy_from(self, other: RangeInfo):  # noqa: F821
         """copies data from another range object"""
 
         self._condition = other._condition
@@ -1174,7 +1177,7 @@ class TriggerTracking:
     def triggers(self) -> list:
         return self._triggers
 
-    def registerTrigger(self, owner, trigger: TriggerData):
+    def registerTrigger(self, owner, trigger: TriggerData):  # noqa: F821
         """registers/overrides prior trigger"""
         if owner not in self._tracking_map:
             self._tracking_map[owner] = {}
@@ -1549,7 +1552,7 @@ class GateData:
         """hook events"""
 
         if not self._hooked:
-            _jep = gremlin.event_handler.JoystickEventProcessor()
+            
             self._hooked = True
             verbose = gremlin.config.Configuration().verbose_mode_gate
 
@@ -1585,14 +1588,13 @@ class GateData:
         """unhook events"""
         if self._hooked:
             self._hooked = False
-            # jep = gremlin.event_handler.JoystickEventProcessor()
             verbose = gremlin.config.Configuration().verbose_mode_gate
             if verbose:
                 syslog.info(f"GATE: UNHOOK: {self._description}")
             el = gremlin.event_handler.EventListener()
             el.joystick_event.disconnect(self._joystick_event_handler)
 
-            # jep.unregisterCallback(self.id)
+            
 
     @property
     def device_guid(self):
@@ -1739,13 +1741,13 @@ class GateData:
 
         # note: hook to joystick event maintained until shutdown or profile unload
 
-    def _fire_trigger_callbacks_ui(self, trigger: TriggerData):
+    def _fire_trigger_callbacks_ui(self, trigger: TriggerData):  # noqa: F821
         """fires the trigger callbacks"""
         gremlin.util.assert_ui_thread()
         for callback in self._trigger_callbacks:
             callback(trigger)
 
-    def _fire_trigger_callbacks(self, trigger: TriggerData):
+    def _fire_trigger_callbacks(self, trigger: TriggerData):  # noqa: F821
         """fires the trigger callbackes"""
         gremlin.util.InvokeUiMethod(
             self._fire_trigger_callbacks_ui, trigger
@@ -2049,13 +2051,14 @@ class GateData:
                                 input_value, False
                             )
                             delay = trigger.delay / 1000  # delay in seconds
-                            release = lambda: self._ec.execute_functor_id(
-                                self._action_data.id,
-                                button_release_event,
-                                button_release_value,
-                                extra_data,
-                                True,
-                            )
+                            def release():
+                                return self._ec.execute_functor_id(
+                                                            self._action_data.id,
+                                                            button_release_event,
+                                                            button_release_value,
+                                                            extra_data,
+                                                            True,
+                                                        )
                             worker = gremlin.repeater.PulseWorker(
                                 delay, -1, None, release
                             )
@@ -2995,7 +2998,7 @@ class GateData:
         if value < range_info.v1 or value > range_info.v2:
             # not in range
             if verbose:
-                log_info(
+                syslog.info(
                     f"{value} Not in range [{range_info.v1},{range_info.v2}] -> none"
                 )
             return None
@@ -3004,19 +3007,19 @@ class GateData:
                 case GateRangeOutputMode.Normal:
                     # as is
                     # if verbose:
-                    #     log_info(f"range [NORMAL]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} as is [{range_info.v1},{range_info.v2}] -> {value}")
+                    #     syslog.info(f"range [NORMAL]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} as is [{range_info.v1},{range_info.v2}] -> {value}")
                     return value
                 case GateRangeOutputMode.FilterOut:
                     if verbose:
-                        log_info(
-                            f"range [FILTER OUT]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} filtered out -> none"
+                        syslog.info(
+                            f"range [FILTER OUT]: {range_info.v1:0.3f} {range_info.v2:0.3f} input: {value:0.3f} filtered out -> none"
                         )
                     return None  # filter the data out
                 case GateRangeOutputMode.Fixed:
                     # return the range's fixed value
                     output_value = range_info.fixed_value
                     if verbose:
-                        log_info(
+                        syslog.info(
                             f"range [FIXED]:  input: {value:0.3f} Fixed  -> {output_value:0.3f}"
                         )
                     return output_value
@@ -3035,7 +3038,7 @@ class GateData:
                     # output_value = gremlin.util.scale_to_range(value, v1, v2, target_min = range_info.range_min, target_max=range_info.range_max)
                     # output_value = gremlin.util.scale_to_range(value, v1, v2, target_min = range_info.output_range_min, target_max=range_info.output_range_max)
                     if verbose:
-                        log_info(
+                        syslog.info(
                             f"range [RANGED]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} scaled [{range_info.output_range_min:0.3f},{range_info.output_range_max:0.3f}]-> {output_value:0.3f}"
                         )
                     return output_value
@@ -3047,7 +3050,7 @@ class GateData:
                         value, source_min=v1, source_max=v2
                     )
                     if verbose:
-                        log_info(
+                        syslog.info(
                             f"range [REBASE]: {v1:0.3f} {v2:0.3f} input: {value:0.3f} rebased value: -> {output_value:0.3f}"
                         )
                     return output_value
@@ -3568,7 +3571,7 @@ class GateData:
         gate_list = self.getUsedGates()
         for gate_info in gate_list:
             if verbose:
-                log_info(
+                syslog.info(
                     f"Saving gate {gate_info.id} value: {gate_info.value} containers count: {gate_info.containerCount:,}"
                 )
             child = ElementTree.SubElement(node, "gate")
@@ -3577,8 +3580,8 @@ class GateData:
             )  # last condition selected
             child.set("value", f"{gate_info.value:0.{_decimals}f}")
             child.set("id", gate_info.id)
-            child.set("index", safe_format(gate_info.slider_index, int))
-            child.set("delay", safe_format(gate_info.delay, int))
+            child.set("index", gremlin.util.safe_format(gate_info.slider_index, int))
+            child.set("delay", gremlin.util.safe_format(gate_info.delay, int))
 
             # description
             if gate_info.description:
@@ -3609,7 +3612,7 @@ class GateData:
         )
         for range_info in range_list:
             if verbose:
-                log_info(
+                syslog.info(
                     f"Saving range {range_info.id} min: {range_info.range_min}  max: {range_info.range_max} containers count: {range_info.containerCount:,}"
                 )
             child_comment = ElementTree.Comment(
@@ -3830,7 +3833,7 @@ class GateData:
                 syslog.error(
                     f"GATE XML: invalid max gate ID in range data.  Gate [{max_id}] is not a valid gate. "
                 )
-                continue1
+                continue
 
             assert min_id != max_id, "XML: invalid range gate IDs detected"
 
@@ -4696,9 +4699,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
             self.slider.setValue(values)
             self.slider.setReadOnly(True)
 
-            self.axis_widget = gremlin.ui.ui_common.QHookedProgressBar(
-                orientation=QtCore.Qt.Orientation.Horizontal
-            )
+            self.axis_widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar()
 
             self.output_mode_widget = gremlin.ui.ui_common.QDataComboBox()
             self.output_container_widget = QtWidgets.QWidget()

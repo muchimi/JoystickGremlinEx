@@ -1828,9 +1828,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
             self.container_repeater_widget
         )
         self.container_repeater_layout.setContentsMargins(0, 0, 0, 0)
-        self.reapeater_widget = ui_common.QHookedProgressBar(
-            orientation=QtCore.Qt.Orientation.Horizontal
-        )
+        self.reapeater_widget = ui_common.QAxisRepeaterProgressbar()
 
         self.container_repeater_layout.addWidget(QtWidgets.QLabel("Input:"))
         self.container_repeater_layout.addWidget(self.input_raw_widget)

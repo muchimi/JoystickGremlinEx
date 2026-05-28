@@ -88,7 +88,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         self.enabled_widget.setChecked(self.condition_data.enabled)
         self.enabled_widget.clicked.connect(self._enabled_changed)
 
-        self.axis_repeater_widget = ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
+        self.axis_repeater_widget = ui_common.QAxisRepeaterProgressbar()
         self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
 
         self.range_status_widget = ui_common.QIconLabel()

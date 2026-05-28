@@ -636,7 +636,7 @@ class ControlPointGraphicsItem(QtWidgets.QGraphicsEllipseItem):
         :param evt the mouse even to process
         """
         self.ungrabMouse()
-        # self.control_point.model.model_updated()
+        super().mouseReleaseEvent(evt)
 
     def mouseMoveEvent(self, evt):
         """Updates the position of the control point based on mouse
@@ -712,6 +712,7 @@ class CurveHandleGraphicsItem(QtWidgets.QGraphicsRectItem):
         :param evt the mouse event to process
         """
         self.ungrabMouse()
+        super().mouseReleaseEvent(evt)
 
     def mouseMoveEvent(self, evt):
         """Updates the position of the control point based on mouse
@@ -726,6 +727,7 @@ class CurveHandleGraphicsItem(QtWidgets.QGraphicsRectItem):
         )
 
         self.parent.control_point.set_handle(self.index, new_point)
+        super().mouseMoveEvent(evt)
 
 
 class CurveView(QtWidgets.QGraphicsScene):

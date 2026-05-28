@@ -20,7 +20,7 @@ from typing import Callable
 import logging
 
 from PySide6 import QtWidgets, QtCore
-import time
+
 import dinput
 from dinput import DeviceSummary
 
@@ -38,8 +38,6 @@ import gremlin.ui.ui_common
 from shiboken6 import Shiboken
 from psygnal import Signal
 import gremlin.util
-
-
 
 
 syslog = logging.getLogger("system")
@@ -90,9 +88,7 @@ class JoystickInputModel(gremlin.input_item.InputItemListModel):
 class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     """Widget used to display the input joystick device."""
 
-    inputChanged = Signal(
-        str, object, object
-    )  # indicates the input selection changed sends (device_guid string, input_type, input_id)
+    inputChanged = Signal(str, object, object)  # indicates the input selection changed sends (device_guid string, input_type, input_id)
 
     def __init__(
         self,
@@ -145,6 +141,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._last_selected_index = _index = 0
         self._last_selected_input_item = None
         self.device_guid = device.device_guid
+
         self.device_name = device.name
         self._debug_widget = None
         self._input_dirty = False  # true if the input list should be refreshed
@@ -180,12 +177,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # as if they were physical input devices
 
         # device stats
-        self.stats: gremlin.base_profile.JoystickInputStats = (
-            profile.settings.getJoystickInputStats(device.device_guid)
-        )
-        self.stats_widget = gremlin.ui.ui_common.QJoystickInputWidget(
-            device.device_guid
-        )
+        self.stats: gremlin.base_profile.JoystickInputStats = profile.settings.getJoystickInputStats(device.device_guid)
+        self.stats_widget = gremlin.ui.ui_common.QJoystickInputWidget(device.device_guid)
         self.stats_widget.setStats(self.stats)
 
         # Add modifiable device label
@@ -195,14 +188,10 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         line_edit.textChanged.connect(self.update_device_label)
 
         # lock widget (add filter for joystick devices)
-        lock_widget = gremlin.ui.ui_common.QInputLockWidget(
-            data=self.device_guid, filter=True, filter_enabled=True
-        )
+        lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid, filter=True, filter_enabled=True)
         lock_widget.filterChanged.connect(self._handle_filter_changed)
 
-        widget = gremlin.ui.ui_common.getHContainer(
-            [self.stats_widget, "||", lock_widget], widget_only=True
-        )
+        widget = gremlin.ui.ui_common.getHContainer([self.stats_widget, "||", lock_widget], widget_only=True)
 
         self.addLeftPanelHeaderWidget(widget)
 
@@ -210,9 +199,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         grids = []
 
-        widget = gremlin.ui.ui_common.getGridContainer(
-            line_edit, "Device Label:", widget_only=True
-        )
+        widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Label:", widget_only=True)
         line_edit.setMinimumWidth(width)
         self.addLeftPanelHeaderWidget(widget)
 
@@ -223,9 +210,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(
-                line_edit, "Device ID:", widget_only=True
-            )
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             grids.append(widget)
 
@@ -233,20 +218,14 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(
-                line_edit, "Device Name:", widget_only=True
-            )
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             grids.append(widget)
 
         gremlin.ui.ui_common.synchronize_grids(grids)
 
         # Add a help text for the purpose of the vJoy tab
-        if (
-            device is not None
-            and device.is_virtual
-            and not vjoy_as_input.get(device.vjoy_id, False)
-        ):
+        if device is not None and device.is_virtual and not vjoy_as_input.get(device.vjoy_id, False):
             # msg = '''
             #     This tab allows assigning a response curve to virtual axis.
             #     The purpose of this is to enable split and merge axis to be
@@ -301,9 +280,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # see if the profile has a default input setup saved for this input
 
         if settings.hasFilterDefinition(device_guid):
-            count = settings.getFilterInputCounts(
-                device_guid, [InputType.JoystickAxis, InputType.JoystickButton]
-            )
+            count = settings.getFilterInputCounts(device_guid, [InputType.JoystickAxis, InputType.JoystickButton])
             if count:
                 input_filter = settings.getInputFilter(device_guid)
                 return input_filter
@@ -319,16 +296,12 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             input_filter[device.device_guid][InputType.JoystickAxis] = {}
             for index in range(axis_count):
                 input_id = device.axis_sequence_to_input_id(index)
-                input_filter[device.device_id][InputType.JoystickAxis][input_id] = (
-                    True
-                )
+                input_filter[device.device_id][InputType.JoystickAxis][input_id] = True
         if device.button_count:
             button_count = max(device.button_count, 2)  # first 2 buttons
             input_filter[device.device_guid][InputType.JoystickButton] = {}
             for input_id in range(1, button_count + 1):
-                input_filter[device.device_guid][InputType.JoystickButton][input_id] = (
-                    True
-                )
+                input_filter[device.device_guid][InputType.JoystickButton][input_id] = True
         # ignore hats
 
         # save the defaults to the settings
@@ -353,9 +326,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """ensures we have joystick input stats for the current device"""
         if not self.stats:
             profile = gremlin.shared_state.current_profile
-            self.stats: gremlin.base_profile.JoystickInputStats = (
-                profile.settings.getJoystickInputStats(self.device_guid)
-            )
+            self.stats: gremlin.base_profile.JoystickInputStats = profile.settings.getJoystickInputStats(self.device_guid)
 
     def update_mappings(self):
         """updates input mapping status data"""
@@ -385,40 +356,28 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         verbose = gremlin.config.Configuration().verbose_mode_filter
 
         # filtered = true if the input should not be displayed (filtered), false if it should be visible
-        include = profile.isInputFiltered(
-            input_item.device_guid, input_item.input_type, input_item.input_id
-        )
+        include = profile.isInputFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
         if verbose and include:
-            syslog.info(
-                f"custom filter: {input_item.input_type.name} {input_item.input_id} visible"
-            )
+            syslog.info(f"custom filter: {input_item.input_type.name} {input_item.input_id} visible")
         return include
 
-    
     def _handle_filter_changed(self, value: bool):
-        gremlin.util.InvokeUiMethod(
-            self._handle_filter_changed_ui, value
-        )  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._handle_filter_changed_ui, value)  # ensure on UI thread
 
     def _handle_filter_changed_ui(self, value: bool):
         """update filtered to used inputs only"""
 
-
-        dialog_filter = JoystickFilterDialog(
-            self.device_guid, callback=self._handle_filter_dialog
-        )
+        dialog_filter = JoystickFilterDialog(self.device_guid, callback=self._handle_filter_dialog)
         dialog_filter.exec()
 
     def _handle_filter_dialog(self):
         """runs when the filter dialog is closed"""
         dialog = self.sender()
         if dialog.accepted:
-           
             # get the current selected input
             input_item = self.inputItemListView.getSelectedItem()
 
             # see if there are changes to the filter
-
 
             # set the filter list from the visible inputs
             self.inputItemListModel.refresh()
@@ -471,13 +430,9 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """called when deleted"""
         super()._cleanup_ui()
 
-        if gremlin.util.isSignalConnected(
-            self.inputItemListView, "_edit_curve_item_cb"
-        ):
+        if gremlin.util.isSignalConnected(self.inputItemListView, "_edit_curve_item_cb"):
             self.inputItemListView.item_edit_curve.disconnect(self._edit_curve_item_cb)
-            self.inputItemListView.item_delete_curve.disconnect(
-                self._delete_curve_item_cb
-            )
+            self.inputItemListView.item_delete_curve.disconnect(self._delete_curve_item_cb)
 
             self.inputItemListView.setParent(None)
             self.inputItemListView.deleteLater()
@@ -499,11 +454,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         curve_data: gremlin.curve_handler.AxisCurveData = data.curve_data
         if not curve_data:
             curve_data = gremlin.curve_handler.AxisCurveData()
-            curve_data.calibration = (
-                gremlin.ui.axis_calibration.CalibrationManager().getCalibration(
-                    data.device_guid, data.input_id
-                )
-            )
+            curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(data.device_guid, data.input_id)
             curve_data.curve_update()
             data.curve_data = curve_data
 
@@ -517,22 +468,25 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         value = gremlin.joystick_handling.get_axis(data.device_guid, data.input_id)
         self._curve_update_handler(value)
 
-        device_name = gremlin.joystick_handling.getDeviceName(data.device_guid)
-        description = (
-            f"curve position update: device: [{device_name}] input: [{data.input_id}]"
-        )
+        # device_name = gremlin.joystick_handling.getDeviceName(data.device_guid)
+        # description = (
+        #     f"curve position update: device: [{device_name}] input: [{data.input_id}]"
+        # )
 
         # hook joystick queue to update position on the curve
-        jep = gremlin.event_handler.JoystickEventProcessor()
-        jep.registerCallback(
-            self.hook_id,
-            callback=self._handle_curve_update,
-            device_guid=data.device_guid,
-            input_type=InputType.JoystickAxis,
-            input_id=data.input_id,
-            ui_only=True,
-            description=description,
-        )
+        # jep = gremlin.event_handler.JoystickEventProcessor()
+        # jep.registerCallback(
+        #     self.hook_id,
+        #     callback=self._handle_curve_update,
+        #     device_guid=data.device_guid,
+        #     input_type=InputType.JoystickAxis,
+        #     input_id=data.input_id,
+        #     ui_only=True,
+        #     description=description,
+        # )
+
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event_ui.connect(self._handle_curve_update)
 
         # disable highlighting
         gremlin.shared_state.push_suspend_highlighting()
@@ -544,27 +498,29 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # renable highlighting
         gremlin.shared_state.pop_suspend_highlighting()
 
-        jep.unregisterCallback(self.hook_id)
+        # jep.unregisterCallback(self.hook_id)
 
         self._update_curve_icon(index, data)
 
-    def _handle_curve_update(self, event, values):
+    def _handle_curve_update(self, event: gremlin.event_handler.Event):
+        if not event.is_axis:
+            return
+        if not event.device_guid == self.device_guid:
+            return
         if self._curve_update_handler:
             self._curve_update_handler(event.value)
 
     def unhook(self):
-        jep = gremlin.event_handler.JoystickEventProcessor()
-        jep.unregisterCallback(self.hook_id)
+        # jep = gremlin.event_handler.JoystickEventProcessor()
+        # jep.unregisterCallback(self.hook_id)
+        pass
 
     def _delete_curve_item_cb(self, widget, index, data):
         """delete curve request"""
         message_box = QtWidgets.QMessageBox()
         message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
         message_box.setText("Delete this input curve?")
-        message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok
-            | QtWidgets.QMessageBox.StandardButton.Cancel
-        )
+        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
@@ -575,16 +531,11 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             self._update_curve_icon(index, data)
 
     def _update_input_value_changed_cb(self, index: int, value: float):
-        if (
-            index in self.curve_update_handler
-            and self.curve_update_handler[index] is not None
-        ):
+        if index in self.curve_update_handler and self.curve_update_handler[index] is not None:
             self.curve_update_handler[index](value)
 
     def _handle_edit_mode_changed(self, mode: str):
-        gremlin.util.InvokeUiMethod(
-            self._edit_mode_changed_ui, mode
-        )  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode)  # ensure on UI thread
 
     def _edit_mode_changed_ui(self, mode: str):
         """called on edit mode change"""
@@ -603,9 +554,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             if widgets:
                 for index, widget in enumerate(widgets):
                     if widget is not None:
-                        self._update_curve_icon(
-                            index, self.inputItemListView.model.data(index)
-                        )
+                        self._update_curve_icon(index, self.inputItemListView.model.data(index))
 
     def _update_curve_icon(self, index: int, data):
         widget = self.inputItemListView.widget(index)
@@ -616,9 +565,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if self.inputItemListView:  # check for delay load
             self.inputItemListModel.refresh()
 
-    def _custom_widget_handler(
-        self, list_view, index: int, identifier, data, parent=None
-    ):
+    def _custom_widget_handler(self, list_view, index: int, identifier, data, parent=None):
         """creates a widget for the input
 
         the widget must have a selected property
@@ -630,24 +577,16 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """
 
         if data.input_type == InputType.JoystickAxis:
-            widget = gremlin.input_item.InputItemWidget(
-                identifier=identifier, parent=parent, data=data
-            )
+            widget = gremlin.input_item.InputItemWidget(identifier=identifier, parent=parent, data=data)
             prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
             widget.setIcon(f"{prefix}joystick.png", use_qta=False)
-            if widget.axis_widget is not None and identifier.is_axis:
-                widget.axis_widget.valueChanged.connect(
-                    lambda x: self._update_input_value_changed_cb(index, x)
-                )
+            if widget.axis_repeater_widget is not None and identifier.is_axis:
+                widget.axis_repeater_widget.valueChanged.connect(lambda x: self._update_input_value_changed_cb(index, x))
         elif data.input_type == InputType.JoystickButton:
-            widget = gremlin.input_item.InputItemWidget(
-                identifier=identifier, parent=parent, data=data
-            )
+            widget = gremlin.input_item.InputItemWidget(identifier=identifier, parent=parent, data=data)
             widget.setIcon("mdi.gesture-tap-button")
         elif data.input_type == InputType.JoystickHat:
-            widget = gremlin.input_item.InputItemWidget(
-                identifier=identifier, parent=parent, data=data
-            )
+            widget = gremlin.input_item.InputItemWidget(identifier=identifier, parent=parent, data=data)
             widget.setIcon("ei.fullscreen")
         widget.create_action_icons(data)
         widget.disable_close()
@@ -666,9 +605,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         if gremlin.config.Configuration().verbose_mode_detailed:
             # syslog = logging.getLogger("system")
-            syslog.info(
-                f"Device tab: change mode requested: device tab: {gremlin.shared_state.get_device_name(self.device.device_guid)} current mode: [{mode}]  new mode: [{mode}] "
-            )
+            syslog.info(f"Device tab: change mode requested: device tab: {gremlin.shared_state.get_device_name(self.device.device_guid)} current mode: [{mode}]  new mode: [{mode}] ")
 
         self.device_profile.ensure_mode_exists(mode, self.device)
 
@@ -734,36 +671,19 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             # Handle non continuous axis setups
             axis_keys = sorted(input_items.config[InputType.JoystickAxis].keys())
             if not input_items.has_data(InputType.JoystickAxis, axis_keys[index]):
-                syslog.error(
-                    "Attempting to retrieve non existent axis input, "
-                    f"type={InputType.to_string(InputType.JoystickAxis)} index={axis_keys[index]}"
-                )
+                syslog.error(f"Attempting to retrieve non existent axis input, type={InputType.to_string(InputType.JoystickAxis)} index={axis_keys[index]}")
 
             return input_items.get_data(InputType.JoystickAxis, axis_keys[index])
         elif index < axis_count + button_count:
-            if not input_items.has_data(
-                InputType.JoystickButton, index - axis_count + 1
-            ):
-                syslog.error(
-                    "Attempting to retrieve non existent button input, "
-                    f"type={InputType.to_string(InputType.JoystickButton)} index={index - axis_count + 1}"
-                )
+            if not input_items.has_data(InputType.JoystickButton, index - axis_count + 1):
+                syslog.error(f"Attempting to retrieve non existent button input, type={InputType.to_string(InputType.JoystickButton)} index={index - axis_count + 1}")
 
-            return input_items.get_data(
-                InputType.JoystickButton, index - axis_count + 1
-            )
+            return input_items.get_data(InputType.JoystickButton, index - axis_count + 1)
         elif index < axis_count + button_count + hat_count:
-            if not input_items.has_data(
-                InputType.JoystickHat, index - axis_count - button_count + 1
-            ):
-                syslog.error(
-                    "Attempting to retrieve non existent hat input, "
-                    f"type={InputType.to_string(InputType.JoystickHat)} index={index - axis_count - button_count + 1}"
-                )
+            if not input_items.has_data(InputType.JoystickHat, index - axis_count - button_count + 1):
+                syslog.error(f"Attempting to retrieve non existent hat input, type={InputType.to_string(InputType.JoystickHat)} index={index - axis_count - button_count + 1}")
 
-            return input_items.get_data(
-                InputType.JoystickHat, index - axis_count - button_count + 1
-            )
+            return input_items.get_data(InputType.JoystickHat, index - axis_count - button_count + 1)
 
 
 class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
@@ -783,11 +703,8 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
         self.setWindowTitle("Input Filter Configuration")
         self.setModal(True)
 
-
         try:
             # self.setUpdatesEnabled(False)
-            if __debug__:
-                time_start = time.perf_counter()
 
             self.input_widgets = {}  # holds a reference to the input widget
 
@@ -798,12 +715,9 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
             profile = gremlin.shared_state.current_profile
 
             self._build_input_filter()  # get the inputs for the current device
-            self._base_hash = gremlin.util.hashDict(self.input_filter) # get a base hash value
+            self._base_hash = gremlin.util.hashDict(self.input_filter)  # get a base hash value
 
-
-            self.stats = gremlin.base_profile.JoystickInputStats(
-                self.device_guid, self.input_filter
-            )
+            self.stats = gremlin.base_profile.JoystickInputStats(self.device_guid, self.input_filter)
 
             # device properties
 
@@ -816,17 +730,11 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
                 device.name,
             ]
 
-            header_widget = gremlin.ui.ui_common.getHContainer(
-                widgets, widget_only=True
-            )
+            header_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
             self.main_layout.addWidget(header_widget)
-            container = gremlin.ui.ui_common.getHContainer(
-                [self.stats_widget, mapped_count_widget], widget_only=True
-            )
-            stats_container = gremlin.ui.ui_common.getHContainer(
-                container, widget_only=True
-            )
+            container = gremlin.ui.ui_common.getHContainer([self.stats_widget, mapped_count_widget], widget_only=True)
+            stats_container = gremlin.ui.ui_common.getHContainer(container, widget_only=True)
             self.main_layout.addWidget(stats_container)
 
             css = gremlin.ui.ui_common.Color.cssButtonState()
@@ -860,30 +768,18 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
 
             if device.axis_count:
                 input_type = InputType.JoystickAxis
-                self.group_widgets[input_type] = QtWidgets.QGroupBox(
-                    f"Axis ({device.axis_count} inputs, {self.stats.visible_axis_count} visible)"
-                )
-                flow_layouts[input_type] = gremlin.ui.ui_common.QFlowLayout(
-                    self.group_widgets[input_type]
-                )
+                self.group_widgets[input_type] = QtWidgets.QGroupBox(f"Axis ({device.axis_count} inputs, {self.stats.visible_axis_count} visible)")
+                flow_layouts[input_type] = gremlin.ui.ui_common.QFlowLayout(self.group_widgets[input_type])
 
             if device.button_count:
                 input_type = InputType.JoystickButton
-                self.group_widgets[input_type] = QtWidgets.QGroupBox(
-                    f"Buttons ({device.button_count} inputs, {self.stats.visible_button_count} visible)"
-                )
-                flow_layouts[input_type] = gremlin.ui.ui_common.QFlowLayout(
-                    self.group_widgets[input_type]
-                )
+                self.group_widgets[input_type] = QtWidgets.QGroupBox(f"Buttons ({device.button_count} inputs, {self.stats.visible_button_count} visible)")
+                flow_layouts[input_type] = gremlin.ui.ui_common.QFlowLayout(self.group_widgets[input_type])
 
             if device.hat_count:
                 input_type = InputType.JoystickHat
-                self.group_widgets[input_type] = QtWidgets.QGroupBox(
-                    f"Hats ({device.hat_count} inputs, {self.stats.visible_hat_count} visible)"
-                )
-                flow_layouts[input_type] = gremlin.ui.ui_common.QFlowLayout(
-                    self.group_widgets[input_type]
-                )
+                self.group_widgets[input_type] = QtWidgets.QGroupBox(f"Hats ({device.hat_count} inputs, {self.stats.visible_hat_count} visible)")
+                flow_layouts[input_type] = gremlin.ui.ui_common.QFlowLayout(self.group_widgets[input_type])
 
             mapped_count = 0
             input_count = 0
@@ -895,22 +791,12 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
                     mapped_count += 1
                 input_count += 1
                 if linear_id == input_id:
-                    tooltip = (
-                        f"{InputType.to_name(input_type)} {input_id}"
-                        if input_type != InputType.JoystickAxis
-                        else device.get_axis_name(input_id)
-                    )
+                    tooltip = f"{InputType.to_name(input_type)} {input_id}" if input_type != InputType.JoystickAxis else device.get_axis_name(input_id)
                 else:
-                    tooltip = (
-                        f"{InputType.to_name(input_type)} {input_id}/L{linear_id}"
-                        if input_type != InputType.JoystickAxis
-                        else device.get_axis_name(input_id)
-                    )
+                    tooltip = f"{InputType.to_name(input_type)} {input_id}/L{linear_id}" if input_type != InputType.JoystickAxis else device.get_axis_name(input_id)
 
                 btn = gremlin.ui.ui_common.QUsedPushButton(
-                    str(input_id)
-                    if input_type != InputType.JoystickAxis
-                    else device.get_axis_name(input_id, short_name=True),
+                    str(input_id) if input_type != InputType.JoystickAxis else device.get_axis_name(input_id, short_name=True),
                     used=is_used,
                     callback=self._handle_toggle,
                     data=(input_type, input_id),
@@ -928,9 +814,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
 
             self.input_map = data
 
-            mapped_count_widget.setText(
-                f"- Found {input_count} input(s), {mapped_count} mapped"
-            )
+            mapped_count_widget.setText(f"- Found {input_count} input(s), {mapped_count} mapped")
             self.stats_widget.setStats(self.stats)
 
             container_group, container_layout = gremlin.ui.ui_common.getVContainer()
@@ -1051,9 +935,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
     Inputs will highlight when the associated axis, button or hat is triggered to help with identification.
     If an input is hidden, it can be made visible again in this dialog.  Hidden inputs do not delete any mappings.
     """
-            info_widget = gremlin.ui.ui_common.QInfoBox(
-                msg, hide_key=self.__class__.__name__
-            )
+            info_widget = gremlin.ui.ui_common.QInfoBox(msg, hide_key=self.__class__.__name__)
 
             self.main_layout.addWidget(info_widget)
 
@@ -1064,20 +946,12 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
             self.main_layout.addWidget(self.status_widget)
 
             self.save_default_widget = QtWidgets.QPushButton("Set Default for device")
-            self.save_default_widget.clicked.connect(
-                self._handle_set_default_for_device
-            )
-            self.save_default_widget.setToolTip(
-                "Saves the current filter selection as default for new profiles for this device"
-            )
+            self.save_default_widget.clicked.connect(self._handle_set_default_for_device)
+            self.save_default_widget.setToolTip("Saves the current filter selection as default for new profiles for this device")
 
             self.delete_default_widget = QtWidgets.QPushButton("Delete Default")
-            self.delete_default_widget.clicked.connect(
-                self._handle_delete_default_for_device
-            )
-            self.delete_default_widget.setToolTip(
-                "Saves the current filter selection as default for new profiles for this device"
-            )
+            self.delete_default_widget.clicked.connect(self._handle_delete_default_for_device)
+            self.delete_default_widget.setToolTip("Saves the current filter selection as default for new profiles for this device")
 
             self.ok_widget = QtWidgets.QPushButton("Ok")
             self.ok_widget.clicked.connect(self._ok_button_cb)
@@ -1105,17 +979,15 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
             # self.setUpdatesEnabled(True)
             pass
 
+        # if __debug__:
+        #     time_end = time.perf_counter()
+        #     elapsed = time_end - time_start
+        #     syslog.info(f"JoystickFilterDialog build time: [{elapsed:0.6f}]")
 
-        if __debug__:
-            time_end = time.perf_counter()
-            elapsed = time_end - time_start
-            syslog.info(f"JoystickFilterDialog build time: [{elapsed:0.6f}]")
-
-
-            gremlin.util.timeit(self._update_ui)
-        else:
-            self._update_ui()
-
+        #     gremlin.util.timeit(self._update_ui)
+        # else:
+        #    self._update_ui()
+        self._update_ui()
 
     def _update_ui(self):
         """updates widgets"""
@@ -1136,7 +1008,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
         """builds the input list from the profile settings"""
         profile = gremlin.shared_state.current_profile
         device = self.device
-        device_guid = device.device_id # use string version
+        device_guid = device.device_id  # use string version
         self.input_filter = {}
         self.input_filter[device_guid] = {}
 
@@ -1144,29 +1016,17 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
             self.input_filter[device_guid][InputType.JoystickAxis] = {}
             for index in range(device.axis_count):
                 input_id = device.axis_sequence_to_input_id(index)
-                self.input_filter[device_guid][InputType.JoystickAxis][
-                    input_id
-                ] = profile.settings.getFiltered(
-                    device_guid, InputType.JoystickAxis, input_id
-                )
+                self.input_filter[device_guid][InputType.JoystickAxis][input_id] = profile.settings.getFiltered(device_guid, InputType.JoystickAxis, input_id)
         if device.button_count:
             self.input_filter[device_guid][InputType.JoystickButton] = {}
             for index in range(device.button_count):
                 input_id = index + 1
-                self.input_filter[device_guid][InputType.JoystickButton][
-                    input_id
-                ] = profile.settings.getFiltered(
-                    device_guid, InputType.JoystickButton, input_id
-                )
+                self.input_filter[device_guid][InputType.JoystickButton][input_id] = profile.settings.getFiltered(device_guid, InputType.JoystickButton, input_id)
         if device.hat_count:
             self.input_filter[device_guid][InputType.JoystickHat] = {}
             for index in range(device.button_count):
                 input_id = index + 1
-                self.input_filter[device_guid][InputType.JoystickHat][
-                    input_id
-                ] = profile.settings.getFiltered(
-                    device_guid, InputType.JoystickHat, input_id
-                )
+                self.input_filter[device_guid][InputType.JoystickHat][input_id] = profile.settings.getFiltered(device_guid, InputType.JoystickHat, input_id)
 
     def closeEvent(self, event):
         self.input_widgets.clear()  # remove all widget references
@@ -1184,10 +1044,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
         input_id = event.identifier
         input_type = event.event_type
 
-        if (
-            input_type in self.input_widgets
-            and input_id in self.input_widgets[input_type]
-        ):
+        if input_type in self.input_widgets and input_id in self.input_widgets[input_type]:
             btn = self.input_widgets[input_type][input_id]
             match input_type:
                 case InputType.JoystickAxis:
@@ -1215,9 +1072,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
         syslog.info(f"\tVisible count: {visible_count}")
 
     @QtCore.Slot()
-    def _handle_filter(
-        self, widget, is_control: bool, is_shift: bool, is_alt: bool, is_right: bool
-    ):
+    def _handle_filter(self, widget, is_control: bool, is_shift: bool, is_alt: bool, is_right: bool):
         mode = widget.data
         profile = gremlin.shared_state.current_profile
         device = self.device
@@ -1232,19 +1087,13 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
                 config = gremlin.config.Configuration()
                 max_count = config.device_filter_max_axis
                 if device.axis_count > max_count:
-                    self._set_default_filter_list(
-                        device, InputType.JoystickAxis, max_count, is_shift
-                    )
+                    self._set_default_filter_list(device, InputType.JoystickAxis, max_count, is_shift)
                 max_count = config.device_filter_max_button
                 if device.button_count > max_count:
-                    self._set_default_filter_list(
-                        device, InputType.JoystickButton, max_count, is_shift
-                    )
+                    self._set_default_filter_list(device, InputType.JoystickButton, max_count, is_shift)
                 max_count = config.device_filter_max_hat
                 if device.hat_count > max_count:
-                    self._set_default_filter_list(
-                        device, InputType.JoystickHat, max_count, is_shift
-                    )
+                    self._set_default_filter_list(device, InputType.JoystickHat, max_count, is_shift)
 
                 if is_control:
                     # apply to all devices
@@ -1276,9 +1125,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
                         # if not prompt:
                         #     prompt="Mapped filter applied to all joystick devices"
 
-                    included = profile.isInputMapped(
-                        device_guid, input_type, input_id, current_mode
-                    )
+                    included = profile.isInputMapped(device_guid, input_type, input_id, current_mode)
 
                 case "mapped_all":
                     if is_control:
@@ -1337,9 +1184,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
                     continue
 
             # if verbose: syslog.info(f"{input_type.name} {input_id} {filtered}")
-            btn: gremlin.ui.ui_common.QDataPushButton = self.input_widgets[input_type][
-                input_id
-            ]
+            btn: gremlin.ui.ui_common.QDataPushButton = self.input_widgets[input_type][input_id]
             selected = not included
             if not selected and is_shift and not btn.isChecked():
                 # add to the selection
@@ -1358,17 +1203,11 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
         device = self.device
         # group headers
         if device.axis_count:
-            self.group_widgets[InputType.JoystickAxis].setTitle(
-                f"Axis ({device.axis_count} inputs, {self.stats.visible_axis_count} visible)"
-            )
+            self.group_widgets[InputType.JoystickAxis].setTitle(f"Axis ({device.axis_count} inputs, {self.stats.visible_axis_count} visible)")
         if device.button_count:
-            self.group_widgets[InputType.JoystickButton].setTitle(
-                f"Button ({device.button_count} inputs, {self.stats.visible_button_count} visible)"
-            )
+            self.group_widgets[InputType.JoystickButton].setTitle(f"Button ({device.button_count} inputs, {self.stats.visible_button_count} visible)")
         if device.hat_count:
-            self.group_widgets[InputType.JoystickHat].setTitle(
-                f"Hat ({device.hat_count} inputs, {self.stats.visible_hat_count} visible)"
-            )
+            self.group_widgets[InputType.JoystickHat].setTitle(f"Hat ({device.hat_count} inputs, {self.stats.visible_hat_count} visible)")
 
     def _set_default_filter_list(
         self,
@@ -1450,13 +1289,11 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
         is_filtered = visible
         self._set_filtered(input_type, input_id, is_filtered, emit=False)
 
-    def _set_filtered(
-        self, input_type: InputType, input_id: int, value: bool, emit=False
-    ):
+    def _set_filtered(self, input_type: InputType, input_id: int, value: bool, emit=False):
         """sets the filtered state internal to the dialog"""
         verbose = gremlin.config.Configuration().verbose_mode_filter
 
-        device_guid = self.device.device_id # use string representation
+        device_guid = self.device.device_id  # use string representation
         if device_guid not in self.input_filter:
             self.input_filter[device_guid] = {}
         if input_type not in self.input_filter[device_guid]:
@@ -1465,18 +1302,14 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
             syslog.info(f"Toggle {input_type.name} {input_id} {value}")
         self.input_filter[device_guid][input_type][input_id] = value
         if verbose and input_type == InputType.JoystickAxis:
-            syslog.info(
-                f"set filter: {self.device.name} axis: {input_id} included: {value}"
-            )
+            syslog.info(f"set filter: {self.device.name} axis: {input_id} included: {value}")
         if emit:
             self.stats.updateFilters(self.input_filter)
             self.stats_widget.setStats(self.stats)
             self.updateGroups()
 
             el = gremlin.event_handler.EventListener()
-            el.input_filtered_change.emit(
-                device_guid
-            )  # tell the widget the input list has changed
+            el.input_filtered_change.emit(device_guid)  # tell the widget the input list has changed
 
     def _is_filtered(self, input_type: InputType, input_id: int) -> bool:
         """checks filtered state internal to the dialog"""

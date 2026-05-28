@@ -789,11 +789,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         """
         self._hook_requested = False
 
-        # delay load flags
+         # delay load flags
         self._step_ui_loaded = False  # true if stepped UI is loaded
         self._grid_ui_loaded = False  # true if button grid UI is loaded
         self._merged_ui_loaded = False  # true if the merged UI is loaded
         self._hat_mapping_ui_loaded = False  # true if the hat mapping UI is loaded
+        
 
         super().__init__(action_data, parent=parent)
         assert isinstance(action_data, VjoyRemap)
@@ -918,6 +919,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 self._vjoy_button_usage_changed
             )  # listen to grid button changes # called when a button actually flips
 
+            el.joystick_event_ui.connect(self._joystick_event_handler)
+
             # set the action type from the input type
             self.load_actions_from_input_type()
 
@@ -945,6 +948,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self._merge_device_input_map[device_id] = []
         if input_id not in self._merge_device_input_map[device_id]:
             self._merge_device_input_map[device_id].append(input_id)
+
 
     def _update_merge_data(self):
         """build map of ID to axis ID for merge operations"""
@@ -1036,7 +1040,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             )
         )
         self.main_layout.addWidget(self.container_repeater_widget)
-        # self.container_repeater_widget.setStyleSheet("background: orange;")
 
     def _update_repeater_value(self, value):
         """callback for the output repeater when it changes values"""
@@ -1055,6 +1058,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             return
         if not Shiboken.isValid(self):
             return
+
+        # syslog.info(f"update vjoy remap repeater: {value:0.3f}")
 
         range_widget_visible = False
         axis_widget_visible = False
@@ -1096,8 +1101,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                         # self._repeater_button_widget.setValue(False)
                 case VjoyAction.VJoyAxis:
                     # plain axis output
-                    if not Shiboken.isValid(self._repeater_axis_widget):
-                        return
+                    # if not Shiboken.isValid(self._repeater_axis_widget):
+                    #     return
 
                     values = self.action_data.get_filtered_axis_value(
                         value, curves=curves, channels=True
@@ -1116,8 +1121,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                         )
                 case VjoyAction.VJoyMergeAxis:
                     # axis merging
-                    if not Shiboken.isValid(self._repeater_axis_widget):
-                        return
+                    # if not Shiboken.isValid(self._repeater_axis_widget):
+                    #     return
                     values = self.action_data.get_filtered_axis_value(
                         value, curves=curves, channels=True
                     )
@@ -1134,7 +1139,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                         )
 
         self._repeater_range_widget.setVisible(range_widget_visible)
-        self._repeater_axis_widget.setVisible(axis_widget_visible)
+        if self._repeater_axis_widget.isVisible() != axis_widget_visible:
+            self._repeater_axis_widget.setVisible(axis_widget_visible)
 
         # grow based on channel count
         count = self._repeater_axis_widget.channels
@@ -1148,6 +1154,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         )
         self.container_repeater_widget.setMaximumHeight(h)
         self.container_repeater_widget.setMinimumHeight(h)
+
+
+        
+            
 
     def _create_range_widgets(self):
 
@@ -1822,11 +1832,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if self._hook_requested and not self._axis_tracking_enabled:
             self._axis_tracking_enabled = True
             el = gremlin.event_handler.EventListener()
-            # el.custom_joystick_event.connect(self._joystick_event_handler)
-
-            if not self.chained_input:
-                el.addUIJoystickEventCallback(self._joystick_event_handler)
-                # el.joystick_event.connect(self._joystick_event_handler)
             el.profile_start.connect(self._profile_start)
             el.profile_stop.connect(self._profile_stop)
 
@@ -1834,16 +1839,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if self._hook_requested:
             self._disable_axis_tracking()
 
+
+
     def _disable_axis_tracking(self):
         """disables tracking"""
         if self._axis_tracking_enabled:
-            el = gremlin.event_handler.EventListener()
-            # el.custom_joystick_event.disconnect(self._joystick_event_handler)
             if not self.chained_input:
-                # jep = gremlin.event_handler.JoystickEventProcessor()
-                # jep.unregisterCallback(self.action_data.action_id)
+                el = gremlin.event_handler.EventListener()
                 el.removeUIJoystickEventCallback(self._joystick_event_handler)
-                # el.joystick_event.disconnect(self._joystick_event_handler)
             self._axis_tracking_enabled = False
 
     def _create_merge_ui(self):
@@ -1917,6 +1920,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             and len(self.action_data._merge_data) > 1
         ):
             # can only delete if there is more than one entry
+
             self.action_data._merge_data.remove(data)
             self._update_merge_widgets()
             self._update_merge_data()
@@ -2111,7 +2115,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._update_axis_widget()
         self._enable_axis_tracking()
 
-    def _joystick_event_handler(self, event, values=None):
+    def _joystick_event_handler(self, event : gremlin.event_handler.Event):
         """handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time"""
         if gremlin.shared_state.is_running:
             return
@@ -2120,7 +2124,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             gremlin.util.is_ui_thread()
         )  # new handler for joystick should be on the ui thread
 
-        if not event.is_axis:
+        if event.device_guid != self.action_data.device_guid:
+            return
+        if event.event_type != self.action_data.input_type:
+            return
+        if event.identifier != self.action_data.input_id:
             return
 
         if self.action_data.action_mode == VjoyAction.VJoyMergeAxis:
@@ -2154,8 +2162,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self._update_repeater(value)
 
-        # gremlin.util.InvokeUiMethod(self._update_repeater, value) # ensure on UI thread
-
+  
     def _current_input_axis(self):
         """gets the current input axis value"""
         return gremlin.joystick_handling.get_curved_axis(
@@ -6874,6 +6881,9 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._input_type: InputType = self.get_input_type()
         if self._input_type in (InputType.ModeControl, InputType.VirtualButton):
             self._input_type = InputType.JoystickButton
+        self.device_guid = self.hardware_device_guid
+        self.input_id = self.hardware_input_id
+        self.input_type = self.hardware_input_type
 
         # default hat map table setup and default mapping for new hats
         self.hat_map = {}  # map of button id keyed by hat position tuple

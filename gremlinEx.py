@@ -165,7 +165,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         super().__init__("main_window", parent)
 
         self.ui = Ui_Gremlin()
-        self.ui.setupUi(self)
+        #self.addWidget(QtWidgets.QLabel("TOP"))
+        self.ui.build(self) # build the main window 
+        #self.addWidget(QtWidgets.QLabel("BOTTOM"))
+        
         self._is_active = False  # status bar active flag
         self._widget_device_index_map = {}
 
@@ -403,8 +406,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         el._init_joysticks()
 
-        # self.apply_user_settings()
-        self._apply_window_settings()
 
         self._profile_map = gremlin.base_profile.ProfileMap()
 
@@ -894,9 +895,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             tab_changed=True,
             extra_data={
                 "completion_callback": self._tab_selection_complete,
-                "source":"tab_selected"
-                }
-            
+                "source": "tab_selected",
+            },
         )
 
         # wait for the tab selection to complete
@@ -1752,8 +1752,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         sd.reset()
 
         # reset event processor
-        jap = gremlin.event_handler.JoystickEventProcessor()
-        jap.reset()
+        # jap = gremlin.event_handler.JoystickEventProcessor()
+        # jap.reset()
 
         # setup profile default input filters
         self.profile.settings.setAllFiltered("default")
@@ -3059,7 +3059,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             widget.data = (TabDeviceType.Joystick, device_guid, index)
 
                             # gremlin.shared_state.device_widget_map[device_profile.device_guid] = widget
-                            widget.inputChanged.connect(self._device_input_changed_cb)
+                            # widget.inputChanged.connect(self._device_input_changed_cb)
 
                             index += 1
 
@@ -3735,7 +3735,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # enable highlighting
         self.pop_highlighting(True)
 
-    def _select_last_input(self, extra_data : dict = None,):
+    def _select_last_input(
+        self,
+        extra_data: dict = None,
+    ):
         # if there is a last input - select that input as well
         device_guid, input_type, input_id = self.config.get_last_input()
         if input_type and input_id:
@@ -3838,21 +3841,21 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         force_update=False,
         force_switch=False,
         tab_changed=False,
-        extra_data : dict = None,
+        extra_data: dict = None,
     ):
         if gremlin.shared_state.is_input_selection_suspended:
             return  # skip if disabled
-        
-        args =  (
+
+        args = (
             device_guid,
             input_type,
             input_id,
             force_update,
             force_switch,
             tab_changed,
-            extra_data
+            extra_data,
         )
-        
+
         gremlin.util.InvokeUiMethod(self._select_input_handler_ui, args)
         # el = gremlin.event_handler.EventListener()
         # el.select_input.emit(
@@ -3889,7 +3892,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         force_update: bool = False,
         force_switch=False,
         tab_changed=False,
-        extra_data :dict = None,
+        extra_data: dict = None,
     ):
         args = (
             device_guid,
@@ -3898,7 +3901,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             force_update,
             force_switch,
             tab_changed,
-            extra_data
+            extra_data,
         )
         gremlin.util.InvokeUiMethod(self._select_input_handler_ui, args)
 
@@ -3913,7 +3916,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         force_update: bool = False
         force_switch = False
         tab_changed = False
-        extra_data : dict = None
+        extra_data: dict = None
 
         (
             restore_device_guid,
@@ -3924,10 +3927,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             tab_changed,
             extra_data,
         ) = args
-
-
-
-
 
         import gremlin.config
         import gremlin.event_handler
@@ -3940,7 +3939,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if extra_data:
             if "completion_callback" in extra_data:
                 completion_callback = extra_data["completion_callback"]
-                assert isinstance(completion_callback, Callable),"invalid completion callback"
+                assert isinstance(completion_callback, Callable), (
+                    "invalid completion callback"
+                )
             pass
 
         try:
@@ -4430,14 +4431,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             widget.refresh()
 
     def _sort_tabs(self):
-        ''' sorts device tabs '''
+        """sorts device tabs"""
         wm = WorkManager()
-        wm.submit(self._sort_tabs_worker )
-
+        wm.submit(self._sort_tabs_worker)
 
     def _sort_tabs_worker(self, args):
         """sorts device tabs by default order name"""
-
 
         self._tab_sorted_flag = False
 
@@ -4498,19 +4497,15 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._dump_tab_map(tab_map)
 
         self._select_last_tab()
-        self._select_last_input(extra_data={
-            "completion_callback" : self._handle_tabs_sorted_completed
-        })
+        self._select_last_input(
+            extra_data={"completion_callback": self._handle_tabs_sorted_completed}
+        )
 
         while not self._tab_sorted_flag:
             QThread.sleep(0)
 
-
     def _handle_tabs_sorted_completed(self, *args):
         self._tab_sorted_flag = True
-
-
-
 
     def _setup_icons(self):
         """Sets the icons of all QAction items."""
@@ -4733,10 +4728,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             syslog.info(f"UI: tab move detected {tab_from} {tab_to}")
         wm = WorkManager()
         wm.submit(self._tab_move_worker)
-      
 
     def _tab_move_worker(self, args):
-        ''' worker thread to process tab move '''
+        """worker thread to process tab move"""
 
         syslog.info("tab move start")
         # rebuild the tab order
@@ -4758,8 +4752,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             force_switch=True,
             extra_data={
                 "completion_callback": self._handle_tab_move_completed,
-                "source":"tab_move"
-                }
+                "source": "tab_move",
+            },
         )
 
         syslog.info("tab move waiting for selection complete")
@@ -5441,18 +5435,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         wm = WorkManager()
         wm.submit(
-            self._do_load_profile_internal,
-            self._profile_load_completed,
-            source_xml,
-            as_new_profile,
-            emit,
+            callback=self._do_load_profile_internal_worker,
+            complete_callback=self._profile_load_completed,
+            args=(
+                source_xml,
+                as_new_profile,
+                emit,
+            ),
         )
-        # return self._do_load_profile_internal(source_xml, as_new_profile)
 
-    def _profile_load_completed(self, *args, **kwargs):
+    def _profile_load_completed(self, *args):
         syslog.info("profile loaded")
 
-    def _do_load_profile_internal(self, *args, **kwargs) -> bool | tuple:
+    def _do_load_profile_internal_worker(self, args) -> bool | tuple:
         """Load the profile with the given filename.
 
         :param source_xml: the name of the profile file to load
@@ -5464,7 +5459,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         source_xml: str
         as_new_profile: bool
-        source_xml, as_new_profile, emit = args[0]
+        source_xml, as_new_profile, emit = args
 
         # clear current inputs
         registry = gremlin.base_profile.ProfileRegistry()
@@ -5509,8 +5504,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             sd.reset()
 
             # reset event processor
-            jap = gremlin.event_handler.JoystickEventProcessor()
-            jap.reset()
+            # jap = gremlin.event_handler.JoystickEventProcessor()
+            # jap.reset()
 
             if emit:
                 el.request_activate.emit(False)
@@ -6490,7 +6485,7 @@ if __name__ == "__main__":
     astate.reset()
 
     # joystick processor instance
-    event_processor = gremlin.event_handler.JoystickEventProcessor()
+    # event_processor = gremlin.event_handler.JoystickEventProcessor()
 
     syslog.info("GremlinEx UI created")
 

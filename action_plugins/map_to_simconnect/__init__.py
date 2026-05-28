@@ -3385,7 +3385,7 @@ class MapToSimConnectWidget(gremlin.input_item.AbstractActionWidget):
         self.curve_clear_widget.setToolTip("Removes the curve output")
         self.curve_clear_widget.clicked.connect(self._curve_delete_button_cb)
 
-        self._axis_repeater_widget = gremlin.ui.ui_common.QHookedProgressBar(
+        self._axis_repeater_widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar(
             orientation=QtCore.Qt.Orientation.Horizontal
         )
         self._axis_value_widget = gremlin.ui.ui_common.QFloatLineEdit()

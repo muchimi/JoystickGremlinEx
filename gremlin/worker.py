@@ -101,7 +101,7 @@ class WorkManager(QObject):
 
     def _handle_worker_finish(self):
         self.popCursor()
-        syslog.info("worker finished")
+        # syslog.info("worker finished")
 
 
     def pushCursor(self, immediate=True):
@@ -124,7 +124,7 @@ class WorkManager(QObject):
         self._cursor_push += 1
 
         # allow other processing to happen
-        syslog.info(f"PUSH CURSOR: [{self._cursor_push}]")
+        # syslog.info(f"PUSH CURSOR: [{self._cursor_push}]")
 
     def _pushcursor_monitor_runner(self):
         """runs while the worker thread is going to monitor it"""
@@ -183,11 +183,11 @@ class WorkManager(QObject):
             #     QtWidgets.QApplication.processEvents()
             #     cursor = QtWidgets.QApplication.overrideCursor()
 
-            syslog.info("show hourglass")
+            # syslog.info("show hourglass")
 
     def popCursor(self, reset=False):
         """decreases the wait cursor stack"""
-        syslog.info(f"POP CURSOR: [{self._cursor_push}]")
+        # syslog.info(f"POP CURSOR: [{self._cursor_push}]")
         if self._cursor_push > 0:
             self._cursor_push -= 1
         if self._cursor_push == 0 or reset:
@@ -208,7 +208,7 @@ class WorkManager(QObject):
 
             QtWidgets.QApplication.restoreOverrideCursor()
             QtWidgets.QApplication.processEvents()
-            syslog.info("hide hourglass")
+            # syslog.info("hide hourglass")
 
     def isWaitCursor(self) -> bool:
         """true if the cursor is an hourglass"""
@@ -262,50 +262,6 @@ class WorkManager(QObject):
         return self._cursor_push > 0
 
 
-# class WorkRunner(QObject):
-#     def __init__(self):
-#         super().__init__()
-#         el = gremlin.event_handler.EventListener()
-#         el.shutdown.connect(self._handle_shutdown)
-#         self._running = True
-
-#     def _handle_shutdown(self):
-#         self._running = False
-
-
-#     @Slot()
-#     def runner(self):
-#         # start the worker thread
-#         syslog.info("worker monitor start")
-
-#         while self._running:
-#             if self._completed_callback_map:
-#                 remove_task = None
-#                 task: Thread
-#                 for task in self._completed_callback_map:
-#                     if not task.is_alive() and task.native_id:
-#                         syslog.info(f"task completed: [{task.name}]")
-#                         completed_callback, args, kwargs = self._completed_callback_map[
-#                             task
-#                         ]
-#                         del self._completed_callback_map[task]
-#                         if completed_callback:
-#                             # call the completion callback
-#                             completed_callback(args, kwargs)
-#                         remove_task = task
-#                         break
-
-#                 if remove_task:
-#                     del self._completed_callback_map[remove_task]
-
-#             QThread.sleep(0)  # do other work
-
-#         # restore the cursor
-#         self.popCursor()
-
-#         syslog.info("worker thread(s) completed")
-#         self._cursor_thread_monitor = None
-#         self._running = False
 
 
 class WorkTask(QRunnable):
@@ -336,5 +292,6 @@ class WorkTask(QRunnable):
         syslog.info(f"callback complete: [{self._name}]")
         if self._completed_callback:
             self._completed_callback(result, self._args)
+        syslog.info(f"work task [{self._name}] finished")
         self.signals.finished.emit()
         

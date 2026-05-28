@@ -147,7 +147,7 @@ class GUID:
         if isinstance(guid, str):
             try:
                 guid = uuid.UUID(guid)
-                guid_int = guid.int    
+                guid_int = guid.int
                 guid = _GUID(guid_int)  # convert to internal _GUID
             except Exception:
                 syslog.error(f"GUID: Unable to convert ID {guid} to UUID")
@@ -424,7 +424,10 @@ class DeviceSummary:
         import gremlin.types
 
         self._connected = False  # true if device is connected
-        self.disabled = False  # true if the device is disabled in GremlinEx
+        self._disabled = False  # true if the device is disabled in GremlinEx
+        self._hard_disabled = (
+            False  # true if the device is out of spec or otherwise excluded by GEX
+        )
         self.axis_count = 0
         self.button_count = 0
         self.hat_count = 0
@@ -437,8 +440,8 @@ class DeviceSummary:
         self.linear_id_map = {}  # map of linear ID to axis ID
         self.input_enabled = False
         self.vjoy_id = -1
-        self.vendor_id = 0 # vendor ID
-        self.product_id = 0 # product ID
+        self.vendor_id = 0  # vendor ID
+        self.product_id = 0  # product ID
         self.name = None
         self.is_special = False
         self._device_type = gremlin.types.DeviceType.NotSet
@@ -501,9 +504,17 @@ class DeviceSummary:
                 # syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
                 self.axis_names.append(axis_name)
 
+            # auto disable invalid joystick devices that are not in spec
+            self._hard_disabled = self.axis_count > 8 or self.button_count > 128 or self.hat_count > 4
+            if self._hard_disabled:
+                syslog.warning(f"JOY: auto disabling device [{self.name}] id [{self.device_id}]: out of spec")
+            
+
             self._connected = (
                 True  # if dinput data is provided, the device is marked as connected
             )
+
+ 
 
     def setAxisCallback(self, callback):
         """sets a custom axis callback to get an axis value (parameter is the axis number)"""
@@ -564,6 +575,15 @@ class DeviceSummary:
     @device_type.setter
     def device_type(self, value):
         self._device_type = value
+
+    @property
+    def disabled(self) -> bool:
+        ''' true if the device is disabled manually or excluded by GEX logic'''
+        return self._hard_disabled or self._disabled
+
+    @disabled.setter
+    def disabled(self, value: bool):
+        self._disabled = value        
 
     @property
     def connected(self) -> bool:
@@ -902,9 +922,6 @@ class DILL:
                 os._exit(1)
 
             DILL.initalized = True
-
-
-
 
     @staticmethod
     def reset():

@@ -251,7 +251,7 @@ class OscInputWidget(QtWidgets.QWidget):
         self._axis_max_widget.setMinimum(0)
         self._axis_max_widget.setValue(max_value)
         self._axis_max_widget.valueChanged.connect(self._range_changed)
-        self._axis_repeater_widget = gremlin.ui.ui_common.QHookedProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
+        self._axis_repeater_widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar()
         self._axis_repeater_widget.setRange(min_value, max_value)
         
         self._axis_container_widget, self._axis_container_layout = gremlin.ui.ui_common.getHContainer()
@@ -619,12 +619,6 @@ class MapToOscWidget(gremlin.input_item.AbstractActionWidget):
         if not self._ui_ready:
             return # not loaded yet
         
-        # if gremlin.shared_state.is_running:
-        #     return 
-
-        # if not event.is_axis:
-        #     return 
-        
         value = event.value
         
         if event.device_guid != self.action_data.hardware_device_guid:
@@ -761,7 +755,7 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
     properly with a single input, at least partially.
     """
 
-    def __init__(self, action : MapToOsc, parent = None):
+    def __init__(self, action : MapToOsc, parent = None):  # noqa: F821
         """Creates a new functor with the provided data.
 
         :param action contains parameters to use with the functor

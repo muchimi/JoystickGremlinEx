@@ -25,6 +25,7 @@ from gremlin.input_types import InputType
 
 import gremlin.event_handler
 import gremlin.shared_state
+
 from gremlin.ui.qsliderwidget import QSliderWidget
 from PySide6.QtGui import QColor
 from lxml import etree
@@ -296,7 +297,7 @@ class CalibrationData:
         self._last_value = None # last value (normalized)
 
     
-    def copyFrom(self, other : CalibrationData):
+    def copyFrom(self, other : CalibrationData):  # noqa: F821
         self._calibrated_min = other._calibrated_min
         self._calibrated_max = other._calibrated_max
         self._calibrated_center = other._calibrated_center
@@ -347,13 +348,13 @@ class CalibrationData:
         el = gremlin.event_handler.EventListener()
         el.calibration_changed.emit(self)
 
-    def compare(self, other : CalibrationData) -> bool:
+    def compare(self, other : CalibrationData) -> bool:  # noqa: F821
         ''' compares two calibration objects to see if they map to the same object '''
         if other is None:
             return False
         return gremlin.util.compare_guid(self.device_guid, other.device_guid) and self.input_id == other.input_id
     
-    def __eq__(self, other : CalibrationData):
+    def __eq__(self, other : CalibrationData):  # noqa: F821
         d1 = gremlin.util.normalize_guid(self.device_guid)
         d2 = gremlin.util.normalize_guid(other.device_guid)
         if d1 != d2:
@@ -953,19 +954,26 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             input_id -- axis number
         
         '''
-        #super().__init__(self.__class__.__name__, parent = parent)
+        from gremlin.curve_handler import DeadzoneWidget
+        from gremlin.input_item import InputItem
+        
         super().__init__(parent = parent)
 
-        from gremlin.curve_handler import DeadzoneWidget
+        assert isinstance(input_item, InputItem),"invalid input item"
+
+        
 
         self._lock = False
         self._calibrating = False # true if calibrating 
+        self._device_guid = input_item.device_guid
+        self._input_id = input_item.input_id
 
         config = gremlin.config.Configuration()
         self._auto_calibrate = config.auto_calibrate
 
         self.setModal(True)
         self.input_item = input_item
+
         input_type = input_item.get_input_type()
         if input_type != InputType.JoystickAxis:
             self.close()
@@ -1181,15 +1189,18 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self.main_layout.addStretch()
 
 
-        jep = gremlin.event_handler.JoystickEventProcessor()
-        description = f"calibration axis position device: [{gremlin.joystick_handling.getDeviceName(self.action_data.device_guid)}] input id: [{self.action_data.input_id}]"
-        jep.registerCallback(self.hook_id,
-                             self._handle_joystick_event_ui,
-                            device_guid = self.action_data.device_guid,
-                            input_type = InputType.JoystickAxis,
-                            input_id = self.action_data.input_id,
-                            ui_only = True,
-                            description = description)
+        # jep = gremlin.event_handler.JoystickEventProcessor()
+        # description = f"calibration axis position device: [{gremlin.joystick_handling.getDeviceName(self.action_data.device_guid)}] input id: [{self.action_data.input_id}]"
+        # jep.registerCallback(self.hook_id,
+        #                      self._handle_joystick_event_ui,
+        #                     device_guid = self.action_data.device_guid,
+        #                     input_type = InputType.JoystickAxis,
+        #                     input_id = self.action_data.input_id,
+        #                     ui_only = True,
+        #                     description = description)
+
+        el = gremlin.event_handler.EventListener()
+        el.joystick_event_ui.connect(self._joystick_event_handler)
 
         # initial value
         self._update_ui()
@@ -1203,8 +1214,15 @@ class CalibrationDialogEx(QtWidgets.QDialog):
     def _handle_close(self, widget):
         self.close()
 
-    def _handle_joystick_event_ui(self, event, values):
+    def _joystick_event_handler(self, event : gremlin.event_handler.Event):
         ''' handles a joystick axis event '''
+        
+        if event.isAxis:
+            return
+        if event.device_guid != self._device_guid:
+            return
+        if event.identifier != self._input_id:
+            return
         if self._lock:
             return
         if self._calibrating:
@@ -1295,9 +1313,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
                 
             self._closing = True
 
-            jep = gremlin.event_handler.JoystickEventProcessor()
-            
-            jep.unregisterCallback(self.hook_id)
+            # jep = gremlin.event_handler.JoystickEventProcessor()
+            # jep.unregisterCallback(self.hook_id)
 
             self._input_slider_widget.valueChanged.disconnect(self._slider_changed)
             self._deadzone_widget.changed.disconnect(self._deadzone_changed)
@@ -1305,6 +1322,10 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             self._calibrated_min_widget.valueChanged.disconnect(self._calibrated_min_changed)
             self._calibrated_max_widget.valueChanged.disconnect(self._calibrated_max_changed)
             self._calibrated_center_widget.valueChanged.disconnect(self._calibrated_center_changed)
+
+            el = gremlin.event_handler.EventListener()
+            el.joystick_event_ui.disconnect(self._joystick_event_handler)
+
 
             gremlin.util.clear_layout(self.main_layout)
 
