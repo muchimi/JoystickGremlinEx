@@ -653,10 +653,17 @@ class CalibrationManager():
         ''' reloads the calibration data '''
         self._load()
 
+    def hasCalibration(self, device_guid, input_id) -> bool:
+        ''' true if the axis has a calibration applied '''
+        if not isinstance(device_guid, str):
+            device_guid = gremlin.util.normalize_guid(device_guid)
+        return device_guid in self.calibration_map and input_id in self.calibration_map[device_guid]
 
     def getCalibration(self, device_guid, input_id) -> CalibrationData:
         ''' gets calibration data for a given device/axis '''
-        device_guid = gremlin.util.normalize_guid(device_guid)
+        if not isinstance(device_guid, str):
+            device_guid = gremlin.util.normalize_guid(device_guid)
+        
   
 
         if device_guid not in self.calibration_map:

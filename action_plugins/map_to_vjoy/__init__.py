@@ -75,16 +75,10 @@ class StepWidgetGroup:
 class MergeWidget(gremlin.ui.ui_common.QDataWidget):
     """merge axis widget - lets the user pick a device and axis"""
 
-    delete_requested = QtCore.Signal(
-        object
-    )  # requesdt to delete (passes the data block)
-    changed = QtCore.Signal(
-        object
-    )  # request to update visualization (passes the data block)
+    delete_requested = QtCore.Signal(object)  # requesdt to delete (passes the data block)
+    changed = QtCore.Signal(object)  # request to update visualization (passes the data block)
 
-    def __init__(
-        self, data, label: str = None, filter_input=None, action_data=None, parent=None
-    ):
+    def __init__(self, data, label: str = None, filter_input=None, action_data=None, parent=None):
         """creates a merge axis selector
 
         :param data : the merge block that sets or stores the return data
@@ -104,12 +98,8 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
 
         self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
-        step_widget = gremlin.ui.ui_common.QFrameBox(
-            f"<b>{label if label else 'Merge Axis'}</b>"
-        )
-        self.main_layout.addWidget(
-            gremlin.ui.ui_common.getHContainer(step_widget, widget_only=True)
-        )
+        step_widget = gremlin.ui.ui_common.QFrameBox(f"<b>{label if label else 'Merge Axis'}</b>")
+        self.main_layout.addWidget(gremlin.ui.ui_common.getHContainer(step_widget, widget_only=True))
 
         # self.main_layout.addWidget(QtWidgets.QLabel(label if label else "Merge axis:"))
 
@@ -120,9 +110,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         self.merge_selector_device_widget = gremlin.ui.ui_common.QDataComboBox()
         self.merge_selector_input_widget = gremlin.ui.ui_common.QDataComboBox()
 
-        merge_remove_widget = gremlin.ui.ui_common.Buttons.getRemoveWidget(
-            callback=self._remove_cb
-        )
+        merge_remove_widget = gremlin.ui.ui_common.Buttons.getRemoveWidget(callback=self._remove_cb)
 
         device_widget = QtWidgets.QWidget()
         device_layout = QtWidgets.QGridLayout(device_widget)
@@ -132,21 +120,15 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         device_layout.addWidget(QtWidgets.QLabel("Merge Axis:"), 1, 0)
         device_layout.addWidget(self.merge_selector_input_widget, 1, 1)
 
-        self.merge_device_listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(
-            callback=self._listen_cb, tooltip="Listen for axis to merge"
-        )
+        self.merge_device_listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._listen_cb, tooltip="Listen for axis to merge")
         device_layout.addWidget(self.merge_device_listen_widget, 0, 2)
         device_layout.addWidget(merge_remove_widget, 0, 3)
         device_layout.setColumnStretch(4, 2)
 
         self.container_merge_layout.addWidget(device_widget)
 
-        self.merge_selector_device_widget.currentIndexChanged.connect(
-            self._merged_device_changed_cb
-        )
-        self.merge_selector_input_widget.currentIndexChanged.connect(
-            self._merged_input_changed_cb
-        )
+        self.merge_selector_device_widget.currentIndexChanged.connect(self._merged_device_changed_cb)
+        self.merge_selector_input_widget.currentIndexChanged.connect(self._merged_input_changed_cb)
 
         # populate the selector with hardware inputs
         self.merge_device_map = {}  # holds the device information keyed by device_id (str)
@@ -159,9 +141,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         default_device = None
         selected_input_id = 1
         if self.data.device_id:
-            default_device: dinput.DeviceSummary = next(
-                (dev for dev in devices if dev.device_id == self.data.device_id), None
-            )
+            default_device: dinput.DeviceSummary = next((dev for dev in devices if dev.device_id == self.data.device_id), None)
             if default_device:
                 if default_device.device_guid == self.action_data.hardware_device_guid:
                     # the merge device to pick is the same as the current device
@@ -175,11 +155,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
 
         if not default_device:
             default_device = next(
-                (
-                    dev
-                    for dev in devices
-                    if dev.device_guid == self.action_data.hardware_device_guid
-                ),
+                (dev for dev in devices if dev.device_guid == self.action_data.hardware_device_guid),
                 None,
             )
             if default_device:
@@ -214,10 +190,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
                 axis_list = {}
                 for index in range(dev.axis_count):
                     input_id = dev.axis_sequence_to_input_id(index)
-                    if (
-                        dev.device_guid == self.action_data.hardware_device_guid
-                        and input_id == self.action_data.hardware_input_id
-                    ):
+                    if dev.device_guid == self.action_data.hardware_device_guid and input_id == self.action_data.hardware_input_id:
                         # skip self as a possible input
                         continue
                     axis_list[input_id] = dev.get_axis_name(input_id)
@@ -279,13 +252,9 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         self.merge_invert_widget.clicked.connect(self._merge_invert_changed_cb)
         row_widgets.append(self.merge_invert_widget)
 
-        self.container_merge_options_widget = gremlin.ui.ui_common.getVContainer(
-            row_widgets, widget_only=True
-        )
+        self.container_merge_options_widget = gremlin.ui.ui_common.getVContainer(row_widgets, widget_only=True)
 
-        widget = gremlin.ui.ui_common.getHContainer(
-            self.merge_description_widget, "Merge Operation:", widget_only=True
-        )
+        widget = gremlin.ui.ui_common.getHContainer(self.merge_description_widget, "Merge Operation:", widget_only=True)
 
         self.container_merge_layout.addWidget(widget)
         self.container_merge_layout.addWidget(self.container_merge_options_widget)
@@ -294,18 +263,14 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         self.merge_curve_widget.curveChanged.connect(self._handle_curve_changed)
         widgets = [self.merge_curve_widget]
         if config.show_input_axis:
-            self.merge_axis_repeater_widget = gremlin.ui.ui_common.QProgressBar(
-                orientation=QtCore.Qt.Orientation.Horizontal
-            )
+            self.merge_axis_repeater_widget = gremlin.ui.ui_common.QProgressBar(orientation=QtCore.Qt.Orientation.Horizontal)
             self.merge_axis_repeater_label_widget = QtWidgets.QLabel()
             widgets.append(self.merge_axis_repeater_widget)
             widgets.append(self.merge_axis_repeater_label_widget)
         else:
             self.merge_axis_repeater_widget = None
 
-        widget = gremlin.ui.ui_common.getHContainer(
-            widgets, "Merge curve:", widget_only=True
-        )
+        widget = gremlin.ui.ui_common.getHContainer(widgets, "Merge curve:", widget_only=True)
         self.container_merge_layout.addWidget(widget)
 
         self.main_layout.addWidget(self.container_merge_widget)
@@ -314,9 +279,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         with QtCore.QSignalBlocker(self.merge_selector_device_widget):
             self.merge_selector_device_widget.setCurrentIndex(selected_device_index)
 
-        selected_input_index = self.merge_selector_input_widget.findData(
-            selected_input_id
-        )
+        selected_input_index = self.merge_selector_input_widget.findData(selected_input_id)
         if selected_input_index == -1:
             selected_input_index = 0
         self.merge_selector_input_widget.setCurrentIndex(selected_input_index)
@@ -363,9 +326,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
     def _update_axis_list(self, device_id, select_input_id=None):
         """updates the axis list for a merge input"""
 
-        if self.last_merge_device_id and gremlin.util.compare_guid(
-            self.last_merge_device_id, device_id
-        ):
+        if self.last_merge_device_id and gremlin.util.compare_guid(self.last_merge_device_id, device_id):
             return
 
         device = joystick_handling.getDevice(device_id)
@@ -382,16 +343,12 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
             valid_input_ids = device.getValidAxisInputIds()
             # gremlin.util.compare_guid(device.device_guid, input_device_id)
             for input_id in valid_input_ids:
-                if input_id == input_input_id and gremlin.util.compare_guid(
-                    input_device_guid, device_id
-                ):
+                if input_id == input_input_id and gremlin.util.compare_guid(input_device_guid, device_id):
                     # skip current input as a merge target
                     continue
                 axis_name = device.getAxisName(input_id)
                 if verbose:
-                    syslog.info(
-                        f"merged axis: {axis_name}  input id: {input_id} item input id: {input_input_id}"
-                    )
+                    syslog.info(f"merged axis: {axis_name}  input id: {input_id} item input id: {input_input_id}")
                 self.merge_selector_input_widget.addItem(axis_name, input_id)
 
             index = self.merge_selector_input_widget.findData(select_input_id)
@@ -443,17 +400,10 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
     def _remove_cb(self):
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Delete confirmation")
-        message_box.setInformativeText(
-            "This will delete this merge data.\nAre you sure?"
-        )
-        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(
-            gremlin.ui.ui_common.Icons.warningIcon()
-        )
+        message_box.setInformativeText("This will delete this merge data.\nAre you sure?")
+        pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
         message_box.setIconPixmap(pixmap)
-        message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok
-            | QtWidgets.QMessageBox.StandardButton.Cancel
-        )
+        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
         message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
@@ -508,9 +458,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
             if index != -1:
                 if index != self.merge_selector_device_widget.currentIndex():
                     with QtCore.QSignalBlocker(self.merge_selector_device_widget):
-                        self.merge_selector_device_widget.setCurrentIndex(
-                            index
-                        )  # this also updates the axis list if needed
+                        self.merge_selector_device_widget.setCurrentIndex(index)  # this also updates the axis list if needed
                         self._update_axis_list(device_id, input_id)
                         self.data.device_id = device_id
                         self.data.device_guid = gremlin.util.parse_guid(device_id)
@@ -720,9 +668,7 @@ class GridPopupWindow(gremlin.ui.ui_common.QShowAtCursorDialog):
                 elif action.device_input_type == InputType.JoystickHat:
                     name = f"Hat {action.device_input_id}"
 
-                widget = gremlin.ui.ui_common.getHContainer(
-                    [action.device_name, name], widget_only=True, left_margin=12
-                )
+                widget = gremlin.ui.ui_common.getHContainer([action.device_name, name], widget_only=True, left_margin=12)
                 widgets.append(widget)
                 has_action = True
 
@@ -732,9 +678,7 @@ class GridPopupWindow(gremlin.ui.ui_common.QShowAtCursorDialog):
             self.scroll_widget = QtWidgets.QWidget()
             self.scroll_layout = QtWidgets.QVBoxLayout()
             self.scroll_widget.setLayout(self.scroll_layout)
-            self.scroll_widget.setSizePolicy(
-                QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
-            )
+            self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
             self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
             self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
             self.scroll_area.setWidgetResizable(True)
@@ -752,12 +696,8 @@ class GridPopupWindow(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         self.main_layout.addWidget(widget)
 
-        close_widget = gremlin.ui.ui_common.QDataPushButton(
-            "Close", callback=self._handle_close
-        )
-        widget = gremlin.ui.ui_common.getHContainer(
-            close_widget, widget_only=True, left_stretch=True
-        )
+        close_widget = gremlin.ui.ui_common.QDataPushButton("Close", callback=self._handle_close)
+        widget = gremlin.ui.ui_common.getHContainer(close_widget, widget_only=True, left_stretch=True)
         self.main_layout.addWidget(widget)
 
     def _handle_close(self, widget):
@@ -789,12 +729,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         """
         self._hook_requested = False
 
-         # delay load flags
+        # delay load flags
         self._step_ui_loaded = False  # true if stepped UI is loaded
         self._grid_ui_loaded = False  # true if button grid UI is loaded
         self._merged_ui_loaded = False  # true if the merged UI is loaded
         self._hat_mapping_ui_loaded = False  # true if the hat mapping UI is loaded
-        
+        self._repeater_created = False
 
         super().__init__(action_data, parent=parent)
         assert isinstance(action_data, VjoyRemap)
@@ -829,11 +769,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._ui_loaded = False
 
         if not gremlin.shared_state.vjoy_enabled:
-            self.main_layout.addWidget(
-                QtWidgets.QLabel(
-                    "VJOY is not available.  Ensure VJOY is installed and configured."
-                )
-            )
+            self.main_layout.addWidget(QtWidgets.QLabel("VJOY is not available.  Ensure VJOY is installed and configured."))
             return
 
         veh = gremlin.event_handler.VjoyRemapEventHandler()
@@ -915,11 +851,17 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             el = gremlin.event_handler.EventListener()
             # el.button_usage_changed.connect(self._button_usage_changed) # listen to grid button changes
-            el.vjoy_button_usage.connect(
-                self._vjoy_button_usage_changed
-            )  # listen to grid button changes # called when a button actually flips
+            el.vjoy_button_usage.connect(self._vjoy_button_usage_changed)  # listen to grid button changes # called when a button actually flips
 
-            el.joystick_event_ui.connect(self._joystick_event_handler)
+            # jp = gremlin.event_handler.JoystickEventProcessor()
+            # jp.registerListenerCallback(
+            #     device_guid = self.action_data.device_guid,
+            #     input_type = self.action_data.input_type,
+            #     input_id = self.action_data.input_id,
+            #     callback = self._joystick_event_handler
+            # )
+
+            # el.joystick_event_ui.connect(self._joystick_event_handler)
 
             # set the action type from the input type
             self.load_actions_from_input_type()
@@ -949,7 +891,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if input_id not in self._merge_device_input_map[device_id]:
             self._merge_device_input_map[device_id].append(input_id)
 
-
     def _update_merge_data(self):
         """build map of ID to axis ID for merge operations"""
         if not self._merged_ui_loaded:
@@ -969,12 +910,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             if verbose:
                 syslog.info("Merge data update: ")
                 for device_guid, input_id in self._merge_device_input_map.items():
-                    device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(
-                        device_guid
-                    )
-                    syslog.info(
-                        f"\t{device.name} [{device.device_id}] -> axis {input_id} ({device.get_axis_name(input_id)})"
-                    )
+                    device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
+                    syslog.info(f"\t{device.name} [{device.device_id}] -> axis {input_id} ({device.get_axis_name(input_id)})")
 
     def getCurveData(self, event, value):
         """returns active curve data that applies to the container through included response curve actions"""
@@ -997,15 +934,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         """gets a modified input type based on the current mode"""
         input_type = self.action_data.get_input_type()
 
-        if (
-            input_type in VJoyRemapWidget.input_type_buttons
-            and self.action_data.action_mode
-            in (
-                VjoyAction.VJoySetAxis,
-                VjoyAction.VJoyInvertAxis,
-                VjoyAction.VJoyRangeAxis,
-                VjoyAction.VJoySetAxisStepped,
-            )
+        if input_type in VJoyRemapWidget.input_type_buttons and self.action_data.action_mode in (
+            VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyInvertAxis,
+            VjoyAction.VJoyRangeAxis,
+            VjoyAction.VJoySetAxisStepped,
         ):
             return InputType.JoystickAxis
         return input_type
@@ -1018,42 +951,46 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _create_repeater(self):
         """creates an input repeater"""
         input_type = self.action_data.get_input_type()
-        self._repeater_axis_widget = gremlin.ui.ui_common.QProgressBar(
-            orientation=QtCore.Qt.Orientation.Horizontal
-        )
-        # get the current value
         if input_type == InputType.JoystickAxis:
-            value = self.action_data.get_filtered_axis_value()
-        else:
-            value = 0.0
-
-        if value is not None:
-            self._repeater_axis_widget.setValue(value)
-            self._repeater_value_widget = QtWidgets.QLabel(f"{value:0.4f}")
-
-        widgets = ["Output:", self._repeater_axis_widget, self._repeater_value_widget]
-
-        # wrap horizontal setup in vertical containers for independent height
-        self.container_repeater_widget, self.container_repeater_layout = (
-            gremlin.ui.ui_common.getHContainer(
-                widgets, use_vcontainers=True, left_margin=12
+            self._repeater_axis_widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar(
+                device_guid=self.action_data.device_guid,
+                input_id=self.action_data.input_id,
+                callback=self._get_repeater_value,
             )
-        )
-        self.main_layout.addWidget(self.container_repeater_widget)
+            # get the current value
+            value = self.action_data.get_filtered_axis_value()
 
-    def _update_repeater_value(self, value):
-        """callback for the output repeater when it changes values"""
-        if self._repeater_value_widget and Shiboken.isValid(
-            self._repeater_value_widget
-        ):
-            if hasattr(value, "__iter__"):
-                # compound value
-                value = value[0]
+            if value is not None:
+                self._repeater_axis_widget.setValue(value)
+                self._repeater_value_widget = QtWidgets.QLabel(f"{value:0.4f}")
 
-            self._repeater_value_widget.setText(f"{value:0.4f}")
+            widgets = ["Output:", self._repeater_axis_widget, self._repeater_value_widget]
+
+            # wrap horizontal setup in vertical containers for independent height
+            self.container_repeater_widget, self.container_repeater_layout = gremlin.ui.ui_common.getHContainer(widgets, use_vcontainers=True, left_margin=12)
+            self.main_layout.addWidget(self.container_repeater_widget)
+
+        self._repeater_created = True
+
+    def _get_repeater_value(self, event: gremlin.event_handler.Event):
+        """called by the merge repeater to update values when the input changes"""
+        values = self.action_data.get_filtered_axis_value(event.value, channels=True)
+        return values
+
+    # def _update_repeater_value(self, value):
+    #     """callback for the output repeater when it changes values"""
+    #     if self._repeater_value_widget and Shiboken.isValid(
+    #         self._repeater_value_widget
+    #     ):
+    #         if hasattr(value, "__iter__"):
+    #             # compound value
+    #             value = value[0]
+
+    #         self._repeater_value_widget.setText(f"{value:0.4f}")
 
     def _update_repeater(self, value=None):
-        """updates the input repeater"""
+        """updates the input repeater section"""
+
         if not self._ui_loaded:
             return
         if not Shiboken.isValid(self):
@@ -1084,59 +1021,39 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     v2 = self.action_data.button_range_max
                     in_range = gremlin.util.valueInRange(value, v1, v2)
                     if in_range:
-                        self._repeater_range_widget.setText(
-                            f"In range ({value:0.3f} in {self._range_text})"
-                        )
-                        self._repeater_range_widget.setIcon(
-                            gremlin.ui.ui_common.Icons.validIcon()
-                        )
+                        self._repeater_range_widget.setText(f"In range ({value:0.3f} in {self._range_text})")
+                        self._repeater_range_widget.setIcon(gremlin.ui.ui_common.Icons.validIcon())
                         # self._repeater_button_widget.setValue(True)
                     else:
-                        self._repeater_range_widget.setText(
-                            f"Out of range ({value:0.3f} not in {self._range_text})"
-                        )
-                        self._repeater_range_widget.setIcon(
-                            gremlin.ui.ui_common.Icons.invalidIcon()
-                        )
+                        self._repeater_range_widget.setText(f"Out of range ({value:0.3f} not in {self._range_text})")
+                        self._repeater_range_widget.setIcon(gremlin.ui.ui_common.Icons.invalidIcon())
                         # self._repeater_button_widget.setValue(False)
                 case VjoyAction.VJoyAxis:
                     # plain axis output
                     # if not Shiboken.isValid(self._repeater_axis_widget):
                     #     return
 
-                    values = self.action_data.get_filtered_axis_value(
-                        value, curves=curves, channels=True
-                    )
+                    values = self.action_data.get_filtered_axis_value(value, curves=curves, channels=True)
                     # syslog.info(f"got data: {data}")
                     if values is not None:
                         axis_widget_visible = True
                         self._repeater_axis_widget.setValue(values)
                         if self._repeater_value_widget:
-                            self._repeater_value_widget.setText(
-                                f"{values.actual:+0.4f}"
-                            )
+                            self._repeater_value_widget.setText(f"{values.actual:+0.4f}")
                     else:
-                        syslog.error(
-                            f"VJOY: repeater: got invalid value for axis - received value {value}"
-                        )
+                        syslog.error(f"VJOY: repeater: got invalid value for axis - received value {value}")
                 case VjoyAction.VJoyMergeAxis:
                     # axis merging
                     # if not Shiboken.isValid(self._repeater_axis_widget):
                     #     return
-                    values = self.action_data.get_filtered_axis_value(
-                        value, curves=curves, channels=True
-                    )
+                    values = self.action_data.get_filtered_axis_value(value, curves=curves, channels=True)
                     if values is not None:
                         axis_widget_visible = True
                         self._repeater_axis_widget.setValue(values)
                         if self._repeater_value_widget:
-                            self._repeater_value_widget.setText(
-                                f"{values.actual:+0.4f}"
-                            )
+                            self._repeater_value_widget.setText(f"{values.actual:+0.4f}")
                     else:
-                        syslog.error(
-                            f"VJOY: repeater: got invalid value for axis - received value {value}"
-                        )
+                        syslog.error(f"VJOY: repeater: got invalid value for axis - received value {value}")
 
         self._repeater_range_widget.setVisible(range_widget_visible)
         if self._repeater_axis_widget.isVisible() != axis_widget_visible:
@@ -1147,38 +1064,24 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         ch = self._repeater_axis_widget.channelHeight
 
         h = max(
-            gremlin.ui.ui_common.getLayoutWidgetHeight(
-                self.container_repeater_layout, 32
-            ),
+            gremlin.ui.ui_common.getLayoutWidgetHeight(self.container_repeater_layout, 32),
             32 + ch * (count - 1),
         )
         self.container_repeater_widget.setMaximumHeight(h)
         self.container_repeater_widget.setMinimumHeight(h)
 
-
-        
-            
-
     def _create_range_widgets(self):
 
         self.button_range_min_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.button_range_min_widget.setValue(self.action_data.button_range_min)
-        self.button_range_min_widget.valueChanged.connect(
-            self._button_range_min_changed_cb
-        )
+        self.button_range_min_widget.valueChanged.connect(self._button_range_min_changed_cb)
 
         self.button_range_max_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.button_range_max_widget.setValue(self.action_data.button_range_max)
-        self.button_range_max_widget.valueChanged.connect(
-            self._button_range_max_changed_cb
-        )
+        self.button_range_max_widget.valueChanged.connect(self._button_range_max_changed_cb)
 
-        self.button_grab_min_widget = gremlin.ui.ui_common.Buttons.getGrabWidget(
-            tooltip="Grab minimum value", callback=self._grab_min
-        )
-        self.button_grab_max_widget = gremlin.ui.ui_common.Buttons.getGrabWidget(
-            tooltip="Grab maximum value", callback=self._grab_max
-        )
+        self.button_grab_min_widget = gremlin.ui.ui_common.Buttons.getGrabWidget(tooltip="Grab minimum value", callback=self._grab_min)
+        self.button_grab_max_widget = gremlin.ui.ui_common.Buttons.getGrabWidget(tooltip="Grab maximum value", callback=self._grab_max)
 
         self._update_range_text()
         self._repeater_range_widget = gremlin.ui.ui_common.QIconLabel()
@@ -1213,14 +1116,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         widgets.append(self._repeater_range_widget)
 
-        self.container_axis_to_button_range_widget, _ = (
-            gremlin.ui.ui_common.getHContainer(
-                widgets, min_height=self.container_height
-            )
-        )
-        self.container_axis_to_button_range_widget.setToolTip(
-            "Button to axis range parameters. The button will be output if the input axis in this range."
-        )
+        self.container_axis_to_button_range_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, min_height=self.container_height)
+        self.container_axis_to_button_range_widget.setToolTip("Button to axis range parameters. The button will be output if the input axis in this range.")
         self.main_layout.addWidget(self.container_axis_to_button_range_widget)
 
     @QtCore.Slot()
@@ -1283,15 +1180,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.container_hat_layout.setContentsMargins(0, 0, 0, 0)
 
         self.container_hat_grid_widget = QtWidgets.QWidget()
-        self.container_hat_grid_layout = QtWidgets.QGridLayout(
-            self.container_hat_grid_widget
-        )
+        self.container_hat_grid_layout = QtWidgets.QGridLayout(self.container_hat_grid_widget)
 
         self.container_hat_options_widget = QtWidgets.QWidget()
         self.container_hat_options_widget.setContentsMargins(0, 0, 0, 0)
-        self.container_hat_options_layout = QtWidgets.QHBoxLayout(
-            self.container_hat_options_widget
-        )
+        self.container_hat_options_layout = QtWidgets.QHBoxLayout(self.container_hat_options_widget)
 
         self.container_hat_mapping_stack_widget.addWidget(self.container_hat_widget)
 
@@ -1314,9 +1207,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.hat_unmap_widget = QtWidgets.QPushButton("Clear Buttons")
         self.hat_unmap_widget.setToolTip("Clears all mappings")
         self.hat_map_widget = QtWidgets.QPushButton("Map Buttons")
-        self.hat_map_widget.setToolTip(
-            "Maps all positions sequentially using the first button as the reference if set."
-        )
+        self.hat_map_widget.setToolTip("Maps all positions sequentially using the first button as the reference if set.")
 
         self.hat_hold_widget.clicked.connect(self._set_all_hold)
         self.hat_pulse_widget.clicked.connect(self._set_all_pulse)
@@ -1370,17 +1261,13 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             rb_hold.setToolTip("Output will match the current state of the input.")
             rb_hold.data = position
             rb_pulse = gremlin.ui.ui_common.QDataRadioButton("Pulse")
-            rb_pulse.setToolTip(
-                "Output will pulse on (pressed), wait a delay, and turn off (released) when triggered."
-            )
+            rb_pulse.setToolTip("Output will pulse on (pressed), wait a delay, and turn off (released) when triggered.")
             rb_pulse.data = position
             rb_press = gremlin.ui.ui_common.QDataRadioButton("Press")
             rb_press.setToolTip("Output will be turned on (pressed) when triggered.")
             rb_press.data = position
             rb_release = gremlin.ui.ui_common.QDataRadioButton("Release")
-            rb_release.setToolTip(
-                "Output will be turned off (released) when triggered."
-            )
+            rb_release.setToolTip("Output will be turned off (released) when triggered.")
             rb_release.data = position
             rb_noop = gremlin.ui.ui_common.QDataRadioButton("NoOp")
             rb_noop.setToolTip("No output.")
@@ -1416,6 +1303,17 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._update_hat_mapping()
 
         self._hat_mapping_ui_loaded = True  # indicate loaded
+
+    def _cleanup_ui(self):
+        """called when widget is destroyed"""
+        # jp = gremlin.event_handler.JoystickEventProcessor()
+        # jp.registerListenerCallback(
+        #     device_guid = self.action_data.device_guid,
+        #     input_type = self.action_data.input_type,
+        #     input_id = self.action_data.input_id,
+        #     callback = self._joystick_event_handler
+        #     )
+        pass
 
     @QtCore.Slot(bool)
     def _hat_sticky_changed(self, checked: bool):
@@ -1460,9 +1358,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _clear_map(self):
         """sets all mappings to pulse mode"""
-        result = gremlin.ui.ui_common.ConfirmBox(
-            prompt="Clear all hat button mappings?"
-        )
+        result = gremlin.ui.ui_common.ConfirmBox(prompt="Clear all hat button mappings?")
         if result:
             positions = self.action_data.hat_positions
             for position in positions:
@@ -1472,9 +1368,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _auto_map(self):
         """sets all mappings to pulse mode"""
-        result = gremlin.ui.ui_common.ConfirmBox(
-            prompt="Remap all hat button mappings?"
-        )
+        result = gremlin.ui.ui_common.ConfirmBox(prompt="Remap all hat button mappings?")
         if result:
             positions = self.action_data.hat_positions
             dev = self.action_data.vjoy_map[self.action_data.vjoy_id]
@@ -1546,9 +1440,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         dev = self.action_data.vjoy_map[self.action_data.vjoy_id]
         count = dev.button_count
         positions = self.action_data.hat_positions
-        for index, position in enumerate(
-            positions
-        ):  # 9 positions - 8 cardinal and center push
+        for index, position in enumerate(positions):  # 9 positions - 8 cardinal and center push
             cb = self.cb_hat_list[index]
             with QtCore.QSignalBlocker(cb):
                 cb.clear()
@@ -1566,9 +1458,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _load_hat_mapping(self):
         """loads the hat data into the UI"""
         positions = self.action_data.hat_positions
-        for index, position in enumerate(
-            positions
-        ):  # 9 positions - 8 cardinal and center push
+        for index, position in enumerate(positions):  # 9 positions - 8 cardinal and center push
             button_id = self.action_data.hat_map[position]  # 0 means disabled
             button_index = button_id
             cb = self.cb_hat_list[index]
@@ -1579,11 +1469,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _create_sync_widget(self):
         """creates the sync widget"""
         input_type = self.action_data.get_input_type()
-        default_value = (
-            self.action_data.axis_start_value
-            if input_type == InputType.JoystickAxis
-            else self.action_data.button_start_value
-        )
+        default_value = self.action_data.axis_start_value if input_type == InputType.JoystickAxis else self.action_data.button_start_value
 
         modes = [SyncMode.Default, SyncMode.Input]
 
@@ -1596,9 +1482,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         )
         self._sync_widget.valueChanged.connect(self._default_value_changed)
         widgets = [self._sync_widget]
-        self.sync_on_start_widget = gremlin.ui.ui_common.getHContainer(
-            widgets, widget_only=True
-        )
+        self.sync_on_start_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.sync_on_start_widget.setContentsMargins(12, 8, 0, 8)
         self.main_layout.addWidget(self.sync_on_start_widget)
 
@@ -1632,29 +1516,19 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.b_max_value = QtWidgets.QPushButton("+1")
         self.set_width(self.b_max_value, w)
 
-        self._relative_value_widget = gremlin.ui.ui_common.QFloatLineEdit(
-            min_range=0, max_range=1
-        )
-        self._relative_value_widget.setToolTip(
-            "Relative value to add or remove from the axis.  This value is scaled with the deviation of the input if the input is an axis."
-        )
+        self._relative_value_widget = gremlin.ui.ui_common.QFloatLineEdit(min_range=0, max_range=1)
+        self._relative_value_widget.setToolTip("Relative value to add or remove from the axis.  This value is scaled with the deviation of the input if the input is an axis.")
         self._relative_value_widget.setValue(self.action_data.relative_value)
         self._relative_value_widget.valueChanged.connect(self._relative_value_changed)
 
         self._use_relative_value_widget = QtWidgets.QCheckBox("Use relative value:")
         self._use_relative_value_widget.setChecked(self.action_data.use_relative_value)
-        self._use_relative_value_widget.clicked.connect(
-            self._use_relative_value_changed
-        )
+        self._use_relative_value_widget.clicked.connect(self._use_relative_value_changed)
 
         self._relative_pulse_widget = gremlin.ui.ui_common.QDelayWidget()
-        self._relative_pulse_widget.setToolTip(
-            "Pulse Delay in milliseconds while the input is deviated or pressed"
-        )
+        self._relative_pulse_widget.setToolTip("Pulse Delay in milliseconds while the input is deviated or pressed")
         self._relative_pulse_widget.setValue(self.action_data.relative_pulse_delay)
-        self._relative_pulse_widget.valueChanged.connect(
-            self._relative_pulse_value_changed
-        )
+        self._relative_pulse_widget.valueChanged.connect(self._relative_pulse_value_changed)
 
         self.relative_scaling_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.relative_scaling_widget.setMinimum(0)
@@ -1709,9 +1583,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self._relative_pulse_widget,
         ]
 
-        self.container_target_widget = gremlin.ui.ui_common.getHContainer(
-            widgets, min_height=self.container_height, widget_only=True, left_margin=12
-        )
+        self.container_target_widget = gremlin.ui.ui_common.getHContainer(widgets, min_height=self.container_height, widget_only=True, left_margin=12)
 
         self.main_layout.addWidget(self.container_relative_widget)
         self.main_layout.addWidget(self.container_target_widget)
@@ -1750,12 +1622,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         active_color = gremlin.ui.ui_common.Color.activeColor()
         normal_color = gremlin.ui.ui_common.Color.normalColor()
-        self.curve_icon_inactive = util.load_icon(
-            "mdi.chart-bell-curve", qta_color=normal_color
-        )
-        self.curve_icon_active = util.load_icon(
-            "mdi.chart-bell-curve", qta_color=active_color
-        )
+        self.curve_icon_inactive = util.load_icon("mdi.chart-bell-curve", qta_color=normal_color)
+        self.curve_icon_active = util.load_icon("mdi.chart-bell-curve", qta_color=active_color)
         self.curve_button_widget.setToolTip("Curve output")
         self.curve_button_widget.clicked.connect(self._curve_button_cb)
 
@@ -1767,16 +1635,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self.output_range_min_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.output_range_min_widget.setValue(self.action_data.output_range_min)
-        self.output_range_min_widget.valueChanged.connect(
-            self._output_range_min_changed_cb
-        )
+        self.output_range_min_widget.valueChanged.connect(self._output_range_min_changed_cb)
 
         self.output_range_max_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.output_range_max_widget.setValue(self.action_data.output_range_max)
 
-        self.output_range_max_widget.valueChanged.connect(
-            self._output_range_max_changed_cb
-        )
+        self.output_range_max_widget.valueChanged.connect(self._output_range_max_changed_cb)
 
         reset_widget = QtWidgets.QPushButton("Reset")
         reset_widget.setToolTip("Resets the output range to default")
@@ -1804,14 +1668,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             reset_widget,
         ]
 
-        self.container_output_range_widget, self.container_output_range_layout = (
-            gremlin.ui.ui_common.getHContainer(
-                widgets, "Output Scale:", min_height=self.container_height
-            )
-        )
-        self.container_output_range_widget.setToolTip(
-            "Allows you to set limits to the output range of an axis to constrain the output to a particular reduced range from normal."
-        )
+        self.container_output_range_widget, self.container_output_range_layout = gremlin.ui.ui_common.getHContainer(widgets, "Output Scale:", min_height=self.container_height)
+        self.container_output_range_widget.setToolTip("Allows you to set limits to the output range of an axis to constrain the output to a particular reduced range from normal.")
 
         self._update_curve_icon()
         self.main_layout.addWidget(self.container_output_range_widget)
@@ -1839,14 +1697,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if self._hook_requested:
             self._disable_axis_tracking()
 
-
-
     def _disable_axis_tracking(self):
         """disables tracking"""
         if self._axis_tracking_enabled:
-            if not self.chained_input:
-                el = gremlin.event_handler.EventListener()
-                el.removeUIJoystickEventCallback(self._joystick_event_handler)
+            # if not self.chained_input:
+            #     el = gremlin.event_handler.EventListener()
+            #     el.removeUIJoystickEventCallback(self._joystick_event_handler)
             self._axis_tracking_enabled = False
 
     def _create_merge_ui(self):
@@ -1861,9 +1717,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _create_merge_mapping_ui(self):
         """populates the merge mapping UI"""
-        self.container_merge_widget, self.container_merge_layout = (
-            gremlin.ui.ui_common.getVContainer(label="Merge Information")
-        )
+        self.container_merge_widget, self.container_merge_layout = gremlin.ui.ui_common.getVContainer(label="Merge Information")
         self._update_merge_widgets()
         self.container_merge_stack_widget.addWidget(self.container_merge_widget)
 
@@ -1900,12 +1754,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             count += 1
             self.container_merge_layout.addWidget(widget)
 
-        merge_add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(
-            callback=self._add_merge_axis
-        )
-        self.merge_clear_widget = gremlin.ui.ui_common.Buttons.getClearWidget(
-            callback=self._clear_merge_axis
-        )
+        merge_add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(callback=self._add_merge_axis)
+        self.merge_clear_widget = gremlin.ui.ui_common.Buttons.getClearWidget(callback=self._clear_merge_axis)
         widgets = [merge_add_widget, self.merge_clear_widget]
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.container_merge_layout.addWidget(widget)
@@ -1915,10 +1765,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot(object)
     def _delete_merge_widget(self, data: MergeData):  # noqa: F821
         """called when a merge axis should be deleted"""
-        if (
-            data in self.action_data._merge_data
-            and len(self.action_data._merge_data) > 1
-        ):
+        if data in self.action_data._merge_data and len(self.action_data._merge_data) > 1:
             # can only delete if there is more than one entry
 
             self.action_data._merge_data.remove(data)
@@ -1946,17 +1793,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             # can only clear if more than one merge axis as there must be always at least 1
             message_box = QtWidgets.QMessageBox()
             message_box.setText("Delete confirmation")
-            message_box.setInformativeText(
-                "This will delete all merge data.\nAre you sure?"
-            )
-            pixmap = gremlin.ui.ui_common.Icons.to_pixmap(
-                gremlin.ui.ui_common.Icons.warningIcon()
-            )
+            message_box.setInformativeText("This will delete all merge data.\nAre you sure?")
+            pixmap = gremlin.ui.ui_common.Icons.to_pixmap(gremlin.ui.ui_common.Icons.warningIcon())
             message_box.setIconPixmap(pixmap)
-            message_box.setStandardButtons(
-                QtWidgets.QMessageBox.StandardButton.Ok
-                | QtWidgets.QMessageBox.StandardButton.Cancel
-            )
+            message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
             message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
             gremlin.util.centerDialog(message_box)
             result = message_box.exec()
@@ -1970,21 +1810,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _filter_input(self, event: gremlin.event_handler.Event) -> bool:
         # only accept axes different from the current input axis
-        if (
-            gremlin.util.compare_guid(
-                event.device_id, self.action_data.hardware_device_id
-            )
-            and event.identifier == self.action_data.get_input_id()
-        ):
+        if gremlin.util.compare_guid(event.device_id, self.action_data.hardware_device_id) and event.identifier == self.action_data.get_input_id():
             # don't listen to the same input as the current input for merged axis
             return False
         return True
 
     def _update_merged_axis(self, event: gremlin.event_handler.Event):
         """merged axis selected via the listen button"""
-        self.axis_listen_dialog.item_selected.disconnect(
-            self._update_merged_axis
-        )  # stop listening
+        self.axis_listen_dialog.item_selected.disconnect(self._update_merged_axis)  # stop listening
         device_id = event.device_id
         input_id = event.identifier
         self._select_merge_target(device_id, input_id)
@@ -1995,9 +1828,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if index != -1:
             if index != self.merge_selector_device_widget.currentIndex():
                 with QtCore.QSignalBlocker(self.merge_selector_device_widget):
-                    self.merge_selector_device_widget.setCurrentIndex(
-                        index
-                    )  # this also updates the axis list if needed
+                    self.merge_selector_device_widget.setCurrentIndex(index)  # this also updates the axis list if needed
                     self._update_axis_list(device_id, input_id)
                     self.action_data.merge_device_id = device_id
 
@@ -2021,11 +1852,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _curve_button_cb(self):
         if not self.action_data.curve_data:
             curve_data = gremlin.curve_handler.AxisCurveData()
-            curve_data.calibration = (
-                gremlin.ui.axis_calibration.CalibrationManager().getCalibration(
-                    self.action_data.hardware_device_guid,
-                    self.action_data.hardware_input_id,
-                )
+            curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(
+                self.action_data.hardware_device_guid,
+                self.action_data.hardware_input_id,
             )
             curve_data.curve_update()
             self.action_data.curve_data = curve_data
@@ -2057,10 +1886,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         message_box = QtWidgets.QMessageBox()
         message_box.setText("Confirmation")
         message_box.setInformativeText("Delete curve data for this output?")
-        message_box.setStandardButtons(
-            QtWidgets.QMessageBox.StandardButton.Ok
-            | QtWidgets.QMessageBox.StandardButton.Cancel
-        )
+        message_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel)
         message_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Ok)
         gremlin.util.centerDialog(message_box)
 
@@ -2115,14 +1941,13 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._update_axis_widget()
         self._enable_axis_tracking()
 
-    def _joystick_event_handler(self, event : gremlin.event_handler.Event):
+    @QtCore.Slot(gremlin.event_handler.Event)
+    def _joystick_event_handler(self, event: gremlin.event_handler.Event):
         """handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time"""
         if gremlin.shared_state.is_running:
             return
 
-        assert (
-            gremlin.util.is_ui_thread()
-        )  # new handler for joystick should be on the ui thread
+        assert gremlin.util.is_ui_thread()  # new handler for joystick should be on the ui thread
 
         if event.device_guid != self.action_data.device_guid:
             return
@@ -2140,11 +1965,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             input_id = event.identifier
             event_key = (device_guid, input_id)
 
-            md_list = [
-                md
-                for md in self.action_data._merge_data
-                if md.key == event_key and md.callback is not None
-            ]
+            md_list = [md for md in self.action_data._merge_data if md.key == event_key and md.callback is not None]
             for data in md_list:
                 data.callback(event.value)
 
@@ -2162,12 +1983,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self._update_repeater(value)
 
-  
     def _current_input_axis(self):
         """gets the current input axis value"""
-        return gremlin.joystick_handling.get_curved_axis(
-            self.action_data.hardware_device_guid, self.action_data.hardware_input_id
-        )
+        return gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
 
     def _update_axis_widget(self):
         """updates the axis output repeater with the value
@@ -2179,16 +1997,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             return
         # always read the current input as the value could be from another device for merged inputs
         if self.action_data.input_is_axis():  # == InputType.JoystickAxis:
-            curves = (
-                [self.action_data.curve_data] if self.action_data.curve_data else None
-            )
+            curves = [self.action_data.curve_data] if self.action_data.curve_data else None
             value = self.action_data.get_filtered_axis_value(curves=curves)
 
             # update the curved window if displayed
             if self.curve_update_handler is not None:
-                self.curve_update_handler(
-                    value
-                )  # use the current axis input value, not the curved value
+                self.curve_update_handler(value)  # use the current axis input value, not the curved value
 
             self._update_repeater()
 
@@ -2200,9 +2014,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _update_info(self):
         """updates the output display info widget"""
-        input_type = (
-            self.action_data._get_input_type()
-        )  # self.action_data.hardware_input_type # state._active_device_input_type
+        input_type = self.action_data._get_input_type()  # self.action_data.hardware_input_type # state._active_device_input_type
         input_id = self.action_data.hardware_input_id  # state._active_device_input_id
 
         vjoy_id = self.action_data.vjoy_id
@@ -2267,23 +2079,15 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         """creates a manual input type override"""
 
         current_input_type = self.action_data.get_input_type()
-        self._override_enabled_widget = QtWidgets.QCheckBox(
-            f"Override input type ({InputType.to_display_name(current_input_type)})"
-        )
+        self._override_enabled_widget = QtWidgets.QCheckBox(f"Override input type ({InputType.to_display_name(current_input_type)})")
         input_type = self.action_data.override_input_type
         self._override_enabled_widget.setChecked(input_type is not None)
         self._override_enabled_widget.clicked.connect(self._update_override)
-        self._override_axis_widget = gremlin.ui.ui_common.QDataRadioButton(
-            "Axis", InputType.JoystickAxis
-        )
+        self._override_axis_widget = gremlin.ui.ui_common.QDataRadioButton("Axis", InputType.JoystickAxis)
         self._override_axis_widget.clicked.connect(self._update_override_changed)
-        self._override_button_widget = gremlin.ui.ui_common.QDataRadioButton(
-            "Button", InputType.JoystickButton
-        )
+        self._override_button_widget = gremlin.ui.ui_common.QDataRadioButton("Button", InputType.JoystickButton)
         self._override_button_widget.clicked.connect(self._update_override_changed)
-        self._override_hat_widget = gremlin.ui.ui_common.QDataRadioButton(
-            "Hat", InputType.JoystickHat
-        )
+        self._override_hat_widget = gremlin.ui.ui_common.QDataRadioButton("Hat", InputType.JoystickHat)
         self._override_hat_widget.clicked.connect(self._update_override_changed)
 
         widgets = [
@@ -2293,9 +2097,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self._override_hat_widget,
         ]
 
-        self.container_override_widget, _ = gremlin.ui.ui_common.getHContainer(
-            widgets, min_height=self.container_height
-        )
+        self.container_override_widget, _ = gremlin.ui.ui_common.getHContainer(widgets, min_height=self.container_height)
         self._update_override()
         self.main_layout.addWidget(self.container_override_widget)
 
@@ -2310,9 +2112,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self._override_axis_widget):
             self._override_axis_widget.setChecked(input_type == InputType.JoystickAxis)
         with QtCore.QSignalBlocker(self._override_button_widget):
-            self._override_button_widget.setChecked(
-                input_type == InputType.JoystickButton
-            )
+            self._override_button_widget.setChecked(input_type == InputType.JoystickButton)
         with QtCore.QSignalBlocker(self._override_hat_widget):
             self._override_hat_widget.setChecked(input_type == InputType.JoystickHat)
 
@@ -2327,47 +2127,29 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _create_button_modes(self):
         """button output options"""
         self.button_rb_hold = gremlin.ui.ui_common.QDataRadioButton("Hold")
-        self.button_rb_hold.setToolTip(
-            "Output will be pressed (on) while the input is in range."
-        )
+        self.button_rb_hold.setToolTip("Output will be pressed (on) while the input is in range.")
         self.button_rb_hold.data = ButtonOutputMode.Hold
-        self.button_rb_hold.setChecked(
-            self.action_data.button_mode == ButtonOutputMode.Hold
-        )
+        self.button_rb_hold.setChecked(self.action_data.button_mode == ButtonOutputMode.Hold)
 
         self.button_rb_pulse = gremlin.ui.ui_common.QDataRadioButton("Pulse")
-        self.button_rb_pulse.setToolTip(
-            "Output will pulse on (pressed), wait a delay, and turn off (released) when the range is entered"
-        )
+        self.button_rb_pulse.setToolTip("Output will pulse on (pressed), wait a delay, and turn off (released) when the range is entered")
         self.button_rb_pulse.data = ButtonOutputMode.Pulse
-        self.button_rb_pulse.setChecked(
-            self.action_data.button_mode == ButtonOutputMode.Pulse
-        )
+        self.button_rb_pulse.setChecked(self.action_data.button_mode == ButtonOutputMode.Pulse)
 
         self.button_rb_press = gremlin.ui.ui_common.QDataRadioButton("Press")
-        self.button_rb_press.setToolTip(
-            "Output will be turned on (pressed) and stay on if the range is entered."
-        )
+        self.button_rb_press.setToolTip("Output will be turned on (pressed) and stay on if the range is entered.")
         self.button_rb_press.data = ButtonOutputMode.Press
-        self.button_rb_press.setChecked(
-            self.action_data.button_mode == ButtonOutputMode.Press
-        )
+        self.button_rb_press.setChecked(self.action_data.button_mode == ButtonOutputMode.Press)
 
         self.button_rb_release = gremlin.ui.ui_common.QDataRadioButton("Release")
-        self.button_rb_release.setToolTip(
-            "Output will be turned off (released) and stay off is the range is entered."
-        )
+        self.button_rb_release.setToolTip("Output will be turned off (released) and stay off is the range is entered.")
         self.button_rb_release.data = ButtonOutputMode.Release
-        self.button_rb_release.setChecked(
-            self.action_data.button_mode == ButtonOutputMode.Release
-        )
+        self.button_rb_release.setChecked(self.action_data.button_mode == ButtonOutputMode.Release)
 
         self.button_rb_noop = gremlin.ui.ui_common.QDataRadioButton("NoOp")
         self.button_rb_noop.setToolTip("No output.")
         self.button_rb_noop.data = ButtonOutputMode.NoOp
-        self.button_rb_noop.setChecked(
-            self.action_data.button_mode == ButtonOutputMode.NoOp
-        )
+        self.button_rb_noop.setChecked(self.action_data.button_mode == ButtonOutputMode.NoOp)
 
         self.pulse_duration_widget = gremlin.ui.ui_common.QDelayWidget(
             value=self.action_data.pulse_delay,
@@ -2395,19 +2177,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.button_rb_noop,
         ]
 
-        self.container_button_mode_widget = gremlin.ui.ui_common.getHContainer(
-            widgets, "Output Mode:", min_height=self.container_height, widget_only=True
-        )
+        self.container_button_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, "Output Mode:", min_height=self.container_height, widget_only=True)
 
-        self.container_pulse_widget = gremlin.ui.ui_common.getGridContainer(
-            self.pulse_duration_widget, "Duration (ms):", widget_only=True
-        )
-        self.container_repeat_widget = gremlin.ui.ui_common.getGridContainer(
-            self.button_repeat_widget, "Pulse Repeat:", widget_only=True
-        )
-        self.container_interval_widget = gremlin.ui.ui_common.getGridContainer(
-            self.pulse_interval_widget, "Interval (ms):", widget_only=True
-        )
+        self.container_pulse_widget = gremlin.ui.ui_common.getGridContainer(self.pulse_duration_widget, "Duration (ms):", widget_only=True)
+        self.container_repeat_widget = gremlin.ui.ui_common.getGridContainer(self.button_repeat_widget, "Pulse Repeat:", widget_only=True)
+        self.container_interval_widget = gremlin.ui.ui_common.getGridContainer(self.pulse_interval_widget, "Interval (ms):", widget_only=True)
 
         widgets = [
             self.container_pulse_widget,
@@ -2415,18 +2189,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.container_interval_widget,
         ]
 
-        widget = gremlin.ui.ui_common.getVContainer(
-            widgets, widget_only=True, left_margin=12
-        )
+        widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True, left_margin=12)
         gremlin.ui.ui_common.synchronize_grids(widgets)
 
         widgets = [
             widget,
         ]
 
-        self.container_pulse_widget = gremlin.ui.ui_common.getVContainer(
-            widgets, widget_only=True
-        )
+        self.container_pulse_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
         self.button_rb_hold.clicked.connect(self._button_mode_changed)
         self.button_rb_pulse.clicked.connect(self._button_mode_changed)
@@ -2461,9 +2231,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.cb_action_list = gremlin.ui.ui_common.QDataComboBox()
         self.cb_action_list.setFixedWidth(width)
 
-        self.cb_action_list.currentIndexChanged.connect(
-            self._handle_action_mode_changed
-        )
+        self.cb_action_list.currentIndexChanged.connect(self._handle_action_mode_changed)
         self.action_label = QtWidgets.QLabel()
 
         self.container_mode_selector_widget = gremlin.ui.ui_common.getGridContainer(
@@ -2496,16 +2264,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self.lbl_hat_selector = QtWidgets.QLabel("Press Position:")
 
-        self.cb_hat_selector = gremlin.ui.ui_common.QDataComboBox(
-            callback=self._handle_hat_selector_changed
-        )
+        self.cb_hat_selector = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_hat_selector_changed)
         self.cb_hat_selector.setFixedWidth(width)
 
         self.lbl_hat_return_selector = QtWidgets.QLabel("Release position:")
 
-        self.cb_hat_return_selector = gremlin.ui.ui_common.QDataComboBox(
-            callback=self._handle_hat_return_selector_changed
-        )
+        self.cb_hat_return_selector = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_hat_return_selector_changed)
         self.cb_hat_return_selector.setFixedWidth(width)
 
         self.container_output_selector_widget = gremlin.ui.ui_common.getGridContainer(
@@ -2526,12 +2290,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         )
         grids.append(self.container_hat_selector_widget)
 
-        self.container_hat_return_selector_widget = (
-            gremlin.ui.ui_common.getGridContainer(
-                [self.lbl_hat_return_selector, self.cb_hat_return_selector, " "],
-                widget_only=True,
-                bottom_margin=4,
-            )
+        self.container_hat_return_selector_widget = gremlin.ui.ui_common.getGridContainer(
+            [self.lbl_hat_return_selector, self.cb_hat_return_selector, " "],
+            widget_only=True,
+            bottom_margin=4,
         )
         grids.append(self.container_hat_return_selector_widget)
 
@@ -2545,9 +2307,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             callback=self._handle_show_vjoy_disconnect_changed,
         )
 
-        widget = gremlin.ui.ui_common.getHContainer(
-            self.show_disconnected_widget, widget_only=True, bottom_margin=6
-        )
+        widget = gremlin.ui.ui_common.getHContainer(self.show_disconnected_widget, widget_only=True, bottom_margin=6)
 
         self.main_layout.addWidget(widget)
         self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
@@ -2561,42 +2321,28 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             text="",
             use_wrap=False,
         )
-        self.container_warning_widget = gremlin.ui.ui_common.getHContainer(
-            self.warning_widget, min_height=self.container_height, widget_only=True
-        )
+        self.container_warning_widget = gremlin.ui.ui_common.getHContainer(self.warning_widget, min_height=self.container_height, widget_only=True)
 
-        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(
-            self.action_data.exec_on_press, self.action_data.exec_on_release
-        )
+        self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        self.remote_widget = gremlin.ui.ui_common.RemoteClientWidget(
-            self.action_data.remote_config
-        )
+        self.remote_widget = gremlin.ui.ui_common.RemoteClientWidget(self.action_data.remote_config)
 
         self.chkb_ignore_release = QtWidgets.QCheckBox("Ignore release")
-        self.chkb_ignore_release.setToolTip(
-            "If enabled, the action will ignore release triggers (this is input and container dependent) - normal is OFF"
-        )
+        self.chkb_ignore_release.setToolTip("If enabled, the action will ignore release triggers (this is input and container dependent) - normal is OFF")
         self.chkb_ignore_release.setStyleSheet("")
 
         self.chkb_paired = QtWidgets.QCheckBox("Paired Group Member")
         # self.chkb_paired.setStyleSheet(css)
-        self.chkb_paired.setToolTip(
-            "Paired groups with a remote client - when enabled - sends a remote signal and a local signal (this is seldom used)."
-        )
+        self.chkb_paired.setToolTip("Paired groups with a remote client - when enabled - sends a remote signal and a local signal (this is seldom used).")
 
         self.chkb_auto_release_widget = QtWidgets.QCheckBox("Auto Release")
-        self.chkb_auto_release_widget.setToolTip(
-            "Autorelease will trigger a release action when the input is released if the input does not issue one and that is the desired behavior."
-        )
+        self.chkb_auto_release_widget.setToolTip("Autorelease will trigger a release action when the input is released if the input does not issue one and that is the desired behavior.")
         self.chkb_auto_release_widget.setChecked(self.action_data.auto_release)
 
         self.grid_visible_widget = QtWidgets.QCheckBox("Show button grid")
-        self.grid_visible_widget.setToolTip(
-            "Sets the button grid visibility, use ctrl+ to enable/disable globally"
-        )
+        self.grid_visible_widget.setToolTip("Sets the button grid visibility, use ctrl+ to enable/disable globally")
         self.grid_visible_widget.setChecked(self.action_data.grid_visible)
         self.grid_visible_widget.clicked.connect(self._grid_visible_cb)
 
@@ -2609,15 +2355,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.grid_visible_widget,
         ]
 
-        self.container_options_widget = gremlin.ui.ui_common.getHContainer(
-            widgets, min_height=self.container_height, widget_only=True
-        )
+        self.container_options_widget = gremlin.ui.ui_common.getHContainer(widgets, min_height=self.container_height, widget_only=True)
 
         # selector hooks
         self.cb_vjoy_device_selector.currentIndexChanged.connect(self._vjoy_id_changed)
-        self.cb_vjoy_output_selector.currentIndexChanged.connect(
-            self._vjoy_input_id_changed
-        )
+        self.cb_vjoy_output_selector.currentIndexChanged.connect(self._vjoy_input_id_changed)
 
         # set axis range widget
         self.axis_range_container_widget = QtWidgets.QWidget()
@@ -2677,9 +2419,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.target_is_relative,
         ]
 
-        self.target_value_container_widget = gremlin.ui.ui_common.getHContainer(
-            widgets, widget_only=True
-        )
+        self.target_value_container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         self.main_layout.addWidget(self.selector_widget)
         self.main_layout.addWidget(self.container_warning_widget)
@@ -2697,9 +2437,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         # self.start_button_group.buttonClicked.connect(self._start_changed)
         self.sb_button_range_low.valueChanged.connect(self._button_range_low_changed)
         self.sb_button_range_high.valueChanged.connect(self._button_range_high_changed)
-        self.button_to_axis_value_widget.valueChanged.connect(
-            self._button_to_axis_value_changed
-        )
+        self.button_to_axis_value_widget.valueChanged.connect(self._button_to_axis_value_changed)
 
         self.b_range_reset.clicked.connect(self._b_range_reset_clicked)
         self.b_range_half.clicked.connect(self._b_range_half_clicked)
@@ -2728,13 +2466,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             vjoy_id = self.action_data.vjoy_id
 
-            if connected_only and not gremlin.joystick_handling.is_vjoy_connected(
-                vjoy_id
-            ):
+            if connected_only and not gremlin.joystick_handling.is_vjoy_connected(vjoy_id):
                 # add the missing device even if not connected so it is in the list
-                dev = gremlin.joystick_handling.vjoy_info_from_vjoy_id(
-                    vjoy_id, connected_only=False
-                )
+                dev = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id, connected_only=False)
                 self.cb_vjoy_device_selector.addItem(dev.name, dev.vjoy_id)
 
             index = self.cb_vjoy_device_selector.findData(vjoy_id)
@@ -2742,9 +2476,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 self.cb_vjoy_device_selector.setCurrentIndex(index)
             else:
                 # change the action ID
-                syslog.warning(
-                    f"VJOY REMAP: vjoy device [{vjoy_id}] not found in the available vjoy device list - resetting to [{self.cb_vjoy_device_selector.currentData()}]"
-                )
+                syslog.warning(f"VJOY REMAP: vjoy device [{vjoy_id}] not found in the available vjoy device list - resetting to [{self.cb_vjoy_device_selector.currentData()}]")
                 self.action_data.vjoy_id = self.cb_vjoy_device_selector.currentData()
 
             # update warning if needed
@@ -2793,9 +2525,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.action_data.target_step_list.sort()
 
             with QtCore.QSignalBlocker(self.step_list_widget):
-                csv = gremlin.util.floatlist_to_csv(
-                    self.action_data.target_step_list, decimals=3
-                )
+                csv = gremlin.util.floatlist_to_csv(self.action_data.target_step_list, decimals=3)
                 self.step_list_widget.setText(csv)
 
             # updates individual step widgets and layout
@@ -2804,17 +2534,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.step_count_widget.setValue(steps, False)
 
             self.action_data: VjoyRemap
-            if (
-                self.action_data.target_step_start_index
-                not in self.action_data.target_step_list
-            ):
+            if self.action_data.target_step_start_index not in self.action_data.target_step_list:
                 # reset the default if no longer in the list
                 self.action_data.target_step_start_index = 0
 
             self.step_start_value_widget.setValue(
-                self.action_data.target_step_list[
-                    self.action_data.target_step_start_index
-                ],
+                self.action_data.target_step_list[self.action_data.target_step_start_index],
                 emit=False,
             )
 
@@ -2929,9 +2654,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             index = new_index
 
         self.action_data.target_step_start_index = index - 1
-        value = self.action_data.target_step_list[
-            self.action_data.target_step_start_index
-        ]
+        value = self.action_data.target_step_list[self.action_data.target_step_start_index]
         self.step_start_value_widget.setText(f"{value:0.3f}")
         self.update_steps()
 
@@ -2988,19 +2711,13 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.target_step_index_map = {}  # map of step index to step widget ID keyed by index in the step list
 
         self.container_stepped_widget = QtWidgets.QWidget()
-        self.container_stepped_layout = QtWidgets.QVBoxLayout(
-            self.container_stepped_widget
-        )
+        self.container_stepped_layout = QtWidgets.QVBoxLayout(self.container_stepped_widget)
 
         self.step_value_container_widget = QtWidgets.QWidget()
-        self.step_value_container_layout = QtWidgets.QHBoxLayout(
-            self.step_value_container_widget
-        )
+        self.step_value_container_layout = QtWidgets.QHBoxLayout(self.step_value_container_widget)
 
         self.progression_container_widget = QtWidgets.QWidget()
-        self.progression_container_layout = QtWidgets.QHBoxLayout(
-            self.progression_container_widget
-        )
+        self.progression_container_layout = QtWidgets.QHBoxLayout(self.progression_container_widget)
 
         self.step_start_index_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.step_count_widget = gremlin.ui.ui_common.QIntLineEdit()
@@ -3008,9 +2725,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.step_count_widget.valueChanged.connect(self._step_count_changed)
         self.step_start_value_widget = gremlin.ui.ui_common.QFloatLineEdit()
         self.step_start_value_widget.setReadOnly(True)
-        value = self.action_data.target_step_list[
-            self.action_data.target_step_start_index
-        ]
+        value = self.action_data.target_step_list[self.action_data.target_step_start_index]
         self.step_start_value_widget.setValue(value)
 
         self.step_velocity_mode_widget = gremlin.ui.ui_common.QDataCheckbox(
@@ -3059,36 +2774,24 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         widgets.append(widget)
 
-        self.container_linear_timings = gremlin.ui.ui_common.getVContainer(
-            widgets, widget_only=True
-        )
+        self.container_linear_timings = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
         self.container_stepped_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-        self.container_stepped_layout.addWidget(
-            QtWidgets.QLabel("Stepping Configuration:")
-        )
+        self.container_stepped_layout.addWidget(QtWidgets.QLabel("Stepping Configuration:"))
         self.container_stepped_layout.addWidget(self.step_velocity_mode_widget)
         self.container_stepped_layout.addWidget(self.container_linear_timings)
 
-        self.step_latched_enabled_widget = QtWidgets.QCheckBox(
-            "Latch secondary input for reverse action"
-        )
-        self.step_latched_enabled_widget.setToolTip(
-            "If enabled, allows binding of another input to trigger a down step"
-        )
+        self.step_latched_enabled_widget = QtWidgets.QCheckBox("Latch secondary input for reverse action")
+        self.step_latched_enabled_widget.setToolTip("If enabled, allows binding of another input to trigger a down step")
         self.step_latched_enabled_widget.setChecked(self.action_data._stepped_latched)
         self.step_latched_enabled_widget.clicked.connect(self._step_latched_changed)
 
         direction = self.action_data.target_step_direction
-        self_step_direction_up_widget = gremlin.ui.ui_common.QDataRadioButton(
-            "Up", data=1
-        )
+        self_step_direction_up_widget = gremlin.ui.ui_common.QDataRadioButton("Up", data=1)
         self_step_direction_up_widget.setChecked(direction == 1)
         self_step_direction_up_widget.clicked.connect(self._step_direction_changed)
 
-        self_step_direction_down_widget = gremlin.ui.ui_common.QDataRadioButton(
-            "Down", data=-1
-        )
+        self_step_direction_down_widget = gremlin.ui.ui_common.QDataRadioButton("Down", data=-1)
         self_step_direction_down_widget.setChecked(direction == -1)
         self_step_direction_down_widget.clicked.connect(self._step_direction_changed)
 
@@ -3100,9 +2803,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         )
 
         self.step_start_index_widget.setRange(1, 100)
-        self.step_start_index_widget.valueChanged.connect(
-            self._step_start_index_changed
-        )
+        self.step_start_index_widget.valueChanged.connect(self._step_start_index_changed)
 
         self.step_list_widget = gremlin.ui.ui_common.QDataLineEdit()
         self.step_list_widget.lostFocus.connect(self._step_list_changed)
@@ -3111,9 +2812,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.add_step_widget.setToolTip("Adds a new step")
         self.add_step_widget.clicked.connect(self._add_step)
 
-        self.slider_widget = gremlin.ui.qsliderwidget.QSliderWidget(
-            object_name=f"Slider for VjoyWidget: {self.action_data.input_display_name}"
-        )
+        self.slider_widget = gremlin.ui.qsliderwidget.QSliderWidget(object_name=f"Slider for VjoyWidget: {self.action_data.input_display_name}")
         self.slider_widget.setRange(-1, 1)
         self.slider_widget.setReadOnly(True)
         self.slider_widget.setDrawHandles(False)
@@ -3125,32 +2824,20 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.normalize_widget.clicked.connect(self._normalize_steps)
 
         self.low_progression_widget = QtWidgets.QPushButton("Low")
-        self.low_progression_widget.setToolTip(
-            "Steps follow a linear progression from the low range.  Most steps are in the lower half."
-        )
+        self.low_progression_widget.setToolTip("Steps follow a linear progression from the low range.  Most steps are in the lower half.")
         self.low_progression_widget.clicked.connect(self._low_progression_steps)
 
         self.high_progression_widget = QtWidgets.QPushButton("High")
-        self.high_progression_widget.setToolTip(
-            "Steps follow a linear progression from the high range.  Most steps are in the higher half."
-        )
+        self.high_progression_widget.setToolTip("Steps follow a linear progression from the high range.  Most steps are in the higher half.")
         self.high_progression_widget.clicked.connect(self._high_progression_steps)
 
         self.cubic_progression_low_widget = QtWidgets.QPushButton("Geometric Low")
-        self.cubic_progression_low_widget.setToolTip(
-            "Steps follow a geometric (log) progression."
-        )
-        self.cubic_progression_low_widget.clicked.connect(
-            self._geometric_progression_steps_low
-        )
+        self.cubic_progression_low_widget.setToolTip("Steps follow a geometric (log) progression.")
+        self.cubic_progression_low_widget.clicked.connect(self._geometric_progression_steps_low)
 
         self.cubic_progression_high_widget = QtWidgets.QPushButton("Geometric High")
-        self.cubic_progression_high_widget.setToolTip(
-            "Steps follow a geometric (log) progression."
-        )
-        self.cubic_progression_high_widget.clicked.connect(
-            self._geometric_progression_steps_high
-        )
+        self.cubic_progression_high_widget.setToolTip("Steps follow a geometric (log) progression.")
+        self.cubic_progression_high_widget.clicked.connect(self._geometric_progression_steps_high)
 
         # self.step_value_container_layout.addWidget(self.grab_widget)
         self.step_value_container_layout.addWidget(self.add_step_widget)
@@ -3183,18 +2870,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.step_widget_container,
             self.progression_container_widget,
         ]
-        self.container_ticks_widget = gremlin.ui.ui_common.getVContainer(
-            widgets, widget_only=True
-        )
+        self.container_ticks_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
         self.container_stepped_layout.addWidget(self.container_ticks_widget)
 
         self.stepped_selector_device_widget = gremlin.ui.ui_common.QDataComboBox()
         self.stepped_selector_input_widget = gremlin.ui.ui_common.QDataComboBox()
 
-        listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(
-            callback=self._stepped_listen
-        )
+        listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._stepped_listen)
 
         self.latched_device_widget = QtWidgets.QWidget()
         device_layout = QtWidgets.QGridLayout(self.latched_device_widget)
@@ -3214,23 +2897,15 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.container_stepped_layout.addWidget(self.step_latched_enabled_widget)
         self.container_stepped_layout.addWidget(self.latched_device_widget)
 
-        self.stepped_selector_device_widget.currentIndexChanged.connect(
-            self._stepped_device_changed_cb
-        )
-        self.stepped_selector_input_widget.currentIndexChanged.connect(
-            self._stepped_input_changed_cb
-        )
+        self.stepped_selector_device_widget.currentIndexChanged.connect(self._stepped_device_changed_cb)
+        self.stepped_selector_input_widget.currentIndexChanged.connect(self._stepped_input_changed_cb)
 
         self.stepped_device_map = {}  # holds the device information keyed by device_id (str)
         self.stepped_input_map = {}  # holds the list of buttons for the given device by device_id(str)
         devices = sorted(joystick_handling.button_input_devices(), key=lambda x: x.name)
 
         # default device
-        device_guid = (
-            self.action_data.hardware_device_guid
-            if self.action_data.stepped_device_id is None
-            else self.action_data.stepped_device_id
-        )
+        device_guid = self.action_data.hardware_device_guid if self.action_data.stepped_device_id is None else self.action_data.stepped_device_id
         device_index = None
         current_index = 0
 
@@ -3238,10 +2913,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self.stepped_device_map[dev.device_id] = dev
             button_list = {}
             for input_id in range(1, dev.button_count + 1):
-                if (
-                    dev.device_guid == self.action_data.hardware_device_guid
-                    and input_id == self.action_data.hardware_input_id
-                ):
+                if dev.device_guid == self.action_data.hardware_device_guid and input_id == self.action_data.hardware_input_id:
                     # skip self as a possible input
                     continue
                 button_list[input_id] = f"Button {input_id}"
@@ -3376,9 +3048,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             data = []
             progression = np.geomspace(1, 10, count)
             for n in progression:
-                value = gremlin.util.scale_to_range(
-                    float(n), source_min=1, source_max=10, invert=inverted
-                )
+                value = gremlin.util.scale_to_range(float(n), source_min=1, source_max=10, invert=inverted)
 
                 data.append(value)
             data.sort()
@@ -3389,9 +3059,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _grab_handler(self):
         """grab the min value from the axis position"""
-        value = gremlin.joystick_handling.get_curved_axis(
-            self.action_data.hardware_device_guid, self.action_data.hardware_input_id
-        )
+        value = gremlin.joystick_handling.get_curved_axis(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
         if value not in self.action_data.target_step_list:
             self.action_data.target_step_list.append(value)
             self.action_data.target_step_list.sort()
@@ -3402,9 +3070,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _stepped_listen_ui(self):
         """listens for the button to use as the down step - runs on UI thread"""
-        button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
-            [InputType.JoystickButton], return_kb_event=False
-        )
+        button_press_dialog = gremlin.ui.ui_common.InputListenerWidget([InputType.JoystickButton], return_kb_event=False)
 
         button_press_dialog.item_selected.connect(self._update_button)
 
@@ -3452,13 +3118,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 current_index += 1
 
             if selected_input_index is not None:
-                index = self.stepped_selector_input_widget.findData(
-                    selected_input_index
-                )
+                index = self.stepped_selector_input_widget.findData(selected_input_index)
                 if index != -1:
-                    self.stepped_selector_input_widget.setCurrentIndex(
-                        selected_input_index
-                    )
+                    self.stepped_selector_input_widget.setCurrentIndex(selected_input_index)
                 else:
                     self.action_data.stepped_input_id = first_input_id
             else:
@@ -3488,10 +3150,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     VjoyAction.VJoyMergeAxis,
                 )
 
-            elif (
-                self.action_data.input_is_button()
-                or input_type == InputType.JoystickButton
-            ):
+            elif self.action_data.input_is_button() or input_type == InputType.JoystickButton:
                 # various button modes
                 actions = (
                     VjoyAction.VJoyButton,  # hold button
@@ -3525,9 +3184,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 actions = [VjoyAction.VJoyHat, VjoyAction.VJoyHatToButton]
 
             else:
-                syslog.warning(
-                    f"VJOYREMAP: don't know what actions to load for input type: {input_type} {input_type.name}"
-                )
+                syslog.warning(f"VJOYREMAP: don't know what actions to load for input type: {input_type} {input_type.name}")
 
             for action in actions:
                 self.cb_action_list.addItem(VjoyAction.to_name(action), action)
@@ -3543,9 +3200,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             # update warning if the device is disconnected
             if not gremlin.joystick_handling.is_vjoy_connected(device_id):
-                self.setWarning(
-                    f"Warning: Device VJOY [{device_id}] is not currently connected."
-                )
+                self.setWarning(f"Warning: Device VJOY [{device_id}] is not currently connected.")
             else:
                 self.setWarning(None)
 
@@ -3590,13 +3245,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _handle_tag_callback(self, action: VjoyRemap, extra_data: dict):  # noqa: F821
         if action.vjoy_id == self.action_data.vjoy_id:
             # same vjoy device
-            input_type = (
-                action._get_input_type()
-                if hasattr(action, "_get_input_type")
-                else action.input_type
-                if hasattr(action, "input_type")
-                else None
-            )  # ignore
+            input_type = action._get_input_type() if hasattr(action, "_get_input_type") else action.input_type if hasattr(action, "input_type") else None  # ignore
             if input_type == self.action_data.get_input_type():
                 match input_type:
                     case InputType.JoystickAxis:
@@ -3683,17 +3332,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             if self.action_data.vjoy_id not in self.action_data.vjoy_map:
                 self.action_data.refresh_vjoy()
                 if self.action_data.vjoy_id not in self.action_data.vjoy_map:
-                    self.setWarning(
-                        f"VJOY configuration has changed and GremlinEx is unable to find requested Vjoy device [{self.action_data.vjoy_id}]"
-                    )
+                    self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find requested Vjoy device [{self.action_data.vjoy_id}]")
                     return
 
-            if not gremlin.joystick_handling.is_vjoy_connected(
-                self.action_data.vjoy_id
-            ):
-                self.setWarning(
-                    f"VJOY device [{self.action_data.vjoy_id}] is not currently connected or available."
-                )
+            if not gremlin.joystick_handling.is_vjoy_connected(self.action_data.vjoy_id):
+                self.setWarning(f"VJOY device [{self.action_data.vjoy_id}] is not currently connected or available.")
 
             dev = self.action_data.vjoy_map[self.action_data.vjoy_id]
             if action_mode in (
@@ -3709,9 +3352,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     axis_name = dev.axis_names[id - 1]
                     self.cb_vjoy_output_selector.addItem(f"Axis {axis_name}", id)
 
-                output_index = self.cb_vjoy_output_selector.findData(
-                    self.action_data.vjoy_input_id
-                )
+                output_index = self.cb_vjoy_output_selector.findData(self.action_data.vjoy_input_id)
                 if output_index != -1:
                     self.cb_vjoy_output_selector.setCurrentIndex(output_index)
             elif input_type in VJoyRemapWidget.input_type_buttons:
@@ -3735,9 +3376,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                             self.cb_vjoy_output_selector.setCurrentIndex(index)
 
                     if input_id < 1 or input_id > count:
-                        self.setWarning(
-                            f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy button # {input_id}"
-                        )
+                        self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy button # {input_id}")
                         return
                 elif action_mode in (
                     VjoyAction.VJoyHat,
@@ -3770,37 +3409,24 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                                 icon_name = icon_map[position]
                                 icon = gremlin.util.load_icon(icon_name)
                                 key = (position,)
-                                self.cb_hat_selector.addItem(
-                                    icon, f"{name_map[position]}", key
-                                )
-                                self.cb_hat_return_selector.addItem(
-                                    icon, f"{name_map[position]}", key
-                                )
+                                self.cb_hat_selector.addItem(icon, f"{name_map[position]}", key)
+                                self.cb_hat_return_selector.addItem(icon, f"{name_map[position]}", key)
                                 if position == self.action_data.vjoy_hat_position:
                                     hat_position_index = i
-                                if (
-                                    position
-                                    == self.action_data.vjoy_hat_return_position
-                                ):
+                                if position == self.action_data.vjoy_hat_return_position:
                                     hat_return_index = i
 
                                 # hat position key
                                 if hat_position_index != -1:
-                                    self.cb_hat_selector.setCurrentIndex(
-                                        hat_position_index
-                                    )
+                                    self.cb_hat_selector.setCurrentIndex(hat_position_index)
 
                                 # hat return position key
                                 if hat_return_index != -1:
-                                    self.cb_hat_return_selector.setCurrentIndex(
-                                        hat_return_index
-                                    )
+                                    self.cb_hat_return_selector.setCurrentIndex(hat_return_index)
 
                     input_id = self.action_data.vjoy_input_id
                     if input_id < 1 or input_id > count:
-                        self.setWarning(
-                            f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy hat # {input_id}"
-                        )
+                        self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy hat # {input_id}")
                         return
 
             elif input_type == InputType.JoystickHat:
@@ -3809,9 +3435,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     self.cb_vjoy_output_selector.addItem(f"Hat {id}", id)
                 input_id = self.action_data.vjoy_input_id
                 if input_id < 1 or input_id > count:
-                    self.setWarning(
-                        f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy hat # {input_id}"
-                    )
+                    self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy hat # {input_id}")
                     return
 
     def _get_output_index(self):
@@ -3895,9 +3519,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             )
         )
 
-        is_axis = (
-            self.action_data.input_is_axis()
-        )  # input_type == InputType.JoystickAxis
+        is_axis = self.action_data.input_is_axis()  # input_type == InputType.JoystickAxis
 
         if is_axis:
             grid_visible = action == VjoyAction.VJoyAxisToButton
@@ -3905,9 +3527,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             button_range_visible = action == VjoyAction.VJoyAxisToButton
             pulse_visible = self.action_data.button_mode == ButtonOutputMode.Pulse
 
-            axis_visible = not (
-                grid_visible or output_range_visible
-            )  # or hardware_widget_visible)
+            axis_visible = not (grid_visible or output_range_visible)  # or hardware_widget_visible)
             merge_visible = action == VjoyAction.VJoyMergeAxis and axis_visible
             reverse_visible = True
             relative_visible = self.action_data.axis_mode == "relative"
@@ -3927,9 +3547,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             if action == VjoyAction.VJoyMergeAxis:
                 # can clear if more than one merge axis defined
-                self.merge_clear_widget.setEnabled(
-                    len(self.action_data._merge_data) > 1
-                )
+                self.merge_clear_widget.setEnabled(len(self.action_data._merge_data) > 1)
 
             repeater_visible = True
 
@@ -3952,9 +3570,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 grid_visible = True
                 _start_visible = True
             paired_visible = action == VjoyAction.VJoyButtonPress
-            _exec_on_release_visible = (
-                action_data.input_type in VJoyRemapWidget.input_type_buttons
-            )
+            _exec_on_release_visible = action_data.input_type in VJoyRemapWidget.input_type_buttons
             options_visible = True
 
             hat_position_visible = action in (
@@ -3999,9 +3615,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 output_range_visible
                 grid_visible = False
                 stepped_visible = True
-                ticks_visible = (
-                    not self.action_data._target_step_linear_mode
-                )  # hide steps if in linear mode
+                ticks_visible = not self.action_data._target_step_linear_mode  # hide steps if in linear mode
             case VjoyAction.VJoyAxisToButton:
                 output_range_visible = False
 
@@ -4103,11 +3717,13 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.container_pulse_widget.setVisible(pulse_visible)
         self.pulse_duration_widget.setVisible(pulse_visible)
         self.container_interval_widget.setVisible(repeat_visible)
-
-        self.container_options_widget.setVisible(options_visible)
+        if self._repeater_created:
+            self.container_options_widget.setVisible(options_visible)
+            self.container_repeater_widget.setVisible(repeater_visible)
+            
         self.container_target_widget.setVisible(relative_target_visible)
         self.container_relative_widget.setVisible(default_target_visible)
-        self.container_repeater_widget.setVisible(repeater_visible)
+            
 
         self.sync_on_start_widget.setVisible(sync_on_start_visible)
 
@@ -4116,9 +3732,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.show_disconnected_widget.setVisible(output_selector_visible)
 
         self.container_hat_selector_widget.setVisible(hat_position_visible)
-        self.container_hat_return_selector_widget.setVisible(
-            hat_return_position_visible
-        )
+        self.container_hat_return_selector_widget.setVisible(hat_return_position_visible)
 
         self._update_info()
 
@@ -4174,15 +3788,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if self.action_data.vjoy_id not in self.action_data.vjoy_map:
             self.action_data.refresh_vjoy()
             if self.action_data.vjoy_id not in self.action_data.vjoy_map:
-                gremlin.ui.ui_common.MessageBox(
-                    prompt=f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.vjoy_id}"
-                )
+                gremlin.ui.ui_common.MessageBox(prompt=f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.vjoy_id}")
                 return
 
         self.button_grid_stack_widget = QtWidgets.QStackedWidget()
-        self.button_grid_stack_widget.addWidget(
-            QtWidgets.QWidget()
-        )  # blank item at index 0
+        self.button_grid_stack_widget.addWidget(QtWidgets.QWidget())  # blank item at index 0
 
         if self.action_data.grid_visible and not self.button_grid_widget:
             # create the widget if requested
@@ -4236,9 +3846,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 v_box.addWidget(h_cont)
 
                 # line 2
-                line2_cont = gremlin.ui.ui_common.GridClickWidget(
-                    vjoy_id, input_type, id
-                )
+                line2_cont = gremlin.ui.ui_common.GridClickWidget(vjoy_id, input_type, id)
                 line2_cont.setFixedWidth(36)
                 h_box = QtWidgets.QHBoxLayout(line2_cont)
                 h_box.setContentsMargins(0, 0, 0, 0)
@@ -4263,9 +3871,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     row += 1
                     col = 0
 
-                self.button_grid_stack_widget.addWidget(
-                    self.button_grid_widget
-                )  # index 1
+                self.button_grid_stack_widget.addWidget(self.button_grid_widget)  # index 1
 
         self.main_layout.addWidget(self.button_grid_stack_widget)
 
@@ -4276,9 +3882,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._update_ui()
 
     def _grid_visible_changed(self, visible):
-        gremlin.util.InvokeUiMethod(
-            self._grid_visible_changed_ui, visible
-        )  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._grid_visible_changed_ui, visible)  # ensure on UI thread
 
     def _grid_visible_changed_ui(self, visible):
         """global grid visible change event"""
@@ -4311,12 +3915,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             # clear the old button if it was previously selected
 
             if verbose:
-                syslog.info(
-                    f"VJOYREMAP: send button clear {vjoy_id} {self._last_button_id} {self.action_data.id}"
-                )
-            el.set_vjoy_button_usage.emit(
-                vjoy_id, self._last_button_id, False, self.action_data.id
-            )
+                syslog.info(f"VJOYREMAP: send button clear {vjoy_id} {self._last_button_id} {self.action_data.id}")
+            el.set_vjoy_button_usage.emit(vjoy_id, self._last_button_id, False, self.action_data.id)
 
         if self._last_button_id == button_id:
             # already selected
@@ -4332,9 +3932,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         # set the usage state for this button
         if verbose:
-            syslog.info(
-                f"VJOYREMAP: send button select {vjoy_id} {button_id} {self.action_data.id}"
-            )
+            syslog.info(f"VJOYREMAP: send button select {vjoy_id} {button_id} {self.action_data.id}")
         el.set_vjoy_button_usage.emit(vjoy_id, button_id, True, self.action_data.id)
 
         # update the UI when a state change occurs
@@ -4442,14 +4040,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self.sb_button_range_low):
                     self.sb_button_range_low.setValue(self.action_data.button_range_min)
                 with QtCore.QSignalBlocker(self.sb_button_range_high):
-                    self.sb_button_range_high.setValue(
-                        self.action_data.button_range_max
-                    )
+                    self.sb_button_range_high.setValue(self.action_data.button_range_max)
 
                 with QtCore.QSignalBlocker(self.button_to_axis_value_widget):
-                    self.button_to_axis_value_widget.setValue(
-                        self.action_data.target_value
-                    )
+                    self.button_to_axis_value_widget.setValue(self.action_data.target_value)
 
             if is_button_mode:
                 # self.pulse_widget.setValue(self.action_data.pulse_delay)
@@ -4459,9 +4053,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     self.sb_button_range_low.setValue(self.action_data.button_range_min)
 
                 with QtCore.QSignalBlocker(self.sb_button_range_high):
-                    self.sb_button_range_high.setValue(
-                        self.action_data.button_range_max
-                    )
+                    self.sb_button_range_high.setValue(self.action_data.button_range_max)
 
                 # with QtCore.QSignalBlocker(self.chkb_exec_on_release):
                 #     self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
@@ -4483,11 +4075,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             self._update_ui()
 
         except gremlin.error.GremlinError as err:
-            util.display_error(
-                "A needed vJoy device is not accessible:\n"
-                + "Default values have been set for the input, but they are "
-                "not what has been specified."
-            )
+            util.display_error("A needed vJoy device is not accessible:\n" + "Default values have been set for the input, but they are not what has been specified.")
             syslog.error(f"{err}\n{traceback.format_exc()}")
 
         except Exception as err:
@@ -4499,9 +4087,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     @QtCore.Slot()
     def _axis_mode_changed(self):
-        self.action_data.axis_mode = (
-            "absolute" if self.absolute_checkbox.isChecked() else "relative"
-        )
+        self.action_data.axis_mode = "absolute" if self.absolute_checkbox.isChecked() else "relative"
         self._update_ui()
 
     @QtCore.Slot()
@@ -4690,9 +4276,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             InputType.Midi,
             InputType.OpenSoundControl,
         ):
-            self.action_data.auto_release = (
-                self.action_data.auto_release or self.action_data.auto_release
-            )
+            self.action_data.auto_release = self.action_data.auto_release or self.action_data.auto_release
         self.thread_running = False
         self.should_stop_thread = False
         self.thread_last_update = time.time()
@@ -4705,9 +4289,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.remote_client: gremlin.remote.RemoteClient = gremlin.remote.remote_client
         self.hat_position = (0, 0)
         self.pressed_hat_buttons = {}
-        self.in_range = (
-            False  # true when in axis to button mode and the axis was in range
-        )
+        self.in_range = False  # true when in axis to button mode and the axis was in range
         self.lock = threading.Lock()
 
         self.pulse_worker_map = {}  # map of (device_id, input_id) to pulse worker object
@@ -4766,9 +4348,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
     def _convert_condition(self, condition):
         """converts a base condition to an action condition"""
         if isinstance(condition, gremlin.input_item.BaseKeyboardCondition):
-            return gremlin.actions.KeyboardCondition(
-                condition.scan_code, condition.is_extended, condition.comparison
-            )
+            return gremlin.actions.KeyboardCondition(condition.scan_code, condition.is_extended, condition.comparison)
 
         elif isinstance(condition, gremlin.input_item.BaseJoystickCondition):
             return gremlin.actions.JoystickCondition(condition)
@@ -4795,27 +4375,19 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             else:
                 conditions.append(self._convert_condition(condition))
 
-        return gremlin.input_item.BaseActivationCondition(
-            conditions, activation_condition.rule, target
-        )
+        return gremlin.input_item.BaseActivationCondition(conditions, activation_condition.rule, target)
 
     def shouldExecute(self, event, value, action) -> bool:
         """determines if the given action should execute or not: returns True if the condition is satisfied"""
 
-        activation_condition: gremlin.input_item.BaseActivationCondition = (
-            action.activation_condition
-        )
+        activation_condition: gremlin.input_item.BaseActivationCondition = action.activation_condition
         if activation_condition is None or not activation_condition.conditions:
             # no condition
             return True
 
-        functor = self._create_activation_condition(
-            activation_condition, self.action_data
-        )
+        functor = self._create_activation_condition(activation_condition, self.action_data)
 
-        return gremlin.input_item.BaseActivationCondition.rule_function[functor._rule](
-            [partial(c, event, value) for c in functor._conditions]
-        )
+        return gremlin.input_item.BaseActivationCondition.rule_function[functor._rule]([partial(c, event, value) for c in functor._conditions])
 
     def applyContainerCurves(self, value: float):
         """applies the container curve data to the curve"""
@@ -4836,17 +4408,13 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.usage_data.set_inverted(self.vjoy_id, self.vjoy_input_id, not inverted)
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose:
-            syslog.info(
-                f"toggle reverse: {self.vjoy_id} {self.vjoy_input_id} new state: {self.reverse}"
-            )
+            syslog.info(f"toggle reverse: {self.vjoy_id} {self.vjoy_input_id} new state: {self.reverse}")
 
     def setReverse(self, value: bool):
         """sets the axis' reverse state"""
         self.usage_data.set_inverted(self.vjoy_id, self.vjoy_input_id, value)
 
-    def latch_extra_inputs(
-        self, container_condition_node=None, action_condition_node=None
-    ):
+    def latch_extra_inputs(self, container_condition_node=None, action_condition_node=None):
         """returns the list of extra devices to latch to this functor (device_guid, input_type, input_id)
 
         :param container_condition_node: the execution graph condition node applied to the container, if any
@@ -4859,14 +4427,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             latched = []
             verbose = gremlin.config.Configuration().verbose_mode_merge
             for data in self.action_data._merge_data:
-                latched.append(
-                    (data.device_guid, InputType.JoystickAxis, data.input_id)
-                )
+                latched.append((data.device_guid, InputType.JoystickAxis, data.input_id))
                 device = gremlin.joystick_handling.getDevice(data.device_guid)
                 if verbose:
-                    syslog.info(
-                        f"MERGE: latched [{device.name}] axis: {data.input_id}  {device.get_axis_name(data.input_id)}"
-                    )
+                    syslog.info(f"MERGE: latched [{device.name}] axis: {data.input_id}  {device.get_axis_name(data.input_id)}")
 
             return latched
             # return [(self.action_data.merge_device_guid, self.action_data.merge_input_type, self.action_data.merge_input_id)]
@@ -4887,9 +4451,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         is_local, is_remote = self.action_data.sendFlags()
         is_paired = gremlin.remote.remote_control.paired
         config = gremlin.config.Configuration()
-        verbose = (
-            self.verbose or config.verbose_mode_outputs or config.verbose_mode_vjoy
-        )
+        verbose = self.verbose or config.verbose_mode_outputs or config.verbose_mode_vjoy
         device_guid = self.action_data.hardware_device_guid
         input_id = self.action_data.hardware_input_id
         raw_input_type = self.action_data.hardware_raw_input_type
@@ -4909,25 +4471,16 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         if self.input_type in VJoyRemapWidget.input_type_buttons:
             # set start button state
-            if (
-                self.action_data.button_start_value is not None
-                and gremlin.joystick_handling.is_vjoy_connected(
-                    self.action_data.vjoy_id
-                )
-            ):
+            if self.action_data.button_start_value is not None and gremlin.joystick_handling.is_vjoy_connected(self.action_data.vjoy_id):
                 if verbose:
                     syslog.info(
                         f"VJOY REMAP: startup vjoy: [{self.action_data.vjoy_id}] button [{self.action_data.vjoy_button_id}] set to {'pressed' if self.action_data.button_start_value else 'released'}"
                     )
-                joystick_handling.VJoyProxy()[self.action_data.vjoy_id].button(
-                    self.action_data.vjoy_button_id
-                ).is_pressed = self.action_data.button_start_value
+                joystick_handling.VJoyProxy()[self.action_data.vjoy_id].button(self.action_data.vjoy_button_id).is_pressed = self.action_data.button_start_value
         if self.input_type == InputType.JoystickAxis:
             # send initial axis values to the output
 
-            self.usage_data.set_range(
-                self.vjoy_id, self.vjoy_input_id, self.range_low, self.range_high
-            )
+            self.usage_data.set_range(self.vjoy_id, self.vjoy_input_id, self.range_low, self.range_high)
             # print(f"Axis start value: vjoy: {self.vjoy_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
 
             match self.action_mode:
@@ -4951,12 +4504,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                     # apply any curves
                     curves = self.getCurveData(None, actual_value)
-                    filtered_value = self.action_data.get_filtered_axis_value(
-                        actual_value, curves=curves
-                    )
-                    ranged_value = self.action_data.get_ranged_axis_value(
-                        filtered_value
-                    )
+                    filtered_value = self.action_data.get_filtered_axis_value(actual_value, curves=curves)
+                    ranged_value = self.action_data.get_ranged_axis_value(filtered_value)
 
                     # output value
                     value = ranged_value
@@ -4964,12 +4513,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     trigger = False
 
                     if verbose:
-                        device = gremlin.joystick_handling.getDevice(
-                            self.hardware_device_guid
-                        )
-                        assert device is not None, (
-                            f"Unable to find device for {str(self.hardware_device_guid)}"
-                        )
+                        device = gremlin.joystick_handling.getDevice(self.hardware_device_guid)
+                        assert device is not None, f"Unable to find device for {str(self.hardware_device_guid)}"
                         vjoy_stub = f"sync mode: [{self.action_data.sync_mode.name}] set start value for vjoy axis: {self.vjoy_input_id}"
                         device_stub = f"{device.name} input: {self.action_data.input_type.name} input id: {input_id}"
 
@@ -4977,30 +4522,22 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         case SyncMode.Default:
                             trigger = True
                             if verbose:
-                                syslog.info(
-                                    f"{vjoy_stub} default : {self.action_data.state.default_value}"
-                                )
+                                syslog.info(f"{vjoy_stub} default : {self.action_data.state.default_value}")
                             value = self.action_data.axis_start_value
                         case SyncMode.Input:
                             trigger = True
                             if verbose:
-                                syslog.info(
-                                    f"VJOY REMAP SYNC: {device_stub} {vjoy_stub} input : {value:0.3f}"
-                                )
+                                syslog.info(f"VJOY REMAP SYNC: {device_stub} {vjoy_stub} input : {value:0.3f}")
                             value = value
                         case SyncMode.LastOrInput:
                             trigger = True
                             last = self.action_data.axis_last_value
                             if last is None:
                                 if verbose:
-                                    syslog.info(
-                                        f"VJOY REMAP SYNC: {vjoy_stub} last or input : use input value : {value:0.3f}"
-                                    )
+                                    syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use input value : {value:0.3f}")
                             else:
                                 if verbose:
-                                    syslog.info(
-                                        f"VJOY REMAP SYNC: {vjoy_stub} last or input : use last value : {last:0.3f}"
-                                    )
+                                    syslog.info(f"VJOY REMAP SYNC: {vjoy_stub} last or input : use last value : {last:0.3f}")
                                 value = last
                         case SyncMode.LastOrDefault:
                             pass  # do nothing
@@ -5012,15 +4549,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         vs.setStartValue(self.vjoy_id, self.vjoy_input_id, value)
                         self.action_data.axis_last_value = value
 
-                    if (
-                        raw_input_type == InputType.OpenSoundControl
-                        and self.action_data.axis_start_value_enabled
-                    ):
+                    if raw_input_type == InputType.OpenSoundControl and self.action_data.axis_start_value_enabled:
                         # sync OSC with the start value
                         message = input_id.message
-                        osc_value = gremlin.util.scale_to_range(
-                            value, target_min=0, target_max=1
-                        )
+                        osc_value = gremlin.util.scale_to_range(value, target_min=0, target_max=1)
                         gremlin.ui.osc_device.osc_client.sendData(message, osc_value)
 
                 case VjoyAction.VJoyAxisToButton:
@@ -5038,10 +4570,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     self.action_data.axis_last_value = value
                     self.process_event(event, action_value)
 
-        elif (
-            self.input_type == InputType.JoystickHat
-            and self.action_mode == VjoyAction.VJoyHatToButton
-        ):
+        elif self.input_type == InputType.JoystickHat and self.action_mode == VjoyAction.VJoyHatToButton:
             value = joystick_handling.get_hat(device_guid, input_id)
             if value in vjoy.vjoy.Hat.to_continuous_position:
                 self.hat_position = vjoy.vjoy.Hat.to_continuous_position[value]
@@ -5076,13 +4605,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     # input is momentary
                     match self.action_mode:
                         case VjoyAction.VJoyButton:
-                            is_pressed = joystick_handling.get_button(
-                                device_guid, input_id
-                            )
+                            is_pressed = joystick_handling.get_button(device_guid, input_id)
                         case VjoyAction.VJoyButtonInverted:
-                            is_pressed = not joystick_handling.get_button(
-                                device_guid, input_id
-                            )
+                            is_pressed = not joystick_handling.get_button(device_guid, input_id)
 
                         case VjoyAction.VJoyButton.VJoyButtonPress:
                             is_pressed = True
@@ -5090,44 +4615,28 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             is_pressed = False
                             trigger = False
                         case VjoyAction.VJoyInvertAxis:
-                            is_pressed = joystick_handling.get_button(
-                                device_guid, input_id
-                            )
+                            is_pressed = joystick_handling.get_button(device_guid, input_id)
                             trigger_reverse = self.action_data.sync_mode in (
                                 SyncMode.Input,
                                 SyncMode.LastOrInput,
                                 SyncMode.LastOrDefault,
                             )
                         case VjoyAction.VJoySetAxis:
-                            is_pressed = joystick_handling.get_button(
-                                device_guid, input_id
+                            is_pressed = joystick_handling.get_button(device_guid, input_id)
+                            trigger_setValue = is_pressed and self.action_data.sync_mode in (
+                                SyncMode.Input,
+                                SyncMode.LastOrInput,
+                                SyncMode.LastOrDefault,
                             )
-                            trigger_setValue = (
-                                is_pressed
-                                and self.action_data.sync_mode
-                                in (
-                                    SyncMode.Input,
-                                    SyncMode.LastOrInput,
-                                    SyncMode.LastOrDefault,
-                                )
-                            )
-                        case (
-                            VjoyAction.VJoyHat
-                            | VjoyAction.VJoyHatPress
-                            | VjoyAction.VJoyHatPulse
-                        ):
+                        case VjoyAction.VJoyHat | VjoyAction.VJoyHatPress | VjoyAction.VJoyHatPulse:
                             # hat
-                            is_pressed = joystick_handling.get_button(
-                                device_guid, input_id
-                            )
+                            is_pressed = joystick_handling.get_button(device_guid, input_id)
 
                 case InputType.OpenSoundControl:
                     message = self.action_data.input_item.message_key
                     match self.action_mode:
                         case VjoyAction.VJoyButton:
-                            is_pressed = gremlin.ui.osc_device.osc_client.getData(
-                                message
-                            )
+                            is_pressed = gremlin.ui.osc_device.osc_client.getData(message)
                         case VjoyAction.VJoyButton.VJoyButtonPress:
                             is_pressed = True
                         case VjoyAction.VJoyButton.VJoyButtonRelease:
@@ -5137,9 +4646,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     message = self.action_data.input_item.message_key
                     match self.action_mode:
                         case VjoyAction.VJoyButton:
-                            is_pressed = gremlin.ui.midi_device.midi_client.getData(
-                                message
-                            )
+                            is_pressed = gremlin.ui.midi_device.midi_client.getData(message)
                         case VjoyAction.VJoyButton.VJoyButtonPress:
                             is_pressed = True
                         case VjoyAction.VJoyButton.VJoyButtonRelease:
@@ -5160,30 +4667,22 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     last = self.action_data.button_last_value
                     if last is None:
                         if verbose:
-                            syslog.info(
-                                f"{vjoy_stub} last or input : use input value : {is_pressed}"
-                            )
+                            syslog.info(f"{vjoy_stub} last or input : use input value : {is_pressed}")
                         value = is_pressed
                     else:
                         if verbose:
-                            syslog.info(
-                                f"{vjoy_stub} last or input : use last value : {last:0.3f}"
-                            )
+                            syslog.info(f"{vjoy_stub} last or input : use last value : {last:0.3f}")
                         value = last
                 case SyncMode.LastOrDefault:
                     last = self.action_data.button_last_value
                     if last is None:
                         value = self.action_data.button_start_value
                         if verbose:
-                            syslog.info(
-                                f"{vjoy_stub} last or input : use default value : {value}"
-                            )
+                            syslog.info(f"{vjoy_stub} last or input : use default value : {value}")
 
                     else:
                         if verbose:
-                            syslog.info(
-                                f"{vjoy_stub} last or default: use last value : {last}"
-                            )
+                            syslog.info(f"{vjoy_stub} last or default: use last value : {last}")
                         value = last
                 case SyncMode.Ignore:
                     trigger = False  # do nothing
@@ -5199,16 +4698,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     VjoyAction.VJoyHatPulse,
                 ):
                     # hat output
-                    position = (
-                        self.action_data.vjoy_hat_position
-                        if is_pressed
-                        else self.action_data.vjoy_hat_return_position
-                    )
+                    position = self.action_data.vjoy_hat_position if is_pressed else self.action_data.vjoy_hat_return_position
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            joystick_handling.VJoyProxy()[self.vjoy_id].hat(
-                                self.vjoy_input_id
-                            ).direction = position
+                            joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = position
                     if is_remote:
                         self.remote_client.send_hat(
                             self.vjoy_id,
@@ -5225,9 +4718,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     self.action_data.button_last_value = value
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            joystick_handling.VJoyProxy()[self.vjoy_id].button(
-                                self.vjoy_input_id
-                            ).is_pressed = value
+                            joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = value
                     if is_remote or is_paired:
                         self.remote_client.send_button(
                             self.vjoy_id,
@@ -5284,9 +4775,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 position = (0, 0)  # return hat to center
                 if is_local:
                     if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(
-                            self.vjoy_input_id
-                        ).direction = position
+                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = position
                 if is_remote:
                     self.remote_client.send_hat(
                         self.vjoy_id,
@@ -5305,9 +4794,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 is_pressed = False
                 if is_local:
                     if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                        joystick_handling.VJoyProxy()[self.vjoy_id].button(
-                            self.vjoy_input_id
-                        ).is_pressed = is_pressed
+                        joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = is_pressed
                 if is_remote or is_paired:
                     self.remote_client.send_button(
                         self.vjoy_id,
@@ -5336,9 +4823,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _pulse_on(self, data):
         """called when pulse is on"""
-        device_id, input_type, input_id, position, is_local, is_remote, force_remote = (
-            data
-        )
+        device_id, input_type, input_id, position, is_local, is_remote, force_remote = data
         if self.verbose_extra:
             syslog.info(f"Pulse ON {device_id} button {input_id}")
 
@@ -5365,18 +4850,14 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 # value = self._pid(sp, last_value)
                 value = self._compute_value(last_value, self.step_direction)
                 if self.verbose:
-                    syslog.info(
-                        f"STEPPED AXIS: linear: direction: [{self.step_direction}] new value: [{value:0.3f}]"
-                    )
+                    syslog.info(f"STEPPED AXIS: linear: direction: [{self.step_direction}] new value: [{value:0.3f}]")
             else:
                 # normal pulsed stepping
                 delta = self.action_data._target_step_delta
                 value = max(-1.0, min(1.0, last_value + delta * self.step_direction))
 
                 if self.verbose:
-                    syslog.info(
-                        f"STEPPED AXIS: linear pulse: direction: [{self.step_direction}] delta: [{delta:0.3f}] new value: [{value:0.3f}]"
-                    )
+                    syslog.info(f"STEPPED AXIS: linear pulse: direction: [{self.step_direction}] delta: [{delta:0.3f}] new value: [{value:0.3f}]")
                 self._set_axis(device_id, input_id, value)
 
         else:
@@ -5387,9 +4868,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(device_id):
-                            joystick_handling.VJoyProxy()[device_id].button(
-                                input_id
-                            ).is_pressed = True
+                            joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = True
                     if is_remote:
                         self.remote_client.send_button(
                             device_id,
@@ -5400,14 +4879,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         )
                 case InputType.JoystickHat:
                     if self.verbose_extra:
-                        syslog.info(
-                            f"pulse ON vjoy [{device_id}] hat [{input_id}] position: [{position}]"
-                        )
+                        syslog.info(f"pulse ON vjoy [{device_id}] hat [{input_id}] position: [{position}]")
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            joystick_handling.VJoyProxy()[self.vjoy_id].hat(
-                                self.vjoy_input_id
-                            ).direction = position
+                            joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = position
                     if is_remote:
                         self.remote_client.send_hat(
                             self.vjoy_id,
@@ -5422,9 +4897,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         # if self.action_data._target_step_linear_mode:
         #     return # nothing to do if in PID mode
 
-        device_id, input_type, input_id, position, is_local, is_remote, force_remote = (
-            data
-        )
+        device_id, input_type, input_id, position, is_local, is_remote, force_remote = data
 
         match input_type:
             case InputType.JoystickButton:
@@ -5432,9 +4905,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     syslog.info(f"Pulse OFF vjoy [{device_id}] button {input_id}")
                 if is_local:
                     if gremlin.joystick_handling.is_vjoy_connected(device_id):
-                        joystick_handling.VJoyProxy()[device_id].button(
-                            input_id
-                        ).is_pressed = False
+                        joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = False
                 if is_remote:
                     self.remote_client.send_button(
                         device_id,
@@ -5448,14 +4919,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 position = self.action_data.vjoy_hat_return_position
 
                 if self.verbose_extra:
-                    syslog.info(
-                        f"pulse OFF vjoy [{device_id}] hat [{input_id}] position: [{position}]"
-                    )
+                    syslog.info(f"pulse OFF vjoy [{device_id}] hat [{input_id}] position: [{position}]")
                 if is_local:
                     if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(
-                            self.vjoy_input_id
-                        ).direction = position
+                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = position
                 if is_remote:
                     self.remote_client.send_hat(
                         self.vjoy_id,
@@ -5480,9 +4947,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         """pulse setup"""
         verbose = self.verbose
         if verbose:
-            syslog.info(
-                f"Pulse START vjoy {device_id} input type: {input_type.name} input id {input_id} position: {position} duration: {duration:0.3f} interval: {interval:0.3f}"
-            )
+            syslog.info(f"Pulse START vjoy {device_id} input type: {input_type.name} input id {input_id} position: {position} duration: {duration:0.3f} interval: {interval:0.3f}")
         key = (device_id, input_type, input_id, position)
         worker: gremlin.repeater.PulseWorker
         if key in self.pulse_worker_map:
@@ -5502,9 +4967,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 is_remote,
                 force_remote,
             )
-            worker = gremlin.repeater.PulseWorker(
-                duration, interval, self._pulse_on, self._pulse_off, data=args
-            )
+            worker = gremlin.repeater.PulseWorker(duration, interval, self._pulse_on, self._pulse_off, data=args)
             self.pulse_worker_map[key] = worker
 
         if verbose:
@@ -5534,25 +4997,17 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         with self.lock:
             # value position is now between 0 and 1
-            offset = (
-                self.direction * self.action_data.relative_value * self.scale_factor
-            )
+            offset = self.direction * self.action_data.relative_value * self.scale_factor
 
             syslog.info(f"Tick: {offset:0.3f} scale: {self.scale_factor:0.3f}")
 
             # read the current output axis value
-            value = (
-                joystick_handling.VJoyProxy()[self.vjoy_id]
-                .axis(self.vjoy_input_id)
-                .value
-            )
+            value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
 
             # apply the offset
             value = gremlin.util.clamp(value + offset)
             if is_local:
-                joystick_handling.VJoyProxy()[self.vjoy_id].axis(
-                    self.vjoy_input_id
-                ).value = value
+                joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
             if is_remote:
                 self.remote_client.send_relative_axis(
                     self.vjoy_id,
@@ -5590,29 +5045,21 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 self.target_value = value  # value to restore after wiggle
 
                 if verbose:
-                    syslog.info(
-                        f"VJOY: set last value [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f} wiggle value: {wiggle_value:0.3f}"
-                    )
+                    syslog.info(f"VJOY: set last value [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f} wiggle value: {wiggle_value:0.3f}")
                 self._set_axis(self.vjoy_id, self.vjoy_input_id, wiggle_value)
                 timer = threading.Timer(0.25, self._handle_set_axis_wiggle)
                 timer.start()
 
                 return True
 
-            target_value_valid = (
-                self.target_value_valid or self.action_data.use_relative_value
-            )
+            target_value_valid = self.target_value_valid or self.action_data.use_relative_value
 
             if target_value_valid:
                 target_value = self.target_value
 
                 if self.action_data.use_relative_value:
                     # read the current output axis value
-                    value = (
-                        joystick_handling.VJoyProxy()[self.vjoy_id]
-                        .axis(self.vjoy_input_id)
-                        .value
-                    )
+                    value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
                     # apply the offset
                     value += target_value
                 else:
@@ -5620,9 +5067,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                 value = gremlin.util.clamp(value)
                 if verbose:
-                    syslog.info(
-                        f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}"
-                    )
+                    syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
                 self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
 
                 # remember the last value
@@ -5652,9 +5097,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
     #         return (pow((value - v_start) / v_end - 1, power) + 1) * v_end + v_start
     #     return pow((value - v_start) / v_end, power) * v_end + v_start
 
-    def process_event(
-        self, event, action_value: gremlin.actions.Value, extra_data=None
-    ):
+    def process_event(self, event, action_value: gremlin.actions.Value, extra_data=None):
         """runs when a joystick event occurs like a button press or axis movement when a profile is running"""
         # if self.action_data.merged and event.is_axis:
         #     # merged axis data is handled by the internal hook - ignore
@@ -5667,10 +5110,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 # make sure conditions are valid for latched input
                 # the reason is conditions are only evaluated for the actual mapped input, not the latched inputs
                 # therfore we need to evaluate the conditions for the latched input as well
-                if (
-                    event.device_guid != self.hardware_device_guid
-                    or event.identifier != self.hardware_input_id
-                ):
+                if event.device_guid != self.hardware_device_guid or event.identifier != self.hardware_input_id:
                     # event is for a latched input = run conditions if any are applied
 
                     # check for condition applied to container
@@ -5710,9 +5150,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     curve_count = len(curves) if curves else 0
 
                 # this handles axis merging and applies any curves and axis inversion
-                filtered_value = self.action_data.get_filtered_axis_value(
-                    value, curves=curves
-                )
+                filtered_value = self.action_data.get_filtered_axis_value(value, curves=curves)
                 if filtered_value is None:
                     filtered_value = value
 
@@ -5722,13 +5160,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     ranged_value = filtered_value
 
                 if verbose:
-                    syslog.info(
-                        f"VjoyRemap: using input value source {source}: [{value:0.3f}] -> filtered [{filtered_value:0.3f}] -> range [{ranged_value:0.3f}] applied curves: {curve_count}"
-                    )
+                    syslog.info(f"VjoyRemap: using input value source {source}: [{value:0.3f}] -> filtered [{filtered_value:0.3f}] -> range [{ranged_value:0.3f}] applied curves: {curve_count}")
 
-            action_value = gremlin.actions.Value(
-                value=ranged_value, raw=event.raw_value, is_pressed=event.is_pressed
-            )
+            action_value = gremlin.actions.Value(value=ranged_value, raw=event.raw_value, is_pressed=event.is_pressed)
             event.curve_value = ranged_value
 
         return self._process_event(event, action_value, extra_data)
@@ -5764,9 +5198,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             # axis response mode
 
             if verbose:
-                syslog.info(
-                    f"Value raw: {action_value.raw:0.3f}  current {action_value.current:0.3f}  Event raw: {event.raw_value:0.3f} value: {event.value:0.3f} curve: {event.curve_value:0.3f}"
-                )
+                syslog.info(f"Value raw: {action_value.raw:0.3f}  current {action_value.current:0.3f}  Event raw: {event.raw_value:0.3f} value: {event.value:0.3f} curve: {event.curve_value:0.3f}")
 
             axis_mode = self.action_data.axis_mode
 
@@ -5804,18 +5236,14 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                     self.in_range = True
                                     is_pressed = True
                                     if verbose:
-                                        syslog.info(
-                                            f"AXIS TO BUTTON: ON in range vjoy {self.vjoy_id} button {self.vjoy_input_id}"
-                                        )
+                                        syslog.info(f"AXIS TO BUTTON: ON in range vjoy {self.vjoy_id} button {self.vjoy_input_id}")
 
                             else:
                                 # not in range
                                 if self.in_range:
                                     # toggle OFF
                                     if verbose:
-                                        syslog.info(
-                                            f"AXIS TO BUTTON: OFF out of range vjoy {self.vjoy_id} button {self.vjoy_input_id}"
-                                        )
+                                        syslog.info(f"AXIS TO BUTTON: OFF out of range vjoy {self.vjoy_id} button {self.vjoy_input_id}")
                                     self.in_range = False
                                     is_pressed = False
 
@@ -5828,14 +5256,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 if not self.in_range:
                                     self.in_range = True
                                     if verbose:
-                                        syslog.info(
-                                            f"VJOY: trigger start range pulse vjoy {device_id} hat {input_id}"
-                                        )
-                                    repeat_interval = (
-                                        self.action_data.pulse_repeat_delay / 1000
-                                        if self.action_data.pulse_repeat
-                                        else -1
-                                    )
+                                        syslog.info(f"VJOY: trigger start range pulse vjoy {device_id} hat {input_id}")
+                                    repeat_interval = self.action_data.pulse_repeat_delay / 1000 if self.action_data.pulse_repeat else -1
                                     self.pulse_start(
                                         device_id,
                                         input_type,
@@ -5852,12 +5274,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 if self.in_range:
                                     self.in_range = False
                                     if verbose:
-                                        syslog.info(
-                                            f"VJOY: trigger stop range pulse vjoy {device_id} hat {input_id}"
-                                        )
-                                    self.pulse_stop(
-                                        device_id, input_type, input_id, position
-                                    )
+                                        syslog.info(f"VJOY: trigger stop range pulse vjoy {device_id} hat {input_id}")
+                                    self.pulse_stop(device_id, input_type, input_id, position)
                             return True
 
                         case ButtonOutputMode.Press:
@@ -5872,17 +5290,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                     if is_pressed is not None:
                         if verbose:
-                            syslog.info(
-                                f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: {is_pressed}"
-                            )
+                            syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: {is_pressed}")
                         self.action_data.button_last_value = is_pressed
                         if is_local:
-                            if gremlin.joystick_handling.is_vjoy_connected(
-                                self.vjoy_id
-                            ):
-                                joystick_handling.VJoyProxy()[self.vjoy_id].button(
-                                    self.vjoy_input_id
-                                ).is_pressed = is_pressed
+                            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                                joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = is_pressed
                         if is_remote:
                             self.remote_client.send_button(
                                 self.vjoy_id,
@@ -5901,9 +5313,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             )
 
                         if verbose:
-                            syslog.info(
-                                f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}"
-                            )
+                            syslog.info(f"VJOY: set device [{self.vjoy_id}] axis  {self.vjoy_input_id} value: {value:0.3f}")
 
                         self.action_data.axis_last_value = value
                         self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
@@ -5923,18 +5333,16 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             else:
                                 direction = +1
                             if not self._relative_pulse_worker:
-                                self._relative_pulse_worker = (
-                                    gremlin.repeater.PulseWorker(
-                                        0,
-                                        self.action_data.relative_pulse_delay / 1000,
-                                        on_callback=self._relative_pulse_on,
-                                        data=(
-                                            self.vjoy_id,
-                                            self.vjoy_input_id,
-                                            is_local,
-                                            is_remote,
-                                        ),
-                                    )
+                                self._relative_pulse_worker = gremlin.repeater.PulseWorker(
+                                    0,
+                                    self.action_data.relative_pulse_delay / 1000,
+                                    on_callback=self._relative_pulse_on,
+                                    data=(
+                                        self.vjoy_id,
+                                        self.vjoy_input_id,
+                                        is_local,
+                                        is_remote,
+                                    ),
                                 )
 
                         else:
@@ -5983,14 +5391,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     case ButtonOutputMode.Pulse:
                         if is_pressed:
                             if verbose:
-                                syslog.info(
-                                    f"VJOY: trigger start pulse vjoy {device_id} hat {input_id}"
-                                )
-                            repeat_interval = (
-                                self.action_data.pulse_repeat_delay / 1000
-                                if self.action_data.pulse_repeat
-                                else -1
-                            )
+                                syslog.info(f"VJOY: trigger start pulse vjoy {device_id} hat {input_id}")
+                            repeat_interval = self.action_data.pulse_repeat_delay / 1000 if self.action_data.pulse_repeat else -1
                             self.pulse_start(
                                 device_id,
                                 input_type,
@@ -6005,9 +5407,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             auto_complete = False
                         else:
                             if verbose:
-                                syslog.info(
-                                    f"VJOY: trigger stop pulse vjoy {device_id} hat {input_id}"
-                                )
+                                syslog.info(f"VJOY: trigger stop pulse vjoy {device_id} hat {input_id}")
                             self.pulse_stop(device_id, input_type, input_id, position)
 
                             # threading.Timer(0.01, self._fire_pulse, [self.vjoy_id, input_id, self.pulse_delay/1000, self.action_data.pulse_repeat, self.action_data.pulse_repeat_delay/1000]).start()
@@ -6017,19 +5417,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             for pressed_position in pressed_positions:
                                 if position == pressed_position:
                                     continue
-                                release_input_id = self.pressed_hat_buttons[
-                                    pressed_position
-                                ]
+                                release_input_id = self.pressed_hat_buttons[pressed_position]
                                 if release_input_id > 0:
                                     if is_local:
-                                        if gremlin.joystick_handling.is_vjoy_connected(
-                                            device_id
-                                        ):
-                                            joystick_handling.VJoyProxy()[
-                                                device_id
-                                            ].button(
-                                                release_input_id
-                                            ).is_pressed = False
+                                        if gremlin.joystick_handling.is_vjoy_connected(device_id):
+                                            joystick_handling.VJoyProxy()[device_id].button(release_input_id).is_pressed = False
                                     if is_remote:
                                         self.remote_client.send_button(
                                             device_id,
@@ -6056,13 +5448,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 self.action_data.button_last_value = is_pressed
                 if is_local:
                     if gremlin.joystick_handling.is_vjoy_connected(device_id):
-                        joystick_handling.VJoyProxy()[device_id].button(
-                            input_id
-                        ).is_pressed = is_pressed
+                        joystick_handling.VJoyProxy()[device_id].button(input_id).is_pressed = is_pressed
                 if is_remote:
-                    self.remote_client.send_button(
-                        device_id, input_id, is_pressed, client_list=self.client_list
-                    )
+                    self.remote_client.send_button(device_id, input_id, is_pressed, client_list=self.client_list)
 
             else:
                 # release
@@ -6079,16 +5467,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     input_id = self.pressed_hat_buttons[pressed_position]
                     if input_id > 0:
                         if verbose:
-                            syslog.info(
-                                f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: False"
-                            )
+                            syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: False")
                         if is_local:
-                            if gremlin.joystick_handling.is_vjoy_connected(
-                                self.vjoy_id
-                            ):
-                                joystick_handling.VJoyProxy()[self.vjoy_id].button(
-                                    input_id
-                                ).is_pressed = False
+                            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                                joystick_handling.VJoyProxy()[self.vjoy_id].button(input_id).is_pressed = False
                         if is_remote:
                             self.remote_client.send_button(
                                 self.vjoy_id,
@@ -6109,9 +5491,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             # determine if event should be fired based on release mode
             is_pressed = event.is_pressed
             trigger = False
-            fire_event = (self.action_data.exec_on_release and not is_pressed) or (
-                self.action_data.exec_on_press and is_pressed
-            )
+            fire_event = (self.action_data.exec_on_release and not is_pressed) or (self.action_data.exec_on_press and is_pressed)
 
             # if self.vjoy_input_id == 2:
             #     syslog.info(f"=============================================================== button 2 set pressed {is_pressed}")
@@ -6134,12 +5514,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
                             if verbose:
-                                syslog.info(
-                                    f"VJOY: set device [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [True]"
-                                )
-                            joystick_handling.VJoyProxy()[self.vjoy_id].button(
-                                self.vjoy_input_id
-                            ).is_pressed = pressed_value
+                                syslog.info(f"VJOY: set device [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [True]")
+                            joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = pressed_value
                     if is_remote or is_paired:
                         self.remote_client.send_button(
                             self.vjoy_id,
@@ -6167,9 +5543,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             )
                         if auto_release:
                             if verbose:
-                                syslog.info(
-                                    f"VjoyRemap: autorelease enabled for {str(event)}"
-                                )
+                                syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
                             input_devices.CallbackActions().register_button_release(
                                 (self.vjoy_id, self.vjoy_input_id),
                                 event,
@@ -6180,11 +5554,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             )
 
                     if verbose:
-                        syslog.info(
-                            f"\t{self.vjoy_input_id} pressed: {is_pressed}  ignore release: {self.action_data.ignore_release}"
-                        )
-                    trigger = (
-                        is_pressed or (not auto_release and not is_pressed)
+                        syslog.info(f"\t{self.vjoy_input_id} pressed: {is_pressed}  ignore release: {self.action_data.ignore_release}")
+                    trigger = is_pressed or (
+                        not auto_release and not is_pressed
                     )  # trigger on press, or on release unless an auto-release was already registered for the release action to avoid double releases
                     if not is_pressed and self.action_data.ignore_release:
                         # ignore release action on press/release modes
@@ -6199,12 +5571,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
                             if verbose:
-                                syslog.info(
-                                    f"\tTrigger vjoy [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [{is_pressed}]"
-                                )
-                            joystick_handling.VJoyProxy()[self.vjoy_id].button(
-                                self.vjoy_input_id
-                            ).is_pressed = pressed_value
+                                syslog.info(f"\tTrigger vjoy [{self.vjoy_id}] button [{self.vjoy_input_id}] pressed: [{is_pressed}]")
+                            joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = pressed_value
                     if is_remote or is_paired:
                         self.remote_client.send_button(
                             self.vjoy_id,
@@ -6220,18 +5588,14 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             elif self.action_mode == VjoyAction.VJoyHat:
                 # hat output when mapped to a button (hold mode)
                 if verbose:
-                    syslog.info(
-                        f"VJOY: hold hat device [{self.vjoy_id}] hat {self.vjoy_input_id} position: {self.action_data.vjoy_hat_position}"
-                    )
+                    syslog.info(f"VJOY: hold hat device [{self.vjoy_id}] hat {self.vjoy_input_id} position: {self.action_data.vjoy_hat_position}")
                 if is_pressed:
                     direction = self.action_data.vjoy_hat_position
                 else:
                     direction = self.action_data.vjoy_hat_return_position
                 if is_local:
                     if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(
-                            self.vjoy_input_id
-                        ).direction = direction
+                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = direction
                     if is_remote or is_paired:
                         self.remote_client.send_hat(
                             self.vjoy_id,
@@ -6244,15 +5608,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             elif self.action_mode == VjoyAction.VJoyHatPress:
                 # hat ouput when mapped to a button (press only)
                 if verbose:
-                    syslog.info(
-                        f"VJOY: set hat device [{self.vjoy_id}] hat {self.vjoy_input_id} position: {self.action_data.vjoy_hat_position}"
-                    )
+                    syslog.info(f"VJOY: set hat device [{self.vjoy_id}] hat {self.vjoy_input_id} position: {self.action_data.vjoy_hat_position}")
                 direction = self.action_data.vjoy_hat_position
                 if is_local:
                     if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(
-                            self.vjoy_input_id
-                        ).direction = direction
+                        joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = direction
                     if is_remote or is_paired:
                         self.remote_client.send_hat(
                             self.vjoy_id,
@@ -6265,9 +5625,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             elif self.action_mode == VjoyAction.VJoyHatPulse:
                 # hat ouput when mapped to a button (press only)
                 if verbose:
-                    syslog.info(
-                        f"VJOY: pulse hat device [{self.vjoy_id}] hat {self.vjoy_input_id} position: {self.action_data.vjoy_hat_position}"
-                    )
+                    syslog.info(f"VJOY: pulse hat device [{self.vjoy_id}] hat {self.vjoy_input_id} position: {self.action_data.vjoy_hat_position}")
 
                 input_id = self.vjoy_input_id
                 device_id = self.vjoy_id
@@ -6277,11 +5635,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 if fire_event:
                     auto_complete = False
 
-                    repeat_interval = (
-                        self.action_data.pulse_repeat_delay / 1000
-                        if self.action_data.pulse_repeat
-                        else -1
-                    )
+                    repeat_interval = self.action_data.pulse_repeat_delay / 1000 if self.action_data.pulse_repeat else -1
                     self.pulse_start(
                         device_id,
                         input_type,
@@ -6295,25 +5649,19 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     )
                 else:
                     if verbose:
-                        syslog.info(
-                            f"VJOY: trigger stop pulse vjoy {device_id} button {input_id}"
-                        )
+                        syslog.info(f"VJOY: trigger stop pulse vjoy {device_id} button {input_id}")
                     self.pulse_stop(self.vjoy_id, input_type, input_id, position)
 
             elif self.action_mode == VjoyAction.VJoyButtonPress:
                 # press button (no auto release)
                 if verbose:
-                    syslog.info(
-                        f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: True"
-                    )
+                    syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: True")
 
                 if fire_event:
                     self.action_data.button_last_value = True
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            joystick_handling.VJoyProxy()[self.vjoy_id].button(
-                                self.vjoy_input_id
-                            ).is_pressed = True
+                            joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = True
                     if is_remote or is_paired:
                         self.remote_client.send_button(
                             self.vjoy_id,
@@ -6326,16 +5674,12 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             elif self.action_mode == VjoyAction.VJoyButtonRelease:
                 # release button (no auto release)
                 if verbose:
-                    syslog.info(
-                        f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: False"
-                    )
+                    syslog.info(f"VJOY: set device [{self.vjoy_id}] button {self.vjoy_input_id} pressed: False")
                 if fire_event:
                     self.action_data.button_last_value = False
                     if is_local:
                         if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
-                            joystick_handling.VJoyProxy()[self.vjoy_id].button(
-                                self.vjoy_input_id
-                            ).is_pressed = False
+                            joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = False
                     if is_remote or is_paired:
                         self.remote_client.send_button(
                             self.vjoy_id,
@@ -6349,27 +5693,16 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 # toggle action
 
                 if fire_event:
-                    if (
-                        input_type in [InputType.JoystickButton, InputType.Keyboard]
-                        and event.is_pressed
-                    ):
+                    if input_type in [InputType.JoystickButton, InputType.Keyboard] and event.is_pressed:
                         if is_local:
-                            if gremlin.joystick_handling.is_vjoy_connected(
-                                self.vjoy_id
-                            ):
-                                button = joystick_handling.VJoyProxy()[
-                                    self.vjoy_id
-                                ].button(self.vjoy_input_id)
+                            if gremlin.joystick_handling.is_vjoy_connected(self.vjoy_id):
+                                button = joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id)
                                 button.is_pressed = not button.is_pressed
                                 self.action_data.button_last_value = button.is_pressed
                                 if verbose:
-                                    syslog.info(
-                                        f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: {button.is_pressed}"
-                                    )
+                                    syslog.info(f"VJOY: set device [{self.vjoy_id}] button {input_id} pressed: {button.is_pressed}")
                         if is_remote:
-                            self.remote_client.toggle_button(
-                                self.vjoy_id, self.vjoy_input_id
-                            )
+                            self.remote_client.toggle_button(self.vjoy_id, self.vjoy_input_id)
 
             elif self.action_mode == VjoyAction.VJoyPulse:
                 input_id = self.vjoy_input_id
@@ -6377,17 +5710,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 input_type = InputType.JoystickButton
                 position = None
                 if verbose:
-                    syslog.info(
-                        f"VJOY: trigger start pulse vjoy {device_id} button {input_id}"
-                    )
+                    syslog.info(f"VJOY: trigger start pulse vjoy {device_id} button {input_id}")
                 # pulse action
                 if fire_event:
                     auto_complete = False
-                    repeat_interval = (
-                        self.action_data.pulse_repeat_delay / 1000
-                        if self.action_data.pulse_repeat
-                        else -1
-                    )
+                    repeat_interval = self.action_data.pulse_repeat_delay / 1000 if self.action_data.pulse_repeat else -1
                     self.pulse_start(
                         device_id,
                         input_type,
@@ -6401,9 +5728,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     )
                 else:
                     if verbose:
-                        syslog.info(
-                            f"VJOY: trigger stop pulse vjoy {device_id} button {input_id}"
-                        )
+                        syslog.info(f"VJOY: trigger stop pulse vjoy {device_id} button {input_id}")
                     self.pulse_stop(self.vjoy_id, input_type, input_id, position)
             elif self.action_mode == VjoyAction.VJoyInvertAxis:
                 # invert the specified axis
@@ -6436,33 +5761,20 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 position = None
 
                 if fire_event:
-                    latched = (
-                        self.action_data._stepped_latched
-                        and event.device_guid == self.action_data.stepped_device_guid
-                        and event.identifier == self.action_data.stepped_input_id
-                    )
-                    primary = (
-                        event.device_guid == self.hardware_device_guid
-                        and event.identifier == self.hardware_input_id
-                    )
+                    latched = self.action_data._stepped_latched and event.device_guid == self.action_data.stepped_device_guid and event.identifier == self.action_data.stepped_input_id
+                    primary = event.device_guid == self.hardware_device_guid and event.identifier == self.hardware_input_id
 
                     if primary or latched:
                         trigger = False
-                        trigger = (
-                            event.is_pressed and not self.action_data.exec_on_release
-                        ) or (not event.is_pressed and self.action_data.exec_on_release)
+                        trigger = (event.is_pressed and not self.action_data.exec_on_release) or (not event.is_pressed and self.action_data.exec_on_release)
                         if trigger:
                             # determine direction we're going
                             direction = self.action_data.target_step_direction
 
                             if self.action_data._target_step_linear_mode:
                                 # linear mode = start pulsing while pressed
-                                self.repeat_interval = (
-                                    self.action_data.pulse_delay / 1000
-                                )
-                                self.step_direction = (
-                                    direction if primary else -direction
-                                )
+                                self.repeat_interval = self.action_data.pulse_delay / 1000
+                                self.step_direction = direction if primary else -direction
                                 self._start_time = None
                                 self._start_value = None
                                 if verbose:
@@ -6484,15 +5796,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 # non linear step mode
                                 # trigger = False
                                 key = ("stepped-axis", self.vjoy_input_id)
-                                device = (
-                                    gremlin.joystick_handling.vjoy_info_from_vjoy_id(
-                                        self.vjoy_id
-                                    )
-                                )
+                                device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(self.vjoy_id)
                                 if key not in device.data:
-                                    device.data[key] = (
-                                        self.action_data.target_step_start_index
-                                    )
+                                    device.data[key] = self.action_data.target_step_start_index
 
                                 start_index = device.data[key]
                                 count = len(self.action_data.target_step_list)
@@ -6501,11 +5807,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
                                 if not self.synced:
                                     # synchronize index if needed
-                                    if (
-                                        self.action_data.sync_mode
-                                        in (SyncMode.Input, SyncMode.LastOrInput)
-                                        and value is not None
-                                    ):
+                                    if self.action_data.sync_mode in (SyncMode.Input, SyncMode.LastOrInput) and value is not None:
                                         # sync the current index with the current axis value
                                         v1 = v2 = None
 
@@ -6534,13 +5836,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                                 self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
 
-                                device.data[key] = (
-                                    index  # remember the last step index used
-                                )
+                                device.data[key] = index  # remember the last step index used
                                 if verbose:
-                                    syslog.info(
-                                        f"STEPPED AXIS: previous index: [{start_index}] new index: [{index}] new value: {value:0.3f}"
-                                    )
+                                    syslog.info(f"STEPPED AXIS: previous index: [{start_index}] new index: [{index}] new value: {value:0.3f}")
 
                                 # remember the last value
                                 syslog.info(f"set step last value: {value:0.3f}")
@@ -6551,9 +5849,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         # stop the updates
                         if verbose:
                             syslog.info("STEPPED AXIS: stop linear update")
-                        self.pulse_stop(
-                            self.vjoy_id, input_type, self.vjoy_input_id, position
-                        )
+                        self.pulse_stop(self.vjoy_id, input_type, self.vjoy_input_id, position)
 
                     result = False
 
@@ -6564,17 +5860,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     self.action_data.button_last_value = is_pressed
                     if is_local:
                         if verbose:
-                            syslog.info(
-                                f"VJOY: send local button [{self.vjoy_id}] button: {self.vjoy_input_id} pressed: {is_pressed}"
-                            )
-                        joystick_handling.VJoyProxy()[self.vjoy_id].button(
-                            self.vjoy_input_id
-                        ).is_pressed = is_pressed
+                            syslog.info(f"VJOY: send local button [{self.vjoy_id}] button: {self.vjoy_input_id} pressed: {is_pressed}")
+                        joystick_handling.VJoyProxy()[self.vjoy_id].button(self.vjoy_input_id).is_pressed = is_pressed
                     if is_remote:
                         if verbose:
-                            syslog.info(
-                                f"VJOY: send remote button [{self.vjoy_id}] button: {self.vjoy_input_id} pressed: {is_pressed}"
-                            )
+                            syslog.info(f"VJOY: send remote button [{self.vjoy_id}] button: {self.vjoy_input_id} pressed: {is_pressed}")
                         self.remote_client.send_button(
                             self.vjoy_id,
                             self.vjoy_input_id,
@@ -6584,22 +5874,14 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         elif input_type == InputType.JoystickHat:
             if verbose:
-                syslog.info(
-                    f"VJOY: set device [{self.vjoy_id}] hat {self.vjoy_input_id} direction: {action_value.current}"
-                )
+                syslog.info(f"VJOY: set device [{self.vjoy_id}] hat {self.vjoy_input_id} direction: {action_value.current}")
             if is_local:
                 if self.verbose:
-                    syslog.info(
-                        f"VJOY: send local hat: vjoy [{self.vjoy_id}] hat [{self.vjoy_input_id}] value: {action_value.current}"
-                    )
-                joystick_handling.VJoyProxy()[self.vjoy_id].hat(
-                    self.vjoy_input_id
-                ).direction = action_value.current
+                    syslog.info(f"VJOY: send local hat: vjoy [{self.vjoy_id}] hat [{self.vjoy_input_id}] value: {action_value.current}")
+                joystick_handling.VJoyProxy()[self.vjoy_id].hat(self.vjoy_input_id).direction = action_value.current
             if is_remote:
                 if self.verbose:
-                    syslog.info(
-                        f"VJOY: send remote hat: vjoy [{self.vjoy_id}] hat [{self.vjoy_input_id}] value: {action_value.current}"
-                    )
+                    syslog.info(f"VJOY: send remote hat: vjoy [{self.vjoy_id}] hat [{self.vjoy_input_id}] value: {action_value.current}")
                 self.remote_client.send_hat(
                     self.vjoy_id,
                     self.vjoy_input_id,
@@ -6623,26 +5905,16 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         is_local, is_remote = self.action_data.sendFlags()
         if is_local:
             if self.verbose:
-                syslog.info(
-                    f"VJOY: send local axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}"
-                )
-            joystick_handling.VJoyProxy()[self.vjoy_id].axis(
-                self.vjoy_input_id
-            ).value = value
+                syslog.info(f"VJOY: send local axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}")
+            joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value = value
         if is_remote:
             if self.verbose:
-                syslog.info(
-                    f"VJOY: send remote axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}"
-                )
-            self.remote_client.send_axis(
-                self.vjoy_id, self.vjoy_input_id, value, client_list=self.client_list
-            )
+                syslog.info(f"VJOY: send remote axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}")
+            self.remote_client.send_axis(self.vjoy_id, self.vjoy_input_id, value, client_list=self.client_list)
 
     def _get_axis(self, vid: int, axis_id: int) -> float:
         """gets the axis value using the inversion factor"""
-        value = (
-            joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
-        )
+        value = joystick_handling.VJoyProxy()[self.vjoy_id].axis(self.vjoy_input_id).value
         inverted = self.usage_data.is_inverted(vid, axis_id)
         if inverted:
             value = -value
@@ -6669,23 +5941,17 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         self.should_stop_thread = True
                         return
 
-                    self.axis_value = max(
-                        -1.0, min(1.0, self.axis_value + self.axis_delta_value)
-                    )
+                    self.axis_value = max(-1.0, min(1.0, self.axis_value + self.axis_delta_value))
 
                     value = self.axis_value
 
                     if is_local:
                         if self.verbose:
-                            syslog.info(
-                                f"VJOY: send local relative axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}"
-                            )
+                            syslog.info(f"VJOY: send local relative axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}")
                         vjoy_dev.axis(self.vjoy_input_id).value = value
                     if is_remote:
                         if self.verbose:
-                            syslog.info(
-                                f"VJOY: send remote relative axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}"
-                            )
+                            syslog.info(f"VJOY: send remote relative axis: vjoy [{self.vjoy_id}] axis [{self.vjoy_input_id}] value: {value:0.03f}")
                         self.remote_client.send_axis(
                             self.vjoy_id,
                             self.vjoy_input_id,
@@ -6695,10 +5961,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     # remember the last value
                     self.action_data.axis_last_value = value
 
-                    if (
-                        self.should_stop_thread
-                        and self.thread_last_update + 1.0 < time.time()
-                    ):
+                    if self.should_stop_thread and self.thread_last_update + 1.0 < time.time():
                         self.thread_running = False
                     time.sleep(0)
 
@@ -6917,9 +6180,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._reverse: bool = False
         self.axis_mode = "absolute"
         self.axis_scaling: float = 1.0
-        self.axis_start_value: float = (
-            0.0  # start value if sync mode is set to default and the output is an axis
-        )
+        self.axis_start_value: float = 0.0  # start value if sync mode is set to default and the output is an axis
         self.axis_last_value = None  # last axis value
 
         self.curve_data = None  # present if curve data is needed
@@ -6931,9 +6192,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._grid_visible = None
 
         self.exec_on_press = True  # true if trigger should execute on input press event
-        self.exec_on_release = (
-            False  # true if trigger should execute on input release event
-        )
+        self.exec_on_release = False  # true if trigger should execute on input release event
 
         self._paired: bool = False
 
@@ -6982,32 +6241,24 @@ Supports axis merging, curved output, command, hat and button mappings.
         ]  # list of values to send - if empty - uses the fixed target_value
 
         self._current_step_index = 0  # index of last value sent
-        self._target_step_start_index = (
-            0  # start index when profile is loaded (initial step)
-        )
+        self._target_step_start_index = 0  # start index when profile is loaded (initial step)
         self._target_step_direction = 1  # direction of stepping, +1 or -1
 
         self._target_step_interval = 0.1  # interval for linear stepping
         self._target_step_delta = 0.01  # delta when in manual pulse mode
         self._target_step_linear_mode = True  # true if using velocity/acceleration mode controller for simple up/down
-        self._target_step_velocity = (
-            0.01  # rate of change per second for accelerated mode
-        )
+        self._target_step_velocity = 0.01  # rate of change per second for accelerated mode
         self._target_step_acceleration = 2.0  # acceleration for the rate of change
         self._stepped_latched = True  # true if the step down latching is enabled
 
         self.target_value_valid = True
-        self.target_is_relative = (
-            False  # true if the set value axis is a relative value (+ or -)
-        )
+        self.target_is_relative = False  # true if the set value axis is a relative value (+ or -)
         self.target_use_last = False  # true if the last sent axis value is sent again
         self.relative_value = 0.2  # relative value to add or remove
         self.relative_pulse_delay = 100  # relative pulse delay in miliseconds
         self.use_relative_value = False  # true if set value should use relative value
         self._stepped_device_id: str = None  # device of the down step action to latch
-        self._stepped_device_guid: dinput.GUID = (
-            None  # device GUID of the down step device
-        )
+        self._stepped_device_guid: dinput.GUID = None  # device GUID of the down step device
         self.stepped_input_type = gremlin.input_types.InputType.JoystickButton
         self.stepped_input_id: int = None  # input of the down step action to latch
 
@@ -7024,9 +6275,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         """called if the action is being deleted"""
         if self._input_type == InputType.JoystickButton:
             el = gremlin.event_handler.EventListener()
-            el.set_vjoy_button_usage.emit(
-                self._vjoy_id, self._vjoy_input_id, False, self.id
-            )
+            el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, False, self.id)
 
     @property
     def vjoy_id(self):
@@ -7039,13 +6288,9 @@ Supports axis merging, curved output, command, hat and button mappings.
             if self.input_type == InputType.JoystickButton:
                 # notify of button usage change for the tracking
                 el = gremlin.event_handler.EventListener()
-                el.set_vjoy_button_usage.emit(
-                    self._vjoy_id, self._vjoy_input_id, False, self.id
-                )
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, False, self.id)
                 self._vjoy_id = value
-                el.set_vjoy_button_usage.emit(
-                    self._vjoy_id, self._vjoy_input_id, True, self.id
-                )
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_input_id, True, self.id)
             else:
                 self._vjoy_id = value
 
@@ -7069,17 +6314,13 @@ Supports axis merging, curved output, command, hat and button mappings.
             if self._input_type == InputType.JoystickButton:
                 # notify of button usage change for the tracking
                 el = gremlin.event_handler.EventListener()
-                el.vjoy_button_usage.emit(
-                    self.vjoy_id, self._vjoy_input_id, False, self.id
-                )
+                el.vjoy_button_usage.emit(self.vjoy_id, self._vjoy_input_id, False, self.id)
 
             self._input_type = value
 
             if self._input_type == InputType.JoystickButton:
                 el = gremlin.event_handler.EventListener()
-                el.vjoy_button_usage.emit(
-                    self.vjoy_id, self._vjoy_input_id, True, self.id
-                )
+                el.vjoy_button_usage.emit(self.vjoy_id, self._vjoy_input_id, True, self.id)
 
     @property
     def vjoy_button_id(self) -> int:
@@ -7091,23 +6332,16 @@ Supports axis merging, curved output, command, hat and button mappings.
             if self._vjoy_button_id == InputType.JoystickButton:
                 # notify of button usage change for the tracking
                 el = gremlin.event_handler.EventListener()
-                el.set_vjoy_button_usage.emit(
-                    self._vjoy_id, self._vjoy_button_id, False, self.id
-                )
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_button_id, False, self.id)
                 self._vjoy_button_id = value
-                el.set_vjoy_button_usage.emit(
-                    self._vjoy_id, self._vjoy_button_id, True, self.id
-                )
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self._vjoy_button_id, True, self.id)
             else:
                 self._vjoy_button_id = value
 
     @property
     def axis_start_value_enabled(self) -> bool:
         """true if the axis start value is enabled"""
-        return (
-            self.sync_mode == SyncMode.Default
-            and self.action_mode == VjoyAction.VJoyAxis
-        )
+        return self.sync_mode == SyncMode.Default and self.action_mode == VjoyAction.VJoyAxis
 
     def queueAxisEvent(self):
         """queues an axis event on demand to force updates"""
@@ -7161,36 +6395,286 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     def get_raw_axis_value(self):
         if self.input_is_hardware():
-            return gremlin.joystick_handling.get_curved_axis(
-                self.hardware_device_guid, self.hardware_input_id
-            )
+            return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
         return self.hardware_input_id.getAxisValue()
 
-    def get_filtered_axis_value(
-        self, value: float = None, curves: list = None, channels=False
-    ) -> float:
+    # def _apply_curve(self, value: float, curves=None) -> float:
+    #     """applies an output curve to the input if any curves are to be applied """
+
+    #     if curves is None:
+    #         curves = [self.curve_data] if self.curve_data else []
+
+    #     if not curves:
+    #         """ no curves to apply """
+    #         return value
+
+    #     config = gremlin.config.Configuration()
+    #     verbose = config.verbose_mode_merge or (config.verbose_mode_curve and gremlin.shared_state.is_running) or config.verbose_mode_vjoy
+    #     curve_value = None
+
+    #     raw_value = value
+
+    #     if self.action_mode == VjoyAction.VJoyAxis:
+    #         # plain axis
+
+    #         if curves:
+    #             if verbose:
+    #                 curve_msg = f"Applying {len(curves)} curves: "
+
+    #             for curve_data in curves:
+    #                 curve_value = curve_data.curve_value(value)  # remember to make sure curve_data had curve_update() called or the data will be incorrect
+    #                 # syslog.info(f"Apply curve data: {curve_data} input: {value:0.3f} output: {curve_value:0.3f}")
+    #                 if verbose:
+    #                     curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
+    #                 value = curve_value
+
+    #             if verbose:
+    #                 syslog.info(f"VJOY AXIS Filter: applied curve: {curve_msg} final curve value: {curve_value:0.3f}  input: {raw_value:0.3f}")
+
+    #         # apply scale or invert to input
+    #         is_scaled = self.is_scaled()
+    #         is_reverse = self.reverse
+    #         if is_scaled or is_reverse:
+    #             value = scale_to_range(
+    #                 value,
+    #                 target_min=self.output_range_min,
+    #                 target_max=self.output_range_max,
+    #                 invert=is_reverse,
+    #             )
+
+    #     return value
+
+    # def _get_merge_value(self):
+    #     """applies merging to the value"""
+    #     config = gremlin.config.Configuration()
+    #     verbose = config.verbose_mode_merge or (config.verbose_mode_curve and gremlin.shared_state.is_running) or config.verbose_mode_vjoy
+
+    #     merged_values = None
+
+    #     if self.action_mode == VjoyAction.VJoyMergeAxis:  # and self.merge_mode != MergeOperationType.NotSet:
+    #         if gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid):
+    #             v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+    #         elif gremlin.joystick_handling.is_vjoy_device(self.hardware_device_guid):
+    #             v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+    #         else:
+    #             v1 = self.hardware_input_id.axis_value
+
+    #         if self.reverse:  # if the primary input should be reversed before merge
+    #             v1 = -v1
+
+    #         # include in merged data the input axis
+    #         merged_values = [v1]
+    #         value = v1
+    #         sd = gremlin.event_handler.AxisState()
+    #         if verbose:
+    #             d1_name = gremlin.joystick_handling.getDeviceName(self.hardware_device_guid)
+    #             syslog.info(f"MERGE: source: [{d1_name}] axis: [{self.hardware_input_id}] steps: {len(self._merge_data)}")
+    #             step = 1
+
+    #         for data in self._merge_data:
+    #             merge_device_id = data.device_id
+    #             merge_input_id = data.input_id
+    #             merge_device_guid = data.device_guid
+    #             merge_input_type = InputType.JoystickAxis
+
+    #             if not merge_device_id or merge_input_id is None or merge_device_guid is None:
+    #                 # no data
+    #                 continue
+
+    #             v2 = None
+
+    #             if gremlin.joystick_handling.is_hardware_device(merge_device_guid):
+    #                 values = sd.getAxisValues(merge_device_guid, merge_input_id)
+    #                 if values:
+    #                     v2 = values.actual
+    #                 else:
+    #                     sd.registerDeviceGuid(merge_device_guid)
+    #                     values = sd.getAxisValues(merge_device_guid, merge_input_id)
+
+    #                     if values:
+    #                         v2 = values.actual
+    #                     else:
+    #                         device_name = gremlin.joystick_handling.device_name_from_guid(merge_device_guid)
+    #                         v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
+    #                         syslog.warning(f"Unable to get value for hardware device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}")
+
+    #             elif gremlin.joystick_handling.is_vjoy_device(merge_device_guid):
+    #                 values = sd.getAxisValues(merge_device_guid, merge_input_id)
+    #                 if values:
+    #                     v2 = values.actual
+    #                 else:
+    #                     sd.registerDeviceGuid(merge_device_guid)
+    #                     values = sd.getAxisValues(merge_device_guid, merge_input_id)
+    #                     if values:
+    #                         v2 = values.actual
+    #                     else:
+    #                         device_name = gremlin.joystick_handling.device_name_from_guid(merge_device_guid)
+    #                         v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
+    #                         syslog.warning(f"Unable to get value for vjoy device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}")
+
+    #             else:
+    #                 # find the merged device
+    #                 ec = gremlin.execution_graph.ExecutionContext()
+    #                 input_item = ec.findInputItem(
+    #                     merge_device_guid,
+    #                     merge_input_type,
+    #                     merge_input_id,
+    #                     gremlin.shared_state.current_mode,
+    #                 )
+    #                 if input_item:
+    #                     v2 = input_item.axis_value
+
+    #             if v1 is None or v2 is None:
+    #                 # something wasn't found
+    #                 syslog.error(f"VjoyRemap: merge: unable to get an axis value, one of the inputs was not found.: id: [{str(merge_device_guid)}] axis: [{merge_input_id}] ")
+    #                 return 0.0
+
+    #             if data.curve_data:
+    #                 # apply any curve to the merged data before applying it
+    #                 v2 = data.curve_data.curve_value(v2)
+
+    #             merged_values.append(v2)  # add the merge value
+
+    #             match data.operation:
+    #                 case MergeOperationType.Add:
+    #                     value = scale_to_range(
+    #                         v1 + v2,
+    #                         target_min=self.output_range_min,
+    #                         target_max=self.output_range_max,
+    #                         invert=self.merge_invert,
+    #                     )
+
+    #                 case MergeOperationType.Average:
+    #                     value = scale_to_range(
+    #                         (v1 + v2) / 2,
+    #                         target_min=self.output_range_min,
+    #                         target_max=self.output_range_max,
+    #                         invert=self.merge_invert,
+    #                     )
+
+    #                 case MergeOperationType.Center:
+    #                     value = scale_to_range(
+    #                         (v1 - v2) / 2,
+    #                         target_min=self.output_range_min,
+    #                         target_max=self.output_range_max,
+    #                         invert=self.merge_invert,
+    #                     )
+
+    #                 case MergeOperationType.Min:
+    #                     value = scale_to_range(
+    #                         min(v1, v2),
+    #                         target_min=self.output_range_min,
+    #                         target_max=self.output_range_max,
+    #                         invert=self.merge_invert,
+    #                     )
+
+    #                 case MergeOperationType.Max:
+    #                     value = scale_to_range(
+    #                         max(v1, v2),
+    #                         target_min=self.output_range_min,
+    #                         target_max=self.output_range_max,
+    #                         invert=self.merge_invert,
+    #                     )
+
+    #                 case MergeOperationType.ScaleFull:
+    #                     scale = v2
+    #                     value = scale_to_range(v1 * scale)
+
+    #                 case MergeOperationType.ScaleHalf:
+    #                     if v2 > 0:
+    #                         scale = v2
+    #                         value = scale_to_range(v1 * scale)
+    #                     else:
+    #                         scale = abs(v2)
+    #                         value = scale_to_range(v1 * -scale)
+
+    #                 case MergeOperationType.ScaleFullCentered:
+    #                     scale = scale_to_range(v2, target_min=0, target_max=1)
+    #                     value = scale_to_range(v1 * scale)
+
+    #                 case MergeOperationType.ScaleHalfCentered:
+    #                     scale = abs(v2)
+    #                     value = scale_to_range(v1 * scale)
+
+    #                 case MergeOperationType.Multiply:
+    #                     value = scale_to_range(v1 * v2)
+
+    #                 case MergeOperationType.Trim:
+    #                     v2 = scale_to_range(v2, target_min=0, target_max=1)  # scale v2 0 to 1
+    #                     if v1 > 0:
+    #                         value = v2 + ((1 - v2) * v1)
+    #                     else:
+    #                         value = v2 + ((v2 + 1) * v1)
+
+    #                 case MergeOperationType.TrimCentered:
+    #                     # v2 = scale_to_range(v2, target_min=0, target_max = 1) # scale v2 0 to 1
+    #                     # v2 is -1 to +1
+    #                     a = scale_to_range(v2, target_min=0, target_max=1)  # scale v2 0 to 1
+    #                     b = a - 0.5
+    #                     c = scale_to_range(b, source_min=0, source_max=0.5, target_min=0, target_max=1)
+    #                     t = b
+    #                     syslog.info(f"v2: {v2:0.03f} a: {a:0.03f} b: {b:0.03f} c: {c:0.03f} t: {t:0.03f}")
+    #                     if v1 > 0:
+    #                         value = v2 + ((1 - t) * v1)
+    #                     else:
+    #                         value = v2 + ((t + 1) * v1)
+
+    #             if verbose:
+    #                 d2_name = gremlin.joystick_handling.getDeviceName(merge_device_guid)
+
+    #                 syslog.info(f"Merge operation: step [{step}]: {data.operation.name}: v1 {v1:0.03f} - merge with [{d2_name}] axis [{merge_input_id}]  v2: [{v2:0.03f}] result: [{value:0.03f}]")
+    #                 step += 1
+
+    #             v1 = value
+    #     else:
+    #         # not a merge mode, get the current value of the input
+    #         if gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid):
+    #             value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+    #         elif gremlin.joystick_handling.is_vjoy_device(self.hardware_device_guid):
+    #             value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
+
+    #     return value
+
+    # def get_filtered_axis_value(self, value: float = None, curves: list = None, channels=False) -> float:
+    #     ''' gets the filtered axis output value '''
+    #     raw_value = value
+    #     merge_value : float = None
+    #     curve_value : float = None
+    #     if self.action_mode == VjoyAction.VJoyMergeAxis:
+    #         # action mode is curve mode
+    #         value = self._get_merge_value()
+    #         merge_value = value
+        
+    #     if curves or self.curve_data:
+    #         value = self._apply_curve(value, curves)
+    #         curve_value = value
+
+    #     if self.invert_merged_output:
+    #         # invert the final output if needed
+    #         value = -value
+
+    #     if channels:
+    #         data = gremlin.event_handler.AxisValues(actual=value, raw=raw_value, curved=curve_value, merged=merge_value)
+    #         return data
+        
+    #     return value
+
+    
+    def get_filtered_axis_value(self, value: float = None, curves: list = None, channels=False) -> float:
         """computes the output value for the current configuration - applies curves if curves are provided
         if channels is enabled, returns the data as an AxisValue object with channels
         """
         config = gremlin.config.Configuration()
-        verbose = (
-            config.verbose_mode_merge
-            or (config.verbose_mode_curve and gremlin.shared_state.is_running)
-            or config.verbose_mode_vjoy
-        )
+        verbose = config.verbose_mode_merge or (config.verbose_mode_curve and gremlin.shared_state.is_running) or config.verbose_mode_vjoy
         curve_value = None
         merged_values = None
 
         if verbose:
             device = gremlin.joystick_handling.getDevice(self.hardware_device_guid)
             if not device:
-                syslog.warning(
-                    f"Unable to find device: [{gremlin.util.normalize_guid(self.hardware_device_guid)}]"
-                )
+                syslog.warning(f"Unable to find device: [{gremlin.util.normalize_guid(self.hardware_device_guid)}]")
                 return None
-            device_stub = (
-                f"[{device.name}/{device.get_axis_name(self.hardware_input_id)}]"
-            )
+            device_stub = f"[{device.name}/{device.get_axis_name(self.hardware_input_id)}]"
 
         if value is not None:
             if verbose:
@@ -7200,9 +6684,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             if verbose:
                 source = f"{device_stub} get hardware value"
             # get the calibrated, curved input (if input is curved and calibrated)
-            axis_value = gremlin.joystick_handling.get_curved_axis(
-                self.hardware_device_guid, self.hardware_input_id
-            )
+            axis_value = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
             if axis_value is None:
                 # not an axis type or device not found
                 return None
@@ -7225,18 +6707,14 @@ Supports axis merging, curved output, command, hat and button mappings.
                     curve_msg = f"Applying {len(curves)} curves: "
 
                 for curve_data in curves:
-                    curve_value = curve_data.curve_value(
-                        value
-                    )  # remember to make sure curve_data had curve_update() called or the data will be incorrect
+                    curve_value = curve_data.curve_value(value)  # remember to make sure curve_data had curve_update() called or the data will be incorrect
                     # syslog.info(f"Apply curve data: {curve_data} input: {value:0.3f} output: {curve_value:0.3f}")
                     if verbose:
                         curve_msg += f"[{value:0.3f} -> [{curve_value:0.3f}] |"
                     value = curve_value
 
                 if verbose:
-                    syslog.info(
-                        f"VJOY AXIS Filter: applied curve: {curve_msg} final curve value: {curve_value:0.3f}  input: {raw_value:0.3f}"
-                    )
+                    syslog.info(f"VJOY AXIS Filter: applied curve: {curve_msg} final curve value: {curve_value:0.3f}  input: {raw_value:0.3f}")
 
             # apply scale or invert to input
             is_scaled = self.is_scaled()
@@ -7249,26 +6727,16 @@ Supports axis merging, curved output, command, hat and button mappings.
                     invert=is_reverse,
                 )
                 if verbose:
-                    syslog.info(
-                        f"VJOY AXIS Filter: using source: [{source}] applied filter: [{axis_value:0.3f}]  scaled: {is_scaled} reversed: {is_reverse} -> included: [{value:0.3f}]"
-                    )
+                    syslog.info(f"VJOY AXIS Filter: using source: [{source}] applied filter: [{axis_value:0.3f}]  scaled: {is_scaled} reversed: {is_reverse} -> included: [{value:0.3f}]")
             else:
                 if verbose:
-                    syslog.info(
-                        f"VJOY AXIS Filter: using source: [{source}] applied filter: [{axis_value:0.3f}] -> included: [{value:0.3f}]"
-                    )
+                    syslog.info(f"VJOY AXIS Filter: using source: [{source}] applied filter: [{axis_value:0.3f}] -> included: [{value:0.3f}]")
 
-        elif (
-            self.action_mode == VjoyAction.VJoyMergeAxis
-        ):  # and self.merge_mode != MergeOperationType.NotSet:
+        elif self.action_mode == VjoyAction.VJoyMergeAxis:  # and self.merge_mode != MergeOperationType.NotSet:
             if gremlin.joystick_handling.is_hardware_device(self.hardware_device_guid):
-                v1 = gremlin.joystick_handling.get_curved_axis(
-                    self.hardware_device_guid, self.hardware_input_id
-                )
+                v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
             elif gremlin.joystick_handling.is_vjoy_device(self.hardware_device_guid):
-                v1 = gremlin.joystick_handling.get_curved_axis(
-                    self.hardware_device_guid, self.hardware_input_id
-                )
+                v1 = gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
             else:
                 v1 = self.hardware_input_id.axis_value
 
@@ -7284,12 +6752,8 @@ Supports axis merging, curved output, command, hat and button mappings.
             value = v1
             sd = gremlin.event_handler.AxisState()
             if verbose:
-                d1_name = gremlin.joystick_handling.getDeviceName(
-                    self.hardware_device_guid
-                )
-                syslog.info(
-                    f"MERGE: source: [{d1_name}] axis: [{self.hardware_input_id}] steps: {len(self._merge_data)}"
-                )
+                d1_name = gremlin.joystick_handling.getDeviceName(self.hardware_device_guid)
+                syslog.info(f"MERGE: source: [{d1_name}] axis: [{self.hardware_input_id}] steps: {len(self._merge_data)}")
                 step = 1
 
             for data in self._merge_data:
@@ -7298,11 +6762,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 merge_device_guid = data.device_guid
                 merge_input_type = InputType.JoystickAxis
 
-                if (
-                    not merge_device_id
-                    or merge_input_id is None
-                    or merge_device_guid is None
-                ):
+                if not merge_device_id or merge_input_id is None or merge_device_guid is None:
                     # no data
                     continue
 
@@ -7319,17 +6779,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                         if values:
                             v2 = values.actual
                         else:
-                            device_name = (
-                                gremlin.joystick_handling.device_name_from_guid(
-                                    merge_device_guid
-                                )
-                            )
-                            v2 = gremlin.joystick_handling.get_curved_axis(
-                                merge_device_guid, merge_input_id
-                            )
-                            syslog.warning(
-                                f"Unable to get value for hardware device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}"
-                            )
+                            device_name = gremlin.joystick_handling.device_name_from_guid(merge_device_guid)
+                            v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
+                            syslog.warning(f"Unable to get value for hardware device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}")
 
                 elif gremlin.joystick_handling.is_vjoy_device(merge_device_guid):
                     values = sd.getAxisValues(merge_device_guid, merge_input_id)
@@ -7341,17 +6793,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                         if values:
                             v2 = values.actual
                         else:
-                            device_name = (
-                                gremlin.joystick_handling.device_name_from_guid(
-                                    merge_device_guid
-                                )
-                            )
-                            v2 = gremlin.joystick_handling.get_curved_axis(
-                                merge_device_guid, merge_input_id
-                            )
-                            syslog.warning(
-                                f"Unable to get value for vjoy device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}"
-                            )
+                            device_name = gremlin.joystick_handling.device_name_from_guid(merge_device_guid)
+                            v2 = gremlin.joystick_handling.get_curved_axis(merge_device_guid, merge_input_id)
+                            syslog.warning(f"Unable to get value for vjoy device: {device_name} [{merge_device_guid}] input: [{merge_input_id}] - using alternate method. value: {v2:0.3f}")
 
                 else:
                     # find the merged device
@@ -7367,9 +6811,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
                 if v1 is None or v2 is None:
                     # something wasn't found
-                    syslog.error(
-                        f"VjoyRemap: merge: unable to get an axis value, one of the inputs was not found.: id: [{str(merge_device_guid)}] axis: [{merge_input_id}] "
-                    )
+                    syslog.error(f"VjoyRemap: merge: unable to get an axis value, one of the inputs was not found.: id: [{str(merge_device_guid)}] axis: [{merge_input_id}] ")
                     return 0.0
 
                 if data.curve_data:
@@ -7443,9 +6885,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                         value = scale_to_range(v1 * v2)
 
                     case MergeOperationType.Trim:
-                        v2 = scale_to_range(
-                            v2, target_min=0, target_max=1
-                        )  # scale v2 0 to 1
+                        v2 = scale_to_range(v2, target_min=0, target_max=1)  # scale v2 0 to 1
                         if v1 > 0:
                             value = v2 + ((1 - v2) * v1)
                         else:
@@ -7454,17 +6894,11 @@ Supports axis merging, curved output, command, hat and button mappings.
                     case MergeOperationType.TrimCentered:
                         # v2 = scale_to_range(v2, target_min=0, target_max = 1) # scale v2 0 to 1
                         # v2 is -1 to +1
-                        a = scale_to_range(
-                            v2, target_min=0, target_max=1
-                        )  # scale v2 0 to 1
+                        a = scale_to_range(v2, target_min=0, target_max=1)  # scale v2 0 to 1
                         b = a - 0.5
-                        c = scale_to_range(
-                            b, source_min=0, source_max=0.5, target_min=0, target_max=1
-                        )
+                        c = scale_to_range(b, source_min=0, source_max=0.5, target_min=0, target_max=1)
                         t = b
-                        syslog.info(
-                            f"v2: {v2:0.03f} a: {a:0.03f} b: {b:0.03f} c: {c:0.03f} t: {t:0.03f}"
-                        )
+                        syslog.info(f"v2: {v2:0.03f} a: {a:0.03f} b: {b:0.03f} c: {c:0.03f} t: {t:0.03f}")
                         if v1 > 0:
                             value = v2 + ((1 - t) * v1)
                         else:
@@ -7473,9 +6907,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 if verbose:
                     d2_name = gremlin.joystick_handling.getDeviceName(merge_device_guid)
 
-                    syslog.info(
-                        f"Merge operation: step [{step}]: {data.operation.name}: v1 {v1:0.03f} - merge with [{d2_name}] axis [{merge_input_id}]  v2: [{v2:0.03f}] result: [{value:0.03f}]"
-                    )
+                    syslog.info(f"Merge operation: step [{step}]: {data.operation.name}: v1 {v1:0.03f} - merge with [{d2_name}] axis [{merge_input_id}]  v2: [{v2:0.03f}] result: [{value:0.03f}]")
                     step += 1
 
                 v1 = value
@@ -7485,9 +6917,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 value = -value
 
         if channels:
-            data = gremlin.event_handler.AxisValues(
-                actual=value, raw=raw_value, curved=curve_value, merged=merged_values
-            )
+            data = gremlin.event_handler.AxisValues(actual=value, raw=raw_value, curved=curve_value, merged=merged_values)
             return data
 
         return value
@@ -7516,12 +6946,8 @@ Supports axis merging, curved output, command, hat and button mappings.
         if event.is_axis:
             device_guid = gremlin.util.normalize_guid(event.device_guid)
             input_id = event.identifier
-            if (
-                event.device_guid == self.hardware_device_guid
-                and event.identifier == self.hardware_input_id
-            ) or (
-                event.device_guid == self.get_device_guid()
-                and event.identifier == self.get_input_id()
+            if (event.device_guid == self.hardware_device_guid and event.identifier == self.hardware_input_id) or (
+                event.device_guid == self.get_device_guid() and event.identifier == self.get_input_id()
             ):
                 # process self
                 return True
@@ -7580,9 +7006,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         elif self.action_mode == VjoyAction.VJoyMergeAxis:
             stub = ""
             for index, data in enumerate(self._merge_data):
-                device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(
-                    data.device_id
-                )
+                device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(data.device_id)
                 stub += f", merge[{index}] = device: {device.name} axis: {data.input_id}/{device.get_axis_name(data.input_id)} invert: [{data.invert}] operation: [{data.operation.name}]"
             return f"VJoy #{self._vjoy_id} Mode: {self.action_mode.name} Axis: {self.vjoy_axis_id} {stub} "
         else:
@@ -7650,9 +7074,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         ):
             input_type = InputType.JoystickButton
         else:
-            syslog.warning(
-                f"VJOYREMAP ICON: don't know how to handle action mode: {self.action_mode}"
-            )
+            syslog.warning(f"VJOYREMAP ICON: don't know how to handle action mode: {self.action_mode}")
         return input_type
 
     @property
@@ -7727,9 +7149,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
                 # also reset ALL vjoy remaps
                 extra_data = {"value": value}
-                gremlin.shared_state.current_profile.filter_actions(
-                    self.tag, self._update_grid_callback, extra_data
-                )
+                gremlin.shared_state.current_profile.filter_actions(self.tag, self._update_grid_callback, extra_data)
 
             # notify all visible controls to update
             veh = gremlin.event_handler.VjoyRemapEventHandler()
@@ -7801,9 +7221,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     VjoyAction.VJoyHatPulse,
                 ):
                     position = (0, 0)
-                    return gremlin.util.load_icon(
-                        vjoy.vjoy.Hat.getEightDirectionsIconMap()[position]
-                    )
+                    return gremlin.util.load_icon(vjoy.vjoy.Hat.getEightDirectionsIconMap()[position])
                 else:
                     input_string = "button"
                     suffix = f"{self.vjoy_input_id:03d}"
@@ -7819,9 +7237,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         if input_string:
             if suffix:
-                icon_path = (
-                    f"{prefix}icon_{input_string}_{suffix}.png" if suffix else fallback
-                )
+                icon_path = f"{prefix}icon_{input_string}_{suffix}.png" if suffix else fallback
                 icon_file = gremlin.util.find_icon(icon_path)
                 if icon_file and os.path.isfile(icon_file):
                     return icon_file
@@ -7869,13 +7285,9 @@ Supports axis merging, curved output, command, hat and button mappings.
             # button
             if self.vjoy_button_id != index:
                 # notify of button usage change for the tracking
-                el.set_vjoy_button_usage.emit(
-                    self._vjoy_id, self.vjoy_button_id, False, self.id
-                )
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self.vjoy_button_id, False, self.id)
                 self.vjoy_button_id = index
-                el.set_vjoy_button_usage.emit(
-                    self._vjoy_id, self.vjoy_button_id, True, self.id
-                )
+                el.set_vjoy_button_usage.emit(self._vjoy_id, self.vjoy_button_id, True, self.id)
         self.vjoy_input_id = index
 
     def get_input_id(self):
@@ -7907,9 +7319,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 self.refresh_vjoy()  # ensure we have the latest device list
 
             if vjoy_id not in self.vjoy_map:
-                syslog.error(
-                    f"Profile load: vjoy device {vjoy_id} was not found in the list of valid VJOY devices"
-                )
+                syslog.error(f"Profile load: vjoy device {vjoy_id} was not found in the list of valid VJOY devices")
                 self.vjoy_axis_id = 1
                 self.vjoy_button_id = 1
                 self.vjoy_hat_id = 1
@@ -7936,13 +7346,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                 VjoyAction.VJoyHatPulse,
             ):
                 if "position" in node.attrib:
-                    self.vjoy_hat_position = vjoy.vjoy.Hat.getDirection(
-                        node.get("position")
-                    )
+                    self.vjoy_hat_position = vjoy.vjoy.Hat.getDirection(node.get("position"))
                 if "return-position" in node.attrib:
-                    self.vjoy_hat_return_position = vjoy.vjoy.Hat.getDirection(
-                        node.get("return-position")
-                    )
+                    self.vjoy_hat_return_position = vjoy.vjoy.Hat.getDirection(node.get("return-position"))
 
             if "input" in node.attrib:
                 index = safe_read(node, "input", int, 1)
@@ -7989,9 +7395,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 if value == "none":
                     self.button_start_value = None
                 else:
-                    self.button_start_value = safe_read(
-                        node, "start_pressed", bool, False
-                    )
+                    self.button_start_value = safe_read(node, "start_pressed", bool, False)
 
             if "target_value" in node.attrib:
                 self.target_value = safe_read(node, "target_value", float, 0.0)
@@ -8001,27 +7405,19 @@ Supports axis merging, curved output, command, hat and button mappings.
                 self.target_use_last = safe_read(node, "target-use-last", bool, False)
 
             if "target_relative" in node.attrib:
-                self.target_is_relative = safe_read(
-                    node, "target_relative", bool, False
-                )
+                self.target_is_relative = safe_read(node, "target_relative", bool, False)
 
             if "relative_value" in node.attrib:
-                relative_value = gremlin.util.clamp(
-                    safe_read(node, "relative_value", float, 0.1)
-                )
+                relative_value = gremlin.util.clamp(safe_read(node, "relative_value", float, 0.1))
                 if relative_value < 0:
                     relative_value = abs(relative_value)
                 self.relative_value = relative_value
 
             if "use_relative_value" in node.attrib:
-                self.use_relative_value = safe_read(
-                    node, "use_relative_value", bool, False
-                )
+                self.use_relative_value = safe_read(node, "use_relative_value", bool, False)
 
             if "relative_pulse_delay" in node.attrib:
-                self.relative_pulse_delay = safe_read(
-                    node, "relative_pulse_delay", int, 500
-                )
+                self.relative_pulse_delay = safe_read(node, "relative_pulse_delay", int, 500)
 
             if "range_low" in node.attrib:
                 self.button_range_min = safe_read(node, "range_low", float, -1.0)
@@ -8046,11 +7442,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     case _:
                         # legacy mode
                         is_pulse = safe_read(node, "pulse", bool, False)
-                        mode = (
-                            ButtonOutputMode.Pulse
-                            if is_pulse
-                            else ButtonOutputMode.Hold
-                        )
+                        mode = ButtonOutputMode.Pulse if is_pulse else ButtonOutputMode.Hold
                 self.button_mode = mode
 
             if "output_range_low" in node.attrib:
@@ -8068,11 +7460,9 @@ Supports axis merging, curved output, command, hat and button mappings.
             if "paired" in node.attrib:
                 self.paired = safe_read(node, "paired", bool, False)
 
-            self.invert_merged_output = safe_read(
-                node, "invert-merged-output", bool, False
-            )
+            self.invert_merged_output = safe_read(node, "invert-merged-output", bool, False)
 
-            self._merge_data = []
+            self._merge_data.clear()
 
             if self.action_mode == VjoyAction.VJoyMergeAxis:
                 # legacy
@@ -8082,9 +7472,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     input_id = safe_read(node, "merge_input_id", int, 0)
                     if "merge_input_type" in node.attrib:
                         merge_input_type = safe_read(node, "merge_input_type", str, "")
-                        merge_input_type = gremlin.input_types.InputType.to_enum(
-                            merge_input_type
-                        )
+                        merge_input_type = gremlin.input_types.InputType.to_enum(merge_input_type)
                     merge_mode = MergeOperationType.Center
                     if "merge_mode" in node.attrib:
                         mode = node.get("merge_mode")
@@ -8095,9 +7483,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                             syslog.error(f"{err}\n{traceback.format_exc()}")
 
                     invert = safe_read(node, "merge_invert", bool, False)
-                    data = MergeData(
-                        device_id, input_id, operation=merge_mode, invert=invert
-                    )
+                    data = MergeData(device_id, input_id, operation=merge_mode, invert=invert)
                     self._merge_data.append(data)
 
                 else:
@@ -8135,9 +7521,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             self._stepped_latched = safe_read(node, "latched", bool, True)
 
             if "step-start-index" in node.attrib:
-                self.target_step_start_index = safe_read(
-                    node, "step-start-index", int, 0
-                )
+                self.target_step_start_index = safe_read(node, "step-start-index", int, 0)
             if "stepped-device-id" in node.attrib:
                 self.stepped_device_id = node.get("stepped-device-id")
 
@@ -8155,9 +7539,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
             if "override-input-type" in node.attrib:
                 input_type = safe_read(node, "override-input-type", str, "")
-                self.override_input_type = gremlin.input_types.InputType.to_enum(
-                    input_type
-                )
+                self.override_input_type = gremlin.input_types.InputType.to_enum(input_type)
 
             if "pulse-delay" in node.attrib:
                 self.pulse_delay = safe_read(node, "pulse-delay", int, 250)
@@ -8177,11 +7559,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
             if curve_node is not None:
                 self.curve_data = gremlin.curve_handler.AxisCurveData()
-                self.curve_data.calibration = (
-                    gremlin.ui.axis_calibration.CalibrationManager().getCalibration(
-                        self.hardware_device_guid, self.hardware_input_id
-                    )
-                )
+                self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
                 self.curve_data._parse_xml(curve_node)
                 self.curve_data.curve_update()
 
@@ -8206,11 +7584,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                         case _:
                             # legacy mode
                             is_pulse = safe_read(node_hat, "pulse", bool, False)
-                            mode = (
-                                ButtonOutputMode.Pulse
-                                if is_pulse
-                                else ButtonOutputMode.Hold
-                            )
+                            mode = ButtonOutputMode.Pulse if is_pulse else ButtonOutputMode.Hold
 
                     self.hat_mode_map[position] = mode
 
@@ -8229,9 +7603,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         node = ElementTree.Element(VjoyRemap.tag)
         node.set("vjoy", str(self.vjoy_id))
 
-        save_exec_on_release = VjoyAction.is_command(
-            self.action_mode
-        ) or self.action_mode in (
+        save_exec_on_release = VjoyAction.is_command(self.action_mode) or self.action_mode in (
             VjoyAction.VJoyButtonPress,
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoySetAxis,
@@ -8286,9 +7658,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 if self.button_start_value is None:
                     node.set("start_pressed", "none")
                 else:
-                    node.set(
-                        "start_pressed", safe_format(self.button_start_value, bool)
-                    )
+                    node.set("start_pressed", safe_format(self.button_start_value, bool))
 
                 node.set("paired", safe_format(self.paired, bool))
 
@@ -8296,9 +7666,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 node.set("target-use-last", safe_format(self.target_use_last, bool))
 
             case VjoyAction.VJoyMergeAxis:
-                node.set(
-                    "invert-merged-output", safe_format(self.invert_merged_output, bool)
-                )
+                node.set("invert-merged-output", safe_format(self.invert_merged_output, bool))
 
                 if self._merge_data:
                     child = ElementTree.SubElement(node, "merge-axis")
@@ -8343,9 +7711,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             case VjoyAction.VJoySetAxisStepped:
                 node.set("step-dir", safe_format(self.target_step_direction, int))
                 node.set("steps", gremlin.util.floatlist_to_csv(self.target_step_list))
-                node.set(
-                    "step-start-index", safe_format(self.target_step_start_index, int)
-                )
+                node.set("step-start-index", safe_format(self.target_step_start_index, int))
                 node.set("latched", safe_format(self._stepped_latched, bool))
                 if self.stepped_device_id:
                     node.set("stepped-device-id", self.stepped_device_id)
@@ -8353,9 +7719,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     node.set("stepped-input-id", str(self.stepped_input_id))
                 node.set("linear", safe_format(self._target_step_linear_mode, bool))
                 node.set("velocity", safe_format(self._target_step_velocity, float))
-                node.set(
-                    "acceleration", safe_format(self._target_step_acceleration, float)
-                )
+                node.set("acceleration", safe_format(self._target_step_acceleration, float))
                 node.set("delta", safe_format(self._target_step_delta, float))
                 node.set("pulse_delay", safe_format(self.pulse_delay, int))
 
@@ -8442,9 +7806,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 for data in self._merge_data:
                     device_id, input_id = data.key
                     device = gremlin.joystick_handling.getDevice(device_id)
-                    assert device is not None, (
-                        f"Unable to get device for id {device_id}"
-                    )
+                    assert device is not None, f"Unable to get device for id {device_id}"
                     table.addField(f"Merge: {device.name}", f"{input_id}")
 
             case VjoyAction.VJoyButton:
@@ -8468,9 +7830,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 table.addField("Pulse Delay", f" {self.pulse_delay}ms")
                 if self.pulse_repeat:
                     table.addField("Pulse Repeat", "yes")
-                    table.addField(
-                        "Repeat Delay", f"Repeat Delay: {self.pulse_repeat_delay}ms"
-                    )
+                    table.addField("Repeat Delay", f"Repeat Delay: {self.pulse_repeat_delay}ms")
 
             case VjoyAction.VJoyInvertAxis:
                 table.addField("Invert Axis", "yes")
@@ -8502,9 +7862,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             case VjoyAction.VJoyHatToButton:
                 for position in self.hat_map:
                     input_id = self.action_data.hat_map[position]
-                    table.addField(
-                        f"{vjoy.vjoy.Hat.direction_to_name(position)}", f"{input_id}"
-                    )
+                    table.addField(f"{vjoy.vjoy.Hat.direction_to_name(position)}", f"{input_id}")
 
             case VjoyAction.VJoySetAxisStepped:
                 pass

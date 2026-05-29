@@ -1417,6 +1417,10 @@ class InputItemWidget(QBoxFrame):
         # clear input curve button
         self.clear_curve_widget = None
 
+        # repeaters
+        self.axis_repeater_widget = None
+        self.button_repeater_widget = None
+
         if self.is_axis:
             # curve container (axis only)
             self._curve_container_widget, self._curve_container_layout = gremlin.ui.ui_common.getHContainer()
@@ -1770,24 +1774,12 @@ class InputItemWidget(QBoxFrame):
                 widget.setFixedHeight(h)
 
     def unhook(self):
-        hook_id = gremlin.util.normalize_guid(self._identifier.id)
-
-        if self.axis_repeater_widget:
-            config = gremlin.config.Configuration()
-            verbose = config.verbose_mode_perf and config.verbose_mode_detailed
-            if verbose:
-                description = f"input repeater:  hook id: [{hook_id}] [{str(self.input_item.id)}] device [{gremlin.joystick_handling.getDeviceName(self._identifier.device_guid)}] axis id: [{self._identifier.input_id}] "
-                syslog.info(f"Unregister repeater: {description}")
-            self.axis_repeater_widget.setParent(None)
-            self.axis_repeater_widget.deleteLater()
-            self.axis_repeater_widget = None
-        if self.button_repeater_widget:
-            self.button_repeater_widget.setParent(None)
-            self.button_repeater_widget.deleteLater()
-            self.button_repeater_widget = None
+        self._button_widget_unhooked()
+        
 
     def _update_repeater(self):
         """updates the repeaters based on the type of widget"""
+        gremlin.util.assert_ui_thread()
 
         if self._input_type in (
             InputType.Keyboard,
@@ -1811,9 +1803,7 @@ class InputItemWidget(QBoxFrame):
         input_type = self._identifier.input_type
 
         if config.show_input_axis:
-            self.axis_repeater_widget = None
-            self.button_repeater_widget = None
-            gremlin.util.clear_layout(self._repeater_container_layout)
+            # gremlin.util.clear_layout(self._repeater_container_layout)
 
             if (self._identifier.is_axis or self._identifier.is_button or self._identifier.is_hat) or input_type in (
                 InputType.JoystickAxis,
@@ -1831,63 +1821,75 @@ class InputItemWidget(QBoxFrame):
                         astate = gremlin.event_handler.AxisState()
                         values = astate.getAxisValues(device_guid, input_id)
 
-                        widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar(device_guid, input_id)
-                        widget.setValue(values)
+                        if not self.axis_repeater_widget:
+                            # create the repeater
+                            widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar(device_guid = device_guid, 
+                                                                                input_id = input_id,
+                                                                                values = values,)
 
-                        # widget.unhooked.connect(self._axis_widget_unhooked)
-                        widget.sizeChanged.connect(self._repeater_size_changed)
-                        widget.data = self
-                        self.axis_repeater_widget = widget
-                        self._repeater_container_layout.addWidget(widget)
-                        self._repeater_container_layout.addStretch()
+                            # widget.unhooked.connect(self._axis_widget_unhooked)
+                            widget.sizeChanged.connect(self._repeater_size_changed)
+                            widget.data = self
+                            widget.setObjectName(f"axis repeater for input item: {self.input_item.display_name}")
+                            self.axis_repeater_widget = widget
+                            self._repeater_container_layout.addWidget(widget)
+                            # self._repeater_container_layout.addStretch()
 
-                        widget.setMaximumWidth(200)
-                        if self._debug_layout:
-                            widget.setStyleSheet("background: purple;")
+                            widget.setMaximumWidth(200)
+                            if self._debug_layout:
+                                widget.setStyleSheet("background: purple;")
 
-                        description = f"input repeater:  hook id: [{hook_id}] [{str(self.input_item.id)}] device [{gremlin.joystick_handling.getDeviceName(self._identifier.device_guid)}] axis id: [{self._identifier.input_id}] "
-                        if verbose:
-                            syslog.info(f"register repeater: {description}")
-                        # widget.hookDevice(
-                        #     hook_id,
-                        #     self._identifier.device_guid,
-                        #     self._identifier.input_type,
-                        #     self._identifier.input_id,
-                        #     ui_only=True,
-                        #     description=description,
-                        # )
-                        height = widget.sizeHint().height() + 4
-                        self._setWidgetHeight(self._repeater_container_widget, height)
+                            description = f"input repeater:  hook id: [{hook_id}] [{str(self.input_item.id)}] device [{gremlin.joystick_handling.getDeviceName(self._identifier.device_guid)}] axis id: [{self._identifier.input_id}] "
+                            if verbose:
+                                syslog.info(f"register repeater: {description}")
+                       
+                            height = widget.sizeHint().height() + 4
+                            self._setWidgetHeight(self._repeater_container_widget, height)
 
                         self.axis_repeater_widget.triggerUpdate()  # force an update
                     else:
                         # button
-                        widget = gremlin.ui.ui_common.ButtonStateWidget()
-                        widget.unhooked.connect(self._button_widget_unhooked)
-                        widget.hookDevice(
-                            hook_id,
-                            self._identifier.device_guid,
-                            self._identifier.input_type,
-                            self._identifier.input_id,
-                        )
-                        # widget.hookDevice(self._device_guid, input_type, self._input_id )
-                        self.button_repeater_widget = widget
-                        self._repeater_container_layout.addWidget(widget)
-                        widget.updateState()
+                        if not self.button_repeater_widget:
+                            widget = gremlin.ui.ui_common.ButtonStateWidget()
+                            widget.unhooked.connect(self._button_widget_unhooked)
+                            widget.hookDevice(
+                                hook_id,
+                                self._identifier.device_guid,
+                                self._identifier.input_type,
+                                self._identifier.input_id,
+                            )
+                            # widget.hookDevice(self._device_guid, input_type, self._input_id )
+                            self.button_repeater_widget = widget
+                            self._repeater_container_layout.addWidget(widget)
+                            widget.updateState()
+                            # self._repeater_container_layout.addStretch()
 
-                        self._repeater_container_layout.addStretch()
-                        if self._debug_layout:
-                            widget.setStyleSheet("background: purple;")
-                        height = widget.sizeHint().height() + 4
-                        self._setWidgetHeight(self._repeater_container_widget, height)
+                            if self._debug_layout:
+                                widget.setStyleSheet("background: purple;")
+                            height = widget.sizeHint().height() + 4
+                            self._setWidgetHeight(self._repeater_container_widget, height)
 
     def _button_widget_unhooked(self):
+        widget = self.button_repeater_widget
+        if widget:
+            widget.hide()
+            if hasattr("_cleanup_ui"):
+                widget._cleanup_ui()
+            widget.deleteLater()
+            self.button_repeater_widget = None
+            self._repeater_container_layout.removeWidget(widget)
         self.button_repeater_widget = None  # force a new button widget
-        gremlin.util.clear_layout(self._repeater_container_layout)
+        
 
-    def _axis_widget_unhooked(self):
-        self.axis_repeater_widget = None
-        gremlin.util.clear_layout(self._repeater_container_layout)
+    # def _axis_widget_unhooked(self):
+    #     widget = self.axis_repeater_widget
+    #     if widget:
+    #         widget.hide()
+    #         if hasattr("_cleanup_ui"):
+    #             widget._cleanup_ui()
+    #         widget.deleteLater()
+    #         self.axis_repeater_widget = None
+    #         self._repeater_container_layout.removeWidget(widget)
 
     def _repeater_size_changed(self):
         widget = self.sender()
@@ -9373,8 +9375,8 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.device_selector_widget.currentIndexChanged.connect(self._device_selected)
         self.input_selector_widget = ui_common.QLimitedComboBox()
         self.input_selector_widget.currentIndexChanged.connect(self._input_selected)
-        self.axis_repeater_widget = ui_common.QAxisRepeaterProgressbar(orientation=QtCore.Qt.Orientation.Horizontal)
-        self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
+        # self.axis_repeater_widget = ui_common.QAxisRepeaterProgressbar()  # todo: determin parameters for the axis repeater for conditions
+        # self.axis_repeater_widget.valueChanged.connect(self._axis_value_changed)
 
         self.use_calibrated_input_widget = QtWidgets.QCheckBox("Use calibrated input")
         self.use_calibrated_input_widget.setToolTip("When enabled, the condition will use as input the calibrated data if found.  When disabled, the condition will use the raw input.")
@@ -9387,7 +9389,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         self.selector_container_layout.addWidget(self.device_selector_widget, 0, 1)
         self.selector_container_layout.addWidget(QtWidgets.QLabel("Input:"), 1, 0)
         self.selector_container_layout.addWidget(self.input_selector_widget, 1, 1)
-        self.selector_container_layout.addWidget(self.axis_repeater_widget, 2, 1)
+        # self.selector_container_layout.addWidget(self.axis_repeater_widget, 2, 1)
 
         self.selector_container_layout.addWidget(QtWidgets.QWidget(), 0, 2)  # spacer column
 
@@ -9501,17 +9503,15 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
     def _init_ui(self):
         input_type = self.condition.input_type
-        self.axis_repeater_widget.hookDevice(
-            self.condition.id,
-            self.condition.device_guid,
-            self.condition.input_type,
-            self.condition.input_id,
-        )
-
+        #axis_visible = False
         match input_type:
             case InputType.JoystickAxis:
                 self._axis_ui()
-                _visible = True
+                # self.axis_repeater_widget.setInput(
+                #     device_guid = self.condition.device_guid,
+                #     input_id = self.condition.input_id,
+                # )
+                # axis_visible = True
 
             case InputType.JoystickButton:
                 self._button_ui()
@@ -9519,14 +9519,14 @@ class JoystickConditionWidget(AbstractConditionWidget):
             case InputType.JoystickHat:
                 self._hat_ui()
 
+        # self.axis_repeater_widget.setVisible(axis_visible)
         self._update_ui()
 
     def _update_ui(self):
         """updates UI based on input type"""
         gremlin.util.assert_ui_thread()
-        visible = False
-
-        self.axis_repeater_widget.setVisible(visible)
+        # visible = False
+        # self.axis_repeater_widget.setVisible(visible)
 
         if self.delay_widget:
             input_type = self.condition.input_type

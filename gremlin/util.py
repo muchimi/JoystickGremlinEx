@@ -2779,12 +2779,13 @@ def getMonitorOrientation(hwnd):
 def timeit(callback, *args, **kwargs):
     """times a call"""
     start_time = time.perf_counter()
-    callback(*args, **kwargs)
+    value = callback(*args, **kwargs)
     end_time = time.perf_counter()
     elapsed = end_time - start_time
     syslog.info(
         f"Perf: [{callback.__module__}] [{callback.__name__}] time: [{elapsed:.6f}]"
     )
+    return value
 
 
 class TriggerDict(collections.UserDict):

@@ -1291,7 +1291,7 @@ class QSliderWidget(QtWidgets.QWidget):
         )
         self._internal_pixmaps = [pd]
 
-    def _update_handle_pixmaps(self, hid: QSliderWidget.HandleIconData):
+    def _update_handle_pixmaps(self, hid: QSliderWidget.HandleIconData):  # noqa: F821
         """updates the pixmaps for the handle icons
 
         two versions of the icon are loaded, a regular and highlighted version

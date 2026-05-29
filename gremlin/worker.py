@@ -172,7 +172,7 @@ class WorkManager(QObject):
                 # create a wait cursor
                 self._qt_wait_cursor = QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor)
 
-            syslog.info("set hourglass")
+            # syslog.info("set hourglass")
             win32gui.LoadCursor(None, win32con.IDC_WAIT)
             QtWidgets.QApplication.setOverrideCursor(self._qt_wait_cursor)
             QtWidgets.QApplication.processEvents()
