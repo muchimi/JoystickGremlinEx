@@ -801,7 +801,7 @@ class JoystickInputStats:
     def updateFilters(self, input_filter: dict):
         """updates the filter counts for the device"""
         verbose = gremlin.config.Configuration().verbose_mode_filter
-        device_guid = gremlin.util.normalize_guid(self.device_guid) 
+        device_guid = gremlin.util.normalize_guid(self.device_guid)
         for input_type in self.input_types:
             self.filtered_counts[input_type] = 0
 
@@ -990,7 +990,7 @@ class Settings:
             device_guid = gremlin.util.parse_guid(device_id)
             input_type = InputType.to_enum(safe_read(filter_node, "type", str, ""))
             input_id = safe_read(filter_node, "id", int, -1)
-            value = True  # if present in the xml, filter on # safe_read(filter_node, "filter", bool, False)
+            value = False  # if present in the xml, filter on # safe_read(filter_node, "filter", bool, False)
             self.setFiltered(device_guid, input_type, input_id, value)
 
         # update the data from the profile
@@ -1391,9 +1391,9 @@ class Settings:
         device = gremlin.joystick_handling.getDevice(device_guid)
         assert device is not None, "invalid device"
         device_guid = gremlin.util.normalize_guid(device.device_guid) # key must be a string
-        config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_filter or config.verbose_mode_ui
-        # verbose = True
+        # config = gremlin.config.Configuration()
+        # verbose = config.verbose_mode_filter or config.verbose_mode_ui
+        # # verbose = True
 
         if device_guid not in self.input_filter:
             # not in settings
@@ -1416,19 +1416,10 @@ class Settings:
         if input_type not in self.input_filter[device_guid]:
             return False  # do not include by default
 
-        if input_id not in self.input_filter[device_guid][input_type]:
-            return False  # do not include by default
-        if (
-            verbose
-            and input_type == InputType.JoystickAxis
-            and not device.is_virtual
-            and "LEFT" in device.name
-        ):
-            syslog.info(
-                f"PROFILE GET FILTER: [{device.name}] axis: [{input_id}] included: {self.input_filter[device_guid][input_type][input_id]}"
-            )
+        if input_id in self.input_filter[device_guid][input_type]:
+           return self.input_filter[device_guid][input_type][input_id]
 
-        return self.input_filter[device_guid][input_type][input_id]
+        return True # include in display if no entry
 
     def getFilterMap(self):
         """gets the input filter"""
@@ -1515,7 +1506,7 @@ class Settings:
                 device = gremlin.joystick_handling.getDevice(device_guid)
                 if device:
                     device_node = etree.Element("device")
-                    device_node.set("id", device_guid) # device_guid is a str at this point 
+                    device_node.set("id", device_guid) # device_guid is a str at this point
                     device_node.set("name", device.name)
 
                     # comment_node = ElementTree.Comment(f"device: {device.name}")
@@ -1791,7 +1782,8 @@ class ProfileRegistry:
             return
 
         # axis inputs
-        for input_id in range(1, device.axis_count + 1):
+        for linear_id in range(device.axis_count):
+            input_id = device.getAxisInputId(linear_id)
             self.getInputItem(
                 device_guid,
                 device.device_type,

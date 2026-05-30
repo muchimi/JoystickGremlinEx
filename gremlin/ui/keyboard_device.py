@@ -17,7 +17,7 @@
 
 # from __future__ import annotations # deprecated with python 3.14+
 import logging
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtGui
 
 # import container_plugins.basic
 # import gremlin
@@ -29,12 +29,14 @@ import gremlin.shared_state
 import gremlin.util
 from . import ui_common
 from gremlin.keyboard import Key
-from ..input_item import InputItemWidget, InputIdentifier, InputItemListView
+from gremlin.input_item import InputItemWidget, InputIdentifier, InputItemListView
 import uuid
-from gremlin.util import *
+from gremlin.util import read_guid, write_guid, safe_read
+from typing import Callable
 from lxml import etree
 import gremlin.ui.ui_common
 import gremlin.base_profile
+from shiboken6 import Shiboken
 
 
 syslog = logging.getLogger("system")
@@ -311,7 +313,7 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
     def display_name(self) -> str:
         return f"{self._display_name} {self.message_key}"
 
-    def duplicate(self) -> KeyboardInputItem:
+    def duplicate(self) -> KeyboardInputItem:  # noqa: F821
         """duplicates this object"""
         import copy
 

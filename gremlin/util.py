@@ -45,6 +45,7 @@ from shiboken6 import Shiboken
 import inspect
 import html
 import gremlin.singleton_decorator
+import functools
 
 
 from . import error
@@ -55,6 +56,14 @@ g_loaded_modules = {}
 
 syslog = logging.getLogger("system")
 
+
+def debug_only(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not __debug__:
+            return None
+        return func(*args, **kwargs)
+    return wrapper
 
 class FileWatcher(QtCore.QObject):
     """Watches files in the filesystem for changes."""
@@ -519,9 +528,9 @@ def delete_widget(widget: QtWidgets.QWidget):
             widget.unhook()
         if hasattr(widget, "_cleanup_ui"):
             widget._cleanup_ui()
-        layout = widget.layout()
-        if layout is not None:
-            clear_layout(layout)
+        # layout = widget.layout()
+        # if layout is not None:
+        #     clear_layout(layout)
         widget.setParent(None)  # removes the widget from the containing layout
         widget.deleteLater()  # tell QT to free the widget from memory
 
@@ -1459,7 +1468,7 @@ def parse_guid(value) -> dinput.GUID:
     except Exception:
         syslog.error(f"Failed parsing GUID from value [{value}]")
         raise ValueError(f"Failed parsing GUID from value [{value}]")
-        
+
 
 
 def parse_bool(value, default_value=False):
@@ -2001,19 +2010,17 @@ class InvokeUiMethod(QtCore.QObject):
         self._exec(self.method, p0, p1, p2, p3, p4, p5, p6, p7)
 
 
+
 def is_ui_thread():
     """true if the current thread is the UI thread"""
     current_thread = QtCore.QThread.currentThread()
     ui_thread = QtWidgets.QApplication.instance().thread()  # UI thread
     return current_thread == ui_thread
 
-
+@debug_only
 def assert_ui_thread():
     """throws an assertion if not running on UI thread which is needed for QT"""
-    current_thread = QtCore.QThread.currentThread()
-    ui_thread = QtWidgets.QApplication.instance().thread()  # UI thread
-    if current_thread != ui_thread:
-        assert False, "call not on UI thread"
+    assert is_ui_thread(), "call not on UI thread"
 
 
 def highlight_qcolor(color: QColor, factor: float = 1.1) -> QColor:
@@ -2467,7 +2474,7 @@ def to_guid(device_guid) -> dinput.GUID:
     if isinstance(device_guid, dinput.GUID):
         return device_guid
     return dinput.GUID(device_guid)
-    
+
 
 def to_uuid(device_guid) -> uuid.UUID:
     """converts a string GUID to a GUID"""

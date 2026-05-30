@@ -1423,7 +1423,7 @@ class AbstractCallbackModel(AbstractModel):
         self._change_pending = False
 
     def addCallback(self, callback: Callable):
-        """adds a callback to be called when the model data changes"""
+        """adds a change callback to be called when the model data changes"""
         if __debug__ and callback is not None and not callable(callback):
             raise TypeError("Callback must be callable")
         if callback not in self._data_changed_callbacks:
@@ -1467,10 +1467,10 @@ class AbstractCallbackModel(AbstractModel):
 
     def _fireChanged(self, force=False, emit=False):
         """fires a data changed signal if the data has changed or if force is true"""
-        if self._change_pending and not force:
+        if self._suspend_stack and self._change_pending and not force:
             return
         new_hash = hash(self)
-        if self._suspend_stack:
+        if self._suspend_stack and not force:
             # firing changes currently suspended
             self._change_pending = new_hash != self._old_hash
             return
@@ -1489,7 +1489,7 @@ class AbstractCallbackModel(AbstractModel):
             if emit:
                 self.data_changed.emit()  # indicate the model changed
 
-            self._change_pending = False
+        self._change_pending = False
 
     def __hash__(self):
         """unique hash value of model contents"""

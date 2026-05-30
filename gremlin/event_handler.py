@@ -3966,12 +3966,13 @@ class AxisState:
                 axis_id = dev.linear_id_map[linear_id]
 
             else:
-                # translate to linear
-                if input_id not in dev.axis_id_map:
-                    syslog.error(f"AXIS STATE: invalid axis ID {input_id} - valid axis IDs are [{[id for id in dev.axis_id_map]}]")
+                # translate input to linear
+                linear_id = dev.linear_id_map[input_id]
+                if linear_id not in dev.axis_id_map:
+                    syslog.error(f"AXIS STATE: invalid axis ID [{input_id}] linear [{linear_id}]- valid axis IDs are [{[id for id in dev.axis_id_map]}]")
                     return None
-                linear_id = dev.axis_id_map[input_id]
-                axis_id = input_id
+
+                axis_id = linear_id
         else:
             axis_id = input_id
 
@@ -4425,6 +4426,17 @@ class JoystickEventProcessor:
         if not isinstance(device_guid, dinput.GUID):
             device_guid = gremlin.util.to_guid(device_guid)
         assert isinstance(device_guid, dinput.GUID), "invalid device guid"
+
+        key = (device_guid, input_type, input_id)
+
+        if callback in self._callback_map:
+            if key in self._callback_map[callback]:
+                syslog.info("callback already registered for input, skipping")
+                return
+        else:
+            self._callback_map[callback] = []
+        self._callback_map[callback].append(key)
+
         if device_guid not in self._listener_callbacks:
             self._listener_callbacks[device_guid] = {}
         if input_type not in self._listener_callbacks[device_guid]:
@@ -4433,13 +4445,12 @@ class JoystickEventProcessor:
             self._listener_callbacks[device_guid][input_type][input_id] = []
         if callback not in self._listener_callbacks[device_guid][input_type][input_id]:
             self._listener_callbacks[device_guid][input_type][input_id].append(callback)
-            if callback not in self._callback_map:
-                self._callback_map[callback] = []
-            data = (device_guid, input_type, input_id)
-            if data not in self._callback_map[callback]:
-                self._callback_map[callback].append(data)
-            syslog.info(f"JEP: add listener: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}]")
 
+        syslog.info(f"JEP: add listener: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}]")
+        obj = callback.__self__
+        if hasattr(obj,"_description"):
+            syslog.info(f"\t{obj._description}")
+        pass
         # self.start()  # ensure started
 
     def unregisterListenerCallback(
@@ -4467,11 +4478,15 @@ class JoystickEventProcessor:
                                     continue
 
                             self._listener_callbacks[l_device_guid][l_input_type][l_input_id].remove(callback)
-                            data = (l_device_guid, l_input_type, l_input_id)
-                            if data in self._callback_map[callback]:
-                                self._callback_map[callback].remove(data)
+                            key = (l_device_guid, l_input_type, l_input_id)
+                            if key in self._callback_map[callback]:
+                                self._callback_map[callback].remove(key)
 
                             syslog.info(f"JEP: remove listener: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}]")
+                            obj = callback.__self__
+                            if hasattr(obj,"_description"):
+                                syslog.info(f"\t{obj._description}")
+                            pass
 
             if not self._callback_map[callback]:
                 del self._callback_map[callback]
