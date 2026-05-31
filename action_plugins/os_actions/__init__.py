@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import win32gui
 import win32con
 import win32api
@@ -84,9 +84,7 @@ class OsActionWidget(gremlin.input_item.AbstractActionWidget):
             auto_adjust=True,
         )
 
-        widget = gremlin.ui.ui_common.getHContainer(
-            self.action_selector, "Mode:", widget_only=True
-        )
+        widget = gremlin.ui.ui_common.getHContainer(self.action_selector, "Mode:", widget_only=True)
         self.action_selector.setMaximumWidth(300)
         self.main_layout.addWidget(widget)
 
@@ -98,13 +96,9 @@ class OsActionWidget(gremlin.input_item.AbstractActionWidget):
         )
         self.process_path_widget.setMaximumWidth(300)
 
-        select_process = gremlin.ui.ui_common.QDataPushButton(
-            "Select Executable...", callback=self._handle_select_executable
-        )
+        select_process = gremlin.ui.ui_common.QDataPushButton("Select Executable...", callback=self._handle_select_executable)
 
-        container_process = gremlin.ui.ui_common.getHContainer(
-            [self.process_path_widget, select_process], widget_only=True
-        )
+        container_process = gremlin.ui.ui_common.getHContainer([self.process_path_widget, select_process], widget_only=True)
 
         start_widget = gremlin.ui.ui_common.QDataCheckbox(
             "Auto-start process if not running",
@@ -149,9 +143,7 @@ class OsActionWidget(gremlin.input_item.AbstractActionWidget):
             self.container_args,
         ]
 
-        self.container_setfocus = gremlin.ui.ui_common.getVContainer(
-            widgets, widget_only=True
-        )
+        self.container_setfocus = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
         self.main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
         self.main_layout.addWidget(self.container_setfocus)
 
@@ -165,9 +157,7 @@ class OsActionWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_select_executable(self, widget):
         """opens the process executable"""
-        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
-            None, "Process", self.action_data.process_name, "Executable files (*.exe)"
-        )
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(None, "Process", self.action_data.process_name, "Executable files (*.exe)")
         if fname and os.path.isfile(fname):
             self.action_data.process_name = fname
             with QtCore.QSignalBlocker(self.process_path_widget):
@@ -259,21 +249,14 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
                         pm = gremlin.process.ProcessHelper()
                         data = pm.getWindows()
                         info = next(
-                            (
-                                item
-                                for item in data
-                                if item["process_path"].casefold()
-                                == self.action_data.process_name.casefold()
-                            ),
+                            (item for item in data if item["process_path"].casefold() == self.action_data.process_name.casefold()),
                             None,
                         )
 
                         if not info and self.action_data.start_process:
                             """ attempt to autostart the process """
                             if not self._is_running:
-                                self._thread = threading.Thread(
-                                    target=self._exec_runner
-                                )
+                                self._thread = threading.Thread(target=self._exec_runner)
                                 self._thread.name = "os action exec"
 
                                 # wait for the process to load
@@ -285,16 +268,12 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
                         if info:
                             hwnd = info["hwnd"]
                             if verbose:
-                                syslog.info(
-                                    f"OSACTION: set focus: handle: [{hwnd}] process: [{info['process_name']}]"
-                                )
+                                syslog.info(f"OSACTION: set focus: handle: [{hwnd}] process: [{info['process_name']}]")
                             self._set_focus(hwnd)
 
                     except Exception:
                         if verbose:
-                            syslog.info(
-                                f"OSACTION: set focus: unable to find process window for [{self.action_data.process_name}]"
-                            )
+                            syslog.info(f"OSACTION: set focus: unable to find process window for [{self.action_data.process_name}]")
 
         return True
 
@@ -313,12 +292,7 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
         while self._is_running and time.time() < timeout:
             data = pm.getWindows()
             info = next(
-                (
-                    item
-                    for item in data
-                    if item["process_path"].casefold()
-                    == self.action_data.process_name.casefold()
-                ),
+                (item for item in data if item["process_path"].casefold() == self.action_data.process_name.casefold()),
                 None,
             )
             if info:
@@ -332,16 +306,12 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
         if info:
             hwnd = info["hwnd"]
             if verbose:
-                syslog.info(
-                    f"OSACTION: set focus: handle: [{hwnd}] process: [{info['process_name']}]"
-                )
+                syslog.info(f"OSACTION: set focus: handle: [{hwnd}] process: [{info['process_name']}]")
             self._set_focus(hwnd)
 
         elif not self._is_running:
             # only issue warning if not aborted
-            syslog.warning(
-                "OSACTION: set focus: unable to find process window (timeout)"
-            )
+            syslog.warning("OSACTION: set focus: unable to find process window (timeout)")
 
         self._is_running = False
 
@@ -353,9 +323,7 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
         # enable setforeground if the process is not the current foreground exploiting a windows hack to send the alt key first, then setting the focus
         # in case gremlinEx is not the current foreground application (which it most invariably isn't at runtime)
         win32api.keybd_event(win32con.VK_MENU, 0, 0, 0)  # Alt key down
-        win32api.keybd_event(
-            win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0
-        )  # Alt key up
+        win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0)  # Alt key up
         win32gui.SetForegroundWindow(hwnd)
 
     def _execute(self, path, args=None, args_per_line: bool = False):
@@ -400,9 +368,7 @@ class OsAction(gremlin.base_profile.AbstractAction):
         self.window_title: str = None  # window title
         self.start_process = False  # if true, starts the process if it's not running
         self.process_args: str = None  # process start args (optional)
-        self.start_timeout: float = (
-            5  # number of seconds to wait for the process to start
-        )
+        self.start_timeout: float = 5  # number of seconds to wait for the process to start
 
     def icon(self):
         return "mdi.windows"
@@ -423,9 +389,7 @@ class OsAction(gremlin.base_profile.AbstractAction):
                 try:
                     value = html.unescape(value)
                 except Exception:
-                    syslog.error(
-                        f"OSACTION: Unable to convert window class name: [{value}] due to invalid data."
-                    )
+                    syslog.error(f"OSACTION: Unable to convert window class name: [{value}] due to invalid data.")
                     value = None
             self.window_class = value
         if "window-title" in node.attrib:
@@ -450,9 +414,7 @@ class OsAction(gremlin.base_profile.AbstractAction):
                 if escaped:
                     node.set("window-class", safe_format(escaped, str))
             except Exception:
-                syslog.error(
-                    f"OSACTION: Unable to save window class name: [{self.window_class}] due to invalid data."
-                )
+                syslog.error(f"OSACTION: Unable to save window class name: [{self.window_class}] due to invalid data.")
 
         if self.window_title:
             node.set("window-title", self.window_title)

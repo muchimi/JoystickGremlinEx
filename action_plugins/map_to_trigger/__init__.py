@@ -2,7 +2,7 @@
 
 # MaptoState - maps to a state
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import logging
 from lxml import etree as ElementTree
 
@@ -26,83 +26,73 @@ import gremlin.ui.ui_common
 
 syslog = logging.getLogger("system")
 
-class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
 
+class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
     """Widget for the pause action."""
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
-        assert(isinstance(action_data, MapToTrigger))
+        assert isinstance(action_data, MapToTrigger)
 
     def _create_ui(self):
         if not Shiboken.isValid(self):
-            return        
-        
+            return
 
         # self.action_selector_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
         # self.action_selector_widget.addItem("Joystick","joystick")
 
         self.device_selector_widget = gremlin.ui.ui_common.JoystickSelector(
-            valid_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
-            callback = self._handle_device_selected
+            valid_types=[InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat], callback=self._handle_device_selected
         )
 
         self.device_selector_widget.set_selection(
-            device_id= self.action_data.device_id,
-            input_type = self.action_data.input_type,
-            input_id = self.action_data.input_id
-            )
-        
-        
-        
+            device_id=self.action_data.device_id, input_type=self.action_data.input_type, input_id=self.action_data.input_id
+        )
+
         margin = 12
-        
-        listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._handle_listen_request)
 
-        widgets = [ self.device_selector_widget, listen_widget]
+        listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback=self._handle_listen_request)
 
-        self.container_selector_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
+        widgets = [self.device_selector_widget, listen_widget]
+
+        self.container_selector_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         # button press widget
-        self.button_release_widget = gremlin.ui.ui_common.QDataRadioButton("Released",
-                                                                           value = not self.action_data.is_pressed,
-                                                                           data = False,
-                                                                           callback= self._handle_button_state_changed)
-        self.button_press_widget = gremlin.ui.ui_common.QDataRadioButton("Pressed",
-                                                                          value = self.action_data.is_pressed,
-                                                                          data = True,
-                                                                          callback= self._handle_button_state_changed,
-                                                                        )
+        self.button_release_widget = gremlin.ui.ui_common.QDataRadioButton(
+            "Released", value=not self.action_data.is_pressed, data=False, callback=self._handle_button_state_changed
+        )
+        self.button_press_widget = gremlin.ui.ui_common.QDataRadioButton(
+            "Pressed",
+            value=self.action_data.is_pressed,
+            data=True,
+            callback=self._handle_button_state_changed,
+        )
         # set button widgets
         widgets = [self.button_press_widget, self.button_release_widget]
-        self.container_button_widget = gremlin.ui.ui_common.getHContainer(widgets,"Set Button:", left_margin = margin, widget_only = True)
+        self.container_button_widget = gremlin.ui.ui_common.getHContainer(widgets, "Set Button:", left_margin=margin, widget_only=True)
 
-        self.use_actual_widget =gremlin.ui.ui_common.QDataCheckbox("Use actual value",
-                                                                   value = self.action_data.use_actual,
-                                                                   callback = self._handle_use_actual_changed,
-                                                                   tooltip = "When enabled, the virtual event will use the input value to determine the value of the trigger."
-                                                                   )
+        self.use_actual_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Use actual value",
+            value=self.action_data.use_actual,
+            callback=self._handle_use_actual_changed,
+            tooltip="When enabled, the virtual event will use the input value to determine the value of the trigger.",
+        )
 
-        
-        
         # set axis widgets
-        self.value_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self.action_data.value, callback=self._handle_value_changed)
-        self.container_value_widget = gremlin.ui.ui_common.getHContainer(self.value_widget,"Set Axis:", left_margin = margin, widget_only = True)
-        
+        self.value_widget = gremlin.ui.ui_common.QFloatLineEdit(value=self.action_data.value, callback=self._handle_value_changed)
+        self.container_value_widget = gremlin.ui.ui_common.getHContainer(self.value_widget, "Set Axis:", left_margin=margin, widget_only=True)
 
         # set hat direction widgets
-        self.direction_widget = gremlin.ui.ui_common.QHatSelectorComboBox(value = self.action_data.direction,
-                                                                           callback = self._handle_direction_changed)
-        
-        self.container_direction_widget = gremlin.ui.ui_common.getHContainer(self.direction_widget,"Set Position:", left_margin = margin, widget_only = True)
+        self.direction_widget = gremlin.ui.ui_common.QHatSelectorComboBox(value=self.action_data.direction, callback=self._handle_direction_changed)
 
+        self.container_direction_widget = gremlin.ui.ui_common.getHContainer(self.direction_widget, "Set Position:", left_margin=margin, widget_only=True)
 
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
-        #self.main_layout.addWidget(self.action_selector_widget)
-        
+        # self.main_layout.addWidget(self.action_selector_widget)
+
         self.main_layout.addWidget(self.container_selector_widget)
 
         self.main_layout.addWidget(self.use_actual_widget)
@@ -115,10 +105,8 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
         self.warning_widget = gremlin.ui.ui_common.QWarningWidget()
         self.main_layout.addWidget(self.warning_widget)
 
-        info_widget = gremlin.ui.ui_common.QInfoBox("This action will trigger a virtual event as if the input was triggered.", hide_key = "trigger_action")
+        info_widget = gremlin.ui.ui_common.QInfoBox("This action will trigger a virtual event as if the input was triggered.", hide_key="trigger_action")
         self.main_layout.addWidget(info_widget)
-
-        
 
         self._update_ui()
 
@@ -126,56 +114,44 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
         pass
 
     @QtCore.Slot(bool)
-    def _handle_use_actual_changed(self, checked : bool):
+    def _handle_use_actual_changed(self, checked: bool):
         self.action_data.use_actual = checked
         self._update_ui()
 
-
     def _handle_listen_request(self):
-        ''' calls up a listen box to select the input '''
+        """calls up a listen box to select the input"""
         dialog = gremlin.ui.ui_common.InputListenerWidget(
-                [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
-                callback = self._handle_listen_selection,
-            )
-        
+            [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat],
+            callback=self._handle_listen_selection,
+        )
+
         root = self
         while root.parent():
             root = root.parent()
         geom = root.geometry()
-    
-        dialog.setGeometry(
-                int(geom.x() + geom.width() / 2 - 150),
-                int(geom.y() + geom.height() / 2 - 75),
-                300,
-                150
-            )
-        
+
+        dialog.setGeometry(int(geom.x() + geom.width() / 2 - 150), int(geom.y() + geom.height() / 2 - 75), 300, 150)
+
         dialog.show()
 
     def _handle_listen_selection(self, event):
         gremlin.util.InvokeUiMethod(self._handle_listen_selection_ui, event)
 
     def _handle_listen_selection_ui(self, event):
-        dev : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(event.device_guid)
-        
+        dev: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(event.device_guid)
+
         self.action_data.device_id = dev.device_id
         self.action_data.input_id = event.identifier
         self.action_data.input_type = event.event_type
         self.device_selector_widget.set_selection(
-            device_id=self.action_data.device_id,
-            input_type = self.action_data.input_type,
-            input_id = self.action_data.input_id
-            )
-        
+            device_id=self.action_data.device_id, input_type=self.action_data.input_type, input_id=self.action_data.input_id
+        )
+
         self._update_ui()
 
-              
-    
     def _update_ui(self):
-        ''' updates the UI based on the selected options '''
+        """updates the UI based on the selected options"""
         input_type = self.action_data.get_input_type()
-
-
 
         axis_visible = False
         button_visible = False
@@ -183,7 +159,6 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
         exec_visible = False
         warning = None
         if not self.action_data.use_actual:
-            
             match self.action_data.input_type:
                 case InputType.JoystickAxis:
                     axis_visible = True
@@ -199,10 +174,10 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
                     else:
                         hat_visible = True
                         exec_visible = True
-        
+
         else:
             # use actual - if a hat - select the hat position when the input is pressed
-            
+
             if input_type == InputType.JoystickButton and self.action_data.input_type == InputType.JoystickHat:
                 hat_visible = True
 
@@ -213,12 +188,9 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
         self.warning_widget.setText(warning)
         self.warning_widget.setVisible(warning is not None)
 
-
-
     def _handle_device_selected(self, data):
-        #data = self.device_selector_widget.get_selection()
+        # data = self.device_selector_widget.get_selection()
 
-        
         self.action_data.device_id = gremlin.util.normalize_guid(data["device_id"])
         self.action_data.input_id = data["input_id"]
         self.action_data.input_type = data["input_type"]
@@ -238,38 +210,34 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
     def _handle_direction_changed(self, direction):
         self.action_data.direction = direction
 
-    def _handle_value_changed(self, value : float):
+    def _handle_value_changed(self, value: float):
         self.action_data.value = value
 
     @QtCore.Slot(bool)
-    def _execute_on_press_changed(self, checked : bool):
+    def _execute_on_press_changed(self, checked: bool):
         self.action_data.exec_on_press = checked
 
     @QtCore.Slot(bool)
-    def _execute_on_release_changed(self, checked : bool):
-        self.action_data.exec_on_release = checked            
+    def _execute_on_release_changed(self, checked: bool):
+        self.action_data.exec_on_release = checked
 
-    
+
 class MapToTriggerFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action_data, parent = None):
+    def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent)
         self.action_data = action_data
-        
 
-    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
-        
+    def process_event(self, event: gremlin.event_handler.Event, value: gremlin.actions.Value, extra_data=None):
+
         use_actual = self.action_data.use_actual
         if use_actual:
             trigger = True
         else:
-            trigger = (event.is_pressed and self.action_data.exec_on_press) \
-                or (not event.is_pressed and self.action_data.exec_on_release)
+            trigger = (event.is_pressed and self.action_data.exec_on_press) or (not event.is_pressed and self.action_data.exec_on_release)
 
         if trigger:
-
             el = gremlin.event_handler.EventListener()
-            extra_data = {"trigger": True} # indicate the source of the event is a macro
+            extra_data = {"trigger": True}  # indicate the source of the event is a macro
             device_guid = gremlin.util.parse_guid(self.action_data.device_id)
             match self.action_data.input_type:
                 case InputType.JoystickAxis:
@@ -278,12 +246,12 @@ class MapToTriggerFunctor(gremlin.base_profile.AbstractFunctor):
                     else:
                         value = self.value
                     event = gremlin.event_handler.Event(
-                        event_type= InputType.JoystickAxis,
-                        device_guid= device_guid,
+                        event_type=InputType.JoystickAxis,
+                        device_guid=device_guid,
                         identifier=self.action_data.input_id,
-                        value= value,
-                        is_axis = True,
-                        extra_data = extra_data
+                        value=value,
+                        is_axis=True,
+                        extra_data=extra_data,
                     )
                 case InputType.JoystickButton:
                     if event.is_axis:
@@ -295,12 +263,12 @@ class MapToTriggerFunctor(gremlin.base_profile.AbstractFunctor):
                     else:
                         is_pressed = self.action_data.is_pressed
                     event = gremlin.event_handler.Event(
-                        event_type= InputType.JoystickButton,
-                        device_guid= device_guid,
+                        event_type=InputType.JoystickButton,
+                        device_guid=device_guid,
                         identifier=self.action_data.input_id,
-                        value = is_pressed,
-                        is_pressed = is_pressed,
-                        extra_data = extra_data
+                        value=is_pressed,
+                        is_pressed=is_pressed,
+                        extra_data=extra_data,
                     )
                 case InputType.JoystickHat:
                     if event.is_axis:
@@ -312,18 +280,13 @@ class MapToTriggerFunctor(gremlin.base_profile.AbstractFunctor):
                             position = event.value
                         else:
                             if event.is_pressed:
-                                position = HatDirection.to_position(self.action_data.direction)            
+                                position = HatDirection.to_position(self.action_data.direction)
                             else:
                                 # release = center
                                 position = HatDirection.Center.value
 
-                    
                     event = gremlin.event_handler.Event(
-                        event_type= InputType.JoystickHat,
-                        device_guid= device_guid,
-                        identifier=self.action_data.input_id,
-                        value = position,
-                        extra_data = extra_data
+                        event_type=InputType.JoystickHat, device_guid=device_guid, identifier=self.action_data.input_id, value=position, extra_data=extra_data
                     )
 
             event.is_virtual = True
@@ -331,23 +294,22 @@ class MapToTriggerFunctor(gremlin.base_profile.AbstractFunctor):
 
         return True
 
-    
+
 class MapToTrigger(gremlin.base_profile.AbstractAction):
-    ''' map to trigger action '''
+    """map to trigger action"""
+
     name = "Trigger (Joystick)"
     tag = "trigger"
-    hint = '''Triggers a joystick event'''
-
+    hint = """Triggers a joystick event"""
 
     input_types = [
-         InputType.JoystickAxis,
-         InputType.JoystickButton,
-         InputType.JoystickHat,
+        InputType.JoystickAxis,
+        InputType.JoystickButton,
+        InputType.JoystickHat,
     ]
 
     functor = MapToTriggerFunctor
     widget = MapToTriggerWidget
-
 
     def icon(self):
         return "mdi6.send"
@@ -355,43 +317,39 @@ class MapToTrigger(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return False
 
-
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
 
-    
         default_device = gremlin.joystick_handling.default_device()
         config = gremlin.config.Configuration()
         last_device_id = config.trigger_last_device_id
         dev = gremlin.joystick_handling.getDevice(last_device_id)
         if not dev:
             last_device_id = default_device.device_id
-        
+
         last_input_id = config.trigger_last_input_id
         if not last_input_id:
             last_input_id = 1
-                    
+
         last_input_type = config.trigger_last_input_type
         if not last_input_type:
             last_input_type = InputType.JoystickAxis
-        
 
-        self.device_id = last_device_id # id of the device to trigger
+        self.device_id = last_device_id  # id of the device to trigger
         self.input_type = last_input_type
         self.input_id = last_input_id
-        self.action = "joystick" # trigger action "joystick" for now
-        self.is_pressed = False # true if a button is pressed
-        self.use_actual = False # true if the actual event value is used
-        self.value = 0.0 # value if setting a joystick
-        self.direction = HatDirection.Center # value if setting a hat
-        
-        self.exec_on_press = True # true if the mode should execute on input press
-        self.exec_on_release = False # true if the mode should execute on input release
-   
+        self.action = "joystick"  # trigger action "joystick" for now
+        self.is_pressed = False  # true if a button is pressed
+        self.use_actual = False  # true if the actual event value is used
+        self.value = 0.0  # value if setting a joystick
+        self.direction = HatDirection.Center  # value if setting a hat
+
+        self.exec_on_press = True  # true if the mode should execute on input press
+        self.exec_on_release = False  # true if the mode should execute on input release
 
     def _generate_xml(self):
-        ''' reads data from the profile '''
+        """reads data from the profile"""
         node = ElementTree.Element("trigger")
 
         node.set("id", self._id)
@@ -406,10 +364,10 @@ class MapToTrigger(gremlin.base_profile.AbstractAction):
         node.set("exec-on-press", safe_format(self.exec_on_press, bool))
         node.set("exec-on-release", safe_format(self.exec_on_release, bool))
         node.set("actual", safe_format(self.use_actual, bool))
-        
+
         match self.input_type:
             case InputType.JoystickAxis:
-                node.set("value", safe_format(self.value,float))
+                node.set("value", safe_format(self.value, float))
             case InputType.JoystickButton:
                 node.set("pressed", safe_format(self.is_pressed, bool))
             case InputType.JoystickHat:
@@ -417,43 +375,41 @@ class MapToTrigger(gremlin.base_profile.AbstractAction):
 
         return node
 
-
-
-    def _parse_xml(self, node, data = None, extra_data = None):
-        input_type = safe_read(node,"input-type", str,"")
+    def _parse_xml(self, node, data=None, extra_data=None):
+        input_type = safe_read(node, "input-type", str, "")
         if input_type:
             self.input_type = InputType.to_enum(input_type)
-        self.input_id = safe_read(node,"input", int, 1)
+        self.input_id = safe_read(node, "input", int, 1)
         if "id" in node.attrib:
             self._id = node.get("id")
-        self.device_id = safe_read(node,"device", str, "")
-        action = safe_read(node,"action",str,"")
+        self.device_id = safe_read(node, "device", str, "")
+        action = safe_read(node, "action", str, "")
         if action:
             self.action = action
 
-        self.use_actual = safe_read(node,"actual", bool, False)
-        
+        self.use_actual = safe_read(node, "actual", bool, False)
+
         match self.input_type:
             case InputType.JoystickAxis:
                 self.value = safe_read(node, "value", float, 0.0)
             case InputType.JoystickButton:
-                self.is_pressed = safe_read(node,"pressed", bool, False)
+                self.is_pressed = safe_read(node, "pressed", bool, False)
             case InputType.JoystickHat:
-                direction = safe_read(node,"direction", str, "Center")
+                direction = safe_read(node, "direction", str, "Center")
                 self.direction = HatDirection.to_enum(direction)
 
-        self.exec_on_press = safe_read(node,"exec-on-press", bool, True)
-        self.exec_on_release = safe_read(node,"exec-on-release", bool, False)
+        self.exec_on_press = safe_read(node, "exec-on-press", bool, True)
+        self.exec_on_release = safe_read(node, "exec-on-release", bool, False)
 
-    
     def to_html(self) -> str:
-        ''' returns reporting graphviz data for this action '''
+        """returns reporting graphviz data for this action"""
         from gremlin.reporting import ReportTable
-        table = ReportTable(cellpadding=4)    
+
+        table = ReportTable(cellpadding=4)
 
         table.addField("Map to Trigger", self.mode.name)
 
-        device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(self.device_id)
+        device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(self.device_id)
         if not device:
             table.addField("Unknown device", self.device_id)
         else:
@@ -476,12 +432,10 @@ class MapToTrigger(gremlin.base_profile.AbstractAction):
             table.addField("Exec (release)", "Yes")
 
         return table.to_html()
-        
 
     def _is_valid(self):
         return True
-  
-        
+
 
 version = 1
 name = MapToTrigger.name

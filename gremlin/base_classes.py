@@ -435,6 +435,12 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self.setInputId(value)
 
     def setInputId(self, value):
+        if __debug__ and self._device_guid:
+            from gremlin.types import DeviceType
+            device = gremlin.joystick_handling.getDevice(self._device_guid)
+            if device.device_type == DeviceType.Joystick and self._input_type == InputType.JoystickAxis:
+                assert value in device.axis_id_map,"invalid axis for device"
+
         if value != self._input_id:
             assert isinstance(value, int) or isinstance(value, AbstractInputItem), (
                 f"Invalid input id: {value}"
@@ -897,12 +903,10 @@ class AbstractCallbackModel(AbstractModel):
     def __init__(
         self,
         change_callback: Callable = None,
-        filter_callback: Callable[[object], bool] = None,
-        sort_callback: Callable[
-            [_collections_abc.Iterable], _collections_abc.Iterable
-        ] = None,
-        added_callback: Callable[[object], (object, int, int)] = None,
-        removed_callback: Callable[[object]] = None,
+        filter_callback: Callable = None,
+        sort_callback: Callable = None,
+        added_callback: Callable = None,
+        removed_callback: Callable = None,
         allowed_types: tuple = None,
         model_description: str = None,
     ):
@@ -1250,6 +1254,8 @@ class AbstractCallbackModel(AbstractModel):
         :param emit: true if a change trigger should fire on change
         :returns int: the index, or -1 if not found
         """
+        import gremlin.input_item
+        assert isinstance(item, gremlin.input_item.InputItem)
 
         if self._can_filter() and item and item in self._item_map:
             # item is in the model
@@ -1260,8 +1266,10 @@ class AbstractCallbackModel(AbstractModel):
             if value:
                 if item in self._filtered_item_map:
                     return self._filtered_item_map[item]  # already filtered
+
                 index = len(self._filtered_index_map)
                 self.pushSuspend()
+
                 self._filtered_index_map[index] = item
                 self._filtered_item_map[item] = index
                 self.popSuspend()
@@ -1283,6 +1291,7 @@ class AbstractCallbackModel(AbstractModel):
 
     def applySort(self, emit=True):
         """sorts the model based on the callback"""
+        import gremlin.input_item
         if not self._can_sort():
             # nothing to do
             return
@@ -1315,6 +1324,8 @@ class AbstractCallbackModel(AbstractModel):
                 return
         # valid
         for item, index in zip(items, indices):
+            assert isinstance(item, gremlin.input_item.InputItem)
+            assert isinstance(index, int)
             self._filtered_index_map[index] = item
             self._filtered_item_map[item] = index
         if emit:

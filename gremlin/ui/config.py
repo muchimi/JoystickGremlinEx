@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 
 from typing import Any, Dict, Optional
 
@@ -32,7 +32,6 @@ QML_IMPORT_MAJOR_VERSION = 1
 
 @QtQml.QmlElement
 class ConfigSectionModel(QtCore.QAbstractListModel):
-
     """Exposes the sections present in the configuration as a list model."""
 
     roles = {
@@ -40,7 +39,7 @@ class ConfigSectionModel(QtCore.QAbstractListModel):
         QtCore.Qt.UserRole + 2: QtCore.QByteArray("groupModel".encode()),
     }
 
-    def __init__(self, parent: Optional[QtCore.QObject]=None) -> None:
+    def __init__(self, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
 
         self._config = gremlin.config.Configuration()
@@ -68,7 +67,6 @@ class ConfigSectionModel(QtCore.QAbstractListModel):
 
 @QtQml.QmlElement
 class ConfigGroupModel(QtCore.QAbstractListModel):
-
     """Exposes the groups present in a specific configuration section as a
     list model.
     """
@@ -78,7 +76,7 @@ class ConfigGroupModel(QtCore.QAbstractListModel):
         QtCore.Qt.UserRole + 2: QtCore.QByteArray("entryModel".encode()),
     }
 
-    def __init__(self, section: str, parent: Optional[QtCore.QObject]=None) -> None:
+    def __init__(self, section: str, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
 
         self._config = gremlin.config.Configuration()
@@ -104,7 +102,6 @@ class ConfigGroupModel(QtCore.QAbstractListModel):
 
 @QtQml.QmlElement
 class ConfigEntryModel(QtCore.QAbstractListModel):
-
     """Exposes the entries in a section's group as a list model."""
 
     roles = {
@@ -114,12 +111,7 @@ class ConfigEntryModel(QtCore.QAbstractListModel):
         QtCore.Qt.UserRole + 4: QtCore.QByteArray("properties".encode()),
     }
 
-    def __init__(
-        self,
-        section: str,
-        group: str,
-        parent: Optional[QtCore.QObject]=None
-    ) -> None:
+    def __init__(self, section: str, group: str, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
 
         self._config = gremlin.config.Configuration()
@@ -136,12 +128,7 @@ class ConfigEntryModel(QtCore.QAbstractListModel):
 
         if role in ConfigEntryModel.roles:
             role_name = ConfigEntryModel.roles[role].data().decode()
-            value = self._config.get(
-                self._section_name,
-                self._group_name,
-                entries[index.row()],
-                role_name
-            )
+            value = self._config.get(self._section_name, self._group_name, entries[index.row()], role_name)
             if isinstance(value, PropertyType):
                 value = PropertyType.to_string(value)
             return value
@@ -154,14 +141,9 @@ class ConfigEntryModel(QtCore.QAbstractListModel):
 
         role_name = ConfigEntryModel.roles[role].data().decode()
         if role_name == "value":
-            self._config.set(
-                self._section_name,
-                self._group_name,
-                entries[index.row()],
-                value
-            )
+            self._config.set(self._section_name, self._group_name, entries[index.row()], value)
 
-            self.dataChanged.emit(index, index, {role});
+            self.dataChanged.emit(index, index, {role})
             return True
         return False
 

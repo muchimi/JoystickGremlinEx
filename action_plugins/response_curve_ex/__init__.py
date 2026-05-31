@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import logging
 from PySide6 import QtCore
 
@@ -29,15 +29,15 @@ import gremlin.ui.ui_common
 import gremlin.shared_state
 import gremlin.curve_handler
 from shiboken6 import Shiboken
+
 syslog = logging.getLogger("system")
 
 
 class ResponseCurveExWidget(gremlin.input_item.AbstractActionWidget):
-
     """Widget that allows configuring the response of an axis to
     user inputs."""
 
-    def __init__(self, action_data : ResponseCurveEx, parent=None):
+    def __init__(self, action_data: ResponseCurveEx, parent=None):
         """Creates a new instance.
 
         :param action_data the data associated with this specific action.
@@ -48,13 +48,11 @@ class ResponseCurveExWidget(gremlin.input_item.AbstractActionWidget):
         self.is_inverted = False
         self.action_data = action_data
 
-   
-
     def _create_ui(self):
         """Creates the required UI elements."""
         if not Shiboken.isValid(self):
             return
-        
+
         msg = "Consider using <i><b>Vjoy Remap</b></i> to curve axis output to further reduce response latency.<br>Curve Ex should only be used in special situations that require chained or nested processing."
         warning_widget = gremlin.ui.ui_common.QWarningWidget(msg)
         self.main_layout.addWidget(warning_widget)
@@ -73,8 +71,6 @@ class ResponseCurveExWidget(gremlin.input_item.AbstractActionWidget):
         values = astate.getAxisValues(self.action_data.hardware_device_guid, self.action_data.hardware_input_id)
         if values is not None:
             self.curve_widget.update_value(values[0])
-        
-
 
     @QtCore.Slot()
     def _profile_start(self):
@@ -90,14 +86,13 @@ class ResponseCurveExWidget(gremlin.input_item.AbstractActionWidget):
             el = gremlin.event_handler.EventListener()
             el.joystick_event.connect(self._joystick_event_handler)
 
-
     def _joystick_event_handler(self, event):
-        ''' handles joystick input '''
+        """handles joystick input"""
 
         if not event.is_axis:
             # ignore if not an axis event
             return
-        
+
         if gremlin.shared_state.is_running:
             # ignore if profile is running
             return
@@ -105,62 +100,58 @@ class ResponseCurveExWidget(gremlin.input_item.AbstractActionWidget):
         if self.action_data.hardware_device_guid != event.device_guid:
             # ignore if a different input device
             return
-            
+
         if self.action_data.hardware_input_id != event.identifier:
             # ignore if a different input axis on the input device
             return
-        
+
         self.curve_widget.update_value(event.value)
-        
+
 
 class ResponseCurveExFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action_data : ResponseCurveEx, parent = None) :
+    def __init__(self, action_data: ResponseCurveEx, parent=None):
         super().__init__(action_data, parent)
         self.curve_data = action_data.curve_data
         self.curve_data.curve_update()
 
-    def process_event(self, event, action_value, extra_data = None):
+    def process_event(self, event, action_value, extra_data=None):
         if event.is_axis:
             verbose = gremlin.config.Configuration().verbose_mode_joystick
             if event.curve_value is not None:
                 value = event.curve_value
                 if verbose:
                     source = "curve value"
-                    
+
             else:
                 value = action_value.current
                 if verbose:
                     source = "action current"
-                
+
             curved_value = self.curve_data.curve_value(value)
 
             if verbose:
                 syslog.info(f"CURVE: using input from [{source}] value {value:0.3f} -> curved: {curved_value:0.3f}")
-                
+
             event.curve_value = curved_value
             action_value.current = curved_value
         return True
 
 
 class ResponseCurveEx(gremlin.base_profile.AbstractAction):
-
     """Represents axis response curve mapping."""
 
     name = "Response Curve Ex"
     tag = "response-curve-ex"
-    hint = '''Applies a response curve to the input.
-This effect is cummulative and is applied before any actions are executed, 
+    hint = """Applies a response curve to the input.
+This effect is cummulative and is applied before any actions are executed,
 even if this action appears after other actions.
-If applying a curve to an output axis, use VJOY Remap instead for improved performance.'''    
+If applying a curve to an output axis, use VJOY Remap instead for improved performance."""
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
-    
+
     # override allowed input if different from default
-    input_types = [
-        InputType.JoystickAxis
-    ]
+    input_types = [InputType.JoystickAxis]
 
     functor = ResponseCurveExFunctor
     widget = ResponseCurveExWidget
@@ -173,24 +164,23 @@ If applying a curve to an output axis, use VJOY Remap instead for improved perfo
         super().__init__(parent)
         self.parent = parent
         self.curve_data = gremlin.curve_handler.AxisCurveData()
-        # uptate m76T62 - ignore any calibration data 
-        #self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
+        # uptate m76T62 - ignore any calibration data
+        # self.curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.hardware_device_guid, self.hardware_input_id)
         self.curve_data.curve_update()
         self.show_input_axis = gremlin.config.Configuration().show_input_axis
-        self.setPriority(1) # execute before other nodes (default priority is 5)
+        self.setPriority(1)  # execute before other nodes (default priority is 5)
 
     def getCurveData(self):
-        ''' returns the curve data '''
+        """returns the curve data"""
         return self.curve_data
 
     def display_name(self):
         return "ResponseCurveEx"
-        
 
     def icon(self):
         """Returns the icon representing the action."""
         return "mdi.chart-bell-curve"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.
@@ -199,7 +189,7 @@ If applying a curve to an output axis, use VJOY Remap instead for improved perfo
         """
         return False
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         """Parses the XML corresponding to a response curve.
 
         :param node the XML node to parse
@@ -207,15 +197,12 @@ If applying a curve to an output axis, use VJOY Remap instead for improved perfo
 
         self.curve_data._parse_xml(node)
 
-
-
     def _generate_xml(self):
         """Generates a XML node corresponding to this object.
 
         :return XML node representing the object's data
         """
 
-        
         node = self.curve_data._generate_xml()
         node.tag = "response-curve-ex"
         return node
@@ -227,9 +214,8 @@ If applying a curve to an output axis, use VJOY Remap instead for improved perfo
         """
         return True
 
-
-    def to_html(self) -> str:    
-        ''' returns reporting graphviz data for this action '''
+    def to_html(self) -> str:
+        """returns reporting graphviz data for this action"""
         return self.curve_data.to_html()
 
 

@@ -162,7 +162,7 @@ class CodeRunner:
         # gc.collect()
 
         # update hardware list for any missing devices
-        gremlin.joystick_handling._scan_dinput()
+        gremlin.joystick_handling.scanDinput()
 
         # indicate we're in run mode
         gremlin.shared_state.is_running = True

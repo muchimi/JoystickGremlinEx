@@ -60,7 +60,6 @@ class Ui_Gremlin(object):
         main_window.addWidget(self.device_widget)
         main_window.addWidget(self.statusbar_widget)
 
-        main_window.addWidget(QtWidgets.QLabel("bottom of window content"))
 
         # build the menus
         self.menubar = QtWidgets.QMenuBar(main_window)
@@ -192,10 +191,16 @@ class Ui_Gremlin(object):
         self.actionReloadDevices.setObjectName("actionReloadDevices")
         icon = gremlin.ui.ui_common.load_icon("mdi6.reload")
         self.actionReloadDevices.setIcon(icon)
-
         self.actionReloadDevices.setToolTip(
             "Performs a fresh scan of devices and reloads them"
         )
+
+        self.actionReorderDevices = QtGui.QAction(main_window)
+        self.actionReorderDevices.setText("Reorder Devices...")
+        self.actionReorderDevices.setObjectName("actionReorderDevices")
+        self.actionReorderDevices.setToolTip("Reorders the device tabs")
+
+
 
         self.actionInputViewer = QtGui.QAction(main_window)
         self.actionInputViewer.setObjectName("actionInputViewer")
@@ -246,6 +251,8 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionDeviceInformation)
         self.menuTools.addAction(self.actionProfileDevices)
         self.menuTools.addAction(self.actionReloadDevices)
+        self.menuTools.addAction(self.actionReorderDevices)
+
         # self.menuTools.addAction(self.actionToggleRemoteControl)
 
         # self.menuTools.addAction(self.actionCalibration)

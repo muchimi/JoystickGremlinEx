@@ -1398,10 +1398,16 @@ class Configuration(QtCore.QObject):
 
     @property
     def verbose_mode_ui(self):
-        """true if verbose mode is in UI mode"""
-        if __debug__:
-            return True
         return self.verbose and VerboseMode.UI in self.verbose_mode
+
+    def verbose_mode_ui_level(self, level = 0):
+        """true if verbose mode is in UI mode"""
+        flag = self.verbose and VerboseMode.UI in self.verbose_mode
+        return flag and (level == 0 \
+            or (level >= 1 and VerboseMode.L1 in self.verbose_mode) \
+            or (level >= 2 and VerboseMode.L2 in self.verbose_mode) \
+            or (level >= 3 and VerboseMode.L3 in self.verbose_mode)
+        )
 
     @property
     def verbose_mode_vjoy(self):
@@ -1575,9 +1581,16 @@ class Configuration(QtCore.QObject):
 
     @property
     def verbose_mode_perf(self):
+        return self.verbose and VerboseMode.Perf in self.verbose_mode
+
+
+    def verbose_mode_perf_level(self, level = 0):
         """true if verbose mode for performance timing"""
-        return True
-        # return self.verbose and VerboseMode.Perf in self.verbose_mode
+        flag = self.verbose and VerboseMode.Perf in self.verbose_mode
+        return flag and (level == 0 \
+            or level == 1 and VerboseMode.L1 in self.verbose_mode \
+            or level == 2 and VerboseMode.L2 in self.verbose_mode \
+            or level >= 3 and VerboseMode.L3 in self.verbose_mode)
 
     @property
     def verbose_mode_timing(self):
@@ -1627,6 +1640,21 @@ class Configuration(QtCore.QObject):
     def verbose_mode_mode(self):
         """true if verbose mode is in Mode mode"""
         return self.verbose and VerboseMode.Mode in self.verbose_mode
+
+    @property
+    def verbose_mode_l1(self):
+        """true if verbose mode level 3"""
+        return self.verbose and VerboseMode.L1 in self.verbose_mode
+
+    @property
+    def verbose_mode_l2(self):
+        """true if verbose mode level 2 """
+        return self.verbose and VerboseMode.L2 in self.verbose_mode
+
+    @property
+    def verbose_mode_l3(self):
+        """true if verbose mode level 3"""
+        return self.verbose and VerboseMode.L3 in self.verbose_mode
 
     @property
     def midi_enabled(self):

@@ -17,7 +17,7 @@
 
 # Adapted from: https://github.com/odwdinc/Python-SimConnect  Credit for original code goes to the authors of the Python-SimConnect project
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import logging
 from ctypes import *
 import traceback
@@ -76,9 +76,7 @@ class SimConnectBridge(QtCore.QObject):
     """Simconnect bridge for GremlinEx"""
 
     lvars_loaded = Signal(object)  # sent when lvars are received
-    aircraft_list_loaded = Signal(
-        object
-    )  # sends the aircraft list (map of [aircraft][list of liveries] )
+    aircraft_list_loaded = Signal(object)  # sends the aircraft list (map of [aircraft][list of liveries] )
     alive = Signal()  # sent when pong is received (alive signal)
 
     def __init__(self, sm: SimConnect):
@@ -95,9 +93,7 @@ class SimConnectBridge(QtCore.QObject):
         self._aircraft_map = {}  # list of aicrafts keyed by aircraft name, holds liveries as a list
         self._state = None  # response state
         self._wait_event = threading.Event()  # wait event
-        self._wait_alive_event = (
-            threading.Event()
-        )  # alive wait event when sending a ping
+        self._wait_alive_event = threading.Event()  # alive wait event when sending a ping
         el = gremlin.event_handler.EventListener()
         self._alive_thread = None
         self._connect_in_progress = False
@@ -122,12 +118,8 @@ class SimConnectBridge(QtCore.QObject):
                 0.0,
                 SIMCONNECT_UNUSED,
             )
-            self.sm._dll.MapClientDataNameToID(
-                self.sm._hSimConnect, kPublicDownlinkChannel, kPublicDownlinkArea
-            )
-            self.sm._dll.MapClientDataNameToID(
-                self.sm._hSimConnect, kPublicUplinkChannel, kPublicUplinkArea
-            )
+            self.sm._dll.MapClientDataNameToID(self.sm._hSimConnect, kPublicDownlinkChannel, kPublicDownlinkArea)
+            self.sm._dll.MapClientDataNameToID(self.sm._hSimConnect, kPublicUplinkChannel, kPublicUplinkArea)
             self.sm._dll.RequestClientData(
                 self.sm._hSimConnect,
                 kPublicDownlinkArea,
@@ -162,9 +154,7 @@ class SimConnectBridge(QtCore.QObject):
             # syslog = logging.getLogger("system")
             syslog.info("SIMCONNECT BRIDGE: stop")
             try:
-                self.sm.unregister_client_data_handler(
-                    self.client_data_callback_handler
-                )
+                self.sm.unregister_client_data_handler(self.client_data_callback_handler)
                 if self.sm._dll:
                     self.sm._dll.RequestClientData(
                         self.sm._hSimConnect,
@@ -242,9 +232,7 @@ class SimConnectBridge(QtCore.QObject):
 
                 case BridgeCommands.GetNamedVariable:
                     # named variable
-                    packet = cast(
-                        client_data.dwData, POINTER(BRIDGE_PACKET_DOUBLE)
-                    ).contents
+                    packet = cast(client_data.dwData, POINTER(BRIDGE_PACKET_DOUBLE)).contents
                     _value = packet.data  # double
                     # syslog.info(f"SIMCONNECT BRIDGE: received value: {value}")
 
@@ -284,9 +272,7 @@ class SimConnectBridge(QtCore.QObject):
                     elif data == "#ac_end#":
                         self._state = "complete"
                         thread = threading.Thread(
-                            target=lambda: self.aircraft_list_loaded.emit(
-                                self._aircraft_map
-                            ),
+                            target=lambda: self.aircraft_list_loaded.emit(self._aircraft_map),
                             daemon=False,
                         )
                         thread.name = "simconnect ac list"
@@ -315,9 +301,7 @@ class SimConnectBridge(QtCore.QObject):
         #     if verbose: syslog.info("execute: already executing")
         #     return
         try:
-            id = (
-                self._get_next_id()
-            )  # id is sequential so it's unique for each call and will roundrobin
+            id = self._get_next_id()  # id is sequential so it's unique for each call and will roundrobin
             data = command.encode("ascii")
 
             packet = BRIDGE_PACKET(id, BridgeCommands.ExecuteCalculatorCode, data)
@@ -342,18 +326,14 @@ class SimConnectBridge(QtCore.QObject):
                 syslog.info(f"SIMCONNECT BRIDGE: {command} sent")
             # self._wait_event.clear()
         except Exception:
-            syslog.error(
-                f"SIMCONNECT BRIDGE: error executing calculator code: {command}"
-            )
+            syslog.error(f"SIMCONNECT BRIDGE: error executing calculator code: {command}")
 
     def get_variable(self, command):
         """gets a named variables"""
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_simconnect
         try:
-            id = (
-                self._get_next_id()
-            )  # id is sequential so it's unique for each call and will roundrobin
+            id = self._get_next_id()  # id is sequential so it's unique for each call and will roundrobin
             data = command.encode("ascii")
             packet = BRIDGE_PACKET(id, BridgeCommands.GetNamedVariable, data)
             packet_pointer = cast(pointer(packet), c_void_p)
@@ -383,9 +363,7 @@ class SimConnectBridge(QtCore.QObject):
             if verbose:
                 syslog.info("SIMCONNECT BRIDGE: handshake initiated...")
             self._connect_in_progress = True
-            self._alive_thread = threading.Thread(
-                target=self._ping_runner, daemon=False
-            )
+            self._alive_thread = threading.Thread(target=self._ping_runner, daemon=False)
             self._alive_thread.name = "SIMCONNECT wasm ping runner"
             self._alive_thread.start()
 
@@ -396,9 +374,7 @@ class SimConnectBridge(QtCore.QObject):
             while self._connect_in_progress:
                 if verbose:
                     syslog.info("SIMCONNECT BRIDGE: (alive thread) send ping request")
-                id = (
-                    self._get_next_id()
-                )  # id is sequential so it's unique for each call and will roundrobin
+                id = self._get_next_id()  # id is sequential so it's unique for each call and will roundrobin
                 packet = BRIDGE_PACKET(id, BridgeCommands.Ping)
                 packet_pointer = cast(pointer(packet), c_void_p)
                 self.sm._dll.SetClientData(
@@ -423,9 +399,7 @@ class SimConnectBridge(QtCore.QObject):
     def _request_data(self, bridge_command: BridgeCommands):
         _verbose = gremlin.config.Configuration().verbose_mode_simconnect
         try:
-            id = (
-                self._get_next_id()
-            )  # id is sequential so it's unique for each call and will roundrobin
+            id = self._get_next_id()  # id is sequential so it's unique for each call and will roundrobin
             packet = BRIDGE_PACKET(id, bridge_command, b"")
             packet_pointer = cast(pointer(packet), c_void_p)
             self.sm._dll.SetClientData(
@@ -439,9 +413,7 @@ class SimConnectBridge(QtCore.QObject):
             )
             syslog.info(f"SIMCONNECT BRIDGE: get bridge data: {bridge_command.name}")
         except Exception:
-            syslog.error(
-                f"SIMCONNECT BRIDGE: error getting variable list: {bridge_command.name}"
-            )
+            syslog.error(f"SIMCONNECT BRIDGE: error getting variable list: {bridge_command.name}")
 
     def get_lvars(self):
         """gets the list of lvars from the sim"""

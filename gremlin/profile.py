@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import copy
 import logging
 import os
@@ -72,9 +72,7 @@ class TTSDialog(QtWidgets.QDialog):
 
         # get a list of speakers
 
-        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(
-            auto_adjust=True, tooltip="Selected speaker for AI voice generation."
-        )
+        self.speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip="Selected speaker for AI voice generation.")
         self._update_speakers(initialize=True)
         self.speaker_widget.setCallback(self._handle_speaker_changed)
 
@@ -104,9 +102,7 @@ class TTSDialog(QtWidgets.QDialog):
         self.main_layout.addWidget(ai_container)
 
         ok_button = gremlin.ui.ui_common.QDataPushButton("Ok", callback=self._handle_ok)
-        cancel_button = gremlin.ui.ui_common.QDataPushButton(
-            "Cancel", callback=self._handle_cancel
-        )
+        cancel_button = gremlin.ui.ui_common.QDataPushButton("Cancel", callback=self._handle_cancel)
 
         widgets = ["||", ok_button, cancel_button, "||"]
         button_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
@@ -258,17 +254,13 @@ class ProfileConverter:
 
             else:
                 # syslog = logging.getLogger("system")
-                syslog.warning(
-                    f"Unexpected version: {old_version} found in profile.  Some unsupported features may not have loaded correctly."
-                )
+                syslog.warning(f"Unexpected version: {old_version} found in profile.  Some unsupported features may not have loaded correctly.")
 
         if converted:
             if new_root is not None:
                 # Save converted version
                 tree = etree.ElementTree(root)
-                tree.write(
-                    fname, pretty_print=True, xml_declaration=True, encoding="utf-8"
-                )
+                tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
             else:
                 raise error.ProfileError("Failed to convert profile")
 
@@ -331,9 +323,7 @@ class ProfileConverter:
                 if device.get("name") in device_name_map:
                     device.set("id", str(device_name_map[device.get("name")]))
                 else:
-                    syslog.warning(
-                        f"Device '{device.get('name')}' missing, no conversion performed, ID will be incorrect."
-                    )
+                    syslog.warning(f"Device '{device.get('name')}' missing, no conversion performed, ID will be incorrect.")
         return new_root
 
     def _convert_from_v3(self, root, fname=None):
@@ -363,13 +353,9 @@ class ProfileConverter:
                     if input_item.tag == "button":
                         if action.tag == "macro":
                             if "on-press" in action.keys():
-                                press_and_release[0] = press_and_release[
-                                    0
-                                ] or parse_bool(action.get("on-press"))
+                                press_and_release[0] = press_and_release[0] or parse_bool(action.get("on-press"))
                             if "on-release" in action.keys():
-                                press_and_release[1] = press_and_release[
-                                    1
-                                ] or parse_bool(action.get("on-release"))
+                                press_and_release[1] = press_and_release[1] or parse_bool(action.get("on-release"))
 
                 # If this widget is purely a map to keyboard action then
                 # replace the two macro widgets with a single one
@@ -564,9 +550,7 @@ class ProfileConverter:
 
         root.attrib["version"] = "7"
         for module in root.findall("import/module"):
-            module.attrib["name"] = os.path.normpath(
-                f"{base_path}\\{module.attrib['name']}.py"
-            )
+            module.attrib["name"] = os.path.normpath(f"{base_path}\\{module.attrib['name']}.py")
 
         return root
 
@@ -716,12 +700,8 @@ class ProfileConverter:
                     return linear_id
 
                 device = self.dev_info[device_guid]
-                if linear_id > device.axis_count or linear_id >= len(
-                    device.axismap_list
-                ):
-                    syslog.error(
-                        f"Invalid linear axis id received, {device.name} id = {linear_id}"
-                    )
+                if linear_id > device.axis_count or linear_id >= len(device.axismap_list):
+                    syslog.error(f"Invalid linear axis id received, {device.name} id = {linear_id}")
                     return linear_id
 
                 return device.axismap_list[linear_id].axis_index
@@ -739,15 +719,11 @@ class ProfileConverter:
                 try:
                     hardware_id = int(hardware_id)
                 except (ValueError, TypeError):
-                    syslog.warn(
-                        f"Cannot convert {hardware_id} into a valid hardware id"
-                    )
+                    syslog.warn(f"Cannot convert {hardware_id} into a valid hardware id")
                     return f"{{{uuid.uuid4()}}}"
 
                 if hardware_id not in self.hwid_to_guid:
-                    syslog.warn(
-                        f"GUID for device {'' if name is None else name} with hardware_id {hardware_id} is unknown."
-                    )
+                    syslog.warn(f"GUID for device {'' if name is None else name} with hardware_id {hardware_id} is unknown.")
                     self.hwid_to_guid[hardware_id] = f"{{{uuid.uuid4()}}}"
 
                 return self.hwid_to_guid[hardware_id]
@@ -782,9 +758,7 @@ class ProfileConverter:
             else:
                 entry.set(
                     "device-guid",
-                    uuid_converter.lookup(
-                        entry.attrib.get("id", None), entry.attrib.get("name", "")
-                    ),
+                    uuid_converter.lookup(entry.attrib.get("id", None), entry.attrib.get("name", "")),
                 )
 
             # Remove the now obsolete id and windows id attributes
@@ -794,18 +768,12 @@ class ProfileConverter:
             for child in entry.findall("mode/axis"):
                 child.set(
                     "id",
-                    str(
-                        uuid_converter.axis_lookup(
-                            entry.attrib["device-guid"], int(child.attrib["id"]) - 1
-                        )
-                    ),
+                    str(uuid_converter.axis_lookup(entry.attrib["device-guid"], int(child.attrib["id"]) - 1)),
                 )
 
         for entry in root.findall("vjoy-devices/vjoy-device"):
             entry.set("vjoy-id", entry.attrib["id"])
-            entry.set(
-                "device-guid", uuid_converter.vjoy_lookup(int(entry.attrib["id"]))
-            )
+            entry.set("device-guid", uuid_converter.vjoy_lookup(int(entry.attrib["id"])))
             del entry.attrib["id"]
             del entry.attrib["windows_id"]
 
@@ -864,18 +832,14 @@ class ProfileConverter:
             del entry.attrib["axis"]
 
         for entry in root.findall(".//merge-axis/lower"):
-            entry.set(
-                "device-guid", uuid_converter.lookup(entry.attrib.get("id", None))
-            )
+            entry.set("device-guid", uuid_converter.lookup(entry.attrib.get("id", None)))
             entry.set("axis-id", entry.attrib["axis"])
             del entry.attrib["id"]
             del entry.attrib["axis"]
             del entry.attrib["windows_id"]
 
         for entry in root.findall(".//merge-axis/upper"):
-            entry.set(
-                "device-guid", uuid_converter.lookup(entry.attrib.get("id", None))
-            )
+            entry.set("device-guid", uuid_converter.lookup(entry.attrib.get("id", None)))
             entry.set("axis-id", entry.attrib["axis"])
             del entry.attrib["id"]
             del entry.attrib["axis"]
@@ -936,21 +900,15 @@ class ProfileConverter:
             if nodes:
                 master_node = nodes[0]
                 # remove any empty profile start/stop nodes
-                nodes = master_node.xpath(
-                    "modecontrol[not(*) and (@id='5' or @id='6')]"
-                )
+                nodes = master_node.xpath("modecontrol[not(*) and (@id='5' or @id='6')]")
                 for node in nodes:
                     master_node.remove(node)
             else:
                 # create it
-                master_node = lxml.etree.Element(
-                    "mode", name=master_mode, system="True"
-                )
+                master_node = lxml.etree.Element("mode", name=master_mode, system="True")
                 device_node.append(master_node)
 
-            nodes = device_node.xpath(
-                "//modecontrol[@id='5' or @id='6']"
-            )  # profile start or profile stop
+            nodes = device_node.xpath("//modecontrol[@id='5' or @id='6']")  # profile start or profile stop
             for node in nodes:
                 mode_node = node.getparent()
                 if mode_node != master_node:
@@ -1144,9 +1102,7 @@ class ProfileConverter:
 
         return root
 
-    def convert_tts(
-        self, fname: str, speaker=None, tts_speed: float = 1.0, generate=True
-    ) -> bool:
+    def convert_tts(self, fname: str, speaker=None, tts_speed: float = 1.0, generate=True) -> bool:
         # change value for button macro actions from boolean to actual action names
 
         import gremlin.util
@@ -1156,16 +1112,12 @@ class ProfileConverter:
 
         config = gremlin.config.Configuration()
         if not speaker:
-            speaker = (
-                config.ai_tts_last_speaker
-            )  # use the last speaker if none provided
+            speaker = config.ai_tts_last_speaker  # use the last speaker if none provided
 
         ui = gremlin.shared_state.ui
 
         if not fname or not os.path.isfile(fname):
-            gremlin.ui.ui_common.MessageBoxWarning(
-                prompt="Invalid profile file.\nEnsure profile is saved."
-            )
+            gremlin.ui.ui_common.MessageBoxWarning(prompt="Invalid profile file.\nEnsure profile is saved.")
             return False
 
         if generate:
@@ -1187,9 +1139,7 @@ class ProfileConverter:
             nodes = root.xpath("//text-to-speech")
             count = len(nodes)
 
-            progress_dialog = QtWidgets.QProgressDialog(
-                "Operation in progress...", "Cancel", 0, count, parent=ui
-            )
+            progress_dialog = QtWidgets.QProgressDialog("Operation in progress...", "Cancel", 0, count, parent=ui)
             progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
             progress_dialog.setAutoClose(True)
             progress_dialog.setMinimumDuration(0)  # Show immediately
@@ -1259,9 +1209,7 @@ class ProfileConverter:
 
                 if generate:
                     # generate the wav file
-                    progress_dialog.setLabelText(
-                        f"Generate voice file {index} out of {count}..."
-                    )
+                    progress_dialog.setLabelText(f"Generate voice file {index} out of {count}...")
 
                     wav = ktts.getNewWav()
                     if config.ai_tts_use_word_filenames:
@@ -1280,22 +1228,16 @@ class ProfileConverter:
                                 try:
                                     os.unlink(suggested_file)
                                 except Exception as e:
-                                    syslog.error(
-                                        f"CONVERT: unable to remove file {suggested_file}"
-                                    )
+                                    syslog.error(f"CONVERT: unable to remove file {suggested_file}")
                                     syslog.error(f"\tError: {str(e)}")
                                     return False
                             else:
                                 # don't reuse, find a unique file name by sequencing
                                 index = 1
-                                fname = gremlin.util.swap_ext(
-                                    suggested_file, suffix=f"_{index}"
-                                )
+                                fname = gremlin.util.swap_ext(suggested_file, suffix=f"_{index}")
                                 while os.path.isfile(fname):
                                     index += 1
-                                    fname = gremlin.util.swap_ext(
-                                        suggested_file, suffix=f"_{index}"
-                                    )
+                                    fname = gremlin.util.swap_ext(suggested_file, suffix=f"_{index}")
 
                                 target_file = fname
                         else:
@@ -1303,9 +1245,7 @@ class ProfileConverter:
                             target_file = suggested_file
 
                     # generate on a temporary file
-                    wav = ktts.generateWav(
-                        tts_file=wav, text=text, speaker=speaker, tts_speed=tts_speed
-                    )
+                    wav = ktts.generateWav(tts_file=wav, text=text, speaker=speaker, tts_speed=tts_speed)
                     if wav:
                         # file was generated ok
                         if target_file != wav:
@@ -1314,9 +1254,7 @@ class ProfileConverter:
                                 try:
                                     os.unlink(target_file)
                                 except Exception as e:
-                                    syslog.error(
-                                        f"CONVERT: unable to remove file [{wav}] to [{target_file}]"
-                                    )
+                                    syslog.error(f"CONVERT: unable to remove file [{wav}] to [{target_file}]")
                                     syslog.error(f"\tError: {str(e)}")
                                     target_file = wav  # do not rename
 
@@ -1325,9 +1263,7 @@ class ProfileConverter:
                                 shutil.copy(wav, target_file)
                                 os.unlink(wav)
                             except Exception as e:
-                                syslog.error(
-                                    f"CONVERT: unable to save file [{wav}] to [{target_file}]"
-                                )
+                                syslog.error(f"CONVERT: unable to save file [{wav}] to [{target_file}]")
                                 syslog.error(f"\tError: {str(e)}")
                                 target_file = wav  # do not rename
 
@@ -1347,9 +1283,7 @@ class ProfileConverter:
                 try:
                     os.unlink(fname)
                 except Exception as e:
-                    syslog.error(
-                        f"CONVERT TTS: unable to delete existing profile file: {str(e)}"
-                    )
+                    syslog.error(f"CONVERT TTS: unable to delete existing profile file: {str(e)}")
                     return False
             tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
             syslog.info(f"CONVERT TTS: saved data to : {fname}")
@@ -1410,9 +1344,7 @@ class ProfileConverter:
             legacy_fname = gremlin.util.swap_ext(fname, ".xml", suffix="_legacy")
             index = 1
             while os.path.isfile(legacy_fname):
-                legacy_fname = gremlin.util.swap_ext(
-                    fname, ".xml", suffix=f"_legacy_{index}"
-                )
+                legacy_fname = gremlin.util.swap_ext(fname, ".xml", suffix=f"_legacy_{index}")
                 index += 1
             try:
                 shutil.copyfile(fname, legacy_fname)
@@ -1485,9 +1417,7 @@ class ProfileConverter:
                     syslog.error(err)
 
             syslog.info("CONVERT: did not find any actions to convert")
-            gremlin.ui.ui_common.MessageBox(
-                title="Conversion Results", prompt="No actions converted."
-            )
+            gremlin.ui.ui_common.MessageBox(title="Conversion Results", prompt="No actions converted.")
 
         else:
             # items were converted
@@ -1509,9 +1439,7 @@ class ProfileConverter:
                 syslog.error(f"Unable to write converted file: {fname}")
                 syslog.error(err)
                 return False
-            syslog.info(
-                f"CONVERT: converted {keyboard_count} keyboard actions and {remap_count} remap actions."
-            )
+            syslog.info(f"CONVERT: converted {keyboard_count} keyboard actions and {remap_count} remap actions.")
 
             # output a message box
             gremlin.ui.ui_common.MessageBox(
@@ -1601,10 +1529,7 @@ class ProfileModifier:
 
         count = 0
         for cond in self.all_conditions():
-            if (
-                isinstance(cond, BaseJoystickCondition)
-                and cond.device_guid == device_guid
-            ):
+            if isinstance(cond, BaseJoystickCondition) and cond.device_guid == device_guid:
                 count += 1
         return count
 
@@ -1685,9 +1610,7 @@ class ProfileModifier:
                     input_id = input_item.input_id
 
                     if input_id not in target_mode.config[input_type]:
-                        syslog.warning(
-                            "Swap devices: Source input id not present in target device"
-                        )
+                        syslog.warning("Swap devices: Source input id not present in target device")
                         continue
 
                     # Move containers from source to target input item
@@ -1695,9 +1618,7 @@ class ProfileModifier:
 
                     for container in input_item.containers:
                         container.parent = target_input_item
-                        target_mode.config[input_type][input_id].containers.append(
-                            container
-                        )
+                        target_mode.config[input_type][input_id].containers.append(container)
 
                     # Remove all containers from the source device
                     input_item.containers.clear()
@@ -1766,9 +1687,7 @@ class ProfileModifier:
                     for input_item in input_items.values():
                         for container in input_item.containers:
                             if container.activation_condition is not None:
-                                all_conditions.extend(
-                                    container.activation_condition.conditions
-                                )
+                                all_conditions.extend(container.activation_condition.conditions)
         return all_conditions
 
     def _get_device(self, device_guid):

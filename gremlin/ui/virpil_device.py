@@ -1,4 +1,3 @@
-
 # # -*- coding: utf-8; -*-
 
 # # Based on original work by (C) Lionel Ott -  (C) EMCS 2024 and other contributors
@@ -16,7 +15,7 @@
 # # You should have received a copy of the GNU General Public License
 # # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# # from __future__ import annotations # deprecated with python 3.14+
+# from __future__ import annotations # deprecated with python 3.14+
 # import logging
 
 # from PySide6 import QtWidgets, QtCore, QtGui
@@ -81,9 +80,6 @@
 #     ALPHA_RIGHT = [0x40CB]
 #     ALPHA_LEFT = [0x80CB]
 
-    
-
-    
 
 # class VirpilBoardType(enum.IntEnum):
 #     ''' virpil board types as of September 2025 (byte) '''
@@ -109,13 +105,13 @@
 #         self._devices = {} # list of virpil HID devices
 #         self._vendor_id = 0x3344 # virpil vendor ID
 #         self.deviceFound() # true if the device is found
-        
+
 
 #     def deviceFound(self, refresh = False) -> bool:
 #         ''' scans the HID devices to see if the device is found '''
 #         if self._device_found:
 #             return True
-        
+
 #         for data in hid.enumerate():
 #             vid = data['vendor_id']
 #             pid = data['product_id']
@@ -126,16 +122,16 @@
 #                             device = hid.Device(vid, pid)
 #                             self._devices[pid] = device
 #                             device.nonblocking = 1
-                            
+
 #                             break
-                
+
 #         self._device_found = len(self._devices) > 0
 #         syslog.info("IFR1: not detected")
 #         return False
-    
+
 #     def setLed(self, pid, led, r, g, b, board : VirpilBoardType = VirpilBoardType.Default):
-#         ''' sets a virpil device LED 
-        
+#         ''' sets a virpil device LED
+
 #         pid: product ID (number)
 #         led: led number
 #         r = red component 0..255
@@ -151,7 +147,7 @@
 #         data = [0 for i in range(38)] # 38 bytes
 #         report = 2
 #         data[0] = report
-#         data[1] = board.value & 0xff # board value 
+#         data[1] = board.value & 0xff # board value
 #         command = self._get_command(board, led)
 #         if command is None:
 #             # invalid data
@@ -166,11 +162,11 @@
 #         color = color & 0xff
 #         data[led + 4] =  color
 #         data[37] = 0xf0 # terminator
-        
+
 #         data_bytes = bytes(data)
 #         device.send_feature_report(data_bytes)
 #         pass
-    
+
 #     def _find_device(self, pid):
 #         ''' finds a virpil device by its PID '''
 #         if pid in self._devices:
@@ -189,12 +185,9 @@
 #                 return led + 0x18
 #             case VirpilBoardType.ExtraBoard:
 #                 return led + 0x2C
-            
+
 #         return None
-            
 
-            
 
-    
 # # primary instance
 # _virpil_interface = VirpilInterface()

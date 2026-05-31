@@ -1,9 +1,6 @@
-
-
-
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,14 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
-from PySide6 import QtWidgets, QtCore #QtWebEngineWidgets
+from __future__ import annotations  # deprecated with python 3.14+
+from PySide6 import QtWidgets, QtCore  # QtWebEngineWidgets
 from gremlin.ui import ui_common
 from gremlin.ui.qsliderwidget import QSliderWidget
 from gremlin.util import *
 import gremlin.util
 from gremlin.types import *
-import gremlin.ui.ui_common 
+import gremlin.ui.ui_common
 import enum
 
 
@@ -40,25 +37,26 @@ class DeadzonePreset(enum.IntEnum):
     reset = 7
 
     @staticmethod
-    def to_display(value : DeadzonePreset) -> str:
+    def to_display(value: DeadzonePreset) -> str:
         return _deadzone_preset_string_lookup[value]
 
-_deadzone_preset_string_lookup = {    
-    DeadzonePreset.center_zero : "Center 0%",
-    DeadzonePreset.center_two : "Center 2%",
-    DeadzonePreset.center_five : "Center 5%",
-    DeadzonePreset.center_ten : "Center 10%",
-    DeadzonePreset.end_two : "End 2%",
-    DeadzonePreset.end_five : "End 5%",
-    DeadzonePreset.end_ten : "End 10%",
-    DeadzonePreset.reset : "Reset"
+
+_deadzone_preset_string_lookup = {
+    DeadzonePreset.center_zero: "Center 0%",
+    DeadzonePreset.center_two: "Center 2%",
+    DeadzonePreset.center_five: "Center 5%",
+    DeadzonePreset.center_ten: "Center 10%",
+    DeadzonePreset.end_two: "End 2%",
+    DeadzonePreset.end_five: "End 5%",
+    DeadzonePreset.end_ten: "End 10%",
+    DeadzonePreset.reset: "Reset",
 }
 
-class DeadzoneWidget(QtWidgets.QWidget):
-    ''' deadzone widget '''
 
-    changed = QtCore.Signal() # indicates the data has changed
-    
+class DeadzoneWidget(QtWidgets.QWidget):
+    """deadzone widget"""
+
+    changed = QtCore.Signal()  # indicates the data has changed
 
     def __init__(self, profile_data, parent=None):
         """Creates a new instance.
@@ -77,7 +75,6 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         # use a single slider for non-centered axes
         self.slider = QSliderWidget()
-
 
         self.slider.desired_height = 20
         self.slider.setRange(-1.0, 1.0)
@@ -128,27 +125,17 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.left_slider.valueChanged.connect(self._update_left)
         self.right_slider.valueChanged.connect(self._update_right)
 
-        self.left_lower.valueChanged.connect(
-            lambda value: self._update_from_spinner(value,0)
-        )
-        self.left_upper.valueChanged.connect(
-            lambda value: self._update_from_spinner(value,1)
-        )
-        self.right_lower.valueChanged.connect(
-            lambda value: self._update_from_spinner(value,2)
-        )
-        self.right_upper.valueChanged.connect(
-            lambda value: self._update_from_spinner(value,3)
-        )
-
-
-
+        self.left_lower.valueChanged.connect(lambda value: self._update_from_spinner(value, 0))
+        self.left_upper.valueChanged.connect(lambda value: self._update_from_spinner(value, 1))
+        self.right_lower.valueChanged.connect(lambda value: self._update_from_spinner(value, 2))
+        self.right_upper.valueChanged.connect(lambda value: self._update_from_spinner(value, 3))
 
         self.container_preset_widget = QtWidgets.QWidget()
         self.container_preset_layout = QtWidgets.QHBoxLayout(self.container_preset_widget)
         self.container_preset_layout.addWidget(QtWidgets.QLabel("Deadzone"))
 
         from gremlin.curve_handler import DeadzonePreset
+
         self._center_presets = []
         for preset in DeadzonePreset:
             name = DeadzonePreset.to_display(preset)
@@ -177,23 +164,23 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.main_layout.addWidget(widget, row, 0)
 
         widget = gremlin.ui.ui_common.QDataWidget()
-        widget.data = DeadzonePreset.center_five # this is so it gets hidden when in slider mode
+        widget.data = DeadzonePreset.center_five  # this is so it gets hidden when in slider mode
         layout = QtWidgets.QHBoxLayout(widget)
         layout.addStretch()
         layout.addWidget(QtWidgets.QLabel("Ctr Min:"))
         layout.addWidget(self.left_upper)
-        
+
         self.main_layout.addWidget(widget, row, 1)
         self._center_presets.append(widget)
 
         widget = gremlin.ui.ui_common.QDataWidget()
-        widget.data = DeadzonePreset.center_five # this is so it gets hidden when in slider mode
+        widget.data = DeadzonePreset.center_five  # this is so it gets hidden when in slider mode
         layout = QtWidgets.QHBoxLayout(widget)
-        
+
         layout.addWidget(QtWidgets.QLabel("Ctr Max:"))
         layout.addWidget(self.right_lower)
         layout.addStretch()
-        
+
         self.main_layout.addWidget(widget, row, 2)
         self._center_presets.append(widget)
         widget = gremlin.ui.ui_common.QDataWidget()
@@ -201,24 +188,24 @@ class DeadzoneWidget(QtWidgets.QWidget):
         layout.addStretch()
         layout.addWidget(QtWidgets.QLabel("Max:"))
         layout.addWidget(self.right_upper)
-        
+
         self.main_layout.addWidget(widget, row, 3)
 
         self._update()
 
     def unhook(self):
-        ''' called when the widget is destroyed '''
+        """called when the widget is destroyed"""
         self.slider.valueChanged.disconnect()
 
-
     def _is_center_preset(self, preset):
-        ''' true if a center preset '''
+        """true if a center preset"""
         return preset in (DeadzonePreset.center_zero, DeadzonePreset.center_two, DeadzonePreset.center_five, DeadzonePreset.center_ten)
 
-    @QtCore.Slot() 
+    @QtCore.Slot()
     def _deadzone_preset_cb(self):
-        ''' handles deadzone presets '''
+        """handles deadzone presets"""
         from gremlin.curve_handler import DeadzonePreset
+
         widget = self.sender()
         preset = widget.data
 
@@ -231,31 +218,31 @@ class DeadzoneWidget(QtWidgets.QWidget):
             d_left = 0
         if d_right is None:
             d_right = 0
-        
+
         match preset:
             case DeadzonePreset.center_zero:
                 d_left = 0.0
                 d_right = 0.0
-            case DeadzonePreset.center_two :
+            case DeadzonePreset.center_two:
                 d_left = -0.02 * 2
                 d_right = 0.02 * 2
-            case DeadzonePreset.center_five :
+            case DeadzonePreset.center_five:
                 d_left = -0.05 * 2
                 d_right = 0.05 * 2
-            case DeadzonePreset.center_ten :
+            case DeadzonePreset.center_ten:
                 d_left = -0.1 * 2
                 d_right = 0.1 * 2
-            case DeadzonePreset.end_two : 
+            case DeadzonePreset.end_two:
                 d_start = -1 + 0.02 * 2
                 d_end = 1 - 0.02 * 2
-            case DeadzonePreset.end_five :
+            case DeadzonePreset.end_five:
                 d_start = -1 + 0.05 * 2
                 d_end = 1 - 0.05 * 2
-            case DeadzonePreset.end_ten : 
+            case DeadzonePreset.end_ten:
                 d_start = -1 + 0.1 * 2
                 d_end = 1 - 0.1 * 2
 
-            case DeadzonePreset.reset : 
+            case DeadzonePreset.reset:
                 d_start = -1
                 d_left = 0
                 d_right = 0
@@ -263,21 +250,20 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         self._update_deadzone([d_start, d_left, d_right, d_end])
 
-
     @property
     def isCentered(self) -> bool:
         return self._centered
+
     @isCentered.setter
     def isCentered(self, value: bool):
         if value != self._centered:
             self._centered = value
             self._update()
 
+    def setValues(self, values, emit=False):
+        gremlin.util.InvokeUiMethod(self._setValues_ui, values, emit)  # ensure on UI thread
 
-    def setValues(self, values, emit = False):            
-        gremlin.util.InvokeUiMethod(self._setValues_ui, values, emit) # ensure on UI thread
-
-    def _setValues_ui(self, values, emit = False):
+    def _setValues_ui(self, values, emit=False):
         """Sets the deadzone values.
 
         :param values the new deadzone values [min, min center, max center, max]
@@ -285,63 +271,54 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         if len(values) == 2:
             # has enpoints only
-            v1,v4 = values
+            v1, v4 = values
             v2 = v3 = 0.0
         else:
             # has enpoints and centering
-            v1,v2,v3,v4 = values
+            v1, v2, v3, v4 = values
 
         with QtCore.QSignalBlocker(self.left_slider):
-            self.left_slider.setValue((v1,v2))
+            self.left_slider.setValue((v1, v2))
             # print (f"left slider: {v1} {v2}   values: {self.left_slider.values}")
         with QtCore.QSignalBlocker(self.left_lower):
             self.left_lower.setValue(v1)
-        with QtCore.QSignalBlocker(self.left_upper):            
+        with QtCore.QSignalBlocker(self.left_upper):
             self.left_upper.setValue(v2)
         with QtCore.QSignalBlocker(self.right_slider):
-            self.right_slider.setValue((v3,v4))
+            self.right_slider.setValue((v3, v4))
         with QtCore.QSignalBlocker(self.right_lower):
             self.right_lower.setValue(v3)
         with QtCore.QSignalBlocker(self.right_upper):
             self.right_upper.setValue(v4)
         with QtCore.QSignalBlocker(self.slider):
-            self.slider.setValue((v1,v4))
+            self.slider.setValue((v1, v4))
 
         self._update()
-       
 
         if emit:
             self.changed.emit()
-
-
-
 
     def values(self):
         """Returns the current deadzone values.
 
         :return current deadzone values
         """
-        return [
-            self.left_lower.value(),
-            self.left_upper.value(),
-            self.right_lower.value(),
-            self.right_upper.value()
-            ]
-        
-    
+        return [self.left_lower.value(), self.left_upper.value(), self.right_lower.value(), self.right_upper.value()]
+
     def get_min(self) -> float:
         return self.left_lower.value()
 
     def get_max(self) -> float:
         return self.right_upper.value()
-    
+
     def get_center_left(self) -> float:
         return self.left_upper.value()
+
     def get_center_right(self) -> float:
         return self.right_lower.value()
-    
+
     def _update_center(self, handle, value):
-        ''' updates the main slider when in non centered mode'''
+        """updates the main slider when in non centered mode"""
         if not self.event_lock:
             self.event_lock = True
             if handle == 0:
@@ -390,8 +367,6 @@ class DeadzoneWidget(QtWidgets.QWidget):
             self.changed.emit()
             self.event_lock = False
 
-        
-
     def _update_from_spinner(self, value, index):
         """Updates the slider position.
 
@@ -409,20 +384,15 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.setValues(values)
         # print (f"index {index} value: {value} Values: {values}  left range: {self.left_slider.values} {self.left_slider.range()}  right range: {self.right_slider.values} {self.right_slider.range()}")
         self.changed.emit()
-        
 
-            
-
-    def _update_deadzone(self, data : list):
-        ''' updates the deadzone text values '''
+    def _update_deadzone(self, data: list):
+        """updates the deadzone text values"""
         if len(data) == 2:
             v1, v4 = data
             data = [v1, 0.0, 0.0, v4]
         self.setValues(data)
         self.profile_data.deadzone = data
-        self.changed.emit() # notify we changed
-            
-
+        self.changed.emit()  # notify we changed
 
     def _update(self):
         is_centered = self._centered
@@ -443,4 +413,3 @@ class DeadzoneWidget(QtWidgets.QWidget):
             preset = button.data
             if self._is_center_preset(preset):
                 button.setVisible(is_centered)
-

@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 from typing import Callable
 import logging
 
@@ -293,15 +293,15 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # default axes
         if device.axis_count:
             axis_count = max(device.axis_count, 3)  # first three axes
-            input_filter[device.device_guid][InputType.JoystickAxis] = {}
+            input_filter[device.device_id][InputType.JoystickAxis] = {}
             for index in range(axis_count):
                 input_id = device.axis_sequence_to_input_id(index)
                 input_filter[device.device_id][InputType.JoystickAxis][input_id] = True
         if device.button_count:
             button_count = max(device.button_count, 2)  # first 2 buttons
-            input_filter[device.device_guid][InputType.JoystickButton] = {}
+            input_filter[device.device_id][InputType.JoystickButton] = {}
             for input_id in range(1, button_count + 1):
-                input_filter[device.device_guid][InputType.JoystickButton][input_id] = True
+                input_filter[device.device_id][InputType.JoystickButton][input_id] = True
         # ignore hats
 
         # save the defaults to the settings
@@ -605,7 +605,9 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         if gremlin.config.Configuration().verbose_mode_detailed:
             # syslog = logging.getLogger("system")
-            syslog.info(f"Device tab: change mode requested: device tab: {gremlin.shared_state.get_device_name(self.device.device_guid)} current mode: [{mode}]  new mode: [{mode}] ")
+            syslog.info(
+                f"Device tab: change mode requested: device tab: {gremlin.shared_state.get_device_name(self.device.device_guid)} current mode: [{mode}]  new mode: [{mode}] "
+            )
 
         self.device_profile.ensure_mode_exists(mode, self.device)
 
@@ -676,12 +678,16 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             return input_items.get_data(InputType.JoystickAxis, axis_keys[index])
         elif index < axis_count + button_count:
             if not input_items.has_data(InputType.JoystickButton, index - axis_count + 1):
-                syslog.error(f"Attempting to retrieve non existent button input, type={InputType.to_string(InputType.JoystickButton)} index={index - axis_count + 1}")
+                syslog.error(
+                    f"Attempting to retrieve non existent button input, type={InputType.to_string(InputType.JoystickButton)} index={index - axis_count + 1}"
+                )
 
             return input_items.get_data(InputType.JoystickButton, index - axis_count + 1)
         elif index < axis_count + button_count + hat_count:
             if not input_items.has_data(InputType.JoystickHat, index - axis_count - button_count + 1):
-                syslog.error(f"Attempting to retrieve non existent hat input, type={InputType.to_string(InputType.JoystickHat)} index={index - axis_count - button_count + 1}")
+                syslog.error(
+                    f"Attempting to retrieve non existent hat input, type={InputType.to_string(InputType.JoystickHat)} index={index - axis_count - button_count + 1}"
+                )
 
             return input_items.get_data(InputType.JoystickHat, index - axis_count - button_count + 1)
 
@@ -793,7 +799,9 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
                 if linear_id == input_id:
                     tooltip = f"{InputType.to_name(input_type)} {input_id}" if input_type != InputType.JoystickAxis else device.get_axis_name(input_id)
                 else:
-                    tooltip = f"{InputType.to_name(input_type)} {input_id}/L{linear_id}" if input_type != InputType.JoystickAxis else device.get_axis_name(input_id)
+                    tooltip = (
+                        f"{InputType.to_name(input_type)} {input_id}/L{linear_id}" if input_type != InputType.JoystickAxis else device.get_axis_name(input_id)
+                    )
 
                 btn = gremlin.ui.ui_common.QUsedPushButton(
                     str(input_id) if input_type != InputType.JoystickAxis else device.get_axis_name(input_id, short_name=True),
@@ -1021,7 +1029,9 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
             self.input_filter[device_guid][InputType.JoystickButton] = {}
             for index in range(device.button_count):
                 input_id = index + 1
-                self.input_filter[device_guid][InputType.JoystickButton][input_id] = profile.settings.getFiltered(device_guid, InputType.JoystickButton, input_id)
+                self.input_filter[device_guid][InputType.JoystickButton][input_id] = profile.settings.getFiltered(
+                    device_guid, InputType.JoystickButton, input_id
+                )
         if device.hat_count:
             self.input_filter[device_guid][InputType.JoystickHat] = {}
             for index in range(device.button_count):

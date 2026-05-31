@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import logging
 
 from PySide6 import QtWidgets, QtCore
@@ -259,9 +259,7 @@ class OctaviInterface:
         self._running = False
         self._buttons = {}  # map of [OctaviButton] to bool
         self._last_buttons = {}  # last buttons
-        self._core_buttons = [
-            button for button in OctaviButton if button < OctaviButton.INNER
-        ]
+        self._core_buttons = [button for button in OctaviButton if button < OctaviButton.INNER]
         self._timers = {}
         self._device_guid = gremlin.shared_state.octavi_tab_guid
         self._last_led = 0  # last status LED
@@ -370,9 +368,7 @@ class OctaviInterface:
                         timer = self._timers[button]
                         timer.cancel()
 
-                    timer = threading.Timer(
-                        self._autorelease_delay, callback
-                    )  # autorelease
+                    timer = threading.Timer(self._autorelease_delay, callback)  # autorelease
                     self._timers[button] = timer
                     timers.append(timer)
 
@@ -389,9 +385,7 @@ class OctaviInterface:
                         timer = self._timers[button]
                         timer.cancel()
 
-                    timer = threading.Timer(
-                        self._autorelease_delay, callback
-                    )  # autorelease
+                    timer = threading.Timer(self._autorelease_delay, callback)  # autorelease
                     self._timers[button] = timer
                     timers.append(timer)
 
@@ -617,9 +611,7 @@ class OctaviInputItemListModel(gremlin.input_item.InputItemListModel):
 class OctaviInputItemListView(gremlin.input_item.InputItemListView):
     """list view for mode input items"""
 
-    def __init__(
-        self, custom_widget_handler, model: OctaviInputItemListModel, parent=None
-    ):
+    def __init__(self, custom_widget_handler, model: OctaviInputItemListModel, parent=None):
         """creates a new list view for mode input items
 
         :param custom_widget_handler a handler that creates a widget for an input item
@@ -674,9 +666,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
-        widget = gremlin.ui.ui_common.getHContainer(
-            lock_widget, left_stretch=True, widget_only=True
-        )
+        widget = gremlin.ui.ui_common.getHContainer(lock_widget, left_stretch=True, widget_only=True)
         self.addLeftPanelHeaderWidget(widget)
 
         config = gremlin.config.Configuration()
@@ -687,9 +677,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(
-                line_edit, "Device ID:", widget_only=True
-            )
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
@@ -697,9 +685,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(
-                line_edit, "Device Name:", widget_only=True
-            )
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
@@ -724,14 +710,10 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         return self.inputItemListView.count()
 
     def _handle_lock_inputs(self, data):
-        gremlin.util.InvokeUiMethod(
-            self._handle_lock_inputs_ui, data
-        )  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data)  # ensure on UI thread
 
     def _handle_unlock_inputs(self, data):
-        gremlin.util.InvokeUiMethod(
-            self._handle_unlock_inputs_ui, data
-        )  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._handle_unlock_inputs_ui, data)  # ensure on UI thread
 
     def _handle_lock_inputs_ui(self, data):
         """lock all inputs event"""
@@ -810,9 +792,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         return changed
 
-    def _custom_widget_handler(
-        self, list_view, index: int, identifier, data, parent=None
-    ):
+    def _custom_widget_handler(self, list_view, index: int, identifier, data, parent=None):
         """creates a widget for the input
 
         the widget must have a selected property

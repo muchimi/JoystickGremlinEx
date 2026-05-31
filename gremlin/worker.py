@@ -34,7 +34,6 @@ from gremlin.util import InvokeUiMethod
 # import gremlin.event_handler
 # import gremlin.shared_state
 
-
 syslog = logging.getLogger("system")
 
 class WorkerSignals(QObject):
@@ -59,7 +58,7 @@ class WorkManager(QObject):
         self._monitor: QThread = None  # monitoring thread
         self._threadpool = QThreadPool.globalInstance()
 
-      
+
     def submit(
         self,
         callback: Callable = None,
@@ -77,10 +76,10 @@ class WorkManager(QObject):
         :param args: positional arguments for the callback
         :param kwargs: keyword arguments for the callback
         """
-        
+        import gremlin.config
 
 
-        
+
         self.pushCursor()  # display hourglass
 
         if callback is not None:
@@ -95,7 +94,9 @@ class WorkManager(QObject):
             worker = WorkTask(callback, args = args)
             worker.setCompletedCallback(complete_callback)
             worker.signals.finished.connect(self._handle_worker_finish)
-            syslog.info(f"starting task: [{callback.__name__}]")
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
+            if verbose:
+                syslog.info(f"starting task: [{callback.__name__}]")
             self._threadpool.start(worker)
 
 
@@ -281,17 +282,22 @@ class WorkTask(QRunnable):
         self._name = value
 
 
-    
+
 
     @Slot()
     def run(self):
-       
+        import gremlin.config
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
         QThread.currentThread().setObjectName(self._name)
-        syslog.info(f"executing task: [{self._name}]")
+        if verbose:
+            syslog.info(f"executing task: [{self._name}]")
         result = self._callback(self._args)
-        syslog.info(f"callback complete: [{self._name}]")
+        if verbose:
+            syslog.info(f"callback complete: [{self._name}]")
         if self._completed_callback:
             self._completed_callback(result, self._args)
-        syslog.info(f"work task [{self._name}] finished")
+        if verbose:
+            syslog.info(f"work task [{self._name}] finished")
+
         self.signals.finished.emit()
-        
+

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import copy
 import logging
 import threading
@@ -35,17 +35,18 @@ from shiboken6 import Shiboken
 
 
 syslog = logging.getLogger("system")
-class TempoContainerWidget(AbstractContainerWidget):
 
+
+class TempoContainerWidget(AbstractContainerWidget):
     """Container with two actions, triggered based on activation duration."""
 
-    def __init__(self, container : TempoContainer, parent=None):  # noqa: F821
+    def __init__(self, container: TempoContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
         :param parent the parent of this widget
         """
-        self.container : TempoContainer = container
+        self.container: TempoContainer = container
         super().__init__(container, parent)
 
     def _create_action_ui(self):
@@ -57,18 +58,17 @@ class TempoContainerWidget(AbstractContainerWidget):
         self.options_layout = QtWidgets.QHBoxLayout()
         self.options2_layout = QtWidgets.QHBoxLayout()
 
-        self.longpress_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Long Press Delay (ms):")
+        self.longpress_delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Long Press Delay (ms):")
         self.longpress_delay_widget.setValue(self.profile_data.delay * 1000)
         self.longpress_delay_widget.valueChanged.connect(self._delay_changed_cb)
         self.options_layout.addWidget(self.longpress_delay_widget)
         self.options_layout.addStretch()
 
-        self.autorelease_delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Autorelease Delay (ms):")
+        self.autorelease_delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Autorelease Delay (ms):")
         self.autorelease_delay_widget.setValue(self.profile_data.autorelease_delay * 1000)
         self.autorelease_delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
         self.options2_layout.addWidget(self.autorelease_delay_widget)
         self.options2_layout.addStretch()
-
 
         # Activation moment
         self.options_layout.addWidget(QtWidgets.QLabel("<b>Activate on: </b>"))
@@ -87,8 +87,8 @@ class TempoContainerWidget(AbstractContainerWidget):
         self.action_layout.addLayout(self.options2_layout)
 
         icon = gremlin.ui.ui_common.Icons.chevronIcon()
-        
-        self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Short Press Action Sets</b>", icon = icon))
+
+        self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Short Press Action Sets</b>", icon=icon))
 
         if self.profile_data.action_sets[0] is None:
             self._add_action_selector(
@@ -97,18 +97,10 @@ class TempoContainerWidget(AbstractContainerWidget):
                 lambda x: self._paste_action(0, x),
             )
         else:
-            self._create_action_widget(
-                0,
-                None,
-                self.action_layout,
-                gremlin.ui.ui_common.ContainerViewTypes.Action
-            )
+            self._create_action_widget(0, None, self.action_layout, gremlin.ui.ui_common.ContainerViewTypes.Action)
 
+        self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Long Press Action Sets</b>", icon=icon))
 
-        
-        self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Long Press Action Sets</b>", icon = icon))
-
-        
         if self.profile_data.action_sets[1] is None:
             self._add_action_selector(
                 lambda x: self._add_action(1, x),
@@ -116,30 +108,15 @@ class TempoContainerWidget(AbstractContainerWidget):
                 lambda x: self._paste_action(1, x),
             )
         else:
-            self._create_action_widget(
-                1,
-                None,
-                self.action_layout,
-                gremlin.ui.ui_common.ContainerViewTypes.Action
-            )
+            self._create_action_widget(1, None, self.action_layout, gremlin.ui.ui_common.ContainerViewTypes.Action)
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
             if self.profile_data.action_sets[0] is not None:
-                self._create_action_widget(
-                    0,
-                    "Short Press",
-                    self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
-                )
+                self._create_action_widget(0, "Short Press", self.activation_condition_layout, gremlin.ui.ui_common.ContainerViewTypes.Conditions)
 
             if self.profile_data.action_sets[1] is not None:
-                self._create_action_widget(
-                    1,
-                    "Long Press",
-                    self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
-                )
+                self._create_action_widget(1, "Long Press", self.activation_condition_layout, gremlin.ui.ui_common.ContainerViewTypes.Conditions)
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
         """Adds an action selection UI widget.
@@ -159,11 +136,10 @@ class TempoContainerWidget(AbstractContainerWidget):
         group_layout = QtWidgets.QVBoxLayout()
         group_layout.addWidget(action_selector)
         group_layout.addStretch(1)
-        group_box = QtWidgets.QGroupBox(label or '')
+        group_box = QtWidgets.QGroupBox(label or "")
         group_box.setLayout(group_layout)
 
-        self.action_layout.addWidget(group_box)        
-        
+        self.action_layout.addWidget(group_box)
 
     def _create_action_widget(self, index, label, layout, view_type):
         """Creates a new action widget.
@@ -171,11 +147,7 @@ class TempoContainerWidget(AbstractContainerWidget):
         :param index the index at which to store the created action
         :param label the name of the action to create
         """
-        widget = self._create_action_set_widget(
-            self.profile_data.action_sets[index],
-            label,
-            view_type
-        )
+        widget = self._create_action_set_widget(self.profile_data.action_sets[index], label, view_type)
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self.container_modified.emit)
@@ -186,7 +158,7 @@ class TempoContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        
+
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.profile_data)
         if self.profile_data.action_sets[index] is None:
@@ -195,11 +167,10 @@ class TempoContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
-        
 
     def _paste_action(self, index, action):
-        """paste action into the container """
-        
+        """paste action into the container"""
+
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         if self.profile_data.action_sets[index] is None:
@@ -208,8 +179,6 @@ class TempoContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
-        
-        
 
     @QtCore.Slot()
     def _delay_changed_cb(self, value):
@@ -238,7 +207,7 @@ class TempoContainerWidget(AbstractContainerWidget):
         else:
             self.profile_data.activate_on = "release"
 
-    def _handle_interaction(self, widget, action : gremlin.input_item.ActionSetView.Interactions):
+    def _handle_interaction(self, widget, action: gremlin.input_item.ActionSetView.Interactions):
         """Handles interaction icons being pressed on the individual actions.
 
         :param widget the action widget on which an action was invoked
@@ -259,19 +228,15 @@ class TempoContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         title = "Tempo (legacy):"
-        if self.profile_data.is_valid() \
-            and len(self.profile_data.action_sets) == 2 \
-                and None not in self.profile_data.action_sets:
-            title += f"({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
+        if self.profile_data.is_valid() and len(self.profile_data.action_sets) == 2 and None not in self.profile_data.action_sets:
+            title += f"({', '.join([a.name for a in self.profile_data.action_sets[0]])}) / ({', '.join([a.name for a in self.profile_data.action_sets[1]])})"
         return title
 
 
 class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
-
-    def __init__(self, container : TempoContainer, parent = None):  # noqa: F821
-        self.container : TempoContainer = container
+    def __init__(self, container: TempoContainer, parent=None):  # noqa: F821
+        self.container: TempoContainer = container
         super().__init__(container, parent)
-
 
         self.delay = container.delay
         self.activate_on = container.activate_on
@@ -284,9 +249,8 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.autorelease_delay = container.autorelease_delay
         self.long_nodes = []
         self.short_nodes = []
-        self.trigger_mode = None 
+        self.trigger_mode = None
         self._thread = None
-
 
     def profile_started(self):
         # reset any prior values before start
@@ -304,30 +268,30 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
             self.valid = False
             return
 
-        group_node = container_node.children[0] # group node is the only child of the container node
-        self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set]
-        
+        group_node = container_node.children[0]  # group node is the only child of the container node
+        self.action_set_nodes = [
+            node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set
+        ]
+
         self.short_nodes = []
         self.long_nodes = []
         if self.action_set_nodes:
             self.short_nodes.append(self.action_set_nodes[0])
             if len(self.action_set_nodes) == 2:
                 self.long_nodes.append(self.action_set_nodes[1])
-            
+
         self.trigger_mode = None
 
+    def profile_mode_changed(self, mode: str):
+        """called when the runtime mode changes"""
 
-    def profile_mode_changed(self, mode : str):
-        ''' called when the runtime mode changes '''
-        
         # kill any executing timers on mode change
         if self.timer:
             self.timer.cancel()
             self.timer = None
 
-
-    def _trigger_short_press(self, event, value, extra_data : dict = None):
-        ''' triggers a short press '''
+    def _trigger_short_press(self, event, value, extra_data: dict = None):
+        """triggers a short press"""
 
         # syslog.info(f"execute short press {self.short_index}")
         ec = gremlin.execution_graph.ExecutionContext()
@@ -336,10 +300,9 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
                 ec.execute_node(node, event, value, extra_data)
         else:
             syslog.warning("TEMPO: no short action to trigger")
-        
 
-    def _trigger_long_press(self, event, value, extra_data : dict = None):
-        ''' triggers a long press '''
+    def _trigger_long_press(self, event, value, extra_data: dict = None):
+        """triggers a long press"""
         # syslog.info(f"execute long press {self.long_index}")
         ec = gremlin.execution_graph.ExecutionContext()
         if self.long_nodes:
@@ -348,19 +311,16 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         else:
             syslog.warning("TEMPO: no long action to trigger")
 
-
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         if event.event_type == InputType.JoystickHat:
-            is_pressed = value.current != (0,0)
+            is_pressed = value.current != (0, 0)
         else:
-            is_pressed = event.is_pressed # use new API for GremlinEx
+            is_pressed = event.is_pressed  # use new API for GremlinEx
 
-     
         # Copy state when input is pressed
         if is_pressed:
             self.value_press = copy.deepcopy(value)
             self.event_press = event.clone()
-        
 
         # Execute tempo logic
         if is_pressed:
@@ -369,7 +329,6 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
             self.timer = threading.Timer(self.delay, self._long_press)
             self.timer.start()
 
-                
         else:
             # input release event
 
@@ -380,19 +339,21 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
                 if self.timer:
                     self.timer.cancel()
                     self.timer = None
-                thread =  threading.Thread(target=lambda: self._short_press(
-                    self.event_press, # send a press event to the functors
-                    self.value_press,
-                    event,
-                    value
-                ), daemon=False)
+                thread = threading.Thread(
+                    target=lambda: self._short_press(
+                        self.event_press,  # send a press event to the functors
+                        self.value_press,
+                        event,
+                        value,
+                    ),
+                    daemon=False,
+                )
                 thread.name = "TEMPO short"
                 thread.start()
 
-            
             self.trigger_mode = None
 
-        return False # stop execution as the logic is internal to trigger the other nodes
+        return False  # stop execution as the logic is internal to trigger the other nodes
 
     def _short_press(self, event_p, value_p, event_r, value_r):
         """Callback executed for a short press action.
@@ -406,16 +367,12 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         time.sleep(self.autorelease_delay)
         self._trigger_short_press(event_r, value_r)
 
-
-
-
     def _long_press(self):
-        self.trigger_mode = "long" # indicate long press triggered
+        self.trigger_mode = "long"  # indicate long press triggered
         self._trigger_long_press(self.event_press, self.value_press)
 
 
 class TempoContainer(AbstractContainer):
-
     """A container with two actions which are triggered based on the duration
     of the activation.
 
@@ -425,10 +382,10 @@ class TempoContainer(AbstractContainer):
 
     name = "Tempo"
     tag = "tempo"
-    hint = '''Use this container to trigger actions based on short press or long press.
+    hint = """Use this container to trigger actions based on short press or long press.
 The delay between short and long press is customizable.
 This container only supports single actions.
-Look at Tempo Ex for a container that allows more than one action per short or long press.'''
+Look at Tempo Ex for a container that allows more than one action per short or long press."""
     functor = TempoContainerFunctor
     widget = TempoContainerWidget
 
@@ -440,41 +397,38 @@ Look at Tempo Ex for a container that allows more than one action per short or l
     #     InputType.Keyboard
     # ]
     input_types = [
-         InputType.JoystickButton,
-         InputType.JoystickHat,
+        InputType.JoystickButton,
+        InputType.JoystickHat,
     ]
-    
+
     interaction_types = [
         gremlin.input_item.ActionSetView.Interactions.Delete,
     ]
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
-       
-        self.delay = 0.5 # delay for long press
-        self.autorelease_delay = 0.250 # delay between press and autorelease 
-        self.activate_on = "release"
-        self.short_action_sets = [] 
-        self.long_action_sets = []
-        self.setActionSets([self.short_action_sets,self.long_action_sets])
-    
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+        self.delay = 0.5  # delay for long press
+        self.autorelease_delay = 0.250  # delay between press and autorelease
+        self.activate_on = "release"
+        self.short_action_sets = []
+        self.long_action_sets = []
+        self.setActionSets([self.short_action_sets, self.long_action_sets])
+
+    def _parse_xml(self, node, data=None, extra_data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
-        
+
         super()._parse_xml(node, data)
         self.delay = float(node.get("delay", 0.5))
         self.autorelease_delay = float(node.get("autorelease-delay", 0.25))
         self.activate_on = node.get("activate-on", "release")
-        
-     
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -501,9 +455,7 @@ Look at Tempo Ex for a container that allows more than one action per short or l
 
         :return True if the container is configured properly, False otherwise
         """
-        return True # len(self.action_sets) == 2 and None not in self.action_sets
-    
-
+        return True  # len(self.action_sets) == 2 and None not in self.action_sets
 
 
 # Plugin definitions

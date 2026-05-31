@@ -16,16 +16,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import os
 from pathlib import Path
 import logging
 import ctypes
+
 syslog = logging.getLogger("system")
 
 dll_folder = os.path.dirname(__file__)
 dll_file = "hidapi.dll"
-dll_path = os.path.join(dll_folder, dll_file )
+dll_path = os.path.join(dll_folder, dll_file)
 if not os.path.isfile(dll_path):
     # look one level up for packaging in 3.12
     parent = Path(dll_folder).parent
@@ -42,11 +43,12 @@ ctypes.CDLL(dll_path)
 import hid
 
 
-
 from gremlin.singleton_decorator import SingletonDecorator
 
-class HidDevice():
-    ''' holds data for an HID device '''
+
+class HidDevice:
+    """holds data for an HID device"""
+
     def __init__(self):
         self.BusType = None
         self.Manufacturer = None
@@ -61,13 +63,14 @@ class HidDevice():
         self.UsagePage = None
 
     def isJoystick(self):
-        return self.Usage is not None and self.Usage == 4 # game controllers report as HD usage 4
+        return self.Usage is not None and self.Usage == 4  # game controllers report as HD usage 4
 
 
 @SingletonDecorator
-class Hid():
+class Hid:
     def __init__(self):
         import gremlin.config
+
         enabled = gremlin.config.Configuration().hid_list_enabled
         self._devices = []
         self._all_devices = []
@@ -106,15 +109,17 @@ class Hid():
 
                 if device.Usage in (4, 5) and device.UsagePage == 1:
                     # devices 4,5 are controllers, require usage page 1
-                    syslog.info(f"HID device: [{index}] Manufacturer: {device.Manufacturer} Product: {device.ProductString} VendorID: 0x{device.VendorId:X}({device.VendorId}) ProductID: 0x{device.ProductId:X}({device.ProductId}) Usage: {device.Usage} Page: {device.UsagePage} Interface: {device.InterfaceNumber}")
-                    index +=1
+                    syslog.info(
+                        f"HID device: [{index}] Manufacturer: {device.Manufacturer} Product: {device.ProductString} VendorID: 0x{device.VendorId:X}({device.VendorId}) ProductID: 0x{device.ProductId:X}({device.ProductId}) Usage: {device.Usage} Page: {device.UsagePage} Interface: {device.InterfaceNumber}"
+                    )
+                    index += 1
                     self._devices.append(device)
                 self._all_devices.append(device)
         else:
             syslog.info("HID: device check disabled in options")
 
     def get_controller_count(self):
-        ''' returns the number of visible controllers (HID device type 4) '''
+        """returns the number of visible controllers (HID device type 4)"""
 
         # HID usage pages: https://www.usb.org/sites/default/files/hut1_6.pdf
         return len(self._devices)

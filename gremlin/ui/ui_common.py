@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import enum
 import time
 import threading
@@ -89,6 +89,7 @@ from gremlin.types import HatDirection
 import gremlin.remote
 from dinput import DeviceSummary
 import gremlin.event_handler
+
 
 syslog = logging.getLogger("system")
 
@@ -5184,8 +5185,9 @@ class QProgressBar(QtWidgets.QWidget):
         step: float = 0.1,
         data=None,
         parent=None,
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(parent=parent, **kwargs)
         self.parent = parent
         self.config = gremlin.config.Configuration()
         if orientation == Qt.Orientation.Vertical:
@@ -5560,12 +5562,10 @@ class QProgressBar(QtWidgets.QWidget):
             self._row_count = count
             self.sizeChanged.emit()
 
-        self.setVisible(True)
+        # self.setVisible(True)
         self.update()  # repaint
 
     def paintEvent(self, event):
-
-        syslog.info("progress paint start")
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
@@ -5638,16 +5638,13 @@ class QProgressBar(QtWidgets.QWidget):
 _hook_registry = {}  # registers hook list [hook_id]
 
 
-class QAxisRepeaterProgressbar(QProgressBar):
-    """axis repeater - shows a device axis and changes on live input"""
-
+class QJoystickListener:
     def __init__(
         self,
-        device_guid: dinput.GUID = None,
-        input_id: int = None,
+        input_item=None,
         callback: Callable = None,
-        values: float | list[float] = None,
-        description: str = "AxisRepeater",
+        description: str = "JoystickListener",
+        **kwargs,
     ):
         """creates a joystick axis visual repeater
         :param device_guid: optional, device GUID of the joystick
@@ -5656,79 +5653,126 @@ class QAxisRepeaterProgressbar(QProgressBar):
         :param description: optional description for the widget
         """
 
+        super().__init__()  # forward any unused args
+
+        assert isinstance(callback, Callable) if callback is not None else True, "invalid callback"
         self.id = gremlin.util.get_guid()  # unique ID of this widget
-        self._device_guid = device_guid
-        self._input_id = input_id
-        self._connected = False
-        self._callback = callback
+        self._input_item: gremlin.input_item.InputItem = None
+        self._device_guid: dinput.GUID = None
+        self._input_type: InputType = None
+        self._input_id: int | object = None
+        self._connected: bool = False
+        self._callback: Callable = callback
         self._description = description
+        self._connected = False  # tracks connectivity to the event
 
-        super().__init__(orientation=Qt.Orientation.Horizontal)
-        if device_guid is not None:
-            if not isinstance(device_guid, dinput.GUID):
-                device_guid = gremlin.util.to_guid(device_guid)
-                assert isinstance(device_guid, dinput.GUID), "invalid device guid"
-        assert isinstance(input_id, int) if input_id is not None else True, "invalid input id"
+        if input_item is not None:
+            self.setInputItem(input_item, description)
 
-        if values is not None:
-            self._set_value_ui(values)
+    @property
+    def device_guid(self) -> dinput.GUID:
+        return self._device_guid
 
-        self._connect()
+    @property
+    def input_type(self) -> InputType:
+        return self._input_type
 
-    # def eventFilter(self, widget, event):
-    #     t = event.type()
-    #     if t == QEvent.Type.Show:
-    #         self._connect()
-    #         syslog.info("repeater show")
-    #     elif t == QEvent.Type.Hide:
-    #         self._disconnect()
-    #         syslog.info("repeater hide")
-    #     return super().eventFilter(widget, event)
+    @property
+    def input_id(self) -> int | object:
+        return self._input_id
 
-    def hook(self):
-        self._connect()
+    @property
+    def connected(self) -> bool:
+        """true if listening to events"""
+        return self._connected
+
+    def setInputItem(self, input_item, description: str = "JoystickListener"):
+        """sets hook data based on the input item"""
+        if self._input_item != input_item:
+            assert isinstance(input_item, gremlin.input_item.InputItem) if input_item is not None else True, "invalid input item"
+            self._disconnect()  # disconnect old input
+            self.setInput(device_guid=input_item.device_guid, input_type=input_item.input_type, input_id=input_item.input_id, description=description)
+
+    def setInput(self, device_guid: dinput.GUID, input_type: InputType, input_id, description: str = "JoystickListener"):
+        """sets hook data based on specific input"""
+        if device_guid != self._device_guid or input_type != self._input_type or self._input_id != self._input_id:
+            self._disconnect()
+            if device_guid is not None:
+                if not isinstance(device_guid, dinput.GUID):
+                    device_guid = gremlin.util.to_guid(device_guid)
+                    assert isinstance(device_guid, dinput.GUID), "invalid device guid"
+            assert isinstance(input_id, int) if input_id is not None else True, "invalid input id"
+            assert isinstance(input_type, InputType) if input_type is not None else True, "invalid input type"
+
+            self._device_guid = device_guid
+            self._input_id = input_id
+            self._input_type = input_type
+            self._description = description
+            self._connect()
+
+    def hook(self, input_item, description=None):
+        """hooks an input item"""
+        self._description = description or f"repeater (button): [{input_item.display_name}]"
+        self.setInputItem(input_item)
 
     def unhook(self):
         self._disconnect()
 
     def _connect(self):
-        if not self._connected and self._device_guid is not None and self._input_id is not None:
+        """connect axis updates"""
+        if not self._connected and self._device_guid is not None and self._input_id is not None and self._input_type is not None:
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
             jp = gremlin.event_handler.JoystickEventProcessor()
-            jp.registerListenerCallback(self._device_guid, InputType.JoystickAxis, self._input_id, self._handle_update_ui)
-            # el = gremlin.event_handler.EventListener()
-            # el.joystick_event_ui.connect(self._handle_update_ui)
+            jp.registerListenerUICallback(
+                self._device_guid, self._input_type, self._input_id, self._callback
+            )  # direct to UI thread as these updates are on the UI thread
             self._connected = True
             device = gremlin.joystick_handling.getDevice(self._device_guid)
-            syslog.info(f"Repeater: connect: [{self._description}] [{self.id}] device: [{device.name}] axis: [{self._input_id}]")
+            if verbose:
+                syslog.info(f"Repeater: connect: [{self._description}] [{self.id}] device: [{device.name}] axis: [{self._input_id}]")
 
     def _disconnect(self):
         if self._connected:
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
             jp = gremlin.event_handler.JoystickEventProcessor()
-            jp.unregisterListenerCallback(self._device_guid, InputType.JoystickAxis, self._input_id, self._handle_update_ui)
-            # el = gremlin.event_handler.EventListener()
-            # el.joystick_event_ui.disconnect(self._handle_update_ui)
+            jp.unregisterListenerUICallback(self._device_guid, self._input_type, self._input_id, self._callback)
             device = gremlin.joystick_handling.getDevice(self._device_guid)
-            syslog.info(f"Repeater: disconnect: [{self._description}] [{self.id}] device: [{device.name}] axis: [{self._input_id}]")
+            if verbose:
+                syslog.info(f"Repeater: disconnect: [{self._description}] [{self.id}] device: [{device.name}] axis: [{self._input_id}]")
             self._connected = False
 
-    def setInput(self, device_guid: dinput.GUID, input_id: int):
-        """registers an axis input with the repeater (multiple can be added)"""
-        if not isinstance(device_guid, dinput.GUID):
-            device_guid = gremlin.util.to_guid(device_guid)
-        assert isinstance(device_guid, dinput.GUID), "invalid device guid"
-        assert isinstance(input_id, int) if input_id is not None else True, "invalid input id"
+    def _cleanup_ui(self):
+        # called when cleaning up - disconnect hooks
+        self._disconnect()
 
-        if device_guid:
-            device = gremlin.joystick_handling.getDevice(device_guid)
-            syslog.info(f"Repeater: set input:  [{self._description}] [{self.id}] device: [{device.name}] axis: [{input_id}]")
 
-        self._disconnect()  # stop processing events
+class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
+    """axis repeater - shows a device axis and changes on live input"""
 
-        self._device_guid = device_guid
-        self._input_id = input_id
+    def __init__(
+        self,
+        input_item=None,
+        values: float | list[float] = None,
+        callback: Callable = None,
+        description: str = "AxisRepeater",
+    ):
+        """creates a joystick axis visual repeater
+        :param device_guid: optional, device GUID of the joystick
+        :param input_id: optional if device guid not provided, required if provided, input_id of the axis to monitor
+        :param callback: optional, get values callback, should return and AxisValues object, the callback if provided gets the event passed as a parameter  callback(event:Event) -> values : AxisValues
+        :param description: optional description for the widget
+        """
 
-        if self.isVisible():
-            self._connect()  # start processing events if visible
+        super().__init__(
+            orientation=Qt.Orientation.Horizontal,
+            input_item=input_item,
+            callback=self._handle_update_ui,
+            description=description,
+        )
+
+        self._get_values_callback = callback
+        if values is not None:
+            self._set_value_ui(values)
 
     def _handle_update_ui(self, event: gremlin.event_handler.Event):
         """handles joystick event"""
@@ -5741,14 +5785,17 @@ class QAxisRepeaterProgressbar(QProgressBar):
             f"Axis Repeater: event received: instance  [{self._description}] [{self.id}] device: [{device.name}] axis: [{self._input_id}] value: {event.value:0.3f} visible: {self.isVisible()}"
         )
 
-        if self._callback:
-            values = self._callback(event)
+        if self._get_values_callback:
+            # get the values via the custom callback
+            values = self._get_values_callback(event)
             if values is None:
                 # do not update
-                syslog.info("\tdo not update")
                 return
+            else:
+                assert isinstance(values, gremlin.event_handler.AxisValues), "invalid values - expecting AxisValues()"
+
         else:
-            # parse the event data received
+            # parse the event
             values = gremlin.event_handler.AxisValues(event.value)
             extra_data = event.extra_data
             if extra_data:
@@ -5790,24 +5837,19 @@ class QAxisRepeaterProgressbar(QProgressBar):
         self._disconnect()  # disconnect handler
 
 
-class QButtonStateWidget(QtWidgets.QWidget):
+class QButtonStateWidget(QtWidgets.QWidget, QJoystickListener):
     """visualizes the state of a button"""
 
     def __init__(self, input_item, description: str = None, parent=None):
-        super().__init__(parent)
+        QtWidgets.QWidget.__init__(self, parent)
+        QJoystickListener.__init__(self, input_item=input_item, callback=self._handle_update_ui, description=description)
 
         self.setContentsMargins(0, 0, 0, 0)
         self.main_layout = QtWidgets.QHBoxLayout(self)
         self.main_layout.setSpacing(0)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self._deleted = False
 
         self._icon_size = QtCore.QSize(16, 16)
-        self._input_item: gremlin.input_item.InputItem = input_item
-        self._description = None
-        self._device_guid = None
-        self._input_id = None
-        self._input_type = InputType.JoystickButton  # default to a button
         self._button_widget = QtWidgets.QLabel()
         self._button_widget.setContentsMargins(0, 0, 0, 0)
         height = self._icon_size.height() + 2
@@ -5826,17 +5868,8 @@ class QButtonStateWidget(QtWidgets.QWidget):
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
 
-    def showEvent(self, event):
-        """called when the widget is visible"""
-        super().showEvent(event)
-        if self._input_item is not None:
-            self._connect()  # start processing events when visible
-
-    def hideEvent(self, event):
-        """called when the widget is invisible"""
-        super().hideEvent(event)
-        if self._input_item is not None:
-            self._disconnect()  # stop processing events when hidden
+    def process_event_ui(self, event : gremlin.event_handler.Event):
+        self._update_value_ui(event.is_pressed)
 
     def desiredHeight(self):
         return self.sizeHint().height()
@@ -5849,83 +5882,12 @@ class QButtonStateWidget(QtWidgets.QWidget):
             case "highlight_device":
                 self._last_state_value = None
 
-    def _cleanup_ui(self):
-        # called when cleaning up - disconnect hooks
-        self._disconnect()
-
-    def hook(self, input_item, description: str = None):
-        import gremlin.input_item
-
-        assert isinstance(input_item, gremlin.input_item.InputItem), "invalid input item"
-        assert input_item.input_type == InputType.JoystickButton, "invalid input item type"
-
-        changed = False
-        if self._input_item != input_item:
-            self._device_guid = input_item.device_guid
-            self._input_id = input_item.input_id
-            self._input_type = input_item.input_type
-            self._description = description or f"repeater (button): [{input_item.display_name}]"
-            changed = True
-
-        if self.isVisible():
-            # only hook if visible
-            if not self._hooked:
-                self._connect()
-            elif changed:
-                # data changed
-                self._disconnect()
-                self._connect()
-
-    def _connect(self):
-        """hooks the input"""
-        import gremlin.event_handler
-
-        if not self._hooked and self._input_item is not None:
-            syslog.info(f"ButtonStateWidget: connect input: [{self._input_item.display_name}]")
-            jp = gremlin.event_handler.JoystickEventProcessor()
-            jp.registerListenerCallback(self._device_guid, self._input_type, self._input_id, self.process_event_ui)
-            self._hooked = True
-
-    def unhook(self):
-        self._disconnect()
-
-    def _disconnect(self):
-        if self._hooked:
-            import gremlin.event_handler
-
-            syslog.info(f"ButtonStateWidget: disconnect input: [{self._input_item.display_name}]")
-            jp = gremlin.event_handler.JoystickEventProcessor()
-            jp.unregisterListenerCallback(self._device_guid, self._input_type, self._input_id, self.process_event_ui)
-            self._hooked = False
-
-    def process_event_ui(self, event):
-        """joystick event handler"""
-        gremlin.util.assert_ui_thread()  # ensure the callback is on the UI thread
-        self._update_value_ui(event.is_pressed)
-
-    @property
-    def enabled(self) -> bool:
-        return self._handler_connected
-
-    @property
-    def input_id(self):
-        """gets the associated input id - can be an int or an object depending on the input"""
-        return self._input_id
-
-    @property
-    def device_guid(self) -> dinput.GUID:
-        """gets the associated device"""
-        return self._device_guid
-
-    @property
-    def input_item(self):
-        """gets the associated input"""
-        return self._input_item
-
-    @property
-    def input_type(self) -> InputType:
-        """gets the associated input type"""
-        return self._input_type
+    def _handle_update_ui(self, event: gremlin.event_handler.Event):
+        match self.input_type:
+            case InputType.JoystickButton:
+                self._update_value_ui(event.is_pressed)
+            case InputType.JoystickHat:
+                self._update_hat(event.value)
 
     def _update_value_ui(self, is_pressed: bool):
         gremlin.util.assert_ui_thread()
@@ -5948,8 +5910,6 @@ class QButtonStateWidget(QtWidgets.QWidget):
     def _update_hat(self, position):
         """updates a hat position"""
         if not Shiboken.isValid(self._button_widget):
-            return
-        if self._deleted:
             return
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
         if not isinstance(position, tuple):
@@ -6756,10 +6716,9 @@ class AxesCurrentState(QtWidgets.QGroupBox):
         # axis_list = device.axis_index_list()
         name_index = 0
 
-        _verbose = gremlin.config.Configuration().verbose_mode_hooks
         if device.axis_count:
-            for i in range(device.axis_count):
-                linear_id = i + 1
+            col = 0  # axis column
+            for linear_id in device.linear_id_map:
                 axis_id = device.linear_id_map[linear_id]  # map linear -> axis ID for non sequential axes
 
                 widget, layout = getVContainer()
@@ -6781,7 +6740,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 astate = gremlin.event_handler.AxisState()
                 values = astate.getAxisValues(device.device_guid, axis_id)
 
-                axis_widget = QProgressBar(data=axis_id, value=values)
+                axis_widget = QProgressBar(data=axis_id, value=values, orientation=QtCore.Qt.Orientation.Vertical)
                 el = gremlin.event_handler.EventListener()
                 el.addUIJoystickEventCallback(self.process_event_ui)
 
@@ -6814,20 +6773,21 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
                 bar_container, _ = getHContainer(["||", axis_widget, "||"])  # centered horizontally
                 layout.addWidget(bar_container)
-
                 row = 0
-                axes_layout.addWidget(axis_label, row, i, alignment=QtCore.Qt.AlignCenter)
+                axes_layout.addWidget(axis_label, row, col, alignment=QtCore.Qt.AlignCenter)
                 row += 1
-                axes_layout.addWidget(QtWidgets.QLabel(" "), row, i, alignment=QtCore.Qt.AlignCenter)  # spacer
+                axes_layout.addWidget(QtWidgets.QLabel(" "), row, col, alignment=QtCore.Qt.AlignCenter)  # spacer
                 row += 1
-                axes_layout.addWidget(widget, row, i, alignment=QtCore.Qt.AlignCenter)
+                axes_layout.addWidget(widget, row, col, alignment=QtCore.Qt.AlignCenter)
                 row += 1
-                axes_layout.addWidget(value_widget, row, i, alignment=QtCore.Qt.AlignCenter)
+                axes_layout.addWidget(value_widget, row, col, alignment=QtCore.Qt.AlignCenter)
                 row += 1
-                axes_layout.addWidget(percent_label, row, i, alignment=QtCore.Qt.AlignCenter)
+                axes_layout.addWidget(percent_label, row, col, alignment=QtCore.Qt.AlignCenter)
                 row += 1
 
-            axes_layout.setColumnStretch(i + 1, 2)
+                col += 1  # next column
+
+            axes_layout.setColumnStretch(col + 1, 2)
 
         self.main_layout.addLayout(axes_layout)
 
@@ -7447,10 +7407,11 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         self._device = device
         self.hook_id = gremlin.util.get_guid()
         self.vis_type = vis_type
-        self.widgets = []
-        layout = QtWidgets.QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(layout)
+        self.widgets = []  # holds the list of widgets in the display
+
+        # horizontal layout
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.vis_type = vis_type
         self._hooked = False
         self.show_raw = True  # true if raw value is displayed
@@ -7479,15 +7440,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             self._current_axis_update(event)
 
         elif vis_type == gremlin.types.VisualizationType.AxisTemporal:
-            pass  # automatic
-            # self._temporal_axis_update(event)
-            # for widget in self.widgets:
-            #     for input_id in self._device.axis_index_list():
-            #         values = self._as.getAxisValues(self.device_guid, input_id)
-            #         value= values[0]
-            #         # syslog.info(f"input: {input_id} value: {value:0.3f}")
-            #         #value = gremlin.joystick_handling.get_axis(self.device_guid, input_id)
-            #         widget.add_point(value, input_id)
+            pass
         elif vis_type in (
             gremlin.types.VisualizationType.ButtonHat,
             gremlin.types.VisualizationType.Button,
@@ -7645,9 +7598,9 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _create_current_axis(self):
         """Creates display for current axes data."""
-        self.widgets = [AxesCurrentState(self._device)]
-        for widget in self.widgets:
-            self.layout().addWidget(widget)
+        widget = AxesCurrentState(self._device)
+        self.widgets.append(widget)
+        self.main_layout.addWidget(widget)
 
     def _create_temporal_axis(self):
         """Creates display for temporal axes data."""
@@ -10216,6 +10169,7 @@ class ResizableWindow(QMainWindow):
         # State tracking for resize events
         self._is_resizing = False
         self.resize_pixmap = None
+
         self._resize_timer = QTimer(self)
         self._resize_timer.setSingleShot(True)
         self._resize_timer.timeout.connect(self._stop_resize)
@@ -10253,6 +10207,7 @@ class ResizableWindow(QMainWindow):
             self._is_resizing = False
             self.resize_pixmap = None
             self._central_widget.setVisible(True)
+            
             self.update()
 
 

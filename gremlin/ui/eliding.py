@@ -1,10 +1,10 @@
-''' eliding widgets - borrowed from superQT and PyAppKit 
+"""eliding widgets - borrowed from superQT and PyAppKit
 
 Elidable controls show an ellipsis on a label and line edit if too long
 
-'''
+"""
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QFontMetrics, QTextLayout
 from PySide6.QtCore import QPoint, QRect, QSize
@@ -12,7 +12,6 @@ from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import QLabel
 from PySide6.QtGui import QFocusEvent
 from PySide6.QtWidgets import QLineEdit
-
 
 
 class _GenericEliding:
@@ -69,7 +68,7 @@ class _GenericEliding:
 
     # private implementation methods
 
-    def _elidedText(self, width = None, font = None) -> str:
+    def _elidedText(self, width=None, font=None) -> str:
         """Return `self._text` elided to `width`."""
         fm = QFontMetrics(font or QFont())
         ellipses_width = 0
@@ -78,7 +77,7 @@ class _GenericEliding:
         if width is None:
             width = self._width
         tw = max(width or 0, fm.averageCharWidth() * len(self._text))
-        w = max (32, tw - ellipses_width)
+        w = max(32, tw - ellipses_width)
         if not getattr(self, "wordWrap", None) or not self.wordWrap():
             return fm.elidedText(self._text, self._elide_mode, w)
 
@@ -92,27 +91,26 @@ class _GenericEliding:
 
     def _wrappedText(self) -> list[str]:
         return _GenericEliding.wrapText(self._text, self.width(), self._font or QFont())
-    
+
 
 class ElidedString(_GenericEliding):
-    def __init__(self, text : str = None, width : int = 100, font = None):
+    def __init__(self, text: str = None, width: int = 100, font=None):
         super().__init__()
         self._font = font or QFont()
         self._width = width if width is not None else 100
         if text:
             self.setText(text)
-        
-    def text(self, width = None):
+
+    def text(self, width=None):
         return self._elidedText(width)
-    
-    def setText(self, text : str):
+
+    def setText(self, text: str):
         self._text = text
 
     @staticmethod
-    def elidedText(text : str, width = None, font = None):
+    def elidedText(text: str, width=None, font=None):
         es = ElidedString(text, width, font)
         return es.text()
-    
 
 
 class QElidingLabel(_GenericEliding, QLabel):
@@ -191,7 +189,6 @@ class QElidingLabel(_GenericEliding, QLabel):
         flags = int(self.alignment() | Qt.TextFlag.TextWordWrap)
         r = fm.boundingRect(QRect(QPoint(0, 0), self.size()), flags, "...")
         return QSize(r.width(), r.height())
-    
 
 
 class QElidingLineEdit(_GenericEliding, QLineEdit):
@@ -277,4 +274,4 @@ class QElidingLineEdit(_GenericEliding, QLineEdit):
 
         The actual text is the text the widget has without eliding.
         """
-        self._text = text    
+        self._text = text

@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations # deprecated with python 3.14+
 
 from enum import Enum, auto, IntFlag, IntEnum, unique
 
@@ -37,7 +37,7 @@ class VisualizationType(IntEnum):
     AxisTemporal = 1
     AxisCurrent = 2
     ButtonHat = 3
-    Keyboard = 4 
+    Keyboard = 4
     State = 5
     Button = 6
     Hat = 7
@@ -59,10 +59,10 @@ class KeyboardOutputMode(Enum): # order is that of the display order for keyboar
             case  KeyboardOutputMode.AutoRepeat:
                 return "Pulse Repeat"
         return value.name
-    
-    
 
-    
+
+
+
 
 
 
@@ -94,7 +94,7 @@ class AxisNames(Enum):
         except KeyError:
             syslog.error(f"AxisNames: Don't know how to convert axis to enum: '{value}' to a string - defaulting to X (1)")
             return AxisNames.X
-        
+
     @staticmethod
     def to_list():
         return [axis for axis in AxisNames]
@@ -129,7 +129,7 @@ class AxisButtonDirection(Enum):
     Anywhere = 1
     Below = 2
     Above = 3,
-    
+
     @staticmethod
     def to_string(value: AxisButtonDirection) -> str:  # noqa: F821
         try:
@@ -153,7 +153,7 @@ _AxisButtonDirection_to_string_lookup = {
     AxisButtonDirection.Anywhere: "anywhere",
     AxisButtonDirection.Above: "above",
     AxisButtonDirection.Below: "below",
-    
+
 
 }
 _AxisButtonDirection_to_enum_lookup = {
@@ -171,10 +171,10 @@ class xIntEnum(IntEnum):
         if other is int:
             return self.value == other
         return False
-    
+
     def __hash__(self) -> int:
         return hash(self.value)
-    
+
 class ControlAction(IntEnum):
     ''' defines the available control actions for the control plugin'''
     EnableInput = 0 # enables an input
@@ -192,7 +192,7 @@ class ControlAction(IntEnum):
     @staticmethod
     def to_string(action):
         return action.name.casefold()
-    
+
     @staticmethod
     def from_string(name):
         name = name.casefold()
@@ -200,13 +200,13 @@ class ControlAction(IntEnum):
             if action.name.casefold() == name:
                 return action
         return None
-    
-    
+
+
     @staticmethod
     def to_display_name(action):
         return _control_action_display[action]
-        
-        
+
+
 _control_action_display = {
     ControlAction.EnableInput: "Enable Input",
     ControlAction.DisableInput: "Disable Input",
@@ -243,7 +243,7 @@ class DeviceType(IntEnum):
             return _DeviceType_to_string_lookup[value]
         syslog.error(f"DeviceType lookup failed in to_string(): unable to find type: [{value}] - defaulting to NotSet")
         return "invalid"
-        
+
 
     @staticmethod
     def to_enum(value):
@@ -254,8 +254,8 @@ class DeviceType(IntEnum):
             return _DeviceType_to_enum_lookup[value]
         syslog.error(f"DeviceType lookup failed in to_enum(): unable to find type: [{value}] - defaulting to NotSet")
         return DeviceType.NotSet
-        
-        
+
+
     @staticmethod
     def to_display_name(value):
         if value in _DeviceType_to_display_name:
@@ -340,8 +340,8 @@ class PluginVariableType(xIntEnum):
             raise gremlin.error.GremlinError(
                 "Invalid PluginVariableType in lookup"
             )
-        
-    
+
+
 
 
 _PluginVariableType_to_string_lookup = {
@@ -554,11 +554,11 @@ class HatDirection(Enum):
             raise gremlin.error.GremlinError(
                 "Invalid HatDirection in lookup"
             )
-        
+
     @staticmethod
     def to_position(value : HatDirection) -> tuple:  # noqa: F821
         return value.value
-        
+
     @staticmethod
     def to_display_name(value: HatDirection) -> str:  # noqa: F821
         return value.name
@@ -708,17 +708,17 @@ class MouseClickMode(Enum):
     @staticmethod
     def to_string(mode):
         return mode.name
-    
+
     def __str__(self):
         return str(self.value)
-    
+
     @classmethod
     def _missing_(cls, name):
         for item in cls:
             if item.name.lower() == name.lower():
                 return item
             return cls.Normal
-        
+
     @staticmethod
     def from_string(str):
         ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
@@ -731,7 +731,7 @@ class MouseClickMode(Enum):
                 return item
 
         return None
-    
+
     @staticmethod
     def to_description(action):
         ''' returns a descriptive string for the action '''
@@ -744,8 +744,8 @@ class MouseClickMode(Enum):
         elif action == MouseClickMode.DoubleClick:
             return "Double Click"
         return f"Unknown {action}"
-    
-    
+
+
     @staticmethod
     def to_name(action):
         ''' returns the name from the action '''
@@ -758,7 +758,7 @@ class MouseClickMode(Enum):
         elif action == MouseClickMode.DoubleClick:
             return "Double click"
         return f"Unknown {action}"
-    
+
 class MouseAction(Enum):
     MouseButton = 0 # output a mouse button
     MouseMotion = 1 # output a mouse motion
@@ -768,17 +768,17 @@ class MouseAction(Enum):
     @staticmethod
     def to_string(mode):
         return mode.name
-    
+
     def __str__(self):
         return str(self.value)
-    
+
     @classmethod
     def _missing_(cls, name):
         for item in cls:
             if item.name.lower() == name.lower():
                 return item
             return cls.MouseButton
-        
+
     @staticmethod
     def from_string(str):
         ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
@@ -791,7 +791,7 @@ class MouseAction(Enum):
                 return item
 
         return None
-    
+
     @staticmethod
     def to_description(action):
         ''' returns a descriptive string for the action '''
@@ -805,7 +805,7 @@ class MouseAction(Enum):
 
 
         return f"Unknown [{action}]"
-    
+
     @staticmethod
     def to_name(action):
         ''' returns the name from the action '''
@@ -818,13 +818,13 @@ class MouseAction(Enum):
                 return "Mouse position"
             case MouseAction.MouseSetPrecisionPosition:
                 return "Mouse position (precision)"
-            
 
 
 
-                
+
+
         return f"Unknown [{action}]"
-    
+
 class MouseButton(IntEnum):
 
     """Enumeration of all possible mouse buttons."""
@@ -860,7 +860,7 @@ class MouseButton(IntEnum):
             return _MouseButton_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
-        
+
     @staticmethod
     def to_lookup_string(value):
         ''' mouse button to key lookup name'''
@@ -868,7 +868,7 @@ class MouseButton(IntEnum):
             return _MouseButton_to_lookup_string_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
-        
+
     @staticmethod
     def lookup_to_enum(value):
         if isinstance(value, int):
@@ -877,14 +877,14 @@ class MouseButton(IntEnum):
             return _MouseButton_to_enum_lookup[value]
         except KeyError:
             raise gremlin.error.GremlinError("Invalid type in lookup")
-        
+
     def to_short_name(value):
         if value in _MouseButton_to_enum_lookup:
             value = _MouseButton_to_enum_lookup[value] # to enum
         if value in _MouseButton_to_short_string_lookup:
             return _MouseButton_to_short_string_lookup[value] # to short name
         return value
-        
+
     def is_lookup_valid(value):
         # true if the enum is a mouse button
         return value in _MouseButton_to_enum_lookup
@@ -993,12 +993,12 @@ class VerboseMode(IntFlag):
     SimConnect = auto() # simconnect interface
     Details = auto() # user interface details
     Condition = auto() # conditions diagnostics / execution graph
-    OSC = auto() # OSC data 
+    OSC = auto() # OSC data
     Process = auto() # process changes
     Exec = auto() # execution trees
     Midi = auto() # midi mode
     Device = auto() # device change modes
-    Macro = auto() # macro 
+    Macro = auto() # macro
     Gate = auto() # auto
     Outputs = auto() # list outputs
     UI = auto() # UI mode
@@ -1024,13 +1024,16 @@ class VerboseMode(IntFlag):
     InputItems = auto()
     Switch = auto()
     Select = auto()
+    L1 = auto()
+    L2 = auto()
+    L3 = auto()
     All = Keyboard | Joystick | Inputs | Mouse | MouseInput | Details | \
           SimConnect | Condition | Process | Exec | Midi | \
           Device | Macro | Gate | Outputs | UI | ExecDetails |\
           VJoy | State | Extra | Remote | Container | Octavi |\
           dinput | Curve | TTS | Sound | Filter | Perf | Events |\
           Calib | Hooks | Merge | Sequence | Mode | InputItems | Switch |\
-          Select
+          Select | L1 | L2 | L3
 
     def __contains__(self, item):
         return  (self.value & item.value) == item.value
@@ -1081,15 +1084,15 @@ class GamePadOutput(Enum):
     @staticmethod
     def to_string(value):
         return _gamepad_output_to_string[value]
-    
+
     @staticmethod
     def to_enum(value):
         return _gamepad_output_to_enum[value]
-    
+
     @staticmethod
     def to_display_name(value):
         return _gamepad_output_to_display_name[value]
-    
+
 _gamepad_output_to_string = {
     GamePadOutput.NotSet : "none",
     GamePadOutput.LeftStickX: "left_x",
@@ -1187,7 +1190,7 @@ class ButtonOutputMode (IntEnum):
     Release = 3 # release / off
     NoOp = 4 # do nothing
     Latch = 5 # latch mode (triggers on, sets a timer, an ignores ON retriggers until OFF or until timer lapses)
-    
+
 
 
 
@@ -1197,13 +1200,13 @@ class SyncMode(IntEnum):
     Input = 2 # sync to input
     LastOrDefault = 3 # sync to last value if there is one, else to the default state
     LastOrInput = 4 # sync to last value if there is one, else to the input state
-    
+
     @staticmethod
     def to_description(value):
         if value in _syncmode_to_description:
             return _syncmode_to_description[value]
         return f"Unknown mode: {value}"
-    
+
 _syncmode_to_description = {
     SyncMode.Ignore : "Do nothing",
     SyncMode.Default : "Use the default value on profile start.",
@@ -1244,7 +1247,7 @@ class VjoyAction(enum.Enum):
     VJoyButtonInverted = 24 # hold state (inverted = off means pressed, on means released)
     VJoyHatPress = 25 # hat press mode
     VJoyHatPulse = 26 # hat pulse mode
-    
+
     @staticmethod
     def is_button_action(mode):
         ''' true if the mode is a button output mode '''
@@ -1256,16 +1259,16 @@ class VjoyAction(enum.Enum):
                         VjoyAction.VJoyPulse,
                         VjoyAction.VJoyToggle,
         )
-                        
-  
+
+
 
     @staticmethod
     def to_string(mode):
         return mode.name
-    
+
     def __str__(self):
         return str(self.value)
-    
+
     @classmethod
     def _missing_(cls, name):
         for item in cls:
@@ -1273,7 +1276,7 @@ class VjoyAction(enum.Enum):
                 return item
             return cls.VJoyButtonPress
 
-    
+
     @staticmethod
     def from_string(str):
         ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
@@ -1286,7 +1289,7 @@ class VjoyAction(enum.Enum):
                 return item
 
         return None
-    
+
     @staticmethod
     def to_description(action):
         ''' returns a descriptive string for the action '''
@@ -1348,11 +1351,11 @@ class VjoyAction(enum.Enum):
             case VjoyAction.VJoyButtonInverted:
                 return "Presses or releases a button by inverted input state"
 
-        
+
         msg  = f"Unknown [{action}]"
         syslog.warning(f"Warning: missing action description mapping: {msg}")
         return msg
-        
+
     @staticmethod
     def to_name(action):
         ''' returns a name string for the action '''
@@ -1414,11 +1417,11 @@ class VjoyAction(enum.Enum):
             case VjoyAction.VJoyButtonInverted:
                 return "Button (Inverted)"
 
-        
+
         msg  = f"Unknown [{action}]"
         syslog.warning(f"Warning: missing action name mapping: {msg}")
         return msg
-    
+
 
     @staticmethod
     def is_command(value):
@@ -1458,5 +1461,5 @@ class SendType(enum.IntEnum):
                 return "Local and remote clients regardless of profile setting."
             case _:
                 return f"Don't know how to handle: [{value}]"
-            
+
 

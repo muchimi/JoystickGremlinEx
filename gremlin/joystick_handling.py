@@ -55,8 +55,8 @@ _all_devices_map = gremlin.util.TriggerDict() # all detected devices [dinput.GUI
 
 def _handle_change(data, key, old_value, value):
     assert isinstance(key, dinput.GUID)
-    
-        
+
+
 _all_devices_map.addCallback(_handle_change)
 
 
@@ -324,7 +324,9 @@ def get_axis(guid, index, normalized = True, linear = False):
     '''
     dev : dinput.DeviceSummary = get_device(guid)
     if dev and dev.axis_count:
-        axis_id = dev.linear_id_map[index] if linear else index
+        axis_id = dev.getAxisInputId(index)
+        assert axis_id is not None,"invalid axis index"
+
         value = dinput.DILL.get_axis(dev.device_guid, axis_id)
         if normalized:
             value = gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
@@ -595,7 +597,7 @@ def device_name_from_guid(device_guid) -> str:
 
 def known_devices() -> list:
     ''' gets the list of device GUID (strings) known to GremlinEx '''
-    global _all_devices_map    
+    global _all_devices_map
     return list(_all_devices_map.keys())
 
 def getKnownDevicesGuids():
@@ -606,7 +608,7 @@ def getKnownDevicesGuids():
 def getDevices() -> list[dinput.DeviceSummary]:
     ''' gets a list of known devices, physical and virtual (iterator)'''
     global _all_devices_map
-    return _all_devices_map.values() 
+    return _all_devices_map.values()
 
 def getValidJoysticksDevices() -> list[dinput.DeviceSummary]:
     ''' gets a list of enabled joystick type devices'''
@@ -633,8 +635,8 @@ def getDevice(device_guid : int | str | dinput.GUID, show_error = False) -> dinp
         if device_guid in _all_devices_map:
             return _all_devices_map[device_guid]
     return None
-    
-    
+
+
 
 
 def getDeviceName(device_guid : int | str | dinput.GUID):
@@ -766,7 +768,7 @@ def registerSpecialDevices():
 
 
     syslog.info("Special devices:")
-    
+
 
     # keyboard
     device_guid = str(gremlin.shared_state.keyboard_tab_guid)
@@ -778,7 +780,7 @@ def registerSpecialDevices():
     device.is_special = True
     registerSpecialDevice(device)
 
-    
+
     # state
     device_guid = str(gremlin.shared_state.state_tab_guid)
     device = dinput.DeviceSummary()
@@ -788,7 +790,7 @@ def registerSpecialDevices():
     device.device_type = DeviceType.State
     device.is_special = True
     registerSpecialDevice(device)
-    
+
 
     # OSC
     device_guid = str(gremlin.shared_state.osc_tab_guid)
@@ -809,7 +811,7 @@ def registerSpecialDevices():
     device.device_type = DeviceType.Midi
     device.is_special = True
     registerSpecialDevice(device)
-    
+
 
     # Octavi IFR1
     device_guid = str(gremlin.shared_state.octavi_tab_guid)
@@ -824,7 +826,7 @@ def registerSpecialDevices():
     oo = gremlin.ui.octavi_device.OctaviInterface()
     device.setButtonCallback(oo.get_button)
     registerSpecialDevice(device)
-    
+
 
     # mode
     device_guid = str(gremlin.shared_state.mode_tab_guid)
@@ -835,7 +837,7 @@ def registerSpecialDevices():
     device.device_type = DeviceType.ModeControl
     device.is_special = True
     registerSpecialDevice(device)
-    
+
 
 
     # plugin
@@ -847,7 +849,7 @@ def registerSpecialDevices():
     device.device_type = DeviceType.Plugins
     device.is_special = True
     registerSpecialDevice(device)
-    
+
 
     # settings
     device_guid = str(gremlin.shared_state.settings_tab_guid)
@@ -860,45 +862,45 @@ def registerSpecialDevices():
     registerSpecialDevice(device)
 
 
-    
+
 
 def getSpecialDevices() -> list:
     ''' gets all the special devices '''
     global _special_devices
     return _special_devices
-    
-
-# def _scan_dinput():
-#     ''' rescans dinput devices '''
-
-#     dinput.DILL.init()
-#     device_count = dinput.DILL.get_device_count()
-#     if device_count == 0:
-#         # no hardware input detected
-#         syslog.info("INIT: no DirectInput devices detected - waiting for data")
-#         max_retries = 3
-#         attempt = 1
-#         while device_count == 0 and attempt <= max_retries:
-#             time.sleep(0.25)
-#             device_count = dinput.DILL.get_device_count()
-#             syslog.info(f"INIT: attempt number {attempt}")
-#             attempt += 1
-
-#     for device_index in range(device_count):
-#         dev = dinput.DILL.get_device_information_by_index(device_index)
-#         device_guid = gremlin.util.normalize_guid(dev.device_guid)
-#         if device_guid not in _joystick_device_guid_map:
-#             syslog.info(f"\tindex: [{device_index}] {str(dev)}")
-#             if dev.vendor_id == 0x31e3 and dev.axis_count == 0: # handle wooting no axis/no button devices
-#                 dev.disabled = True
-#             elif dev.vendor_id == 0x4d8 and dev.product_id == 0xe6d6 and dev.button_count == 35:
-#                 dev.disabled = True
-                
 
 
+def scanDinput():
+    ''' rescans dinput devices '''
 
-#             _joystick_devices.append(dev)
-#             _joystick_device_guid_map[device_guid] = dev # key by GUID
+    dinput.DILL.init()
+    device_count = dinput.DILL.get_device_count()
+    if device_count == 0:
+        # no hardware input detected
+        syslog.info("INIT: no DirectInput devices detected - waiting for data")
+        max_retries = 3
+        attempt = 1
+        while device_count == 0 and attempt <= max_retries:
+            time.sleep(0.25)
+            device_count = dinput.DILL.get_device_count()
+            syslog.info(f"INIT: attempt number {attempt}")
+            attempt += 1
+
+    for device_index in range(device_count):
+        dev = dinput.DILL.get_device_information_by_index(device_index)
+        device_guid = gremlin.util.normalize_guid(dev.device_guid)
+        if device_guid not in _joystick_device_guid_map:
+            syslog.info(f"\tindex: [{device_index}] {str(dev)}")
+            if dev.vendor_id == 0x31e3 and dev.axis_count == 0: # handle wooting no axis/no button devices
+                dev.disabled = True
+            elif dev.vendor_id == 0x4d8 and dev.product_id == 0xe6d6 and dev.button_count == 35:
+                dev.disabled = True
+
+
+
+
+            _joystick_devices.append(dev)
+            _joystick_device_guid_map[device_guid] = dev # key by GUID
 
 
 def _create_vjoy_device(vjoy_index : int):
@@ -1015,7 +1017,7 @@ def joystick_devices_initialization():
                 dev.disabled = True
             if dev.vendor_id == 0x31e3 and dev.axis_count == 0: # handle wooting no axis/no button devices
                 dev.disabled = True
-                
+
 
 
             if dev.axis_count:
@@ -1029,14 +1031,14 @@ def joystick_devices_initialization():
 
             devices.append(dev)
             syslog.info(f"\t\tIndex: [{device_index}] {str(dev)}")
-            
+
             if dev.device_type == DeviceType.Joystick:
                 _joystick_devices.append(dev)
                 _all_joystick_devices.append(dev)
                 _joystick_device_guid_map[dev.device_guid] = dev # key by GUID
 
             _all_devices_map[dev.device_guid] = dev # key by GUID
-            
+
             if dev.is_virtual:
                 virtual_count += 1
                 virtual_devices[dev.hashkey] = dev
@@ -1102,7 +1104,7 @@ def joystick_devices_initialization():
                 _all_vjoy_devices_map[vjoy_index] = device
                 _joystick_device_guid_map[device.device_guid] = device # key by GUID
                 _all_devices_map[dev.device_guid] = dev
-                
+
                 if verbose:
                     syslog.warning(f"VJOY device [{vjoy_index}] is not detected or not enabled in the VJOY API. This VJOY will be disabled.")
 

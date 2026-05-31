@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import enum
 
 
@@ -88,9 +88,7 @@ class InputType(enum.IntEnum):
                 return f"Don't know how to handle {value}"
 
     @staticmethod
-    def to_list(
-        include_notset=False, include_mouse=False, include_virtualbutton=False
-    ) -> list:
+    def to_list(include_notset=False, include_mouse=False, include_virtualbutton=False) -> list:
         data = [it for it in InputType]
         if not include_notset:
             data.remove(InputType.NotSet)

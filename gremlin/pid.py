@@ -1,16 +1,16 @@
-''' PID controllers = adapted from 
-    https://github.com/m-lundberg/simple-pid/tree/master
-    and
-    https://github.com/ThunderTecke/PID_Py
+"""PID controllers = adapted from
+https://github.com/m-lundberg/simple-pid/tree/master
+and
+https://github.com/ThunderTecke/PID_Py
 
 
-'''
-# from __future__ import annotations # deprecated with python 3.14+
+"""
+
+from __future__ import annotations  # deprecated with python 3.14+
 import time
 from enum import Flag, auto
 from threading import Thread
 import logging
-
 
 
 def _clamp(value, limits):
@@ -131,7 +131,7 @@ class SimplePID(object):
         if dt is None:
             dt = now - self._last_time if (now - self._last_time) else 1e-16
         elif dt <= 0:
-            raise ValueError('dt has negative value {}, must be positive'.format(dt))
+            raise ValueError("dt has negative value {}, must be positive".format(dt))
 
         if self.sample_time is not None and dt < self.sample_time and self._last_output is not None:
             # Only update every sample_time seconds
@@ -177,14 +177,14 @@ class SimplePID(object):
 
     def __repr__(self):
         return (
-            '{self.__class__.__name__}('
-            'Kp={self.Kp!r}, Ki={self.Ki!r}, Kd={self.Kd!r}, '
-            'setpoint={self.setpoint!r}, sample_time={self.sample_time!r}, '
-            'output_limits={self.output_limits!r}, auto_mode={self.auto_mode!r}, '
-            'proportional_on_measurement={self.proportional_on_measurement!r}, '
-            'differential_on_measurement={self.differential_on_measurement!r}, '
-            'error_map={self.error_map!r}'
-            ')'
+            "{self.__class__.__name__}("
+            "Kp={self.Kp!r}, Ki={self.Ki!r}, Kd={self.Kd!r}, "
+            "setpoint={self.setpoint!r}, sample_time={self.sample_time!r}, "
+            "output_limits={self.output_limits!r}, auto_mode={self.auto_mode!r}, "
+            "proportional_on_measurement={self.proportional_on_measurement!r}, "
+            "differential_on_measurement={self.differential_on_measurement!r}, "
+            "error_map={self.error_map!r}"
+            ")"
         ).format(self=self)
 
     @property
@@ -257,7 +257,7 @@ class SimplePID(object):
         min_output, max_output = limits
 
         if (None not in limits) and (max_output < min_output):
-            raise ValueError('lower limit must be less than upper limit')
+            raise ValueError("lower limit must be less than upper limit")
 
         self._min_output = min_output
         self._max_output = max_output
@@ -284,13 +284,13 @@ class SimplePID(object):
         self._last_error = None
 
 
-
 class HistorianParams(Flag):
     """
     Enumeration to configure historian.
     Use with `or` (|) to sum parameters
         - (HistorianParams.P | HistorianParams.I | HistorianParams.D)
     """
+
     P = auto()
     I = auto()
     D = auto()
@@ -298,6 +298,7 @@ class HistorianParams(Flag):
     SETPOINT = auto()
     PROCESS_VALUE = auto()
     ERROR = auto()
+
 
 class PID:
     """
@@ -307,17 +308,17 @@ class PID:
     ----------
     kp: float
         Proportionnal gain
-    
+
     ki: float
         Integral gain
-    
+
     kd: float
         Derivative gain
-    
+
     indirectAction: bool, default = False
         Invert PID action. Direct action (False) -> error = setpoint - processValue, Indirect action (True) -> error = processValue - setpoint.
         This option implies that when error is increasing the output is decreasing.
-    
+
     proportionnalOnMeasurement: bool, default = False
         Activate proportionnal part calculation on processValue, instead of error.
         This avoid output bump when the setpoint change strongly, but increase stabilization time.
@@ -327,14 +328,14 @@ class PID:
     integralLimit: float, default = None
         Limit the integral part. When this value is set to None, the integral part is not limited.
         The integral part is clamped between -`integralLimit` and +`integralLimit`.
-    
+
     derivativeOnMeasurement: bool, default = False
         Activate derivative part calculation on processValue, instead of error.
         This avoid output bump when the setpoint change strongly, and there is no repercution on the PID behavior.
         If the processValue change strongly, the derivative part will slow down the processValue.s6
         False -> D = kd * ((error - lastError) / dt)
         True  -> D = -kd * ((processValue - lastProcessValue) / dt)
-    
+
     setpointRamp: float, default = None
         Determine the maximum variation of the setpoint per second (unit/s).
         If None, no ramps are applied.
@@ -345,7 +346,7 @@ class PID:
 
     setpointStableTime: float, default = 1.0
         Determine the amount of time (second) which the process value must be stabilized on the setpoint to activate `setpointReached` output.
-    
+
     deadband: float, defaut = None
         Determine the interval ([-`deadband`, `deadband`]) on the error, where the integral part is no longer calculated.
         If None, the deadband is ignored.
@@ -356,10 +357,10 @@ class PID:
     processValueStableLimit: float, default = None
         Determine the maximum variation to be considered stabilized.
         If None, the process value will not be considered stabilized.
-    
+
     processValueStableTime: float, default = 1.0
         Determine the amount of time (second) which the process value must be stabilized to activate `processValueStabilized` output.
-    
+
     historianParams: HistorianParams, default = None
         Configure historian to record some value of the PID. When at least one value is recorded, time is recorded too.
         Possible value :
@@ -370,45 +371,45 @@ class PID:
             - HistorianParams.SETPOINT : PID setpoint
             - HistorianParams.PROCESS_VALUE : PID process value
             - HistorianParams.OUTPUT : PID output
-    
+
     historianLenght: int, default = 100000
         The maximum lenght of the historian. When the limit is reached, remove the oldest element.
-    
+
     outputLimits: tuple[float, float], default = (None, None)
         Limit the output between a minimum and a maximum (min, max).
         If a limit is set to None, the limit is deactivated.
         If `outputLimit` is set to None, there is no limits.
-    
+
     logger: logging.Logger or str, default = None
         Logging system. `logging.Logger` instance or logger name (str) can be passed.
         If it's anything else (None or other type), the PID will not send any log.
-    
+
     simulation: Simulation, default = None
         Pass a simulation object to activate simulation.
-    
+
     Attributes
     ----------
     kp: float
         Same as `kp` in parameters section
-    
+
     ki: float
         Same as `ki` in parameters section
-    
+
     kd: float
         Same as `kd` in parameters section
-    
+
     indirectAction: float
         Same as `indirectAction` in parameters section
-    
+
     proportionnalOnMeasurement: bool
         Same as `proportionnalOnMeasurement` in parameters section
 
     integralLimit: float
         Same as `integralLimit` in parameters section
-    
+
     derivativeOnMeasurement: bool
         Same as `derivativeOnMeasurement` in parameters section
-    
+
     setpointRamp: float
         Same as `setpointRamp` in parameters section
 
@@ -420,7 +421,7 @@ class PID:
 
     processValueStableLimit: float
         Same as `processValueStableLimit` in parameters section
-    
+
     processValueStableTime: float
         Same as `processValueStableTime` in parameters section
 
@@ -434,36 +435,36 @@ class PID:
 
     historianParams: HistorianParams
         Same as `historianParams` in parameters section
-    
+
     historian: dict[str, list]
         PID value recorded
-    
+
     historianLenght: int
         Same as `historianLenght` in parameters section.
-    
+
     output: float
         PID output
-    
+
     manualMode: bool
         Activate manual mode. In manual mode `output` is directly written by `manualValue` (limitations are always active).
         PID calculation is no longer executed in manual mode.
         Default value : False
-    
+
     manualValue: float
         In manual mode `output` is directly written by `manualValue` (limitations are always active).
-    
+
     bumplessSwitching: bool
         If `bumplessSwitching` is activate, in automatic mode `manualValue` is written by `output` to avoid bump when the manual mode is activated.
         When automatic mode is activated, the PID calculation restart and take setpoint.
         Bump can occur if the setpoint is too far from process value when automatic mode is reactivated.
         Default value : True
-    
+
     logger: logging.Logger
         Contain the `logging.Logger` instance. If it's None or other type, the PID will not send any log.
 
     simulation: Simulation
         Same as `simulation` in parameters section.
-    
+
     Methods
     -------
     compute(processValue, setpoint)
@@ -472,7 +473,29 @@ class PID:
     __call__(processValue, setpoint)
         call `compute`. Is a code simplification.
     """
-    def __init__(self, kp: float, ki: float, kd: float, indirectAction: bool = False, proportionnalOnMeasurement: bool = False, integralLimit: float = None, derivativeOnMeasurement: bool = False, setpointRamp: float = None, setpointStableLimit: float = None, setpointStableTime: float = 1.0, deadband: float = None, deadbandActivationTime: float = 1.0, processValueStableLimit: float = None, processValueStableTime: float = 1.0, historianParams: HistorianParams = None, historianLenght: int = 100000, outputLimits: tuple[float, float] = (None, None), logger: logging.Logger = None, simulation: Simulation = None) -> None:
+
+    def __init__(
+        self,
+        kp: float,
+        ki: float,
+        kd: float,
+        indirectAction: bool = False,
+        proportionnalOnMeasurement: bool = False,
+        integralLimit: float = None,
+        derivativeOnMeasurement: bool = False,
+        setpointRamp: float = None,
+        setpointStableLimit: float = None,
+        setpointStableTime: float = 1.0,
+        deadband: float = None,
+        deadbandActivationTime: float = 1.0,
+        processValueStableLimit: float = None,
+        processValueStableTime: float = 1.0,
+        historianParams: HistorianParams = None,
+        historianLenght: int = 100000,
+        outputLimits: tuple[float, float] = (None, None),
+        logger: logging.Logger = None,
+        simulation: Simulation = None,
+    ) -> None:
         # PID parameters
         self.kp = kp
         self.ki = ki
@@ -508,38 +531,46 @@ class PID:
         self.historianParams = historianParams
         self.historian = {}
 
-        if (historianLenght <= 0):
+        if historianLenght <= 0:
             raise ValueError("`historianLenght` can't be 0 or negative!")
 
         self.historianLenght = historianLenght
-        
+
         if self.historianParams is not None:
             if HistorianParams.P in self.historianParams:
                 self.historian["P"] = []
-            
+
             if HistorianParams.I in self.historianParams:
                 self.historian["I"] = []
 
             if HistorianParams.D in self.historianParams:
                 self.historian["D"] = []
-            
+
             if HistorianParams.OUTPUT in self.historianParams:
                 self.historian["OUTPUT"] = []
-            
+
             if HistorianParams.SETPOINT in self.historianParams:
                 self.historian["SETPOINT"] = []
-            
+
             if HistorianParams.PROCESS_VALUE in self.historianParams:
                 self.historian["PROCESS_VALUE"] = []
 
             if HistorianParams.ERROR in self.historianParams:
                 self.historian["ERROR"] = []
 
-            if (HistorianParams.P in self.historianParams) or (HistorianParams.I in self.historianParams) or (HistorianParams.D in self.historianParams) or (HistorianParams.ERROR in self.historianParams) or (HistorianParams.OUTPUT in self.historianParams) or (HistorianParams.PROCESS_VALUE in self.historianParams) or (HistorianParams.SETPOINT in self.historianParams):
+            if (
+                (HistorianParams.P in self.historianParams)
+                or (HistorianParams.I in self.historianParams)
+                or (HistorianParams.D in self.historianParams)
+                or (HistorianParams.ERROR in self.historianParams)
+                or (HistorianParams.OUTPUT in self.historianParams)
+                or (HistorianParams.PROCESS_VALUE in self.historianParams)
+                or (HistorianParams.SETPOINT in self.historianParams)
+            ):
                 self.historian["TIME"] = []
         else:
             self.historian = None
-        
+
         # Internal attributes
         self._lastTime = None
         self._lastError = 0.0
@@ -566,10 +597,10 @@ class PID:
 
         # Logger
         self.logger = None
-        if (isinstance(logger, logging.Logger)):
+        if isinstance(logger, logging.Logger):
             self.logger = logger
             self.logger.info("PID object created")
-        elif (isinstance(logger, str)):
+        elif isinstance(logger, str):
             self.logger = logging.getLogger(logger)
             self.logger.info("PID object created")
 
@@ -598,7 +629,7 @@ class PID:
         currentTime: float, default = None
             The current time. For simulation purpose only.
             Leave it to `None` for a real application.
-        
+
         Returns
         -------
         float
@@ -607,28 +638,28 @@ class PID:
         # Process value
         if processValue is None:
             processValue = self.simulation.output
-        
+
         # Logging mode switching
-        if (self.manualMode and not self.memManualMode and isinstance(self.logger, logging.Logger)):
+        if self.manualMode and not self.memManualMode and isinstance(self.logger, logging.Logger):
             self.logger.info("PID switched to manual mode")
-        elif (not self.manualMode and self.memManualMode and isinstance(self.logger, logging.Logger)):
+        elif not self.manualMode and self.memManualMode and isinstance(self.logger, logging.Logger):
             self.logger.info("PID switched to automatic mode")
-        
+
         self.memManualMode = self.manualMode
-        
-        if (currentTime is None):
+
+        if currentTime is None:
             actualTime = time.time()
         else:
             actualTime = currentTime
-        
+
         # PID calculation
         if self._startTime is not None and self._lastTime is not None:
             # ===== Delta time =====
             deltaTime = actualTime - self._lastTime
 
             # Process value stabilization
-            if (self.processValueStableLimit is not None):
-                if (abs((processValue - self._lastProcessValue) / deltaTime) < self.processValueStableLimit):
+            if self.processValueStableLimit is not None:
+                if abs((processValue - self._lastProcessValue) / deltaTime) < self.processValueStableLimit:
                     self._processValueCurrStableTime += deltaTime
                 else:
                     self._processValueCurrStableTime = 0.0
@@ -645,13 +676,13 @@ class PID:
             else:
                 setpointDiff = self._setuptoolSetpoint - self._setpoint
 
-            if (self.setpointRamp is not None):
-                if (self.setpointRamp > 0.0):
-                    if (setpointDiff > self.setpointRamp * deltaTime):
+            if self.setpointRamp is not None:
+                if self.setpointRamp > 0.0:
+                    if setpointDiff > self.setpointRamp * deltaTime:
                         setpointDiff = self.setpointRamp * deltaTime
-                    elif (setpointDiff < -self.setpointRamp * deltaTime):
+                    elif setpointDiff < -self.setpointRamp * deltaTime:
                         setpointDiff = -self.setpointRamp * deltaTime
-                
+
             self._setpoint += setpointDiff
 
             # ===== Error calculation =====
@@ -661,26 +692,26 @@ class PID:
                 error = self._setpoint - processValue
 
             # ===== Setpoint reached =====
-            if (self.setpointStableLimit is not None):
+            if self.setpointStableLimit is not None:
                 if abs(error) < self.setpointStableLimit:
                     self._setpointValueCurrStableTime += deltaTime
                 else:
                     self._setpointValueCurrStableTime = 0.0
-                
+
                 self.setpointReached = self._setpointValueCurrStableTime > self.setpointStableTime
             else:
                 self._setpointValueCurrStableTime = 0.0
                 self.setpointReached = False
-            
+
             # ===== Proportionnal part =====
-            if (not self.proportionnalOnMeasurement):
+            if not self.proportionnalOnMeasurement:
                 self._p = error * self.kp
             else:
                 self._p = -processValue * self.kp
 
             # ===== Deadband =====
-            if (self.deadband is not None):
-                if (abs(error) < self.deadband):
+            if self.deadband is not None:
+                if abs(error) < self.deadband:
                     self._deadbandTime += deltaTime
                 else:
                     self._deadbandTime = 0.0
@@ -688,7 +719,7 @@ class PID:
                 self._deadbandTime = 0.0
 
             # ===== Integral part =====
-            if (not self.manualMode and not self.integralFreezing and (self._deadbandTime < self.deadbandActivationTime)):
+            if not self.manualMode and not self.integralFreezing and (self._deadbandTime < self.deadbandActivationTime):
                 self._i += ((error + self._lastError) / 2.0) * deltaTime * self.ki
 
             # Integral part limitation
@@ -699,30 +730,30 @@ class PID:
                     self._i = self.integralLimit
 
                     self.integralLimitReached = True
-                    
+
                 elif self._i < -self.integralLimit:
                     self._i = -self.integralLimit
 
                     self.integralLimitReached = True
-            
+
             # Integral limit reached warning message
-            if (self.integralLimitReached and not self.memIntegralLimitReached and isinstance(self.logger, logging.Logger)):
+            if self.integralLimitReached and not self.memIntegralLimitReached and isinstance(self.logger, logging.Logger):
                 self.logger.warning("Integral part has reached the limit (%d, %d)", -self.integralLimit, self.integralLimit)
-            
+
             self.memIntegralLimitReached = self.integralLimitReached
-            
+
             # ===== Derivative part =====
-            if (not self.derivativeOnMeasurement):
+            if not self.derivativeOnMeasurement:
                 self._d = ((error - self._lastError) / deltaTime) * self.kd
             else:
                 self._d = -((processValue - self._lastProcessValue) / deltaTime) * self.kd
-            
+
             # ===== Output =====
-            if (not self.manualMode):
+            if not self.manualMode:
                 _output = self._p + self._i + self._d
 
                 # Bumpless manual value
-                if (self.bumplessSwitching):
+                if self.bumplessSwitching:
                     self.manualValue = _output
             else:
                 _output = self.manualValue
@@ -739,19 +770,19 @@ class PID:
                 if self.outputLimits[1] is not None:
                     if _output > self.outputLimits[1]:
                         _output = self.outputLimits[1]
-                        
+
                         self.outputLimitsReached = True
-            
+
             # Output limit reached warning message
-            if (self.outputLimitsReached and not self.memoutputLimitsReached and isinstance(self.logger, logging.Logger)):
+            if self.outputLimitsReached and not self.memoutputLimitsReached and isinstance(self.logger, logging.Logger):
                 self.logger.warning("Output limits reached (%d, %d)", self.outputLimits[0], self.outputLimits[1])
-            
+
             self.memoutputLimitsReached = self.outputLimitsReached
 
             # Interal part equal to output in manual mode
-            if (self.manualMode):
+            if self.manualMode:
                 self._i = _output - self._p
-            
+
             # ===== Output =====
             self.output = _output
 
@@ -759,52 +790,60 @@ class PID:
             if self.historian is not None:
                 if HistorianParams.P in self.historianParams:
                     self.historian["P"].append(self._p)
-                    
+
                     if len(self.historian["P"]) > self.historianLenght:
                         del self.historian["P"][0]
-                
+
                 if HistorianParams.I in self.historianParams:
                     self.historian["I"].append(self._i)
-                    
+
                     if len(self.historian["I"]) > self.historianLenght:
                         del self.historian["I"][0]
 
                 if HistorianParams.D in self.historianParams:
                     self.historian["D"].append(self._d)
-                    
+
                     if len(self.historian["D"]) > self.historianLenght:
                         del self.historian["D"][0]
-                
+
                 if HistorianParams.OUTPUT in self.historianParams:
                     self.historian["OUTPUT"].append(self.output)
-                    
+
                     if len(self.historian["OUTPUT"]) > self.historianLenght:
                         del self.historian["OUTPUT"][0]
-                
+
                 if HistorianParams.SETPOINT in self.historianParams:
                     self.historian["SETPOINT"].append(self._setpoint)
-                    
+
                     if len(self.historian["SETPOINT"]) > self.historianLenght:
                         del self.historian["SETPOINT"][0]
-                
+
                 if HistorianParams.PROCESS_VALUE in self.historianParams:
                     self.historian["PROCESS_VALUE"].append(processValue)
-                    
+
                     if len(self.historian["PROCESS_VALUE"]) > self.historianLenght:
                         del self.historian["PROCESS_VALUE"][0]
 
                 if HistorianParams.ERROR in self.historianParams:
                     self.historian["ERROR"].append(error)
-                    
+
                     if len(self.historian["ERROR"]) > self.historianLenght:
                         del self.historian["ERROR"][0]
 
-                if (HistorianParams.P in self.historianParams) or (HistorianParams.I in self.historianParams) or (HistorianParams.D in self.historianParams) or (HistorianParams.ERROR in self.historianParams) or (HistorianParams.OUTPUT in self.historianParams) or (HistorianParams.PROCESS_VALUE in self.historianParams) or (HistorianParams.SETPOINT in self.historianParams):
+                if (
+                    (HistorianParams.P in self.historianParams)
+                    or (HistorianParams.I in self.historianParams)
+                    or (HistorianParams.D in self.historianParams)
+                    or (HistorianParams.ERROR in self.historianParams)
+                    or (HistorianParams.OUTPUT in self.historianParams)
+                    or (HistorianParams.PROCESS_VALUE in self.historianParams)
+                    or (HistorianParams.SETPOINT in self.historianParams)
+                ):
                     self.historian["TIME"].append(actualTime - self._startTime)
-                    
+
                     if len(self.historian["TIME"]) > self.historianLenght:
                         del self.historian["TIME"][0]
-            
+
             # ===== Saving data for next execution =====
             self._lastError = error
             self._lastTime = actualTime
@@ -815,7 +854,7 @@ class PID:
                 self.simulation(self.output, actualTime)
 
             return self.output
-        else: # First execution
+        else:  # First execution
             self._startTime = actualTime
             self._lastTime = actualTime
 
@@ -825,7 +864,7 @@ class PID:
     def __call__(self, setpoint: float, processValue: float = None, currentTime: float = None) -> float:
         """
         call `compute`. Is a code simplification.
-        
+
         Parameters
         ----------
         setpoint: float
@@ -838,13 +877,14 @@ class PID:
         currentTime: float, default = None
             The current time. For simulation purpose only.
             Leave it to `None` for a real application.
-        
+
         Returns
         -------
         float
             Return the PID output (same as `self.output`)
         """
         return self.compute(setpoint, processValue, currentTime)
+
 
 class ThreadedPID(PID, Thread):
     """
@@ -855,17 +895,17 @@ class ThreadedPID(PID, Thread):
     ----------
     kp: float
         Proportionnal gain
-    
+
     ki: float
         Integral gain
-    
+
     kd: float
         Derivative gain
-    
+
     indirectAction: bool, default = False
         Invert PID action. Direct action (False) -> error = setpoint - processValue, Indirect action (True) -> error = processValue - setpoint.
         This option implies that when error is increasing the output is decreasing.
-    
+
     proportionnalOnMeasurement: bool
         Activate proportionnal part calculation on processValue, instead of error.
         This avoid output bump when the setpoint change strongly, but increase stabilization time.
@@ -875,7 +915,7 @@ class ThreadedPID(PID, Thread):
     integralLimit: float, default = None
         Limit the integral part. When this value is set to None, the integral part is not limited.
         The integral part is clamped between -`integralLimit` and +`integralLimit`.
-    
+
     derivativeOnMeasurement: bool
         Activate derivative part calculation on processValue, instead of error.
         This avoid output bump when the setpoint change strongly, and there is no repercution on the PID behavior.
@@ -893,7 +933,7 @@ class ThreadedPID(PID, Thread):
 
     setpointStableTime: float, default = 1.0
         Determine the amount of time (second) which the process value must be stabilized on the setpoint to activate `setpointReached` output.
-    
+
     deadband: float, defaut = None
         Determine the interval ([-`deadband`, `deadband`]) on the error, where the integral part is no longer calculated.
         If None, the deadband is ignored.
@@ -904,10 +944,10 @@ class ThreadedPID(PID, Thread):
     processValueStableLimit: float, default = None
         Determine the maximum variation to be considered stabilized.
         If None, the process value will not be considered stabilized.
-    
+
     processValueStableTime: float, default = 1.0
         Determine the amount of time which the process value must be stabilized to activate `processValueStabilized` output.
-    
+
     historianParams: HistorianParams, default = None
         Configure historian to record some value of the PID. When at least one value is recorded, time is recorded too.
         Possible value :
@@ -918,22 +958,22 @@ class ThreadedPID(PID, Thread):
             - HistorianParams.SETPOINT : PID setpoint
             - HistorianParams.PROCESS_VALUE : PID process value
             - HistorianParams.OUTPUT : PID output
-            
+
     historianLenght: int, default = 100000
         The maximum lenght of the historian. When the limit is reached, remove the oldest element.
-    
+
     outputLimits: tuple[float, float], default = (None, None)
         Limit the output between a minimum and a maximum (min, max).
         If a limit is set to None, the limit is deactivated.
         If `outputLimit` is set to None, there is no limits.
-    
+
     logger: logging.Logger or str, default = None
         Logging system. `logging.Logger` instance or logger name (str) can be passed.
         If it's anything else (None or other type), the PID will not send any log.
 
     simulation: Simulation, default = None
         Pass a simulation object to activate simulation.
-    
+
     cycleTime: float, default = 0.0
         Define the minimum time between two PID calculations.
         If this time is lower than the real execution time, there is no pause between execution.
@@ -943,23 +983,67 @@ class ThreadedPID(PID, Thread):
     ----------
     setpoint: float
         The current target value used for the PID calculation.
-    
+
     processValue: float
         The current system feedback used for the PID calculation. For a better PID, update it more faster than the PID execution.
-    
+
     cycleTime: float
         Same as `cycleTime` in parameters section.
-    
+
     quit: bool
         When the threaded PID is started, it can be stopped by setting `quit` to `True`. The PID finish the current execution and stop the thread.
-    
+
     Methods
     -------
     start()
         Used to start the thread.
     """
-    def __init__(self, kp: float, ki: float, kd: float, indirectAction: bool = False, proportionnalOnMeasurement: bool = False, integralLimit: float = None, derivativeOnMeasurment: bool = False, setpointRamp: float = None, setpointStableLimit: float = None, setpointStableTime: float = 1.0, deadband: float = None, deadbandActivationTime: float = 1.0, processValueStableLimit: float = None, processValueStableTime: float = 1.0, historianParams: HistorianParams = None, historianLenght: int = 100000, outputLimits: tuple[float, float] = (None, None), logger: logging.Logger = None, simulation: Simulation = None, cycleTime: float = 0.0) -> None:
-        PID.__init__(self, kp, ki, kd, indirectAction, proportionnalOnMeasurement, integralLimit, derivativeOnMeasurment, setpointRamp, setpointStableLimit, setpointStableTime, deadband, deadbandActivationTime, processValueStableLimit, processValueStableTime, historianParams, historianLenght, outputLimits, logger, simulation)
+
+    def __init__(
+        self,
+        kp: float,
+        ki: float,
+        kd: float,
+        indirectAction: bool = False,
+        proportionnalOnMeasurement: bool = False,
+        integralLimit: float = None,
+        derivativeOnMeasurment: bool = False,
+        setpointRamp: float = None,
+        setpointStableLimit: float = None,
+        setpointStableTime: float = 1.0,
+        deadband: float = None,
+        deadbandActivationTime: float = 1.0,
+        processValueStableLimit: float = None,
+        processValueStableTime: float = 1.0,
+        historianParams: HistorianParams = None,
+        historianLenght: int = 100000,
+        outputLimits: tuple[float, float] = (None, None),
+        logger: logging.Logger = None,
+        simulation: Simulation = None,
+        cycleTime: float = 0.0,
+    ) -> None:
+        PID.__init__(
+            self,
+            kp,
+            ki,
+            kd,
+            indirectAction,
+            proportionnalOnMeasurement,
+            integralLimit,
+            derivativeOnMeasurment,
+            setpointRamp,
+            setpointStableLimit,
+            setpointStableTime,
+            deadband,
+            deadbandActivationTime,
+            processValueStableLimit,
+            processValueStableTime,
+            historianParams,
+            historianLenght,
+            outputLimits,
+            logger,
+            simulation,
+        )
         Thread.__init__(self)
 
         self.setpoint = 0.0
@@ -967,7 +1051,7 @@ class ThreadedPID(PID, Thread):
         self.cycleTime = cycleTime
 
         self.quit = False
-    
+
     def start(self) -> None:
         """
         Used to start the threaded PID. Overrided from `threading.Thread`
@@ -977,7 +1061,7 @@ class ThreadedPID(PID, Thread):
         self.compute(self.setpoint, self.processValue if self.simulation is None else None)
         self.quit = False
         return Thread.start(self)
-    
+
     def run(self):
         """
         Thread execution. Overrided from `threading.Thread`
@@ -1001,15 +1085,15 @@ class Simulation:
 
         # Output
         self.output = 0.0
-        
+
     def __call__(self, input: float, t: float = None) -> float:
-        if (t is None):
+        if t is None:
             actualTime = time.time()
         else:
             actualTime = t
 
         if self._lastTime is not None:
             deltaTime = actualTime - self._lastTime
-            self.output += (1.0/self.tau) * ((self.K * input) - self.output) * deltaTime
-        
-        self._lastTime = actualTime            
+            self.output += (1.0 / self.tau) * ((self.K * input) - self.output) * deltaTime
+
+        self._lastTime = actualTime

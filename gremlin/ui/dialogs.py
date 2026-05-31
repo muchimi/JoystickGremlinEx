@@ -21,6 +21,7 @@ import subprocess
 import sys
 
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtWidgets import QAbstractItemView, QWidget, QListWidget, QLabel, QListWidgetItem
 
 import dinput
 
@@ -33,6 +34,9 @@ import gremlin.process
 import gremlin.shared_state
 import gremlin.types
 import gremlin.ui.ui_common
+from gremlin.types import DeviceType
+import json
+
 
 import gremlin.ui.ui_about as ui_about
 import gremlin.ui.ui_common as ui_common
@@ -2854,7 +2858,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     @QtCore.Slot(bool)
     def _start_windows(self, checked: bool):
         """Set registry entry to launch Joystick Gremlin on login.
-        Hive location: Computer\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
+        Hive location: Computer\\HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run
         :param clicked True if launch should happen on login, False otherwise
         """
         is_error = False
@@ -4820,4 +4824,272 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
 
     @QtCore.Slot()
     def _cancel_button_cb(self):
+        self.close()
+
+
+class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
+    """dialog for drag drop re-ordering of device tabs"""
+
+    def __init__(self, parent=None):
+        import gremlin.config
+        import gremlin.ui.ui_common
+        import gremlin.ui
+        import gremlin.shared_state
+        ui = gremlin.shared_state.ui
+
+        super().__init__(self.__class__.__name__, parent=parent)
+
+        self.setWindowTitle("Order Devices")
+        self.setModal(True)
+
+        self.config = gremlin.config.Configuration()
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        label = QLabel("Device List:")
+        self.main_layout.addWidget(label)
+
+        list_widget = QListWidget()
+        list_widget.setDragEnabled(True)
+        list_widget.setAcceptDrops(True)
+        list_widget.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        list_widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        list_widget.setDropIndicatorShown(True)
+
+        tab_map = ui.getTabMap()
+        for data in tab_map.values():
+            device_guid, device_name, tab_type, index = data
+            item = QListWidgetItem(device_name, list_widget)
+            item.setData(1, data)
+
+        self._tab_map = tab_map
+
+        self.main_layout.addWidget(list_widget)
+        self._list_widget = list_widget
+
+        default_order_widget = gremlin.ui.ui_common.QDataPushButton("Default",
+                                                                    tooltip ="Default device order",
+                                                                    callback=self._handle_default_order
+                                                                    )
+
+        save_order_widget = gremlin.ui.ui_common.QDataPushButton("Save...",
+                                                                    tooltip ="Save a device device order",
+                                                                    callback=self._handle_save_order
+                                                                    )
+        load_order_widget = gremlin.ui.ui_common.QDataPushButton("Load...",
+                                                                    tooltip ="Load a saved device order",
+                                                                    callback=self._handle_load_order
+                                                                    )
+
+
+        action_container_widget = gremlin.ui.ui_common.getHContainer(
+            [default_order_widget, "||", save_order_widget, load_order_widget],
+            widget_only=True,
+        )
+
+        self.main_layout.addWidget(action_container_widget)
+
+        cancel_button_widget = QtWidgets.QPushButton("Cancel")
+        cancel_button_widget.clicked.connect(self._cancel_cb)
+
+        ok_button_widget = QtWidgets.QPushButton("Ok")
+        ok_button_widget.clicked.connect(self._close_cb)
+
+        button_container_widget = gremlin.ui.ui_common.getHContainer(
+            [ok_button_widget, cancel_button_widget],
+            left_stretch=True,
+            widget_only=True,
+        )
+
+        self.main_layout.addWidget(button_container_widget)
+
+    def _get_current_map(self):
+        ''' gets the current data map from the list widget '''
+        tab_map = {}
+        items = [self._list_widget.item(i) for i in range(self._list_widget.count())]
+        for index, item in enumerate(items):
+            data = item.data(1)
+            tab_map[index] = data
+
+        return tab_map
+
+
+    def _handle_save_order(self, widget):
+        ''' saves the order to a configuration file '''
+        tab_map = self._get_current_map()
+        if tab_map:
+            fname, _ = QtWidgets.QFileDialog.getSaveFileName(
+                None, "Save Device Order", gremlin.shared_state.data_path, "JSON files (*.json)"
+            )
+            if fname != "":
+                try:
+                    data = json.dumps(tab_map)
+                    with open(fname,"w") as h:
+                        h.write(data)
+                        h.flush()
+                except Exception as err:
+                    gremlin.ui.ui_common.MessageBoxWarning("Error",f"Unable to save: {err}")
+                    syslog.error(err)
+
+
+
+
+    def _handle_load_order(self, widget):
+        ''' loads the order from a configuration file '''
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+                None,
+                "Load Device Order",
+                gremlin.shared_state.data_path,
+                "JSON files (*.json)",)
+
+        if fname and os.path.isfile(fname):
+            try:
+                tab_map = json.load(fname)
+
+                # load the tab map
+                # current_map = self._get_current_map()
+                # missing_list = []
+                # valid_list = []
+                # existing_list = []
+                # for data in current_map:
+                #     device_guid, device_name, tab_type, index = data
+                #     device = gremlin.joystick_handling.getDevice(device_guid)
+                #     existing_list.append((data, device))
+
+
+                # for data in tab_map.values():
+                #     device_guid, device_name, tab_type, index = data
+                #     device = gremlin.joystick_handling.getDevice(device_guid)
+                #     if not device:
+                #         # missing
+                #         missing_list = (data, device)
+                #     else:
+                #         valid_list = (data, device)
+
+                # # add any missing items
+                # for data, device in valid_list:
+                #     e_data, e_dev = next ((e_data, e_dev) for e_data, e_dev in existing_list if e_dev == device), (None, None))
+                #     if e_data:
+
+
+
+
+
+                self._list_widget.clear()
+                for data in tab_map.values():
+                    device_guid, device_name, tab_type, index = data
+                    # validate the device still exists
+
+
+                    item = QListWidgetItem(device_name, self._list_widget)
+                    item.setData(1, data)
+            except Exception as err:
+                gremlin.ui.ui_common.MessageBoxWarning("Error",f"Unable to read file: {err}")
+                syslog.error(err)
+
+
+
+
+
+    def _handle_default_order(self, widget):
+        ''' orders using the default order '''
+
+
+        physical_list = []
+        virtual_list = []
+        other_list = []
+
+        keyboard_data = None
+        state_data = None
+        osc_data = None
+        midi_data = None
+        mode_data = None
+        plugin_data = None
+        settings_data = None
+        octavi_data = None
+
+
+        # build a device list by category
+        for data in self._tab_map.values():
+            device_guid, device_name, tab_type, index = data
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            match device.device_type:
+                case DeviceType.Joystick:
+                    if device.is_virtual:
+                        virtual_list.append((data, device))
+                    else:
+                        physical_list.append((data, device))
+                case DeviceType.Keyboard:
+                    keyboard_data = (data, device)
+                case DeviceType.State:
+                    state_data = (data, device)
+                case DeviceType.Osc:
+                    osc_data = (data, device)
+                case DeviceType.Midi:
+                    midi_data = (data, device)
+                case DeviceType.ModeControl:
+                    mode_data = (data, device)
+                case DeviceType.Plugins:
+                    plugin_data = (data, device)
+                case DeviceType.Settings:
+                    settings_data = (data, device)
+                case DeviceType.OctaviIFR1:
+                    octavi_data = (data, device)
+                case _:
+                    other_list.append((data, device))
+
+
+        standard_items = [
+            keyboard_data,
+            state_data,
+            osc_data,
+            midi_data,
+            mode_data,
+            octavi_data,
+            plugin_data,
+            settings_data
+        ]
+
+        standard_list = [data for data in standard_items if data is not None]
+
+        # sort joysticks by name
+        physical_list.sort(key = lambda x: x[1].name.casefold())
+        virtual_list.sort(key = lambda x: x[1].name.casefold())
+        sorted_list = []
+        sorted_list.extend(physical_list)
+        sorted_list.extend(virtual_list)
+        sorted_list.extend(standard_list)
+        sorted_list.extend(other_list)
+
+
+        self._list_widget.clear()
+        for data, device in sorted_list:
+            item = QListWidgetItem(device.name, self._list_widget)
+            item.setData(1, data)
+
+
+
+    def _update_tabs(self):
+        import gremlin.shared_state
+        ui = gremlin.shared_state.ui
+
+        tab_map = {}
+        items = [self._list_widget.item(i) for i in range(self._list_widget.count())]
+        for index, item in enumerate(items):
+            data = item.data(1)
+            tab_map[index] = data
+        ui.setTabMap(tab_map)
+
+
+    @QtCore.Slot()
+    def _close_cb(self):
+        # validate the mode name
+
+        self._update_tabs()
+        self.accept()
+        self.close()
+
+    @QtCore.Slot()
+    def _cancel_cb(self):
+        self.reject()
         self.close()

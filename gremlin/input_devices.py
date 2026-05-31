@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import collections
 import functools
 import heapq
@@ -45,20 +45,13 @@ import gremlin.remote
 from . import error
 
 
-
 import gremlin.singleton_decorator
-
 
 
 syslog = logging.getLogger("system")
 
 
-
-
-
-
 class CallbackRegistry:
-
     """Registry of all callbacks known to the system."""
 
     def __init__(self):
@@ -103,7 +96,6 @@ class CallbackRegistry:
 
 
 class PeriodicRegistry:
-
     """Registry for periodically executed functions."""
 
     def __init__(self):
@@ -161,16 +153,12 @@ class PeriodicRegistry:
                 callback = plugin.install(callback, partial_fn)
         return callback
 
-
     def _thread_loop(self):
         """Main execution loop run in a separate thread."""
         import uuid
+
         # Setup plugins to use
-        self._plugins = [
-            JoystickPlugin(),
-            VJoyPlugin(),
-            KeyboardPlugin()
-        ]
+        self._plugins = [JoystickPlugin(), VJoyPlugin(), KeyboardPlugin()]
         callback_map = {}
         period_map = {}
         # Populate the queue
@@ -183,7 +171,6 @@ class PeriodicRegistry:
             value = time.time() + period_map[node_id]
             heapq.heappush(self._queue, (value, node_id))
 
-
         # Main thread loop
         while self._running:
             # Process all events that require running
@@ -192,20 +179,15 @@ class PeriodicRegistry:
                     value, node_id = heapq.heappop(self._queue)
                     callback_map[node_id]()
 
-                    heapq.heappush(
-                        self._queue,
-                        (time.time() + period_map[node_id], node_id)
-                    )
+                    heapq.heappush(self._queue, (time.time() + period_map[node_id], node_id))
 
             # Sleep until either the next function needs to be run or
             # our timeout expires
             time.sleep(min(self._queue[0][0] - time.time(), 1.0))
 
 
-
 class SimpleRegistry:
-
-    """Registry for functions executed  """
+    """Registry for functions executed"""
 
     def __init__(self):
         """Creates a new instance."""
@@ -226,21 +208,18 @@ class SimpleRegistry:
             plugin_cb = self._install_plugins(item)
             plugin_cb()
 
-
     def stop(self):
         """Stops the event loop."""
         self._running = False
 
-
-    def add(self, callback : Callable):
+    def add(self, callback: Callable):
         """Adds a function to execute periodically.
 
         :param callback the function to execute
         :param interval the time between executions
         """
-        assert callback is not None and callable(callback), 'Callback must be provided and be a callable'
-        self._registry[callback] =  callback
-
+        assert callback is not None and callable(callback), "Callback must be provided and be a callable"
+        self._registry[callback] = callback
 
     def clear(self):
         """Clears the registry."""
@@ -263,8 +242,9 @@ class SimpleRegistry:
         return callback
 
 
-class ModeChangeRegistry():
-    """Registry for functions executed on mode change """
+class ModeChangeRegistry:
+    """Registry for functions executed on mode change"""
+
     def __init__(self):
         """Creates a new instance."""
         self._registry = {}
@@ -277,9 +257,8 @@ class ModeChangeRegistry():
         :param callback the function to execute
         :param interval the time between executions
         """
-        assert callback is not None and callable(callback), 'Callback must be provided and be a callable'
+        assert callback is not None and callable(callback), "Callback must be provided and be a callable"
         self._registry[callback] = callback
-
 
     def clear(self):
         """Clears the registry."""
@@ -302,8 +281,8 @@ class ModeChangeRegistry():
                 callback = plugin.install(callback, partial_fn)
         return callback
 
-    def runtime_mode_changed(self, mode : str):
-        ''' calls all registered callbacks when the GremlinEx mode changes '''
+    def runtime_mode_changed(self, mode: str):
+        """calls all registered callbacks when the GremlinEx mode changes"""
         if len(self._registry) == 0:
             return
         for item in self._registry.values():
@@ -311,12 +290,13 @@ class ModeChangeRegistry():
             plugin_cb(mode)
 
 
+class StateChangeRegistry:
+    """Registry for functions executed on state (remote/local) change"""
 
-class StateChangeRegistry():
-    """Registry for functions executed on state (remote/local) change """
     def __init__(self):
         """Creates a new instance."""
         from gremlin.event_handler import EventListener
+
         self._registry = {}
         self._running = False
         self._plugins = []
@@ -329,9 +309,8 @@ class StateChangeRegistry():
         :param callback the function to execute
         :param interval the time between executions
         """
-        assert callback is not None and callable(callback), 'Callback must be provided and be a callable'
+        assert callback is not None and callable(callback), "Callback must be provided and be a callable"
         self._registry[callback] = callback
-
 
     def clear(self):
         """Clears the registry."""
@@ -358,20 +337,12 @@ class StateChangeRegistry():
         return callback
 
     def state_changed(self, event):
-        ''' calls all registered callbacks when the GremlinEx local or remote states change '''
+        """calls all registered callbacks when the GremlinEx local or remote states change"""
         if len(self._registry) == 0:
             return
         for item in self._registry.values():
             plugin_cb = self._install_plugins(item)
             plugin_cb(event)
-
-
-
-
-
-
-
-
 
 
 def register_callback(callback, device, input_type, input_id):
@@ -393,20 +364,14 @@ def register_callback(callback, device, input_type, input_id):
     input_id : int
         Index of the input on which to execute the callback
     """
-    event = gremlin.event_handler.Event(
-        event_type=input_type,
-        device_guid=device.device_guid,
-        identifier=input_id
-    )
+    event = gremlin.event_handler.Event(event_type=input_type, device_guid=device.device_guid, identifier=input_id)
     callback_registry.add(callback, event, device.mode, False)
 
 
 class JoystickWrapper:
-
     """Wraps joysticks and presents an API similar to vjoy."""
 
     class Input:
-
         """Represents a joystick input."""
 
         def __init__(self, joystick_guid, index):
@@ -419,7 +384,6 @@ class JoystickWrapper:
             self._index = index
 
     class Axis(Input):
-
         """Represents a single axis of a joystick."""
 
         def __init__(self, joystick_guid, index):
@@ -432,7 +396,6 @@ class JoystickWrapper:
             return DILL.get_axis(self._joystick_guid, self._index) / float(32768)
 
     class Button(Input):
-
         """Represents a single button of a joystick."""
 
         def __init__(self, joystick_guid, index):
@@ -443,7 +406,6 @@ class JoystickWrapper:
             return DILL.get_button(self._joystick_guid, self._index)
 
     class Hat(Input):
-
         """Represents a single hat of a joystick,"""
 
         def __init__(self, joystick_guid, index):
@@ -452,13 +414,14 @@ class JoystickWrapper:
         @property
         def direction(self):
             import vjoy
+
             value = gremlin.joystick_handling.get_hat(self._joystick_guid, self._index)
             if value in vjoy.vjoy.Hat.to_continuous_position:
                 position = vjoy.vjoy.Hat.to_continuous_position[value]
             else:
-                position = (0,0)
+                position = (0, 0)
             return position
-            #return gremlin.util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
+            # return gremlin.util.dill_hat_lookup(DILL.get_hat(self._joystick_guid, self._index))
 
     def __init__(self, device_guid):
         """Creates a new wrapper object for the given object id.
@@ -466,9 +429,7 @@ class JoystickWrapper:
         :param device_guid the GUID of the joystick instance to wrap
         """
         if DILL.device_exists(device_guid) is False:
-            raise error.GremlinError(
-                f"No device with the provided GUID {device_guid} exist"
-            )
+            raise error.GremlinError(f"No device with the provided GUID {device_guid} exist")
         self._device_guid = device_guid
         self._info = DILL.get_device_information_by_guid(self._device_guid)
         self._axis = self._init_axes()
@@ -511,9 +472,7 @@ class JoystickWrapper:
         :return the current value of the axis
         """
         if index not in self._axis:
-            raise error.GremlinError(
-                f"Invalid axis {index} specified for device {self._device_guid}"
-                )
+            raise error.GremlinError(f"Invalid axis {index} specified for device {self._device_guid}")
         return self._axis[index]
 
     def button(self, index):
@@ -525,9 +484,7 @@ class JoystickWrapper:
         :return the current state of the button
         """
         if not (0 < index < len(self._buttons)):
-            raise error.GremlinError(
-                f"Invalid button {index} specified for device {self._device_guid}"
-            )
+            raise error.GremlinError(f"Invalid button {index} specified for device {self._device_guid}")
         return self._buttons[index]
 
     def hat(self, index):
@@ -539,9 +496,7 @@ class JoystickWrapper:
         :return the current state of the hat
         """
         if not (0 < index < len(self._hats)):
-            raise error.GremlinError(
-                f"Invalid hat {index} specified for device {self._device_guid}"
-            )
+            raise error.GremlinError(f"Invalid hat {index} specified for device {self._device_guid}")
         return self._hats[index]
 
     def axis_count(self) -> int:
@@ -584,9 +539,11 @@ class JoystickWrapper:
 
         :return list of JoystickWrapper.Button objects
         """
-        buttons = [None,]
+        buttons = [
+            None,
+        ]
         for i in range(self._info.button_count):
-            buttons.append(JoystickWrapper.Button(self._device_guid, i+1))
+            buttons.append(JoystickWrapper.Button(self._device_guid, i + 1))
         return buttons
 
     def _init_hats(self):
@@ -594,14 +551,15 @@ class JoystickWrapper:
 
         :return list of JoystickWrapper.Hat objects
         """
-        hats = [None,]
+        hats = [
+            None,
+        ]
         for i in range(self._info.hat_count):
-            hats.append(JoystickWrapper.Hat(self._device_guid, i+1))
+            hats.append(JoystickWrapper.Hat(self._device_guid, i + 1))
         return hats
 
 
 class JoystickProxy:
-
     """Allows read access to joystick state information."""
 
     # Dictionary of initialized joystick devices
@@ -626,19 +584,15 @@ class JoystickProxy:
                 syslog.warning(f"Requested device with guid {device_guid} not found in current hardware set")
                 return None
 
-
         return JoystickProxy.joystick_devices[device_guid]
 
 
 class VJoyPlugin:
-
     """Plugin providing automatic access to the VJoyProxy object.
 
     For a function to use this plugin it requires one of its parameters
     to be named "vjoy".
     """
-
-
 
     vjoy = gremlin.joystick_handling.VJoyProxy()
 
@@ -660,7 +614,6 @@ class VJoyPlugin:
 
 
 class JoystickPlugin:
-
     """Plugin providing automatic access to the JoystickProxy object.
 
     For a function to use this plugin it requires one of its parameters
@@ -688,13 +641,12 @@ class JoystickPlugin:
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Keyboard(QtCore.QObject):
-
     """Provides access to the keyboard state."""
 
     def __init__(self):
         """Initialises a new object."""
         QtCore.QObject.__init__(self)
-        self._keyboard_state = {} # holds the state of the keys
+        self._keyboard_state = {}  # holds the state of the keys
 
     @QtCore.Slot(object)
     def keyboard_event(self, event):
@@ -720,7 +672,6 @@ class Keyboard(QtCore.QObject):
 
 
 class KeyboardPlugin:
-
     """Plugin providing automatic access to the Keyboard object.
 
     For a function to use this plugin it requires one of its parameters
@@ -744,7 +695,6 @@ class KeyboardPlugin:
 
 
 class JoystickDecorator:
-
     """Creates customized decorators for physical joystick devices."""
 
     def __init__(self, name, device_guid, mode):
@@ -761,32 +711,25 @@ class JoystickDecorator:
         try:
             self.device_guid = gremlin.profile.parse_guid(device_guid)
         except error.ProfileError:
-            syslog.error(
-                f"Invalid guid value '{device_guid}' received"
-            )
+            syslog.error(f"Invalid guid value '{device_guid}' received")
             self.device_guid = GUID_Invalid
 
-        self.axis = functools.partial(
-            _axis, device_guid=self.device_guid, mode=mode
-        )
-        self.button = functools.partial(
-            _button, device_guid=self.device_guid, mode=mode
-        )
-        self.hat = functools.partial(
-            _hat, device_guid=self.device_guid, mode=mode
-        )
+        self.axis = functools.partial(_axis, device_guid=self.device_guid, mode=mode)
+        self.button = functools.partial(_button, device_guid=self.device_guid, mode=mode)
+        self.hat = functools.partial(_hat, device_guid=self.device_guid, mode=mode)
 
 
 class OscDecorator:
-    ''' creates a decorator for OSC inputs '''
-    def __init__(self, mode = "Default"):
+    """creates a decorator for OSC inputs"""
+
+    def __init__(self, mode="Default"):
 
         self.mode = mode
-        self.message = functools.partial(_osc, mode = mode)
+        self.message = functools.partial(_osc, mode=mode)
 
 
-def _osc(message, mode = "Default", always_execute=False):
-    ''' decorator for osc callbacks '''
+def _osc(message, mode="Default", always_execute=False):
+    """decorator for osc callbacks"""
 
     def wrap(callback):
         import gremlin.ui.osc_device
@@ -805,10 +748,8 @@ def _osc(message, mode = "Default", always_execute=False):
         input_item.source_index = 0
 
         event = gremlin.event_handler.Event(
-            event_type = gremlin.input_types.InputType.OpenSoundControl,
-            device_guid = gremlin.shared_state.osc_tab_guid,
-            identifier = input_item
-            )
+            event_type=gremlin.input_types.InputType.OpenSoundControl, device_guid=gremlin.shared_state.osc_tab_guid, identifier=input_item
+        )
 
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
@@ -817,40 +758,29 @@ def _osc(message, mode = "Default", always_execute=False):
     return wrap
 
 
-ButtonPressEntry = collections.namedtuple(
-    "Press", ["callback", "event"]
-)
+ButtonPressEntry = collections.namedtuple("Press", ["callback", "event"])
 
-ButtonReleaseEntry = collections.namedtuple(
-    "Entry", ["callback", "event"]
-)
-
-
+ButtonReleaseEntry = collections.namedtuple("Entry", ["callback", "event"])
 
 
 @gremlin.singleton_decorator.SingletonDecorator
-class CallbackActions():
-
+class CallbackActions:
     """Ensures a desired action is run when a button is released."""
 
     def __init__(self):
         """Initializes the instance."""
         self._registry = {}
-        #self._registry_key_map = {} # map of event callback keys to the events
+        # self._registry_key_map = {} # map of event callback keys to the events
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._input_event_cb)
         el.keyboard_event.connect(self._input_event_cb)
         el.virtual_event.connect(self._input_event_cb)
         el.mouse_event.connect(self._input_event_cb)
-        #self._current_mode = gremlin.shared_state.runtime_mode
+        # self._current_mode = gremlin.shared_state.runtime_mode
 
-        #el.runtime_mode_changed.connect(self._mode_changed_cb)
+        # el.runtime_mode_changed.connect(self._mode_changed_cb)
 
-    def register_callback(
-        self,
-        callback: Callable[[], None],
-        physical_event
-    ) -> None:
+    def register_callback(self, callback: Callable[[], None], physical_event) -> None:
         """Registers a button release callback with the system.
 
         Args:
@@ -862,25 +792,22 @@ class CallbackActions():
         release_evt.is_pressed = False
         key = release_evt.callbackKey
 
-        assert callback is not None and callable(callback), 'Callback must be provided and be a callable'
+        assert callback is not None and callable(callback), "Callback must be provided and be a callable"
 
         if release_evt not in self._registry:
             self._registry[key] = []
         # Do not record the mode since we may want to run the release action
         # independent of a mode
-        self._registry[key].append(
-            ButtonReleaseEntry(callback, release_evt)
-        )
+        self._registry[key].append(ButtonReleaseEntry(callback, release_evt))
 
     def register_button_release(
         self,
         vjoy_input: int,
         physical_event,
         activate_on: bool = False,
-        is_local = True,
-        is_remote = False,
-        force_remote = False,
-
+        is_local=True,
+        is_remote=False,
+        force_remote=False,
     ):
         """Registers a physical and vjoy button pair for tracking.
 
@@ -904,17 +831,17 @@ class CallbackActions():
             syslog.info(f"AUTORELEASE: register autorelease key: {key} event: {str(release_evt)}")
         if release_evt not in self._registry:
             self._registry[key] = []
-            #self._registry_key_map[key] = release_evt
+            # self._registry_key_map[key] = release_evt
 
         # Record current mode so we only release if we've changed mode
         self._registry[key].append(
             ButtonReleaseEntry(
-            lambda: self._release_callback_prototype(vjoy_input, is_local, is_remote, force_remote),
-            release_evt,
+                lambda: self._release_callback_prototype(vjoy_input, is_local, is_remote, force_remote),
+                release_evt,
             )
         )
 
-    def _release_callback_prototype(self, vjoy_input: int, is_local = False, is_remote = False, force_remote = False) -> None:
+    def _release_callback_prototype(self, vjoy_input: int, is_local=False, is_remote=False, force_remote=False) -> None:
         """Prototype of a button release callback, used with lambdas.
 
         Args:
@@ -928,13 +855,10 @@ class CallbackActions():
                 vjoy[vjoy_input[0]].button(vjoy_input[1]).is_pressed = False
 
             if is_remote or force_remote:
-                gremlin.remote.remote_client.send_button(vjoy_input[0], vjoy_input[1], False, force_remote = force_remote )
+                gremlin.remote.remote_client.send_button(vjoy_input[0], vjoy_input[1], False, force_remote=force_remote)
 
         else:
-            syslog.warning(
-                "Attempted to use non existent button: " +
-                f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}"
-            )
+            syslog.warning("Attempted to use non existent button: " + f"vJoy {vjoy_input[0]:d} button {vjoy_input[1]:d}")
 
     def _input_event_cb(self, event):
         """Runs callbacks associated with the given event.
@@ -951,7 +875,6 @@ class CallbackActions():
                 syslog.info(f"AUTORELEASE: execute trigger : {key}")
             new_list = []
             for entry in self._registry[key]:
-
                 if entry.event.is_pressed == event.is_pressed:
                     try:
                         entry.callback()
@@ -968,15 +891,13 @@ class CallbackActions():
 
 @gremlin.singleton_decorator.SingletonDecorator
 class JoystickInputSignificant:
-
     """Checks whether or not joystick inputs are significant."""
 
     def __init__(self):
         """Initializes the instance."""
         self.reset()
 
-
-    def should_process(self, event, deviation = 0.1) -> bool:
+    def should_process(self, event, deviation=0.1) -> bool:
         """Returns whether or not a particular event is significant enough to
         process.
 
@@ -987,6 +908,7 @@ class JoystickInputSignificant:
             True if the event should be processed, False otherwise
         """
         from gremlin.input_types import InputType
+
         self._mre_registry[event.callbackKey] = event
 
         match event.event_type:
@@ -1024,11 +946,10 @@ class JoystickInputSignificant:
         self._mre_registry = {}
         self._time_registry = {}
 
-
-    def should_process_axis(self, event, deviation = 0.1) -> bool:
+    def should_process_axis(self, event, deviation=0.1) -> bool:
         return self._process_axis(event, deviation)
 
-    def _process_axis(self, event, deviation = 0.1) -> bool:
+    def _process_axis(self, event, deviation=0.1) -> bool:
         """Process an axis event.
 
         Args:
@@ -1037,7 +958,7 @@ class JoystickInputSignificant:
         Returns:
             True if it should be processed, False otherwise
         """
-        offset = 0.25 # quarter second
+        offset = 0.25  # quarter second
         key = event.callbackKey
         if key in self._event_registry:
             if self._time_registry[key] >= time.time():
@@ -1046,16 +967,15 @@ class JoystickInputSignificant:
                 self._time_registry[key] = time.time() + 0.25
                 return True
             else:
-
                 self._time_registry[key] = time.time() + offset
 
                 if abs(self._event_registry[key].value - event.value) > deviation:
                     self._event_registry[key] = event
                     self._time_registry[key] = time.time()
-                    #print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} TRUE")
+                    # print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} TRUE")
                     return True
                 else:
-                    #print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} FALSE")
+                    # print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} FALSE")
                     return False
         else:
             self._event_registry[key] = event
@@ -1101,11 +1021,7 @@ def _button(button_id, device_guid, mode, always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        event = gremlin.event_handler.Event(
-            event_type=gremlin.input_types.InputType.JoystickButton,
-            device_guid=device_guid,
-            identifier=button_id
-        )
+        event = gremlin.event_handler.Event(event_type=gremlin.input_types.InputType.JoystickButton, device_guid=device_guid, identifier=button_id)
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
         return wrapper_fn
@@ -1129,11 +1045,7 @@ def _hat(hat_id, device_guid, mode, always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        event = gremlin.event_handler.Event(
-            event_type=gremlin.input_types.InputType.JoystickHat,
-            device_guid=device_guid,
-            identifier=hat_id
-        )
+        event = gremlin.event_handler.Event(event_type=gremlin.input_types.InputType.JoystickHat, device_guid=device_guid, identifier=hat_id)
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
         return wrapper_fn
@@ -1157,11 +1069,7 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        event = gremlin.event_handler.Event(
-            event_type=gremlin.input_types.InputType.JoystickAxis,
-            device_guid=device_guid,
-            identifier=axis_id
-        )
+        event = gremlin.event_handler.Event(event_type=gremlin.input_types.InputType.JoystickAxis, device_guid=device_guid, identifier=axis_id)
         callback_registry.add(wrapper_fn, event, mode, always_execute)
 
         return wrapper_fn
@@ -1169,7 +1077,9 @@ def _axis(axis_id, device_guid, mode, always_execute=False):
     return wrap
 
 
-''' KEYBOARD DECORATOR '''
+""" KEYBOARD DECORATOR """
+
+
 def keyboard(key_name, mode, always_execute=False):
     """Decorator for keyboard key callbacks.
 
@@ -1194,10 +1104,9 @@ def keyboard(key_name, mode, always_execute=False):
     return wrap
 
 
+""" PERIODIC DECORATOR """
 
 
-
-''' PERIODIC DECORATOR '''
 def periodic(interval):
     """Decorator for periodic function callbacks.
 
@@ -1217,15 +1126,18 @@ def periodic(interval):
     return wrap
 
 
+""" PROFILE START DECORATOR """
 
-''' PROFILE START DECORATOR '''
+
 def gremlin_start():
-    ''' decorator when a profile is activated '''
+    """decorator when a profile is activated"""
+
     def wrap(callback):
 
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
+
         _vjoy = gremlin.joystick_handling.VJoyProxy()
         start_registry.add(wrapper_fn)
 
@@ -1233,9 +1145,13 @@ def gremlin_start():
 
     return wrap
 
-''' PROFILE STOP DECORATOR '''
+
+""" PROFILE STOP DECORATOR """
+
+
 def gremlin_stop():
-    ''' decorator when a profile is de-activated '''
+    """decorator when a profile is de-activated"""
+
     def wrap(callback):
 
         @functools.wraps(callback)
@@ -1248,9 +1164,13 @@ def gremlin_stop():
 
     return wrap
 
-''' PROFILE MODE DECORATOR'''
+
+""" PROFILE MODE DECORATOR"""
+
+
 def gremlin_mode():
-    ''' decorator when gremlin changes profile modes - passes the new mode to the plugin '''
+    """decorator when gremlin changes profile modes - passes the new mode to the plugin"""
+
     def wrap(callback):
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
@@ -1262,9 +1182,13 @@ def gremlin_mode():
 
     return wrap
 
-''' STATE DECORATOR '''
+
+""" STATE DECORATOR """
+
+
 def gremlin_state():
-    ''' decorator when gremlin changes states local or remote or both '''
+    """decorator when gremlin changes states local or remote or both"""
+
     def wrap(callback):
         @functools.wraps(callback)
         def wrapper_fn(*args, **kwargs):
@@ -1275,9 +1199,6 @@ def gremlin_state():
         return wrapper_fn
 
     return wrap
-
-
-
 
 
 def squash(value, func):
@@ -1316,7 +1237,6 @@ def deadzone(value, low, low_center, high_center, high):
     if high is None:
         high = 1.0
 
-
     if value >= 0:
         return min(1, max(0, (value - high_center) / abs(high - high_center)))
     else:
@@ -1342,23 +1262,16 @@ def format_input(event) -> str:
     # Retrieve device name
     label = ""
     if device is None:
-        logging.warning(
-            f"Unable to find a device with GUID {str(event.device_guid)}"
-        )
+        logging.warning(f"Unable to find a device with GUID {str(event.device_guid)}")
         label = "Unknown"
     else:
         label = device.name
 
     # Retrive input name
     label += " - "
-    label += gremlin.common.input_to_ui_string(
-        event.event_type,
-        event.identifier
-    )
+    label += gremlin.common.input_to_ui_string(event.event_type, event.identifier)
 
     return label
-
-
 
 
 # Global registry of all registered callbacks
@@ -1378,5 +1291,3 @@ mode_registry = ModeChangeRegistry()
 
 # Global state registry of all state change callbacks
 state_registry = StateChangeRegistry()
-
-

@@ -171,12 +171,7 @@ class GUID:
             guid.Data2,
             guid.Data3,
             (guid.Data4[0] << 8) + guid.Data4[1],
-            (guid.Data4[2] << 40)
-            + (guid.Data4[3] << 32)
-            + (guid.Data4[4] << 24)
-            + (guid.Data4[5] << 16)
-            + (guid.Data4[6] << 8)
-            + guid.Data4[7],
+            (guid.Data4[2] << 40) + (guid.Data4[3] << 32) + (guid.Data4[4] << 24) + (guid.Data4[5] << 16) + (guid.Data4[6] << 8) + guid.Data4[7],
         )
 
         self._guid_int: int = guid_int  # for fast hash
@@ -184,12 +179,7 @@ class GUID:
     @property
     def valid(self):
         """true if the GUID is valid"""
-        return not (
-            self._ctypes_guid.Data1 == 0
-            and self._ctypes_guid.Data2 == 0
-            and self._ctypes_guid.Data3 == 0
-            and self._ctypes_guid.Data4 == 0
-        )
+        return not (self._ctypes_guid.Data1 == 0 and self._ctypes_guid.Data2 == 0 and self._ctypes_guid.Data3 == 0 and self._ctypes_guid.Data4 == 0)
 
     @property
     def ctypes(self):
@@ -425,9 +415,7 @@ class DeviceSummary:
 
         self._connected = False  # true if device is connected
         self._disabled = False  # true if the device is disabled in GremlinEx
-        self._hard_disabled = (
-            False  # true if the device is out of spec or otherwise excluded by GEX
-        )
+        self._hard_disabled = False  # true if the device is out of spec or otherwise excluded by GEX
         self.axis_count = 0
         self.button_count = 0
         self.hat_count = 0
@@ -437,7 +425,6 @@ class DeviceSummary:
         self.axis_names = []
         self.axismap_list = []
         self.axis_id_map = {}  # map of axis ID to linear ID
-        self.linear_id_map = {}  # map of linear ID to axis ID
         self.input_enabled = False
         self.vjoy_id = -1
         self.vendor_id = 0  # vendor ID
@@ -469,9 +456,7 @@ class DeviceSummary:
                 except Exception:
                     pass
             if not self.name:
-                syslog.error(
-                    f"Unable to decode device name: {data.name} - contains invalid characters.  Defaulting."
-                )
+                syslog.error(f"Unable to decode device name: {data.name} - contains invalid characters.  Defaulting.")
                 self.name = f"Unable to decode {self.device_id} "
 
             self.axis_count = data.axis_count
@@ -501,20 +486,15 @@ class DeviceSummary:
                 else:
                     logical_count += 1
 
-                # syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
+                syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
                 self.axis_names.append(axis_name)
 
             # auto disable invalid joystick devices that are not in spec
             self._hard_disabled = self.axis_count > 8 or self.button_count > 128 or self.hat_count > 4
             if self._hard_disabled:
                 syslog.warning(f"JOY: auto disabling device [{self.name}] id [{self.device_id}]: out of spec")
-            
 
-            self._connected = (
-                True  # if dinput data is provided, the device is marked as connected
-            )
-
- 
+            self._connected = True  # if dinput data is provided, the device is marked as connected
 
     def setAxisCallback(self, callback):
         """sets a custom axis callback to get an axis value (parameter is the axis number)"""
@@ -550,15 +530,13 @@ class DeviceSummary:
 
     def linear_index_from_assigned(self, index: int):
         """converts an assigned (display) axis index to the linear DINPUT axis"""
-        if index in self.axis_id_map:
-            index = self.axis_id_map[index]
-        return index
+        assert index in self.axis_id_map, "invalid axis index"
+        return self.axis_id_map[index]  # to linear
 
     def assigned_index_from_linear_(self, index: int):
         """converts from a linear DiNPUT axis to the display axis index"""
-        if index in self.linear_id_map:
-            return self.linear_id_map[index]
-        return index
+        assert index in self.linear_id_map, "invalid index"
+        return self.linear_id_map[index]  # to axis
 
     def axis_sequence_to_input_id(self, index: int):
         """zero based index to input ID for axes"""
@@ -578,12 +556,12 @@ class DeviceSummary:
 
     @property
     def disabled(self) -> bool:
-        ''' true if the device is disabled manually or excluded by GEX logic'''
+        """true if the device is disabled manually or excluded by GEX logic"""
         return self._hard_disabled or self._disabled
 
     @disabled.setter
     def disabled(self, value: bool):
-        self._disabled = value        
+        self._disabled = value
 
     @property
     def connected(self) -> bool:
@@ -624,9 +602,7 @@ class DeviceSummary:
         """
         assert self.is_virtual is True
         self.vjoy_id = vjoy_id
-        self.name = (
-            f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
-        )
+        self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
 
     def get_axis_name(self, axis_id, is_axis_id=True, short_name=False):
         """gets the axis name based on the input #"""
@@ -674,9 +650,7 @@ class DeviceSummary:
 
     def axis_index_list(self) -> list:
         """returns the list of valid axis indices"""
-        index_list = [
-            data.axis_index for data in self.axismap_list if data.axis_index > 0
-        ]
+        index_list = [data.axis_index for data in self.axismap_list if data.axis_index > 0]
         return index_list
 
     def getValidLinearIndices(self):
@@ -689,19 +663,16 @@ class DeviceSummary:
         """gets the list of valid axis inputs"""
         return [input_id for input_id in self.axis_id_map]
 
-    def getAxisInputId(self, linear_index: int):
+    def getAxisInputId(self, linear_id: int, throw_on_missing = True):
         """Gets the input for the linear index
         :param index: index 0 to axis_count -1
         """
-        linear_index += 1  # linear index is 1 based
-        return next(
-            (
-                am.axis_index
-                for am in self.axismap_list
-                if am.linear_index == linear_index
-            ),
-            None,
-        )
+
+        if linear_id in self.linear_id_map:
+            return self.linear_id_map[linear_id]
+        if throw_on_missing:
+            raise ValueError(f"invalid linear index for axis: {linear_id}")
+        return None
 
     def getAxisLinearId(self, axis_id: int):
         """gets the linear index for a given ID axis if the axis is skipped"""
@@ -758,9 +729,7 @@ class DeviceSummary:
                 else:
                     return f"(disc. device) axis {index}"
         except Exception as e:
-            syslog.error(
-                f"GET AXIS NAME: unable to get axis name for device : {self.name}"
-            )
+            syslog.error(f"GET AXIS NAME: unable to get axis name for device : {self.name}")
             syslog.error(f"{str(e)}")
             syslog.error(f"{traceback.format_exc()}")
 
@@ -780,9 +749,7 @@ class DeviceSummary:
         return [am.axis_index for am in self.axismap_list if am.axis_index > 0]
 
     def __hash__(self):
-        return hash(
-            (self.device_guid, self.axis_count, self.button_count, self.hat_count)
-        )
+        return hash((self.device_guid, self.axis_count, self.button_count, self.hat_count))
 
     @property
     def hashkey(self):
@@ -907,12 +874,8 @@ class DILL:
                 os._exit(1)
 
             try:
-                _di_listener_dll.get_device_information_by_index.argtypes = [
-                    ctypes.c_uint
-                ]
-                _di_listener_dll.get_device_information_by_index.restype = (
-                    _DeviceSummary
-                )
+                _di_listener_dll.get_device_information_by_index.argtypes = [ctypes.c_uint]
+                _di_listener_dll.get_device_information_by_index.restype = _DeviceSummary
                 DILL._dll = _di_listener_dll
                 DILL._dll.init()
             except Exception as error:

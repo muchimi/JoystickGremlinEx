@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 
 import ctypes
 import enum
@@ -182,9 +182,7 @@ class Axis:
 
         # If this is not the case our value setter needs to change
         if self._min_value != 0:
-            syslog.error(
-                f"vJoy axis minimum value is not 0  - {_error_string(self.vjoy_id, self.axis_id, self._min_value)}"
-            )
+            syslog.error(f"vJoy axis minimum value is not 0  - {_error_string(self.vjoy_id, self.axis_id, self._min_value)}")
 
     def set_response_curve(self, spline_type, control_points):
         """Sets the response curve to use for the axis.
@@ -243,9 +241,7 @@ class Axis:
 
         # Normalize value to [-1, 1] and apply response curve and deadzone
         # settings
-        self._value = self._response_curve_fn(
-            self._deadzone_fn(min(1.0, max(-1.0, p_value)))
-        )
+        self._value = self._response_curve_fn(self._deadzone_fn(min(1.0, max(-1.0, p_value))))
 
         # TEST - disable loopback T139+
         # el = gremlin.event_handler.EventListener()
@@ -260,9 +256,7 @@ class Axis:
             self.vjoy_id,
             self.axis_id,
         ):
-            syslog.error(
-                f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}"
-            )
+            syslog.error(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}")
 
         self.vjoy_dev.used()
 
@@ -277,10 +271,7 @@ class Axis:
         # Log an error on invalid data but continue processing by clamping
         # the values in the next step
         if 1.0 - abs(value) < -0.001:
-            syslog.warning(
-                "Wrong data type provided, has to be float in [-1, 1],"
-                f" provided value was {value:.2f}"
-            )
+            syslog.warning(f"Wrong data type provided, has to be float in [-1, 1], provided value was {value:.2f}")
 
         # Normalize value to [-1, 1] and apply response curve and deadzone
         # settings
@@ -291,9 +282,7 @@ class Axis:
             self.vjoy_id,
             self.axis_id,
         ):
-            syslog.error(
-                f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}"
-            )
+            syslog.error(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}")
 
         self.vjoy_dev.used()
 
@@ -339,17 +328,13 @@ class Button:
         self.vjoy_dev.ensure_ownership()
         self._is_pressed = is_pressed
         if not VJoyInterface.SetBtn(self._is_pressed, self.vjoy_id, self.button_id):
-            syslog.error(
-                f"Failed setting button value - {_error_string(self.vjoy_id, self.button_id, self._is_pressed)}"
-            )
+            syslog.error(f"Failed setting button value - {_error_string(self.vjoy_id, self.button_id, self._is_pressed)}")
             return
 
         self.vjoy_dev.used()
 
         el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.VjoyEvent(
-            self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed
-        )
+        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed)
         el.vjoy_output_event.emit(event)
 
 
@@ -520,9 +505,7 @@ class Hat:
         from gremlin.input_types import InputType
 
         el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.VjoyEvent(
-            self.vjoy_id, InputType.JoystickHat, self.hat_id, direction
-        )
+        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickHat, self.hat_id, direction)
         el.vjoy_event.emit(event)
 
         self.vjoy_dev.ensure_ownership()
@@ -532,9 +515,7 @@ class Hat:
         elif self.hat_type == HatType.Continuous:
             self._set_continuous_direction(direction)
         else:
-            syslog.error(
-                f"Invalid hat type specified - {_error_string(self.vjoy_id, self.hat_id, self.direction)}"
-            )
+            syslog.error(f"Invalid hat type specified - {_error_string(self.vjoy_id, self.hat_id, self.direction)}")
         self.vjoy_dev.used()
 
     def _set_discrete_direction(self, direction):
@@ -543,17 +524,11 @@ class Hat:
         :param direction the direction of the hat
         """
         if direction not in Hat.to_discrete_direction:
-            raise VJoyError(
-                f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, self._direction)}"
-            )
+            raise VJoyError(f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, self._direction)}")
 
         self._direction = direction
-        if not VJoyInterface.SetDiscPov(
-            Hat.to_discrete_direction[direction], self.vjoy_id, self.hat_id
-        ):
-            raise VJoyError(
-                f"Failed to set hat direction - {_error_string(self.vjoy_id, self.hat_id, self._direction)}"
-            )
+        if not VJoyInterface.SetDiscPov(Hat.to_discrete_direction[direction], self.vjoy_id, self.hat_id):
+            raise VJoyError(f"Failed to set hat direction - {_error_string(self.vjoy_id, self.hat_id, self._direction)}")
 
     def _set_continuous_direction(self, direction):
         """Sets the direction of a continuous hat.
@@ -561,17 +536,11 @@ class Hat:
         :param direction the angle in degree of the hat
         """
         if direction not in Hat.to_continuous_direction:
-            raise VJoyError(
-                f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, direction)}"
-            )
+            raise VJoyError(f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, direction)}")
 
         self._direction = direction
-        if not VJoyInterface.SetContPov(
-            Hat.to_continuous_direction[direction], self.vjoy_id, self.hat_id
-        ):
-            raise VJoyError(
-                f"Failed to set hat direction - {_error_string(self.vjoy_id, self.hat_id, self._direction)}"
-            )
+        if not VJoyInterface.SetContPov(Hat.to_continuous_direction[direction], self.vjoy_id, self.hat_id):
+            raise VJoyError(f"Failed to set hat direction - {_error_string(self.vjoy_id, self.hat_id, self._direction)}")
 
 
 class VJoy:
@@ -634,9 +603,7 @@ class VJoy:
 
         # Timestamp of the last time the device was used
         self._last_active = time.time()
-        self._keep_alive_timer = threading.Timer(
-            VJoy.keep_alive_timeout, self._keep_alive
-        )
+        self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout, self._keep_alive)
         self._keep_alive_timer.daemon = True
         self._keep_alive_timer.name = f"VJOY{self.vjoy_id} keepalive"
         self._keep_alive_timer.start()
@@ -681,9 +648,7 @@ class VJoy:
                 retry_count -= 1
                 time.sleep(0.01)
 
-            syslog.error(
-                f"VJOY API: Failed to re-acquire the vJoy device - vid: {self.vjoy_id}"
-            )
+            syslog.error(f"VJOY API: Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
             # raise VJoyError(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
             return False
 
@@ -744,15 +709,11 @@ class VJoy:
         if axis_id is not None:
             axis_id = VJoy.axis_equivalence.get(axis_id, axis_id)
             if not self.is_axis_valid(axis_id=axis_id):
-                syslog.error(
-                    f"VJOY API: Invalid axis index requested - {_error_string(self.vjoy_id, axis_id, '')}"
-                )
+                syslog.error(f"VJOY API: Invalid axis index requested - {_error_string(self.vjoy_id, axis_id, '')}")
             return self._axis_names[axis_id]
         elif linear_index is not None:
             if not self.is_axis_valid(linear_index=linear_index):
-                syslog.error(
-                    f"VJOY API:Invalid linear index for axis lookup provided - {_error_string(self.vjoy_id, linear_index, '')}"
-                )
+                syslog.error(f"VJOY API:Invalid linear index for axis lookup provided - {_error_string(self.vjoy_id, linear_index, '')}")
             return self._axis_names[self._axis_lookup[linear_index]]
         else:
             syslog.error("VJOY API:No vjoy_id or linear_index provided")
@@ -872,9 +833,7 @@ class VJoy:
 
             # awake = device_available(self.vjoy_id)
 
-            syslog.warning(
-                f"VJOY AWAKE: vjoy [{self.vjoy_id}] is reporting no longer available. code: {status}"
-            )
+            syslog.warning(f"VJOY AWAKE: vjoy [{self.vjoy_id}] is reporting no longer available. code: {status}")
 
     def reset(self):
         gremlin.util.InvokeUiMethod(self._reset_ui)  # ui thread
@@ -936,9 +895,7 @@ class VJoy:
             self.keep_awake()
 
             # self.reset()
-        self._keep_alive_timer = threading.Timer(
-            VJoy.keep_alive_timeout, self._keep_alive
-        )
+        self._keep_alive_timer = threading.Timer(VJoy.keep_alive_timeout, self._keep_alive)
         self._keep_alive_timer.daemon = True
         self._keep_alive_timer.name = f"VJOY{self.vjoy_id} keepalive"
         self._keep_alive_timer.start()
@@ -953,9 +910,7 @@ class VJoy:
         for i, axis in enumerate(AxisName):
             if VJoyInterface.GetVJDAxisExist(self.vjoy_id, axis.value) > 0:
                 axes[i + 1] = Axis(self, axis.value)
-                self._axis_names[i + 1] = gremlin.types.AxisNames.to_string(
-                    gremlin.types.AxisNames(i + 1)
-                )
+                self._axis_names[i + 1] = gremlin.types.AxisNames.to_string(gremlin.types.AxisNames(i + 1))
                 self._axis_lookup[len(self._axis_names)] = i + 1
                 self._axis_lookup[axis] = i + 1
         return axes
@@ -984,11 +939,7 @@ class VJoy:
         # We can't use discrete hats as such their existence is considered
         # an error
         if VJoyInterface.GetVJDDiscPovNumber(self.vjoy_id) > 0:
-            error_msg = (
-                "vJoy is configured incorrectly. \n\n"
-                "Please ensure hats are configured as 'Continuous' "
-                "rather then '4 Directions'."
-            )
+            error_msg = "vJoy is configured incorrectly. \n\nPlease ensure hats are configured as 'Continuous' rather then '4 Directions'."
             syslog.error(error_msg)
             raise VJoyError(error_msg)
         # for hat_id in range(1, VJoyInterface.GetVJDDiscPovNumber(self.vjoy_id)+1):

@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import logging
 from PySide6 import QtWidgets, QtGui
 
@@ -83,9 +83,7 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
 
     @key.setter
     def key(self, value):
-        assert isinstance(value, Key), (
-            f"Invalid type for key property: expected Key - got {value.type()}"
-        )
+        assert isinstance(value, Key), f"Invalid type for key property: expected Key - got {value.type()}"
         self._key = value
         self._update()
 
@@ -181,18 +179,14 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
 
             child = next((n for n in node.xpath(".//key")), None)
             if child is None:
-                raise ValueError(
-                    f"Invalid XML - missing key definition in profile XML - offending line: [{node.sourceline}]"
-                )
+                raise ValueError(f"Invalid XML - missing key definition in profile XML - offending line: [{node.sourceline}]")
 
             # virtual_code = safe_read(child,"virtual-code", int, 0)
             scan_code = safe_read(child, "scan-code", int, 0)
             is_extended = safe_read(child, "extended", bool, False)
             is_mouse = safe_read(child, "mouse", bool, False)
 
-            (scan_code, is_extended), _ = gremlin.keyboard.KeyMap.translate(
-                (scan_code, is_extended)
-            )
+            (scan_code, is_extended), _ = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
             key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
 
             self._key = key
@@ -208,9 +202,7 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
                         # if virtual_code > 0:
                         #     key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
                         # else:
-                        (scan_code, is_extended), _ = gremlin.keyboard.KeyMap.translate(
-                            (scan_code, is_extended)
-                        )
+                        (scan_code, is_extended), _ = gremlin.keyboard.KeyMap.translate((scan_code, is_extended))
                         key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                     if key not in self._key.latched_keys:
                         self._key._latched_keys.append(key)
@@ -432,9 +424,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
-        widget = gremlin.ui.ui_common.getHContainer(
-            ["Keyboard/Mouse Inputs", "||", lock_widget], widget_only=True
-        )
+        widget = gremlin.ui.ui_common.getHContainer(["Keyboard/Mouse Inputs", "||", lock_widget], widget_only=True)
         self.addLeftPanelHeaderWidget(widget)
 
         config = gremlin.config.Configuration()
@@ -445,9 +435,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setText(device.device_id)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(
-                line_edit, "Device ID:", widget_only=True
-            )
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device ID:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w1 = widget
 
@@ -455,9 +443,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             line_edit.setText(device.name)
             line_edit.setReadOnly(True)
             line_edit.setMinimumWidth(width)
-            widget = gremlin.ui.ui_common.getGridContainer(
-                line_edit, "Device Name:", widget_only=True
-            )
+            widget = gremlin.ui.ui_common.getGridContainer(line_edit, "Device Name:", widget_only=True)
             self.addLeftPanelHeaderWidget(widget)
             w2 = widget
 
@@ -468,9 +454,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # key clear button
 
-        clear_keyboard_button = ui_common.ConfirmPushButton(
-            "Clear", show_callback=self._show_clear_cb
-        )
+        clear_keyboard_button = ui_common.ConfirmPushButton("Clear", show_callback=self._show_clear_cb)
         icon = gremlin.ui.ui_common.Icons.trashIcon()
         clear_keyboard_button.setIcon(icon)
         clear_keyboard_button.confirmed.connect(self._clear_keys_cb)
@@ -552,14 +536,10 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         return self.inputItemListView.count()
 
     def _handle_lock_inputs(self, data):
-        gremlin.util.InvokeUiMethod(
-            self._handle_lock_inputs_ui, data
-        )  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data)  # ensure on UI thread
 
     def _handle_unlock_inputs(self, data):
-        gremlin.util.InvokeUiMethod(
-            self._handle_unlock_inputs_ui, data
-        )  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._handle_unlock_inputs_ui, data)  # ensure on UI thread
 
     def _handle_lock_inputs_ui(self, data):
         """lock all inputs event"""
@@ -583,9 +563,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """reloads the data for the current device/mode"""
         current_mode = mode if mode else gremlin.shared_state.edit_mode
         self.profile.ensure_mode_exists(current_mode)
-        self.inputItemListModel = input_item.InputItemListModel(
-            self.profile, current_mode, [InputType.Keyboard, InputType.KeyboardLatched]
-        )
+        self.inputItemListModel = input_item.InputItemListModel(self.profile, current_mode, [InputType.Keyboard, InputType.KeyboardLatched])
         self.inputItemListView.setModel(self.inputItemListModel)
 
         self.selectInputItemIndex(self._last_selected_index)
@@ -594,9 +572,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.device_mapping_changed.emit(self._device_id)
 
     def _handle_edit_mode_changed(self, mode: str):
-        gremlin.util.InvokeUiMethod(
-            self._edit_mode_changed_ui, mode
-        )  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode)  # ensure on UI thread
 
     def _edit_mode_changed_ui(self, mode: str):
         """occurs when a new mode is selected"""
@@ -616,12 +592,8 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _clear_keys_cb(self):
         """clears keyboard input keys"""
 
-        self.inputItemListModel.clear(
-            input_types=[InputType.Keyboard, InputType.KeyboardLatched]
-        )
-        assert self.inputItemListModel.rows() == 0, (
-            "Unexpected entries in model - should be 0"
-        )
+        self.inputItemListModel.clear(input_types=[InputType.Keyboard, InputType.KeyboardLatched])
+        assert self.inputItemListModel.rows() == 0, "Unexpected entries in model - should be 0"
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
@@ -638,9 +610,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         gremlin.shared_state.push_suspend_ui_keyinput()
 
-        self._keyboard_dialog = InputKeyboardDialog(
-            parent=self, select_single=False, index=-1
-        )
+        self._keyboard_dialog = InputKeyboardDialog(parent=self, select_single=False, index=-1)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
         self._keyboard_dialog.closed.connect(self._dialog_close_cb)
         self._keyboard_dialog.setModal(True)
@@ -702,9 +672,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # creates the item in the profile if needed
         registry = gremlin.base_profile.ProfileRegistry()
-        self.profile.modes[current_mode].get_data(
-            input_item.input_type, input_item.input_id
-        )  # creates the entry in the profile
+        self.profile.modes[current_mode].get_data(input_item.input_type, input_item.input_id)  # creates the entry in the profile
         # ensure override type for keyboard input is a joystick button
         registry.sync()
 
@@ -948,9 +916,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         syslog.info(f"Editing index {index} {data.display_name}")
         gremlin.shared_state.push_suspend_ui_keyinput()
-        self._keyboard_dialog = InputKeyboardDialog(
-            sequence, parent=self, select_single=False, index=index
-        )
+        self._keyboard_dialog = InputKeyboardDialog(sequence, parent=self, select_single=False, index=index)
         self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
         self._keyboard_dialog.closed.connect(self._dialog_close_cb)
         self._keyboard_dialog.setModal(True)

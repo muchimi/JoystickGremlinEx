@@ -1,1 +1,1 @@
-viztracer --tracer_entries 500000 gremlinex.py
+viztracer --tracer_entries 1000000  --ignore_c_function --exclude_files c:/Python -- gremlinex.py

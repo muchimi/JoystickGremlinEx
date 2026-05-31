@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 import collections
 import ctypes
 from ctypes import wintypes
@@ -85,15 +85,11 @@ def _create_function(lib_name, fn_name, param_types, return_type):
 
 
 # https://msdn.microsoft.com/en-us/library/windows/desktop/ms646296(v=vs.85).aspx
-_get_keyboard_layout = _create_function(
-    "user32", "GetKeyboardLayout", [wintypes.DWORD], wintypes.HKL
-)
+_get_keyboard_layout = _create_function("user32", "GetKeyboardLayout", [wintypes.DWORD], wintypes.HKL)
 
 
 # https://msdn.microsoft.com/en-us/library/windows/desktop/ms646299(v=vs.85).aspx
-_get_keyboard_state = _create_function(
-    "user32", "GetKeyboardState", [ctypes.POINTER(ctypes.c_char)], wintypes.BOOL
-)
+_get_keyboard_state = _create_function("user32", "GetKeyboardState", [ctypes.POINTER(ctypes.c_char)], wintypes.BOOL)
 
 
 # https://msdn.microsoft.com/en-us/library/windows/desktop/ms646307(v=vs.85).aspx
@@ -123,9 +119,7 @@ _to_unicode_ex = _create_function(
 
 
 # https://msdn.microsoft.com/en-us/library/windows/desktop/ms646332(v=vs.85).aspx
-_vk_key_scan_ex = _create_function(
-    "user32", "VkKeyScanExW", [ctypes.c_wchar, wintypes.HKL], ctypes.c_short
-)
+_vk_key_scan_ex = _create_function("user32", "VkKeyScanExW", [ctypes.c_wchar, wintypes.HKL], ctypes.c_short)
 
 
 def _scan_code_to_virtual_code(scan_code, is_extended):
@@ -158,15 +152,9 @@ def _virtual_input_to_unicode(virtual_code):
 
     # Translate three times to get around dead keys showing up in funny ways
     # as the translation takes them into account for future keys
-    state = _to_unicode_ex(
-        virtual_code, 0x00, state_buffer, output_buffer, 8, 0, keyboard_layout
-    )
-    state = _to_unicode_ex(
-        virtual_code, 0x00, state_buffer, output_buffer, 8, 0, keyboard_layout
-    )
-    state = _to_unicode_ex(
-        virtual_code, 0x00, state_buffer, output_buffer, 8, 0, keyboard_layout
-    )
+    state = _to_unicode_ex(virtual_code, 0x00, state_buffer, output_buffer, 8, 0, keyboard_layout)
+    state = _to_unicode_ex(virtual_code, 0x00, state_buffer, output_buffer, 8, 0, keyboard_layout)
+    state = _to_unicode_ex(virtual_code, 0x00, state_buffer, output_buffer, 8, 0, keyboard_layout)
 
     if state == 0:
         syslog.error(f"No translation for key {hex(virtual_code)} available")
@@ -220,9 +208,7 @@ def _send_mouse_button(
             if is_local:
                 gremlin.sendinput.mouse_wheel(direction)
             if is_remote:
-                gremlin.remote.remote_client.send_mouse_wheel(
-                    direction, client_list, extra_data=extra_data
-                )
+                gremlin.remote.remote_client.send_mouse_wheel(direction, client_list, extra_data=extra_data)
     elif button_id in [MouseButton.WheelLeft, MouseButton.WheelRight]:
         if is_pressed:
             direction = -wheel_factor
@@ -231,9 +217,7 @@ def _send_mouse_button(
             if is_local:
                 gremlin.sendinput.mouse_h_wheel(direction)
             if is_remote:
-                gremlin.remote.remote_client.send_mouse_h_wheel(
-                    direction, client_list, extra_data=extra_data
-                )
+                gremlin.remote.remote_client.send_mouse_h_wheel(direction, client_list, extra_data=extra_data)
     else:
         if is_pressed:
             if is_local:
@@ -242,22 +226,16 @@ def _send_mouse_button(
                 else:
                     gremlin.sendinput.mouse_press(button_id)
             if is_remote:
-                gremlin.remote.remote_client.send_mouse_button(
-                    button_id, True, client_list, extra_data=extra_data
-                )
+                gremlin.remote.remote_client.send_mouse_button(button_id, True, client_list, extra_data=extra_data)
         else:
             if not dbl_click:  # double click always releases - no need to release again
                 if is_local:
                     gremlin.sendinput.mouse_release(button_id)
                 if is_remote:
-                    gremlin.remote.remote_client.send_mouse_button(
-                        button_id, False, client_list, extra_data=extra_data
-                    )
+                    gremlin.remote.remote_client.send_mouse_button(button_id, False, client_list, extra_data=extra_data)
 
 
-def _send_key_down(
-    key, is_local=True, is_remote=False, force_remote=False, client_list=None
-):
+def _send_key_down(key, is_local=True, is_remote=False, force_remote=False, client_list=None):
     """Sends the KEYDOWN event for a single key.
 
     :param key the key for which to send the KEYDOWN event
@@ -266,9 +244,7 @@ def _send_key_down(
 
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
-        _send_mouse_button(
-            key.mouse_button, True, is_local, is_remote, client_list, force_remote
-        )
+        _send_mouse_button(key.mouse_button, True, is_local, is_remote, client_list, force_remote)
         return
 
     if force_remote:
@@ -290,17 +266,13 @@ def _send_key_down(
         )
 
 
-def _send_key_up(
-    key, is_local=True, is_remote=False, force_remote=False, client_list=None
-):
+def _send_key_up(key, is_local=True, is_remote=False, force_remote=False, client_list=None):
     """Sends the KEYUP event for a single key.
     :param key the key for which to send the KEYUP event
     """
     if key.is_mouse:
         # special handling of virtual keys for mouse buttons
-        _send_mouse_button(
-            key.mouse_button, False, is_local, is_remote, client_list, force_remote
-        )
+        _send_mouse_button(key.mouse_button, False, is_local, is_remote, client_list, force_remote)
         return
 
     flags = win32con.KEYEVENTF_EXTENDEDKEY if key.is_extended else 0
@@ -434,10 +406,7 @@ class MacroManager(QtCore.QObject):
             eh.unregisterModeChangeHook(self.id)
             self._hook_mode_change = False
 
-        if (
-            self._run_scheduler_thread is not None
-            and self._run_scheduler_thread.is_alive()
-        ):
+        if self._run_scheduler_thread is not None and self._run_scheduler_thread.is_alive():
             # Terminate the scheduler
             self._schedule_event.set()
             self._run_scheduler_thread.join()
@@ -473,9 +442,7 @@ class MacroManager(QtCore.QObject):
 
         if macro.state != MacroState.Idle:
             if verbose:
-                syslog.info(
-                    f"MACRO: QUEUE: skipping queuing of macro [{macro.id}] owner: [{macro.ownerId}] because the state [{macro.state.name} is not idle."
-                )
+                syslog.info(f"MACRO: QUEUE: skipping queuing of macro [{macro.id}] owner: [{macro.ownerId}] because the state [{macro.state.name} is not idle.")
             return
 
         macro.state = MacroState.Scheduled
@@ -495,9 +462,7 @@ class MacroManager(QtCore.QObject):
             if self._max_concurrent:
                 count = len(self._queue)
                 if count > self._max_concurrent:
-                    syslog.error(
-                        f"MACRO: exceeded concurrent macro: {self._max_concurrent}"
-                    )
+                    syslog.error(f"MACRO: exceeded concurrent macro: {self._max_concurrent}")
                     return None
 
             # Preprocess macro to contain pauses as necessary
@@ -508,11 +473,7 @@ class MacroManager(QtCore.QObject):
 
             self._preprocess_macro(macro)
             with self._queue_lock:
-                self._queue.append(
-                    MacroEntry(
-                        macro, True, is_local, is_remote, mode, client_list=client_list
-                    )
-                )
+                self._queue.append(MacroEntry(macro, True, is_local, is_remote, mode, client_list=client_list))
             self._schedule_event.set()
 
         return macro.id
@@ -535,9 +496,7 @@ class MacroManager(QtCore.QObject):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_macro
         if verbose:
-            syslog.info(
-                f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminate requested."
-            )
+            syslog.info(f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminate requested.")
 
         with self._queue_lock:
             mode = gremlin.shared_state.current_mode
@@ -560,9 +519,7 @@ class MacroManager(QtCore.QObject):
 
         # mark it terminated
         if verbose:
-            syslog.info(
-                f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminated."
-            )
+            syslog.info(f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminated.")
         macro.state = MacroState.Idle
 
     def _run_scheduler(self):
@@ -585,17 +542,12 @@ class MacroManager(QtCore.QObject):
                     # Terminate macro if needed
                     if entry.state is False:
                         # entry marked as completed
-                        if (
-                            entry.macro.id in self._flags
-                            and self._flags[entry.macro.id]
-                        ):
+                        if entry.macro.id in self._flags and self._flags[entry.macro.id]:
                             # Terminate currently running macro
                             with self._flags_lock:
                                 self._flags[entry.macro.id] = False
 
-                            removal_list = [
-                                e for e in self._queue if e.macro.id == e.macro.id
-                            ]
+                            removal_list = [e for e in self._queue if e.macro.id == e.macro.id]
 
                             for queue_entry in removal_list:
                                 self._queue.remove(queue_entry)
@@ -647,24 +599,16 @@ class MacroManager(QtCore.QObject):
             if self._mode_affinity:
                 mode = gremlin.shared_state.runtime_mode
                 if macro.mode and macro.mode != mode:
-                    syslog.warning(
-                        f"MACRO: affinity: discard macro due to mode change: [{macro.id}] macro mode: [{macro.mode}] current profile mode [{mode}] "
-                    )
+                    syslog.warning(f"MACRO: affinity: discard macro due to mode change: [{macro.id}] macro mode: [{macro.mode}] current profile mode [{mode}] ")
                     macro.state = MacroState.Idle  # return to idle
                     return False
 
             # add the macro to the active queue
             self._active[macro.id] = macro
             macro.state = MacroState.Running
-            Thread(
-                target=functools.partial(
-                    self._execute_macro, macro, is_local, is_remote, client_list
-                )
-            ).start()
+            Thread(target=functools.partial(self._execute_macro, macro, is_local, is_remote, client_list)).start()
         else:
-            syslog.warning(
-                f"Attempting to dispatch an already running macro: ID: {macro.id}"
-            )
+            syslog.warning(f"Attempting to dispatch an already running macro: ID: {macro.id}")
             return False
         return True
 
@@ -711,11 +655,7 @@ class MacroManager(QtCore.QObject):
                 count = 0
                 if verbose:
                     syslog.info(f"\tMACRO: autorepeat id [{macro.id}]")
-                while (
-                    count < macro.repeat.count
-                    and self._flags[macro.id]
-                    and not macro.aborted
-                ):
+                while count < macro.repeat.count and self._flags[macro.id] and not macro.aborted:
                     for action in macro.sequence:
                         if macro.aborted:
                             break
@@ -738,9 +678,7 @@ class MacroManager(QtCore.QObject):
         else:
             if verbose:
                 msg = "".join(f"{str(a)} " for a in macro.sequence)
-                syslog.info(
-                    f"\tMACRO: single shot: id: [{macro.id} {len(macro.sequence)} {msg}"
-                )
+                syslog.info(f"\tMACRO: single shot: id: [{macro.id} {len(macro.sequence)} {msg}")
             for action in macro.sequence:
                 if macro.aborted:
                     break
@@ -754,9 +692,7 @@ class MacroManager(QtCore.QObject):
         if macro.completed_callback:
             macro.completed_callback()
 
-        self.el.macro_step_completed.emit(
-            macro.id
-        )  # indicate the macro has been completed
+        self.el.macro_step_completed.emit(macro.id)  # indicate the macro has been completed
 
         # Remove macro from active set, notify manager, and remove any
         # potential callbacks
@@ -764,9 +700,7 @@ class MacroManager(QtCore.QObject):
             if macro.id in self._active:
                 del self._active[macro.id]
             else:
-                syslog.error(
-                    f"MACRO: attempt to delete macro id [{macro.id}] that no longer exists in active macro list"
-                )
+                syslog.error(f"MACRO: attempt to delete macro id [{macro.id}] that no longer exists in active macro list")
             if macro.exclusive:
                 self._is_executing_exclusive = False
             with self._flags_lock:
@@ -784,12 +718,7 @@ class MacroManager(QtCore.QObject):
             new_sequence = [macro._sequence[0]]
             a1 = a2 = None
             for a1, a2 in zip(macro._sequence[:-1], macro._sequence[1:]):
-                if (
-                    isinstance(a1, PauseAction)
-                    or isinstance(a2, PauseAction)
-                    or isinstance(a1, ProcessEventsAction)
-                    or isinstance(a2, ProcessEventsAction)
-                ):
+                if isinstance(a1, PauseAction) or isinstance(a2, PauseAction) or isinstance(a1, ProcessEventsAction) or isinstance(a2, ProcessEventsAction):
                     new_sequence.append(a2)
                 else:
                     new_sequence.append(ProcessEventsAction())
@@ -1016,9 +945,7 @@ class MacroAbstractAction(QtCore.QObject):
         force_remote=False,
         client_list: list = None,
     ):
-        raise gremlin.error.MissingImplementationError(
-            "AbstractAction.__call__ not implemented in derived class."
-        )
+        raise gremlin.error.MissingImplementationError("AbstractAction.__call__ not implemented in derived class.")
 
     def _update_flags(self, is_local=None, is_remote=None, force_remote=None):
         # updates flags based on local/remote overrides
@@ -1073,9 +1000,7 @@ class JoystickAction(MacroAbstractAction):
         self.axis_type = state["axis_type"]
         self.value = state["value"]
 
-    def __call__(
-        self, is_local=None, is_remote=None, force_remote=None, client_list: list = None
-    ):
+    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
         """Emits an Event instance through the EventListener system."""
         import gremlin.joystick_handling
 
@@ -1097,9 +1022,7 @@ class JoystickAction(MacroAbstractAction):
         elif self.input_type == InputType.JoystickButton:
             match self.value:
                 case "toggle":
-                    current = gremlin.joystick_handling.get_button(
-                        self.device_guid, self.input_id
-                    )
+                    current = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
                     if current is not None:
                         is_pressed = not current
                 case "press":
@@ -1107,9 +1030,7 @@ class JoystickAction(MacroAbstractAction):
                 case "release":
                     is_pressed = False
                 case _:
-                    syslog.error(
-                        f"VJOY MACRO ACTION: don't know how to handle button mode: [{self.value}]"
-                    )
+                    syslog.error(f"VJOY MACRO ACTION: don't know how to handle button mode: [{self.value}]")
                     return  # nothing to do
 
             event = gremlin.event_handler.Event(
@@ -1157,9 +1078,7 @@ class KeyAction(MacroAbstractAction):
         self.key = key
         self.is_pressed = is_pressed
 
-    def __call__(
-        self, is_local=None, is_remote=None, force_remote=None, client_list: list = None
-    ):
+    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
         # ignore passed local/remote states
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_macro
@@ -1257,9 +1176,7 @@ class MouseButtonAction(MacroAbstractAction):
         self.button = state["button"]
         self.is_pressed = state["is_pressed"]
 
-    def __call__(
-        self, is_local=None, is_remote=None, force_remote=None, client_list: list = None
-    ):
+    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
         # ignore passed local/remote states
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_macro
@@ -1270,9 +1187,7 @@ class MouseButtonAction(MacroAbstractAction):
                     syslog.info("MACRO: mouse wheel up")
                 gremlin.sendinput.mouse_wheel(1)
             if is_remote:
-                gremlin.remote.remote_client.send_mouse_wheel(
-                    1, client_list, force_remote
-                )
+                gremlin.remote.remote_client.send_mouse_wheel(1, client_list, force_remote)
 
         elif self.button == gremlin.types.MouseButton.WheelUp:
             if is_local:
@@ -1280,9 +1195,7 @@ class MouseButtonAction(MacroAbstractAction):
                     syslog.info("MACRO: mouse wheel down")
                 gremlin.sendinput.mouse_wheel(-1)
             if is_remote:
-                gremlin.remote.remote_client.send_mouse_wheel(
-                    -1, client_list, force_remote
-                )
+                gremlin.remote.remote_client.send_mouse_wheel(-1, client_list, force_remote)
         else:
             if is_local:
                 if self.is_pressed:
@@ -1294,9 +1207,7 @@ class MouseButtonAction(MacroAbstractAction):
                         syslog.info(f"MACRO: mouse release {self.button}")
                     gremlin.sendinput.mouse_release(self.button)
             if is_remote:
-                gremlin.remote.remote_client.send_mouse_button(
-                    self.button, self.is_pressed, client_list, force_remote
-                )
+                gremlin.remote.remote_client.send_mouse_button(self.button, self.is_pressed, client_list, force_remote)
 
 
 class MouseMotionAction(MacroAbstractAction):
@@ -1325,9 +1236,7 @@ class MouseMotionAction(MacroAbstractAction):
         self.dx = state["dx"]
         self.dy = state["dy"]
 
-    def __call__(
-        self, is_local=None, is_remote=None, force_remote=None, client_list: list = None
-    ):
+    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
         # ignore passed local/remote states
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_macro
@@ -1337,9 +1246,7 @@ class MouseMotionAction(MacroAbstractAction):
                 syslog.info(f"MACRO: mouse motion {self.dx}, {self.dy}")
             gremlin.sendinput.send_mouse_motion(self.dx, self.dy)
         if is_remote:
-            gremlin.remote.remote_client.send_mouse_motion(
-                self.dx, self.dy, client_list, force_remote
-            )
+            gremlin.remote.remote_client.send_mouse_motion(self.dx, self.dy, client_list, force_remote)
 
 
 class ProcessEventsAction(MacroAbstractAction):
@@ -1348,9 +1255,7 @@ class ProcessEventsAction(MacroAbstractAction):
     def __init__(self):
         super().__init__()
 
-    def __call__(
-        self, is_local=None, is_remote=None, force_remote=None, client_list: list = None
-    ):
+    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
         verbose = gremlin.config.Configuration().verbose_mode_macro
         if verbose:
             syslog.info("MACRO: Process Events")
@@ -1385,9 +1290,7 @@ class PauseAction(MacroAbstractAction):
         self.duration_max = state["duration_max"]
         self.is_random = state["is_random"]
 
-    def __call__(
-        self, is_local=None, is_remote=None, force_remote=None, client_list: list = None
-    ):
+    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
         import random
 
         # syslog = logging.getLogger("system")
@@ -1445,9 +1348,7 @@ class GraphAction(MacroAbstractAction):
             self._complete_event.set()
             time.sleep(0.01)
 
-    def __call__(
-        self, is_local=None, is_remote=None, force_remote=None, client_list: list = None
-    ):
+    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_condition
         if verbose:
@@ -1517,9 +1418,7 @@ class VJoyMacroAction(MacroAbstractAction):
                 case "toggle":
                     self._value = "toggle"
                 case _:
-                    syslog.error(
-                        f"VJOY MACRO ACTION: don't know how to handle value: [{new_value}]"
-                    )
+                    syslog.error(f"VJOY MACRO ACTION: don't know how to handle value: [{new_value}]")
         else:
             self._value = new_value
 
@@ -1544,9 +1443,7 @@ class VJoyMacroAction(MacroAbstractAction):
         self.axis_type = state["axis_type"]
         self.value = state["value"]
 
-    def __call__(
-        self, is_local=None, is_remote=None, force_remote=None, client_list: list = None
-    ):
+    def __call__(self, is_local=None, is_remote=None, force_remote=None, client_list: list = None):
         # ignore passed local/remote states
         verbose = gremlin.config.Configuration().verbose_mode_macro
         is_local, is_remote = self._update_flags(is_local, is_remote, force_remote)
@@ -1566,9 +1463,7 @@ class VJoyMacroAction(MacroAbstractAction):
 
             elif self.axis_type == "relative":
                 if is_local:
-                    vjoy.axis(self.input_id).value = max(
-                        -1.0, min(1.0, vjoy.axis(self.input_id).value + self.value)
-                    )
+                    vjoy.axis(self.input_id).value = max(-1.0, min(1.0, vjoy.axis(self.input_id).value + self.value))
                 if is_remote:
                     gremlin.remote.remote_client.send_relative_axis(
                         self.vjoy_id,
@@ -1580,9 +1475,7 @@ class VJoyMacroAction(MacroAbstractAction):
         elif self.input_type == InputType.JoystickButton:
             if is_local:
                 if verbose:
-                    syslog.info(
-                        f"MACRO: vjoy {self.vjoy_id} button: {self.input_id} press: {self.value}"
-                    )
+                    syslog.info(f"MACRO: vjoy {self.vjoy_id} button: {self.input_id} press: {self.value}")
                 match self.value:
                     case "press":
                         is_pressed = True
@@ -1591,23 +1484,17 @@ class VJoyMacroAction(MacroAbstractAction):
                     case "toggle":
                         is_pressed = not vjoy.button(self.input_id).is_pressed
                     case _:
-                        syslog.error(
-                            f"VJOY MACRO BUTTON ACTION: don't know how to handle: [{self.value}]"
-                        )
+                        syslog.error(f"VJOY MACRO BUTTON ACTION: don't know how to handle: [{self.value}]")
                         return
 
             vjoy.button(self.input_id).is_pressed = is_pressed
             if is_remote:
-                gremlin.remote.remote_client.send_button(
-                    self.vjoy_id, self.input_id, is_pressed, client_list, force_remote
-                )
+                gremlin.remote.remote_client.send_button(self.vjoy_id, self.input_id, is_pressed, client_list, force_remote)
         elif self.input_type == InputType.JoystickHat:
             if is_local:
                 vjoy.hat(self.input_id).direction = self.value
             if is_remote:
-                gremlin.remote.remote_client.send_hat(
-                    self.vjoy_id, self.input_id, self.value, client_list, force_remote
-                )
+                gremlin.remote.remote_client.send_hat(self.vjoy_id, self.input_id, self.value, client_list, force_remote)
 
 
 class RemoteControlAction(MacroAbstractAction):
@@ -1777,9 +1664,7 @@ class StateAction(MacroAbstractAction):
             case "toggle":
                 sd.toggle(self.key)
                 if verbose:
-                    syslog.info(
-                        f"MACRO: set state [Toggle] (new state: [{'Pressed' if sd.value(self.key) else 'Released'}])"
-                    )
+                    syslog.info(f"MACRO: set state [Toggle] (new state: [{'Pressed' if sd.value(self.key) else 'Released'}])")
 
 
 class AbstractRepeat:
@@ -1797,18 +1682,14 @@ class AbstractRepeat:
 
         :return XML node containing the instance's information
         """
-        raise gremlin.error.MissingImplementationError(
-            "AbstractRepeat.to_xml not implemented in subclass."
-        )
+        raise gremlin.error.MissingImplementationError("AbstractRepeat.to_xml not implemented in subclass.")
 
     def from_xml(self, node, data=None, extra_data=None):
         """Populates the instance's data from the provided XML node.
 
         :param node XML node containing data with which to populate the instance
         """
-        raise gremlin.error.MissingImplementationError(
-            "AbstractRepeat.from_xml not implemented in subclass"
-        )
+        raise gremlin.error.MissingImplementationError("AbstractRepeat.from_xml not implemented in subclass")
 
 
 class CountRepeat(AbstractRepeat):

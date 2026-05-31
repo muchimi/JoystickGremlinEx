@@ -16,7 +16,7 @@
 # along with this program.	If not, see <http://www.gnu.org/licenses/>.
 
 
-# from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 
 
 import dinput
@@ -61,6 +61,10 @@ class TabData:
     @property
     def position(self) -> int:
         return self._position
+
+    def setPosition(self, value : int):
+        self._position = value
+
 
     @property
     def device_guid(self) -> dinput.GUID:
@@ -144,6 +148,12 @@ class TabState:
         if device_guid in self._tab_map:
             return self._tab_map[device_guid].position
         return -1  # not found
+
+    def setPosition(self, device_guid, position):
+        """changes the position of the given device GUID"""
+        device_guid = gremlin.util.to_guid(device_guid)
+        if device_guid in self._tab_map:
+            self._tab_map[device_guid].position = position
 
     def getData(self, device_guid) -> TabData:
         device_guid = gremlin.util.to_guid(device_guid)
