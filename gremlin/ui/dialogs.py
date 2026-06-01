@@ -21,7 +21,7 @@ import subprocess
 import sys
 
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtWidgets import QAbstractItemView, QWidget, QListWidget, QLabel, QListWidgetItem
+from PySide6.QtWidgets import QAbstractItemView, QListWidget, QLabel, QListWidgetItem
 
 import dinput
 
@@ -4924,7 +4924,7 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
             if fname != "":
                 try:
                     data = json.dumps(tab_map)
-                    with open(fname,"w") as h:
+                    with open(fname,"w", encoding='utf-8') as h:
                         h.write(data)
                         h.flush()
                 except Exception as err:
@@ -4944,35 +4944,40 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
 
         if fname and os.path.isfile(fname):
             try:
-                tab_map = json.load(fname)
+                with open(fname, 'r', encoding='utf-8') as h:
+                    tab_map = json.load(h)
 
-                # load the tab map
-                # current_map = self._get_current_map()
-                # missing_list = []
-                # valid_list = []
-                # existing_list = []
-                # for data in current_map:
-                #     device_guid, device_name, tab_type, index = data
-                #     device = gremlin.joystick_handling.getDevice(device_guid)
-                #     existing_list.append((data, device))
+                loaded_list = {}
+                for index, data in tab_map.items():
+                    device_guid, device_name, tab_type, index = data
+                    device = gremlin.joystick_handling.getDevice(device_guid)
+                    loaded_list[device] = (index, data)
 
+                # compare with current
+                current_map = self._get_current_map()
+                existing_map = {}
 
-                # for data in tab_map.values():
-                #     device_guid, device_name, tab_type, index = data
-                #     device = gremlin.joystick_handling.getDevice(device_guid)
-                #     if not device:
-                #         # missing
-                #         missing_list = (data, device)
-                #     else:
-                #         valid_list = (data, device)
+                for index, data in current_map.items():
+                    device_guid, device_name, tab_type, index = data
+                    device = gremlin.joystick_handling.getDevice(device_guid)
+                    existing_map[device] = (index, data)
+                    if device in loaded_list:
+                        continue # skip the existing
 
-                # # add any missing items
-                # for data, device in valid_list:
-                #     e_data, e_dev = next ((e_data, e_dev) for e_data, e_dev in existing_list if e_dev == device), (None, None))
-                #     if e_data:
+                # devices in the tab list that are not in the loaded list (because they didn't exist when the data was saved)
+                missing_list = [dev for dev in existing_map if dev not in loaded_list]
 
 
+                for device in missing_list:
+                    index = len(loaded_list)
+                    data = existing_map[device]
+                    data[0] = index
+                    loaded_list[device] = (index, data)
 
+                # loaded list now contains the loaded info with any missing devices added at the end
+                tab_map = {}
+                for index, data in loaded_list.values():
+                    tab_map[index] = data
 
 
                 self._list_widget.clear()

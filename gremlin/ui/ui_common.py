@@ -1375,7 +1375,7 @@ class WidgetTracker:
             widget.setParent(None)
             widget.deleteLater()
         self._widget_cache = {}
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info("TRACKER: clear()")
 
@@ -1417,7 +1417,7 @@ class DeviceWidgetTracker:
 
     def clear(self):
         self._widget_cache = {}
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info("DEVICE WIDGET TRACKER: clear()")
 
@@ -3310,7 +3310,7 @@ class ModeWidget(QtWidgets.QWidget):
     def select_mode(self, mode: str):
         """selects the mode without firing a change event - ignored if the mode doesn't exist"""
         # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"Mode: set edit selector mode to [{mode}]")
         index = self.edit_mode_selector.findData(mode)
@@ -5780,10 +5780,13 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
         assert gremlin.util.is_ui_thread()
         assert event.is_axis, "handler should not be called if the event is not an axis event"
 
-        device = gremlin.joystick_handling.getDevice(self._device_guid)
-        syslog.info(
-            f"Axis Repeater: event received: instance  [{self._description}] [{self.id}] device: [{device.name}] axis: [{self._input_id}] value: {event.value:0.3f} visible: {self.isVisible()}"
-        )
+
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
+        if verbose:
+            device = gremlin.joystick_handling.getDevice(self._device_guid)
+            syslog.info(
+                f"Axis Repeater: event received: instance  [{self._description}] [{self.id}] device: [{device.name}] axis: [{self._input_id}] value: {event.value:0.3f} visible: {self.isVisible()}"
+            )
 
         if self._get_values_callback:
             # get the values via the custom callback
@@ -5837,12 +5840,18 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
         self._disconnect()  # disconnect handler
 
 
-class QButtonStateWidget(QtWidgets.QWidget, QJoystickListener):
+class QButtonStateWidget(QJoystickListener,QtWidgets.QWidget):
     """visualizes the state of a button"""
 
     def __init__(self, input_item, description: str = None, parent=None):
-        QtWidgets.QWidget.__init__(self, parent)
-        QJoystickListener.__init__(self, input_item=input_item, callback=self._handle_update_ui, description=description)
+        super().__init__(
+            input_item=input_item,
+            callback=self._handle_update_ui,
+            description=description,
+            parent = parent
+        )
+
+        assert self._input_type in (InputType.JoystickButton, InputType.JoystickHat),"invalid input type - must be button or hat"
 
         self.setContentsMargins(0, 0, 0, 0)
         self.main_layout = QtWidgets.QHBoxLayout(self)
@@ -5860,13 +5869,18 @@ class QButtonStateWidget(QtWidgets.QWidget, QJoystickListener):
         self._valid = True  # assume ok
         self._hat_icons = {}  # icon hats, keyed by position
         self.main_layout.addWidget(self._button_widget)
-        self._hooked = False
-
-        if input_item is not None:
-            self.hook(input_item, description)
 
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
+
+        if self._input_type == InputType.JoystickButton:
+            is_pressed = gremlin.joystick_handling.get_button(self._device_guid, self.input_id)
+            self._update_value_ui(is_pressed)
+        else:
+            # hat
+            position = gremlin.joystick_handling.get_hat_position(self._device_guid, self.input_id)
+            self._update_hat_ui(position)
+
 
     def process_event_ui(self, event : gremlin.event_handler.Event):
         self._update_value_ui(event.is_pressed)
@@ -5883,6 +5897,9 @@ class QButtonStateWidget(QtWidgets.QWidget, QJoystickListener):
                 self._last_state_value = None
 
     def _handle_update_ui(self, event: gremlin.event_handler.Event):
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
+        if verbose:
+            syslog.info(f"state button: {event.is_pressed}")
         match self.input_type:
             case InputType.JoystickButton:
                 self._update_value_ui(event.is_pressed)
@@ -5907,7 +5924,7 @@ class QButtonStateWidget(QtWidgets.QWidget, QJoystickListener):
         else:
             self._button_widget.setPixmap(Pixmaps().offIconPixmap)
 
-    def _update_hat(self, position):
+    def _update_hat_ui(self, position):
         """updates a hat position"""
         if not Shiboken.isValid(self._button_widget):
             return
@@ -9534,7 +9551,7 @@ class WidgetCacheTracker:
         self._param_map[key] = data
         max_widgets = self._max_widgets
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if self._enabled and max_widgets > 0:
             # queue check
 
@@ -9564,7 +9581,7 @@ class WidgetCacheTracker:
 
     def _remove(self, key):
         """removes a mapping and notifies the owner"""
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if not self._enabled:
             # caching disabled - never remove
             return
@@ -9605,7 +9622,7 @@ class WidgetCacheTracker:
     def getWidget(self, key) -> tuple[QtWidgets.QWidget, bool]:
         """gets an item from the cache and re-cache it"""
         created = False
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if key in self._param_map:
             if key not in self._widget_map:
                 # recreate the widget using the original data
@@ -9628,7 +9645,7 @@ class WidgetCacheTracker:
     def removeWidget(self, key, keep_params=True):
         """removes a widget from the cache, keeping the parameters optionally"""
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if key in self._param_map:
             self._remove(key)
             if verbose:
@@ -9867,7 +9884,7 @@ class QSplitTabWidget(QDataWidget):
 
     def _handle_expired_widget_ui(self, key, widget):
         """called by the widget cache when a widget is being removed from the cache"""
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if key in self._widget_config_index_map:
             # one of ours - unregister it
             if verbose:
@@ -9901,7 +9918,7 @@ class QSplitTabWidget(QDataWidget):
         index = self._right_panel_stacked_widget.indexOf(widget)
         if index != -1:
             # update the widget if needed
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
                 syslog.info(f"RIGHT PANEL: select widget {index}")
 
@@ -9950,7 +9967,7 @@ class QSplitTabWidget(QDataWidget):
     def unregisterAllWidgets(self):
         """clears all device widgets"""
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info("RIGHT PANEL: clear all widgets")
 
@@ -10207,7 +10224,7 @@ class ResizableWindow(QMainWindow):
             self._is_resizing = False
             self.resize_pixmap = None
             self._central_widget.setVisible(True)
-            
+
             self.update()
 
 
@@ -11027,7 +11044,7 @@ class QJoystickRangeWidget(QtWidgets.QWidget):
         self._decimals = decimals
         self._is_range = is_range
         self._inverted = inverted
-        self._verbose = gremlin.config.Configuration().verbose_mode_ui
+        self._verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         self._step = step
 
         min_cmd = gremlin.util.clamp(min_cmd, min_range, max_range)

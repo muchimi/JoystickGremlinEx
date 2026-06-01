@@ -151,7 +151,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # if device.is_virtual and not vjoy_as_input.get(device.vjoy_id, False):
         #     self.inputItemListView.limit_input_types([InputType.JoystickAxis])
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
         if verbose:
             device = gremlin.joystick_handling.getDevice(self._device_guid)
             syslog.info(f"Create Joystick Device tab widget: for [{device.name}]")
@@ -256,7 +256,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """called when the list view is created"""
 
         assert self.stats is not None, "stats should be created before listview"
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info("JoystickDevice: update stats on list view create")
 
@@ -264,7 +264,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _handle_model_changed(self):
         """called when the input model changes to update the display of stats and filter status"""
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info("JoystickDevice: update stats on model change")
         self.update_stats_display(refresh=True)
@@ -524,7 +524,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         gremlin.util.centerDialog(message_box)
         result = message_box.exec()
         if result == QtWidgets.QMessageBox.StandardButton.Ok:
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
                 syslog.info("delete curve data")
             data.curve_data = None

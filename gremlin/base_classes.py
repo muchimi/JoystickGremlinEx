@@ -930,8 +930,8 @@ class AbstractCallbackModel(AbstractModel):
         self._item_map = TriggerDict()  # map of input_id to index
 
         # assume no filters
-        self._filtered_item_map = self._index_map
-        self._filtered_index_map = self._item_map
+        self._filtered_index_map = TriggerDict()
+        self._filtered_item_map =  TriggerDict()
 
         self._filtered_callback: Callable = None
         self._sort_callback: Callable = None
@@ -974,6 +974,18 @@ class AbstractCallbackModel(AbstractModel):
         if change_callback:
             self.addCallback(change_callback)
 
+    def setItemAt(self, index : int, item):
+        ''' sets the item for the specific index '''
+        # ensure the item is hashable
+        assert isinstance(item, _collections_abc.Hashable)
+        assert isinstance(index, _collections_abc.Hashable)
+        self._index_map[index] = item
+        self._item_map[item] = index
+        self._filtered_index_map[index] = item
+        self._filtered_item_map[item] = index
+        self.markDirty()
+
+
     def setSortCallback(self, callback):
         """changes or clears the sort callback"""
         assert isinstance(callback, Callable) if callback is not None else True, (
@@ -1004,7 +1016,7 @@ class AbstractCallbackModel(AbstractModel):
 
     def __iter__(self):
         """iterator - gets an iterator to the contents"""
-        return iter(self._filtered_item_map.values())
+        return iter(self._filtered_index_map.values())
 
     def __len__(self):
         """number of items in the model"""
@@ -1040,10 +1052,12 @@ class AbstractCallbackModel(AbstractModel):
         if item not in self._index_map:
             self.markDirty()
             index = len(self._item_map)
-            self._item_map[item] = index
-            self._index_map[index] = item
+            self.setItemAt(index, item)
             self.applyFilter()
             self._fireChanged()
+
+            return index
+        return -1
 
     def insert(self, i, item, emit=True):
         """inserts an item
@@ -1137,6 +1151,7 @@ class AbstractCallbackModel(AbstractModel):
         """gets the filtered item at the given index if it exists"""
         return self.data(index)
 
+
     def filteredItemAt(self, index: int):
         """gets the filtered item at the given index if it exists"""
         return self.data(index)
@@ -1180,8 +1195,8 @@ class AbstractCallbackModel(AbstractModel):
         if self._filtered_index_map.id != self._index_map.id:
             self._filtered_index_map.clearCallbacks()
             self._filtered_item_map.clearCallbacks()
-            self._filtered_index_map = self._index_map
-            self._filtered_item_map = self._item_map
+            self._filtered_index_map = {key:value for key,value in self._index_map.items()}
+            self._filtered_item_map =  {key:value for key,value in self._item_map.items()}
 
     @property
     def allowedInputTypes(self) -> tuple:
@@ -1201,13 +1216,13 @@ class AbstractCallbackModel(AbstractModel):
         if not self._filtered_enabled:
             if self._filtered_index_map.id != self._index_map.id:
                 # reset filters if previously enabled
-                self._filtered_index_map = self._index_map
-                self._filtered_item_map = self._item_map
+                self._filtered_index_map = {key:value for key,value in self._index_map.items()}
+                self._filtered_item_map =  {key:value for key,value in self._item_map.items()}
                 if emit:
                     self._fireChanged()
             return
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             device = gremlin.joystick_handling.getDevice(self._device_guid)
             syslog.info(f"MODEL INPUT FILTER: for [{device.name}]")
@@ -1238,8 +1253,8 @@ class AbstractCallbackModel(AbstractModel):
             self._filtered_item_map = new_item_map
 
         else:
-            self._filtered_index_map = self._index_map
-            self._filtered_item_map = self._item_map
+            self._filtered_index_map = {key:value for key,value in self._index_map.items()}
+            self._filtered_item_map =  {key:value for key,value in self._item_map.items()}
 
         # resort the data
         self.applySort(False)
@@ -1409,9 +1424,8 @@ class AbstractCallbackModel(AbstractModel):
         if self._suspend_stack == 0:
             self._item_map.pushSuspend()
             self._index_map.pushSuspend()
-            if self._item_map.id != self._filtered_item_map.id:
-                self._filtered_index_map.pushSuspend()
-                self._filtered_item_map.pushSuspend()
+            self._filtered_index_map.pushSuspend()
+            self._filtered_item_map.pushSuspend()
         self._suspend_stack += 1
 
     def popSuspend(self, reset=False, emit=True):
@@ -1423,9 +1437,8 @@ class AbstractCallbackModel(AbstractModel):
         if self._suspend_stack == 0:
             self._item_map.popSuspend(reset)
             self._index_map.popSuspend(reset)
-            if self._item_map.id != self._filtered_item_map.id:
-                self._filtered_index_map.popSuspend(reset)
-                self._filtered_item_map.popSuspend(reset)
+            self._filtered_index_map.popSuspend(reset)
+            self._filtered_item_map.popSuspend(reset)
             self._fireChanged(force=self._change_pending, emit=emit)
 
     def resetChanges(self):
@@ -1488,7 +1501,7 @@ class AbstractCallbackModel(AbstractModel):
 
         if new_hash != self._old_hash or force or self._change_pending:
             config = gremlin.config.Configuration()
-            verbose = config.verbose_mode_ui
+            verbose = config.verbose_mode_ui_level(2)
             if verbose:
                 syslog.info(f"MODEL CHANGE TRIGGER: {self.debug_name} ")
 

@@ -3410,7 +3410,7 @@ class InputItemListView(AbstractView):
         if self.model is None or self._deleted:
             return
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
 
         data = self.model.data(index)
         if data is not None and data.id in self._widget_map:
@@ -3545,7 +3545,7 @@ class InputItemListView(AbstractView):
 
         try:
             assert gremlin.util.is_ui_thread(), "must run on Ui thread"
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
                 syslog.info(
                     f"InputListView: input widget selected callback: [{widget.input_item.device_name}] [{widget.input_item.display_name}]  selected [{widget.selected}]"
@@ -3604,7 +3604,7 @@ class InputItemListView(AbstractView):
         """
 
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_inputs or config.verbose_mode_ui
+        verbose = config.verbose_mode_inputs or config.verbose_mode_ui_level(1)
 
         if verbose:
             syslog.info(f"InputItemListView: request to select input index: [{index}]")
@@ -3780,7 +3780,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
         self._abstract_container_generating_xml = False  # true if generating
         self._action_sets = ActionSets(self)  # containers contain one or more action sets, each action sets contains a list of action set object
-        self.action_model = None  # set at creation by the parent of this container
+        self.action_model : ContainerModel = None  # set at creation by the parent of this container
         self.custom_action_sets = False  # true if the container uses custom action sets (need a converter to produce action_sets)
         self._condition_enabled = True  # condition flag
         self._virtual_button_enabled = (
@@ -3799,6 +3799,8 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.actionsetParseCallback = None  # callback to use when parsing action set if it has additional data (node), returns an action set
         self.actionsetCustomParseCallback = None  # callback for the complete action set parsing
         self.definition_mode = self.get_mode()
+
+        self._container_changed_callbacks = [] # list of callbacks called when this container changes
 
         el = gremlin.event_handler.EventListener()
         el.virtual_button_changed.connect(self._virtual_button_changed)
@@ -3824,6 +3826,28 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.device_input_id = input_item.input_id
         self.device_input_type = input_item.input_type
         self.device = gremlin.joystick_handling.getDevice(self.device_guid)
+
+
+    def _fireChangeCallbacks(self):
+        ''' fires the change callbacks for this container '''
+        for callback in self._container_changed_callbacks:
+            callback(self)
+
+    def registerChangeCallback(self, callback : Callable):
+        ''' registers a change callback for this container '''
+        assert isinstance(callback, Callable), "invalid callback"
+        if callback not in self._container_changed_callbacks:
+            self._container_changed_callbacks.append(callback)
+
+    def unregisterChangeCallback(self, callback : Callable):
+        ''' unregisters a change callback for this container '''
+        assert isinstance(callback, Callable), "invalid callback"
+        if callback in self._container_changed_callbacks:
+            self._container_changed_callbacks.remove(callback)
+
+    def mapping_changed(self):
+        """fires the mapping changed event to notify UI on mapping changes made to this container"""
+        self._fireChangeCallbacks()
 
     @property
     def debug_name(self) -> str:
@@ -3911,11 +3935,6 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
             el = gremlin.event_handler.EventListener()
             el.condition_changed.emit(self)
 
-    def mapping_changed(self):
-        """fires the mapping changed event to notify UI on mapping changes made to this container"""
-        # tell the UI about the change
-        _el = gremlin.event_handler.EventListener()
-        # el.mapping_changed.emit(self._input_item)
 
     def getActions(
         self,
@@ -4028,16 +4047,17 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     def input_display_name(self):
         return f"{gremlin.shared_state.get_device_name(self.device_guid)} {InputType.to_display_name(self.device_input_type)} {self.device_input_id}"
 
-    def add_action(self, action, index=-1):
+    def add_action(self, action, index : int, create = True) -> int:
         """Adds an action to this container.
 
         :param action the action to add
-        :param index the index of the action_set into which to insert the
-            action. A value of -1 indicates that a new set should be
-            created.
+        :param index the index of the action_set into which to insert the action
+        :param auto_create: true if the action set should be created if it does not exist
+        :returns int: the index of the action set
         """
 
-        if index == -1:
+        if not index in self.action_sets:
+
             # add a new action set to the container
             index = self.action_sets.add(ActionSet())
 
@@ -4045,15 +4065,21 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         if index > count:
             for i in range(count, index):
                 if not self.action_sets.data(i):
-                    self.action_set.place(ActionSet(), i)
+                    self.action_sets.place(ActionSet(), i)
         self.action_sets[index].append(action)
 
         # Create activation condition data if needed
         self.create_or_delete_virtual_button()
 
-        # tell the UI about the change
-        _el = gremlin.event_handler.EventListener()
-        # el.mapping_changed.emit(self._input_item)
+        # notify of changes to this container
+        self._fireChangeCallbacks()
+
+        return index
+
+    def ensureActionSet(self, count : int):
+        ''' ensures there are at least count action sets defined '''
+        self.action_sets.ensureCount(count)
+
 
     @property
     def action_sets(self) -> ActionSets:  # noqa: F405
@@ -5889,7 +5915,7 @@ class MultiModeAbstractAction(AbstractAction):
 
 
 class ActionSets(AbstractCallbackModel):
-    """holds a list of ActionSet objects for a container"""
+    """ contains ActionSet objects for a container """
 
     def __init__(self, container: AbstractContainer, description: str = None, data=None):
         assert isinstance(container, AbstractContainer), "Invalid container object"
@@ -5902,6 +5928,9 @@ class ActionSets(AbstractCallbackModel):
         self._input_item = self._container.input_item
         self._description = description
         self._data = data
+
+        # add at least one action set object
+        self.setItemAt(0, ActionSet())
         assert isinstance(self._input_item, InputItem), "Invalid input item for container"
 
     def append(self, item):
@@ -5915,6 +5944,15 @@ class ActionSets(AbstractCallbackModel):
         ):
             item = ActionSet.fromList(item)
         super().add(item)
+
+    def ensureCount(self, count : int):
+        ''' ensures the actions sets has at least count action set object '''
+        if count > 0:
+            while self.count() < count:
+                self.append(ActionSet())
+
+
+
 
     def clear(self):
         """clears all the actions"""
@@ -5968,6 +6006,11 @@ class ActionSets(AbstractCallbackModel):
                     self._description = html.unescape(node.get("description"))
                     set_read = True
 
+        if not self.count():
+            # add at least one action sett
+            self.add(ActionSet())
+
+
 
 class ActionSetView(AbstractView):
     """widget that displays actions defined in a container"""
@@ -6002,7 +6045,7 @@ class ActionSetView(AbstractView):
         assert isinstance(container, AbstractContainer), "invalid container"
         assert isinstance(model, ActionSet), "invalid model"
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"Create action set view for model: {model.debug_name}")
 
@@ -6056,7 +6099,7 @@ class ActionSetView(AbstractView):
 
         self.setObjectName(f"ActionSetView: {'n/a' if label is None else label}")
 
-        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+        verbose_ui = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose_ui:
             syslog.info(f"ActionSetView: create: {self.objectName()}")
 
@@ -6156,7 +6199,7 @@ class ActionSetView(AbstractView):
                 self._stacked_widget.removeWidget(widget)
                 gremlin.util.delete_widget(widget)
 
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
 
             self._container_widget, self._container_layout = gremlin.ui.ui_common.getVContainer()
             self._stacked_widget.addWidget(self._container_widget)  # index 1
@@ -6204,7 +6247,7 @@ class ActionSetView(AbstractView):
 
     def _show_blank(self):
         if self._stacked_widget.currentIndex() != 0:
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
                 syslog.info(f"ActionSetView: show blank {self._input_display()}")
             self._stacked_widget.setCurrentIndex(0)
@@ -6215,7 +6258,7 @@ class ActionSetView(AbstractView):
             self._show_blank()
         else:
             if self._stacked_widget.currentIndex() != 1:
-                verbose = gremlin.config.Configuration().verbose_mode_ui
+                verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
                 if verbose:
                     syslog.info(f"ActionSetView: show content device {self._input_display()}")
                 self._stacked_widget.setCurrentIndex(1)
@@ -6253,7 +6296,7 @@ class ActionSetView(AbstractView):
         try:
             clipboard = gremlin.clipboard.Clipboard()
             clipboard.disable()
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
 
             # if verbose:
             #     object_name = self.objectName()
@@ -6276,7 +6319,7 @@ class ActionSetView(AbstractView):
                 if hasattr(widget, "redraw"):
                     widget.redraw()
 
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
 
             # if verbose: syslog.info(f"ActionSet: redraw complete: {object_name}")
 
@@ -6781,6 +6824,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         )
 
         self.container = container
+
+        # register a change callback for our container
+        container.registerChangeCallback(self._handle_container_changed)
+
         self.input_item = input_item
         self.action_widgets = []
 
@@ -6874,7 +6921,35 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         el.collapse_all_containers.connect(self._handle_collapse)
         el.expand_all_containers.connect(self._handle_expand)
 
+        # holds change callbacks for the container widget
+        self._container_changed_callbacks = []
+
         self._update_container_ui(self.container)
+
+    def _fireChangeCallbacks(self):
+        ''' fires the change callbacks for this container '''
+        for callback in self._container_changed_callbacks:
+            callback(self)
+
+    def registerChangeCallback(self, callback : Callable):
+        ''' registers a change callback for this container '''
+        assert isinstance(callback, Callable), "invalid callback"
+        if callback not in self._container_changed_callbacks:
+            self._container_changed_callbacks.append(callback)
+
+    def unregisterChangeCallback(self, callback : Callable):
+        ''' unregisters a change callback for this container '''
+        assert isinstance(callback, Callable), "invalid callback"
+        if callback in self._container_changed_callbacks:
+            self._container_changed_callbacks.remove(callback)
+
+    def _handle_container_changed(self, container):
+        ''' handles a change in a container '''
+        self._fireChangeCallbacks()
+        self.redrawActionSets()
+
+    def MappingChanged(self):
+        self._handle_container_changed(self.container)
 
     @QtCore.Slot()
     def _handle_toggled(self):
@@ -7022,17 +7097,26 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         tracker = ConditionStateTracker()
         tracker.unregister(self.container.input_item, self.container)
         self.container.input_item.lockedChanged.disconnect(self._handle_lock_changed)
+        self.container.unregisterChangeCallback(self._handle_container_changed)
 
     def _create_action_tab(self):
         # Create root widget of the dock element
+        self._action_tab_container_widget = QtWidgets.QWidget()
+        self._action_tab_container_layout = QtWidgets.QVBoxLayout(self._action_tab_container_widget)
+
         self.action_tab_widget = QtWidgets.QWidget()
         # Create layout and place it inside the dock widget
         self.action_layout = QtWidgets.QVBoxLayout(self.action_tab_widget)
 
+        self._action_tab_container_layout.addWidget(self.action_tab_widget)
+        self._action_tab_container_layout.addStretch()
+
         # Create the actual UI
-        self.dock_tabs.addTab(self.action_tab_widget, "Action")
+        self.dock_tabs.addTab(self._action_tab_container_widget, "Actions")
         self._create(self.container)
-        self._create_action_ui()
+        self._create_action_ui() # ask to create the action UI
+
+
 
     def _create_activation_condition_tab(self):
         # Create widget to place inside the tab
@@ -7166,7 +7250,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         icon=None,
         icon_size=24,
     ):
-        """Adds an action widget to the container.
+        """Adds an action widget to the container widget.
 
         :param action_set_data: data of the actions which form the action set
         :param label the label:  to show in the title
@@ -7182,7 +7266,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         # if action_set_data in self._action_widget_map:
         #     return self._action_widget_map[action_set_data]
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"ContainerWidget: created action set model: {model.debug_name}")
 
@@ -7824,7 +7908,7 @@ class ContainerView(AbstractView):
         self._input_item = input_item
         self._model = model
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"Creating container view for: {model.debug_name}")
 
@@ -7866,7 +7950,7 @@ class ContainerView(AbstractView):
         # Add the scroll area to the main layout - index 1
         self._stacked_widget.addWidget(self._scroll_area)  # index 1
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"create ContainerView [{input_item.display_name if input_item else 'no input'}]")
 
@@ -7951,7 +8035,7 @@ class ContainerView(AbstractView):
 
     def _show_blank(self):
         if self._stacked_widget.currentIndex() != 0:
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
                 syslog.info(f"ContainerView: show blank [{self._input_item.display_name if self._input_item else 'no input'}]")
             self._stacked_widget.setCurrentIndex(0)
@@ -7962,7 +8046,7 @@ class ContainerView(AbstractView):
             self._show_blank()
         else:
             if self._stacked_widget.currentIndex() != 1:
-                verbose = gremlin.config.Configuration().verbose_mode_ui
+                verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
                 if verbose:
                     syslog.info(f"ContainerView: show content [{self._input_item.display_name if self._input_item else 'no input'}]")
                 self._stacked_widget.setCurrentIndex(1)
@@ -7975,7 +8059,7 @@ class ContainerView(AbstractView):
         """Redraws the entire view.  must be on UI thread"""
 
         try:
-            verbose = gremlin.config.Configuration().verbose_mode_ui
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
                 syslog.info(f"ContainerView: redraw for [{self._input_item.display_name if self._input_item else 'no input'}]")
 
@@ -7991,7 +8075,7 @@ class ContainerView(AbstractView):
                 return  # done
 
             with QtCore.QSignalBlocker(self.model):
-                verbose = gremlin.config.Configuration().verbose_mode_ui
+                verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
                 container_count = self.model.rows()
 
                 if container_count > 0:
@@ -8098,7 +8182,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         self._main_layout = QtWidgets.QVBoxLayout(self)
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             self._main_layout.addWidget(QtWidgets.QLabel("InputItemMappingWidget"))
 
@@ -8209,13 +8293,13 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
 
     def _show_blank(self):
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info("InputItemMappingWidget: show blank")
         self._stacked_widget.setCurrentIndex(0)
 
     def _show_content(self):
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(f"InputItemMappingWidget: show content: [{self._input_item.display_name}]")
         self._stacked_widget.setCurrentIndex(1)
@@ -11020,7 +11104,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             return
 
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_ui
+        verbose = config.verbose_mode_ui_level(1)
 
         input_item: InputItem = widget.input_item
         assert input_item is not None, "unexpected: widget should reference a valid input item"
@@ -11038,10 +11122,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         device = gremlin.joystick_handling.getDevice(self.device_guid)
 
         current_mode = gremlin.shared_state.edit_mode
-
-        # if input_item == self._last_selected_input_item:
-        #     # already selected and input widget created
-        #     return
 
         if verbose:
             if input_item:

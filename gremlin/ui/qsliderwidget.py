@@ -325,7 +325,7 @@ class QSliderWidget(QtWidgets.QWidget):
                 changed = gremlin.util.compare_float_lists(self._values, values)
 
             if changed:
-                verbose = gremlin.config.Configuration().verbose_mode_ui
+                verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
                 if verbose:
                     syslog.info(f"Slider changed: {self.objectName()} [{self._id}]: {values}")
                 self._values = values  # [max(min(1.0, n), -1.0) for n in values]
@@ -953,7 +953,7 @@ class QSliderWidget(QtWidgets.QWidget):
         # print ("double click")
         self._double_clicked = True
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog = logging.getLogger("system")
 

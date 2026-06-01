@@ -24,6 +24,7 @@ import gremlin.types
 from gremlin.base_profile import AbstractFunctor
 from gremlin.input_item import AbstractContainer, AbstractAction, AbstractContainerWidget, InputItem
 from shiboken6 import Shiboken
+from gremlin.worker import WorkManager, WorkTask
 import logging
 
 syslog = logging.getLogger("system")
@@ -42,11 +43,11 @@ class BasicContainerWidget(AbstractContainerWidget):
 
 
     def _create_action_ui(self):
-        """Creates the UI components."""
+        """ called when the container should create its action UI """
         if not Shiboken.isValid(self):
             return
 
-        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+        verbose_ui = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose_ui:
             syslog.info("BasicContainerWidget: create action UI start")
         has_actions = False
@@ -67,7 +68,7 @@ class BasicContainerWidget(AbstractContainerWidget):
             )
 
             self.action_layout.addWidget(widget)
-            
+
             widget.model.data_changed.connect(self.container_modified.emit)
         else:
             input_item = self.container.input_item
@@ -86,6 +87,7 @@ class BasicContainerWidget(AbstractContainerWidget):
             action_selector.inputItem = self.container
 
             self.action_layout.addWidget(action_selector)
+
 
         if verbose_ui:
             syslog.info("BasicContainerWidget: create action UI completed")
@@ -108,7 +110,15 @@ class BasicContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
+        wm = WorkManager()
+        wm.submit(callback = self._add_action_worker, args = action_data)
+
+
+    def _add_action_worker(self, args):
+        ''' worker object for adding actions '''
         from gremlin.clipboard import Clipboard
+        action_data = args
+
         if action_data is None:
             return
         if not Shiboken.isValid(self):
@@ -125,22 +135,19 @@ class BasicContainerWidget(AbstractContainerWidget):
 
                 action_item = plugin_manager.duplicate(action_data.data, self.container)
 
-        self.container.add_action(action_item)
+        self.container.add_action(action_item, 0) # for basic containers, add the action to action set 0
 
-        # blows up in QT 6.11
-        if Shiboken.isValid(self):
-            self.container_modified.emit()
-        
+
 
     def _paste_action(self, action, container):
         ''' paste action'''
-        
+
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.container)
         self.container.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
-    
+
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -211,44 +218,44 @@ class BasicContainer(AbstractContainer):
         self._basic_container_generating_xml = False
 
 
-    def add_action(self, action, index=-1):
-        assert isinstance(action, AbstractAction)
+    # def add_action(self, action, index=-1):
+    #     assert isinstance(action, AbstractAction)
 
-        # Make sure if we're dealing with axis with remap and response curve
-        # actions that they are arranged sensibly
-        if action.get_input_type() == InputType.JoystickAxis:
-            remap_sets = []
-            curve_sets = []
-            for container in self.parent.containers:
-                for action_set in container.action_sets:
-                    for t_action in action_set:
-                        if gremlin.input_item._is_curve_tag(t_action.tag):
-                            curve_sets.append(action_set)
-                        elif t_action.tag == "remap":
-                            remap_sets.append(action_set)
+    #     # Make sure if we're dealing with axis with remap and response curve
+    #     # actions that they are arranged sensibly
+    #     if action.get_input_type() == InputType.JoystickAxis:
+    #         remap_sets = []
+    #         curve_sets = []
+    #         for container in self.parent.containers:
+    #             for action_set in container.action_sets:
+    #                 for t_action in action_set:
+    #                     if gremlin.input_item._is_curve_tag(t_action.tag):
+    #                         curve_sets.append(action_set)
+    #                     elif t_action.tag == "remap":
+    #                         remap_sets.append(action_set)
 
-            if action.tag == "remap" and len(curve_sets) == 1 and \
-                    len(remap_sets) == 0:
-                curve_sets[0].append(action)
-            elif gremlin.input_item._is_curve_tag(action.tag) and len(remap_sets) == 1 and \
-                    len(curve_sets) == 0:
-                remap_sets[0].append(action)
-            else:
-                if index == -1:
-                    self.action_sets.append([])
-                    index = len(self.action_sets) - 1
-                self.action_sets[index].append(action)
-        else:
-            if index == -1:
-                self.action_sets.append([])
-                index = len(self.action_sets) - 1
-            self.action_sets[index].append(action)
+    #         if action.tag == "remap" and len(curve_sets) == 1 and \
+    #                 len(remap_sets) == 0:
+    #             curve_sets[0].append(action)
+    #         elif gremlin.input_item._is_curve_tag(action.tag) and len(remap_sets) == 1 and \
+    #                 len(curve_sets) == 0:
+    #             remap_sets[0].append(action)
+    #         else:
+    #             if index == -1:
+    #                 self.action_sets.append([])
+    #                 index = len(self.action_sets) - 1
+    #             self.action_sets[index].append(action)
+    #     else:
+    #         if index == -1:
+    #             self.action_sets.append([])
+    #             index = len(self.action_sets) - 1
+    #         self.action_sets[index].append(action)
 
-        #self.refresh_conditions()
+    #     #self.refresh_conditions()
 
-        self.create_or_delete_virtual_button()
+    #     self.create_or_delete_virtual_button()
 
-        self.mapping_changed() # tell UI of changes
+    #     self.mapping_changed() # tell UI of changes
 
 
     # def _parse_xml(self, node, data = None, extra_data = None):

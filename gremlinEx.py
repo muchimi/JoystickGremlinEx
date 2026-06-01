@@ -637,6 +637,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             tab_data.setPosition(position)
             self.ui.devices.moveTab(old_position, position)
 
+        # save the tabs
+        gremlin.config.Configuration().tab_list = tab_map
+
 
 
     def _get_tab_map(self):
@@ -2335,7 +2338,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         device_guid = gremlin.util.normalize_guid(device_guid)
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
 
         index = self.ui.device_widget.indexOf(widget)
         if index != -1:

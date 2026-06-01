@@ -4019,7 +4019,7 @@ class AxisState:
             values = AxisValues(value, value)
             return values
 
-        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
 
         data = self.getAxisData(device_guid, axis_id)
         if data is None:
