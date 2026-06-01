@@ -31,13 +31,14 @@ import gremlin.config
 import gremlin.plugin_manager
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainerWidget, AbstractContainer
+from gremlin.input_item import AbstractContainerWidget, AbstractContainer, ActionSelector
 from gremlin.util import write_guid, safe_format, safe_read
 import gremlin.execution_graph
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.event_handler
 from shiboken6 import Shiboken
+from gremlin.types import ContainerViewTypes, Interactions
 
 syslog = logging.getLogger("system")
 
@@ -171,21 +172,21 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         self.content_widget, self.content_layout = gremlin.ui.ui_common.getVContainer(widgets)
 
-        self.short_action_selector = gremlin.ui.ui_common.ActionSelector(
+        self.short_action_selector = ActionSelector(
             # self.profile_data.get_input_type(),
             InputType.JoystickButton,
             self.profile_data.input_item,
         )
         self.short_action_selector.action_label.setText("Short Press Action(s)")
 
-        self.long_action_selector = gremlin.ui.ui_common.ActionSelector(
+        self.long_action_selector = ActionSelector(
             # self.profile_data.get_input_type(),
             InputType.JoystickButton,
             self.profile_data.input_item,
         )
         self.long_action_selector.action_label.setText("Long Press Action(s)")
 
-        self.double_action_selector = gremlin.ui.ui_common.ActionSelector(
+        self.double_action_selector = ActionSelector(
             # self.profile_data.get_input_type(),
             InputType.JoystickButton,
             self.profile_data.input_item,
@@ -212,9 +213,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         action_sets = [action_set for action_set in self.profile_data.short_action_sets if action_set]
         for i, action_set in enumerate(action_sets):
-            widget = self._create_action_set_widget(
-                action_set if action_set is not None else [], f"Chain Short Action {i + 1:d}", gremlin.ui.ui_common.ContainerViewTypes.Action
-            )
+            widget = self._create_action_set_widget(action_set if action_set is not None else [], f"Chain Short Action {i + 1:d}", ContainerViewTypes.Action)
             self.short_layout.addWidget(widget)
             self.short_layout_widget_list.append(widget)
             widget.redraw()
@@ -224,7 +223,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_sets = [action_set for action_set in self.profile_data.long_action_sets if action_set]
         for i, action_set in enumerate(action_sets):
             if action_set is not None:
-                widget = self._create_action_set_widget(action_set, f"Chain Long Action {i + 1:d}", gremlin.ui.ui_common.ContainerViewTypes.Action)
+                widget = self._create_action_set_widget(action_set, f"Chain Long Action {i + 1:d}", ContainerViewTypes.Action)
 
             self.long_layout.addWidget(widget)
             self.long_layout_widget_list.append(widget)
@@ -235,7 +234,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         action_sets = [action_set for action_set in self.profile_data.double_action_sets if action_set]
         for i, action_set in enumerate(action_sets):
             if action_set is not None:
-                widget = self._create_action_set_widget(action_set, f"Chain DoubleTap Action {i + 1:d}", gremlin.ui.ui_common.ContainerViewTypes.Action)
+                widget = self._create_action_set_widget(action_set, f"Chain DoubleTap Action {i + 1:d}", ContainerViewTypes.Action)
             self.double_layout.addWidget(widget)
             self.double_layout_widget_list.append(widget)
             widget.redraw()
@@ -258,17 +257,17 @@ class TempoExContainerWidget(AbstractContainerWidget):
         if short_actions:
             for action_set in short_actions:
                 if action_set:
-                    self._create_action_widget(action_set, "Short Press", self.activation_condition_layout, gremlin.ui.ui_common.ContainerViewTypes.Conditions)
+                    self._create_action_widget(action_set, "Short Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
         if long_actions:
             for action_set in long_actions:
                 if action_set:
-                    self._create_action_widget(action_set, "Long Press", self.activation_condition_layout, gremlin.ui.ui_common.ContainerViewTypes.Conditions)
+                    self._create_action_widget(action_set, "Long Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
         if double_actions:
             for action_set in double_actions:
                 if action_set:
-                    self._create_action_widget(action_set, "Double Tap", self.activation_condition_layout, gremlin.ui.ui_common.ContainerViewTypes.Conditions)
+                    self._create_action_widget(action_set, "Double Tap", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
     def _create_action_widget(self, action_set, label, layout, view_type):
         """Creates a new action widget.
@@ -290,9 +289,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
     def _create_widgets(self, action_sets, label, layout, widget_list):
         for i, action_set in enumerate(action_sets):
-            widget = self._create_action_set_widget(
-                action_set if action_set is not None else [], f"{label} {i + 1:d}", gremlin.ui.ui_common.ContainerViewTypes.Action
-            )
+            widget = self._create_action_set_widget(action_set if action_set is not None else [], f"{label} {i + 1:d}", ContainerViewTypes.Action)
             layout.addWidget(widget)
             widget_list.append(widget)
             widget.redraw()
@@ -507,12 +504,12 @@ class TempoExContainerWidget(AbstractContainerWidget):
         # determine which widget this is
         action_sets, index = self._find_widget(widget)
         if index != -1:
-            if action == gremlin.input_item.ActionSetView.Interactions.Edit:
+            if action == Interactions.Edit:
                 action_sets[index] = []
-            elif action == gremlin.input_item.ActionSetView.Interactions.Up:
+            elif action == Interactions.Up:
                 if index > 0:
                     action_sets[index], action_sets[index - 1] = action_sets[index - 1], action_sets[index]
-            elif action == gremlin.input_item.ActionSetView.Interactions.Down:
+            elif action == Interactions.Down:
                 if index < len(action_sets) - 1:
                     action_sets[index], action_sets[index + 1] = action_sets[index + 1], action_sets[index]
             if Shiboken.isValid(self):
@@ -1115,9 +1112,9 @@ More than one action per short press or long press can be added."""
     ]
 
     interaction_types = [
-        #     gremlin.input_item.ActionSetView.Interactions.Up,
-        #     gremlin.input_item.ActionSetView.Interactions.Down,
-        #     gremlin.input_item.ActionSetView.Interactions.Delete,
+        #     Interactions.Up,
+        #     Interactions.Down,
+        #     Interactions.Delete,
     ]
 
     def __init__(self, parent=None, node=None):

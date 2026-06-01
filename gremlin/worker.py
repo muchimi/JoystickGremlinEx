@@ -31,6 +31,8 @@ import win32gui
 
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.util import InvokeUiMethod
+import gremlin.config
+import gremlin.util
 # import gremlin.event_handler
 # import gremlin.shared_state
 
@@ -65,10 +67,7 @@ class WorkManager(QObject):
         complete_callback: Callable = None,
         args = None,
     ):
-        """executes work and displays an hourglass cursor while doing it
-
-        If a callback is specified, a worker thread will be started and called so the UI thread remains responsive.
-
+        """ submits a task to the worker queue and displays an hourglass while it's running
         :param immediate: if true, sets the cursor immediately instead of waiting for a short delay (provided it's not displayed already) - if false, the cursor pops up 1 second after
         :param callback: optional, the function to call while the cursor is displayed - this function should take in (*args, **kwargs) as parameters
         :param complete_callback: optional, the function to call when the work is completed - this function should take in (*args, **kwargs) as parameters
@@ -76,11 +75,22 @@ class WorkManager(QObject):
         :param args: positional arguments for the callback
         :param kwargs: keyword arguments for the callback
         """
-        import gremlin.config
+
+        # route on UI thread as the wait cursor is involved and won't display correctly unless on UI thread
+        gremlin.util.InvokeUiMethod(self._submit_ui, (callback, complete_callback, args))
 
 
+    def _submit_ui(self, args):
+        """executes work and displays an hourglass cursor while doing it
 
-        self.pushCursor()  # display hourglass
+        If a callback is specified, a worker thread will be started and called so the UI thread remains responsive.
+
+        """
+
+        callback, complete_callback, args = args
+
+
+        self._pushCursor_ui()  # display hourglass - immediate
 
         if callback is not None:
             # start a worker thread to run the work
@@ -96,13 +106,16 @@ class WorkManager(QObject):
             worker.signals.finished.connect(self._handle_worker_finish)
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
             if verbose:
-                syslog.info(f"starting task: [{callback.__name__}]")
+                syslog.info(f"starting worker: [{callback.__name__}]")
             self._threadpool.start(worker)
 
 
     def _handle_worker_finish(self):
         self.popCursor()
-        # syslog.info("worker finished")
+
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
+        if verbose:
+            syslog.info("worker finished")
 
 
     def pushCursor(self, immediate=True):
@@ -114,7 +127,6 @@ class WorkManager(QObject):
             if immediate:
                 # show the wait cursor
                 InvokeUiMethod(self._pushCursor_ui)  # ensure on UI thread
-                QtWidgets.QApplication.processEvents()
             else:
                 # syslog.info("PUSH CURSOR: show cursor timer [delay]")
                 if self._cursor_timer:
@@ -174,7 +186,7 @@ class WorkManager(QObject):
                 self._qt_wait_cursor = QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor)
 
             # syslog.info("set hourglass")
-            win32gui.LoadCursor(None, win32con.IDC_WAIT)
+            # win32gui.LoadCursor(None, win32con.IDC_WAIT)
             QtWidgets.QApplication.setOverrideCursor(self._qt_wait_cursor)
             QtWidgets.QApplication.processEvents()
 

@@ -29,9 +29,10 @@ import gremlin
 import gremlin.config
 import gremlin.ui.ui_common
 
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
 from gremlin.util import safe_format, safe_read, write_guid
 from shiboken6 import Shiboken
+from gremlin.types import ContainerViewTypes, Interactions
 
 syslog = logging.getLogger("system")
 
@@ -122,12 +123,12 @@ class RepeatContainerWidget(AbstractContainerWidget):
         if len(self.profile_data.action_sets) > 0:
             assert len(self.profile_data.action_sets) == 1
 
-            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "Repeat", gremlin.ui.ui_common.ContainerViewTypes.Action)
+            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "Repeat", ContainerViewTypes.Action)
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
         else:
-            action_selector = gremlin.ui.ui_common.ActionSelector(
+            action_selector = ActionSelector(
                 self.profile_data.get_input_type(),
                 self.profile_data,
             )
@@ -153,7 +154,7 @@ class RepeatContainerWidget(AbstractContainerWidget):
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
-            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "Smart Toggle", gremlin.ui.ui_common.ContainerViewTypes.Conditions)
+            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "Smart Toggle", ContainerViewTypes.Conditions)
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)

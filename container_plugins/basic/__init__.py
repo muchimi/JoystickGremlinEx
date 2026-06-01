@@ -19,135 +19,123 @@
 import gremlin
 import gremlin.config
 from gremlin.input_types import InputType
+
 import gremlin.ui.ui_common
 import gremlin.types
+from gremlin.types import ContainerViewTypes, Interactions
 from gremlin.base_profile import AbstractFunctor
-from gremlin.input_item import AbstractContainer, AbstractAction, AbstractContainerWidget, InputItem
+from gremlin.input_item import AbstractContainer, AbstractAction, AbstractContainerWidget, InputItem, ActionSelector
 from shiboken6 import Shiboken
 from gremlin.worker import WorkManager, WorkTask
 import logging
 
 syslog = logging.getLogger("system")
-class BasicContainerWidget(AbstractContainerWidget):
 
+
+class BasicContainerWidget(AbstractContainerWidget):
     """Basic container which holds a single action."""
 
-    def __init__(self, input_item : InputItem, container: AbstractContainer, parent = None):
+    def __init__(self, input_item: InputItem, container: AbstractContainer, parent=None):
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(input_item, container, parent)
+        super().__init__(input_item, container, parent, view=True)
 
+    # def _create_action_ui(self):
+    #     """called when the container should create its action UI"""
+    #     if not Shiboken.isValid(self):
+    #         return
 
+    #     verbose_ui = gremlin.config.Configuration().verbose_mode_ui_level(1)
+    #     if verbose_ui:
+    #         syslog.info("BasicContainerWidget: create action UI start")
+    #     has_actions = False
+    #     for action_set in self.container.action_sets:
+    #         if action_set:
+    #             has_actions = True
+    #             break
 
-    def _create_action_ui(self):
-        """ called when the container should create its action UI """
-        if not Shiboken.isValid(self):
-            return
+    #     if has_actions:
+    #         action_sets = self.container.action_sets  # [action_set for action_set in self.container.action_sets if action_set]
+    #         assert len(action_sets) == 1, "invalid action set count - expected a single action set"
 
-        verbose_ui = gremlin.config.Configuration().verbose_mode_ui_level(1)
-        if verbose_ui:
-            syslog.info("BasicContainerWidget: create action UI start")
-        has_actions = False
-        for action_set in self.container.action_sets:
-            if action_set:
-                has_actions = True
-                break
+    #         self.container.create_or_delete_virtual_button()
+    #         widget = self._create_action_set_widget(action_sets[0], "Basic", ContainerViewTypes.Action)
 
-        if has_actions:
-            action_sets = self.container.action_sets # [action_set for action_set in self.container.action_sets if action_set]
-            assert len(action_sets) == 1, "invalid action set count - expected a single action set"
+    #         self.action_layout.addWidget(widget)
 
-            self.container.create_or_delete_virtual_button()
-            widget = self._create_action_set_widget(
-                action_sets[0],
-                "Basic",
-                gremlin.ui.ui_common.ContainerViewTypes.Action
-            )
+    #         widget.model.data_changed.connect(self.container_modified.emit)
+    #     else:
+    #         input_item = self.container.input_item
+    #         if self.container.get_device_type() == gremlin.types.DeviceType.VJoy:
+    #             action_selector = ActionSelector(
+    #                 gremlin.types.DeviceType.VJoy,
+    #                 input_item,
+    #             )
+    #         else:
+    #             action_selector = ActionSelector(
+    #                 input_item.get_input_type(),
+    #                 input_item,
+    #             )
+    #         action_selector.action_added.connect(self._add_action)
+    #         action_selector.action_paste.connect(self._paste_action)
+    #         action_selector.inputItem = self.container
 
-            self.action_layout.addWidget(widget)
+    #         self.action_layout.addWidget(action_selector)
 
-            widget.model.data_changed.connect(self.container_modified.emit)
-        else:
-            input_item = self.container.input_item
-            if self.container.get_device_type() == gremlin.types.DeviceType.VJoy:
-                action_selector = gremlin.ui.ui_common.ActionSelector(
-                    gremlin.types.DeviceType.VJoy,
-                    input_item,
-                )
-            else:
-                action_selector = gremlin.ui.ui_common.ActionSelector(
-                    input_item.get_input_type(),
-                    input_item,
-                )
-            action_selector.action_added.connect(self._add_action)
-            action_selector.action_paste.connect(self._paste_action)
-            action_selector.inputItem = self.container
+    #     if verbose_ui:
+    #         syslog.info("BasicContainerWidget: create action UI completed")
 
-            self.action_layout.addWidget(action_selector)
+    # def _create_condition_ui(self):
+    #     if self.container.action_sets:
+    #         widget = self._create_action_set_widget(self.container.action_sets[0], "Basic", ContainerViewTypes.Conditions)
+    #         self.activation_condition_layout.addWidget(widget)
+    #         widget.redraw()
+    #         widget.model.data_changed.connect(self.container_modified.emit)
 
+    #         return widget
 
-        if verbose_ui:
-            syslog.info("BasicContainerWidget: create action UI completed")
+    # def _add_action(self, action_data):
+    #     """Adds a new action to the container.
 
-    def _create_condition_ui(self):
-        if self.container.action_sets:
-            widget = self._create_action_set_widget(
-                self.container.action_sets[0],
-                "Basic",
-                gremlin.ui.ui_common.ContainerViewTypes.Conditions
-            )
-            self.activation_condition_layout.addWidget(widget)
-            widget.redraw()
-            widget.model.data_changed.connect(self.container_modified.emit)
+    #     :param action_name the name of the action to add
+    #     """
+    #     wm = WorkManager()
+    #     wm.submit(callback = self._add_action_worker, args = action_data)
 
-            return widget
+    # def _add_action_worker(self, args):
+    #     ''' worker object for adding actions '''
+    #     from gremlin.clipboard import Clipboard
+    #     action_data = args
 
-    def _add_action(self, action_data):
-        """Adds a new action to the container.
+    #     if action_data is None:
+    #         return
+    #     if not Shiboken.isValid(self):
+    #         return
 
-        :param action_name the name of the action to add
-        """
-        wm = WorkManager()
-        wm.submit(callback = self._add_action_worker, args = action_data)
+    #     if isinstance(action_data, str):
+    #         action_name = action_data
+    #         plugin_manager = gremlin.plugin_manager.ActionPlugins()
+    #         action_item = plugin_manager.get_class(action_name)(self.container)
+    #     elif isinstance(action_data, Clipboard):
+    #         # paste operation
+    #         if action_data.is_action:
+    #             # verify the action in the clipboard is appropriate for this input
 
+    #             action_item = plugin_manager.duplicate(action_data.data, self.container)
 
-    def _add_action_worker(self, args):
-        ''' worker object for adding actions '''
-        from gremlin.clipboard import Clipboard
-        action_data = args
+    #     self.container.add_action(action_item, 0) # for basic containers, add the action to action set 0
 
-        if action_data is None:
-            return
-        if not Shiboken.isValid(self):
-            return
+    # def _paste_action(self, action, container):
+    #     ''' paste action'''
 
-        if isinstance(action_data, str):
-            action_name = action_data
-            plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.container)
-        elif isinstance(action_data, Clipboard):
-            # paste operation
-            if action_data.is_action:
-                # verify the action in the clipboard is appropriate for this input
-
-                action_item = plugin_manager.duplicate(action_data.data, self.container)
-
-        self.container.add_action(action_item, 0) # for basic containers, add the action to action set 0
-
-
-
-    def _paste_action(self, action, container):
-        ''' paste action'''
-
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.container)
-        self.container.add_action(action_item)
-        if Shiboken.isValid(self):
-            self.container_modified.emit()
-
+    #     plugin_manager = gremlin.plugin_manager.ActionPlugins()
+    #     action_item = plugin_manager.duplicate(action, self.container)
+    #     self.container.add_action(action_item)
+    #     if Shiboken.isValid(self):
+    #         self.container_modified.emit()
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -164,21 +152,19 @@ class BasicContainerWidget(AbstractContainerWidget):
         """
         title = "Basic: "
         if len(self.container.action_sets) > 0:
-            stub =  ", ".join(a.name for a in self.container.action_sets[0])
+            stub = ", ".join(a.name for a in self.container.action_sets[0])
             title += stub
 
         return title
 
 
 class BasicContainerFunctor(AbstractFunctor):
-
     """Executes the contents of the associated basic container."""
 
-    def __init__(self, container, parent = None):
+    def __init__(self, container, parent=None):
         super().__init__(container, parent)
 
-
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         """Executes the content with the provided data.
 
         :param event the event to process
@@ -188,14 +174,12 @@ class BasicContainerFunctor(AbstractFunctor):
         return True
 
 
-
 class BasicContainer(AbstractContainer):
-
     """Represents a container which holds exactly one action."""
 
     name = "Basic"
     tag = "basic"
-    hint = '''This is a simple container that contains an action.'''
+    hint = """This is a simple container that contains an action."""
 
     # input_types = [
     #     InputType.JoystickAxis,
@@ -209,14 +193,13 @@ class BasicContainer(AbstractContainer):
     functor = BasicContainerFunctor
     widget = BasicContainerWidget
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
         self._basic_container_generating_xml = False
-
 
     # def add_action(self, action, index=-1):
     #     assert isinstance(action, AbstractAction)
@@ -257,14 +240,12 @@ class BasicContainer(AbstractContainer):
 
     #     self.mapping_changed() # tell UI of changes
 
-
     # def _parse_xml(self, node, data = None, extra_data = None):
     #     """Populates the container with the XML node's contents.
 
     #     :param node the XML node with which to populate the container
     #     """
     #     pass
-
 
     # def _generate_xml(self):
     #     """Returns an XML node representing this container's data.
@@ -288,7 +269,6 @@ class BasicContainer(AbstractContainer):
     #         return node
     #     finally:
     #         self._basic_container_generating_xml = False
-
 
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.

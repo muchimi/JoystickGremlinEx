@@ -1463,3 +1463,50 @@ class SendType(enum.IntEnum):
                 return f"Don't know how to handle: [{value}]"
 
 
+
+class ContainerViewTypes(enum.Enum):
+    """Enumeration of view types used by containers."""
+
+    Action = 1
+    Conditions = 2
+    VirtualButton = 3
+
+    @staticmethod
+    def to_string(value):
+        try:
+            return _ContainerView_to_string_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError(f"Invalid type in container lookup, {value}")
+
+    @staticmethod
+    def to_enum(value):
+        try:
+            return _ContainerView_to_enum_lookup[value]
+        except KeyError:
+            raise gremlin.error.GremlinError(f"Invalid type in container lookup, {value}")
+
+
+_ContainerView_to_enum_lookup = {
+    "action": ContainerViewTypes.Action,
+    "conditions": ContainerViewTypes.Conditions,
+    "virtual button": ContainerViewTypes.VirtualButton,
+}
+
+
+_ContainerView_to_string_lookup = {
+    ContainerViewTypes.Action: "Action",
+    ContainerViewTypes.Conditions: "Conditions",
+    ContainerViewTypes.VirtualButton: "Virtual Button",
+}
+
+
+class Interactions(enum.Enum):
+    """Enumeration of possible interactions in the UI """
+
+    Up = 1 # move item up
+    Down = 2 # move item down
+    Delete = 3 # delete item
+    Edit = 4 # edit item
+    Add = 5 # add item
+    Count = 6 # count item
+    Copy = 7  # copy to clipboard

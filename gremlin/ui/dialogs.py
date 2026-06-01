@@ -4923,7 +4923,7 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
             )
             if fname != "":
                 try:
-                    data = json.dumps(tab_map)
+                    data = json.dumps(tab_map, indent=4)
                     with open(fname,"w", encoding='utf-8') as h:
                         h.write(data)
                         h.flush()

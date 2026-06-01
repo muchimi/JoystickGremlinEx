@@ -28,7 +28,7 @@ import gremlin.actions
 import gremlin.event_handler
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
 import gremlin.joystick_handling
 from gremlin.input_types import InputType
 import enum
@@ -39,6 +39,7 @@ from shiboken6 import Shiboken
 import threading
 import gremlin.config
 from gremlin.types import SyncMode
+from gremlin.types import ContainerViewTypes, Interactions
 
 syslog = logging.getLogger("system")
 
@@ -203,7 +204,7 @@ class SwitchWidget(QtWidgets.QWidget):
             self.profile_data.action_sets.append([])
             action_set = self.profile_data.action_sets[data.index]
 
-        widget = self.container._create_action_set_widget(action_set, view_type=gremlin.ui.ui_common.ContainerViewTypes.Action)
+        widget = self.container._create_action_set_widget(action_set, view_type=ContainerViewTypes.Action)
         widgets.append(widget)
         widget.redraw()
         widget.model.data_changed.connect(self._action_changed)
@@ -285,7 +286,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
         self._widget_map = {}  # map of widgets by position index
 
         self.profile_data.create_or_delete_virtual_button()
-        self.action_selector = gremlin.ui.ui_common.ActionSelector(
+        self.action_selector = ActionSelector(
             self.profile_data.get_input_type(),
             self.profile_data.input_item,
         )
@@ -343,9 +344,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
             for i, action in enumerate(self.profile_data.action_sets):
-                widget = self._create_action_set_widget(
-                    self.profile_data.action_sets[i], f"Switch {i + 1} Action(s):", gremlin.ui.ui_common.ContainerViewTypes.Conditions
-                )
+                widget = self._create_action_set_widget(self.profile_data.action_sets[i], f"Switch {i + 1} Action(s):", ContainerViewTypes.Conditions)
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
                 widget.model.data_changed.connect(self.container_modified.emit)
@@ -418,19 +417,19 @@ class SwitchContainerWidget(AbstractContainerWidget):
             return
 
         # Perform action
-        if action == gremlin.input_item.ActionSetView.Interactions.Up:
+        if action == Interactions.Up:
             if index > 0:
                 self.profile_data.action_sets[index], self.profile_data.action_sets[index - 1] = (
                     self.profile_data.action_sets[index - 1],
                     self.profile_data.action_sets[index],
                 )
-        if action == gremlin.input_item.ActionSetView.Interactions.Down:
+        if action == Interactions.Down:
             if index < len(self.profile_data.action_sets) - 1:
                 self.profile_data.action_sets[index], self.profile_data.action_sets[index + 1] = (
                     self.profile_data.action_sets[index + 1],
                     self.profile_data.action_sets[index],
                 )
-        if action == gremlin.input_item.ActionSetView.Interactions.Delete:
+        if action == Interactions.Delete:
             del self.profile_data.action_sets[index]
         if Shiboken.isValid(self):
             self.container_modified.emit()
@@ -767,9 +766,9 @@ an input toggle, press or release.  Multiple inputs can be specified for latchin
     input_types = [InputType.JoystickButton, InputType.JoystickHat]
 
     interaction_types = [
-        # gremlin.input_item.ActionSetView.Interactions.Up,
-        # gremlin.input_item.ActionSetView.Interactions.Down,
-        gremlin.input_item.ActionSetView.Interactions.Delete,
+        # Interactions.Up,
+        # Interactions.Down,
+        Interactions.Delete,
     ]
 
     functor = SwitchContainerFunctor

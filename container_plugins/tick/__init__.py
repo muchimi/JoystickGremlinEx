@@ -30,11 +30,12 @@ import gremlin.joystick_handling
 import gremlin.ui.qsliderwidget
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSelector
 
 from gremlin.input_types import InputType
 from gremlin.util import safe_format, safe_read
 from shiboken6 import Shiboken
+from gremlin.types import ContainerViewTypes, Interactions
 
 
 class TickContainerWidget(AbstractContainerWidget):
@@ -105,7 +106,7 @@ class TickContainerWidget(AbstractContainerWidget):
                 lambda x: self._paste_action(0, x),
             )
         else:
-            self._create_action_widget(0, "Tick Up", self.action_layout, gremlin.ui.ui_common.ContainerViewTypes.Action)
+            self._create_action_widget(0, "Tick Up", self.action_layout, ContainerViewTypes.Action)
 
         if self.profile_data.action_sets[1] is None:
             self._add_action_selector(
@@ -114,7 +115,7 @@ class TickContainerWidget(AbstractContainerWidget):
                 lambda x: self._paste_action(1, x),
             )
         else:
-            self._create_action_widget(1, "Tick Down", self.action_layout, gremlin.ui.ui_common.ContainerViewTypes.Action)
+            self._create_action_widget(1, "Tick Down", self.action_layout, ContainerViewTypes.Action)
 
     def unhook(self):
         # jep = gremlin.event_handler.JoystickEventProcessor()
@@ -168,10 +169,10 @@ class TickContainerWidget(AbstractContainerWidget):
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
             if self.profile_data.action_sets[0] is not None:
-                self._create_action_widget(0, "Axis Increase", self.activation_condition_layout, gremlin.ui.ui_common.ContainerViewTypes.Conditions)
+                self._create_action_widget(0, "Axis Increase", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
             if self.profile_data.action_sets[1] is not None:
-                self._create_action_widget(1, "Axis Decrease", self.activation_condition_layout, gremlin.ui.ui_common.ContainerViewTypes.Conditions)
+                self._create_action_widget(1, "Axis Decrease", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
         """Adds an action selection UI widget.
@@ -179,7 +180,7 @@ class TickContainerWidget(AbstractContainerWidget):
         :param add_action_cb function to call when an action is added
         :param label the description of the action selector
         """
-        action_selector = gremlin.ui.ui_common.ActionSelector(
+        action_selector = ActionSelector(
             self.profile_data.get_input_type(),
             self.profile_data,
         )
@@ -342,7 +343,7 @@ For a more advanced way to split an axis and trigger actions at specific points,
         InputType.JoystickAxis,
     ]
     interaction_types = [
-        gremlin.input_item.ActionSetView.Interactions.Edit,
+        Interactions.Edit,
     ]
 
     def getTick(self, value: float) -> int:

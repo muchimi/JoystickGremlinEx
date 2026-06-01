@@ -287,7 +287,7 @@ class Configuration(QtCore.QObject):
             file_size = os.path.getsize(fname)
             if file_size == 0:
                 return True
-            with open(fname, "r") as f:
+            with open(fname, "r", encoding="utf-8") as f:
                 for line in f:
                     if not line.isspace():
                         return False
@@ -304,10 +304,11 @@ class Configuration(QtCore.QObject):
         load_successful = False
         if os.path.isfile(fname):
             if not self._is_blank(fname):
-                with open(fname) as hdl:
+                with open(fname,"r", encoding="utf-8") as hdl:
                     try:
-                        decoder = json.JSONDecoder()
-                        data = decoder.decode(hdl.read())
+                        # decoder = json.JSONDecoder()
+                        # decoder.decode(hdl.read())
+                        data = json.load(hdl)
                         load_successful = True
                     except ValueError:
                         pass
@@ -364,10 +365,11 @@ class Configuration(QtCore.QObject):
         # Attempt to load the configuration file if this fails set
         # default empty values.
         if os.path.isfile(fname):
-            with open(fname) as hdl:
+            with open(fname,"r", encoding="utf-8") as hdl:
                 try:
-                    decoder = json.JSONDecoder()
-                    self._profile_data = decoder.decode(hdl.read())
+                    # decoder = json.JSONDecoder()
+                    # self._profile_data = decoder.decode(hdl.read())
+                    self._profile_data = json.load(hdl)
                     _load_successful = True
                 except ValueError:
                     pass
@@ -402,7 +404,7 @@ class Configuration(QtCore.QObject):
             if not fname:
                 fname = self.get_config()
             # get a temp file name
-            with open(tmp, "w") as hdl:
+            with open(tmp, "w", encoding="utf-8") as hdl:
                 encoder = json.JSONEncoder(sort_keys=True, indent=4)
                 hdl.write(encoder.encode(self._data))
                 hdl.flush()
@@ -441,7 +443,7 @@ class Configuration(QtCore.QObject):
             self._lock = True
             fname = self._profile_config_fname
             if fname:
-                with open(fname, "w") as hdl:
+                with open(fname, "w", encoding="utf-8") as hdl:
                     encoder = json.JSONEncoder(sort_keys=True, indent=4)
                     hdl.write(encoder.encode(self._profile_data))
         except Exception as ex:

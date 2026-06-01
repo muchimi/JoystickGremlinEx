@@ -27,7 +27,8 @@ import gremlin
 import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
+from gremlin.types import ContainerViewTypes, Interactions
 
 from gremlin.util import safe_format, safe_read
 from gremlin.input_types import InputType
@@ -36,14 +37,14 @@ import gremlin.base_profile
 
 syslog = logging.getLogger("system")
 
+
 class ButtonContainerWidget(AbstractContainerWidget):
-
     """Container with two actions, one for input button is pressed, the other for when the input button is released
-    
-       While this can be duplicated with conditions - this is a helper container to simplify the profile setup.
 
-       Works with buttons or hats
-    
+    While this can be duplicated with conditions - this is a helper container to simplify the profile setup.
+
+    Works with buttons or hats
+
     """
 
     def __init__(self, profile_data, parent=None):
@@ -65,11 +66,11 @@ class ButtonContainerWidget(AbstractContainerWidget):
         self.autorelease_widget.clicked.connect(self._autorelease_changed)
         self.autorelease_widget.setToolTip("When enabled, the actions will automatically receive a release trigger after the specified delay.")
 
-        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(label = "Autorelease Delay (ms):")
+        self.delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Autorelease Delay (ms):")
         self.delay_widget.setValue(self.profile_data.autorelease_delay)
         self.delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer([self.autorelease_widget, self.delay_widget],"Options", widget_only = True)
+        widget = gremlin.ui.ui_common.getHContainer([self.autorelease_widget, self.delay_widget], "Options", widget_only=True)
 
         self.action_layout.addWidget(widget)
 
@@ -78,11 +79,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
 
         self._update_visible()
 
-
-            
-
     def _update_actions(self):
-        
 
         if self.profile_data.action_sets[0] is None:
             self._add_action_selector(
@@ -91,12 +88,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
                 lambda x: self._paste_action(0, x),
             )
         else:
-            self._create_action_widget(
-                0,
-                "Press Actions",
-                self.action_layout,
-                gremlin.ui.ui_common.ContainerViewTypes.Action
-            )
+            self._create_action_widget(0, "Press Actions", self.action_layout, ContainerViewTypes.Action)
 
         if self.profile_data.action_sets[1] is None:
             self._add_action_selector(
@@ -105,49 +97,29 @@ class ButtonContainerWidget(AbstractContainerWidget):
                 lambda x: self._paste_action(1, x),
             )
         else:
-            self._create_action_widget(
-                1,
-                "Release Actions",
-                self.action_layout,
-                gremlin.ui.ui_common.ContainerViewTypes.Action
-            )
+            self._create_action_widget(1, "Release Actions", self.action_layout, ContainerViewTypes.Action)
 
-
- 
     def _update_visible(self):
         delay_visible = self.profile_data.autorelease
         self.delay_widget.setVisible(delay_visible)
-            
+
     @QtCore.Slot(bool)
-    def _autorelease_changed(self, checked : bool):
+    def _autorelease_changed(self, checked: bool):
         self.profile_data.autorelease = checked
         self._update_visible()
 
     @QtCore.Slot(int)
     def _autorelease_delay_changed_cb(self, value):
-        ''' Updates the autorelease delay '''
+        """Updates the autorelease delay"""
         self.profile_data.autorelease_delay = value
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
             if self.profile_data.action_sets[0] is not None:
-                self._create_action_widget(
-                    0,
-                    "Button Press",
-                    self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
-                )
+                self._create_action_widget(0, "Button Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
             if self.profile_data.action_sets[1] is not None:
-                self._create_action_widget(
-                    1,
-                    "Button Release",
-                    self.activation_condition_layout,
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
-                )
-
-
-
+                self._create_action_widget(1, "Button Release", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
         """Adds an action selection UI widget.
@@ -155,10 +127,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
         :param add_action_cb function to call when an action is added
         :param label the description of the action selector
         """
-        action_selector = gremlin.ui.ui_common.ActionSelector(
-            self.profile_data.get_input_type(),
-            self.profile_data.get_input_item()
-        )
+        action_selector = ActionSelector(self.profile_data.get_input_type(), self.profile_data.get_input_item())
         action_selector.inputItem = self.profile_data
         action_selector.action_added.connect(add_action_cb)
         action_selector.action_paste.connect(paste_action_cb)
@@ -184,16 +153,10 @@ class ButtonContainerWidget(AbstractContainerWidget):
         widget = gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
         layout.addWidget(widget)
 
-
-
-        widget = self._create_action_set_widget(
-            action_set_data = self.profile_data.action_sets[index],
-            view_type = view_type
-        )
+        widget = self._create_action_set_widget(action_set_data=self.profile_data.action_sets[index], view_type=view_type)
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self._handle_container_changed)
-
 
     def _handle_container_changed(self):
         if Shiboken.isValid(self):
@@ -206,7 +169,6 @@ class ButtonContainerWidget(AbstractContainerWidget):
         :param action_name the name of the action to add
         """
 
-        
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.profile_data)
         if self.profile_data.action_sets[index] is None:
@@ -216,12 +178,10 @@ class ButtonContainerWidget(AbstractContainerWidget):
         if Shiboken.isValid(self):
             self.container_modified.emit()
         self._update_actions()
-    
 
     def _paste_action(self, index, action):
-        ''' paste action'''
+        """paste action"""
 
-        
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         if self.profile_data.action_sets[index] is None:
@@ -229,8 +189,6 @@ class ButtonContainerWidget(AbstractContainerWidget):
         self.profile_data.action_sets[index].append(action_item)
         self.profile_data.create_or_delete_virtual_button()
         self._update_actions()
-    
-
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -254,14 +212,13 @@ class ButtonContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         if self.profile_data.is_valid():
-            return f"Press/Release: ({", ".join([a.name for a in self.profile_data.action_sets[0]])}) / ({", ".join([a.name for a in self.profile_data.action_sets[1]])})"
+            return f"Press/Release: ({', '.join([a.name for a in self.profile_data.action_sets[0]])}) / ({', '.join([a.name for a in self.profile_data.action_sets[1]])})"
         else:
             return "Press/Release:"
 
 
 class ButtonContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
-
-    def __init__(self, container, parent = None):
+    def __init__(self, container, parent=None):
         super().__init__(container, parent)
         self.profile_data = container
         self.last_trigger = None
@@ -273,11 +230,11 @@ class ButtonContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         if self.release_timer:
             self.release_timer.cancel()
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
 
         event = event.clone()
         if event.event_type == InputType.JoystickHat:
-            is_pressed = value.current != (0,0)
+            is_pressed = value.current != (0, 0)
         else:
             is_pressed = event.is_pressed
 
@@ -292,11 +249,11 @@ class ButtonContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 event_r.is_pressed = False
                 if self.release_timer:
                     self.release_timer.cancel()
-                self.release_timer = threading.Timer(self.profile_data.autorelease_delay/1000, lambda: self._trigger(0, event_r, value, extra_data))
+                self.release_timer = threading.Timer(self.profile_data.autorelease_delay / 1000, lambda: self._trigger(0, event_r, value, extra_data))
                 self.release_timer.start()
                 self.last_trigger = 0
 
-            #self.press_set.process_event(event, value)
+            # self.press_set.process_event(event, value)
         else:
             # button release
             event.is_pressed = True
@@ -309,18 +266,16 @@ class ButtonContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 event_r.is_pressed = False
                 if self.release_timer:
                     self.release_timer.cancel()
-                self.release_timer = threading.Timer(self.profile_data.autorelease_delay/1000, lambda: self._trigger(1, event_r, value, extra_data))
+                self.release_timer = threading.Timer(self.profile_data.autorelease_delay / 1000, lambda: self._trigger(1, event_r, value, extra_data))
                 self.release_timer.start()
-            self.last_trigger = 1                
+            self.last_trigger = 1
 
+            # self.release_set.process_event(event, value)
 
-            #self.release_set.process_event(event, value)
-
-        return True 
+        return True
 
 
 class ButtonContainer(AbstractContainer):
-
     """A container with two actions which are triggered based on the duration
     of the activation.
 
@@ -330,20 +285,20 @@ class ButtonContainer(AbstractContainer):
 
     name = "Press/Release"
     tag = "button_container"
-    hint = '''This container is used to trigger one action on trigger press,
-and another action on trigger release in a single container.'''
+    hint = """This container is used to trigger one action on trigger press,
+and another action on trigger release in a single container."""
     functor = ButtonContainerFunctor
     widget = ButtonContainerWidget
 
     input_types = [
-         InputType.JoystickButton,
-         InputType.JoystickHat,
+        InputType.JoystickButton,
+        InputType.JoystickHat,
     ]
     interaction_types = [
-        gremlin.input_item.ActionSetView.Interactions.Edit,
+        Interactions.Edit,
     ]
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
@@ -352,36 +307,32 @@ and another action on trigger release in a single container.'''
         self.delay = 0.5
         self.activate_on = "release"
         self.autorelease = True
-        self.autorelease_delay = 250 # delay for autorelease trigger if in autorelease mode
+        self.autorelease_delay = 250  # delay for autorelease trigger if in autorelease mode
         self.actionsetCustomParseCallback = self._parse_action_set
         self.resetActionSets()
 
     def resetActionSets(self):
-        ''' resets actions sets - override in derived class if the action set default should be different '''
-        self.setActionSets([[],[]])
+        """resets actions sets - override in derived class if the action set default should be different"""
+        self.setActionSets([[], []])
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
         super()._parse_xml(node, data)
         if "autorelease" in node.attrib:
-            self.autorelease = safe_read(node,"autorelease",bool, True)
+            self.autorelease = safe_read(node, "autorelease", bool, True)
         if "delay" in node.attrib:
-            self.autorelease_delay = safe_read(node,"delay",int, 250)
+            self.autorelease_delay = safe_read(node, "delay", int, 250)
 
-        self.setActionSets([[],[]])
+        self.setActionSets([[], []])
 
-        # actionset_nodes = node.xpath("./action-set")   
+        # actionset_nodes = node.xpath("./action-set")
         # for index, actionset_node in enumerate(actionset_nodes):
         #     action_set = gremlin.input_item.ActionSet()
         #     self._parse_action_xml(actionset_node, action_set, data, extra_data)
         #     self.action_sets[index] = action_set
-
-    
-        
-
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -390,7 +341,7 @@ and another action on trigger release in a single container.'''
         """
         node = ElementTree.Element("container")
         node.set("type", ButtonContainer.tag)
-        node.set("autorelease", safe_format(self.autorelease,bool))
+        node.set("autorelease", safe_format(self.autorelease, bool))
         node.set("delay", safe_format(self.autorelease_delay, int))
 
         # for action_set in self.action_sets:

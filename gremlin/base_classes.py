@@ -1022,10 +1022,10 @@ class AbstractCallbackModel(AbstractModel):
         """number of items in the model"""
         return len(self._filtered_item_map)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index : int):
         """subscribtable"""
-        if index in self._filtered_item_map:
-            return self._filtered_item_map[index]
+        if index in self._filtered_index_map:
+            return self._filtered_index_map[index]
         raise IndexError
 
     def append(self, item) -> int:
@@ -1195,8 +1195,8 @@ class AbstractCallbackModel(AbstractModel):
         if self._filtered_index_map.id != self._index_map.id:
             self._filtered_index_map.clearCallbacks()
             self._filtered_item_map.clearCallbacks()
-            self._filtered_index_map = {key:value for key,value in self._index_map.items()}
-            self._filtered_item_map =  {key:value for key,value in self._item_map.items()}
+            self._filtered_index_map = TriggerDict.copyFrom(self._index_map)
+            self._filtered_item_map = TriggerDict.copyFrom(self._item_map)
 
     @property
     def allowedInputTypes(self) -> tuple:
@@ -1253,8 +1253,8 @@ class AbstractCallbackModel(AbstractModel):
             self._filtered_item_map = new_item_map
 
         else:
-            self._filtered_index_map = {key:value for key,value in self._index_map.items()}
-            self._filtered_item_map =  {key:value for key,value in self._item_map.items()}
+            self._filtered_index_map = TriggerDict.copyFrom(self._index_map)
+            self._filtered_item_map =  TriggerDict.copyFrom(self._item_map)
 
         # resort the data
         self.applySort(False)

@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
-import enum
+
 import time
 import threading
 import anytree
@@ -1721,41 +1721,6 @@ class StateTracker:
 _state_tracker = StateTracker()
 
 
-class ContainerViewTypes(enum.Enum):
-    """Enumeration of view types used by containers."""
-
-    Action = 1
-    Conditions = 2
-    VirtualButton = 3
-
-    @staticmethod
-    def to_string(value):
-        try:
-            return _ContainerView_to_string_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError(f"Invalid type in container lookup, {value}")
-
-    @staticmethod
-    def to_enum(value):
-        try:
-            return _ContainerView_to_enum_lookup[value]
-        except KeyError:
-            raise gremlin.error.GremlinError(f"Invalid type in container lookup, {value}")
-
-
-_ContainerView_to_enum_lookup = {
-    "action": ContainerViewTypes.Action,
-    "conditions": ContainerViewTypes.Conditions,
-    "virtual button": ContainerViewTypes.VirtualButton,
-}
-
-
-_ContainerView_to_string_lookup = {
-    ContainerViewTypes.Action: "Action",
-    ContainerViewTypes.Conditions: "Conditions",
-    ContainerViewTypes.VirtualButton: "Virtual Button",
-}
-
 
 class LeftRightPushButton(QtWidgets.QPushButton):
     """Implements a push button that distinguishes between left and right
@@ -2916,244 +2881,6 @@ class VJoySelector(AbstractInputSelector):
         return device.vjoy_id
 
 
-class ActionSelector(QtWidgets.QWidget):
-    """Widget permitting the selection of actions."""
-
-    # Signal emitted when an action is going to be added
-    action_added = QtCore.Signal(str)  # add button pressed
-    action_paste = QtCore.Signal(object, object)  # paste button pressed
-
-    def __init__(self, input_type, input_item, parent=None):
-        """Creates a new selector instance.
-
-        :param input_type the input type for which the action selector is being created
-        :param input_item: the mapped input type
-        :param parent the parent of this widget
-        """
-        super().__init__(parent)
-        import gremlin.base_profile
-
-        # if not input_type in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
-        #     pass
-
-        assert isinstance(input_item, gremlin.input_item.InputItem), "expected an input item, wrong type passed"
-
-        self._input_item = input_item
-        self._input_item.lockedChanged.connect(self._handle_lock_changed)
-        # self._input_type = input_type if input_type else self._input_item.getInputType()
-        self._input_type = self._input_item.getInputType()
-
-        self.action_dropdown = QDataComboBox()
-        self.action_dropdown.currentIndexChanged.connect(self._action_changed)
-        self.refresh()
-
-        self.add_button = Buttons.getAddWidget(callback=self._add_action, tooltip="Adds the selected action")
-
-        # self.help_widget = Buttons.getHelpWidget(callback = self._handle_help)
-
-        # clipboard
-        self.paste_button = Buttons.getPasteWidget(callback=self._paste_action)
-        self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
-        self.paste_button.setToolTip("Paste Action")
-
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-
-        self.action_label = QtWidgets.QLabel("Actions:")
-
-        widget, _ = getHContainer(
-            [
-                self.action_label,
-                self.action_dropdown,
-                self.add_button,
-                # self.help_widget,
-                self.paste_button,
-            ]
-        )
-
-        self.main_layout.addWidget(widget)
-        eh = gremlin.event_handler.EventHandler()
-        eh.last_action_changed.connect(self._last_action_changed)
-
-        el = gremlin.event_handler.EventListener()
-        el.request_action_list_refresh.connect(self._handle_action_list_refresh)
-
-        self._container = None
-
-        self._handle_lock_changed_ui(self._input_item)  # initial lock state
-
-    def _cleanup_ui(self):
-
-        el = gremlin.event_handler.EventListener()
-        el.request_action_list_refresh.disconnect(self._handle_action_list_refresh)
-
-        eh = gremlin.event_handler.EventHandler()
-        eh.last_action_changed.disconnect(self._last_action_changed)
-
-    def _handle_action_list_refresh(self):
-        gremlin.util.InvokeUiMethod(self._handle_action_list_refresh_ui)
-
-    def _handle_action_list_refresh_ui(self):
-        if Shiboken.isValid(self):
-            self.refresh()
-
-    def _handle_lock_changed(self, input_item):
-        gremlin.util.InvokeUiMethod(self._handle_lock_changed_ui, input_item)  # ensure on UI thread
-
-    def _handle_lock_changed_ui(self, input_item):
-        if Shiboken.isValid(self):
-            unlocked = not input_item.locked
-            self.add_button.setEnabled(unlocked)
-            self.paste_button.setEnabled(unlocked)
-
-    def refresh(self):
-        """reloads the selector based on the input"""
-        with QtCore.QSignalBlocker(self.action_dropdown):
-            self.action_dropdown.clear()
-            action_list = self._valid_action_list(self._input_type)
-            for name in action_list:
-                self.action_dropdown.addItem(name)
-            config = gremlin.config.Configuration()
-            self.action_dropdown.setCurrentText(config.last_action)
-            self.action_dropdown.autoSize()
-
-    @property
-    def inputItem(self):
-        return self._input_item
-
-    @inputItem.setter
-    def inputItem(self, value):
-        self._input_item = value
-
-    @QtCore.Slot(object, str)
-    def _last_action_changed(self, widget, name):
-        if not Shiboken.isValid(self):
-            return
-        if not Shiboken.isValid(widget):
-            return
-        if widget != self.action_dropdown:
-            with QtCore.QSignalBlocker(self.action_dropdown):
-                self.action_dropdown.setCurrentText(name)
-
-    def _action_changed(self):
-        """remember the last selection"""
-
-        if not Shiboken.isValid(self):
-            return
-        name = self.action_dropdown.currentText()
-        config = gremlin.config.Configuration()
-        config.last_action = name
-        if config.sync_last_selection:
-            eh = gremlin.event_handler.EventHandler()
-            eh.last_action_changed.emit(self.action_dropdown, name)
-
-    def _valid_action_list(self, input_type: InputType):
-        """Returns a list of valid actions for this InputItemWidget.
-           Get a list of valid actions for the input.
-        :return list of valid action names
-        """
-        action_list = []
-        # if self.input_type == InputType.JoystickAxis:
-        #     action_list.append("Response Curve")
-        # else:
-
-        config = gremlin.config.Configuration()
-        convert_vjoy = config.convert_vjoy_remap
-        convert_curve = config.convert_response_curve
-        _control_enabled = config.show_input_enable
-
-        # all_entries = [entry.name for entry in gremlin.plugin_manager.ActionPlugins().repository.values()]
-        for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
-            # if entry.tag == "gremlin-control":
-            #     pass
-            if not entry.input_types or input_type in entry.input_types:
-                if convert_vjoy and entry.name == "Remap":
-                    continue
-                elif convert_curve and entry.name == "Response Curve":
-                    continue
-                # if entry.name == "Control" and not control_enabled:
-                #     continue
-                action_list.append(entry.name)
-        return sorted(action_list)
-
-    def _handle_help(self):
-        """handles the help box on an action"""
-        action_name = self.action_dropdown.currentText()
-        plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action = plugin_manager.get_class(action_name)(self._input_item)
-        if hasattr(action, "hint"):
-            hint = action.hint
-        else:
-            hint = gremlin.hints.hint.get(action.tag, "")
-        if hint:
-            MessageBox(
-                title=f"About the {action_name} action:",
-                prompt=hint,
-                width=300,
-                is_warning=False,
-            )
-
-    def _add_action(self, clicked=False):
-        """Handles selecting of an action to be added.
-
-        :param clicked flag indicating whether or not the action resulted from
-            a click
-        """
-        self.action_added.emit(self.action_dropdown.currentText())
-
-    def _paste_action(self):
-        """handle paste action"""
-        import gremlin.plugin_manager
-
-        container = None
-        # find the container if we can
-        parent = self
-        while parent is not None:
-            if hasattr(parent, "profile_data"):
-                if isinstance(parent.profile_data, gremlin.input_item.AbstractContainer):
-                    container = parent.profile_data
-                    break
-            parent = parent.parent()
-
-        if container is None:
-            if self.inputItem is None:
-                MessageBox(
-                    title="Invalid paste operation",
-                    prompt="Unable to paste action because it is not valid for the current input",
-                )
-                return
-            # create a new basic container
-            container_plugins = gremlin.plugin_manager.ContainerPlugins()
-            container_tag_map = container_plugins.tag_map
-            container = container_tag_map["basic"](self.inputItem)
-
-        action_list = gremlin.plugin_manager.ActionPlugins().fromClipboard(container, self.inputItem)
-        if not action_list:
-            return
-
-        valid_actions = self._valid_action_list(self._input_type)
-        warning = False
-        for action in action_list:
-            if action.name in valid_actions:
-                # valid action - clone it and add it
-                # syslog.info("Clipboard paste action trigger...")
-                self.action_paste.emit(action, container)
-            else:
-                warning = True
-
-        if warning:
-            MessageBox(
-                title="Invalid Action type",
-                prompt="Unable to paste one or more actions because the action is invalid for the current input",
-            )
-
-    def _clipboard_changed(self, clipboard):
-        """handles paste button state based on clipboard data"""
-        self.paste_button.setEnabled(clipboard.is_action)
-        """ updates the paste button tooltip with the current clipboard contents"""
-        if clipboard.is_action:
-            self.paste_button.setToolTip(f"Paste action ({clipboard.data.name})")
-        else:
-            self.paste_button.setToolTip("Paste action (not available)")
 
 
 class ModeStyle(anytree.AbstractStyle):
@@ -10246,7 +9973,18 @@ class QRememberMainWindow(ResizableWindow):
         """Restores the stored window geometry settings."""
         config = gremlin.config.Configuration()
         window_size = config.getWindowSize(self._window_key)
+
+        if not window_size:
+            # come up with a suitable default size if no config is found
+            screen = self.getActiveScreen()
+            if screen:
+                screen_geometry = screen.availableGeometry()
+                width = int(screen_geometry.width() * 0.5)
+                height = int(screen_geometry.height() * 0.75)
+                window_size = (width, height)
+
         window_location = config.getWindowLocation(self._window_key)
+
         if window_size:
             self.resize(window_size[0], window_size[1])
         if window_location:

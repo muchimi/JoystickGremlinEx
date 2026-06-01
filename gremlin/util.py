@@ -2805,6 +2805,17 @@ class TriggerDict(collections.UserDict):
         self._suspend_stack = 0
         self._callback_pending = False
 
+    @staticmethod
+    def copyFrom(source : dict):
+        target = TriggerDict()
+        for key, item in source.items():
+            target[key] = item
+        return target
+
+
+
+
+
     def pushSuspend(self):
         """suspends callbacks on change"""
         self._suspend_stack += 1

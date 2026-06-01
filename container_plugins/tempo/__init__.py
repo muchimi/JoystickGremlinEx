@@ -26,12 +26,13 @@ from PySide6 import QtWidgets, QtCore
 
 import gremlin
 import gremlin.ui.ui_common
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
 from gremlin.input_types import InputType
 from gremlin.util import safe_format
 import gremlin.execution_graph
 import gremlin.base_profile
 from shiboken6 import Shiboken
+from gremlin.types import ContainerViewTypes, Interactions
 
 
 syslog = logging.getLogger("system")
@@ -97,7 +98,7 @@ class TempoContainerWidget(AbstractContainerWidget):
                 lambda x: self._paste_action(0, x),
             )
         else:
-            self._create_action_widget(0, None, self.action_layout, gremlin.ui.ui_common.ContainerViewTypes.Action)
+            self._create_action_widget(0, None, self.action_layout, ContainerViewTypes.Action)
 
         self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Long Press Action Sets</b>", icon=icon))
 
@@ -108,15 +109,15 @@ class TempoContainerWidget(AbstractContainerWidget):
                 lambda x: self._paste_action(1, x),
             )
         else:
-            self._create_action_widget(1, None, self.action_layout, gremlin.ui.ui_common.ContainerViewTypes.Action)
+            self._create_action_widget(1, None, self.action_layout, ContainerViewTypes.Action)
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
             if self.profile_data.action_sets[0] is not None:
-                self._create_action_widget(0, "Short Press", self.activation_condition_layout, gremlin.ui.ui_common.ContainerViewTypes.Conditions)
+                self._create_action_widget(0, "Short Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
             if self.profile_data.action_sets[1] is not None:
-                self._create_action_widget(1, "Long Press", self.activation_condition_layout, gremlin.ui.ui_common.ContainerViewTypes.Conditions)
+                self._create_action_widget(1, "Long Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
         """Adds an action selection UI widget.
@@ -125,7 +126,7 @@ class TempoContainerWidget(AbstractContainerWidget):
         :param label the description of the action selector
         """
         input_item = self.profile_data.input_item
-        action_selector = gremlin.ui.ui_common.ActionSelector(
+        action_selector = ActionSelector(
             self.profile_data.get_input_type(),
             input_item,
         )
@@ -207,13 +208,13 @@ class TempoContainerWidget(AbstractContainerWidget):
         else:
             self.profile_data.activate_on = "release"
 
-    def _handle_interaction(self, widget, action: gremlin.input_item.ActionSetView.Interactions):
+    def _handle_interaction(self, widget, action: Interactions):
         """Handles interaction icons being pressed on the individual actions.
 
         :param widget the action widget on which an action was invoked
         :param action the type of action being invoked
         """
-        if action == gremlin.input_item.ActionSetView.Interactions.Delete:
+        if action == Interactions.Delete:
             index = self._get_widget_index(widget)
             if index != -1:
                 if index == 0 and self.profile_data.action_sets[0] is None:
@@ -402,7 +403,7 @@ Look at Tempo Ex for a container that allows more than one action per short or l
     ]
 
     interaction_types = [
-        gremlin.input_item.ActionSetView.Interactions.Delete,
+        Interactions.Delete,
     ]
 
     def __init__(self, parent=None, node=None):

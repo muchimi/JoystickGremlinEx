@@ -32,7 +32,7 @@ import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
 from gremlin.input_types import InputType
 from PySide6 import QtCore
 from gremlin.util import safe_format, safe_read
@@ -40,6 +40,7 @@ from shiboken6 import Shiboken
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import SyncMode
 import gremlin.joystick_handling
+from gremlin.types import ContainerViewTypes, Interactions
 
 syslog = logging.getLogger("system")
 
@@ -352,7 +353,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self._warning_widget = gremlin.ui.ui_common.QWarningWidget()
 
         self.action_data.create_or_delete_virtual_button()
-        self.action_selector = gremlin.ui.ui_common.ActionSelector(self.action_data.get_input_type(), self.action_data.input_item)
+        self.action_selector = ActionSelector(self.action_data.get_input_type(), self.action_data.input_item)
         self.action_selector.inputItem = self.action_data.input_item
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.add_button.setText("Add Step")
@@ -610,7 +611,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
             container_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
             self.step_layout.addWidget(container_widget)
 
-            widget = self._create_action_set_widget(self.action_data.action_sets[index], "Step", gremlin.ui.ui_common.ContainerViewTypes.Action)
+            widget = self._create_action_set_widget(self.action_data.action_sets[index], "Step", ContainerViewTypes.Action)
             self.step_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
@@ -813,7 +814,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
     def _create_condition_ui(self):
         if self.action_data.action_sets:
             for i, action in enumerate(self.action_data.action_sets):
-                widget = self._create_action_set_widget(self.action_data.action_sets[i], f"Step {i:d}", gremlin.ui.ui_common.ContainerViewTypes.Conditions)
+                widget = self._create_action_set_widget(self.action_data.action_sets[i], f"Step {i:d}", ContainerViewTypes.Conditions)
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
                 widget.model.data_changed.connect(self.container_modified.emit)
@@ -854,19 +855,19 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         # Perform action
         match action:
-            case gremlin.input_item.ActionSetView.Interactions.Up:
+            case Interactions.Up:
                 if index > 0:
                     self.action_data.action_sets[index], self.action_data.action_sets[index - 1] = (
                         self.action_data.action_sets[index - 1],
                         self.action_data.action_sets[index],
                     )
-            case gremlin.input_item.ActionSetView.Interactions.Down:
+            case Interactions.Down:
                 if index < len(self.action_data.action_sets) - 1:
                     self.action_data.action_sets[index], self.action_data.action_sets[index + 1] = (
                         self.action_data.action_sets[index + 1],
                         self.action_data.action_sets[index],
                     )
-            case gremlin.input_item.ActionSetView.Interactions.Delete:
+            case Interactions.Delete:
                 del self.action_data.action_sets[index]
             case _:
                 return
@@ -1395,9 +1396,9 @@ Unlike a macro, any action suitable for the input can be used."""
     ]
 
     interaction_types = [
-        gremlin.input_item.ActionSetView.Interactions.Up,
-        gremlin.input_item.ActionSetView.Interactions.Down,
-        gremlin.input_item.ActionSetView.Interactions.Delete,
+        Interactions.Up,
+        Interactions.Down,
+        Interactions.Delete,
     ]
 
     functor = SequenceContainerFunctor

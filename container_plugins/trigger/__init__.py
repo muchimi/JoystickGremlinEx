@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,9 +24,10 @@ from gremlin.input_types import InputType
 import gremlin.ui.ui_common
 
 import gremlin.types
+from gremlin.types import ContainerViewTypes
 import gremlin.input_item
 import gremlin.execution_graph
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActivationConditionWidget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActivationConditionWidget, ActionSelector
 
 from shiboken6 import Shiboken
 import logging
@@ -35,8 +36,9 @@ from gremlin.util import safe_format, safe_read
 import threading
 
 syslog = logging.getLogger("system")
-class TriggerContainerWidget(AbstractContainerWidget):
 
+
+class TriggerContainerWidget(AbstractContainerWidget):
     """Trigger container which holds a single action."""
 
     def __init__(self, profile_data, parent=None):
@@ -45,25 +47,23 @@ class TriggerContainerWidget(AbstractContainerWidget):
         :param profile_data the profile data represented by this widget
         :param parent the parent of this widget
         """
-        
+
         super().__init__(profile_data, parent)
-        
 
     def _create(self, action_data):
-        self.action_data : TriggerContainer = action_data
+        self.action_data: TriggerContainer = action_data
 
     def _create_action_ui(self):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
-        
 
         # trigger delay
 
-        delay_widget = gremlin.ui.ui_common.QFloatLineEdit(value = self.action_data.trigger_delay,
-                                                           callback = self._handle_delay_changed,
-                                                           tooltip="Delay trigger in seconds.  Set to 0 to disable.")
-        
+        delay_widget = gremlin.ui.ui_common.QFloatLineEdit(
+            value=self.action_data.trigger_delay, callback=self._handle_delay_changed, tooltip="Delay trigger in seconds.  Set to 0 to disable."
+        )
+
         execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         execute_widget.pressChanged.connect(self._execute_on_press_changed)
         execute_widget.releaseChanged.connect(self._execute_on_release_changed)
@@ -72,16 +72,15 @@ class TriggerContainerWidget(AbstractContainerWidget):
             delay_widget,
             execute_widget,
         ]
-        delay_container = gremlin.ui.ui_common.getHContainer(widgets,"Trigger delay (s):", widget_only=True, left_margin = 12)
+        delay_container = gremlin.ui.ui_common.getHContainer(widgets, "Trigger delay (s):", widget_only=True, left_margin=12)
 
-
-        msg = '''This container will execute the contained actions on input trigger if the defined condition succeeds.
+        msg = """This container will execute the contained actions on input trigger if the defined condition succeeds.
 If the condition fails when the timer lapses, the actions will not be executed.
 If there is no condition defined, the condition will succeeed and the actions will executed.
 If the timer is set to 0, the actions get executed immediately if the condition passes (or is not set)
-'''
+"""
 
-        info_widget = gremlin.ui.ui_common.QInfoBox(msg, hide_key = "TriggerContainer")
+        info_widget = gremlin.ui.ui_common.QInfoBox(msg, hide_key="TriggerContainer")
         self.action_layout.addWidget(info_widget)
 
         self.action_layout.addWidget(QtWidgets.QLabel("Trigger Configuration:"))
@@ -105,17 +104,13 @@ If the timer is set to 0, the actions get executed immediately if the condition 
             if action_set:
                 has_actions = True
                 break
-         
+
         if has_actions:
             action_sets = [action_set for action_set in self.profile_data.action_sets if action_set]
             assert len(action_sets) == 1, "invalid action set count - expected a single action set"
 
             self.profile_data.create_or_delete_virtual_button()
-            widget = self._create_action_set_widget(
-                action_sets[0],
-                "Trigger",
-                gremlin.ui.ui_common.ContainerViewTypes.Action
-            )
+            widget = self._create_action_set_widget(action_sets[0], "Trigger", ContainerViewTypes.Action)
 
             self.action_tab_layout.addWidget(widget)
             widget.redraw()
@@ -123,12 +118,12 @@ If the timer is set to 0, the actions get executed immediately if the condition 
         else:
             input_item = self.profile_data.input_item
             if self.profile_data.get_device_type() == gremlin.types.DeviceType.VJoy:
-                action_selector = gremlin.ui.ui_common.ActionSelector(
+                action_selector = ActionSelector(
                     gremlin.types.DeviceType.VJoy,
                     input_item,
                 )
             else:
-                action_selector = gremlin.ui.ui_common.ActionSelector(
+                action_selector = ActionSelector(
                     input_item.get_input_type(),
                     input_item,
                 )
@@ -139,30 +134,18 @@ If the timer is set to 0, the actions get executed immediately if the condition 
             self.action_tab_layout.addWidget(action_selector)
             self.action_tab_layout.addStretch()
 
+        # create the condition tab data
 
-        # create the condition tab data 
-        
         widget = ActivationConditionWidget(self.action_data.condition_data)
         self.condition_tab_layout.addWidget(widget)
         self.condition_tab_layout.addStretch()
-        
-
 
         if verbose_ui:
             syslog.info("TriggerContainerWidget: create action UI completed")
 
-
-
-
-    
-
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
-            widget = self._create_action_set_widget(
-                self.profile_data.action_sets[0],
-                "Trigger",
-                gremlin.ui.ui_common.ContainerViewTypes.Conditions
-            )
+            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "Trigger", ContainerViewTypes.Conditions)
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
@@ -175,9 +158,10 @@ If the timer is set to 0, the actions get executed immediately if the condition 
         :param action_name the name of the action to add
         """
         from gremlin.clipboard import Clipboard
+
         if action_data is None:
             return
-        
+
         if isinstance(action_data, str):
             action_name = action_data
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
@@ -194,7 +178,7 @@ If the timer is set to 0, the actions get executed immediately if the condition 
             self.container_modified.emit()
 
     def _paste_action(self, action, container):
-        ''' paste action'''
+        """paste action"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
@@ -217,53 +201,48 @@ If the timer is set to 0, the actions get executed immediately if the condition 
         """
         title = "Trigger: "
         if len(self.profile_data.action_sets) > 0:
-            stub =  ", ".join(a.name for a in self.profile_data.action_sets[0])
+            stub = ", ".join(a.name for a in self.profile_data.action_sets[0])
             title += stub
-        
+
         return title
 
-    @QtCore.Slot(float)    
+    @QtCore.Slot(float)
     def _handle_delay_changed(self, value):
         self.action_data.trigger_delay = value
 
     @QtCore.Slot(bool)
-    def _execute_on_press_changed(self, checked : bool):
+    def _execute_on_press_changed(self, checked: bool):
         self.action_data.exec_on_press = checked
 
     @QtCore.Slot(bool)
-    def _execute_on_release_changed(self, checked : bool):
-        self.action_data.exec_on_release = checked        
-
+    def _execute_on_release_changed(self, checked: bool):
+        self.action_data.exec_on_release = checked
 
 
 class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
+    """functor is a trigger functor as we need to trigger the content only if some conditions are met"""
 
-    ''' functor is a trigger functor as we need to trigger the content only if some conditions are met '''
-
-    def __init__(self, container, parent = None):
+    def __init__(self, container, parent=None):
         super().__init__(container, parent)
-        
 
     def profile_started(self):
         super().profile_started()
 
-        self._timer = None # trigger timer
+        self._timer = None  # trigger timer
 
         # preprocessd conditions to check
-        
+
         ac = self.action_data.getActivationCondition()
         self.rule = ac.rule
         ec = gremlin.execution_graph.ExecutionContext()
-        
+
         # convert the conditions to the executable versions
         self.conditions = [ec._convert_condition(condition) for condition in ac.conditions]
         config = gremlin.config.Configuration()
         self.verbose_condition = config.verbose_mode_condition
         self.verbose = config.verbose_mode_container
 
-
-
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         """Executes the content with the provided data.
 
         :param event the event to process
@@ -272,9 +251,8 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         """
 
         is_pressed = event.is_pressed
-        trigger = (is_pressed and self.action_data.exec_on_press) or \
-                (not is_pressed and self.action_data.exec_on_release)
-        
+        trigger = (is_pressed and self.action_data.exec_on_press) or (not is_pressed and self.action_data.exec_on_release)
+
         if trigger:
             if self._timer:
                 # abort curent timer
@@ -284,24 +262,18 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 syslog.info("TRIGGER CONTAINER: scheduling trigger")
             self._timer = threading.Timer(self.action_data.trigger_delay, self._handle_trigger)
             self._timer.start()
-        return False # do not do further processing
+        return False  # do not do further processing
 
     def _handle_trigger(self):
-        ''' triggers when the timer runs out'''
+        """triggers when the timer runs out"""
         import gremlin.event_handler
         import gremlin.shared_state
 
         # come up with our own trigger event
-        event = gremlin.event_handler.Event(
-            InputType.JoystickButton,
-            identifier = 1,
-            device_guid = gremlin.shared_state.fake_tab_guid,
-            is_pressed = True,
-            value = True
-        )
-        
+        event = gremlin.event_handler.Event(InputType.JoystickButton, identifier=1, device_guid=gremlin.shared_state.fake_tab_guid, is_pressed=True, value=True)
+
         # evaluate the conditions
-    
+
         result = True
         if self.conditions:
             for condition in self.conditions:
@@ -310,10 +282,10 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     gremlin.shared_state.pushLog()
                     logTabs = gremlin.shared_state.logTabs(True)
                     condition_name = condition.condition_name()
-                    if isinstance(condition,  gremlin.input_item.BaseActivationCondition):
+                    if isinstance(condition, gremlin.input_item.BaseActivationCondition):
                         syslog.info(f"{logTabs}>Executed latched activation condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                     elif isinstance(condition, gremlin.actions.AbstractCondition):
-                        syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}") 
+                        syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                     gremlin.shared_state.popLog()
 
                 match self.rule:
@@ -326,51 +298,46 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                             # any one condition failed failes the whole stack
                             break
 
-    
-        if self.verbose: 
+        if self.verbose:
             syslog.info(f"TRIGGER CONTAINER: evaluate conditions: {'PASS' if result else 'FAIL'}")
 
         if result:
-            # conditions succeeded - run the functors 
+            # conditions succeeded - run the functors
             if self.verbose:
                 syslog.info("TRIGGER CONTAINER: trigger event")
             self._execute(event, True, None)
-                    
-  
-
-
 
 
 class TriggerContainer(AbstractContainer):
-
     """Represents a container which holds exactly one action."""
 
     name = "Delay Trigger"
     tag = "trigger"
-    hint = '''This container can delay trigger delayed actions.'''
-    
+    hint = """This container can delay trigger delayed actions."""
+
     interaction_types = []
 
     functor = TriggerContainerFunctor
     widget = TriggerContainerWidget
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
         import gremlin.base_profile
+
         super().__init__(parent, node)
 
-        self.trigger_delay = 0 # delay in seconds to wait for the contents to execute
-        self.condition_data = gremlin.input_item.ConditionContainer() # conditions for the trigger release
+        self.trigger_delay = 0  # delay in seconds to wait for the contents to execute
+        self.condition_data = gremlin.input_item.ConditionContainer()  # conditions for the trigger release
         self.condition_data.setContainer(self)
-        self.exec_on_press = True # true if trigger should execute on input press event
-        self.exec_on_release = False # true if trigger should execute on input release event
-     
+        self.exec_on_press = True  # true if trigger should execute on input press event
+        self.exec_on_release = False  # true if trigger should execute on input release event
+
     def getActivationCondition(self):
         return self.condition_data.activation_condition
-    
+
     def add_action(self, action, index=-1):
         assert isinstance(action, gremlin.base_profile.AbstractAction)
 
@@ -382,16 +349,14 @@ class TriggerContainer(AbstractContainer):
             for container in self.parent.containers:
                 for action_set in container.action_sets:
                     for t_action in action_set:
-                        if gremlin.input_item._is_curve_tag(t_action.tag): 
+                        if gremlin.input_item._is_curve_tag(t_action.tag):
                             curve_sets.append(action_set)
                         elif t_action.tag == "remap":
                             remap_sets.append(action_set)
 
-            if action.tag == "remap" and len(curve_sets) == 1 and \
-                    len(remap_sets) == 0:
+            if action.tag == "remap" and len(curve_sets) == 1 and len(remap_sets) == 0:
                 curve_sets[0].append(action)
-            elif gremlin.input_item._is_curve_tag(action.tag) and len(remap_sets) == 1 and \
-                    len(curve_sets) == 0:
+            elif gremlin.input_item._is_curve_tag(action.tag) and len(remap_sets) == 1 and len(curve_sets) == 0:
                 remap_sets[0].append(action)
             else:
                 if index == -1:
@@ -404,35 +369,30 @@ class TriggerContainer(AbstractContainer):
                 index = len(self.action_sets) - 1
             self.action_sets[index].append(action)
 
-        #self.refresh_conditions()
+        # self.refresh_conditions()
 
         self.create_or_delete_virtual_button()
 
-        self.mapping_changed() # tell UI of changes
-        
+        self.mapping_changed()  # tell UI of changes
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
         import gremlin.util
 
+        self.trigger_delay = safe_read(node, "delay", float, 0.0)
 
-        self.trigger_delay = safe_read(node,"delay", float, 0.0)
-
-        
         if "exec_on_press" in node.attrib:
-            self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
+            self.exec_on_press = safe_read(node, "exec_on_press", bool, True)
         if "exec_on_release" in node.attrib:
-            self.exec_on_release = safe_read(node,"exec_on_release",bool, False)            
-
+            self.exec_on_release = safe_read(node, "exec_on_release", bool, False)
 
         # load the condition data
-        condition_node = gremlin.util.get_xml_child(node,"trigger-condition")
+        condition_node = gremlin.util.get_xml_child(node, "trigger-condition")
         if condition_node is not None:
-            self.condition_data.activation_condition.from_xml(condition_node, data = (None, self))
-
+            self.condition_data.activation_condition.from_xml(condition_node, data=(None, self))
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -449,13 +409,12 @@ class TriggerContainer(AbstractContainer):
 
         node.set("delay", safe_format(self.trigger_delay, float))
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
-        node.set("exec_on_release", safe_format(self.exec_on_release, bool))    
+        node.set("exec_on_release", safe_format(self.exec_on_release, bool))
 
         # save trigger condition data
         condition_node = self.condition_data.activation_condition.to_xml()
         condition_node.tag = "trigger-condition"
         node.append(condition_node)
-        
 
         return node
 

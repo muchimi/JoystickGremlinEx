@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,15 +26,16 @@ import gremlin.input_item
 import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
+from gremlin.types import ContainerViewTypes, Interactions
 
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
+
 syslog = logging.getLogger("system")
 
 
 class ChainContainerWidget(AbstractContainerWidget):
-
     """Container which holds a sequence of actions."""
 
     def __init__(self, profile_data, parent=None):
@@ -55,7 +56,7 @@ class ChainContainerWidget(AbstractContainerWidget):
         self.profile_data.create_or_delete_virtual_button()
 
         input_item = self.profile_data.input_item
-        self.action_selector = gremlin.ui.ui_common.ActionSelector(
+        self.action_selector = ActionSelector(
             self.profile_data.get_input_type(),
             input_item,
         )
@@ -63,7 +64,6 @@ class ChainContainerWidget(AbstractContainerWidget):
         self.action_selector.action_added.connect(self._add_action)
         self.action_selector.add_button.setText("Add Step")
         self.action_selector.action_paste.connect(self._paste_action)
-        
 
         self.widget_layout.addWidget(self.action_selector)
 
@@ -83,11 +83,7 @@ class ChainContainerWidget(AbstractContainerWidget):
         # Insert action widgets
         action_sets = [action_set for action_set in self.profile_data.action_sets if action_set]
         for i, action_set in enumerate(action_sets):
-            widget = self._create_action_set_widget(
-                action_set,
-                f"Action {i+1:d}",
-                gremlin.ui.ui_common.ContainerViewTypes.Action
-            )
+            widget = self._create_action_set_widget(action_set, f"Action {i + 1:d}", ContainerViewTypes.Action)
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
@@ -95,11 +91,7 @@ class ChainContainerWidget(AbstractContainerWidget):
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
             for i, action in enumerate(self.profile_data.action_sets):
-                widget = self._create_action_set_widget(
-                    self.profile_data.action_sets[i],
-                    f"Action {i:d}",
-                    gremlin.ui.ui_common.ContainerViewTypes.Conditions
-                )
+                widget = self._create_action_set_widget(self.profile_data.action_sets[i], f"Action {i:d}", ContainerViewTypes.Conditions)
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
                 widget.model.data_changed.connect(self.container_modified.emit)
@@ -109,23 +101,21 @@ class ChainContainerWidget(AbstractContainerWidget):
 
         :param action_name the name of the action to add
         """
-        
+
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.profile_data)
         self.profile_data.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
-    
 
     def _paste_action(self, action, container):
-        ''' pastes an action '''
-        
+        """pastes an action"""
+
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.profile_data)
         self.profile_data.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
-    
 
     def _timeout_changed_cb(self, value):
         """Stores changes to the timeout element.
@@ -144,26 +134,23 @@ class ChainContainerWidget(AbstractContainerWidget):
         index = self._get_widget_index(widget)
 
         if index == -1:
-            syslog.warning(
-                "Unable to find widget specified for interaction, not doing "
-                "anything."
-            )
+            syslog.warning("Unable to find widget specified for interaction, not doing anything.")
             return
 
         # Perform action
-        if action == gremlin.input_item.ActionSetView.Interactions.Up:
+        if action == Interactions.Up:
             if index > 0:
-                self.profile_data.action_sets[index],\
-                    self.profile_data.action_sets[index-1] = \
-                    self.profile_data.action_sets[index-1],\
-                    self.profile_data.action_sets[index]
-        if action == gremlin.input_item.ActionSetView.Interactions.Down:
+                self.profile_data.action_sets[index], self.profile_data.action_sets[index - 1] = (
+                    self.profile_data.action_sets[index - 1],
+                    self.profile_data.action_sets[index],
+                )
+        if action == Interactions.Down:
             if index < len(self.profile_data.action_sets) - 1:
-                self.profile_data.action_sets[index], \
-                    self.profile_data.action_sets[index + 1] = \
-                    self.profile_data.action_sets[index + 1], \
-                    self.profile_data.action_sets[index]
-        if action == gremlin.input_item.ActionSetView.Interactions.Delete:
+                self.profile_data.action_sets[index], self.profile_data.action_sets[index + 1] = (
+                    self.profile_data.action_sets[index + 1],
+                    self.profile_data.action_sets[index],
+                )
+        if action == Interactions.Delete:
             del self.profile_data.action_sets[index]
 
         if Shiboken.isValid(self):
@@ -174,14 +161,13 @@ class ChainContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
-        return f"Chain: {" -> ".join([", ".join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
+        return f"Chain: {' -> '.join([', '.join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
 
 
 class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
-
-    def __init__(self, container, parent = None):
+    def __init__(self, container, parent=None):
         super().__init__(container, parent)
-        
+
         self.timeout = container.timeout
 
         self.index = 0
@@ -197,19 +183,14 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 if cond.comparison == "press":
                     self.switch_on_press = True
 
-    
-
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         if event.event_type == InputType.JoystickHat:
-            is_pressed = value.current != (0,0)
+            is_pressed = value.current != (0, 0)
         elif not isinstance(value.current, bool):
-            syslog.warning(
-                f"Invalid data type received in Chain container: {type(event.value)}"
-            )
+            syslog.warning(f"Invalid data type received in Chain container: {type(event.value)}")
             return False
         else:
             is_pressed = value.current
-
 
         if self.timeout > 0.0:
             if self.last_execution + self.timeout < time.time():
@@ -220,16 +201,15 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         if verbose:
             syslog.info(f"Chain: index {self.index}")
         self._trigger(self.index, event, value, extra_data)
-        #result = self._action_sets[self.index].process_event(event, value)
+        # result = self._action_sets[self.index].process_event(event, value)
 
         if (self.switch_on_press and is_pressed) or not is_pressed:
             self.index = (self.index + 1) % len(self.action_set_nodes)
-        
-        return False # stop execution as the logic is internal to trigger the other nodes
+
+        return False  # stop execution as the logic is internal to trigger the other nodes
 
 
 class ChainContainer(AbstractContainer):
-
     """Represents a container which holds multiplier actions.
 
     The actions will trigger one after the other with subsequent activations.
@@ -238,9 +218,9 @@ class ChainContainer(AbstractContainer):
 
     name = "Chain"
     tag = "chain"
-    hint = '''This container runs all actions one after the other on each trigger. 
+    hint = """This container runs all actions one after the other on each trigger.
 A trigger executes the step, and moves to the next step in roundrobin fashion.
-Unlike a macro or sequence container, only one step is executed for each trigger.'''
+Unlike a macro or sequence container, only one step is executed for each trigger."""
 
     # override default allowed inputs here
     # input_types = [
@@ -251,20 +231,20 @@ Unlike a macro or sequence container, only one step is executed for each trigger
     # ]
 
     input_types = [
-         InputType.JoystickButton,
-         InputType.JoystickHat,
+        InputType.JoystickButton,
+        InputType.JoystickHat,
     ]
 
     interaction_types = [
-        gremlin.input_item.ActionSetView.Interactions.Up,
-        gremlin.input_item.ActionSetView.Interactions.Down,
-        gremlin.input_item.ActionSetView.Interactions.Delete,
+        Interactions.Up,
+        Interactions.Down,
+        Interactions.Delete,
     ]
 
     functor = ChainContainerFunctor
     widget = ChainContainerWidget
 
-    def __init__(self, parent=None, node = None):
+    def __init__(self, parent=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
@@ -272,7 +252,7 @@ Unlike a macro or sequence container, only one step is executed for each trigger
         super().__init__(parent, node)
         self.timeout = 0.0
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
@@ -300,7 +280,7 @@ Unlike a macro or sequence container, only one step is executed for each trigger
 
         :return True if the container is configured properly, False otherwise
         """
-        #return len(self.action_sets) > 0
+        # return len(self.action_sets) > 0
         return True
 
 
