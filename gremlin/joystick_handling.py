@@ -316,18 +316,18 @@ def get_device(guid : int | str | dinput.GUID, show_error = True) -> dinput.Devi
     return getDevice(guid, show_error)
 
 
-def get_axis(guid, index, normalized = True, linear = False):
+def get_axis(device_guid : str | dinput.GUID, input_id : int , normalized = True):
     ''' gets the value of the specified axis
-
+    :param device_guid: device guid
+    :param input_id: axis index (1 based), non linear
     :param: normalized  - if set - normalizes to -1.0 +1.0 floating point
 
     '''
-    dev : dinput.DeviceSummary = get_device(guid)
+    dev : dinput.DeviceSummary = get_device(device_guid)
     if dev and dev.axis_count:
-        axis_id = dev.getAxisInputId(index)
-        assert axis_id is not None,"invalid axis index"
-
-        value = dinput.DILL.get_axis(dev.device_guid, axis_id)
+        assert input_id in dev.axis_id_map, f"invalid axis index [{input_id}] for device {dev.name}"
+        linear_id = dev.axis_id_map[input_id]
+        value = dinput.DILL.get_axis(dev.device_guid, linear_id)
         if normalized:
             value = gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
         return value

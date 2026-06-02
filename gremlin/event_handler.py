@@ -3643,7 +3643,10 @@ class AxisValues:
 class AxisData:
     """holds axis data"""
 
-    def __init__(self, device_guid, input_id):
+    def __init__(self, device_guid : str | dinput.GUID, input_id :int):
+        """
+        param: device_guid: the device guid for this axis
+        param: input_id: the non linear input id for this axis (axis index) """
         import gremlin.joystick_handling
 
         self.device_id = None
@@ -3652,12 +3655,15 @@ class AxisData:
         self.device_type = None
 
         device = gremlin.joystick_handling.getDevice(device_guid)
-        if device:
-            self.device_id = device.device_guid
-            self.device_guid = device.device_id
-            self._device = device
-            self.device_type = device.device_type
+        assert device is not None, "invalid device"
+        assert input_id in device.axis_id_map, f"invalid axis input id [{input_id}] for device {device.name}"
+        self.device_id = device.device_id
+        self.device_guid = device.device_guid
+        self._device = device
+        self.device_type = device.device_type
 
+        self.linear_id = device.getAxisLinearId(input_id)
+        assert self.linear_id in device.linear_id_map, f"invalid axis linear id [{self.linear_id}] for input id [{input_id}] for device {device.name}"
         self.input_id = input_id
         self.actual_value = None  # computed value from last query
         self.raw_value = None
@@ -3685,12 +3691,12 @@ class AxisData:
         """returns the calibration data for this axis if it has any"""
         import gremlin.ui.axis_calibration
 
-        calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.input_id)
+        calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(self.device_guid, self.linear_id)
         if calibration and calibration.hasData:
             return calibration
         return None
 
-    def getAxisValues(self, value: float = None, action=None) -> AxisValues:
+    def getAxisValues(self, value: float = None) -> AxisValues:
         """gets the axis value as an AxisValues named tuple
 
         :param value: optional - input value if known
@@ -3698,6 +3704,7 @@ class AxisData:
 
         """
         import gremlin.ui.axis_calibration
+        import gremlin.joystick_handling
 
         device_guid = self.device_guid
         input_id = self.input_id
@@ -3708,7 +3715,7 @@ class AxisData:
         # OSC input data
 
         # input value (raw value from stick)
-        raw_value = value if value is not None else gremlin.joystick_handling.get_axis(device_guid, input_id)
+        raw_value = value if value is not None else gremlin.joystick_handling.get_axis(device_guid, input_id )
         actual_value = raw_value
         self.raw_value = raw_value
 
@@ -3965,18 +3972,22 @@ class AxisState:
                 return self._data[key]
         return None
 
-    def setAxisData(self, device_guid, axis_id, value: float) -> AxisData:
+    def setAxisData(self, device_guid : str | dinput.GUID, input_id : int, value: float) -> AxisData:
         """sets the axis data"""
         assert device_guid is not None, "invalid ID "
-        key = self._get_key(device_guid, axis_id)
+        import gremlin.joystick_handling
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        assert device is not None, f"device not found for ID: {device_guid}"
+        assert input_id in device.axis_id_map, f"invalid axis input id [{input_id}] for device {device.name}"
 
+        key = self._get_key(device_guid, input_id)
         if key not in self._data:
-            data = AxisData(device_guid, axis_id)
+            data = AxisData(device_guid, input_id)
             data.raw_value = value
             self._data[key] = data
         return self._data[key]
 
-    def getAxisValues(self, device_guid, input_id, value: float = None, linear=False) -> list:
+    def getAxisValues(self, device_guid, input_id: int, value: float = None) -> list:
         """gets an axis input values, including actual, raw, calibrated and curved as a list of floating point values
         a value of None indicates the item is not used.
         the fiest value is the computed value based on applied calibration
@@ -3996,22 +4007,13 @@ class AxisState:
         dev: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
         assert dev is not None, "device not found"
         if dev.device_type == gremlin.types.DeviceType.Joystick:
-            if linear:
-                # input is linear
-                assert input_id in dev.linear_id_map, "invalid input id"
-                axis_id = input_id
-            else:
-                # input id
-                assert input_id in dev.axis_id_map, "invalid input id"
-                axis_id = dev.axis_id_map[input_id]
-        else:
-            axis_id = input_id
+            assert input_id in dev.axis_id_map, "invalid input id"
 
         # special handling of OSC input devices
         if dev.device_type == gremlin.types.DeviceType.Osc:
             osc = gremlin.ui.osc_device.InputOscClient()
             osc.start()  # ensure started
-            data = osc.getData(axis_id.message)  # gets data arguments or None if no data
+            data = osc.getData(input_id.message)  # gets data arguments or None if no data
             if data is None:
                 value = 0
             else:
@@ -4021,16 +4023,16 @@ class AxisState:
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
 
-        data = self.getAxisData(device_guid, axis_id)
+        data = self.getAxisData(device_guid, input_id)
         if data is None:
             # no data in the state yet, read it
-            value = gremlin.joystick_handling.get_axis(device_guid, axis_id)
-            data = self.setAxisData(device_guid, axis_id, value)
+            value = gremlin.joystick_handling.get_axis(device_guid, input_id) # axis id is already linear
+            data = self.setAxisData(device_guid, input_id, value)
 
         if data is not None:
             values = data.getAxisValues(value)
             if not values:
-                syslog.error(f"AXIS STATE: no axis data found for device {dev.name} ID: {input_id} linear: {linear}")
+                syslog.error(f"AXIS STATE: no axis data found for device {dev.name} ID: {input_id}")
                 return None
             return values
         else:
@@ -4039,7 +4041,7 @@ class AxisState:
                     input_stub = input_id.display_name
                 else:
                     input_stub = f"{input_id}"
-                syslog.error(f"AXIS STATE: no axis data found for device {dev.name} ID: {input_stub} linear: {linear}")
+                syslog.error(f"AXIS STATE: no axis data found for device {dev.name} ID: {input_stub}")
                 known_axes = [i for (d, i) in self._data if d == dev.device_id]
                 syslog.info(f"\tknown list: {known_axes}")
         return None
@@ -4066,7 +4068,7 @@ class AxisState:
                 return item.calibration
         return None
 
-    def applyCalibration(self, device_guid, input_id, value: float, return_null: bool = True):
+    def applyCalibration(self, device_guid, input_id : int, value: float, return_null: bool = True):
         """applies an axis calibration to an input value"""
         if device_guid:
             item = self.getItem(device_guid, input_id)

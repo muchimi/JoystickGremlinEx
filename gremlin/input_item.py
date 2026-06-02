@@ -1837,7 +1837,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                     if self._identifier.is_axis:
                         # axis
                         device_guid = self._identifier.device_guid
+                        device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
                         input_id = self._identifier.input_id
+                        assert input_id in device.axis_id_map, f"invalid axis id: {input_id} for device: {device.getName()}"
+
                         astate = gremlin.event_handler.AxisState()
                         values = astate.getAxisValues(device_guid, input_id)
 
@@ -6586,7 +6589,7 @@ class ActionSetView(AbstractView):
                 gremlin.ui.ui_common.MessageBox(prompt=f"Unable to add: [{action_name}]. The action can only appear once per input.")
                 return
 
-        self.model.add_action(action)
+        self.model.add(action)
 
     def _paste_action(self, action, container):
         """handles action paste operation"""
@@ -6605,7 +6608,7 @@ class ActionSetView(AbstractView):
                 self.model.add_action(new_action)
         else:
             action_item = plugin_manager.duplicate(action, self.container)
-            self.model.add_action(action_item)
+            self.model.add(action_item)
 
     def _create_closed_cb(self, widget):
         """Create callbacks to remove individual containers from the model.

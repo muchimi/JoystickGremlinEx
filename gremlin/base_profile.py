@@ -787,8 +787,8 @@ class Settings:
         self.vjoy_initial_values = {}
         self.startup_mode = None
         self.default_delay = 0.05
-        self.input_filter = {}  # map of input filters for each device, [device_guid][input_type][input_id] = bool (true if visible, false if not) - no data = not visible
-        self.default_input_filter = {}  # map of default input filters for devices [device_guid][input_type][input_id] = bool (true if visible, false if not) - no data = not visible/selected
+        self.input_visible_map = {}  # map of input filters for each device, [device_guid][input_type][input_id] = bool (true if visible, false if not) - no data = not visible
+        self.default_input_visible_map = {}  # map of default input filters for devices [device_guid][input_type][input_id] = bool (true if visible, false if not) - no data = not visible/selected
         self.loadFilterDefaults()  # loads the default input filter
 
     def reset(self):
@@ -797,7 +797,7 @@ class Settings:
         self.vjoy_initial_values.clear()
         self.startup_mode = None
         self.default_delay = 0.05
-        self.input_filter.clear()
+        self.input_visible_map.clear()
         self.loadFilterDefaults()  # loads the default input filter
 
     def to_xml(self):
@@ -839,10 +839,10 @@ class Settings:
             node.append(vjoy_node)
 
         # mapping filters
-        if self.input_filter:
+        if self.input_visible_map:
             root_filter_node = etree.Element("input-filter")
             node.append(root_filter_node)
-            for device_guid in self.input_filter:
+            for device_guid in self.input_visible_map:
                 device = gremlin.joystick_handling.getDevice(device_guid)
                 if device:
                     device_id = device.device_id
@@ -851,9 +851,9 @@ class Settings:
                     device_node.set("name", device.name)
                     root_filter_node.append(device_node)
 
-                    for input_type in self.input_filter[device_guid]:
-                        for input_id in self.input_filter[device_guid][input_type]:
-                            value = self.input_filter[device_id][input_type][input_id]
+                    for input_type in self.input_visible_map[device_guid]:
+                        for input_id in self.input_visible_map[device_guid][input_type]:
+                            value = self.input_visible_map[device_id][input_type][input_id]
                             if not value:
                                 # only save non filtered inputs (they are usually less than the filtered ones)
                                 filter_node = etree.Element("filter")
@@ -919,7 +919,7 @@ class Settings:
         # read the device list as it will tell GEX that the device was previously viewed
         for device_node in node.xpath("./input-filter/device"):
             device_guid = safe_read(device_node, "id", str, "")
-            self.input_filter[device_guid] = {}
+            self.input_visible_map[device_guid] = {}
 
         for filter_node in node.xpath("./input-filter/filter"):
             device_id = safe_read(filter_node, "device", str, "")
@@ -927,7 +927,7 @@ class Settings:
             input_type = InputType.to_enum(safe_read(filter_node, "type", str, ""))
             input_id = safe_read(filter_node, "id", int, -1)
             value = False  # if present in the xml, filter on # safe_read(filter_node, "filter", bool, False)
-            self.setFiltered(device_guid, input_type, input_id, value)
+            self.setInputvisible(device_guid, input_type, input_id, value)
 
         # update the data from the profile
         sd.reset()
@@ -1015,11 +1015,11 @@ class Settings:
             syslog.warning(f"PROFILE IS FILTER: unknown device [{device_guid}]")
             return False
         device_guid = device.device_guid
-        if device_guid not in self.input_filter:
+        if device_guid not in self.input_visible_map:
             return False
-        for input_type in self.input_filter[device_guid]:
-            for input_id in self.input_filter[device_guid][input_type]:
-                if self.input_filter[device_guid][input_type][input_id]:
+        for input_type in self.input_visible_map[device_guid]:
+            for input_id in self.input_visible_map[device_guid][input_type]:
+                if self.input_visible_map[device_guid][input_type][input_id]:
                     return True
         return False
 
@@ -1048,13 +1048,13 @@ class Settings:
                 input_type = InputType.JoystickAxis
                 for index in range(device.axis_count):
                     input_id = device.axis_sequence_to_input_id(index)
-                    included = self.getFiltered(device_guid, input_type, input_id)
+                    included = self.getInputVisible(device_guid, input_type, input_id)
                     if included:
                         setFilter(device_guid, input_type, input_id, included)
 
                 input_type = InputType.JoystickButton
                 for input_id in range(1, device.button_count + 1):
-                    included = self.getFiltered(device_guid, input_type, input_id)
+                    included = self.getInputVisible(device_guid, input_type, input_id)
                     if included:
                         setFilter(device_guid, input_type, input_id, included)
 
@@ -1062,9 +1062,9 @@ class Settings:
 
     def getJoystickInputStats(self, device_guid: dinput.GUID | str | int) -> JoystickInputStats:
         """returns a stats object holding filtered data"""
-        return JoystickInputStats(device_guid, self.input_filter)
+        return JoystickInputStats(device_guid, self.input_visible_map)
 
-    def _set_default_filter_list(self, device: dinput.DeviceSummary, input_type: InputType, max_count: int):
+    def _set_default_input_visible_list(self, device: dinput.DeviceSummary, input_type: InputType, max_count: int):
         """gets a default list of filtered inputs based on given parameters"""
         visible_list = []
         device_guid = device.device_guid
@@ -1084,7 +1084,7 @@ class Settings:
             input_id = index + 1
             mapped = self.profile.isInputMapped(device_guid, input_type, input_id)
             if mapped:
-                self.setFiltered(device_guid, input_type, input_id, False)
+                self.setInputvisible(device_guid, input_type, input_id, False)
                 visible_list.append(input_id)
                 map_data.remove(input_id)
 
@@ -1103,26 +1103,27 @@ class Settings:
         for index in range(device_count):
             input_id = index + 1
             filtered = input_id in map_data
-            self.setFiltered(device_guid, input_type, input_id, filtered)
+            self.setInputvisible(device_guid, input_type, input_id, filtered)
 
-    def _set_all_filtered(self, current_mode: str = None):
-        """sets filter for all joystick devices to a specific mode or all modes"""
+    def _set_all_visible(self, current_mode: str = None):
+        """includes all inputs for a specific mode or all modes"""
         for device in gremlin.joystick_handling.all_joystick_devices():
             device_guid = device.device_guid
             for index in range(device.axis_count):
                 input_id = device.axis_sequence_to_input_id(index)
                 is_used = self.profile.isInputMapped(device_guid, InputType.JoystickAxis, input_id, current_mode)
-                self.setFiltered(device_guid, InputType.JoystickAxis, input_id, not is_used)
+                self.setInputvisible(device_guid, InputType.JoystickAxis, input_id, is_used)
+
             for index in range(device.button_count):
                 input_id = index + 1
                 is_used = self.profile.isInputMapped(device_guid, InputType.JoystickButton, input_id, current_mode)
-                self.setFiltered(device_guid, InputType.JoystickButton, input_id, not is_used)
+                self.setInputvisible(device_guid, InputType.JoystickButton, input_id, is_used)
             for index in range(device.hat_count):
                 input_id = index + 1
                 is_used = self.profile.isInputMapped(device_guid, InputType.JoystickHat, input_id, current_mode)
-                self.setFiltered(device_guid, InputType.JoystickHat, input_id, not is_used)
+                self.setInputvisible(device_guid, InputType.JoystickHat, input_id, is_used)
 
-    def setAllFiltered(self, mode: str):
+    def setAllVisible(self, mode: str):
         """set all joystick device filtered list based on requested mode
         :param mode: "default","mapped","hide_all"
         """
@@ -1137,29 +1138,29 @@ class Settings:
             case "mapped":
                 # set all joystick devices to show mapped inputs - specific profile mode
                 current_mode = gremlin.shared_state.edit_mode
-                self._set_all_filtered(current_mode)
+                self._set_all_visible(current_mode)
 
             case "mapped_all":
                 # all profile modes '''
-                self._set_all_filtered()
+                self._set_all_visible()
 
             case "hide_all":
                 # set all joystick devices to hidden (max performance)
                 for device in gremlin.joystick_handling.all_joystick_devices():
                     device_guid = device.device_guid
                     for index in range(device.axis_count):
-                        input_id = device.axis_sequence_to_input_id(index)
-                        self.setFiltered(device_guid, InputType.JoystickAxis, input_id, True)
+                        input_id = device.getAxisInputId(index + 1)
+                        self.setInputvisible(device_guid, InputType.JoystickAxis, input_id, False)
                     for index in range(device.button_count):
                         input_id = index + 1
-                        self.setFiltered(device_guid, InputType.JoystickButton, input_id, True)
+                        self.setInputvisible(device_guid, InputType.JoystickButton, input_id, False)
                     for index in range(device.hat_count):
                         input_id = index + 1
-                        self.setFiltered(device_guid, InputType.JoystickHat, input_id, True)
+                        self.setInputvisible(device_guid, InputType.JoystickHat, input_id, False)
 
-    def dump_filter(self, p_device_guid=None):
+    def dump_visible_map(self, p_device_guid=None):
         """dumps the current input filter to the log file"""
-        for device_guid in self.input_filter:
+        for device_guid in self.input_visible_map:
             if p_device_guid and device_guid != p_device_guid:
                 continue
 
@@ -1168,23 +1169,29 @@ class Settings:
             device = gremlin.joystick_handling.getDevice(device_guid)
             syslog.info(f"Input filter dump for {device.name}")
             visible_count = 0
-            for input_type in self.input_filter[device_guid]:
-                for input_id in self.input_filter[device_guid][input_type]:
-                    included = self.getFiltered(device_guid, input_type, input_id)
+            for input_type in self.input_visible_map[device_guid]:
+                for input_id in self.input_visible_map[device_guid][input_type]:
+                    included = self.getInputVisible(device_guid, input_type, input_id)
                     if not included:
                         # syslog.info(f"\t{input_type.name} {input_id} visible")
                         visible_count += 1
             syslog.info(f"\tVisible count: {visible_count}")
 
-    def setFiltered(
+    def setInputvisible(
         self,
         device_guid: dinput.GUID | str | int,
         input_type: InputType,
         input_id: int,
-        value: bool,
+        visible: bool,
         emit=False,
     ):
-        """marks a joystick input as filtered or not"""
+        """marks a joystick input as filtered or not
+
+        filtered = included in the UI
+        not filtered = not included in the UI (hidden)
+
+
+        """
         device = gremlin.joystick_handling.getDevice(device_guid)
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_filter or config.verbose_mode_ui
@@ -1194,50 +1201,60 @@ class Settings:
             return
         # verbose = True
 
-        device_guid = device.device_id  # key must be a string
-        if device_guid not in self.input_filter:
-            self.input_filter[device_guid] = {}
-        if input_type not in self.input_filter[device_guid]:
-            self.input_filter[device_guid][input_type] = {}
-        self.input_filter[device_guid][input_type][input_id] = value
+        device_id = device.device_id  # key must be a string
+        if device_id not in self.input_visible_map:
+            self.input_visible_map[device_id] = {}
+        if input_type not in self.input_visible_map[device_id]:
+            self.input_visible_map[device_id][input_type] = {}
+        if visible:
+            # remove from list if included (the list should only include excluded inputs.  the absence of an input means it's visible (filtered))
+            if input_id in self.input_visible_map[device_id][input_type]:
+                del self.input_visible_map[device_id][input_type][input_id]  # remove from filter list to include in display
+        else:
+            # add to list if excluded
+            self.input_visible_map[device_id][input_type][input_id] = visible
 
         if emit:
             el = gremlin.event_handler.EventListener()
-            el.input_filtered_change.emit(device_guid)  # tell the widget the input list has changed
+            el.input_filtered_change.emit(device_id)  # tell the widget the input list has changed
 
-        if verbose and input_type == InputType.JoystickAxis and not device.is_virtual and "LEFT" in device.name:
-            syslog.info(f"PROFILE SET FILTER: [{device.name}] axis: [{input_id}] included: {self.input_filter[device_guid][input_type][input_id]}")
-
-    def setDefaultFiltered(
+    def setDefaultInputVisible(
         self,
         device_guid: dinput.GUID | str | int,
         input_type: InputType,
         input_id: int,
-        value: bool,
+        visible: bool,
     ):
         """marks a joystick input as default filtered or not"""
         device = gremlin.joystick_handling.getDevice(device_guid)
+        assert device is not None, "invalid device"
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_filter or config.verbose_mode_ui
-        device_guid = gremlin.util.normalize_guid(device_guid)  # key must be a string
-        if device_guid not in self.default_input_filter:
-            self.default_input_filter[device_guid] = {}
-        if input_type not in self.default_input_filter[device_guid]:
-            self.default_input_filter[device_guid][input_type] = {}
-        self.default_input_filter[device_guid][input_type][input_id] = value
+        device_id = device.device_id  # key must be a string
+        if device_id not in self.default_input_visible_map:
+            self.default_input_visible_map[device_id] = {}
+        if input_type not in self.default_input_visible_map[device_id]:
+            self.default_input_visible_map[device_id][input_type] = {}
+
+        if visible:
+            # remove from list if included (the list should only include excluded inputs.  the absence of an input means it's visible (filtered))
+            if input_id in self.default_input_visible_map[device_id][input_type]:
+                del self.default_input_visible_map[device_id][input_type][input_id]  # remove from filter list to include in display
+        else:
+            self.default_input_visible_map[device_id][input_type][input_id] = visible
 
         if verbose and input_type == InputType.JoystickAxis and not device.is_virtual and "LEFT" in device.name:
-            syslog.info(f"PROFILE SET FILTER: [{device.name}] axis: [{input_id}] included: {self.default_input_filter[device_guid][input_type][input_id]}")
+            syslog.info(f"PROFILE SET FILTER: [{device.name}] axis: [{input_id}] included: {self.default_input_visible_map[device_id][input_type][input_id]}")
 
     def isDefaultFiltered(self, device_guid: dinput.GUID | str | int) -> bool:
         """true if the device has default filter data saved"""
         device_guid = gremlin.util.normalize_guid(device_guid)  # key must be a string
-        return device_guid in self.default_input_filter
+        return device_guid in self.default_input_visible_map
 
     def clearDefaultsFiltered(self, device_guid: dinput.GUID | str | int):
         device_guid = gremlin.util.normalize_guid(device_guid)  # key must be a string
-        if device_guid in self.default_input_filter:
-            del self.default_input_filter[device_guid]
+        if device_guid in self.default_input_visible_map:
+            del self.default_input_visible_map[device_guid]
             return self.saveFilterDefaults()
         return True
 
@@ -1246,13 +1263,13 @@ class Settings:
         device_guid = gremlin.util.normalize_guid(device_guid)  # key must be a string
         device = gremlin.joystick_handling.getDevice(device_guid)
         if device:
-            if device_guid in self.input_filter:
+            if device_guid in self.input_visible_map:
                 return True
-            if device_guid in self.default_input_filter:
+            if device_guid in self.default_input_visible_map:
                 return True
         return False
 
-    def getFilterInputCounts(
+    def getVisibleInputCounts(
         self,
         device_guid: dinput.GUID | str | int,
         input_type: InputType | list[InputType],
@@ -1262,17 +1279,17 @@ class Settings:
         input_type_list = input_type if hasattr(input_type, "__iter__") else [input_type]
         count = 0
         device_guid = gremlin.util.normalize_guid(device_guid)  # key must be a string
-        if device_guid in self.input_filter:
+        if device_guid in self.input_visible_map:
             for input_type in input_type_list:
-                if input_type in self.input_filter[device_guid]:
+                if input_type in self.input_visible_map[device_guid]:
                     filtered_count = sum(
-                        1 if self.input_filter[device_guid][input_type][input_id] else 0 for input_id in self.input_filter[device_guid][input_type]
+                        1 if self.input_visible_map[device_guid][input_type][input_id] else 0 for input_id in self.input_visible_map[device_guid][input_type]
                     )
                     count += filtered_count
 
         return count
 
-    def getFiltered(
+    def getInputVisible(
         self,
         device_guid: dinput.GUID | str | int,
         input_type: InputType,
@@ -1280,7 +1297,7 @@ class Settings:
     ) -> bool:
         """gets the joystick input filtered state
 
-        :returns bool: True if the item is filtered in the model (visible), False if it should not be visible
+        :returns bool: True if the item is visible in the model
         """
         device = gremlin.joystick_handling.getDevice(device_guid)
         assert device is not None, "invalid device"
@@ -1289,13 +1306,13 @@ class Settings:
         # verbose = config.verbose_mode_filter or config.verbose_mode_ui
         # # verbose = True
 
-        if device_guid not in self.input_filter:
+        if device_guid not in self.input_visible_map:
             # not in settings
-            if device_guid in self.default_input_filter:
+            if device_guid in self.default_input_visible_map:
                 # found in saved defaults
-                if input_type in self.default_input_filter[device_guid]:
-                    if input_id in self.default_input_filter[device_guid][input_type]:
-                        return self.default_input_filter[device_guid][input_type][input_id]
+                if input_type in self.default_input_visible_map[device_guid]:
+                    if input_id in self.default_input_visible_map[device_guid][input_type]:
+                        return self.default_input_visible_map[device_guid][input_type][input_id]
                     else:
                         return True
                 else:
@@ -1305,17 +1322,17 @@ class Settings:
                 # apply defaults
                 self.applyFilterDefaults()  # apply defaults
 
-        if input_type not in self.input_filter[device_guid]:
+        if input_type not in self.input_visible_map[device_guid]:
             return False  # do not include by default
 
-        if input_id in self.input_filter[device_guid][input_type]:
-            return self.input_filter[device_guid][input_type][input_id]
+        if input_id in self.input_visible_map[device_guid][input_type]:
+            return self.input_visible_map[device_guid][input_type][input_id]
 
         return True  # include in display if no entry
 
-    def getFilterMap(self):
+    def getInputVisibleMap(self):
         """gets the input filter"""
-        return copy.deepcopy(self.input_filter)  # return a copy so settings are not mutable
+        return copy.deepcopy(self.input_visible_map)  # return a copy so settings are not mutable
 
     def applyFilter(self, input_filter: dict):
         """applies the filter data from the input filter"""
@@ -1323,12 +1340,12 @@ class Settings:
             for input_type in input_filter[device_guid]:
                 for input_id in input_filter[device_guid][input_type]:
                     filtered = input_filter[device_guid][input_type][input_id]
-                    self.setFiltered(device_guid, input_type, input_id, filtered, False)
+                    self.setInputvisible(device_guid, input_type, input_id, filtered, False)
 
     def loadFilterDefaults(self) -> bool:
         """load default input filters"""
-        self.default_input_filter = {}
-        self.input_filter = {}
+        self.default_input_visible_map = {}
+        self.input_visible_map = {}
         default_xml = self.getDefaultFilterXml()
 
         if os.path.isfile(default_xml):
@@ -1340,7 +1357,7 @@ class Settings:
 
             for device_node in device_nodes:
                 device_guid = safe_read(device_node, "id", str, "")
-                self.default_input_filter[device_guid] = {}
+                self.default_input_visible_map[device_guid] = {}
 
             filter_nodes = root.xpath("//input-filter/filter")
 
@@ -1349,9 +1366,9 @@ class Settings:
                     device_guid = safe_read(filter_node, "device", str, "")
                     input_type = InputType.to_enum(safe_read(filter_node, "type", str, ""))
                     input_id = safe_read(filter_node, "id", int, -1)
-                    value = True  # if line is present - item is included (filtered) # safe_read(filter_node, "filter", bool, True)
-                    self.setDefaultFiltered(device_guid, input_type, input_id, value)
-                    self.setFiltered(device_guid, input_type, input_id, value)
+                    value = False # visible OFF if line is present
+                    self.setDefaultInputVisible(device_guid, input_type, input_id, value)
+                    self.setInputvisible(device_guid, input_type, input_id, value)
 
             self.applyFilterDefaults()
 
@@ -1365,7 +1382,7 @@ class Settings:
             # come up with a suitable default
             assert device is not None, "invalid device"
             device_guid = gremlin.util.normalize_guid(device.device_guid)  # key must be a string
-            if device_guid not in self.default_input_filter:
+            if device_guid not in self.default_input_visible_map:
                 # not filtered - needs a default
                 max_axis = min(3, device.axis_count)
                 max_button = min(3, device.button_count)
@@ -1378,17 +1395,17 @@ class Settings:
                 for input_type, count in input_types:
                     if count:
                         for input_id in range(1, count + 1):
-                            self.setDefaultFiltered(device_guid, input_type, input_id, True)
-                            self.setFiltered(device_guid, input_type, input_id, True)
+                            self.setDefaultInputVisible(device_guid, input_type, input_id, True)
+                            self.setInputvisible(device_guid, input_type, input_id, True)
 
     def saveFilterDefaults(self) -> bool:
         """saves the filter defaults to XML"""
         # default data
         default_xml = self.getDefaultFilterXml()
-        if self.default_input_filter:
+        if self.default_input_visible_map:
             # load default input filters
             root_filter_node = etree.Element("input-filter")
-            for device_guid in self.default_input_filter:
+            for device_guid in self.default_input_visible_map:
                 device = gremlin.joystick_handling.getDevice(device_guid)
                 if device:
                     device_node = etree.Element("device")
@@ -1399,9 +1416,9 @@ class Settings:
                     # device_node.append(comment_node)
                     root_filter_node.append(device_node)
 
-                    for input_type in self.default_input_filter[device_guid]:
-                        for input_id in self.default_input_filter[device_guid][input_type]:
-                            value = self.default_input_filter[device_guid][input_type][input_id]
+                    for input_type in self.default_input_visible_map[device_guid]:
+                        for input_id in self.default_input_visible_map[device_guid][input_type]:
+                            value = self.default_input_visible_map[device_guid][input_type][input_id]
                             if not value:
                                 # only save non filtered inputs (they are usually less than the filtered ones)
                                 filter_node = etree.Element("filter")
@@ -2836,7 +2853,7 @@ class Profile:
         :returns bool: True if the item is visible, False if not
 
         """
-        return self.settings.getFiltered(device_guid, input_type, input_id)
+        return self.settings.getInputVisible(device_guid, input_type, input_id)
 
     def get_selectable_modes(self):
         """gets the list of all selectable modes in the profile"""

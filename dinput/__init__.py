@@ -667,15 +667,14 @@ class DeviceSummary:
         """Gets the input for the linear index
         :param index: index 0 to axis_count -1
         """
-
         if linear_id in self.linear_id_map:
             return self.linear_id_map[linear_id]
         if throw_on_missing:
-            raise ValueError(f"invalid linear index for axis: {linear_id}")
+            raise ValueError(f"invalid linear axis id: {linear_id} for device {self.name}")
         return None
 
     def getAxisLinearId(self, axis_id: int):
-        """gets the linear index for a given ID axis if the axis is skipped"""
+        """gets the linear index for a given non linear axis id"""
         if axis_id in self.axis_id_map:
             return self.axis_id_map[axis_id]
         return None

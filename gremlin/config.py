@@ -1161,7 +1161,7 @@ class Configuration(QtCore.QObject):
 
         :return default action to show in action selection drop downs
         """
-        return self._get_data("default_action", "Remap")
+        return self._get_data("default_action", "Vjoy Remap")
 
     @default_action.setter
     def default_action(self, value):
