@@ -21,7 +21,7 @@ import typing
 from typing import List, Optional, TYPE_CHECKING
 import uuid
 
-from PySide6 import QtCore, QtQml
+from PySide6 import QtCore
 from PySide6.QtCore import Property, Slot
 
 from gremlin import error, plugin_manager, profile, tree, util
@@ -31,16 +31,11 @@ from gremlin.tree import TreeNode
 from gremlin.types import AxisButtonDirection, HatDirection
 from gremlin.input_types import InputType
 from psygnal import Signal
+import gremlin.event_handler
 
 if TYPE_CHECKING:
     from gremlin.base_classes import AbstractActionModel
 
-
-QML_IMPORT_NAME = "Gremlin.Profile"
-QML_IMPORT_MAJOR_VERSION = 1
-
-
-@QtQml.QmlElement
 class InputItemModel(QtCore.QObject):
     """QML model class representing a LibraryItem instance."""
 
@@ -86,7 +81,7 @@ class InputItemModel(QtCore.QObject):
         self.bindingsChanged.emit()
 
 
-@QtQml.QmlElement
+
 class InputItemBindingListModel(QtCore.QAbstractListModel):
     """List model of all InputItemBinding instances of a single input item."""
 
@@ -111,7 +106,7 @@ class InputItemBindingListModel(QtCore.QAbstractListModel):
         return InputItemBindingListModel.roles
 
 
-@QtQml.QmlElement
+
 class VirtualButtonModel(QtCore.QObject):
     """Represents both axis and hat virtual buttons."""
 
@@ -234,8 +229,6 @@ class VirtualButtonModel(QtCore.QObject):
         notify=hatDirectionChanged,
     )
 
-
-@QtQml.QmlElement
 class HatDirectionModel(QtCore.QObject):
     """QML model representing the directions of a hat."""
 
@@ -310,7 +303,7 @@ class HatDirectionModel(QtCore.QObject):
     )
 
 
-@QtQml.QmlElement
+
 class ActionNodeModel(QtCore.QObject):
     """QML model representing a single action instance."""
 
@@ -405,7 +398,8 @@ class ActionNodeModel(QtCore.QObject):
                 self.actionChanged.emit()
                 self._signal_change()
             except error.GremlinError:
-                signal.reloadUi.emit()
+                el = gremlin.event_handler.EventListener()
+                el.reloadUi.emit()
 
     def _append_drop_action(self, source: str, target: str) -> None:
         """Positions the source node after the target node.
@@ -432,7 +426,8 @@ class ActionNodeModel(QtCore.QObject):
             self.actionChanged.emit()
             self._signal_change()
         except error.GremlinError:
-            signal.reloadUi.emit()
+            el = gremlin.event_handler.EventListener()
+            el.reloadUi.emit()
 
     @Slot(str)
     def appendNewAction(self, action_name: str) -> None:
@@ -499,15 +494,18 @@ class ActionNodeModel(QtCore.QObject):
         Returns:
             The TreeNode corresponding to the given uuid
         """
-        predicate = lambda x: True if x.value and x.value.id == uuid else False
-        nodes = self._action_tree.root.nodes_matching(predicate)
+        def find_id(node) -> bool:
+            nonlocal uuid
+            return node.value is not None and node.value.id == uuid
+        #predicate = lambda x: True if x.value and x.value.id == uuid else False
+        nodes = self._action_tree.root.nodes_matching(find_id)
 
         if len(nodes) != 1:
             raise error.GremlinError(f"Unable to retrieve node with id {uuid}")
         return nodes[0]
 
 
-@QtQml.QmlElement
+
 class InputItemBindingModel(QtCore.QObject):
     """Model representing an ActionTree instance."""
 
@@ -588,7 +586,8 @@ class InputItemBindingModel(QtCore.QObject):
             self.behaviorChanged.emit()
             self.rootActionChanged.emit()
             # This one might be overkill
-            signal.reloadUi.emit()
+            el = gremlin.event_handler.EventListener()
+            el.reloadUi.emit()
 
     def _get_description(self) -> str:
         return self._input_item_binding.description

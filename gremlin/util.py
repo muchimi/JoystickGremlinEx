@@ -27,7 +27,6 @@ import time
 import shutil
 import uuid
 import json
-import hashlib
 import dinput
 import win32api
 import win32con

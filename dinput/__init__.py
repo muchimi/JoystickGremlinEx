@@ -539,11 +539,15 @@ class DeviceSummary:
         return self.linear_id_map[index]  # to axis
 
     def axis_sequence_to_input_id(self, index: int):
-        """zero based index to input ID for axes"""
-        linear_id = index + 1
+        """zero based index to input ID for axes
+        :param index: zero based index to convert to an input ID
+        """
+        linear_id = index + 1 # linear is 1 based
         if self.is_virtual:
+            # vjoy devices
             return linear_id
         if linear_id in self.linear_id_map:
+            # mapped devices
             return self.linear_id_map[linear_id]
 
     @property
@@ -604,35 +608,39 @@ class DeviceSummary:
         self.vjoy_id = vjoy_id
         self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
 
-    def get_axis_name(self, axis_id, is_axis_id=True, short_name=False):
-        """gets the axis name based on the input #"""
+    def get_axis_name(self, index : int, is_linear=False, short_name=False):
+        """gets the axis name based on the input #
+
+
+        """
+        assert isinstance(index, int) and index > 0,f"invalid index: {index} - should be a 1 based integer"
+        if is_linear:
+            input_id = self.getAxisLinearId(index)
+        else:
+            input_id = index
+
         if not short_name:
-            return f"Axis {self.getAxisName(axis_id, is_linear=not is_axis_id)}"
+            return f"Axis {self.getAxisName(input_id)}"
 
-        if is_axis_id:
-            input_id = axis_id
-        else:
-            if axis_id in self.axis_id_map:
-                input_id = self.axis_id_map[axis_id]
-
-        if input_id == 1:
-            axis_name = "X"
-        elif input_id == 2:
-            axis_name = "Y"
-        elif input_id == 3:
-            axis_name = "Z"
-        elif input_id == 4:
-            axis_name = "RX"
-        elif input_id == 5:
-            axis_name = "RY"
-        elif input_id == 6:
-            axis_name = "RZ"
-        elif input_id == 7:
-            axis_name = "S1"
-        elif input_id == 8:
-            axis_name = "S2"
-        else:
-            axis_name = f"(unknown [{input_id}])"
+        match input_id:
+            case 1:
+                axis_name = "X"
+            case 2:
+                axis_name = "Y"
+            case 3:
+                axis_name = "Z"
+            case 4:
+                axis_name = "RX"
+            case 5:
+                axis_name = "RY"
+            case 6:
+                axis_name = "RZ"
+            case 7:
+                axis_name = "S1"
+            case 8:
+                axis_name = "S2"
+            case _:
+                axis_name = f"(unknown [{input_id}])"
 
         return axis_name
 
@@ -665,8 +673,9 @@ class DeviceSummary:
 
     def getAxisInputId(self, linear_id: int, throw_on_missing = True):
         """Gets the input for the linear index
-        :param index: index 0 to axis_count -1
+        :param index: 1 based linear index to get the mapped input ID for
         """
+        assert linear_id > 0,"invalid linear id - must be 1 based"
         if linear_id in self.linear_id_map:
             return self.linear_id_map[linear_id]
         if throw_on_missing:
@@ -674,7 +683,9 @@ class DeviceSummary:
         return None
 
     def getAxisLinearId(self, axis_id: int):
-        """gets the linear index for a given non linear axis id"""
+        """gets the linear index for a given non linear axis id
+         :param axis_id: axis id to get the linear index for"""
+        assert axis_id > 0,"invalid axis id - must be 1 based"
         if axis_id in self.axis_id_map:
             return self.axis_id_map[axis_id]
         return None
@@ -698,6 +709,7 @@ class DeviceSummary:
         :param is_linear: true if the index is the linear axis index (range 0 to axis_count), false if the axis identifier
 
         """
+        assert isinstance(index, int) and index > 0,f"invalid index: {index} - should be a 1 based integer"
         try:
             am: AxisMap
             stub = ""

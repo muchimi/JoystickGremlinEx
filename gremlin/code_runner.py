@@ -26,11 +26,6 @@ import sys
 import dinput
 
 import gremlin
-# from gremlin import event_handler, input_devices, \
-#     joystick_handling, macro, sendinput, user_plugin, util
-
-
-import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.shared_state
@@ -125,7 +120,7 @@ class CodeRunner:
         ''' enables UI '''
         self.setUIState(True)
 
-    def start(self, inheritance_tree, settings, start_mode, profile : gremlin.base_profile.Profile) -> bool:
+    def start(self, inheritance_tree, settings, start_mode, profile) -> bool:
         """Starts listening to events and loads all existing callbacks.
 
         :param inheritance_tree tree encoding inheritance between the

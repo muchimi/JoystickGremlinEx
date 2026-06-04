@@ -1794,9 +1794,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             if Shiboken.isValid(widget):
                 widget.setFixedHeight(h)
 
-    def unhook(self):
-        self._button_widget_unhooked()
-
     def _update_repeater(self):
         """updates the repeaters based on the type of widget"""
         gremlin.util.assert_ui_thread()
