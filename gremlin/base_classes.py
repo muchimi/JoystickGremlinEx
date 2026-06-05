@@ -1036,7 +1036,7 @@ class AbstractCallbackModel(AbstractModel):
         """
         return self.add(item)
 
-    def add(self, item: object) -> int:
+    def add(self, item: object, index = -1) -> int:
         """
         Adds (appends) a new entry to the model, returns the position inserted
         :param item: the item to append to the model
@@ -1049,9 +1049,16 @@ class AbstractCallbackModel(AbstractModel):
                     f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}"
                 )
         assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
+
+
+
         if item not in self._index_map:
             self.markDirty()
-            index = len(self._item_map)
+            if index == -1:
+                # find the next available index
+                index = 0
+                while index in self._index_map:
+                    index += 1
             self.setItemAt(index, item)
             self.applyFilter()
             self._fireChanged()

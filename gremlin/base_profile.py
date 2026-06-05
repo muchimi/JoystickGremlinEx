@@ -961,7 +961,7 @@ class Settings:
                 raise ValueError("invalid device filter tag: missing tag [device]")
 
             self.input_visible_map[device_id] = {}
-            device = gremlin.joystick_handling.getDevice(device_guid)
+            device = gremlin.joystick_handling.getDevice(device_id)
             self.setAllDefault(device)
 
             match version:
@@ -3571,6 +3571,9 @@ class Profile:
             tree = etree.parse(fname)
             root = tree.getroot()
 
+        if verbose:
+            syslog.info(f"LOAD: [{gremlin.util.toUrl(fname)}]")
+
         self._start_mode = None
         if "start_mode" in root.attrib:
             self._start_mode = root.get("start_mode")
@@ -3609,15 +3612,16 @@ class Profile:
             self._removed_devices.append(id)
 
         # Parse each device into separate DeviceConfiguration objects
-        devices = root.xpath("//profile/devices/device")
-        for child in devices:
+        device_nodes = root.xpath("//profile/devices/device")
+        for child in device_nodes:
             device = Device(self)
             device.from_xml(child, data, extra_data)
             self.devices[device.device_guid] = device
 
             dd: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device.device_guid)
             if not dd:
-                syslog.warning(f"PROFILE: unable to find device [{device.device_guid}] - XML source line: {child.sourceline}")
+                name = safe_read(child, "name", str, "n/a")
+                syslog.warning(f"PROFILE: unable to find device [{device.device_guid}] - name: [{name}] - XML source line: {child.sourceline}")
             elif dd.is_virtual:
                 # vjoy as input
                 self.settings.setVjoyAsInput(dd.vjoy_id, True)
@@ -3700,8 +3704,8 @@ class Profile:
         # device even if it was not part of the loaded XML and
         # replicate the modes present in the profile. This adds both entries
         # for physical and virtual joysticks.
-        devices = gremlin.joystick_handling.all_joystick_devices()
-        for dev in devices:
+        device_nodes = gremlin.joystick_handling.all_joystick_devices()
+        for dev in device_nodes:
             add_device = False
             if dev.is_virtual and dev.device_guid not in self.vjoy_devices:
                 add_device = True
@@ -3794,6 +3798,7 @@ class Profile:
 
         if verbose:
             self.dumpModeTree()
+            syslog.info(f"LOAD: profile loaded: {gremlin.util.toUrl(fname)}")
 
         # clear used memory
         import_data.used_ids = {}  # reset used list
@@ -4210,14 +4215,21 @@ class Profile:
                     shutil.copyfile(use_name, backup_file)
                     verbose = gremlin.config.Configuration().verbose
                     if verbose:
-                        syslog.info(f"BACKUP: backup profile: {backup_file}")
+                        syslog.info(f"BACKUP: backup profile: {gremlin.util.toUrl(backup_file)}")
                 except Exception as err:
-                    syslog.error(f"BACKUP: save error: Unable to backup profile: [{backup_file}]")
+                    syslog.error(f"BACKUP: save error: Unable to backup profile: [{gremlin.util.toUrl(backup_file)}]")
                     syslog.error(f"{err}\n{traceback.format_exc()}")
                     return
 
         if use_name:
-            self.to_xml(use_name)
+            try:
+                self.to_xml(use_name)
+                if verbose:
+                    syslog.info(f"SAVE: [{gremlin.util.toUrl(self._profile_fname)}]")
+
+            except Exception as err:
+                syslog.error(f"SAVE: error: [{gremlin.util.toUrl(self._profile_fname)}]")
+                syslog.error(f"{err}\n{traceback.format_exc()}")
         else:
             self._profile_fname = None
             self._dirty = False

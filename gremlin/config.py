@@ -1337,6 +1337,8 @@ class Configuration(QtCore.QObject):
     @property
     def verbose(self):
         """determines loging level"""
+        if __debug__:
+            return True
         value = self._get_data("verbose", None)
         if value is None:
             # not set - set other defaults
@@ -2064,20 +2066,26 @@ class Configuration(QtCore.QObject):
                             save_input_id = item.identifier.guid
                     else:
                         count = widget.inputItemListModel.rows()
-                        found = False
+                        #found = False
                         save_input_id = input_id
 
-                        items = list(widget.inputItemListModel.getItems())
-                        for item in items:
-                            if item.guid == input_id:
+                        if count:
+                            item = next((item for item in widget.inputItemListModel if item.guid == input_id), None)
+                            if item:
                                 input_id = item
                                 save_input_id = input_id.guid
-                                found = True
-                                break
-                        if not found and count > 0:
-                            item = items[0]
-                            input_id = item
-                            save_input_id = input_id.guid
+
+                        #items = list(widget.inputItemListModel)
+                        # for item in items:
+                        #     if item.guid == input_id:
+                        #         input_id = item
+                        #         save_input_id = input_id.guid
+                        #         found = True
+                        #         break
+                        # if not found and count > 0:
+                        #     item = items[0]
+                        #     input_id = item
+                        #     save_input_id = input_id.guid
             case DeviceType.ModeControl:
                 save_input_id = input_id
                 input_type = InputType.ModeControl

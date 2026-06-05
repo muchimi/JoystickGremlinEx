@@ -5309,10 +5309,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.setTabsDirty(True)
 
     def _edit_mode_update(self, mode: str):
-        gremlin.util.InvokeUiMethod(self._edit_mode_update_ui, mode)  # ensure on UI thread
+        if mode and self.mode_selector.currentMode() != mode:
+            gremlin.util.InvokeUiMethod(self._edit_mode_update_ui, mode)  # ensure on UI thread
 
     def _edit_mode_update_ui(self, mode: str):
-        if mode and self.mode_selector.currentModeName() != mode:
+        if mode and self.mode_selector.currentMode() != mode:
             self.mode_selector.select_mode(mode)
 
     def _runtime_mode_changed(self, mode: str):
@@ -5531,8 +5532,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """
         self.status_bar_repeater_widget.setText("<b>Repeater: </b> {}".format(text))
 
-    def _update_window_title(self, title=None):
+    def _update_window_title(self, title : str =None):
+        gremlin.util.InvokeUiMethod(self._update_window_title_ui, title)
+
+    def _update_window_title_ui(self, title: str =None):
         """Updates the window title to include the current profile."""
+        assert gremlin.util.is_ui_thread()
         if title is None:
             profile_fname = None
             if gremlin.shared_state.current_profile is not None:

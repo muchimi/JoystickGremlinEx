@@ -310,7 +310,7 @@ class AbstractView(QtWidgets.QWidget):
                 self._redraw_pending = True
                 return
 
-            self.redraw(force=True)
+            self.redraw()
 
     def beginModelChange(self):
         """call this before making a change to the model to prevent multiple change events from firing"""
@@ -4036,25 +4036,30 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     def input_display_name(self):
         return f"{gremlin.shared_state.get_device_name(self.device_guid)} {InputType.to_display_name(self.device_input_type)} {self.device_input_id}"
 
-    def add_action(self, action, index: int, create=True) -> int:
+    def add_action(self, action, index: int = None, create=True) -> int:
         """Adds an action to this container.
 
         :param action the action to add
-        :param index the index of the action_set into which to insert the action
+        :param index the index of the action_set into which to insert the action, by default adds to the next available slot unless specified (0 based)
         :param auto_create: true if the action set should be created if it does not exist
         :returns int: the index of the action set
         """
 
-        if index not in self.action_sets:
-            # add a new action set to the container
-            index = self.action_sets.add(ActionSet())
+        if not self.action_sets:
+            # ensure there is at least 1 action set
+            self.action_sets.add(ActionSet())
 
-        count = self.action_sets.count()
-        if index > count:
-            for i in range(count, index):
-                if not self.action_sets.data(i):
-                    self.action_sets.place(ActionSet(), i)
-        self.action_sets[index].append(action)
+        if index is None:
+            index = 0
+
+        action_set =self.action_sets.itemAt(index)
+        if action_set is None:
+            # add a new action set to the container
+            action_set = ActionSet()
+            index = self.action_sets.add(action_set)
+
+
+        action_set.append(action)
 
         # Create activation condition data if needed
         self.create_or_delete_virtual_button()
@@ -6511,13 +6516,11 @@ class ActionSetView(AbstractView):
         """display details for the mapped input"""
         return f"[device [{self.container.hardware_device_name}] type: [{self.container.hardware_input_type.name} input: [{self.container.hardware_input_id}] container: [{self.container.name}] id: [{self.container.id}]"
 
-    def redraw(self, force=False):
-
+    def redraw(self):
         # assert inspect.stack()[1].function == "_fireChanged","redraw should only be called due to a model trigger"
+        gremlin.util.InvokeUiMethod(self._redraw_ui)  # ensure on UI thread
 
-        gremlin.util.InvokeUiMethod(self._redraw_ui, force)  # ensure on UI thread
-
-    def _redraw_ui(self, force=False):
+    def _redraw_ui(self):
         """Redraws the entire view.  must be on UI thread"""
         import gremlin.clipboard
 
@@ -7349,7 +7352,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         container.registerChangeCallback(self._handle_container_changed)
 
         self.input_item = input_item
-        self.action_widgets = [ActionSetView]
+        self.action_widgets : list[ActionSetView] = []
 
         mode = container.get_mode()
         if mode == gremlin.shared_state.master_mode:
@@ -7827,10 +7830,11 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     def redrawActionSets(self):
         """redraws the action set widgets"""
+        assert gremlin.util.is_ui_thread()
         for widget in self.action_widgets:
             # tell each widget to redraw itself
             if Shiboken.isValid(widget):
-                widget.redraw()
+                widget._redraw_ui()
 
     def _copy_container(self, _):
         """Emits the copy clipboard when the widget is being copied"""

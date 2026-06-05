@@ -23,8 +23,8 @@ import os
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
-from PySide6.QtCore import Qt, QTimer, QEvent
-from PySide6.QtGui import QPixmap, QPainter
+from PySide6.QtCore import Qt, QTimer, QEvent, QSize
+from PySide6.QtGui import QPixmap, QPainter, QIcon
 
 import collections
 from typing import Callable
@@ -504,7 +504,13 @@ class Color:
     @staticmethod
     def cssButton():
         background_color = Color.buttonBackgroundColor()
-        css = f" QPushButton {{ background: {background_color};}}"
+        hover_color = Color.buttonHoverBackgroundColor()
+        css = f"""
+          QPushButton {{ background: {background_color};}}
+          QPushButton:hover {{ background: {hover_color};}}
+        """
+
+        # QPushButton:pressed {{ padding-top: 2px; padding-left: 2px; }}
         return css
 
     @staticmethod
@@ -567,6 +573,7 @@ class Color:
     def cssApplication():
         border_color = Color.borderColor()
         _background_color = Color.backgroundColor()
+        hover_color = Color.buttonHoverBackgroundColor()
         _foreground_color = Color.normalColor
         selected_background_color = Color.selectedBackgroundColor()
         if gremlin.config.Configuration().is_debug:
@@ -608,6 +615,9 @@ class Color:
             QMenu::separator {{
                 border: {border_color};
             }}
+            QMenuBar::item:hover {{
+                background: {hover_color}
+            }}
             QLineEdit {{
                 border: 1px solid {border_color};
             }}
@@ -624,8 +634,6 @@ class Color:
             QListView {{
                 border: 1px solid {border_color};
             }}
-
-
 
             QGroupBox::indicator:checked {{
                 image: url({relative_path}{checkbox_checked});
@@ -1135,7 +1143,7 @@ class Buttons:
         if no_keyboard:
             widget = NoKeyboardPushButton()
         else:
-            widget = QDataPushButton()
+            widget = QIconPushButton()
 
         widget.data = data
         if label:
@@ -3129,10 +3137,11 @@ class ModeWidget(QtWidgets.QWidget):
         min_min_sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         exp_min_sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
 
-        self.profile_options_button_widget = QtWidgets.QPushButton()
-        self.profile_options_button_widget.setIcon(Icons.gearIcon())
-        self.profile_options_button_widget.setToolTip("Profile Options")
-        self.profile_options_button_widget.clicked.connect(self._profile_options_cb)
+        self.profile_options_button_widget = QIconPushButton(
+            icon  = Icons.gearIcon(),
+            tooltip = "Profile Options",
+            callback = self._handle_profile_options_cb)
+
 
         # Create mode selector and related widgets
         self.edit_label = QtWidgets.QLabel(self._label)
@@ -3173,7 +3182,7 @@ class ModeWidget(QtWidgets.QWidget):
         ui = gremlin.shared_state.ui
         ui.manage_modes()
 
-    def _profile_options_cb(self):
+    def _handle_profile_options_cb(self, widget):
         import gremlin.ui.dialogs
 
         if not self.profile.profile_file or not os.path.isfile(self.profile.profile_file):
@@ -4230,12 +4239,16 @@ class QDataPushButton(QtWidgets.QPushButton):
         self._callback_ex = callbackEx
         self._enhanced = enhanced or callbackEx is not None
 
+        # self.setStyleSheet(Color.cssButton())
+
         if enabled is not None:
             self.setEnabled(enabled)
         if clicked:
             self.clicked.connect(clicked)
 
         self.installEventFilter(self)
+
+        self.setStyleSheet(Color.cssButton())
 
     def _handle_callback(self):
         if self._callback:
@@ -4251,19 +4264,28 @@ class QDataPushButton(QtWidgets.QPushButton):
     def setCallbackEx(self, callback):
         self._callback_ex = callback
 
+    def on_press(self):
+        pass
+    def on_release(self):
+        pass
+
     def eventFilter(self, watched, event):
         if self.isEnabled():
             t = event.type()
             if t == QtCore.QEvent.Type.MouseButtonPress:
+
                 button = event.buttons()
                 # Check if Control modifier is active
                 is_ctrl = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
                 is_shft = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
                 is_alt = bool(event.modifiers() & Qt.KeyboardModifier.AltModifier)
+
                 if button == QtCore.Qt.RightButton:
+                    self.on_press()
                     self.clickedEx.emit(self, is_ctrl, is_shft, is_alt, True)  # extended click
                     return True  # handled
                 elif button == QtCore.Qt.LeftButton:
+                    self.on_press()
                     if self.isCheckable():
                         self.setChecked(not self.isChecked())
 
@@ -4273,6 +4295,7 @@ class QDataPushButton(QtWidgets.QPushButton):
                     return True
 
             elif t == QtCore.QEvent.Type.MouseButtonRelease:
+                self.on_release()
                 return True
             elif t == QtCore.QEvent.Type.MouseButtonDblClick:
                 return True
@@ -4294,7 +4317,105 @@ class QDataPushButton(QtWidgets.QPushButton):
         self._data = value
 
 
-class NoKeyboardPushButton(QDataPushButton):
+class QIconPushButton(QDataPushButton):
+    """custom push button with data field and right click context events"""
+
+    _clicked = QtCore.Signal(object)  # click internal (widget)
+    clickedEx = QtCore.Signal(object, bool, bool, bool, bool)  # fires on control click (widget, ctrl, shft, right)
+
+    """ a checkbox that has a data property to track an object associated with the checkbox """
+
+    def __init__(
+        self,
+        icon = None,
+        text=None,
+        data=None,
+        parent=None,
+        tooltip=None,
+        callback=None,
+        callbackEx=None,
+        clicked=None,
+        enabled=None,
+        enhanced=False,
+    ):
+        """custom push button
+
+        :param text: label for the button (optiona)
+        :param data: data object tracked with the button (optional)
+        :param parent: parent widget (optional)
+        :param tooltip: tooltip (optional)
+        :param callback: click callback(widget) (optional)
+        :param callback_ex: click callback (ctrl, shft, right) as boolean flags as parameters to the event (optional)
+        :param clicked: click callback()
+        :param enabled: default enabled state (optional) - button is enabled by default
+        :param enhanced: true if the button monitors shift states and double click
+
+
+        """
+        # if callback_ex:
+        #     import inspect
+        #     sig = inspect.signature(callback_ex)
+        #     if len(sig.parameters) != 5:
+        #         pass
+        super().__init__(text=text,
+                         data = data,
+                         parent = parent,
+                         tooltip = tooltip,
+                         callback = callback,
+                         callbackEx=callbackEx,
+                         clicked=clicked,
+                         enabled=enabled,
+                         enhanced=enhanced
+                         )
+
+
+        if icon:
+            self.setIcon(icon)
+
+    def setIcon(self, icon):
+        import gremlin.util
+        icon : QIcon = gremlin.util.load_icon(icon)
+        super().setIcon(icon)
+
+        # build the "press" icon
+        self.icon = icon
+        icon_size = self.iconSize()
+        base_pixmap = icon.pixmap(icon_size)
+        offset = QPoint(2, 2)
+        offset_pixmap = QPixmap(base_pixmap.size() + QSize(offset.x(), offset.y()))
+        offset_pixmap.fill(Qt.transparent) # Ensure background is clear
+
+        # 3. Draw the shifted image using QPainter
+        painter = QPainter(offset_pixmap)
+        painter.drawPixmap(offset, base_pixmap)
+        painter.end()
+
+
+        # 4. Create the final icon and set it
+        self.icon_pressed = QIcon(offset_pixmap)
+        self.icon_default = icon
+
+
+
+    # def enterEvent(self, event):
+    #     self.setIcon(self.icon_pressed)
+    #     return super().enterEvent(event)
+
+    # def leaveEvent(self, event):
+    #     self.setIcon(self.icon_default)
+    #     return super().leaveEvent(event)
+
+    def on_press(self):
+        """override when mouse is pressed """
+        self.setIcon(self.icon_pressed)
+        self.repaint() # force immediate repaint
+
+
+    def on_release(self):
+        """override when mouse is released"""
+        self.setIcon(self.icon_default)
+
+class NoKeyboardPushButton(QIconPushButton):
     """Standard PushButton which does not react to keyboard input."""
 
     def __init__(self, *args, **kwargs):
@@ -4309,15 +4430,14 @@ class NoKeyboardPushButton(QDataPushButton):
         pass
 
 
-class QIconButton(QDataPushButton):
+class QIconButton(QIconPushButton):
     def __init__(self, icon: str, icon_size=24, text=None, data=None, parent=None, tooltip=None):
         super().__init__(text, data, parent, tooltip)
-        icon = load_icon(icon)
-        self.setIcon(icon)
         size = QtCore.QSize(icon_size, icon_size)
         self.setIconSize(size)
-        self.setStyleSheet("border: none;")
-        # self.setMinimumWidth(icon_size)
+        self.setIcon(icon)
+        # self.setStyleSheet("border: none;")
+
 
 
 class QReorderToolbar(QtWidgets.QWidget):
@@ -5764,666 +5884,6 @@ class QOnOffStatusfWidget(QtWidgets.QWidget):
             self._button_widget.setPixmap(self._off_pixmap)
 
 
-# class AxisStateWidget(QtWidgets.QWidget, gremlin.event_handler.JoystickHook):
-#     ''' input axis visualizer '''
-
-#     valueChanged = QtCore.Signal(float, float) # (input_value, curved_value)
-#     deleted = QtCore.Signal(object) # indicates the item is being deleted
-
-#     def __init__(self,
-#                 device_guid = None,
-#                 input_type = None,
-#                 axis_id = None,
-#                 show_calibrated = False, show_percentage = False, show_value = False,
-#                 show_label = False, show_curve = False, orientation = QtCore.Qt.Orientation.Horizontal,
-#                 min_range : float = -1.0,
-#                 max_range : float = 1.0,
-#                 comment = None,
-#                 decimals = 3,
-#                 callback = None,
-#                 parent=None,
-#                 ui_only = True):
-#         """Creates a new instance.
-
-#         :param axis_id: id of the axis, used in the label
-#         :param show_calibrated: show calibrated data
-#         :param show_percentage: show percent label
-#         :param show_value : show value label
-#         :param show_curve : show curve value label
-#         :param orientation: horizontal or vertical
-#         :param min_range: min range (-1)
-#         :param max_range: max range (+1)
-#         :param comment: comment label
-#         :param device : device to use
-#         :param decimals: decimals to use for value data (3)
-#         :param callback: update callback when the widget changes values (optional)
-#         :param parent the parent of this widget
-
-#         """
-#         super().__init__(parent)
-
-#         self._scale_factor = 1000
-#         self.main_layout = QtWidgets.QVBoxLayout(self)
-#         self.device = gremlin.joystick_handling.getDevice(device_guid)
-#         self._device_guid = self.device.device_guid
-#         self._input_id = axis_id
-#         self._input_type = input_type
-#         self.setObjectName("state_repeater")
-#         self._is_state = True # indicate this is a state widget
-#         self.show_raw = True # true if the raw value should be displayed
-#         self._callback = callback
-
-#         self.hookDevice(self.process_event, self._device_guid, self._input_type, self._input_id, ui_only)
-
-
-#         self.container_widget = QtWidgets.QWidget()
-#         if orientation == QtCore.Qt.Orientation.Vertical:
-#             self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
-
-#         else:
-#             # horizontal
-#             self.container_layout = QtWidgets.QHBoxLayout(self.container_widget)
-
-#         self.container_layout.setSpacing(4)
-
-
-#         # container for the progress bars (regular + calibrated)
-#         self.progress_container_widget = None
-#         self.progress_container_layout = None
-
-#         self._orientation = orientation
-#         self._show_percentage = show_percentage
-#         self._show_value = show_value
-#         self._show_label = show_label
-#         self._show_curve = show_curve
-#         self._show_calibrated = show_calibrated
-#         self._decimals = decimals if decimals is not None else 3
-
-#         # widget references
-#         self._progress_widget = None
-#         self._progress_raw_widget = None
-#         self._progress_calibrated_widget = None
-#         self._display_curve_widget = None
-#         self._display_label_widget = None
-#         self._display_percent_widget = None
-#         self._display_value_widget = None
-
-#         self._data = None
-#         self._comment = comment
-
-#         self._label_text = ""
-#         self._label_value = ""
-#         self._label_percentage = ""
-#         self._label_curve = ""
-
-#         self._display_value = 0.0
-#         self._calibrated_value = 0.0
-
-#         if axis_id:
-#             self._label_text = f"Axis {axis_id}"
-
-#         min = min_range
-#         max = max_range
-#         if min > max:
-#             min, max = max, min
-#         self._min_range = min_range
-#         self._max_range = max_range
-
-
-#         self._value = 0
-#         self._raw_value = 0
-#         self._reverse = False
-#         self._decimals = 3
-#         self._width = 10
-
-#         # hook tab events
-#         el = gremlin.event_handler.EventListener()
-#         el.tab_selected.connect(self._tab_selected)
-#         el.tab_unselected.connect(self._tab_unselected)
-#         el.calibration_changed.connect(self._calibration_changed)
-#         el.calibration_options_changed.connect(self._calibration_options_changed)
-
-#         self.main_layout.addWidget(self.container_widget)
-
-#         el = gremlin.event_handler.EventListener()
-#         el.ui_ready.connect(self._ui_ready)
-
-#         self._set_value_ui(self._value)
-
-
-#         css = Color.cssRepeater()
-#         self.setStyleSheet(css)
-#         self.installEventFilter(self)
-
-#     def unhook(self):
-#         self.unhookDevice(self.process_event)
-
-#     def process_event(self, event):
-#         ''' handles joystick updates '''
-#         astate = gremlin.event_handler.AxisState()
-#         values = astate.getAxisValues(self._device_guid, self._input_type, self._axis_id)
-#         self.setValue(values)
-
-#     def sizeHint(self):
-#         if self._orientation == QtCore.Qt.Orientation.Vertical:
-#             w = 20
-#             h = -1
-#         else:
-#             w = -1
-#             h = 20
-
-#         return QtCore.QSize(w, h)
-
-
-#     def eventFilter(self, widget, event):
-#         ''' grab mouse wheel events to avoid random scrolling '''
-#         t = event.type()
-#         if t == QtCore.QEvent.Type.Wheel:
-#             return True
-#         return False
-
-
-#     @QtCore.Slot(object)
-#     def _calibration_changed(self, calibration):
-#         ''' occurs when calibration data is changed '''
-#         if not Shiboken.isValid(self):
-#             return
-#         if self.device_guid == calibration.device_guid and self.input_id == calibration.input_id:
-#             # one of ours
-#             isCalibrated = calibration.hasData
-#             syslog.info(f"Device calibration changed to: {isCalibrated}")
-#             self.setCalibrated(isCalibrated)
-#             self.show_calibrated = isCalibrated
-#             self._clear_widgets()
-#             self._update_widgets()
-
-#     @QtCore.Slot()
-#     def _calibration_options_changed(self):
-#         ''' refresh when calibration options change '''
-#         self._clear_widgets()
-#         self._update_widgets()
-
-
-#     def _clear_widgets(self):
-#         ''' removes all the widgets for a clean slate '''
-#         if not Shiboken.isValid(self):
-#             return
-#         try:
-#             clear_layout(self.container_layout)
-#             self._display_curve_widget = None
-#             self._display_label_widget = None
-#             self._display_percent_widget = None
-#             self._display_value_widget = None
-#             self._progress_widget = None
-#             self._progress_calibrated_widget = None
-#             self.progress_container_widget = None
-#             self.progress_container_widget = None
-#         except Exception:
-#             pass
-
-#     def _update_widgets(self):
-#         ''' loads widgets into the control based on preferences
-
-#         Because QT (as of this writing) does not issue events when it deletes C++ underlying objects, and because the wiring may lead to automatic garbage collection without
-#         Python being aware - we go through special handling to catch these situations and re-create garbage collected elements for this UI widget
-
-#         '''
-
-#         # gremlin.util.assert_ui_thread()
-
-#         if not Shiboken.isValid(self):
-#             return
-
-#         # clear_layout(self.container_layout)
-#         alignment = QtCore.Qt.AlignmentFlag.AlignCenter if self._orientation == QtCore.Qt.Orientation.Vertical else QtCore.Qt.AlignmentFlag.AlignLeft
-#         clear_layout(self.container_layout)
-
-#         # progress bar label
-#         if self._show_label:
-#             self._display_label_widget = QtWidgets.QLabel(self._label_text)
-#             self.container_layout.addWidget(self._display_label_widget, alignment = alignment)
-
-#         # progress bar widget
-#         self._progress_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self._input_id)
-#         #widget, layout = getVContainer(self._progress_widget)
-#         self.container_layout.addWidget(self._progress_widget, alignment = alignment)
-
-#         if self.device and self.device.is_virtual:
-#             self._progress_widget.setReadOnly(False)
-#             self._progress_widget.valueChanged.connect(self._value_changed)
-
-#         if self._hooked:
-#             # automatic value
-#             astate = gremlin.event_handler.AxisState()
-#             values = astate.getAxisValues(self._device_guid, self._input_id)
-#             if values:
-#                 # progress bar widget
-#                 self._progress_widget.setValue(values)
-#         else:
-#             # manual value
-#             self._progress_widget.setValue(self._value)
-
-#         if self._show_calibrated:
-#             config = gremlin.config.Configuration()
-#             if config.splitJoystickRepeater:
-#                 self._progress_calibrated_widget = QProgressBar(orientation= self._orientation, min = self._min_range, max = self._max_range, data = self.input_id)
-#                 self._progress_calibrated_widget.gradientStartColor = Color.selectGradientAltColor()
-#                 self._progress_calibrated_widget.gradientEndColor = Color.selectEndGradientAltColor()
-#                 self._progress_calibrated_widget.setFixedSize(self._progress_calibrated_widget.sizeHint())
-#                 self.container_layout.addWidget(self._progress_calibrated_widget, alignment = alignment)
-#                 if self._orientation == QtCore.Qt.Orientation.Vertical:
-#                     w = 4 + self._progress_widget.width() + self._progress_calibrated_widget.width()
-#                     self.progress_container_widget.setFixedWidth(w)
-#                 else:
-#                     h = 4 + self._progress_widget.height() + self._progress_calibrated_widget.height()
-#                     self.progress_container_widget.setFixedHeight(h)
-
-#                 self._progress_calibrated_widget.setValue(self._calibrated_value)
-#                 if self.device and self.device.is_virtual:
-#                     self._progress_calibrated_widget.setReadOnly(False)
-#                     self._progress_calibrated_widget.valueChanged.connect(self._value_changed)
-
-
-#         # progress bar value
-#         if self._show_value:
-#             if self.device and self.device.is_virtual:
-#                 self._display_value_widget = QFloatLineEdit(value = self._value)
-#                 self._display_value_widget.valueChanged.connect(self._value_changed)
-#             else:
-#                 self._display_value_widget = QtWidgets.QLabel(self._label_value)
-#             self.container_layout.addWidget(self._display_value_widget, alignment = alignment)
-
-
-#         # progress bar percentage
-#         if self._show_percentage:
-#             self._display_percent_widget = QtWidgets.QLabel(self._label_percentage)
-#             self.container_layout.addWidget(self._display_percent_widget, alignment = alignment)
-
-#         # progress curve
-#         if self._show_curve:
-#             self._display_curve_widget = QtWidgets.QLabel(self._label_curve)
-#             self.container_layout.addWidget(self._display_curve_widget, alignment = alignment)
-
-#         self.container_layout.addStretch()
-
-#     @QtCore.Slot()
-#     def _value_changed(self):
-#         if not Shiboken.isValid(self):
-#             return
-#         widget = self.sender()
-#         value = widget.value()
-#         input_id = widget.data
-#         device_guid = self.device.device_guid
-#         gremlin.joystick_handling.set_axis(device_guid, input_id, value)
-
-
-#     @QtCore.Slot()
-#     def _ui_ready(self):
-#         ''' fires when the UI is ready '''
-#         self._value = self._hook_value
-
-#     def _cleanup_ui(self):
-#         ''' item is being deleted '''
-#         if Shiboken.isValid(self):
-#             self.unhookDevice()
-#             self.deleted.emit(self)
-
-#     @property
-#     def data(self):
-#         return self._data
-#     @data.setter
-#     def data(self, value):
-#         self._data = value
-
-#     @property
-#     def show_curved(self) -> bool:
-#         ''' true if repeater shows curved data '''
-#         return self._show_curve
-#     @show_curved.setter
-#     def show_curved(self, value: bool):
-#         if not Shiboken.isValid(self):
-#             return
-#         if value != self._show_curve:
-#             self._show_curve = value
-#             self._setValue(self._value, self._curve_value)
-#             if value:
-#                 self._update_widgets()
-#             else:
-#                 try:
-#                     self.container_layout.removeWidget(self._display_curve_widget)
-#                     self._display_curve_widget = None
-#                 except Exception:
-#                     pass
-
-#     @property
-#     def show_percent(self) -> bool:
-#         ''' true if repeater shows percentd data '''
-#         return self._show_percentage
-#     @show_percent.setter
-#     def show_percent(self, value: bool):
-#         if not Shiboken.isValid(self):
-#             return
-#         if value != self._show_percentage:
-#             self._show_percentage = value
-#             if value:
-#                 self._update_widgets()
-#             else:
-#                 try:
-#                     self.container_layout.removeWidget(self._display_percent_widget)
-#                     self._display_percent_widget = None
-#                 except Exception:
-#                     pass
-
-#     @property
-#     def show_value(self) -> bool:
-#         ''' true if repeater shows percentd data '''
-#         return self._show_value
-#     @show_value.setter
-#     def show_value(self, value: bool):
-#         if not Shiboken.isValid(self):
-#             return
-#         if value != self._show_value:
-#             self._show_value = value
-#             if value:
-#                 self._update_widgets()
-#             else:
-#                 try:
-#                     self.container_layout.removeWidget(self._display_value_widget)
-#                     self._display_value_widget = None
-#                 except Exception:
-#                     pass
-
-#     @property
-#     def show_label(self) -> bool:
-#         ''' true if repeater shows percentd data '''
-#         return self._show_label
-#     @show_label.setter
-#     def show_label(self, value: bool):
-#         if value != self._show_label:
-#             self._show_label = value
-#             if value:
-#                 self._update_widgets()
-#             else:
-#                 try:
-#                     self.container_layout.removeWidget(self._display_label_widget)
-#                     self._display_label_widget = None
-#                 except Exception:
-#                     pass
-
-#     @property
-#     def show_calibrated(self) -> bool:
-#         ''' true if repeater shows percentd data '''
-#         return self._show_calibrated
-#     @show_calibrated.setter
-#     def show_calibrated(self, value: bool):
-#         if value != self._show_calibrated:
-#             self.setCalibrated(value)
-#             self._show_calibrated = value
-#             self._clear_widgets()
-#             self._update_widgets()
-
-#     def setPercentageVisible(self, value: bool):
-#         ''' shows or hides the percentage value on the axis '''
-#         if not Shiboken.isValid(self):
-#             return
-#         self.show_percent(value)
-
-#     def setValueVisible(self, value: bool):
-#         self.show_value(value)
-
-#     def setLabel(self, value : str):
-#         ''' sets the label for the axis '''
-#         if not Shiboken.isValid(self):
-#             return
-#         self._label_text = value
-#         self._update_widgets()
-
-#     def setLabelVisible(self, value: bool):
-#         if not Shiboken.isValid(self):
-#             return
-#         self.show_label(value)
-
-
-#     def setWidth(self, value):
-#         if value > 0:
-#             self._width = value
-#             #self._update_css()
-
-#     def value(self):
-#         return self._value
-
-#     def setValue(self, value, curve_value = None, percent_value = None, other_value = None):
-#         """Sets the value shown by the widget.
-#         :param value new value to show
-#         """
-#         gremlin.util.InvokeUiMethod(self._set_value_ui, value, curve_value, percent_value, other_value)
-
-
-#     def _set_value_ui(self, value, calibrated_value = None, curve_value = None, percent_value = None, other_value = None):
-#         ''' internal set value '''
-
-#         if not Shiboken.isValid(self):
-#             return
-
-#         if self._callback:
-#             self._callback(value)
-
-#         if value is None:
-#             return
-
-#         if hasattr(value,"__iter__"):
-#             # value is [actual, raw, calibrated, curved]
-#             display_value = value[0]
-#             if calibrated_value is not None and curve_value is not None:
-#                 value = value[0] # use the first vlaue only if we have other data passed
-
-#             if calibrated_value is None:
-#                 calibrated_value = value[2]
-#             if curve_value is None:
-#                 curve_value = value[3]
-#         else:
-#             # single value
-#             if calibrated_value is None:
-#                 calibrated_value = value
-
-#             if value < self._min_range:
-#                 value = self._min_range
-#             if value > self._max_range:
-#                 value = self._max_range
-#             value += 0   # avoid negative 0 (WHY?)
-
-#             if curve_value is not None:
-#                 self._curve_value = curve_value
-#                 display_value = curve_value
-#             else:
-#                 display_value = value
-#                 self._curve_value = value
-
-#             if self._reverse:
-#                 display_value = gremlin.util.scale_to_range(display_value, invert=True)
-#                 calibrated_value = gremlin.util.scale_to_range(calibrated_value, invert=True)
-
-#             self._display_value = display_value
-#             self._calibrated_value = calibrated_value
-
-#         if value is None:
-#             display_value = None
-
-#         self._value = value
-
-
-#         if display_value is not None:
-#             self._label_value = f"{display_value:+0.{self._decimals}f}"
-#         else:
-#             self._label_value = "n/a"
-
-
-#         if self._show_curve and curve_value is not None:
-#             self._label_curve = f"C{curve_value:+0.{self._decimals}f}"
-
-#         if self._show_percentage:
-#             if percent_value is None:
-#                 if curve_value is None:
-#                     percent = gremlin.util.scale_to_range(display_value, target_min=0, target_max = 100)
-#                 else:
-#                     percent = gremlin.util.scale_to_range(curve_value, target_min=0, target_max = 100)
-#             else:
-#                 percent = percent_value
-#             self._label_percentage = f"{percent:0.1f} %"
-
-
-#         try:
-#             if self._progress_widget and Shiboken.isValid(self._progress_widget):
-#                 self._progress_widget.setValue(self._value)
-#             else:
-#                 self._update_widgets()
-#                 return
-
-#             if self._show_curve:
-#                 if self._display_curve_widget and Shiboken.isValid(self._display_curve_widget):
-#                     self._display_curve_widget.setText(self._label_curve)
-#                 else:
-#                     self._update_widgets()
-#                     return
-
-#             if self._show_label:
-#                 if self._display_label_widget and Shiboken.isValid(self._display_label_widget):
-#                     self._display_label_widget.setText(self._label_text)
-#                 else:
-#                     self._update_widgets()
-#                     return
-
-
-#             if self._show_value:
-#                 if self._display_value_widget and Shiboken.isValid(self._display_value_widget):
-#                     self._display_value_widget.setText(self._label_value)
-#                 else:
-#                     self._update_widgets()
-#                     return
-
-#             if self._show_percentage:
-#                 if self._display_percent_widget and Shiboken.isValid(self._display_percent_widget):
-#                     self._display_percent_widget.setText(self._label_percentage)
-#                 else:
-#                     self._update_widgets()
-#                     return
-#         finally:
-#             self.valueChanged.emit(self._value, self._curve_value)
-
-
-#     def value(self):
-#         ''' gets the current value '''
-#         if Shiboken.isValid(self):
-#             return self._value
-#         return 0
-
-#     def setRange(self, min = -1.0, max = 1.0, decimals = 3):
-#         ''' sets the range of the widget '''
-#         if not Shiboken.isValid(self):
-#             return
-#         if min > max:
-#             max, min = min, max
-#         self._min_range = min
-#         self._max_range = max
-#         self._decimals = decimals
-#         self._update_range()
-
-#     def _update_range(self):
-#         if self._progress_widget:
-#             self._progress_widget = None
-#         self._setValue(self._value)
-
-#     def setMaximum(self, value):
-#         ''' sets the upper range value '''
-#         self.setRange(self._min_range, value)
-
-#     def setMinimum(self, value):
-#         ''' sets the lower range value'''
-#         self.setRange(value, self._max_range)
-
-#     def setReverse(self, value):
-#         self._reverse = value
-#         self._setValue(self._value)
-
-#     def reverse(self):
-#         ''' reverse flag '''
-#         if not Shiboken.isValid(self):
-#             return
-#         return self._reverse
-
-#     @property
-#     def enabled(self) -> bool:
-#         return self.getEnabled()
-
-#     @QtCore.Slot(str)
-#     def _tab_selected(self, device_guid):
-#         ''' triggered when a tab is selected
-
-#         :param device_guid: the device selected
-
-#         '''
-#         if not Shiboken.isValid(self):
-#             return
-#         if self.getEnabled():
-#             # already connected
-#             return
-
-#         device_name = gremlin.shared_state.get_device_name(device_guid)
-#         if isinstance(device_guid, str):
-#             device_guid = gremlin.util.parse_guid(device_guid)
-
-#         if self._device_guid == device_guid:
-#             # connect the handler
-#             input_id = self._input_id
-#             verbose = gremlin.config.Configuration().verbose_mode_inputs
-#             if verbose:
-#                 # syslog = logging.getLogger("system")
-#                 syslog.info(f"AxisState: {device_name} axis {str(input_id)} connect")
-#             _state_tracker.registerAxisState(self, self._device_guid, self._input_type, self._input_id)
-#             self.setEnabled(True)
-
-
-#     @QtCore.Slot(str)
-#     def _tab_unselected(self, device_guid):
-#         ''' triggered when a device tab is deselected, also used to force a disconnect
-
-#         :param device_guid: the device to deselect - if None - deselect all
-
-#         '''
-#         if not Shiboken.isValid(self):
-#             return
-#         if not self.getEnabled():
-#             # not connected
-#             return
-#         # syslog = logging.getLogger("system")
-#         el = gremlin.event_handler.EventListener()
-#         if device_guid:
-#             if isinstance(device_guid, str):
-#                 device_guid = gremlin.util.parse_guid(device_guid)
-#             disconnect = self._device_guid == device_guid
-#             device_name = gremlin.shared_state.get_device_name(device_guid)
-#         else:
-#             disconnect = True
-#             device_name = "reset"
-
-#         if disconnect:
-#             # disconnect the handler
-#             input_id = self._input_id
-#             # syslog.info(f"AxisState: (unselect) {device_name} axis {input_id} disconnect")
-#             _state_tracker.unregisterAxisState(self._device_guid, self._input_type, self._input_id)
-#             self.setEnabled(False)
-
-
-#     def _update_value(self, value):
-#         # invert the input if needed
-#         if not Shiboken.isValid(self):
-#             return
-#         if self._is_hardware_input:
-#             self._setValue(value)
-#         else:
-#             self._setValue(value)
-
-
 class AxesCurrentState(QtWidgets.QGroupBox):
     """Displays the current state of all axes on a device (input viewer)"""
 
@@ -6462,8 +5922,8 @@ class AxesCurrentState(QtWidgets.QGroupBox):
 
         if device.axis_count:
             col = 0  # axis column
-            for linear_id in device.linear_id_map:
-                axis_id = device.linear_id_map[linear_id]  # map linear -> axis ID for non sequential axes
+            for input_id in device.getAxisInputIdList():
+                linear_id = device.getAxisLinearId(input_id)
 
                 widget, layout = getVContainer()
                 # widget.setStyleSheet("border: 1px solid;")
@@ -6471,20 +5931,19 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                 widget.setFixedHeight(150)
                 sd = gremlin.event_handler.AxisState()
 
-                axis_name = device.axis_names[name_index]
                 name_index += 1
-                axis_label = QtWidgets.QLabel(f"Axis {axis_name} L{linear_id}")
-                self.index_map[axis_id] = linear_id
-                values = sd.getAxisValues(device.device_guid, linear_id, linear=True)
+                axis_label = QtWidgets.QLabel(f"Axis {device.getAxisName(input_id)}")
+                self.index_map[linear_id] = input_id
+                values = sd.getAxisValues(device.device_guid, input_id)
                 if values is None:
-                    syslog.error(f"AxisCurrentState: unregistered axis [{device.name}] id: [{device.device_guid}] axis: A{axis_id} L{linear_id}]")
+                    syslog.error(f"AxisCurrentState: unregistered axis {device.getAxisName(input_id)}")
                     continue
 
                 # get initial data
                 astate = gremlin.event_handler.AxisState()
-                values = astate.getAxisValues(device.device_guid, axis_id)
+                values = astate.getAxisValues(device.device_guid, input_id)
 
-                axis_widget = QProgressBar(data=axis_id, value=values, orientation=QtCore.Qt.Orientation.Vertical)
+                axis_widget = QProgressBar(data=input_id, value=values, orientation=QtCore.Qt.Orientation.Vertical)
                 el = gremlin.event_handler.EventListener()
                 el.addUIJoystickEventCallback(self.process_event_ui)
 
@@ -6498,7 +5957,7 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                     value = values[0]
 
                 # value = gremlin.joystick_handling.get_axis(device.device_guid, index)
-                value_widget = QFloatLineEdit(data=axis_id)
+                value_widget = QFloatLineEdit(data=input_id)
                 if self.device.is_virtual:
                     value_widget.setReadOnly(self._readonly)
                     if not self._readonly:
@@ -6507,12 +5966,12 @@ class AxesCurrentState(QtWidgets.QGroupBox):
                     value_widget.setReadOnly(True)
 
                 # axis.setValue(value)
-                self.axis_widgets[axis_id] = axis_widget
-                self.value_label_widgets[axis_id] = value_widget
+                self.axis_widgets[input_id] = axis_widget
+                self.value_label_widgets[input_id] = value_widget
                 percent = gremlin.util.scale_to_range(value, target_min=0, target_max=100)
 
                 percent_label = QtWidgets.QLabel(f"{percent:0.1f} %")
-                self.percent_widgets[axis_id] = percent_label
+                self.percent_widgets[input_id] = percent_label
                 axis_widget.setValue(values)
 
                 bar_container, _ = getHContainer(["||", axis_widget, "||"])  # centered horizontally
@@ -7386,7 +6845,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _vjoy_button_hat_update_ui(self, event: gremlin.event_handler.VjoyEvent):
         for widget in self.widgets:
-            widget.process_event_ui(event)
+            widget.process_event(event)
 
     # --------------
 
@@ -12814,24 +12273,30 @@ class QInputLockWidget(QtWidgets.QWidget):
         main_layout = QtWidgets.QVBoxLayout(self)
         self._filter = filter
 
-        lock_widget = QtWidgets.QPushButton()
-        lock_widget.setIcon(Icons.lockIcon())
-        lock_widget.clicked.connect(self._handle_lock)
-        lock_widget.setToolTip("Lock all inputs")
+        lock_widget = QIconPushButton(
+            icon = Icons.lockIcon(),
+            tooltip = "Lock all inputs",
+            callback = self._handle_lock,
+        )
 
-        unlock_widget = QtWidgets.QPushButton()
-        unlock_widget.setIcon(Icons.unlockIcon())
-        unlock_widget.setToolTip("Unlock all inputs")
-        unlock_widget.clicked.connect(self._handle_unlock)
+
+        unlock_widget = QIconPushButton(
+            icon = Icons.unlockIcon(),
+            tooltip = "Unlock all inputs",
+            callback = self._handle_unlock,
+        )
+
 
         widgets = [lock_widget, unlock_widget]
 
         if filter_enabled:
-            self._filter_widget = QDataPushButton()
-            self._filter_widget.setIcon(Icons.filterIcon() if filter else Icons.noFilterIcon())
-            self._filter_widget.setToolTip(self._get_filter_tooltip(filter))
-            self._filter_widget.clicked.connect(self._handle_used)
-            self._filter_widget.clickedEx.connect(self._handle_context)
+            icon = Icons.filterIcon() if filter else Icons.noFilterIcon()
+            self._filter_widget = QIconPushButton(icon = icon,
+                                                  tooltip = self._get_filter_tooltip(filter),
+                                                  callback = self._handle_used,
+                                                  callbackEx = self._handle_context
+            )
+
             widgets.insert(0, self._filter_widget)
 
         else:
@@ -12855,7 +12320,7 @@ class QInputLockWidget(QtWidgets.QWidget):
     def _get_filter_tooltip(self, value: bool) -> str:
         return "Input Filter Options"
 
-    def _handle_used(self):
+    def _handle_used(self, widget):
         # toggle filter
         self.filterChanged.emit(self.filter)
         # self.filter = not self.filter
@@ -12866,12 +12331,12 @@ class QInputLockWidget(QtWidgets.QWidget):
             el = gremlin.event_handler.EventListener()
             el.jump_to_mapped_input.emit()  # request jump to first mapped input
 
-    def _handle_lock(self):
+    def _handle_lock(self, widget):
 
         el = gremlin.event_handler.EventListener()
         el.lock_inputs.emit(self.data)
 
-    def _handle_unlock(self):
+    def _handle_unlock(self, widget):
 
         el = gremlin.event_handler.EventListener()
         el.unlock_inputs.emit(self.data)

@@ -1064,6 +1064,8 @@ def load_icon(*paths, use_qta=False, qta_color=None):
     the_path = paths[0]
     if not the_path:
         return get_generic_icon()
+    if isinstance(the_path, QtGui.QIcon):
+        return the_path
 
     _, ext = os.path.splitext(the_path.casefold())
 
@@ -2881,3 +2883,10 @@ def hashDict(d: dict):
         "utf-8"
     )  # sort keys so they are in the same sequence between dictionaries
     return hash(dump)
+
+
+def toUrl(fname : str):
+    ''' converts a file name to a URL link format '''
+    import pathlib
+    url = pathlib.Path(fname)
+    return url.as_uri()
