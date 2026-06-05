@@ -1697,9 +1697,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # jap = gremlin.event_handler.JoystickEventProcessor()
         # jap.reset()
 
-        # setup profile default input filters
-        self.profile.settings.setAllVisible("default")
-
         # Update profile information
         self._update_window_title()
 

@@ -21,7 +21,6 @@ import logging
 
 from PySide6 import QtWidgets, QtCore
 
-import dinput
 from dinput import DeviceSummary
 
 import gremlin.config
@@ -157,6 +156,9 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             syslog.info(f"Create Joystick Device tab widget: for [{device.name}]")
             if "left" in device.name.casefold():
                 pass
+
+            profile.settings.dump_visible_map(self.device_guid)
+
 
         # model that holds all the input items for the joystick device
         model = JoystickInputModel(
@@ -359,14 +361,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _handle_custom_filter(self, input_item):
         """custom filter handled - true if the item is included in the list, false if not"""
         profile = gremlin.shared_state.current_profile
-
-        verbose = gremlin.config.Configuration().verbose_mode_filter
-
         # filtered = true if the input should not be displayed (filtered), false if it should be visible
-        include = profile.isInputFiltered(input_item.device_guid, input_item.input_type, input_item.input_id)
-        if verbose and include:
-            syslog.info(f"custom filter: {input_item.input_type.name} {input_item.input_id} visible")
-        return include
+        return profile.settings.getInputVisible(input_item.device_guid, input_item.input_type, input_item.input_id)
 
     def _handle_filter_changed(self, value: bool):
         gremlin.util.InvokeUiMethod(self._handle_filter_changed_ui, value)  # ensure on UI thread

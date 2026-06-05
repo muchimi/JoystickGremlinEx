@@ -12692,14 +12692,32 @@ class QJoystickInputWidget(QtWidgets.QWidget):
 
         widget = None
         device = gremlin.joystick_handling.getDevice(self.device_guid)
-        if "wooting" in device.name.casefold():
-            pass
+
+        has_inputs = (filtered_axis or 0) + (filtered_button or 0) + (filtered_hat or 0)
+        if not has_inputs:
+            warning_color = gremlin.ui.ui_common.Color.blueColor()
+            widget = gremlin.ui.ui_common.QIconLabel(
+                "ph.shield-warning-fill",
+                use_qta=True,
+                icon_color=QtGui.QColor(warning_color),
+                text="All inputs filtered.",
+                use_wrap=False,
+                )
+
+            self._widget = widget
+            self.main_layout.addWidget(widget)
+
+            return
+
+
+
+
         if device:
             if device.axis_count:
                 if filtered_axis is not None and filtered_axis > 0 and filtered_axis != device.axis_count:
                     icon = Icons.axisIcon(fcolor)
                     tooltip = f"Showing {filtered_axis} out of {device.axis_count} axis inputs"
-                    label = QIconLabel(
+                    widget = QIconLabel(
                         icon,
                         f"<span style='color: {fcolor}; font-weight: bold;'>{filtered_axis}</span>/{device.axis_count}",
                         tooltip=tooltip,
@@ -12707,14 +12725,14 @@ class QJoystickInputWidget(QtWidgets.QWidget):
                 else:
                     icon = Icons.axisIcon()
                     tooltip = f"Showing {device.axis_count} axis inputs"
-                    label = QIconLabel(icon, f"{device.axis_count}", tooltip=tooltip)
-                widgets.append(label)
+                    widget = QIconLabel(icon, f"{device.axis_count}", tooltip=tooltip)
+                widgets.append(widget)
 
             if device.button_count:
                 if filtered_button is not None and filtered_button > 0 and filtered_button != device.button_count:
                     icon = Icons.buttonIcon(fcolor)
                     tooltip = f"Showing {filtered_button} out of {device.button_count} button inputs"
-                    label = QIconLabel(
+                    widget = QIconLabel(
                         icon,
                         f"<span style='color: {fcolor}; font-weight: bold;'>{filtered_button}</span>/{device.button_count}",
                         tooltip=tooltip,
@@ -12722,14 +12740,14 @@ class QJoystickInputWidget(QtWidgets.QWidget):
                 else:
                     icon = Icons.buttonIcon()
                     tooltip = f"Showing {device.button_count} button inputs"
-                    label = QIconLabel(icon, f"{device.button_count}", tooltip=tooltip)
-                widgets.append(label)
+                    widget = QIconLabel(icon, f"{device.button_count}", tooltip=tooltip)
+                widgets.append(widget)
 
             if device.hat_count:
                 if filtered_hat is not None and filtered_hat > 0 and filtered_hat != device.hat_count:
                     icon = Icons.hatIcon(fcolor)
                     tooltip = f"Showing {filtered_hat} out of {device.hat_count} hat inputs"
-                    label = QIconLabel(
+                    widget = QIconLabel(
                         icon,
                         f"<span style='color: {fcolor}; font-weight: bold;'>{filtered_hat}</span>/{device.hat_count}",
                         tooltip=tooltip,
@@ -12737,15 +12755,16 @@ class QJoystickInputWidget(QtWidgets.QWidget):
                 else:
                     icon = Icons.hatIcon()
                     tooltip = f"Showing {device.hat_count} hat inputs"
-                    label = QIconLabel(icon, f"{device.hat_count}", tooltip=tooltip)
-                widgets.append(label)
+                    widget = QIconLabel(icon, f"{device.hat_count}", tooltip=tooltip)
+                widgets.append(widget)
 
-            if visible_count is not None and visible_count > 0:
+            if visible_count:
                 total_count = device.axis_count + device.button_count + device.hat_count
                 tooltip = f"Showing {visible_count} out of {total_count} inputs"
-                label = QtWidgets.QLabel(f"(<span style='color: {fcolor}; font-weight: bold;'>{visible_count}</span>/{total_count})")
-                label.setToolTip(tooltip)
-                widgets.append(label)
+                widget = QtWidgets.QLabel(f"(<span style='color: {fcolor}; font-weight: bold;'>{visible_count}</span>/{total_count})")
+                widget.setToolTip(tooltip)
+                widgets.append(widget)
+
 
             if widgets:
                 widget = getHContainer(widgets, widget_only=True)

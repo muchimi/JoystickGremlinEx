@@ -16,9 +16,6 @@
 # along with this program.	If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
-
-""" profiling related helpers """
-
 import functools
 import logging
 
