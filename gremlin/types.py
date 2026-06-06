@@ -1510,3 +1510,10 @@ class Interactions(enum.Enum):
     Add = 5 # add item
     Count = 6 # count item
     Copy = 7  # copy to clipboard
+
+
+class CallbackMode (enum.IntEnum):
+    """ callback execute mode """
+    Edit = 1
+    Run = 2
+    All = Edit | Run

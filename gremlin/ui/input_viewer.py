@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -48,10 +48,10 @@ class VisualizationConfig():
         self._lock = threading.Lock()
 
     def register(self, device_id, input_type : VisualizationType):
-        ''' registers a configuration entry 
-        
+        ''' registers a configuration entry
+
         :param device_id: id (str) or guid - device id
-        :param input_type: visualization type 
+        :param input_type: visualization type
         :value value:
         '''
         if not isinstance(device_id, str):
@@ -74,7 +74,7 @@ class VisualizationConfig():
 
                 syslog = logging.getLogger("system")
                 verbose = gremlin.config.Configuration().verbose
-                if verbose: 
+                if verbose:
                     syslog.info("INPUT VIEWER: save configuration")
 
                 root = etree.Element("config")
@@ -104,8 +104,8 @@ class VisualizationConfig():
             except Exception as err:
                 syslog.error("VIZ CONFIG SAVE")
                 syslog.error(f"{err}\n{traceback.format_exc()}")
-           
-        
+
+
 
     def clear(self):
         ''' clears config selection '''
@@ -128,7 +128,7 @@ class VisualizationConfig():
         if value is None:
             value = default_value
         return value
-        
+
 
     def getConfig(self):
         return self._config
@@ -160,8 +160,8 @@ class VisualizationConfig():
     def get_config(sef):
         fname = os.path.join(gremlin.shared_state.data_path, "inputViewer.xml")
         return fname
-    
-    
+
+
 class VisualizationSelector(QtWidgets.QWidget):
 
     """Presents a list of devices and visualization widgets."""
@@ -182,10 +182,10 @@ class VisualizationSelector(QtWidgets.QWidget):
         self._selector_widgets = []
         self._selector_callbacks = {}
         self._change_callback = change_callback
-        self._callbacks = [] # list of registered callbacks in the selector 
-        
+        self._callbacks = [] # list of registered callbacks in the selector
 
-        
+
+
         # get the order of the devices as set by the user for the physical devices
         tab_map = gremlin.shared_state.ui._get_tab_map()
         tab_ids = [device_id for device_id, _, _, _ in tab_map.values()]
@@ -210,7 +210,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         self.main_layout.setContentsMargins(0,0,0,0)
 
         self.updateSelector()
- 
+
     def updateSelector(self):
         gremlin.util.InvokeUiMethod(self._update_selector_ui) # ensure on UI thread
 
@@ -219,7 +219,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         ''' updates the selector with input options '''
         if not Shiboken.isValid(self):
             return
-        
+
 
         combine_button_hats = gremlin.config.Configuration().input_viewer_combine_buttonhats
         config = VisualizationConfig()
@@ -240,7 +240,7 @@ class VisualizationSelector(QtWidgets.QWidget):
 
         dev : dinput.DeviceSummary
         for dev in self._devices:
-            
+
             box = QtWidgets.QGroupBox(dev.name)
             layout = QtWidgets.QVBoxLayout()
 
@@ -266,7 +266,7 @@ class VisualizationSelector(QtWidgets.QWidget):
             has_hats = dev.hat_count > 0
 
             if combine_button_hats:
-                # combination button/hat 
+                # combination button/hat
                 stub = ""
                 if has_buttons:
                     stub = "Buttons"
@@ -363,7 +363,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                 continue
             with QtCore.QSignalBlocker(widget):
                 widget.setChecked(False)
-        
+
 
     @QtCore.Slot()
     def _select_real(self):
@@ -396,11 +396,11 @@ class VisualizationSelector(QtWidgets.QWidget):
                     self._create_callback(dev, visualization, widget)()
             else:
                 self._selector_widgets.remove(widget)
-            
+
     @QtCore.Slot()
     def _select_all(self):
         ''' selects all widgets '''
-        
+
         widgets = [w for w in self._selector_widgets]
         for widget in widgets:
             if Shiboken.isValid(widget):
@@ -410,7 +410,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                 self._create_callback(dev, visualisation, widget)()
             else:
                 self._selector_widgets.remove(widget)
-    
+
 
 
     def _create_callback(self, device, vis_type, cb):
@@ -423,7 +423,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         if key not in self._callbacks:
             self._callbacks.append(key)
         return lambda : self._callback(device,vis_type,cb)
-    
+
     def _callback(self, device, vis_type, cb):
 
         checked = cb.isChecked()
@@ -469,7 +469,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self._state_buttons = {} # map of key widget
         self._state_category_filter = None
         self.keyboard_widget = None # keyboard widget
-        
+
         widget, layout = gremlin.ui.ui_common.getVContainer()
         self.view_container_widget = widget
         self.view_container_layout = layout
@@ -489,12 +489,12 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.scroll_selector_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         self.scroll_selector_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
-        
+
         self.scroll_selector_area.setMinimumWidth(200)
         self.scroll_selector_area.setWidgetResizable(True)
         self.scroll_selector_area.setWidget(self.scroll_selector_widget)
 
-        
+
 
         checked = v_config.getValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, False)
         self.keyboard_widget_selector = gremlin.ui.ui_common.QDataCheckbox("Keyboard/Mouse",
@@ -511,10 +511,10 @@ class InputViewerUi(ui_common.BaseDialogUi):
                                                                         callback = self._toggle_state_widget,
                                                                         tooltip = "Toggle state visualizer")
         self.state_widget_selector.setIgnoreKeyboard(True)
-        
-        
+
+
         show_state = checked
-        
+
 
         # option to combine hat/buttons
         config = gremlin.config.Configuration()
@@ -539,7 +539,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
 
         system_selector_widget =  QtWidgets.QGroupBox("System Inputs")
         system_selector_layout = QtWidgets.QVBoxLayout(system_selector_widget)
-    
+
         system_selector_layout.addWidget(self.keyboard_widget_selector)
         system_selector_layout.addWidget(self.state_widget_selector)
         system_selector_layout.addStretch()
@@ -549,7 +549,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.scroll_selector_layout.addWidget(self.vis_selector)
 
 
-                
+
         clear_widget = QtWidgets.QPushButton("Clear")
         clear_widget.setToolTip("Clears the selection")
         clear_widget.clicked.connect(self._clear_all)
@@ -574,7 +574,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
             widget.setToolTip(f"Select VJOY #{i} axis and buttons")
             widget.clicked.connect(self.vis_selector._select_vjoy)
             widgets.append(widget)
-       
+
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
 
         options_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
@@ -588,7 +588,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self._left_panel_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Expanding)
 
         self._right_panel_widget, self._right_panel_layout = gremlin.ui.ui_common.getVContainer()
-        
+
 
         self._splitter.addWidget(self._left_panel_widget)
         self._splitter.addWidget(self._right_panel_widget)
@@ -609,7 +609,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         info_box = gremlin.ui.ui_common.QInfoBox(msg, wrap = True, hide_key = "input_viewer")
         self._right_panel_layout.addWidget(info_box)
-        
+
         self.closed.connect(self._closed)
         self.installEventFilter(self)
 
@@ -628,7 +628,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         el.profile_unhook.connect(self.reload)
 
 
-    
+
 
     def _clear_all(self):
         ''' clears all items '''
@@ -637,7 +637,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         config.clear()
         config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, False)
         config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, False)
-        
+
 
 
     def _select_all(self):
@@ -645,12 +645,12 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._keyboard_visible = True
         self._state_visible = True
         self.vis_selector._select_all()
-        
+
 
         config = VisualizationConfig()
         config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, True)
         config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, True)
-        
+
 
     @QtCore.Slot()
     def _font_size_cb(self):
@@ -669,10 +669,10 @@ States can be toggled by clicking on the state button.  Expression states will u
         if self._keyboard_visible:
             # keyboard visible - filter keys
             t = event.type()
-            if t in (QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease): 
+            if t in (QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease):
                 return True
         return super().eventFilter(widget, event)
-        
+
 
     @QtCore.Slot()
     def _closed(self):
@@ -700,28 +700,28 @@ States can be toggled by clicking on the state button.  Expression states will u
                 widget.unhook()
             widget.setParent(None)
             widget.deleteLater()
-        
+
 
     @QtCore.Slot()
     def _clear(self):
         ''' clears all widgets '''
         assert gremlin.util.is_ui_thread()
 
-        
+
 
         self._delete_widget(self._state_filter_widget)
         self._delete_widget(self._state_visualizer_widget)
-        
+
         self._state_filter_widget = None
         self._state_visualizer_widget = None
         self._state_buttons.clear()
 
         self._delete_widget(self.keyboard_widget)
         self.keyboard_widget = None
-        
+
         self._delete_widget(self._keyboard_visualizer_widget)
         self._keyboard_visualizer_widget = None
-            
+
         for widget in self._joystick_widgets.values():
             self._delete_widget(widget)
 
@@ -729,12 +729,12 @@ States can be toggled by clicking on the state button.  Expression states will u
 
 
         self.views.clear()
- 
+
 
     def reload(self):
         ''' reloads the ui '''
         gremlin.util.InvokeUiMethod(self._reload_ui) # refresh the visuals and selectors
-        
+
 
     def _reload_ui(self):
 
@@ -764,14 +764,14 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         :param device: the device which is being updated (DeviceSummary)
         :param visualization: the visualization type being updated
-        :param enabled: the state - if None, uses the current state 
+        :param enabled: the state - if None, uses the current state
         """
         assert gremlin.util.is_ui_thread()
         if not Shiboken.isValid(self):
             return
         if not Shiboken.isValid(self.views):
             return
-    
+
         key = (device.device_id, visualization)
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui
@@ -785,7 +785,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             if visualization == VisualizationType.ButtonHat:
                 # don't show combined button/hat if not in combined mode
                 return
-            
+
         if enabled is None:
             # use the existing value
             vconfig = VisualizationConfig()
@@ -801,7 +801,7 @@ States can be toggled by clicking on the state button.  Expression states will u
                 widget.hook()
                 if visualization in (gremlin.types.VisualizationType.AxisCurrent, gremlin.types.VisualizationType.AxisTemporal):
                     widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Preferred)
-               
+
                 if verbose:
                     syslog.info(f"Create new vis: {device.name}: {visualization.name}  key: {key}")
             else:
@@ -810,7 +810,7 @@ States can be toggled by clicking on the state button.  Expression states will u
                 if verbose:
                     syslog.info(f"Use existing vis: {device.name}: {visualization.name}")
                 widget.setVisible(True)
-            
+
         else:
             if key in self._joystick_widgets:
                 # remove the widget
@@ -826,9 +826,9 @@ States can be toggled by clicking on the state button.  Expression states will u
                 #self._lock.release()
                 widget.deleteLater()
 
-        
 
-        
+
+
 
 
     def populateState(self):
@@ -850,12 +850,12 @@ States can be toggled by clicking on the state button.  Expression states will u
         if not key:
             # no key = match
             return True
-        
+
         key = state.key.casefold().strip()
         if filter in key:
             return True
-        return fnmatch.fnmatch(key, filter)        
-    
+        return fnmatch.fnmatch(key, filter)
+
     def _reload_states(self):
         gremlin.util.InvokeUiMethod(self._reload_states_ui) # ensure on UI thread
 
@@ -863,7 +863,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         ''' loads or reloads states '''
         layout = self._state_button_layout
         config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_state        
+        verbose = config.verbose_mode_state
         i = 0
         sd = gremlin.ui.state_device.StateData()
         items = sd.getStates().items()
@@ -871,14 +871,14 @@ States can be toggled by clicking on the state button.  Expression states will u
         cm = gremlin.ui.state_device.StateCategories()
         default_category = cm.default()
         category = None
-        
+
 
         sd = gremlin.ui.state_device.StateData()
 
 
         is_filter = config.iv_state_filter_enabled
         if is_filter:
-            category = self._state_filter_widget.category 
+            category = self._state_filter_widget.category
             if not category:
                 category = default_category
         if items:
@@ -897,7 +897,7 @@ States can be toggled by clicking on the state button.  Expression states will u
                 #btn = gremlin.ui.ui_common.QDataPushButton(key)
                 #btn.data = state # store the state with the button
                 btn = gremlin.ui.ui_common.StateRepeaterButton(state, callback = self._state_toggle)
-      
+
 
 
                 #btn.setCheckable(True)
@@ -906,20 +906,21 @@ States can be toggled by clicking on the state button.  Expression states will u
                 if verbose:
                     syslog.info(f"viewer state: {key}  value: {state.value}")
                 #btn.clicked.connect(self._state_toggle)
-                
+
                 layout.addWidget(btn)
 
                 state.changed.connect(lambda x: self._state_changed(x))
 
                 if state.key in self._state_buttons:
                     # remove the prior button reference
-                    gremlin.util.delete_widget(self._state_buttons[state.key]) 
-                    
+                    gremlin.util.delete_widget(self._state_buttons[state.key])
+
                 self._state_buttons[state.key] = btn
                 i+=1
-            
+
         else:
-            widget = gremlin.ui.ui_common.QWarningWidget("No states found.")
+            icon = gremlin.ui.ui_common.Icons.warningIcon(gremlin.ui.ui_common.Color.yellowColor())
+            widget = gremlin.ui.ui_common.QWarningWidget("No states found.", icon = icon, tooltip = "There are no states to display.")
             layout.addWidget(widget)
 
     def showKeyboard(self):
@@ -928,11 +929,11 @@ States can be toggled by clicking on the state button.  Expression states will u
         if self._keyboard_visible:
             return
         if not self._keyboard_visualizer_widget:
-            
+
             group_widget =  QtWidgets.QGroupBox("Keyboard")
             layout = QtWidgets.QVBoxLayout(self._keyboard_visualizer_widget)
             group_widget.setLayout(layout)
-            
+
             self.keyboard_widget = gremlin.ui.virtual_keyboard.QKeyboardWidget(release_wheel = True)
             self.keyboard_widget.setSizePolicy(QtWidgets.QSizePolicy.Fixed,QtWidgets.QSizePolicy.Fixed)
             self.keyboard_widget.setReadonly(True)
@@ -941,8 +942,8 @@ States can be toggled by clicking on the state button.  Expression states will u
             self.keyboard_widget.hook()
             self._keyboard_visualizer_widget = gremlin.ui.ui_common.getHContainer(group_widget, widget_only=True)
             self._keyboard_visible = True
-            self.views.add_widget(self._keyboard_visualizer_widget, 0) 
-        
+            self.views.add_widget(self._keyboard_visualizer_widget, 0)
+
         self._keyboard_visualizer_widget.setVisible(True)
 
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
@@ -954,7 +955,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         if self._keyboard_visible:
             if self._keyboard_visualizer_widget:
                 self._keyboard_visualizer_widget.setVisible(False)
-                
+
             with QtCore.QSignalBlocker(self.keyboard_widget_selector):
                 self.keyboard_widget_selector.setChecked(False)
             self._keyboard_visible = False
@@ -962,11 +963,11 @@ States can be toggled by clicking on the state button.  Expression states will u
     def showState(self):
         ''' state device '''
 
-        if self._state_visible: 
+        if self._state_visible:
             return
-        
+
         if not self._state_visualizer_widget:
-            
+
 
             self._state_visualizer_widget = QtWidgets.QGroupBox("States")
             layout = QtWidgets.QVBoxLayout(self._state_visualizer_widget)
@@ -1004,7 +1005,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             layout.addLayout(self._state_button_layout)
 
             self.views.add_widget(self._state_visualizer_widget,0)
-        
+
         self.populateState()
         self._state_visualizer_widget.setVisible(True)
         self._state_visible = True
@@ -1016,7 +1017,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._state_visible = False
         with QtCore.QSignalBlocker(self.state_widget_selector):
             self.state_widget_selector.setChecked(False)
-        
+
 
 
     @QtCore.Slot(object)
@@ -1029,11 +1030,11 @@ States can be toggled by clicking on the state button.  Expression states will u
     def refreshState(self):
         if self._state_visualizer_widget and Shiboken.isValid(self._state_visualizer_widget):
             self.populateState()
-    
+
     def _state_changed(self, state):
         # state changed received - ensure on UI thread
         gremlin.util.InvokeUiMethod(self._state_changed_ui, state)
-    
+
     def _state_changed_ui(self, state):
         ''' called on state changes '''
         verbose = gremlin.config.Configuration().verbose_mode_state
@@ -1052,20 +1053,20 @@ States can be toggled by clicking on the state button.  Expression states will u
         state = widget.data
         key = state.key
         verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose: 
+        if verbose:
             syslog.info("-"*50)
             syslog.info(f"Viewer: state {state.key} toggle")
         sc = gremlin.ui.state_device.StateData()
         sc.toggle(key)
 
-        
+
 
     @QtCore.Slot()
     def _state_crud(self):
         # called on state create/add/remove/edit
         self.refreshState()
 
-    
+
     @QtCore.Slot(bool)
     def _toggle_keyboard_widget(self, checked : bool):
         if checked:
@@ -1102,9 +1103,9 @@ States can be toggled by clicking on the state button.  Expression states will u
             self._delete_widget(widget)
 
         self._joystick_widgets.clear()
-        
+
         self.vis_selector.updateSelector()
-        
+
 
     @QtCore.Slot(bool)
     def _toggle_flow_layout(self, checked : bool):
@@ -1112,7 +1113,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         config.input_viewer_flow_layout = checked
         self.views.updateLayout()
 
-        
+
 class InputViewerArea(QtWidgets.QScrollArea):
 
     """Holds individual input visualization widgets."""
@@ -1125,11 +1126,11 @@ class InputViewerArea(QtWidgets.QScrollArea):
         super().__init__(parent)
 
         self.widgets = []
-        
+
         self.setWidgetResizable(True)
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout()
-        
+
         self.scroll_widget.setLayout(self.scroll_layout)
         self._is_flow = False # true if using the flow layout
         self.container_widget, self.container_layout = gremlin.ui.ui_common.getVContainer()
@@ -1182,11 +1183,11 @@ class InputViewerArea(QtWidgets.QScrollArea):
                 width = max(width, hint.width())
             else:
                 self.widgets.remove(widget)
-            
-        self.setMinimumWidth(width+40)
-        
 
-    
+        self.setMinimumWidth(width+40)
+
+
+
     def remove_widget(self, widget):
         """Removes a widget from the visualization area.
 
@@ -1200,7 +1201,7 @@ class InputViewerArea(QtWidgets.QScrollArea):
         self.container_layout.removeWidget(widget)
         if widget is self.widgets:
             self.widgets.remove(widget)
-            
+
     def clear(self):
         ''' clears all widgets '''
         if not Shiboken.isValid(self):

@@ -2303,7 +2303,7 @@ class Configuration(QtCore.QObject):
     @property
     def button_grid_visible(self) -> bool:
         """default state of the button grid in vjoy remap"""
-        return self._get_data("button_grid_visible", True)
+        return self._get_data("button_grid_visible", False) # off by default
 
     @button_grid_visible.setter
     def button_grid_visible(self, value: bool):

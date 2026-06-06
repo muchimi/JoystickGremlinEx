@@ -819,7 +819,10 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
                     checked=visible,
                     tooltip=tooltip,
                 )
+
                 widget.setStyleSheet(css)
+                # hook the input so the button highlights on triggers
+                widget.hook(device_guid, input_type, input_id)
 
                 flow_layouts[input_type].addWidget(widget)
 
@@ -1022,6 +1025,9 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
 
     def closeEvent(self, event):
         self._input_widgets.clear()  # remove all widget references
+        for widget in self._widgets:
+            widget.unhook()
+            
         self._widgets.clear()
         el = gremlin.event_handler.EventListener()
         el.joystick_event.disconnect(self._joystick_event_handler)

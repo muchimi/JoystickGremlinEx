@@ -152,16 +152,17 @@ class GUID:
             except Exception:
                 syslog.error(f"GUID: Unable to convert ID {guid} to UUID")
                 return None
-        elif isinstance(guid, int):
-            guid = _GUID(guid)
-            guid_int = guid.int
+        elif isinstance(guid, GUID):
+            guid_int = guid._guid_int
         elif isinstance(guid, uuid.UUID):
             # convert to ctypes structure using the integer value if the class is given a regular python UUID
             guid_int = guid.int
             guid = _GUID(guid_int)  # convert to internal _GUID
+        elif isinstance(guid, int):
+            guid = _GUID(guid)
+            guid_int = guid.int
 
-        elif isinstance(guid, GUID):
-            guid_int = guid._guid_int
+
         else:
             assert isinstance(guid, _GUID)
             guid_int = guid.toInt()

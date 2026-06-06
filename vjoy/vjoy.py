@@ -263,10 +263,13 @@ class Axis:
         # el.vjoy_event.emit(event) # this is used by external plugins to trigger on vjoy output events
         # el.vjoy_callback(event)  test for lag
 
+
+
         event = gremlin.event_handler.Event(
             device_guid=self.device_guid,
             event_type = InputType.JoystickAxis,
-            identifier=self.axis_id,
+            identifier= self.axis_id - 0x30 + 1, # convert vjoy ID to input id 1 to 8
+            is_axis = True,
             value = self._value
 
         )
