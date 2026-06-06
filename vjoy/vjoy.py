@@ -166,6 +166,7 @@ class Axis:
         """
         self.vjoy_dev = vjoy_dev
         self.vjoy_id = vjoy_dev.vjoy_id
+        self.device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self.vjoy_id)
         self.axis_id = axis_id
         self._value = 0.0
 
@@ -223,6 +224,9 @@ class Axis:
 
         :param value the position of the axis in the range [-1, 1]
         """
+        import gremlin.event_handler
+        import gremlin.joystick_handling
+        from gremlin.input_types import InputType
 
         # import gremlin.event_handler
         # from gremlin.input_types import InputType
@@ -243,12 +247,6 @@ class Axis:
         # settings
         self._value = self._response_curve_fn(self._deadzone_fn(min(1.0, max(-1.0, p_value))))
 
-        # TEST - disable loopback T139+
-        # el = gremlin.event_handler.EventListener()
-        # event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, self._value)
-        # el.vjoy_event.emit(event) # this is used by external plugins to trigger on vjoy output events
-        # el.vjoy_callback(event)  test for lag
-
         self.vjoy_dev.ensure_ownership()
 
         if not VJoyInterface.SetAxis(
@@ -259,6 +257,22 @@ class Axis:
             syslog.error(f"Failed setting axis value - {_error_string(self.vjoy_id, self.axis_id, self._value)}")
 
         self.vjoy_dev.used()
+
+        el = gremlin.event_handler.EventListener()
+        # event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, self._value)
+        # el.vjoy_event.emit(event) # this is used by external plugins to trigger on vjoy output events
+        # el.vjoy_callback(event)  test for lag
+
+        event = gremlin.event_handler.Event(
+            device_guid=self.device_guid,
+            event_type = InputType.JoystickAxis,
+            identifier=self.axis_id,
+            value = self._value
+
+        )
+        el.vjoy_output_event.emit(event)
+        el.vjoy_output_event_ui.emit(event)
+
 
     def set_absolute_value(self, value):
         """Sets the position of the axis based on a value between [-1, 1].
@@ -296,9 +310,11 @@ class Button:
         :param vjoy_dev the vJoy device this button belongs to
         :param button_id the id of the button this object controls
         """
+        import gremlin.joystick_handling
         self.vjoy_dev = vjoy_dev
         self.vjoy_id = vjoy_dev.vjoy_id
         self.button_id = button_id
+        self.device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self.vjoy_id)
         self._is_pressed = False
 
     @property
@@ -321,6 +337,7 @@ class Button:
         #     pass
 
         import gremlin.event_handler
+        import gremlin.joystick_handling
         from gremlin.input_types import InputType
 
         # el.vjoy_callback(event) disable 10/8 in m76T23+
@@ -334,8 +351,16 @@ class Button:
         self.vjoy_dev.used()
 
         el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed)
+        # event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed)
+
+        event = gremlin.event_handler.Event(
+            device_guid=self.device_guid,
+            event_type = InputType.JoystickButton,
+            identifier=self.button_id,
+            is_pressed = is_pressed
+        )
         el.vjoy_output_event.emit(event)
+        el.vjoy_output_event_ui.emit(event)
 
 
 class Hat:
@@ -482,6 +507,7 @@ class Hat:
         self.vjoy_dev = vjoy_dev
         self.vjoy_id = vjoy_dev.vjoy_id
         self.hat_id = hat_id
+        self.device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self.vjoy_id)
         self._direction = (0, 0)
         self.hat_type = hat_type
 
@@ -505,8 +531,20 @@ class Hat:
         from gremlin.input_types import InputType
 
         el = gremlin.event_handler.EventListener()
-        event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickHat, self.hat_id, direction)
-        el.vjoy_event.emit(event)
+        # event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickHat, self.hat_id, direction)
+        # el.vjoy_event.emit(event)
+
+        event = gremlin.event_handler.Event(
+            device_guid=self.device_guid,
+            event_type = InputType.JoystickHat,
+            identifier=self.hat_id,
+            value = direction,
+            is_pressed= direction != (0,0)
+        )
+        el.vjoy_output_event.emit(event)
+        el.vjoy_output_event_ui.emit(event)
+
+
 
         self.vjoy_dev.ensure_ownership()
 

@@ -565,7 +565,8 @@ class EventListener(QtCore.QObject):
     joystick_event = Signal(Event)  # Signal(Event)
 
     # ui joystick event = event fired at edit time to edit UI based on the joystick event - use QT for this to the event is on the UI thread
-    joystick_event_ui = QtCore.Signal(Event)
+    joystick_event_ui = QtCore.Signal(Event) # ui thread joystick input event
+    vjoy_output_event_ui =QtCore.Signal(VjoyEvent) # ui thread vjoy output event
 
     # custom joystick event - this is a code based joystick event that mapping items can listen to when inside other containers
     custom_joystick_event = Signal(Event)
@@ -4435,8 +4436,8 @@ class JoystickEventProcessor:
         self.handle_config_changed()  # setup verbose flags
 
         # hook joystick events for the UI
-
-        el.joystick_event_ui.connect(self.process_event_ui)
+        el.joystick_event_ui.connect(self.process_event_ui) # ui thread joystick input event
+        el.vjoy_output_event_ui.connect(self.process_event_ui) # ui thread vjoy output event
 
         # self.start()
 
@@ -4447,7 +4448,14 @@ class JoystickEventProcessor:
         input_id: int,
         callback: Callable,
     ):
-        """register a joystick listener"""
+        """register a joystick listener
+
+        :param device_guid: the id of the device
+        :param input_type: the input type
+        :param input_id: the input id, -1 for any of that type
+        :param callback: the handler to call  callback(event)
+
+        """
         if not device_guid:
             # nothing to do
             return
@@ -4494,7 +4502,13 @@ class JoystickEventProcessor:
         input_id: int = None,
         callback: Callable = None,
     ):
-        """removes a registered callback - if input data is provided only looks for that one - if not provided, removes all inputs associated with the callback"""
+        """removes a registered callback - if input data is provided only looks for that one - if not provided, removes all inputs associated with the callback
+        :param device_guid: the id of the device
+        :param input_type: the input type
+        :param input_id: the input id, -1 for any of that type
+        :param callback: the handler to call  callback(event)
+
+        """
         assert isinstance(callback, Callable), "invalid callback"
         assert isinstance(input_id, int) if input_id is not None else True, "invalid input id"
 
@@ -4538,12 +4552,19 @@ class JoystickEventProcessor:
         device_guid = event.device_guid
         input_type = event.event_type
         input_id = event.identifier
-        verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
+        # verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
+        verbose = True
         if verbose:
             device = gremlin.joystick_handling.getDevice(device_guid)
             syslog.info(f"JEP: got event: [{device.name}] [{event.event_type.name}] input: [{event.identifier}] value: [{event.value:0.3f}]")
         if device_guid in self._listener_callbacks:
             if input_type in self._listener_callbacks[device_guid]:
+                input_id = -1 # all inputs of that type
+                for callback in self._listener_callbacks[device_guid][input_type][input_id]:
+                    if verbose:
+                        syslog.info(f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}")
+                    callback(event)
+
                 if input_id in self._listener_callbacks[device_guid][input_type]:
                     for callback in self._listener_callbacks[device_guid][input_type][input_id]:
                         if verbose:
@@ -4552,8 +4573,10 @@ class JoystickEventProcessor:
 
     @QtCore.Slot(Event)
     def process_event_ui(self, event: Event):
-        """process the event - UI thread"""
+        """process received joystick event - UI thread"""
         self._fireCallbacks_ui(event)
+
+
 
     def handle_config_changed(self):
         pass

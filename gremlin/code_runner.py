@@ -303,20 +303,21 @@ class CodeRunner:
             profile.sync()
 
             verbose = gremlin.config.Configuration().verbose_mode_exec
-            device : gremlin.base_profile.Device
-            for device in profile.devices.values():
-                device_info = gremlin.joystick_handling.getDevice(device.device_guid)
-                if not device_info:
-                    syslog.warning("CALLBACK: skipping a device: ID referenced in profile data is not currently found in the list of known devices:")
-                    syslog.warning(f"\t{str(device)}")
+            profile_device : gremlin.base_profile.Device
+            for profile_device in profile.devices.values():
+                device = gremlin.joystick_handling.getDevice(profile_device.device_guid)
+                if not device:
+                    if verbose:
+                        syslog.info("CALLBACK: skipping a device (this is normal if the device is disabled):")
+                        syslog.info(f"\t{str(profile_device)}")
                     continue
 
 
-                device_name = device_info.name
+                device_name = device.name
                 if verbose:
-                    syslog.info(f"CALLBACK: device: {str(device)}")
+                    syslog.info(f"CALLBACK: device: {str(profile_device)}")
 
-                for mode in device.modes.values():
+                for mode in profile_device.modes.values():
                     if mode.name not in mode_nodes:
                         # special mode or mode not present in profile
                         continue
@@ -338,7 +339,7 @@ class CodeRunner:
 
                             event = gremlin.event_handler.Event(
                                 event_type=input_item.input_type,
-                                device_guid=device.device_guid,
+                                device_guid=profile_device.device_guid,
                                 identifier=input_item.input_id,
                                 extra_data={"input_item": input_item}
                             )
@@ -388,7 +389,7 @@ class CodeRunner:
                                             else:
                                                 syslog.info(f"\t\t\tFunctor: {functor}")
                                     self.event_handler.add_callback(
-                                        device.device_guid,
+                                        profile_device.device_guid,
                                         mode.name,
                                         event,
                                         cb_data.callback,
@@ -479,11 +480,11 @@ class CodeRunner:
 
             # set vjoy from profile defaults
             vjoy_devices = gremlin.joystick_handling.vjoy_devices()
-            for device in vjoy_devices:
-                device_id = device.device_id
+            for profile_device in vjoy_devices:
+                device_id = profile_device.device_id
 
                 # set axes
-                for id in range(1, device.axis_count + 1):
+                for id in range(1, profile_device.axis_count + 1):
                     enabled = profile.getStartAxisEnabled(device_id, id)
                     if enabled:
                         value = profile.getStartAxisValue(device_id, id)
@@ -491,7 +492,7 @@ class CodeRunner:
                             gremlin.joystick_handling.set_axis(device_id, id, value)
 
                 # set buttons
-                for id in range(1, device.button_count + 1):
+                for id in range(1, profile_device.button_count + 1):
                     value = profile.getStartButtonState(device_id, id)
                     if value is not None:
                         gremlin.joystick_handling.set_button(device_id, id, value)
