@@ -2047,7 +2047,7 @@ class Configuration(QtCore.QObject):
                         if input_id is None or input_id > device_info.hat_count:
                             input_id = 1
 
-            case DeviceType.Keyboard | DeviceType.Midi | DeviceType.Osc:
+            case DeviceType.Keyboard | DeviceType.Midi | DeviceType.Osc | DeviceType.State:
                 # grab the tab widget
                 if device_type == DeviceType.Keyboard:
                     input_type = InputType.KeyboardLatched
@@ -2055,6 +2055,8 @@ class Configuration(QtCore.QObject):
                     input_type = InputType.Midi
                 elif device_type == DeviceType.Osc:
                     input_type = InputType.OpenSoundControl
+                elif device_type == DeviceType.State:
+                    input_type = DeviceType.State
 
                 widget = gremlin.shared_state.ui.getRegisteredWidget(dinput_device_guid)
                 # if dinput_device_guid in gremlin.ui._widget_device_index_map: # gremlin.shared_state.device_widget_map:
@@ -2096,6 +2098,7 @@ class Configuration(QtCore.QObject):
             case DeviceType.OctaviIFR1:
                 save_input_id = input_id
                 input_type = InputType.OctaviIfr1
+
             case DeviceType.NotSet:
                 # settings or other non input type page
                 input_type = InputType.NotSet

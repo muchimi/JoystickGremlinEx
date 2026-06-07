@@ -362,7 +362,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """custom filter handled - true if the item is included in the list, false if not"""
         profile = gremlin.shared_state.current_profile
         # filtered = true if the input should not be displayed (filtered), false if it should be visible
-        return profile.settings.getInputVisible(input_item.device_guid, input_item.input_type, input_item.input_id)
+        visible = profile.settings.getInputVisible(input_item.device_guid, input_item.input_type, input_item.input_id)
+        return visible
 
     def _handle_filter_changed(self, value: bool):
         gremlin.util.InvokeUiMethod(self._handle_filter_changed_ui, value)  # ensure on UI thread
@@ -580,16 +581,25 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """
 
         if data.input_type == InputType.JoystickAxis:
-            widget = gremlin.input_item.InputItemWidget(identifier=identifier, parent=parent, data=data)
+            widget = gremlin.input_item.InputItemWidget(input_item = identifier.input_item,
+                                                        identifier=identifier,
+                                                        parent=parent,
+                                                        data=data)
             prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
             widget.setIcon(f"{prefix}joystick.png", use_qta=False)
             if widget.axis_repeater_widget is not None and identifier.is_axis:
                 widget.axis_repeater_widget.valueChanged.connect(lambda x: self._update_input_value_changed_cb(index, x))
         elif data.input_type == InputType.JoystickButton:
-            widget = gremlin.input_item.InputItemWidget(identifier=identifier, parent=parent, data=data)
+            widget = gremlin.input_item.InputItemWidget(input_item = identifier.input_item,
+                                                        identifier=identifier,
+                                                        parent=parent,
+                                                        data=data)
             widget.setIcon("mdi.gesture-tap-button")
         elif data.input_type == InputType.JoystickHat:
-            widget = gremlin.input_item.InputItemWidget(identifier=identifier, parent=parent, data=data)
+            widget = gremlin.input_item.InputItemWidget(input_item = identifier.input_item,
+                                                        identifier=identifier,
+                                                        parent=parent,
+                                                        data=data)
             widget.setIcon("ei.fullscreen")
         widget.create_action_icons(data)
         widget.disable_close()
@@ -1027,7 +1037,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
         self._input_widgets.clear()  # remove all widget references
         for widget in self._widgets:
             widget.unhook()
-            
+
         self._widgets.clear()
         el = gremlin.event_handler.EventListener()
         el.joystick_event.disconnect(self._joystick_event_handler)

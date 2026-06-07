@@ -769,6 +769,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             input_type = InputType.OpenSoundControl
         elif self._device_type == DeviceType.Midi:
             input_type = InputType.Midi
+        elif self._device_type == DeviceType.State:
+            input_type = InputType.State
+        elif self._device_type == DeviceType.Keyboard:
+            input_type = InputType.KeyboardLatched
+
         self._input_type = input_type
         self._update_input()
 
@@ -1032,11 +1037,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 continue
             entry = container_tag_map[container_type](self)
             mode_object = gremlin.base_profile.get_mode_object(node, extra_data)
+            if extra_data is None:
+                extra_data = {}
             if mode_object:
-                if extra_data is None:
-                    extra_data = {}
                 extra_data["mode_object"] = mode_object
-
             extra_data["input_item"] = self
             entry.from_xml(child, data, extra_data)
             # verify the entry has data
@@ -1834,7 +1838,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                     if self._identifier.is_axis:
                         # axis
                         device_guid = self._identifier.device_guid
-                        device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
+                        device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
                         input_id = self._identifier.input_id
                         assert input_id in device.axis_id_map, f"invalid axis id: {input_id} for device: {device.getName()}"
 
@@ -1866,7 +1870,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                         self.axis_repeater_widget.triggerUpdate()  # force an update
                     else:
                         # button
-                        if not self.button_repeater_widget:
+                        if not self.button_repeater_widget and self._input_item.input_type in (InputType.JoystickButton, InputType.JoystickHat):
                             widget = gremlin.ui.ui_common.QButtonStateWidget(self._input_item, f"ButtonRepeater for: [{self._input_item.display_name}]")
                             self.button_repeater_widget = widget
                             self._repeater_container_layout.addWidget(widget)
@@ -4052,12 +4056,11 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         if index is None:
             index = 0
 
-        action_set =self.action_sets.itemAt(index)
+        action_set = self.action_sets.itemAt(index)
         if action_set is None:
             # add a new action set to the container
             action_set = ActionSet()
             index = self.action_sets.add(action_set)
-
 
         action_set.append(action)
 
@@ -7352,7 +7355,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         container.registerChangeCallback(self._handle_container_changed)
 
         self.input_item = input_item
-        self.action_widgets : list[ActionSetView] = []
+        self.action_widgets: list[ActionSetView] = []
 
         mode = container.get_mode()
         if mode == gremlin.shared_state.master_mode:
@@ -11251,6 +11254,10 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 self._model_empty_callback()
             else:
                 self._input_item_list_model.trigger()
+
+    def isInputListViewCreated(self) -> bool:
+        """true if the input list view has been created """
+        return self._input_item_list_view is not None
 
     def onInputListViewCreated(self):
         """called when the input list view is created"""

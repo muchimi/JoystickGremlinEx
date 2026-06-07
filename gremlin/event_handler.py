@@ -4439,7 +4439,7 @@ class JoystickEventProcessor:
 
         # hook joystick events for the UI
         el.joystick_event_ui.connect(self.process_event_ui)  # ui thread joystick input event
-        el.vjoy_output_event_ui.connect(self.process_event_ui)  # ui thread vjoy output event
+        el.vjoy_output_event_ui.connect(self.process_vjoy_ui)  # ui thread vjoy output event
 
         # self.start()
 
@@ -4461,8 +4461,8 @@ class JoystickEventProcessor:
 
         assert isinstance(callback, Callable), "invalid callback"
         assert isinstance(input_id, int), "invalid input id"
-        if not isinstance(device_guid, dinput.GUID):
-            device_guid = gremlin.util.to_guid(device_guid)
+        # if not isinstance(device_guid, dinput.GUID):
+        #     device_guid = gremlin.util.to_guid(device_guid)
         assert isinstance(device_guid, dinput.GUID), "invalid device guid"
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
@@ -4552,7 +4552,7 @@ class JoystickEventProcessor:
 
     def _fireCallbacks_ui(self, event: Event):
         """fires all the callbacks (ui thread)"""
-
+        gremlin.util.assert_ui_thread()
         device_guid = event.device_guid
         input_type = event.event_type
         input_id = event.identifier
@@ -4585,6 +4585,12 @@ class JoystickEventProcessor:
     def process_event_ui(self, event: Event):
         """process received joystick event - UI thread"""
         self._fireCallbacks_ui(event)
+
+    @QtCore.Slot(Event)
+    def process_vjoy_ui(self, event: Event):
+        """process received joystick event - UI thread"""
+        self._fireCallbacks_ui(event)
+
 
     def handle_config_changed(self):
         pass

@@ -21,7 +21,6 @@ Main UI of JoystickGremlin.
 
 # # ruff: disable[E401]
 from __future__ import annotations  # deprecated with python 3.14+
-# import qt5reactor
 
 # ruff: disable[F401]
 import faulthandler
@@ -3154,7 +3153,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 if index is not None:
                     widget = self.getRegisteredWidget(last_device_guid)
                     assert widget is not None, "invalid widget"
-
                     widget.refresh()
 
                     # self.ui.devices.setCurrentIndex(index)

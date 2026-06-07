@@ -695,11 +695,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
 
     def _delete_widget(self, widget):
-        if widget and Shiboken.isValid(widget):
-            if hasattr(widget,"unhook"):
-                widget.unhook()
-            widget.setParent(None)
-            widget.deleteLater()
+        gremlin.util.delete_widget(widget)
 
 
     @QtCore.Slot()
@@ -819,13 +815,9 @@ States can be toggled by clicking on the state button.  Expression states will u
                 if verbose:
                     syslog.info(f"Remove existing vis: {device.name}: {visualization.name} key: {key}")
                 widget.unhook()
-                widget.setVisible(False)
-                widget.setParent(None)
-                #self._lock.acquire()
+                widget.hide()
                 self.views.remove_widget(widget)
-                #self._lock.release()
-                widget.deleteLater()
-
+                gremlin.util.delete_widget(widget)
 
 
 

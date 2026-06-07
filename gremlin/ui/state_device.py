@@ -30,12 +30,17 @@ import gremlin.shared_state
 from gremlin.singleton_decorator import SingletonDecorator
 import re
 import gremlin.ui.ui_common
-from gremlin.util import *
 from lxml import etree as ElementTree
 import gremlin.util
+from gremlin.util import safe_format, safe_read, write_guid, read_guid
+
 import gremlin.base_profile
 from psygnal import Signal
 import gremlin.input_item
+from gremlin.input_item import InputItemWidget
+from shiboken6 import Shiboken
+import html
+from typing import Callable
 
 
 syslog = logging.getLogger("system")
@@ -385,10 +390,10 @@ class StateInputItem(gremlin.input_item.InputItem):
         )
 
         mode_object = device_modes.ensure_mode_exists(master_mode)
-
+        self._key = key # ok if None (blank)
         super().__init__(mode_object=mode_object, device_guid=StateDeviceTabWidget.device_guid)
-        self._key = key
-        self._input_type = InputType.State
+        self.input_type = InputType.State
+
         self._category = category  # category (StateCategory)
         self._default_value = default_value
         self._last_value = None
@@ -409,21 +414,13 @@ class StateInputItem(gremlin.input_item.InputItem):
         self._autorelease_timer = None  # timer when triggered for autorelease
         self._autorelease_trigger_mode = autorelease_trigger_mode  # trigger mode required to enable the autorelease timer
 
-        item = gremlin.input_item.InputItem(mode_object=mode_object)  # self._custom_name_handler)
-        item.input_type = InputType.State
-        item.device_name = "State"
-        item.device_type = DeviceType.State
-        item.setOverrideInputType(InputType.JoystickButton)
-        self._input_item = item
+        self._title_name = "State"
+        self.setOverrideInputType(InputType.JoystickButton)
         self._emit = True  # enable events
         self._hooked = False
         self.hook()  # hook on creation
         self._profile_mode = gremlin.shared_state.master_mode_name  # states all belong to the master mode
         self.setInputIdCallback(self._handle_input_id_callback)
-
-    @property
-    def device_guid(self):
-        return self._device_guid
 
     def _handle_input_id_callback(self):
         """input id is self for STATE"""
@@ -604,9 +601,9 @@ class StateInputItem(gremlin.input_item.InputItem):
                     case "any":
                         trigger = True
                     case "on":
-                        trigger = data == True
+                        trigger = data
                     case "off":
-                        trigger = data == False
+                        trigger = not data
                     case "latch":
                         trigger = True
                 if trigger:
@@ -2605,13 +2602,13 @@ class StateFilterWidget(QtWidgets.QWidget):
             self._count_widget.setText(None)
             return
         total = self._model.rows()
-        filtered = self._model.count()
+        visible = self._model.count()
 
         plural = "s" if total > 1 else ""
         if total == 0:
             msg = "<i>(no states found)</i>"
-        elif filtered != total:
-            msg = f"<i>({included:,} of {total:,} state{plural})</i>"
+        elif visible != total:
+            msg = f"<i>({visible:,} of {total:,} state{plural})</i>"
         else:
             msg = f"<i>({total:,} state{plural})</i>"
         self._count_widget.setText(msg)
@@ -2998,7 +2995,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self._edit_dialog = StateInputConfigDialog(input_item, None, edit_mode=False, parent=self)
         self._edit_dialog.accepted.connect(self._dialog_ok_confirm_cb)
-        self._edit_dialog.rejected.connect(self._handle_edit_dialog_rejected)
+        self._edit_dialog.rejected.connect(self._dialog_cancel_cb)
         gremlin.util.centerDialog(self._edit_dialog)
         self._edit_dialog.showNormal()
 
@@ -3155,7 +3152,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             input_item = data
             self._input_items[key] = input_item
             changed = True
-            model.setData(index, input_item)
+            model.setItemAt(index, input_item)
             index += 1
 
         model.applyFilter()  # update model filters and sort
@@ -3220,9 +3217,10 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def refresh(self, emit=True):
         """Refreshes the current selection, ensuring proper synchronization."""
         # self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
-        self.inputItemListModel.refresh()
-        self._filter_widget.updateCounts()
-        self.selectInputItemIndex(self.inputItemListView.current_index, emit)
+        if self.isInputListViewCreated():
+            self.inputItemListModel.refresh()
+            self._filter_widget.updateCounts()
+            self.selectInputItemIndex(self.inputItemListView.current_index, emit)
 
     def _select_input_item_cb(self, input_item, emit=True):
         """select by input"""
@@ -3327,11 +3325,11 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         :param data the data associated with this input item
 
         """
-        import gremlin.input_item
 
         assert isinstance(data, StateInputItem), f"Unexpected type in widget handler - expected StateInputItem and got [{type(data).__name__}]"
 
-        widget = gremlin.input_item.InputItemWidget(
+        widget = InputItemWidget(
+            input_item = identifier.input_item,
             identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,

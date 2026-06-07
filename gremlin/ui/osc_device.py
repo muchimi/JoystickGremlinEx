@@ -4168,6 +4168,7 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         import gremlin.input_item
 
         widget = gremlin.input_item.InputItemWidget(
+            input_item = identifier.input_item,
             identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,

@@ -5550,8 +5550,6 @@ class QJoystickListener:
                 if not isinstance(device_guid, dinput.GUID):
                     device_guid = gremlin.util.to_guid(device_guid)
                     assert isinstance(device_guid, dinput.GUID), "invalid device guid"
-            assert isinstance(input_id, int) if input_id is not None else True, "invalid input id"
-            assert isinstance(input_type, InputType) if input_type is not None else True, "invalid input type"
 
             self._device_guid = device_guid
             self._input_id = input_id
@@ -7167,9 +7165,9 @@ class QUsedPushButton(QDataPushButton):
 
     def setUsed(self, value: bool):
         """marks the button as used/unused"""
+        self._used = value
         if Shiboken.isValid(self):
-            self._used = value
-            self.update()
+            self.repaint()
 
     def setHighlight(self, value: bool):
         """sets the button highlight effect on/off"""
@@ -7185,7 +7183,8 @@ class QUsedPushButton(QDataPushButton):
         if self._pulse_timer:
             self._pulse_timer.cancel()
             self._pulse_timer = None
-        self._repaint
+        if Shiboken.isValid(self):
+            self.repaint()
 
 
     def pulseHighlight(self, interval=0.25):
@@ -7202,10 +7201,6 @@ class QUsedPushButton(QDataPushButton):
         """stops the highlight effect for pulsed highlights"""
         self._highlight = False
         gremlin.util.InvokeUiMethod(self._repaint)
-
-    def _repaint(self):
-        if Shiboken.isValid(self):
-            self.update()
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -7321,9 +7316,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
             if not is_used and device.is_virtual:
                 # vjoy device
                 is_used = usage_state.get_usage_state(device.vjoy_id, input_id)
-                used_device_guid = device.vjoy_id
-            else:
-                used_device_guid = device.device_guid
+            used_device_guid = device.device_guid
 
             widget = QUsedPushButton(
                 str(input_id),
@@ -7337,13 +7330,11 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
 
 
             # hook the input
-            jep.registerListenerUICallback(device_guid = device.device_guid,
+            jep.registerListenerUICallback(device_guid = used_device_guid,
                                            input_type = InputType.JoystickButton,
                                            input_id = input_id,
                                            callback = self.process_event_ui,
                                            mode = CallbackMode.All)
-
-
 
             widget.setStyleSheet(css)
 
@@ -7413,7 +7404,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
         """
         assert gremlin.util.is_ui_thread()
         input_type = event.getInputType()
-        if input_type == InputType.JoystickButton:
+        if input_type == InputType.JoystickButton and event.identifier in self._widgets:
             # is_pressed = event.is_pressed if event.is_pressed is not None else event.current
             state = event.is_pressed if event.is_pressed is not None else False
             widget = self._widgets[event.identifier]

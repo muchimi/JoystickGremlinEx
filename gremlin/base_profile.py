@@ -763,8 +763,7 @@ class JoystickInputStats:
                     case _:
                         raise ValueError(f"don't know how to handle [{input_type}]")
 
-
-                count = min(max_count,  sum([1 for input_id in input_filter[device_guid][input_type] if input_filter[device_guid][input_type][input_id]]))
+                count = min(max_count, sum([1 for input_id in input_filter[device_guid][input_type] if input_filter[device_guid][input_type][input_id]]))
 
                 self.filtered_counts[input_type] = count
                 if verbose:
@@ -809,7 +808,7 @@ class Settings:
         self.default_delay = 0.05
         self.input_visible_map = {}  # map of input filters for each device, [device_guid][input_type][input_id] = bool (true if visible, false if not) - no data = not visible
         self.default_input_visible_map = {}  # map of default input filters for devices [device_guid][input_type][input_id] = bool (true if visible, false if not) - no data = not visible/selected
-        self.loadFilterDefaults()  # loads the default input filter
+        self.reset()
 
     def reset(self):
         """resets setting"""
@@ -822,6 +821,12 @@ class Settings:
         self.default_delay = 0.05
         self.input_visible_map.clear()
         self.loadFilterDefaults()  # loads the default input filter
+        fname = self.profile.profile_file
+        if fname and os.path.isfile(fname):
+            tree = etree.parse(fname)
+            root = tree.getroot()
+            settings_node = root.find("settings")
+            self.from_xml(settings_node)
 
     def to_xml(self):
         """Returns an XML node containing the settings.
@@ -888,13 +893,15 @@ class Settings:
                                 filter_node.set("type", InputType.to_string(input_type))
                                 filter_node.set("id", safe_format(input_id, int))
                                 filter_node.set("visible", safe_format(visible, bool))
-                                root_filter_node.append(filter_node)
+                                device_node.append(filter_node)
 
         return node
 
     def vjoyAsInput(self, vid: int):
         """true if vjoy device is setup as input in the profile options"""
         return vid in self.vjoy_as_input
+
+
 
     def from_xml(self, node, data=None, extra_data=None):
         """Populates the data storage with the XML node's contents.
@@ -951,6 +958,9 @@ class Settings:
         else:
             version = 0  # not set, assume legacy format
 
+        self.input_visible_map = {}
+        self.loadFilterDefaults()
+
         # read the device list as it will tell GEX that the device was previously viewed
         for device_node in node.xpath("./input-filter/device"):
             if "id" in device_node.attrib:
@@ -962,7 +972,9 @@ class Settings:
 
             self.input_visible_map[device_id] = {}
             device = gremlin.joystick_handling.getDevice(device_id)
-            self.setAllDefault(device)
+       
+
+
 
             match version:
                 case 0:
@@ -982,8 +994,7 @@ class Settings:
                 case _:
                     raise ValueError(f"don't know how to handle filter version [{version}] in profile settings")
 
-        # update the data from the profile
-        sd.reset()
+
 
     def getDefaultFilterXmlFilename(self) -> str:
         """gets the file name for the default profile input filtering data"""
@@ -1418,7 +1429,7 @@ class Settings:
             if verbose:
                 syslog.warning(f"PROFILE SET FILTER: unknown device [{device_guid}]")
             return
-        # verbose = True
+        verbose = True
 
         device_id = device.device_id  # key must be a string
         if device_id not in self.input_visible_map:
@@ -1562,7 +1573,16 @@ class Settings:
             self.input_visible_map[device_id][input_type] = {}
 
         if input_id not in self.input_visible_map[device_id][input_type]:
-            self.input_visible_map[device_id][input_type][input_id] = False  # default to not visible
+
+            self.input_visible_map[device_id][input_type][input_id] = False
+
+        if not self.input_visible_map[device_id][input_type][input_id]:
+            # override if input has a mapping
+            mode = gremlin.shared_state.current_mode
+            visible = self.profile.isInputMapped(device_guid, input_type, input_id, mode)
+            if visible:
+                self.input_visible_map[device_id][input_type][input_id] = True
+
 
         return self.input_visible_map[device_id][input_type][input_id]
 
@@ -2277,9 +2297,10 @@ class Profile:
         self.vjoy_devices = {}
         self.merge_axes = []
         self.plugins = []
+        self._profile_fname = None  # the file name of this profile (xml)
         self.settings = Settings(self)
         self.parent = parent
-        self._profile_fname = None  # the file name of this profile (xml)
+
         self._profile_config_fname = None  # the configuration file name of this profile (json)
         self._profile_name = None  # the friendly name of this profile
         self._start_mode = "Default"  # startup mode for this profile (this will be either the default mode, or the last used mode)
@@ -2300,6 +2321,8 @@ class Profile:
         self._start_state = {}  # profile startup output state - index by [device_id (str)][buttons/axis (str)][id (int)] = value (float or bool)
         self._removed_devices = []  # list of removed devices from the profile, list of device_id (str)
         self._save_config_enabled = False  # true if profile config saving is enabled
+        self._config_data_read = False
+        self._config_data = {}
 
         self.override_start_mode = None  # override mode for profile startup if any (not persisted)
         el = gremlin.event_handler.EventListener()
@@ -2983,7 +3006,7 @@ class Profile:
         """true if the device has mappings"""
         if isinstance(device_guid, str):
             device_guid = gremlin.util.parse_guid(device_guid)
-        profile = gremlin.shared_state.current_profile
+        profile = self # gremlin.shared_state.current_profile
         edit_mode = gremlin.shared_state.edit_mode
         devices = profile.devices
         look_for_containers = True
@@ -4237,15 +4260,26 @@ class Profile:
     def _readConfig(self) -> dict:
         """reads the profile config"""
         fname = self._profile_config_fname
+        if self._config_data_read:
+            return self._config_data
+
         data = {}
         if fname and os.path.isfile(fname):
             try:
-                with open(fname, "r") as hdl:
+                verbose = gremlin.config.Configuration().verbose
+                if verbose:
+                    syslog.info(f"READ: profile configuration: {gremlin.util.toUrl(fname)}")
+
+                with open(fname, "r", encoding="utf-8") as hdl:
                     decoder = json.JSONDecoder()
                     data = decoder.decode(hdl.read())
+
             except Exception:
                 # failed to read
                 pass
+
+        self._config_data = data
+        self._config_data_read = True
 
         return data
 
@@ -4261,8 +4295,12 @@ class Profile:
             except Exception:
                 pass
 
+
+        self._config_data = data
+
     def _setConfig(self, key, value):
         """sets a configuration value and saves to the profile config file"""
+
         data = self._readConfig()  # get the profile config
         data[key] = value
         self._writeConfig(data)
@@ -4333,6 +4371,7 @@ class Profile:
     def getLastInput(self, device_guid=None) -> tuple:
         """gets the last input for this profile (device_guid, input_type, input_id)"""
         data = self._readConfig()  # get the profile config
+
         input_id = None
         input_type = None
         if device_guid is not None and "selection_map" in data:
