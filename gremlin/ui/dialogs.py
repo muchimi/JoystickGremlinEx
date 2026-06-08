@@ -2109,9 +2109,14 @@ This setting is also available on a profile by profile basis on the profile tab,
                 row += 1
             self._verbose_mode_widgets[mode] = widget
 
-        widget, layout = gremlin.ui.ui_common.getHContainer(container_widget)
+        widget = gremlin.ui.ui_common.getHContainer(container_widget, widget_only=True)
         box.addWidget(widget)
         page_layout.addWidget(box)
+
+
+        widget = ui_common.QDataPushButton("All Off", callback=self._handle_verbose_all_off,tooltip = "All options off")
+        container = ui_common.getHContainer(widget, widget_only=True)
+        page_layout.addWidget(container)
 
         widget = gremlin.ui.ui_common.QDataCheckbox(
             "Enable HID enumerations",
@@ -2321,6 +2326,9 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
 
         page_layout.addWidget(container)
 
+
+
+
         msg = """Please configure the network information used for the OSC components in GremlinEx:
 
 The GremlinEx IP is the host IP address.
@@ -2341,6 +2349,8 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
             """
 
+
+
         info_box = gremlin.ui.ui_common.QInfoBox(msg)
 
         page_layout.addWidget(info_box)
@@ -2349,6 +2359,11 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "OSC/MIDI")
+
+    def _handle_verbose_all_off(self, widget):
+        for widget in self._verbose_mode_widgets.values():
+            widget.setChecked(False)
+
 
     @QtCore.Slot(bool)
     def _handle_osc_no_arg_autorelease_changed(self, checked: bool):

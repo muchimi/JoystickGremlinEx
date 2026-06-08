@@ -345,13 +345,14 @@ class AbstractView(QtWidgets.QWidget):
 
         :param model the model to visualize
         """
+        if self._model:
+            # ensure the callback is registered so when the model changes, the list view updates
+            self._model.addCallback(self._handle_model_changed)
         if self._model != model:
             if self._model:
                 self._model.removeCallback(self._handle_model_changed)
             assert isinstance(model, AbstractCallbackModel) if model is not None else True, "invalid model"
             self._model = model
-            if self._model:
-                self._model.addCallback(self._handle_model_changed)
             self._model.trigger()  # force a model update
 
     def modelChanged(self) -> bool:
@@ -471,6 +472,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
         el.reload_axis_state.connect(self._handle_axis_state_request)
+
+    def setContainers(self, containers: containerModel):
+        """sets the container model for this input item"""
+        self._containers = containers
 
     def setSortCallback(self, callback: Callable):
         """sets an optional callback to get the sort key for this item"""
@@ -2520,6 +2525,7 @@ class InputItemListModel(AbstractCallbackModel):
         :param show_filtered_only: determines if only filtered items are shown in the model
         """
         import gremlin.base_profile
+        import gremlin.joystick_handling
 
         if profile is None:
             raise ValueError("Profile cannot be None")
@@ -2540,6 +2546,11 @@ class InputItemListModel(AbstractCallbackModel):
         self._device_guid = device_guid
         self._profile = profile
         self._device_data = profile.getDevice(device_guid)
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        assert device is not None, "invalid device"
+        if device.device_type == DeviceType.Joystick:
+            # ensure all possible inputs are pre-loaded for joysticks before filtered
+            profile.ensureInputItems(device_guid)
 
         self._mode = mode
         self._show_master_mode = show_master_mode
@@ -2659,7 +2670,7 @@ class InputItemListModel(AbstractCallbackModel):
 
         self.pushSuspend()
         try:
-            registry = gremlin.base_profile.ProfileRegistry()
+            registry = gremlin.shared_state.current_profile.registry
             device_guid = self._device_guid
             mode = self.mode
 
@@ -2673,6 +2684,7 @@ class InputItemListModel(AbstractCallbackModel):
                 InputType.JoystickButton,
                 InputType.JoystickHat,
             ]
+
             input_items = registry.getInputItems(device_guid, mode, input_type=allowed_types)
 
             if input_items and device.device_type in (
@@ -2690,11 +2702,10 @@ class InputItemListModel(AbstractCallbackModel):
 
             self.clear()  # rebuild the list
             source_index = 0
-            for input_item in input_items:
+            for item in input_items:
                 # process all possible inputs and build the filtered list vs the full list (source)
-                self.place(input_item, source_index, apply_filter=False, emit=False)
+                self.setItemAt(source_index, item)
                 source_index += 1
-
             if self._show_master_mode:
                 master_mode = gremlin.shared_state.master_mode
                 if master_mode in self._device_data.modes:
@@ -11256,7 +11267,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 self._input_item_list_model.trigger()
 
     def isInputListViewCreated(self) -> bool:
-        """true if the input list view has been created """
+        """true if the input list view has been created"""
         return self._input_item_list_view is not None
 
     def onInputListViewCreated(self):
@@ -11438,8 +11449,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         assert isinstance(model, InputItemListModel), "Ivvalid model"
         if self._input_item_list_model != model:
             self._input_item_list_model = model
-            if self._input_item_list_view is not None:
-                self._input_item_list_view.setModel(model)
+        if self._input_item_list_view is not None:
+            self._input_item_list_view.setModel(model)
 
     @property
     def inputItemListView(self) -> InputItemListView:
@@ -11469,6 +11480,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             )  # hook selected callback - called whenever an input is selected
             self.listview_container.addWidget(widget)
             self.onInputListViewCreated()
+            self.inputItemListView.setModel(self.inputItemListModel)
 
     def setLastSelectedIndex(self, value: int):
         self._last_selected_index = value

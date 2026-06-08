@@ -110,6 +110,10 @@ class Device:
         self.masterMode = {}  # master mode
 
     @property
+    def profile(self) -> Profile:
+        return self.parent
+
+    @property
     def device_guid(self) -> dinput.GUID:
         """device ID as a GUID"""
         return self._device_guid
@@ -208,8 +212,10 @@ class Device:
         node.set("name", safe_format(self.name, str))
         node.set("label", safe_format(self.label, str))
         node.set("device-guid", write_guid(self.device_guid))
-        device_type = DeviceType.to_string(self.type)
-        node.set("type", device_type)
+        if self.type == DeviceType.Keyboard:
+            pass
+        node.set("type", DeviceType.to_string(self.type))
+
         mode_list = sorted(self.modes.values(), key=lambda x: x.name)
         for mode in mode_list:
             mode_node = mode.to_xml()
@@ -522,7 +528,8 @@ class AbstractContainerAction(AbstractAction):
                 current = current.parent
 
             # setup a new input item for these containers and read from config the defined containers
-            registry = ProfileRegistry()
+
+            registry = gremlin.shared_state.current_profile.registry
 
             device_guid = current._device_guid
             device_type = current._device_type
@@ -544,7 +551,6 @@ class AbstractContainerAction(AbstractAction):
         """
 
         super().from_xml(node, data, extra_data)
-        _registry = ProfileRegistry()
         container_nodes = gremlin.util.get_xml_child(node, "action_containers", multiple=True)
 
         # if hasattr(self,"command") and self.command == 'THROTTLE1_AXIS_SET_EX1':
@@ -577,9 +583,9 @@ class AbstractContainerAction(AbstractAction):
 
             input_item = InputItem(mode_object)
             input_item.setInputId(input_id)
-            input_item.input_type = input_type
+            input_item.setInputType(input_type)
             input_item.device_guid = device_guid
-            input_item.device_type = device_type
+            input_item.setDeviceType(device_type)
             input_item.is_action = True  # indicate this input item is a special action input item
 
             if child is not None:
@@ -619,7 +625,7 @@ class AbstractContainerAction(AbstractAction):
         self.__dict__.update(state)
         input_item = InputItem(mode_object=self)
         self.item_data = input_item
-        registry = ProfileRegistry()
+        registry = gremlin.shared_state.current_profile.registry
         registry.registerInputItem(input_item)
 
     @property
@@ -721,7 +727,7 @@ class JoystickInputStats:
         """
         profile = gremlin.shared_state.current_profile
 
-        registry = ProfileRegistry()
+        registry = profile.registry
         if resync:
             registry.sync(profile)
 
@@ -972,7 +978,7 @@ class Settings:
 
             self.input_visible_map[device_id] = {}
             device = gremlin.joystick_handling.getDevice(device_id)
-       
+
 
 
 
@@ -1848,28 +1854,18 @@ def extract_remap_actions(action_sets):
             #     remap_actions.append(action)
     return remap_actions
 
-
-@SingletonDecorator
 class ProfileRegistry:
     """holds data about a profile in a central location for easier reference and to avoid duplication of object references in data structures"""
 
-    def __init__(self):
-        self._input_item_registry = {}  # references created input items in a profile, keyed by device_guid, input_type, input_id
-        self._device_registry = {}  # references the devices in the profile
+    def __init__(self, profile : Profile):
+        assert isinstance(profile, Profile) or isinstance(profile, gremlin.profile_graph.ProfileRootNode), "invalid profile"
+        self._profile = profile
+        self._is_graph = isinstance(profile, gremlin.profile_graph.ProfileRootNode)
+        # sync - this will populate entries from the profile to the registry
 
     def reset(self):
         """clear entries for a new profile"""
-        self._input_item_registry.clear()
-        self._device_registry.clear()
-
-    def registerDevice(self, device: Device):
-        self._device_registry[device.device_guid] = device
-
-    def getDevice(self, device_guid) -> Device:
-        """gets a registered device"""
-        if device_guid in self._device_registry:
-            return self._device_registry[device_guid]
-        return None
+        pass
 
     def getInputIdKey(self, input_id) -> list:
         if input_id is not None and hasattr(input_id, "message_key"):
@@ -1899,76 +1895,70 @@ class ProfileRegistry:
         :param custom_name_handler: optional handler for new inputs
         :param custom_mode_name_handler: optional handler for new inputs
         """
-
         verbose = gremlin.config.Configuration().verbose_mode_inputitems
-
         device_guid = gremlin.util.parse_guid(device_guid)
-        input_id_key = self.getInputIdKey(input_id)  # unique key for the input
-        key = (device_guid, mode_name, input_type, input_id_key)
+        assert isinstance(device_guid, dinput.GUID),"invalid id"
+        input_item = self._profile.getInputItem(device_guid, mode_name, input_type, input_id)
 
-        if key in self._input_item_registry:
-            # if verbose: syslog.info(f"REGISTRY GET INPUT ITEM [{key}]:  returning existing input item")
-            return self._input_item_registry[key]
+        if input_item is None and autocreate:
 
-        if not autocreate:
-            return None
+            profile = self._profile
+            device: Device = profile.getDevice(device_guid)
+            if not device:
+                # create a device
+                device = Device(profile)
+                device.device_guid = device_guid
+                device.device_type = device_type
+                profile.devices[device_guid] = device
 
-        profile = gremlin.shared_state.current_profile
-        device: Device = profile.getDevice(device_guid)
-        if not device:
-            # create a device
-            device = Device(profile)
-            device.device_guid = device_guid
-            device.device_type = device_type
-            profile.devices[device_guid] = device
+            mode_object = device.getMode(mode_name)
+            if not mode_object:
+                # create a mode
+                mode_object = Mode(device)
+                mode_object.name = mode_name
+                mode_object.inherit = True
+                device.modes[mode_name] = mode_object
 
-        mode_object = device.getMode(mode_name)
-        if not mode_object:
-            # create a mode
-            mode_object = Mode(device)
-            mode_object.name = mode_name
-            device.modes[mode_name] = mode_object
+            match input_type:
+                case InputType.State:
+                    input_item = gremlin.ui.state_device.StateInputItem(key=input_id)
 
-        match input_type:
-            case InputType.State:
-                input_item = gremlin.ui.state_device.StateInputItem(key=input_id)
+                case InputType.Keyboard | InputType.KeyboardLatched:
+                    input_item = gremlin.ui.keyboard_device.KeyboardInputItem(mode_object)
+                    input_item.key = input_id
+                    if custom_name_handler:
+                        input_item.setInputNameHandler(custom_name_handler)
 
-            case InputType.Keyboard | InputType.KeyboardLatched:
-                input_item = gremlin.ui.keyboard_device.KeyboardInputItem(mode_object)
-                input_item.key = input_id
-                if custom_name_handler:
-                    input_item.setInputNameHandler(custom_name_handler)
+                case InputType.OpenSoundControl:
+                    input_item = gremlin.ui.osc_device.OscInputItem(mode_object)
+                    input_item.setInputId(input_id)
+                    if override_input_type:
+                        input_item.setOverrideInputType(override_input_type)
+                case InputType.Midi:
+                    input_item = gremlin.ui.midi_device.MidiInputItem(mode_object)
+                    input_item.setInputId(input_id)
+                    if override_input_type:
+                        input_item.setOverrideInputType(override_input_type)
+                case _:
+                    input_item = InputItem(
+                        mode_object=mode_object,
+                        device_guid=device_guid,
+                        override_input_type=override_input_type,
+                        custom_name_handler=custom_name_handler,
+                        custom_mode_name_handler=custom_mode_name_handler,
+                    )
+                    input_item.setInputType(input_type)
+                    input_item.setInputId(input_id)
+                    input_item.setSortCallback(self._handle_joystick_sort)
 
-            case InputType.OpenSoundControl:
-                input_item = gremlin.ui.osc_device.OscInputItem(mode_object)
-                input_item.setInputId(input_id)
-                if override_input_type:
-                    input_item.setOverrideInputType(override_input_type)
-            case InputType.Midi:
-                input_item = gremlin.ui.midi_device.MidiInputItem(mode_object)
-                input_item.setInputId(input_id)
-                if override_input_type:
-                    input_item.setOverrideInputType(override_input_type)
-            case _:
-                input_item = InputItem(
-                    mode_object=mode_object,
-                    device_guid=device_guid,
-                    override_input_type=override_input_type,
-                    custom_name_handler=custom_name_handler,
-                    custom_mode_name_handler=custom_mode_name_handler,
-                )
-                input_item.setInputType(input_type)
-                input_item.setInputId(input_id)
-                input_item.setSortCallback(self._handle_joystick_sort)
+            self._profile.registerInputItem(input_item)
 
-        if verbose:
-            syslog.info(f"REGISTRY GET INPUT ITEM [{key}]: register new input item:")
-            syslog.info(f"\tid: {input_item.id}")
-            syslog.info(f"\tinput mode: {input_item.profile_mode}")
-            syslog.info(f"\tinput type: {input_item.input_type.name}")
-            syslog.info(f"\tinput id: {str(input_item.input_id)}")
-
-        self._input_item_registry[key] = input_item
+            if verbose:
+                syslog.info(f"REGISTRY GET INPUT ITEM [{input_item.display_name}] : register new input item:")
+                syslog.info(f"\tid: {input_item.id}")
+                syslog.info(f"\tinput mode: {input_item.profile_mode}")
+                syslog.info(f"\tinput type: {input_item.input_type.name}")
+                syslog.info(f"\tinput id: {str(input_item.input_id)}")
 
         return input_item
 
@@ -1990,200 +1980,57 @@ class ProfileRegistry:
 
     def removeInputItem(self, input_item: InputItem):
         """removes a given input item from the registry"""
-        device_guid = input_item.device_guid
-        input_type = input_item.input_type
-        _input_id = input_item.input_id
-        input_id_key = self.getInputIdKey(input_item)
-        input_mode = input_item.profile_mode
-        key = (device_guid, input_mode, input_type, input_id_key)
-        if key in self._input_item_registry:
-            del self._input_item_registry[key]
+        self._profile.removeInputItem(input_item)
 
-    def registerInputItem(self, input_item: InputItem, overwrite=False):
+    def registerInputItem(self, input_item: InputItem,
+                          device_guid : dinput.GUID = None,
+                          mode : str  = None,
+                          input_type : InputType = None,
+                          input_id = None,
+                          overwrite=False):
         """registers an input item in the profile registry"""
-        import gremlin.joystick_handling
-        import gremlin.util
 
-        assert input_item is not None, "Input Item must be provided"
-        assert input_item.device_guid is not None, "Device GUID must be provided"
-        assert input_item.input_type is not None, "Input Type must be provided"
-        # assert input_item.input_id is not None or \
-        #     (input_item.input_id is None and input_item.input_type == InputType.State) \
-        #     , "Input ID must be provided"
-        assert input_item.profile_mode is not None, "Profile mode must be provided"
-
-        device_guid = input_item.device_guid
-        input_type = input_item.input_type
-        input_id = input_item.input_id
-        input_id_key = self.getInputIdKey(input_id)
-        input_mode = input_item.profile_mode
-
-        key = (device_guid, input_mode, input_type, input_id_key)
-        device = gremlin.joystick_handling.getDevice(device_guid)
-        if not device:
-            syslog.info(f"Unknown device: {gremlin.util.normalize_guid(device_guid)}")
-            return None
-
-        if key in self._input_item_registry and not overwrite:
-            syslog.error("Item is already registered.  Registration can only occur once.")
-            syslog.error(f"\tid: {input_item.id} device: [{device.name if device else 'unknown device'}][{device.device_id}]")
-            syslog.error(f"\tinput mode: {input_item.profile_mode}")
-            syslog.error(f"\tinput type: {input_item.input_type.name}")
-            syslog.error(f"\tinput id: {str(input_item.input_id)}")
-            syslog.error(f"\thas containers: {input_item.hasContainers}")
-
-            return None
-
-        verbose = gremlin.config.Configuration().verbose_mode_inputitems
-        if verbose and input_item.hasContainers:
-            syslog.info("INPUT ITEM: register mapped input:")
-            syslog.info(f"\tid: {input_item.id} device: [{device.name if device else 'unknown device'}][{device.device_id}]")
-            syslog.info(f"\tinput mode: {input_item.profile_mode}")
-            syslog.info(f"\tinput type: {input_item.input_type.name}")
-            syslog.info(f"\tinput id: {str(input_item.input_id)}")
-
-        self._input_item_registry[key] = input_item
-
+        self._profile.registerInputItem(input_item)
         return input_item
 
     def loadInputItems(self, device_guid, mode: str):
         """loads the possible input items from the profile data into the registry"""
-        device = gremlin.joystick_handling.getDevice(device_guid)
-        if not device or device.device_type not in (
-            DeviceType.Joystick,
-            DeviceType.VJoy,
-        ):
-            return
+        pass
 
-        # axis inputs
-        for linear_id in device.linear_id_map:
-            input_id = device.getAxisInputId(linear_id)
-            assert input_id is not None, "invalid axis id"
-            self.getInputItem(
-                device_guid,
-                device.device_type,
-                mode,
-                InputType.JoystickAxis,
-                input_id,
-                autocreate=True,
-            )
-
-        for input_id in range(1, device.button_count + 1):
-            self.getInputItem(
-                device_guid,
-                device.device_type,
-                mode,
-                InputType.JoystickButton,
-                input_id,
-                autocreate=True,
-            )
-
-        for input_id in range(1, device.hat_count + 1):
-            self.getInputItem(
-                device_guid,
-                device.device_type,
-                mode,
-                InputType.JoystickHat,
-                input_id,
-                autocreate=True,
-            )
 
     def getInputItems(self, device_guid, mode_name, input_type: InputType | list[InputType] = None) -> list:
         """gets a list of all input items for a device and mode with optional filter on input type"""
+        return self._profile.getInputItems(device_guid, mode_name, input_type)
 
-        # update input types for the device
-        self.loadInputItems(device_guid, mode_name)
 
-        if input_type is not None:
-            if hasattr(input_type, "__iter__"):
-                # list of input types
-                input_type_list = input_type
-            else:
-                # single
-                input_type_list = [input_type]
 
-            if __debug__:
-                for tt in input_type_list:
-                    assert isinstance(tt, InputType), f"Invalid input type: {tt}"
-            # items = []
-            # for key in self._input_item_registry:
-            #     key_device_guid, key_mode, key_input_type, key_input_id = key
-            #     if key_device_guid == device_guid:
-            #         if key_mode == mode_name:
-            #             if key_input_type in input_type_list:
-            #                 items.append(self._input_item_registry[key])
+    def dump(self):
+        ''' dumps the profile content and registry contents '''
 
-            # return items
-
-            return [
-                item
-                for item in self._input_item_registry.values()
-                if item.device_guid == device_guid and item.profile_mode == mode_name and item.input_type in input_type_list
-            ]
-
-        return [item for item in self._input_item_registry.values() if item.device_guid == device_guid and item.profile_mode == mode_name]
-
-    def sync(self, profile=None):
-        """synchronizes the input items in this registry with the profile devices"""
-        profile: Profile
-        if profile is None:
-            # default to current profile if not provided
-            profile = gremlin.shared_state.current_profile
-
+        syslog.info("Profile: input items dump:")
+        profile = self._profile
         devices = profile.devices
-        verbose = gremlin.config.Configuration().verbose
-
-        # ensure registry items are in the profile data
-        for key in self._input_item_registry:
-            device_guid, mode_name, input_type, input_id = key
-            input_item = self._input_item_registry[key]
-            if device_guid not in devices:
-                # add missing device if the device can be derived
-                dev = gremlin.joystick_handling.getDevice(device_guid)
-                if dev:
-                    # add the device to the profile
-                    new_device = Device(self)
-                    new_device.device_guid = dev.device_guid
-                    new_device.name = dev.name
-                    new_device.virtual = dev.is_virtual
-                    new_device.device_type = dev.device_type
-                    profile.devices[device_guid] = new_device
-                    if verbose:
-                        syslog.info(f"SYNC: adding missing device [{dev.name}] to profile")
-
-            if device_guid in devices:
-                device = devices[device_guid]
-                if mode_name not in device.modes:
-                    mode_object = Mode(device)
-                    mode_object.name = mode_name
-                    device.modes[mode_name] = mode_object
-                    if verbose:
-                        syslog.info(f"SYNC: adding missing mode [{mode_name}] to device [{device.name}]")
-                if input_type not in device.modes[mode_name].config:
-                    device.modes[mode_name].config[input_type] = {}
-
-                device.modes[mode_name].config[input_type][input_id] = input_item
-            else:
-                syslog.warning(
-                    f"SYNC: device [{str(device_guid)}] not found in profile device list nor in connected devices (this can happen when importing an older profile or a profile referencing defunct device GUIDs)"
-                )
-
-        # ensure profile items not in registry are also removed
         for device_guid in devices:
-            device = devices[device_guid]
-            for mode_name in device.modes:
-                mode_object = device.modes[mode_name]
-                for input_type in mode_object.config:
-                    input_id_list = list(mode_object.config[input_type])
-                    for input_id in input_id_list:
-                        input_id_key = self.getInputIdKey(input_id)
-                        match = next(
-                            (item for key, item in self._input_item_registry.items() if key == (device_guid, mode_name, input_type, input_id_key)),
-                            None,
-                        )
-                        if not match:
-                            # not in registry - delete from profile
-                            del mode_object.config[input_type][input_id]
+            device_node = self.devices[device_guid]
+            for input_mode in device_node.modes:
+                mode_node = device_node.modes[input_mode]
+                for input_type in mode_node.config:
+                    for input_id in mode_node.config[input_type]:
+                        input_item =  mode_node.config[input_type][input_id]
+                        syslog.info(f"\t{input_item.display_name}")
+
+
+    def sync(self):
+        """synchronizes the input items in this registry with the profile devices"""
+        pass
+
+
+
+
+
+
+
+
 
 
 def get_mode_object(node, extra_data=None):  # -> Mode:
@@ -2327,8 +2174,15 @@ class Profile:
         self.override_start_mode = None  # override mode for profile startup if any (not persisted)
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
+        self._profile_registry = ProfileRegistry(self)
+        self._joystick_inputs_loaded = {} # map of [device_guid] to flag to indicate if all base inputs were loaded for this joystick device
 
         self.initialize_regular_devices()  # non joystick devices
+
+    @property
+    def registry(self) -> ProfileRegistry:
+        return self._profile_registry
+
 
     def __getstate__(self):
         """serialization override"""
@@ -2352,8 +2206,181 @@ class Profile:
 
     def sync(self):
         """sync the profile with the profile registry"""
-        registry = ProfileRegistry()
-        registry.sync(self)
+        self.registry.sync()
+
+    def registerInputItem(self, input_item):
+        ''' sets a profile model data  '''
+        assert isinstance(input_item, InputItem),"invalid input item"
+        device_guid = input_item.device_guid
+        assert isinstance(device_guid, dinput.GUID), "invalid device id"
+        input_type = input_item.input_type
+        input_id = input_item.input_id
+        input_mode = input_item.profile_mode
+        device = gremlin.joystick_handling.getDevice(device_guid)
+
+        devices = self.devices
+        if device_guid not in devices:
+            device_node = Device(self)
+            device_node.device_guid = device_guid
+            device_node.name = device.name
+            self.devices[device_guid] = device_node
+        else:
+            device_node = self.devices[device_guid]
+
+        if input_mode not in device_node.modes:
+            mode_node = Mode(device_node)
+            mode_node.name = input_mode
+            device_node.modes[input_mode] = mode_node
+        else:
+            mode_node = device_node.modes[input_mode]
+
+        if input_type not in mode_node.config:
+            mode_node.config[input_type] = {}
+
+        mode_node.config[input_type][input_id] = input_item
+
+    def getInputItem(self, device_guid, mode, input_type, input_id):
+        ''' gets an input item from the profile model data '''
+
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if device.disabled:
+            # ignore joysticks that are disabled
+            return None
+
+        # ensure joystick inputs exist in the model
+        self.ensureInputItems(device_guid)
+        devices = self.devices
+        if device_guid in devices:
+            device_node = devices[device_guid]
+            if mode in device_node.modes:
+                mode_node = device_node.modes[mode]
+                if input_type in mode_node.config:
+                    if input_id in mode_node.config[input_type]:
+                        input_item = mode_node.config[input_type][input_id]
+                        if not input_item:
+                            # delay load it
+                            input_item = InputItem(mode_node)
+                            input_item.setInputId(input_id)
+                            input_item.setInputType(input_type)
+                            input_item.setDeviceType(device.device_type)
+                            input_item.device_guid = device_guid
+                            mode_node.config[input_type][input_id] = input_item
+                        return input_item
+        return None
+
+    def ensureInputItems(self, device_guid):
+        ''' ensures input items are setup for joysticks '''
+        assert isinstance(device_guid, dinput.GUID), "invalid device id format"
+
+
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if device.disabled:
+            # ignore joysticks that are disabled
+            return
+
+
+        if device.device_type == DeviceType.Joystick:
+            # ensure all inputs are defined for joysticks
+            loaded = device_guid in self._joystick_inputs_loaded and self._joystick_inputs_loaded[device_guid]
+            if not loaded:
+                profile_modes = self.get_modes()
+                if device_guid not in self.devices:
+                    device_node = Device(self)
+                    device_node.device_guid = device_guid
+                    device_node.name = device.name
+                    self.devices[device_guid] = device_node
+                else:
+                    device_node = self.devices[device_guid]
+
+                for input_mode in profile_modes:
+                    if input_mode not in device_node.modes:
+                        mode_node = Mode(device_node)
+                        mode_node.name = input_mode
+                        device_node.modes[input_mode] = mode_node
+                    else:
+                        mode_node = device_node.modes[input_mode]
+
+                        input_type_list = (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat)
+                        for input_type in input_type_list:
+                            if input_type not in mode_node.config:
+                                mode_node.config[input_type] = {}
+
+                            match input_type:
+                                case InputType.JoystickAxis:
+                                    input_id_list = device.getAxisInputIdList()
+                                case InputType.JoystickHat:
+                                    input_id_list = range(1,device.hat_count+1)
+                                case InputType.JoystickButton:
+                                    input_id_list = range(1,device.button_count+1)
+                            for input_id in input_id_list:
+                                if input_id not in mode_node.config[input_type]:
+                                      mode_node.config[input_type][input_id] = None # delay load but define the input id
+
+                # mark loaded
+                self._joystick_inputs_loaded[device_guid] = True
+
+
+    def getInputItems(self, device_guid : dinput.GUID, mode : str, input_type : InputType | list[InputType] | tuple[InputType]) -> list:
+        ''' gets input items of a specific type'''
+        devices = self.devices
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if device.disabled:
+            # ignore joysticks that are disabled
+            return []
+        input_type_list = input_type if hasattr(input_type,"__iter__") else [input_type]
+
+         # ensure all inputs are defined for joysticks
+        self.ensureInputItems(device_guid)
+
+
+        input_list = []
+        if device_guid in devices:
+            device_node = devices[device_guid]
+            if mode in device_node.modes:
+                mode_node = device_node.modes[mode]
+                for input_type in input_type_list:
+                    if input_type in mode_node.config:
+                        for input_id in mode_node.config[input_type]:
+                            input_item = mode_node.config[input_type][input_id]
+                            if not input_item:
+                                # delay load it
+                                input_item = InputItem(mode_node)
+                                input_item.setInputId(input_id)
+                                input_item.setInputType(input_type)
+                                input_item.setDeviceType(device.device_type)
+                                input_item.device_guid = device_guid
+                                mode_node.config[input_type][input_id] = input_item
+                            input_list.append(input_item)
+        return input_list
+
+
+    def removeInputItem(self, input_item : InputItem):
+        ''' removes an input item from the profile '''
+        assert isinstance(input_item, InputItem),"invalid input item"
+        device_guid = input_item.device_guid
+        assert isinstance(device_guid, dinput.GUID), "invalid device id"
+        input_type = input_item.input_type
+        input_id = input_item.input_id
+        input_mode = input_item.profile_mode
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+
+        devices = self.devices
+        if device_guid in devices:
+            device_node = self.devices[device_guid]
+            if input_mode in device_node.modes:
+                mode_node = device_node.modes[input_mode]
+                if input_type in mode_node.config:
+                    if input_id in mode_node.config[input_type]:
+                        if mode_node.config[input_type][input_id] == input_item:
+                            del mode_node.config[input_type][input_id]
+                            if verbose:
+                                syslog.info(f"Profile: remove input item: {input_item.display_name}")
+                            return
+
+        if verbose:
+            syslog.warning(f"Profile: warning: input item: {input_item.display_name} not found in profile")
+
+
 
     def unload(self):
         """unloads the current profile - clears all references and unhooks events"""
@@ -2731,10 +2758,11 @@ class Profile:
             mode_map = {}
             if self._loaded:
                 for device in self.devices.values():
-                    for mode_object in device.modes:
-                        if mode_object.name not in mode_map:
-                            node = ModeNode(mode_object.name)
-                            parent_name = mode_object.inherit
+                    for mode_name in device.modes:
+                        mode_node = device.modes[mode_name]
+                        if mode_name not in mode_map:
+                            node = ModeNode(mode_name)
+                            parent_name = mode_node.inherit
                             node.parent = mode_map[parent_name] if parent_name in mode_map else self._mode_tree
 
             # add default mode
@@ -3493,8 +3521,7 @@ class Profile:
         """lists all actions in the current profile"""
         # Create a list of all used remap actions
 
-        registry = ProfileRegistry()
-        registry.sync(self)
+        self.registry.sync()
 
         remap_actions = []
         for dev_guid in self.devices:
@@ -3580,6 +3607,7 @@ class Profile:
         import_data = ProfileImportData()
         import_data.used_ids = {}  # reset used list
         profile_was_updated = False
+        self.registry.reset() # clear registry on profile load
 
         if fname_is_xml:
             # fname is an xml stream
@@ -3808,6 +3836,9 @@ class Profile:
                     enabled = safe_read(node, "enabled", bool, False)
                     self._start_state[device_id]["enabled"][id] = enabled
 
+
+
+
         # have config use updated profile settings
         config = gremlin.config.Configuration()
         config.ensure_profile(self)
@@ -3815,6 +3846,7 @@ class Profile:
         # load the profile graph
         self._profile_graph = gremlin.profile_graph.ProfileGraph()
         self._profile_graph.from_xml(fname, fname_is_xml=fname_is_xml)
+
 
         # load the mode tree
         self.reload_modes(update_devices=True)
@@ -3826,6 +3858,9 @@ class Profile:
         # clear used memory
         import_data.used_ids = {}  # reset used list
 
+
+
+
         return profile_was_updated
 
     def to_xml(self, fname: str = None):
@@ -3833,6 +3868,10 @@ class Profile:
 
         :param fname: name of the file to save the XML to, if None the function returns the XML string of the profile
         """
+
+        # ensure registry and model are synchronized before saving
+        self.sync()
+
         # Generate XML document
         root = etree.Element("profile")
         root.set("version", str(gremlin.profile.ProfileConverter.current_version))
@@ -3876,8 +3915,7 @@ class Profile:
             root.append(removed_device_node)
 
         # sync registry
-        registry = ProfileRegistry()
-        registry.sync(self)
+        self.registry.sync()
 
         # Device settings
         devices = etree.Element("devices")
@@ -4708,6 +4746,16 @@ class Mode:
             InputType.OctaviIfr1: {},
         }
 
+        
+
+    @property
+    def profile(self) -> Profile:
+        return self.parent.profile
+
+    @property
+    def registry(self) -> ProfileRegistry:
+        return self.profile.registry
+
     @property
     def name(self) -> str:
         return self._name
@@ -4754,7 +4802,7 @@ class Mode:
         mode_name = mode_name.strip()
         self._name = mode_name
 
-        registry = ProfileRegistry()
+        registry = self.profile.registry
 
         self.inherit = node.get("inherit", None)
         child: etree.Element
@@ -4848,15 +4896,16 @@ class Mode:
         include = False
         for input_type in input_types:
             item_list = list(self.config[input_type].values())
+
             if item_list:
                 item_list.sort(key=lambda item: item.index)  # sort by index
                 # item_list = [item for item in item_list if item.description or item.containers]
-            if item_list and input_type == InputType.OpenSoundControl:
+            if item_list and input_type in (InputType.OpenSoundControl, InputType.Keyboard, InputType.KeyboardLatched):
                 pass
             for input_item in item_list:
                 # if item.is_valid_for_save():
                 item_node = input_item.to_xml()
-                _index = input_item.index
+                # _index = input_item.index
                 # syslog.info(f"xml write [{index}] = [{input_item.input_id.display_name if hasattr(input_item.input_id, "display_name") else input_item.input_id}]")
 
                 # include the item in the xml if it has attributes we need to save to the profile
@@ -4912,7 +4961,7 @@ class Mode:
 
         assert input_type in self.config, f"Check configuration initialization - missing new type {input_type} in setup definition"
 
-        registry = ProfileRegistry()
+        registry = self.profile.registry
         device: dinput.DeviceSummary = self.parent
         input_item = registry.getInputItem(
             device.device_guid,
@@ -5592,6 +5641,3 @@ class ProfileMap:
     def valid(self):
         return self._valid
 
-
-# global registry instance
-_profile_registry = ProfileRegistry()

@@ -3967,8 +3967,9 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """Adds a new input to the inputs list"""
         input_type = InputType.OpenSoundControl
 
-        registry = gremlin.base_profile.ProfileRegistry()
+
         profile = gremlin.shared_state.current_profile
+        registry = profile.registry
         device_modes = profile.get_device_modes(self._device_guid, DeviceType.to_string(DeviceType.Osc))
         mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
 

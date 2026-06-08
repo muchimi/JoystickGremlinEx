@@ -778,7 +778,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             if button not in config[input_type]:
                 input_item = gremlin.input_item.InputItem(mode_object=mode_object)
                 input_item.setInputId(button)
-                input_item.input_type = input_type
+                input_item.setInputType(input_type)
                 input_item.description = OctaviButton.to_display_name(button)
                 config[input_type][button] = input_item
                 changed = True

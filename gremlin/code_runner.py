@@ -438,9 +438,8 @@ class CodeRunner:
             sd = gremlin.ui.state_device.StateData()
             state_device_guid= gremlin.shared_state.state_tab_guid
 
-            for key, data in sd.getStates().items():
+            for key, input_item in sd.getStates().items():
                 callbacks = []
-                input_item = data.input_item
                 for container in input_item.containers:
                     if not container.is_valid():
                         #test = container.is_valid()

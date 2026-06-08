@@ -1446,29 +1446,33 @@ def parse_guid(value) -> dinput.GUID:
     """
     import dinput
 
-    if value is None or value == "None" or not value:
-        return None
-    elif isinstance(value, str) and len(value) < 32:
-        return None
-    elif isinstance(value, dinput.GUID):
-        return uuid.UUID(int=value._guid_int)
-    elif isinstance(value, uuid.UUID):
-        return value
-    try:
-        tmp = uuid.UUID(value)
-        raw_guid = dinput._GUID()
-        raw_guid.Data1 = int.from_bytes(tmp.bytes[0:4], "big")
-        raw_guid.Data2 = int.from_bytes(tmp.bytes[4:6], "big")
-        raw_guid.Data3 = int.from_bytes(tmp.bytes[6:8], "big")
-        for i in range(8):
-            raw_guid.Data4[i] = tmp.bytes[8 + i]
 
-        value =  dinput.GUID(raw_guid)
-        assert isinstance(value, dinput.GUID)
-        return value
-    except Exception:
-        syslog.error(f"Failed parsing GUID from value [{value}]")
-        raise ValueError(f"Failed parsing GUID from value [{value}]")
+    try:
+
+        if value is None or value == "None" or not value:
+            value = None
+        elif isinstance(value, str) and len(value) < 32:
+            value = None
+        elif isinstance(value, dinput.GUID):
+            pass
+        elif isinstance(value, uuid.UUID):
+            value = dinput.GUID(value)
+        else:
+            try:
+                tmp = uuid.UUID(value)
+                raw_guid = dinput._GUID()
+                raw_guid.Data1 = int.from_bytes(tmp.bytes[0:4], "big")
+                raw_guid.Data2 = int.from_bytes(tmp.bytes[4:6], "big")
+                raw_guid.Data3 = int.from_bytes(tmp.bytes[6:8], "big")
+                for i in range(8):
+                    raw_guid.Data4[i] = tmp.bytes[8 + i]
+                value =  dinput.GUID(raw_guid)
+            except Exception:
+                syslog.error(f"Failed parsing GUID from value [{value}]")
+                raise ValueError(f"Failed parsing GUID from value [{value}]")
+    finally:
+        assert value is None or isinstance(value, dinput.GUID),"conversion failed"
+    return value
 
 
 

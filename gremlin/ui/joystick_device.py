@@ -363,6 +363,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         profile = gremlin.shared_state.current_profile
         # filtered = true if the input should not be displayed (filtered), false if it should be visible
         visible = profile.settings.getInputVisible(input_item.device_guid, input_item.input_type, input_item.input_id)
+        # syslog.info(f"filter for input [{input_item.display_name}] visible: {visible}")
         return visible
 
     def _handle_filter_changed(self, value: bool):

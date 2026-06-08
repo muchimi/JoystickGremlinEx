@@ -1053,7 +1053,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         if "guid" in child_input_node.attrib:
                             input_id = gremlin.util.read_guid(child_input_node, "guid", default_value=uuid.uuid4())
                         else:
-                            entries = self.source_profile.devices[import_item.device_guid].modes[mode].config[InputType.KeyboardLatched]
+                            entries = self.source_profile.devices[item.device_guid].modes[mode].config[InputType.KeyboardLatched]
                             input_id = entries[keyboard_index].id
                         keyboard_index += 1
                         keyboard_input_item.parse_xml(child_input_node, data)
@@ -1083,7 +1083,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         if "guid" in child_input_node.attrib:
                             input_id = gremlin.util.read_guid(child_input_node, "guid", default_value=uuid.uuid4())
                         else:
-                            entries = self.source_profile.devices[import_item.device_guid].modes[mode].config[InputType.Midi]
+                            entries = self.source_profile.devices[item.device_guid].modes[mode].config[InputType.Midi]
                             input_id = entries[midi_index].id
                         midi_index += 1
                         midi_input_item.parse_xml(child_input_node, data)
@@ -1113,7 +1113,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         if "guid" in child_input_node.attrib:
                             input_id = gremlin.util.read_guid(child_input_node, "guid", default_value=uuid.uuid4())
                         else:
-                            entries = self.source_profile.devices[import_item.device_guid].modes[mode].config[InputType.OpenSoundControl]
+                            entries = self.source_profile.devices[item.device_guid].modes[mode].config[InputType.OpenSoundControl]
                             input_id = entries[osc_index].id
                         osc_index += 1
                         osc_input_item.parse_xml(child_input_node, data)
@@ -1513,7 +1513,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                         f"Import: unable to map {input_item.input_type} - no matching suitable device found: type: {input_item.input_type}  name: {input_item.input_name} "
                     )
                     if input_item.input_type == InputType.JoystickHat:
-                        input_item.input_type = InputType.JoystickButton
+                        input_item.setInputType(InputType.JoystickButton)
                         syslog.info(f"\tChanging input type: HAT to input type BUTTON id : {input_item.input_id}")
                     else:
                         has_mapping = False
@@ -2151,7 +2151,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
                                 container_item: ImportContainerItem
 
                                 # profile_input_item : gremlin.input_item.InputItem
-                                input_device: gremlin.base_profile.Device
+                                #input_device: gremlin.base_profile.Device
                                 # input_device = next((device for device in self.source_profile.devices.values() if device.device_guid == source_device_guid), None)
                                 # input_profile_mode = input_device.modes[source_mode]
 
@@ -2496,7 +2496,7 @@ class Mapper:
             vjoy_input_id: int,
             vjoy_mapper: str = "Vjoy Remap",
         ):
-            registry = gremlin.base_profile.ProfileRegistry()
+            registry = gremlin.shared_state.current_profile.registry
             input_item = registry.getInputItem(
                 device_guid,
                 device_type,
@@ -2653,7 +2653,7 @@ class Mapper:
                         )
 
                 # synchronize
-                registry = gremlin.base_profile.ProfileRegistry()
+                registry = gremlin.shared_state.current_profile.registry
                 registry.sync(current_profile)
 
                 # refresh the input tabs

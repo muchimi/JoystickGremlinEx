@@ -118,6 +118,11 @@ class ProfileRootNode(ProfileBaseNode):
         self.source_xml = source_xml  # source file
         self._graph_modes = {}  # list of mode definitions in the graph
         self._load_default_devices()
+        self._registry = gremlin.base_profile.ProfileRegistry(self)
+
+    @property
+    def registry(self):
+        return self._registry
 
     def from_xml(self, node, data=None, extra_data=None):
         self._start_mode = None
@@ -649,7 +654,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 class ProfileDeviceNode(ProfileBaseNode):
     """device node"""
 
-    def __init__(self, device=None, parent=None):
+    def __init__(self, device=None, parent : ProfileRootNode =None):
         super().__init__(ProfileNodeType.Device)
         self.modes = []  # list of defined modes for this node
         self.parent = parent
@@ -657,6 +662,14 @@ class ProfileDeviceNode(ProfileBaseNode):
         self._enabled = True  # flag to enable/disable the mapping
         self.enable_changed_callback = None  # callback when the enabled changed flag changes - callback gets the node as a parameter callback(node)
         self.label = None
+
+
+    @property
+    def registry(self):
+        if self.parent:
+            return self.parent.registry
+        return None
+
 
     @property
     def enabled(self) -> bool:
@@ -845,6 +858,12 @@ class ProfileModeNode(ProfileBaseNode):
         self.inherit = parent_mode_name  # parent mode name
         self.parent = parent
 
+    @property
+    def registry(self):
+        if self.parent:
+            return self.parent.registry
+        return None
+
     def from_xml(self, node: Element, data=None, extra_data=None):
         """Parses the XML mode data.
 
@@ -909,13 +928,13 @@ class ProfileInputNode(ProfileBaseNode):
             mode_object = device_modes.ensure_mode_exists(current_mode)
 
             self._input_item = gremlin.input_item.InputItem(mode_object=mode_object)
-            self._input_item.device_type = DeviceType.ModeControl
+            self._input_item.setDeviceType(DeviceType.ModeControl)
             self._input_item.setInputId(0)
 
     @property
     def input_item(self) -> gremlin.input_item.InputItem:
         if self._input_item is None:
-            registry = gremlin.base_profile.ProfileRegistry()
+            registry = self.device_node.registry
             self._input_item = registry.getInputItem(self.device_guid, self.input_type, self.input_id)
         return self._input_item
 

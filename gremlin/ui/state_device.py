@@ -393,7 +393,6 @@ class StateInputItem(gremlin.input_item.InputItem):
         self._key = key # ok if None (blank)
         super().__init__(mode_object=mode_object, device_guid=StateDeviceTabWidget.device_guid)
         self.input_type = InputType.State
-
         self._category = category  # category (StateCategory)
         self._default_value = default_value
         self._last_value = None
@@ -783,11 +782,6 @@ class StateInputItem(gremlin.input_item.InputItem):
         if self._category == category:
             if self._emit:
                 self.category_changed.emit(self)
-
-    @property
-    def input_item(self):
-        """holds a reference to the mapping data for this input"""
-        return self._input_item
 
     def to_xml(self) -> ElementTree.Element:
         """write XML state node"""
@@ -1429,7 +1423,7 @@ class StateData:
         """gets a dict of input items for each state in the current profile"""
         input_items = {}
         for key, item in self._data.items():
-            input_items[key] = item.input_item
+            input_items[key] = item
         return input_items
 
     def getState(self, key: str) -> StateInputItem:
@@ -2879,6 +2873,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.inputItemListView.item_edit.connect(self._edit_item_cb)
         self.inputItemListView.item_closed.connect(self._close_item_cb)
 
+
     def onInputListViewRemoved(self):
         """called when list view is removed"""
         self.inputItemListView.item_edit.disconnect(self._edit_item_cb)
@@ -3236,80 +3231,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """clears the current data filter"""
         self._filter_widget.clearFilter()
         self.inputItemListModel.refresh()
-
-    # def _select_item_cb(self, index, emit = True):
-    #     """Handles the selection of an input item.
-
-    #     :param index the index of the selected item
-    #     """
-    #     import gremlin.ui.input_item
-
-    #     if not Shiboken.isValid(self.inputItemListView):
-    #         return
-
-    #     if index == -1:
-    #         index = self._last_selected_index
-
-    #     if index == -1:
-    #         # select the first item
-    #         if self.inputItemListModel.rows():
-    #             index = 0
-    #         else:
-    #             return
-
-    #     if self.inputItemListView.current_index != index:
-    #         # select the input in the input view
-    #         with QtCore.QSignalBlocker(self.inputItemListView):
-    #             self.inputItemListView.select_item(index, False)
-
-    #     input_item : StateInputItem = self.inputItemListModel.data(index)
-    #     if not input_item:
-    #         # not in the model yet
-    #         return
-
-    #     input_type = InputType.State
-    #     input_id = input_item.input_id
-    #     assert input_id is not None,"Invalid state input item configuration"
-    #     key = self.getWidgetKey(input_type, input_id)
-    #     widget = self.getRegisteredWidget(key)
-    #     if not widget:
-    #         widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"STATE: {input_item.key}")
-    #         self.registerWidget(key, widget)
-
-    #     # ensure the mapping widget is visible
-    #     self.selectRegisteredWidget(widget)
-
-    #     self._item_data = input_item
-
-    #     # remember the last input
-    #     config = gremlin.config.Configuration()
-    #     device_guid = self.device_guid
-    #     input_type = InputType.State
-    #     input_id = input_item.input_id if input_item else None
-
-    #     profile = gremlin.shared_state.current_profile
-    #     if profile:
-    #         profile.setLastInput(device_guid, input_type, input_id)
-    #     config.set_last_input(device_guid, input_type, input_id)
-
-    #     # Create new configuration widget
-    #     input_item.is_axis = False
-    #     change_cb = self._create_change_cb(index)
-    #     widget._container_model.data_changed.connect(change_cb)
-    #     widget.description_changed.connect(change_cb)
-
-    #     # update container display if blank
-    #     self.updateContainerViewBlankMessage(input_item)
-
-    #     self._last_selected_index = index
-    #     self.selectRegisteredWidget(key)
-    #     # QtWidgets.QApplication.processEvents() # needed or scroll doesn't work
-    #     # self.inputItemListView.scrollToIndex(index)
-
-    #     if emit:
-    #         el = gremlin.event_handler.EventListener()
-    #         el.select_input.emit(device_guid, input_type, input_id, False, True, False)
-    #     # el.input_selection_changed.emit(device_guid, input_type, input_id)
 
     def _custom_filter_handler(self, data) -> bool:
         """evaluates if the item should be included or not based on current input filters"""

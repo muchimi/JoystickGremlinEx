@@ -1674,7 +1674,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         gremlin.shared_state.edit_mode = "Default"
         gremlin.shared_state.current_profile = new_profile
 
-        registry = gremlin.base_profile.ProfileRegistry()
+        registry = new_profile.registry
         registry.reset()
 
         # For each connected device create a new empty device entry
@@ -4854,10 +4854,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         as_new_profile: bool
         source_xml, as_new_profile, emit = args
 
-        # clear current inputs
-        registry = gremlin.base_profile.ProfileRegistry()
-        registry.reset()
-
         # trap recursive call
         if self._profile_load_stack:
             self._profile_load_stack.append(source_xml)
@@ -4921,6 +4917,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # Attempt to load the new profile
                 try:
                     new_profile = gremlin.base_profile.Profile()
+                    
 
                     if not os.path.isfile(source_xml):
                         gremlin.ui.ui_common.MessageBox(title="Profile Error", prompt="Specified file not found.")

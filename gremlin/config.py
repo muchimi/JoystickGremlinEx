@@ -1360,6 +1360,11 @@ class Configuration(QtCore.QObject):
             self.save()
         return VerboseMode(self._data["verbose_mode"])
 
+    def setVerboseMode(self, value):
+        ''' sets the verbose mode to a value '''
+        self._data["verbose_mode"] = value
+        self.save()
+
     def is_verbose_mode(self, mode):
         value = self.verbose_mode
         result = mode in value

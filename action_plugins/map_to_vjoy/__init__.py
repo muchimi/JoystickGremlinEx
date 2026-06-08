@@ -6167,6 +6167,21 @@ Supports axis merging, curved output, command, hat and button mappings.
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
 
+
+        self.vjoy_map = {}  # list of vjoy devices by their vjoy index ID
+        self.refresh_vjoy()
+
+        self._vjoy_id: int = 1
+        self._vjoy_input_id: int = 1
+        self._vjoy_axis_id = 1
+        self._vjoy_button_id = 1
+        self.vjoy_hat_id = 1
+        self.vjoy_hat_position = (0, 0)  # hat position as a tuple
+        self.vjoy_hat_return_position = (
+            0,
+            0,
+        )  # hat return position - center is the default
+
         self.usage_data = gremlin.joystick_handling.VJoyUsageState()
         self._input_type: InputType = self.get_input_type()
         if self._input_type in (InputType.ModeControl, InputType.VirtualButton):
@@ -6190,16 +6205,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 self.hat_mode_map[position] = ButtonOutputMode.Hold  # hold by default
             button_id += 1
 
-        self._vjoy_id: int = 1
-        self._vjoy_input_id: int = 1
-        self._vjoy_axis_id = 1
-        self._vjoy_button_id = 1
-        self.vjoy_hat_id = 1
-        self.vjoy_hat_position = (0, 0)  # hat position as a tuple
-        self.vjoy_hat_return_position = (
-            0,
-            0,
-        )  # hat return position - center is the default
+
 
         self.sync_on_start = (
             True  # true if the value should sync on profile start to synchronize with input (on by default as it's generally a desired behavior)
@@ -6297,8 +6303,6 @@ Supports axis merging, curved output, command, hat and button mappings.
         curve = gremlin.curve_handler.AxisCurveData()
         self.trim_curve = curve
 
-        self.vjoy_map = {}  # list of vjoy devices by their vjoy index ID
-        self.refresh_vjoy()
 
     def actionDeleted(self):
         """called if the action is being deleted"""

@@ -264,7 +264,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         master_config = self.device_profile.modes[master_mode].config
 
         changed = False
-        registry = gremlin.base_profile.ProfileRegistry()
+        registry = gremlin.shared_state.current_profile.registry
 
         if ModeInputModeType.ModeEnter not in config[InputType.ModeControl]:
             modeEnter = registry.getInputItem(

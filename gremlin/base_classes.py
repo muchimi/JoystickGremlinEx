@@ -21,7 +21,7 @@ from abc import abstractmethod, ABCMeta
 from PySide6 import QtCore
 from typing import Callable
 from gremlin.input_types import InputType
-
+from gremlin.types import DeviceType
 from psygnal import Signal
 import logging
 import uuid
@@ -282,6 +282,11 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         )  # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-", "")
         self._device_guid = device_guid
+        self._device_guid = DeviceType.NotSet
+        if device_guid is not None:
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            assert device is not None,"device does not exist"
+            self._device_type = device.device_type
         self._input_id: int | any = (
             None  # input Id on the hardware (can be a int or a class)
         )
@@ -302,6 +307,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
             self._profile_mode = mode.name
         self._sort_index: int = None  # sorting index (int)
         self._input_id_callback = None  # optional callback
+
 
     def setInputIdCallback(self, callback: Callable):
         """callback to use (optional) to get the input id"""
@@ -363,6 +369,9 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         """force a different input type"""
         self._input_type = value
 
+    def setDeviceType(self, value : DeviceType):
+        self._device_type = value
+        
     def setInputDescription(self, value: str):
         self._input_description = value
 
@@ -456,9 +465,9 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         """input type"""
         return self._input_type
 
-    @input_type.setter
-    def input_type(self, value: InputType):
-        self._input_type = value
+    # @input_type.setter
+    # def input_type(self, value: InputType):
+    #     self._input_type = value
 
     @property
     def device_guid(self):
@@ -691,7 +700,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         self._input_item.setInputId(item_data.input_id)
         self._input_item.device_guid = item_data.device_guid
         self._input_item.device_name = item_data.device_name
-        self._input_item.device_type = item_data.device_type
+
 
     def get_mode(self):
         """Returns the Mode this data entry belongs to.
