@@ -880,15 +880,6 @@ class EventListener(QtCore.QObject):
 
         # calibration data access
         self._calibrationManager = None
-        self._verbose_dinput = config.verbose_mode_dinput
-        self._verbose_perf = False
-        self._verbose_dinput_extra = False
-        self._verbose_vjoy = config.verbose_mode_vjoy
-        self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
-        self._verbose_queue = self._verbose_dinput
-        self._verbose_inputs = config.verbose_mode_inputs
-        self._verbose_extra = config.verbose_mode_extra
-
         self._profile_started = False
 
         self.profile_start.connect(self._handle_profile_start)
@@ -933,6 +924,8 @@ class EventListener(QtCore.QObject):
         self.joystick_event_ui.connect(self._fireUIJoystickEventCallbacks_ui, QtCore.Qt.ConnectionType.QueuedConnection)  # no wait signal for speed
 
         self.profile_unload.connect(self.reset)  # reset data on profile unload before a new profile is loaded
+
+        self._handle_options_changed() # load verbose modes
 
     def addUIJoystickEventCallback(self, callback):
         """adds a callback to update UI when a joystick event arrives"""
@@ -1107,7 +1100,7 @@ class EventListener(QtCore.QObject):
         import gremlin.config
 
         config = gremlin.config.Configuration()
-        self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
+        self._verbose_dinput = config.verbose_mode_dinput
         self._verbose_perf = config.verbose_mode_perf
         self._verbose_dinput_extra = self._verbose_dinput and config.verbose_mode_extra
         self._verbose_vjoy = config.verbose_mode_vjoy
@@ -1115,6 +1108,10 @@ class EventListener(QtCore.QObject):
         self._verbose_queue = self._verbose_dinput
         self._verbose_inputs = config.verbose_mode_inputs
         self._verbose_extra = config.verbose_mode_extra
+
+        self._vjoy_events_delay = config.vjoy_loopback_delay / 1000  # quarter second delay for event loopback checking
+        self._vjoy_events_use_time = config.vjoy_loopback_use_time
+
 
         import gremlin.windows_event_hook
 
@@ -1126,17 +1123,11 @@ class EventListener(QtCore.QObject):
         import gremlin.windows_event_hook
 
         self._profile_started = False
-        config = gremlin.config.Configuration()
-        self._verbose_dinput = config.verbose_mode_joystick or config.verbose_mode_dinput
-        self._verbose_dinput_extra = self._verbose_dinput and config.verbose_mode_extra
-        self._verbose_vjoy = config.verbose_mode_vjoy
-        self._verbose_vjoy_extra = self._verbose_vjoy and config.verbose_mode_extra
+        self._handle_options_changed()
 
         # loopback configuration for vjoy events
         self._vjoy_events.clear()  # map of processed events
         # self._vjoy_events_times.clear()# map of processed events times
-        self._vjoy_events_delay = config.vjoy_loopback_delay / 1000  # quarter second delay for event loopback checking
-        self._vjoy_events_use_time = config.vjoy_loopback_use_time
 
         # update valid device map on profile start
         self._valid_device_map = gremlin.joystick_handling.getValidJoystickDevicesMap()
@@ -1675,7 +1666,7 @@ class EventListener(QtCore.QObject):
 
         from gremlin.util import dill_hat_lookup
 
-        verbose = self._verbose_dinput or (self._verbose_perf and self._verbose_extra)
+        verbose = self._verbose_dinput # or (self._verbose_perf and self._verbose_extra)
         verbose_extra = self._verbose_dinput_extra
 
         event = dinput.InputEvent(data)

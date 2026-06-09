@@ -7195,7 +7195,7 @@ class QUsedPushButton(QDataPushButton):
         self._pulse_timer = threading.Timer(interval, self._stopHighlight)
         self._pulse_timer.start()
         self._highlight = True
-        gremlin.util.InvokeUiMethod(self._repaint)
+        gremlin.util.InvokeUiMethod(self.repaint)
 
     def _stopHighlight(self):
         """stops the highlight effect for pulsed highlights"""

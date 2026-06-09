@@ -20,7 +20,7 @@ import logging
 
 from PySide6 import QtWidgets, QtCore, QtGui
 import threading
-from lxml import etree
+
 
 import gremlin.config
 import gremlin.event_handler
@@ -31,7 +31,7 @@ import gremlin.ui.ui_common as ui_common
 import gremlin.shared_state
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
-
+from gremlin.util import read_guid, safe_read, safe_format, list_to_csv, csv_to_list
 import gremlin.base_profile
 import uuid
 from gremlin.singleton_decorator import SingletonDecorator
@@ -63,7 +63,7 @@ import struct
 from datetime import datetime, timedelta
 
 import gremlin.ui.ui_common
-from gremlin.util import *
+from shiboken6 import Shiboken
 from lxml import etree as ElementTree
 
 import enum
@@ -904,7 +904,8 @@ class OscBundleBuilder(object):
         try:
             dgram += write_date(self._timestamp)
             for content in self._contents:
-                if type(content) == OscMessage or type(content) == OscBundle:
+                # if type(content) == OscMessage or type(content) == OscBundle:
+                if isinstance(content, (OscMessage, OscBundle)):
                     size = content.size
                     dgram += write_int(size)
                     dgram += content.dgram
@@ -1138,7 +1139,7 @@ class Handler(object):
     # needed for test module
     def __eq__(self, other: Any) -> bool:
         return (
-            type(self) == type(other) and self.callback == other.callback and self.args == other.args and self.needs_reply_address == other.needs_reply_address
+            type(self) is type(other) and self.callback == other.callback and self.args == other.args and self.needs_reply_address == other.needs_reply_address
         )
 
     def invoke(self, client_address: Tuple[str, int], message) -> None:
@@ -1167,8 +1168,8 @@ class OscDispatcher(object):
     """
 
     def __init__(self) -> None:
-        self._map = collections.defaultdict(list)  # type: DefaultDict[str, List[Handler]]
-        self._default_handler = None  # type: Optional[Handler]
+        self._map = collections.defaultdict(list)
+        self._default_handler = None
 
     def map(
         self,
@@ -2574,7 +2575,7 @@ class OscInputItem(gremlin.input_item.InputItem):
                 return f"{message} {args}"
             return f"{message}"
         else:
-            raise ValueError(f"_update(): don't know how to handle {self._command_mode}")
+            raise ValueError(f"_update(): don't know how to handle {command_mode}")
 
     def toSortKey(self):
         return (self.command_mode, self._message.casefold() if self._message else "")
@@ -3560,13 +3561,13 @@ class OscFilterWidget(QtWidgets.QWidget):
     def _update_count(self):
         """updates the count of defined inputs"""
         total = self._model.rows()
-        filtered = self._model.count()
+        count = self._model.count()
 
         plural = "s" if total > 1 else ""
         if total == 0:
             msg = "<i>(no inputs found)</i>"
-        elif filtered != total:
-            msg = f"<i>({included:,} of {total:,} OSC input{plural})</i>"
+        elif count != total:
+            msg = f"<i>({count:,} of {total:,} OSC input{plural})</i>"
         else:
             msg = f"<i>({total:,} OSC input{plural})</i>"
         self._count_widget.setText(msg)
@@ -3675,7 +3676,9 @@ class OscInputItemModel(gremlin.input_item.InputItemListModel):
         self,
         profile: gremlin.base_profile.Profile,
         mode: str,
-        custom_filter_handler=None,
+        custom_load_handler: Callable = None,
+        custom_remove_handler: Callable = None,
+        custom_filter_handler: Callable = None,
     ):
         """initializes the model
         :param profile: the profile containing the data
@@ -3688,27 +3691,10 @@ class OscInputItemModel(gremlin.input_item.InputItemListModel):
             device_guid=OscDeviceTabWidget.device_guid,
             mode=mode,
             allowed_types=[InputType.OpenSoundControl],
+            custom_load_handler=custom_load_handler,
+            custom_remove_handler=custom_remove_handler,
             custom_filter_handler=custom_filter_handler,
         )
-
-
-# class OscInputItemListView(gremlin.input_item.InputItemListView):
-
-#     ''' list view for OSC input items '''
-
-#     def __init__(self, custom_widget_handler : Callable = None,  parent : QtWidgets.QWidget = None, blank_message : str = None, model : OscInputItemModel= None):
-#         '''' initializes the list view
-#         :param custom_widget_handler: optional function to handle custom widgets, takes an OscInputItem and returns a QWidget
-#         :param parent: the parent widget
-#         :param blank_message: the message to show when there are no items in the list
-#         :param model: the input item model to use
-#         '''
-#         super().__init__(custom_widget_handler = custom_widget_handler,
-#                          device_guid =  OscDeviceTabWidget.device_guid,
-#                          parent = parent,
-#                          blank_message = blank_message,
-#                          model = model,
-#                          )
 
 
 class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
@@ -3742,6 +3728,7 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             parent=parent,
         )
 
+
         config = gremlin.config.Configuration()
 
         self._widget_map = {}
@@ -3751,7 +3738,15 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._last_selected_index = -1  # index of last input, -1 if none
 
         # List of inputs
-        self.inputItemListModel = OscInputItemModel(profile, mode, custom_filter_handler=self._filter_data)
+        model = OscInputItemModel(
+            profile=self.profile,
+            mode=mode,
+            custom_load_handler=self._load_handler,
+            custom_remove_handler=self._remove_handler,
+            custom_filter_handler=self._filter_data,
+        )
+
+        self.setInputItemListModel(model)
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
@@ -3834,6 +3829,51 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
         el.find_next.connect(self._handle_find_next)
+
+    def _load_handler(self, model: OscInputItemModel, emit=True) -> bool:
+        """called when the data model for the input list needs to be updated - refreshes the model view"""
+
+        model.pushSuspend()  # suspend triggers
+        model.clear(emit=False)
+        registry = gremlin.shared_state.current_profile.registry
+        mode = gremlin.shared_state.edit_mode
+        input_list = registry.getInputItems(self.device_guid, mode, InputType.OpenSoundControl)
+        if len(input_list) > 0:
+            input_list.sort(key=lambda x: x.sortKey)
+            for index, input_item in enumerate(input_list):
+                model.setItemAt(index, input_item)
+
+        model.popSuspend()  # resume triggers
+        if emit:
+            model.trigger()  # causes an update
+        return True
+
+    def _remove_handler(self, model: OscInputItemModel, index, emit_change=True):
+        """clears a single index"""
+        if index in model._index_map:
+            del model._index_map[index]
+            item = next((key for key, data in model._item_map.items() if data == index), None)
+            if item:
+                del model._item_map[item]
+
+            model._update_filter()
+
+    def _filter_data(self, input_item) -> bool:
+        """custom filter handler - true if the data is included in the filter, false otherwise"""
+        import fnmatch
+
+        if not self._filter:
+            return True  # ok
+        item: OscInputItem = input_item.input_id
+        key = item.key
+        if not key:
+            # no key = match
+            return True
+
+        key = item.key.casefold().strip()
+        if self._filter in key:
+            return True
+        return fnmatch.fnmatch(key, self._filter)
 
     def onInputListViewCreated(self):
         """called when input item list view is created"""
@@ -3966,7 +4006,6 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _add_input_cb(self):
         """Adds a new input to the inputs list"""
         input_type = InputType.OpenSoundControl
-
 
         profile = gremlin.shared_state.current_profile
         registry = profile.registry
@@ -4169,7 +4208,7 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         import gremlin.input_item
 
         widget = gremlin.input_item.InputItemWidget(
-            input_item = identifier.input_item,
+            input_item=identifier.input_item,
             identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,
@@ -4356,10 +4395,6 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
             self.inputItemListModel.refresh()
             self.selectInputItemIndex(self._last_selected_index)
-
-    def refresh(self, emit=True):
-        """Refreshes the current selection, ensuring proper synchronization."""
-        self.selectInputItemIndex(self.inputItemListView.current_index, emit)
 
 
 @gremlin.singleton_decorator.SingletonDecorator

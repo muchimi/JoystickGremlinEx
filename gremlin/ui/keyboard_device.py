@@ -394,24 +394,6 @@ class KeyboardInputItemModel(gremlin.input_item.InputItemListModel):
             custom_filter_handler=custom_filter_handler,
         )
 
-
-# class KeyboardInputItemListView(gremlin.input_item.InputItemListView):
-#     ''' view for state inputs '''
-#     def __init__(self, custom_widget_handler : Callable = None, parent : QtWidgets.QWidget = None, blank_message : str = None, model : KeyboardInputItemModel = None):
-#         ''' creates a new list view for keyboard input items
-#         :param custom_widget_handler: a handler for creating custom widgets for items in this list
-#         :param parent: the parent of this widget
-#         :param blank_message: the message to display when there are no items in the list
-#         :param model: the data model for this list view
-#         '''
-
-#         super().__init__(custom_widget_handler = custom_widget_handler,
-#                          device_guid = KeyboardDeviceTabWidget.device_guid,
-#                          parent = parent,
-#                          blank_message = blank_message,
-#                          model = model)
-
-
 class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     """Widget used to configure keyboard inputs"""
 
@@ -444,12 +426,14 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         )
 
         # List of inputs
-        self.inputItemListModel = KeyboardInputItemModel(
+        model = KeyboardInputItemModel(
             self.profile,
             mode=mode,
             custom_load_handler = self._load_handler,
             custom_remove_handler = self._remove_handler,
             custom_filter_handler = self._filter_data)
+
+        self.setInputItemListModel(model)
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
@@ -807,9 +791,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
             self.inputItemListModel.refresh()
 
-    def refresh(self, emit=True):
-        """Refreshes the current selection, ensuring proper synchronization."""
-        self.inputItemListModel.refresh()
 
     def _custom_widget_handler(
         self,

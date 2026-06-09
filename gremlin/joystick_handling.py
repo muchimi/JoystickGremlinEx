@@ -925,6 +925,18 @@ def _create_vjoy_device(vjoy_index : int):
     device.axis_names = []
     return device
 
+def invalidDeviceGuid():
+    """invalid device guid placeholder as a dinput.GUID"""
+    global _invalid_device_guid
+    import gremlin.util
+    return gremlin.util.parse_guid(_invalid_device_guid)
+
+def invalidDeviceId() -> str:
+    """invalid device guid placeholder as a string"""
+    global _invalid_device_guid
+    return _invalid_device_guid
+
+
 def joystick_devices_initialization():
     """Initializes joystick device information.
 

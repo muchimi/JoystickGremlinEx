@@ -1339,10 +1339,10 @@ class Configuration(QtCore.QObject):
         """determines loging level"""
         if __debug__:
             return True
-        value = self._get_data("verbose", None)
+        value = self._get_data("verbose", VerboseMode.NotSet)
         if value is None:
             # not set - set other defaults
-            self._data["verbose_mode"] = 0
+            self._data["verbose_mode"] = VerboseMode.NotSet
             self._data["verbose"] = False
             return False
         return value

@@ -32,20 +32,16 @@ class Ui_Gremlin(object):
         self.tab_bar_widget.setMaximumHeight(30)
 
         # tab header for the device selection
-        self.devices = gremlin.ui.ui_common.QTabHeader(parent=self.tab_bar_widget)
-        self.devices.setMovable(True)
-        self.devices.setUsesScrollButtons(True)
-        self.devices.setObjectName("devices")
-        self.tab_bar_layout.addWidget(self.devices)
+        self.devices_tab_header_widget = gremlin.ui.ui_common.QTabHeader(parent=self.tab_bar_widget)
+        self.devices_tab_header_widget.setMovable(True)
+        self.devices_tab_header_widget.setUsesScrollButtons(True)
+        self.devices_tab_header_widget.setObjectName("devices")
+        self.tab_bar_layout.addWidget(self.devices_tab_header_widget)
         self.tab_bar_layout.addStretch(2)
 
         # holds the device widget
-        self.tab_content_widget, self.tab_content_layout = (
-            gremlin.ui.ui_common.getVContainer()
-        )
-        self.device_widget = (
-            QtWidgets.QStackedWidget()
-        )  # holds the device widgets for each device - the index changes with the tab
+        self.tab_content_widget, self.tab_content_layout = gremlin.ui.ui_common.getVContainer()
+        self.device_widget = QtWidgets.QStackedWidget()  # holds the device widgets for each device - the index changes with the tab
         self.tab_content_layout.addWidget(self.device_widget)
 
         # bottom status bar
@@ -53,13 +49,12 @@ class Ui_Gremlin(object):
         self.statusbar_widget.setContentsMargins(0, 0, 0, 0)
         self.statusbar_layout = QtWidgets.QHBoxLayout(self.statusbar_widget)
         self.statusbar_layout.setContentsMargins(0, 0, 0, 0)
-        self.statusbar_widget.setMaximumHeight(32) # constrain height to bottom
+        self.statusbar_widget.setMaximumHeight(32)  # constrain height to bottom
 
         main_window.addWidget(self.tab_bar_widget)
         main_window.addWidget(self.tab_content_widget)
         main_window.addWidget(self.device_widget)
         main_window.addWidget(self.statusbar_widget)
-
 
         # build the menus
         self.menubar = QtWidgets.QMenuBar(main_window)
@@ -85,9 +80,7 @@ class Ui_Gremlin(object):
 
         self.toolbar_options = QtWidgets.QToolBar(main_window)
         self.toolbar_options.setObjectName("toolbar_options")
-        main_window.addToolBar(
-            QtCore.Qt.ToolBarArea.TopToolBarArea, self.toolbar_options
-        )
+        main_window.addToolBar(QtCore.Qt.ToolBarArea.TopToolBarArea, self.toolbar_options)
 
         self.actionSave = QtGui.QAction(main_window)
         self.actionSave.setObjectName("actionSave")
@@ -114,9 +107,7 @@ class Ui_Gremlin(object):
 
         self.actionToggleRemoteControl = QtGui.QAction(main_window)
         self.actionToggleRemoteControl.setCheckable(True)
-        self.actionToggleRemoteControl.setToolTip(
-            "Enable or disable remote control of GremlinEx clients"
-        )
+        self.actionToggleRemoteControl.setToolTip("Enable or disable remote control of GremlinEx clients")
         self.actionToggleRemoteControl.setObjectName("actionToggleRemote Control")
 
         self.actionNewProfile = QtGui.QAction(main_window)
@@ -191,16 +182,12 @@ class Ui_Gremlin(object):
         self.actionReloadDevices.setObjectName("actionReloadDevices")
         icon = gremlin.ui.ui_common.load_icon("mdi6.reload")
         self.actionReloadDevices.setIcon(icon)
-        self.actionReloadDevices.setToolTip(
-            "Performs a fresh scan of devices and reloads them"
-        )
+        self.actionReloadDevices.setToolTip("Performs a fresh scan of devices and reloads them")
 
         self.actionReorderDevices = QtGui.QAction(main_window)
         self.actionReorderDevices.setText("Reorder Devices...")
         self.actionReorderDevices.setObjectName("actionReorderDevices")
         self.actionReorderDevices.setToolTip("Reorders the device tabs")
-
-
 
         self.actionInputViewer = QtGui.QAction(main_window)
         self.actionInputViewer.setObjectName("actionInputViewer")
@@ -214,16 +201,12 @@ class Ui_Gremlin(object):
 
         self.actionConvertTTS = QtGui.QAction(main_window)
         self.actionConvertTTS.setText("Convert TTS to AI")
-        self.actionConvertTTS.setToolTip(
-            "Converts Map to TTS actions to Play Sound actions converting the text to a wav file if KTTS is available"
-        )
+        self.actionConvertTTS.setToolTip("Converts Map to TTS actions to Play Sound actions converting the text to a wav file if KTTS is available")
         self.actionConvertTTS.triggered.connect(self._handle_convert_tts)
 
         self.actionGenerateTTS = QtGui.QAction(main_window)
         self.actionGenerateTTS.setText("Generate TTS via KTTS")
-        self.actionGenerateTTS.setToolTip(
-            "Converts bulk text to TTS audio files via KTTS if available"
-        )
+        self.actionGenerateTTS.setToolTip("Converts bulk text to TTS audio files via KTTS if available")
         self.actionGenerateTTS.triggered.connect(self._handle_generate_tts)
 
         ktts = gremlin.ktts.KTTS()
@@ -308,12 +291,8 @@ class Ui_Gremlin(object):
         self.actionSimconnectOptions.setIcon(gremlin.ui.ui_common.Icons.aircraftIcon())
 
         self.actionSimconnectOptionsToolbar = QtGui.QAction(main_window)
-        self.actionSimconnectOptionsToolbar.setObjectName(
-            "actionSimconnectOptionsToolbar"
-        )
-        self.actionSimconnectOptionsToolbar.setIcon(
-            gremlin.ui.ui_common.Icons.aircraftIcon()
-        )
+        self.actionSimconnectOptionsToolbar.setObjectName("actionSimconnectOptionsToolbar")
+        self.actionSimconnectOptionsToolbar.setIcon(gremlin.ui.ui_common.Icons.aircraftIcon())
 
         self.menuTools.addSeparator()
         self.menuTools.addAction(self.actionSimconnectOptions)
@@ -352,18 +331,14 @@ class Ui_Gremlin(object):
         ui = gremlin.shared_state.ui
         ktts = gremlin.ktts.KTTS()
         if not ktts.is_available():
-            gremlin.ui.ui_common.MessageBoxWarning(
-                prompt="AI engine not found on this system.", parent=ui
-            )
+            gremlin.ui.ui_common.MessageBoxWarning(prompt="AI engine not found on this system.", parent=ui)
             return False
 
         profile_converter = gremlin.profile.ProfileConverter()
         profile = gremlin.shared_state.current_profile
         fname = profile.profile_file
         if not fname or not os.path.isfile(fname):
-            gremlin.ui.ui_common.MessageBoxWarning(
-                prompt="Invalid profile file.\nEnsure profile is saved.", parent=ui
-            )
+            gremlin.ui.ui_common.MessageBoxWarning(prompt="Invalid profile file.\nEnsure profile is saved.", parent=ui)
             return False
 
         dialog = gremlin.sound.GenerateDialog(parent=ui)
@@ -395,10 +370,7 @@ class Ui_Gremlin(object):
 
         visible = gremlin.config.Configuration().show_simconnect_options_on_toolbar
         if visible:
-            if (
-                self.actionSimconnectOptionsToolbar
-                not in self.toolbar_options.actions()
-            ):
+            if self.actionSimconnectOptionsToolbar not in self.toolbar_options.actions():
                 self.toolbar_options.addAction(self.actionSimconnectOptionsToolbar)
         else:
             if self.actionSimconnectOptionsToolbar in self.toolbar_options.actions():
@@ -422,29 +394,15 @@ class Ui_Gremlin(object):
         self.actionNewProfile.setText(_translate("GremlinEx", "&New Profile"))
         self.actionSaveProfile.setText(_translate("GremlinEx", "&Save Profile"))
         self.actionSaveProfileAs.setText(_translate("GremlinEx", "&Save Profile As"))
-        self.actionRevealProfile.setText(
-            _translate("GremlinEx", "&Reveal Profile in Explorer...")
-        )
-        self.actionOpenLogFile.setText(
-            _translate("GremlinEx", "Open &Log file in Editor...")
-        )
-        self.actionOpenXmlProfile.setText(
-            _translate("GremlinEx", "&Open profile XML in Editor...")
-        )
-        self.actionOpenGremlinExFolder.setText(
-            _translate("GremlinEx", "&Open GremlinEx Folder...")
-        )
+        self.actionRevealProfile.setText(_translate("GremlinEx", "&Reveal Profile in Explorer..."))
+        self.actionOpenLogFile.setText(_translate("GremlinEx", "Open &Log file in Editor..."))
+        self.actionOpenXmlProfile.setText(_translate("GremlinEx", "&Open profile XML in Editor..."))
+        self.actionOpenGremlinExFolder.setText(_translate("GremlinEx", "&Open GremlinEx Folder..."))
         self.actionGenerate.setText(_translate("GremlinEx", "Generate"))
-        self.actionProfileDevices.setText(
-            _translate("GremlinEx", "Change Visible Devices...")
-        )
-        self.actionDeviceInformation.setText(
-            _translate("GremlinEx", "Device Information")
-        )
+        self.actionProfileDevices.setText(_translate("GremlinEx", "Change Visible Devices..."))
+        self.actionDeviceInformation.setText(_translate("GremlinEx", "Device Information"))
         self.actionAbout.setText(_translate("GremlinEx", "&About..."))
-        self.actionManageCustomModules.setText(
-            _translate("GremlinEx", "&Manage Custom Modules")
-        )
+        self.actionManageCustomModules.setText(_translate("GremlinEx", "&Manage Custom Modules"))
         self.actionInputRepeater.setText(_translate("GremlinEx", "Input Repeater"))
         self.actionReloadDevices.setText(_translate("GremlinEx", "Reload Devices"))
 
@@ -455,9 +413,7 @@ class Ui_Gremlin(object):
         # self.actionViewInput.setText(_translate("GremlinEx","View Input Map"))
         self.actionExit.setText(_translate("GremlinEx", "E&xit"))
         self.actionOptions.setText(_translate("GremlinEx", "&Options"))
-        self.actionCreate1to1Mapping.setText(
-            _translate("GremlinEx", "Create 1:1 mapping")
-        )
+        self.actionCreate1to1Mapping.setText(_translate("GremlinEx", "Create 1:1 mapping"))
         self.actionLogDisplay.setText(_translate("GremlinEx", "&Log display"))
         self.actionLogEdit.setText(_translate("GremlinEx", "&Log display in editor"))
         # self.actionMergeAxis.setText(_translate("GremlinEx", "&Merge Axis"))

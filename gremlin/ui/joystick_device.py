@@ -37,12 +37,13 @@ import gremlin.ui.ui_common
 from shiboken6 import Shiboken
 from psygnal import Signal
 import gremlin.util
+from gremlin.input_item import InputItem
 
 
 syslog = logging.getLogger("system")
 
 
-class JoystickInputModel(gremlin.input_item.InputItemListModel):
+class JoystickInputItemModel(gremlin.input_item.InputItemListModel):
     """model for the list of input items for a joystick device"""
 
     def __init__(
@@ -50,6 +51,8 @@ class JoystickInputModel(gremlin.input_item.InputItemListModel):
         profile: gremlin.base_profile.Profile,
         device_guid: str,
         mode: str,
+        custom_load_handler: Callable = None,
+        custom_remove_handler: Callable = None,
         custom_filter_handler: Callable = None,
         show_filtered_only=False,
     ):
@@ -70,9 +73,11 @@ class JoystickInputModel(gremlin.input_item.InputItemListModel):
                 InputType.JoystickButton,
                 InputType.JoystickHat,
             ],
-            custom_filter_handler=custom_filter_handler,
             custom_sort_handler=self._custom_sort,
-            show_filtered_only=show_filtered_only,
+            custom_load_handler=custom_load_handler,
+            custom_remove_handler=custom_remove_handler,
+            custom_filter_handler=custom_filter_handler,
+            show_filtered_only=show_filtered_only
         )
 
     def _custom_sort(self, items):
@@ -161,11 +166,13 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
 
         # model that holds all the input items for the joystick device
-        model = JoystickInputModel(
+        model = JoystickInputItemModel(
             profile=profile,
             device_guid=device.device_guid,
             mode=mode,
-            custom_filter_handler=self._handle_custom_filter,
+            custom_load_handler=self._load_handler,
+            custom_remove_handler=self._remove_handler,
+            custom_filter_handler=self._filter_data,
             show_filtered_only=True,
         )
 
@@ -253,6 +260,56 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self.updating = False
         self.last_event = None
+
+    def _load_handler(self, model: JoystickInputItemModel, emit=True) -> bool:
+        """called when the data model for the input list needs to be updated - refreshes the model view"""
+
+        model.pushSuspend()  # suspend triggers
+        model.clear(emit=False)
+
+        registry = gremlin.shared_state.current_profile.registry
+        mode = gremlin.shared_state.edit_mode
+        input_list = registry.getInputItems(self.device_guid, mode, (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat))
+        if not input_list:
+            # retry default init
+            profile = gremlin.shared_state.current_profile
+            profile.ensureInputItems(self.device_guid, True)
+            profile.setFilterDefaults(self.device_guid, True)
+            input_list = registry.getInputItems(self.device_guid, mode, (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat))
+
+        if len(input_list) > 0:
+            input_list.sort(key=lambda x: x.sortKey)
+            for index, input_item in enumerate(input_list):
+                model.setItemAt(index, input_item)
+
+            # filter the inputs
+            model.applyFilter(emit = False)
+
+        model.popSuspend()  # resume triggers
+        if emit:
+            model.trigger()  # causes an update
+        return True
+
+    def _remove_handler(self, model: JoystickInputItemModel, index, emit_change=True):
+        """clears a single index"""
+        if index in model._index_map:
+            del model._index_map[index]
+            item = next((key for key, data in model._item_map.items() if data == index), None)
+            if item:
+                del model._item_map[item]
+
+            model._update_filter()
+
+    def _filter_data(self, input_item : InputItem):
+        """custom filter handled - true if the item is included in the list, false if not"""
+        profile = gremlin.shared_state.current_profile
+        # filtered = true if the input should not be displayed (filtered), false if it should be visible
+        visible = profile.settings.getInputVisible(input_item.device_guid, input_item.input_type, input_item.input_id)
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose:
+            device = gremlin.joystick_handling.getDevice(input_item.device_guid)
+            syslog.info(f"custom filter for input [{device.name}] [{input_item.display_name}] visible: {visible}")
+        return visible
 
     def onInputListViewCreated(self):
         """called when the list view is created"""
@@ -358,13 +415,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self.stats_widget.setStats(self.stats)
 
-    def _handle_custom_filter(self, input_item):
-        """custom filter handled - true if the item is included in the list, false if not"""
-        profile = gremlin.shared_state.current_profile
-        # filtered = true if the input should not be displayed (filtered), false if it should be visible
-        visible = profile.settings.getInputVisible(input_item.device_guid, input_item.input_type, input_item.input_id)
-        # syslog.info(f"filter for input [{input_item.display_name}] visible: {visible}")
-        return visible
+
 
     def _handle_filter_changed(self, value: bool):
         gremlin.util.InvokeUiMethod(self._handle_filter_changed_ui, value)  # ensure on UI thread
@@ -1234,7 +1285,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self.settings.setInputvisible(self.device_guid, input_type, input_id, visible)
         if verbose and input_type == InputType.JoystickAxis:
-            syslog.info(f"set filter: {self.device.name} axis: {input_id} included: {visible}")
+            syslog.info(f"set filter: [{self.device.name}] axis: {input_id} visible: {visible}")
 
         # update corresponding input button if needed
         widget = self._input_widgets[input_type][input_id]

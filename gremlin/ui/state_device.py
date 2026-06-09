@@ -389,7 +389,7 @@ class StateInputItem(gremlin.input_item.InputItem):
             DeviceType.to_string(DeviceType.State),
         )
 
-        mode_object = device_modes.ensure_mode_exists(master_mode)
+        mode_object = device_modes.ensure_mode_exists(profile = profile, mode_name = master_mode)
         self._key = key # ok if None (blank)
         super().__init__(mode_object=mode_object, device_guid=StateDeviceTabWidget.device_guid)
         self.input_type = InputType.State
@@ -2806,12 +2806,13 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._category_filter = config.state_category_filter
 
         # data model
-        self.inputItemListModel = StateInputItemModel(
+        model = StateInputItemModel(
             profile,
             custom_load_handler=self._load_handler,
             custom_remove_handler=self._remove_handler,
             custom_filter_handler=self._filter_data,
         )
+        self.setInputItemListModel(model)
 
         self._filter_widget = StateFilterWidget(model=self.inputItemListModel)
         self._filter_widget.changed.connect(self._filter_changed)
@@ -3208,14 +3209,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def getWidgetKey(self, input_type, input_id):
         """gets the content widget compound key for the item / input combination"""
         return (self._device_guid, input_type, input_id)
-
-    def refresh(self, emit=True):
-        """Refreshes the current selection, ensuring proper synchronization."""
-        # self.set_mode(gremlin.shared_state.edit_mode) # force a model and reload
-        if self.isInputListViewCreated():
-            self.inputItemListModel.refresh()
-            self._filter_widget.updateCounts()
-            self.selectInputItemIndex(self.inputItemListView.current_index, emit)
 
     def _select_input_item_cb(self, input_item, emit=True):
         """select by input"""

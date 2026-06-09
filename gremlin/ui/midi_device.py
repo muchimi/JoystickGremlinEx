@@ -18,14 +18,15 @@
 from __future__ import annotations  # deprecated with python 3.14+
 import logging
 
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtWidgets, QtCore, QtGui
 from gremlin.threading import AbortableThread
 from gremlin.input_types import InputType
 import gremlin.shared_state
-from gremlin.util import *
+from typing import Callable
+from gremlin.util import read_guid, safe_read, byte_string_to_list
 from lxml import etree as ElementTree
 import enum
-
+import time
 import uuid
 import mido
 from gremlin.singleton_decorator import SingletonDecorator
@@ -1467,44 +1468,34 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         return self._mode
 
 
-class MidiInputListModel(gremlin.input_item.InputItemListModel):
-    """list model for MIDI inputs"""
+class MidiInputItemModel(gremlin.input_item.InputItemListModel):
+    """data model for state inputs"""
 
-    def __init__(self, profile: gremlin.base_profile.Profile, mode: str):
-        """creates a new model for MIDI input items
+    def __init__(
+        self,
+        profile: gremlin.base_profile.Profile,
+        mode: str,
+        custom_load_handler: Callable = None,
+        custom_remove_handler: Callable = None,
+        custom_filter_handler: Callable = None,
+    ):
+        """creates a new model for keyboard input items
         :param profile: the profile data for the device this model represents
-        :param current_mode: the current mode
+        :param mode: the current mode
+        :param custom_load_handler: a custom handler for loading items
+        :param custom_remove_handler: a custom handler for removing items
+        :param custom_filter_handler: a custom handler for filtering items
         """
         super().__init__(
             profile=profile,
-            device_guid=MidiDeviceTabWidget.device_guid,
+            device_guid= MidiDeviceTabWidget.device_guid,
             mode=mode,
-            allowed_types=[InputType.Midi],
+            allowed_types=[InputType.Keyboard, InputType.KeyboardLatched],
+            custom_load_handler=custom_load_handler,
+            custom_remove_handler=custom_remove_handler,
+            custom_filter_handler=custom_filter_handler,
         )
 
-
-class MidiInputListView(gremlin.input_item.InputItemListView):
-    def __init__(
-        self,
-        custom_widget_handler: Callable = None,
-        parent: QtWidgets.QWidget = None,
-        blank_message: str = None,
-        model: MidiInputListModel = None,
-    ):
-        """list view for MIDI input items
-        :param custom_widget_handler: callback to handle creating the custom widget for each input item
-        :param parent: the parent widget
-        :param blank_message: the message to show when there are no items in the list
-        :param model: the list model to use
-        """
-
-        super().__init__(
-            custom_widget_handler=custom_widget_handler,
-            device_guid=MidiDeviceTabWidget.device_guid,
-            parent=parent,
-            blank_message=blank_message,
-            model=model,
-        )
 
 
 class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
@@ -1540,7 +1531,14 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._widget_map = {}
 
         # List of inputs
-        self.inputItemListModel = MidiInputListModel(profile, mode)
+        model = MidiInputItemModel(
+            self.profile,
+            mode=mode,
+            custom_load_handler = self._load_handler,
+            custom_remove_handler = self._remove_handler,
+            custom_filter_handler = self._filter_data)
+
+        self.setInputItemListModel(model)
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
@@ -1590,6 +1588,51 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._handle_edit_mode_changed)  # edit mode changed or mode added/removed
+
+    def _load_handler(self, model: MidiInputItemModel, emit=True) -> bool:
+        """called when the data model for the input list needs to be updated - refreshes the model view"""
+
+        model.pushSuspend() # suspend triggers
+        model.clear(emit = False)
+        registry = gremlin.shared_state.current_profile.registry
+        mode = gremlin.shared_state.edit_mode
+        input_list = registry.getInputItems(self.device_guid, mode, InputType.Midi)
+        if len(input_list) > 0:
+            input_list.sort(key = lambda x: x.sortKey)
+            for index, input_item in enumerate(input_list):
+                model.setItemAt(index, input_item)
+
+        model.popSuspend() # resume triggers
+        if emit:
+            model.trigger()  # causes an update
+        return True
+
+    def _remove_handler(self, model: MidiInputItemModel, index, emit_change=True):
+        """clears a single index"""
+        if index in model._index_map:
+            del model._index_map[index]
+            item = next((key for key, data in model._item_map.items() if data == index), None)
+            if item:
+                del model._item_map[item]
+
+            model._update_filter()
+
+    def _filter_data(self, input_item) -> bool:
+        """custom filter handler - true if the data is included in the filter, false otherwise"""
+        import fnmatch
+
+        if not self._filter:
+            return True  # ok
+        item: MidiInputItem = input_item.input_id
+        key = item.key
+        if not key:
+            # no key = match
+            return True
+
+        key = item.key.casefold().strip()
+        if self._filter in key:
+            return True
+        return fnmatch.fnmatch(key, self._filter)
 
     def onInputListViewCreated(self):
         """called when input item list view is created"""
@@ -1740,9 +1783,6 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
             self.inputItemListModel.refresh()
 
-    def refresh(self, emit=False):
-        """Refreshes the current selection, ensuring proper synchronization."""
-        self.set_mode(gremlin.shared_state.edit_mode)  # force a model and reload
 
     def _custom_widget_handler(self, list_view, index: int, identifier, data, parent=None):
         """creates a widget for the input

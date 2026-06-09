@@ -2570,7 +2570,6 @@ class InputItemListModel(AbstractCallbackModel):
         self._custom_load_handler = custom_load_handler
         self._custom_clear_handler = custom_clear_handler
         self._custom_remove_handler = custom_remove_handler
-
         self._custom_delete_confirm_handler = custom_delete_confirm_handler  # return true if the input can be deleted
 
         if custom_sort_handler:
@@ -2589,7 +2588,7 @@ class InputItemListModel(AbstractCallbackModel):
         self.refresh(False)
 
     def _handle_sort(self, items) -> tuple:
-        """returns a sort list for the items"""
+        """returns a sort list for the items if a custom handler was not provided """
         # sort by input sortkey
         if self._can_sort:
             data = [(item, item.sortKey) for item in items]
@@ -11443,10 +11442,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.setInputItemListModel(model)
 
     def setInputItemListModel(self, model: InputItemListModel):
-        gremlin.util.InvokeUiMethod(self._set_input_item_list_model, model)
-
-    def _set_input_item_list_model(self, model: InputItemListModel):
-        assert isinstance(model, InputItemListModel), "Ivvalid model"
+        ''' sets the model '''
         if self._input_item_list_model != model:
             self._input_item_list_model = model
         if self._input_item_list_view is not None:
@@ -11589,15 +11585,18 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         return self._last_selected_widget
 
     def refresh(self, emit=False):
+        if gremlin.shared_state.is_redraw_suspended():
+            return
         if self._input_item_list_view is None:
             return  # not loaded yet
-        gremlin.util.InvokeUiMethod(self._refresh_ui, emit)  # ensure on UI thread
+        if self.isInputListViewCreated():
+            gremlin.util.InvokeUiMethod(self._refresh_ui, emit)  # ensure on UI thread
 
     def _refresh_ui(self, force=False, emit=False):
         """Refreshes the current selection, ensuring proper synchronization. - ensure on UI thread"""
 
-        if gremlin.shared_state.is_redraw_suspended():
-            return
+
+        self.inputItemListModel.refresh()
 
         index = self._input_item_list_view.current_index
         if index == -1:

@@ -655,7 +655,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.profile = profile
         profile.ensure_mode_exists(mode)
         self.device_profile = profile.getDevice(self.device_guid, autocreate=True)
-        self.device_profile.ensure_mode_exists(mode)
+        self.device_profile.ensure_mode_exists(profile = profile, mode_name = mode)
         self.widget_storage = {}
 
         # List of inputs
