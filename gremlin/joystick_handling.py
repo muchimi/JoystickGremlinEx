@@ -326,8 +326,7 @@ def get_axis(device_guid : str | dinput.GUID, input_id : int , normalized = True
     dev : dinput.DeviceSummary = get_device(device_guid)
     if dev and dev.axis_count:
         assert input_id in dev.axis_id_map, f"invalid axis index [{input_id}] for device {dev.name}"
-        linear_id = dev.axis_id_map[input_id]
-        value = dinput.DILL.get_axis(dev.device_guid, linear_id)
+        value = dinput.DILL.get_axis(dev.device_guid, input_id)
         if normalized:
             value = gremlin.util.scale_to_range(value, source_min = -32767, source_max = 32767, target_min = -1, target_max = 1)
         return value

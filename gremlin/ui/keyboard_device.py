@@ -44,15 +44,15 @@ syslog = logging.getLogger("system")
 class KeyboardInputItem(gremlin.input_item.InputItem):
     """holds a keyboard input item"""
 
-    def __init__(self, mode_object: gremlin.base_profile.Mode):
+    def __init__(self, mode_object: gremlin.base_profile.ProfileMode):
         """Keyboard input id
         :param mode: the profile mode for this input
         """
         self._key = None  # associated primary key (containing latched items)
-        super().__init__(mode_object,
-                         device_guid=KeyboardDeviceTabWidget.device_guid,
-                        )
-
+        super().__init__(
+            mode_object,
+            device_guid=KeyboardDeviceTabWidget.device_guid,
+        )
 
         self._title_name = "Keyboard input (not configured)"
 
@@ -63,13 +63,11 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
         self.setSortCallback(self._handle_get_sort_key)
         self._update()
 
-
-    def _handle_get_sort_key(self, input_item : KeyboardInputItem):
-        ''' sorting key for this input item '''
+    def _handle_get_sort_key(self, input_item: KeyboardInputItem):
+        """sorting key for this input item"""
         sort_list = [self._key.name.casefold()]
         sort_list.extend([key.name.casefold() for key in self.latched_keys])
         return sort_list
-
 
     def _handle_input_id_callback(self):
         """input id is the key for keyboard"""
@@ -145,8 +143,6 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
         key_list = [self._key]
         key_list.extend([key for key in self.latched_keys])
         return key_list
-
-
 
     @property
     def message_key(self):
@@ -233,7 +229,6 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
     def to_xml(self):
         # saves itself to xml
 
-
         node = etree.Element(InputType.to_string(self.input_type))
         node.set("guid", write_guid(self.id))
 
@@ -273,9 +268,6 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
 
         # output containers
         super().to_xml(node)
-
-
-
 
         # wrap in input node
         return node
@@ -394,6 +386,7 @@ class KeyboardInputItemModel(gremlin.input_item.InputItemListModel):
             custom_filter_handler=custom_filter_handler,
         )
 
+
 class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     """Widget used to configure keyboard inputs"""
 
@@ -427,11 +420,8 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # List of inputs
         model = KeyboardInputItemModel(
-            self.profile,
-            mode=mode,
-            custom_load_handler = self._load_handler,
-            custom_remove_handler = self._remove_handler,
-            custom_filter_handler = self._filter_data)
+            self.profile, mode=mode, custom_load_handler=self._load_handler, custom_remove_handler=self._remove_handler, custom_filter_handler=self._filter_data
+        )
 
         self.setInputItemListModel(model)
 
@@ -502,18 +492,17 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _load_handler(self, model: KeyboardInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
 
-        model.pushSuspend() # suspend triggers
-        model.clear(emit = False)
+        model.pushSuspend()  # suspend triggers
+        model.clear(emit=False)
         registry = gremlin.shared_state.current_profile.registry
         mode = gremlin.shared_state.edit_mode
         input_list = registry.getInputItems(self.device_guid, mode, (InputType.KeyboardLatched, InputType.Keyboard))
         if len(input_list) > 0:
-            input_list.sort(key = lambda x: x.sortKey)
+            input_list.sort(key=lambda x: x.sortKey)
             for index, input_item in enumerate(input_list):
                 model.setItemAt(index, input_item)
 
-
-        model.popSuspend() # resume triggers
+        model.popSuspend()  # resume triggers
         if emit:
             model.trigger()  # causes an update
         return True
@@ -545,14 +534,11 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             return True
         return fnmatch.fnmatch(key, self._filter)
 
-
-
     def onInputListViewCreated(self):
         """called when input item list view is created"""
         # Handle user interaction
         self.inputItemListView.item_edit.connect(self._edit_item_cb)
         self.inputItemListView.item_closed.connect(self._close_item_cb)
-
 
     def onInputListViewRemoved(self):
         # Handle user interaction
@@ -733,7 +719,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # creates the item in the profile if needed
         registry = gremlin.shared_state.current_profile.registry
         registry.registerInputItem(input_item)
-        #self.profile.modes[current_mode].get_data(input_item.input_type, input_item.input_id)  # creates the entry in the profile
+        # self.profile.modes[current_mode].get_data(input_item.input_type, input_item.input_id)  # creates the entry in the profile
         # ensure override type for keyboard input is a joystick button
         registry.sync()
 
@@ -743,18 +729,16 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
             # select the new item - its index may have changed
             index = self.inputItemListModel.indexOfInputItem(input_item)
-        #else:
-            # update the widget for this entry
-            #self.inputItemListView.update_item(index)
+        # else:
+        # update the widget for this entry
+        # self.inputItemListView.update_item(index)
 
         # select the item
         self.inputItemListView.selectItemAt(index, force=True)
 
-
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
         if verbose:
             syslog.info(f"Final item index {index} {input_item.display_name}")
-
 
     def _index_for_key(self, key_or_index):
         """Returns the index into the key list based on the key itself.
@@ -791,7 +775,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
             self.inputItemListModel.refresh()
 
-
     def _custom_widget_handler(
         self,
         list_view: InputItemListView,
@@ -811,7 +794,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """
 
         widget = InputItemWidget(
-            input_item = identifier.input_item,
+            input_item=identifier.input_item,
             identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,

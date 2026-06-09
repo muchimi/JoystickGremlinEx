@@ -255,12 +255,12 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         current_mode = self.current_mode
         # syslog.info(f"ensure: mode: {current_mode}")
-        mode_object = self.device_profile.ensure_mode_exists(current_mode)
+        mode_object = self.device_profile.ensure_mode_exists(profile = self.profile, mode_name = current_mode, device = self.device_guid)
         config = self.device_profile.modes[current_mode].config
 
         # mode changes are tied to the master mode - so apply
         master_mode = ModeDeviceTabWidget.master_mode
-        master_mode_object = self.device_profile.ensure_mode_exists(master_mode, is_system=True)
+        master_mode_object = self.device_profile.ensure_mode_exists(profile = self.profile, mode_name = master_mode, is_system=True, device = self.device_guid)
         master_config = self.device_profile.modes[master_mode].config
 
         changed = False

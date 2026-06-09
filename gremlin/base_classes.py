@@ -42,7 +42,7 @@ def _get_input_item(parent):
     while parent is not None:
         if isinstance(parent, gremlin.input_item.InputItem):
             break
-        if isinstance(parent, gremlin.profile_graph.ProfileInputNode):
+        if isinstance(parent, gremlin.profile_graph.ProfileInputItemNode):
             return parent.input_item
         if hasattr(parent, "parent"):
             parent = parent.parent
@@ -270,26 +270,20 @@ class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
 class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     """base class for input items for MIDI, OSC, KEYBOARD and STATE items"""
 
-    input_type_change = Signal(
-        object
-    )  # fires when an input item needs to refresh the output mapping due to input type changed
+    input_type_change = Signal(object)  # fires when an input item needs to refresh the output mapping due to input type changed
 
     def __init__(self, mode: str | object, device_guid):
 
         super().__init__()
-        self._id = (
-            uuid.uuid4()
-        )  # GUID (unique) if loaded from XML - will reload that one
+        self._id = uuid.uuid4()  # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-", "")
         self._device_guid = device_guid
         self._device_guid = DeviceType.NotSet
         if device_guid is not None:
             device = gremlin.joystick_handling.getDevice(device_guid)
-            assert device is not None,"device does not exist"
+            assert device is not None, "device does not exist"
             self._device_type = device.device_type
-        self._input_id: int | any = (
-            None  # input Id on the hardware (can be a int or a class)
-        )
+        self._input_id: int | any = None  # input Id on the hardware (can be a int or a class)
         self._input_type: InputType = InputType.NotSet
         self._display_name: str = None
         self._description: str = None
@@ -307,7 +301,6 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
             self._profile_mode = mode.name
         self._sort_index: int = None  # sorting index (int)
         self._input_id_callback = None  # optional callback
-
 
     def setInputIdCallback(self, callback: Callable):
         """callback to use (optional) to get the input id"""
@@ -369,9 +362,9 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         """force a different input type"""
         self._input_type = value
 
-    def setDeviceType(self, value : DeviceType):
+    def setDeviceType(self, value: DeviceType):
         self._device_type = value
-        
+
     def setInputDescription(self, value: str):
         self._input_description = value
 
@@ -446,17 +439,14 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
     def setInputId(self, value):
         if __debug__ and self._device_guid:
             from gremlin.types import DeviceType
+
             device = gremlin.joystick_handling.getDevice(self._device_guid)
             if device.device_type == DeviceType.Joystick and self._input_type == InputType.JoystickAxis:
-                assert value in device.axis_id_map,"invalid axis for device"
+                assert value in device.axis_id_map, "invalid axis for device"
 
         if value != self._input_id:
-            assert isinstance(value, int) or isinstance(value, AbstractInputItem), (
-                f"Invalid input id: {value}"
-            )
-            assert isinstance(value, _collections_abc.Hashable), (
-                f"Invalid input id - must be hashable:  {value} "
-            )
+            assert isinstance(value, int) or isinstance(value, AbstractInputItem), f"Invalid input id: {value}"
+            assert isinstance(value, _collections_abc.Hashable), f"Invalid input id - must be hashable:  {value} "
 
             self._input_id = value
 
@@ -581,7 +571,6 @@ class PickleTarget:
         self._item = value
 
 
-
 class BaseCallbacks(QtCore.QObject):
     """base class implementing callback functionality"""
 
@@ -627,9 +616,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         assert parent is not None
         self.code = None
         self._id = gremlin.util.get_guid(no_brackets=True)
-        self._input_item: gremlin.input_item.InputItem = (
-            gremlin.input_item._get_input_item(parent)
-        )
+        self._input_item: gremlin.input_item.InputItem = gremlin.input_item._get_input_item(parent)
 
         generic_icon = os.path.join(os.path.dirname(__file__), "generic.png")
         if os.path.isfile(generic_icon):
@@ -700,7 +687,6 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         self._input_item.setInputId(item_data.input_id)
         self._input_item.device_guid = item_data.device_guid
         self._input_item.device_name = item_data.device_name
-
 
     def get_mode(self):
         """Returns the Mode this data entry belongs to.
@@ -933,37 +919,23 @@ class AbstractCallbackModel(AbstractModel):
         self._data_changed_callbacks = []
 
         self._index_map = TriggerDict()  # map of input_id to index
-        self._index_map.addCallback(
-            self._handle_data_changed
-        )  # only track one of the two maps as a change in one also changes the other
+        self._index_map.addCallback(self._handle_data_changed)  # only track one of the two maps as a change in one also changes the other
         self._item_map = TriggerDict()  # map of input_id to index
 
         # assume no filters
         self._filtered_index_map = TriggerDict()
-        self._filtered_item_map =  TriggerDict()
+        self._filtered_item_map = TriggerDict()
 
         self._filtered_callback: Callable = None
         self._sort_callback: Callable = None
         self._filtered_enabled: bool = None
         self._sort_enabled: bool = None
 
-        assert (
-            isinstance(change_callback, callable)
-            if change_callback is not None
-            else True
-        ), "Invalid change callback"
-        assert (
-            isinstance(allowed_types, tuple) if allowed_types is not None else True
-        ), "allowed types must be a tuple"
+        assert isinstance(change_callback, callable) if change_callback is not None else True, "Invalid change callback"
+        assert isinstance(allowed_types, tuple) if allowed_types is not None else True, "allowed types must be a tuple"
 
-        assert (
-            isinstance(added_callback, callable) if added_callback is not None else True
-        ), "Invalid add callback"
-        assert (
-            isinstance(removed_callback, callable)
-            if removed_callback is not None
-            else True
-        ), "Invalid remove callback"
+        assert isinstance(added_callback, callable) if added_callback is not None else True, "Invalid add callback"
+        assert isinstance(removed_callback, callable) if removed_callback is not None else True, "Invalid remove callback"
 
         self._add_callback = added_callback
         self._remove_callback = removed_callback
@@ -983,8 +955,8 @@ class AbstractCallbackModel(AbstractModel):
         if change_callback:
             self.addCallback(change_callback)
 
-    def setItemAt(self, index : int, item):
-        ''' sets the item for the specific index '''
+    def setItemAt(self, index: int, item):
+        """sets the item for the specific index"""
         # ensure the item is hashable
         assert isinstance(item, _collections_abc.Hashable)
         assert isinstance(index, _collections_abc.Hashable)
@@ -994,12 +966,9 @@ class AbstractCallbackModel(AbstractModel):
         self._filtered_item_map[item] = index
         self.markDirty()
 
-
     def setSortCallback(self, callback):
         """changes or clears the sort callback"""
-        assert isinstance(callback, Callable) if callback is not None else True, (
-            "Invalid sort callback"
-        )
+        assert isinstance(callback, Callable) if callback is not None else True, "Invalid sort callback"
         self._sort_callback = callback
         if self._sort_enabled is None:
             # not set
@@ -1010,14 +979,10 @@ class AbstractCallbackModel(AbstractModel):
 
     def setFilterCallback(self, callback):
         """changes or clears the filter callback"""
-        assert isinstance(callback, Callable) if callback is not None else True, (
-            "Invalid filter callback"
-        )
+        assert isinstance(callback, Callable) if callback is not None else True, "Invalid filter callback"
         self._filtered_callback = callback
         if self._filtered_enabled is None:
-            self._filtered_enabled = (
-                callback is not None
-            )  # filter enabled by default if a filtering callback is provided
+            self._filtered_enabled = callback is not None  # filter enabled by default if a filtering callback is provided
 
     def setFilterEnabled(self, value: bool):
         """enables or disables filtering"""
@@ -1031,7 +996,7 @@ class AbstractCallbackModel(AbstractModel):
         """number of items in the model"""
         return len(self._filtered_item_map)
 
-    def __getitem__(self, index : int):
+    def __getitem__(self, index: int):
         """subscribtable"""
         if index in self._filtered_index_map:
             return self._filtered_index_map[index]
@@ -1045,7 +1010,7 @@ class AbstractCallbackModel(AbstractModel):
         """
         return self.add(item)
 
-    def add(self, item: object, index = -1) -> int:
+    def add(self, item: object, index=-1) -> int:
         """
         Adds (appends) a new entry to the model, returns the position inserted
         :param item: the item to append to the model
@@ -1054,12 +1019,8 @@ class AbstractCallbackModel(AbstractModel):
         """
         if self._allowed_types:
             if not isinstance(item, self._allowed_types):
-                raise ValueError(
-                    f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}"
-                )
+                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
         assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
-
-
 
         if item not in self._index_map:
             self.markDirty()
@@ -1083,9 +1044,7 @@ class AbstractCallbackModel(AbstractModel):
         """
         if self._allowed_types:
             if not isinstance(item, self._allowed_types):
-                raise ValueError(
-                    f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}"
-                )
+                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
         if i in self._index_map:
             # bump all the items down 1
             start_index = i
@@ -1167,7 +1126,6 @@ class AbstractCallbackModel(AbstractModel):
         """gets the filtered item at the given index if it exists"""
         return self.data(index)
 
-
     def filteredItemAt(self, index: int):
         """gets the filtered item at the given index if it exists"""
         return self.data(index)
@@ -1232,8 +1190,8 @@ class AbstractCallbackModel(AbstractModel):
         if not self._filtered_enabled:
             if self._filtered_index_map.id != self._index_map.id:
                 # reset filters if previously enabled
-                self._filtered_index_map = {key:value for key,value in self._index_map.items()}
-                self._filtered_item_map =  {key:value for key,value in self._item_map.items()}
+                self._filtered_index_map = {key: value for key, value in self._index_map.items()}
+                self._filtered_item_map = {key: value for key, value in self._item_map.items()}
                 if emit:
                     self._fireChanged()
             return
@@ -1270,7 +1228,7 @@ class AbstractCallbackModel(AbstractModel):
 
         else:
             self._filtered_index_map = TriggerDict.copyFrom(self._index_map)
-            self._filtered_item_map =  TriggerDict.copyFrom(self._item_map)
+            self._filtered_item_map = TriggerDict.copyFrom(self._item_map)
 
         # resort the data
         self.applySort(False)
@@ -1286,6 +1244,7 @@ class AbstractCallbackModel(AbstractModel):
         :returns int: the index, or -1 if not found
         """
         import gremlin.input_item
+
         assert isinstance(item, gremlin.input_item.InputItem)
 
         if self._can_filter() and item and item in self._item_map:
@@ -1323,6 +1282,7 @@ class AbstractCallbackModel(AbstractModel):
     def applySort(self, emit=True):
         """sorts the model based on the callback"""
         import gremlin.input_item
+
         if not self._can_sort():
             # nothing to do
             return
@@ -1341,17 +1301,13 @@ class AbstractCallbackModel(AbstractModel):
 
             if len(unique) != count:
                 # invalid list
-                syslog.warning(
-                    f"ModelSort: sorted data has incorrect indices, expecting [{count}] got [{len(unique)}]"
-                )
+                syslog.warning(f"ModelSort: sorted data has incorrect indices, expecting [{count}] got [{len(unique)}]")
                 return
             # verify each index is valid
             invalid = [i for i in indices if i < 0 or i >= count]
             if invalid:
                 # invalid list
-                syslog.warning(
-                    "ModelSort: sorted data has incorrect indices, indices are missing"
-                )
+                syslog.warning("ModelSort: sorted data has incorrect indices, indices are missing")
                 return
         # valid
         for item, index in zip(items, indices):
@@ -1382,11 +1338,7 @@ class AbstractCallbackModel(AbstractModel):
 
     def isFiltered(self) -> bool:
         """true if the model is currently filtered"""
-        return (
-            self._filtered_enabled
-            and self._filtered_callback is not None
-            and self._compare_maps(self._index_map, self._filtered_index_map)
-        )
+        return self._filtered_enabled and self._filtered_callback is not None and self._compare_maps(self._index_map, self._filtered_index_map)
 
     def getFilterCallback(self) -> Callable:
         """gets the model's filtering callback"""

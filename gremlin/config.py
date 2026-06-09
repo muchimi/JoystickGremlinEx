@@ -364,7 +364,7 @@ class Configuration(QtCore.QObject):
 
         # Attempt to load the configuration file if this fails set
         # default empty values.
-        if os.path.isfile(fname):
+        if os.path.isfile(fname) and os.path.getsize(fname):
             with open(fname,"r", encoding="utf-8") as hdl:
                 try:
                     # decoder = json.JSONDecoder()
@@ -1356,7 +1356,7 @@ class Configuration(QtCore.QObject):
     def verbose_mode(self):
         """sub logging level"""
         if "verbose_mode" not in self._data:
-            self._data["verbose_mode"] = VerboseMode.All
+            self._data["verbose_mode"] = VerboseMode.NotSet
             self.save()
         return VerboseMode(self._data["verbose_mode"])
 
@@ -2070,7 +2070,7 @@ class Configuration(QtCore.QObject):
                     if input_id is None:
                         item = widget.itemAt(0)
                         if item is not None:
-                            save_input_id = item.identifier.guid
+                            save_input_id = item.guid
                     else:
                         count = widget.inputItemListModel.rows()
                         #found = False
@@ -3306,3 +3306,12 @@ class Configuration(QtCore.QObject):
     @ui_max_input_enabled.setter
     def ui_max_input_enabled(self, value: bool):
         self._set_data("ui_max_input_enabled", value)
+
+
+    @property
+    def last_reorder_file(self) -> str:
+        """last reorder file used for device tabs"""
+        return self._get_data("last_reorder_file","")
+    @last_reorder_file.setter
+    def last_reorder_file(self, value: str):
+        self._set_data("last_reorder_file", value)

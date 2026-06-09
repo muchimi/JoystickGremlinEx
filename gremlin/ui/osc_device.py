@@ -2195,7 +2195,7 @@ class OscInputItem(gremlin.input_item.InputItem):
         def __lt__(self, other):
             return self.value < other.value
 
-    def __init__(self, mode_object: gremlin.base_profile.Mode = None):
+    def __init__(self, mode_object: gremlin.base_profile.ProfileMode = None):
         super().__init__(mode_object, device_guid=OscDeviceTabWidget.device_guid)  # parent is the mode object this input belongs to
 
         config = gremlin.config.Configuration()
@@ -3727,7 +3727,6 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             blank_input_message="Please add an OSC input.",
             parent=parent,
         )
-
 
         config = gremlin.config.Configuration()
 

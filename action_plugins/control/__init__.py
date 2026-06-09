@@ -82,7 +82,7 @@ class ControlWidget(gremlin.input_item.AbstractActionWidget):
 
     def _update_device_list(self):
         # device list
-        device_list: list[gremlin.base_profile.Device] = self.profile.get_ordered_device_list()
+        device_list: list[gremlin.base_profile.ProfileDevice] = self.profile.get_ordered_device_list()
         device_guid = self.action_data.device_guid
 
         with QtCore.QSignalBlocker(self.device_widget):

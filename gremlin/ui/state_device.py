@@ -383,13 +383,14 @@ class StateInputItem(gremlin.input_item.InputItem):
 
         # get the mode object for this state input
         profile = gremlin.shared_state.current_profile
+        device = gremlin.joystick_handling.getDevice(StateDeviceTabWidget.device_guid)
         device_modes = profile.get_device_modes(
             gremlin.shared_state.state_tab_guid,
             DeviceType.State,
             DeviceType.to_string(DeviceType.State),
         )
 
-        mode_object = device_modes.ensure_mode_exists(profile = profile, mode_name = master_mode)
+        mode_object = device_modes.ensure_mode_exists(profile = profile, mode_name = master_mode, device = device)
         self._key = key # ok if None (blank)
         super().__init__(mode_object=mode_object, device_guid=StateDeviceTabWidget.device_guid)
         self.input_type = InputType.State
@@ -2727,16 +2728,6 @@ class StateInputItemModel(gremlin.input_item.InputItemListModel):
         )
 
 
-# class StateInputItemListView(gremlin.input_item.InputItemListView):
-#     ''' view for state inputs '''
-#     def __init__(self, custom_widget_handler : Callable = None, parent : QtWidgets.QWidget = None, blank_message : str = None, model : StateInputItemModel= None):
-#         super().__init__(custom_widget_handler = custom_widget_handler,
-#                          device_guid = StateDeviceTabWidget.device_guid,
-#                          parent = parent,
-#                          blank_message = blank_message,
-#                          model = model,
-#                          )
-
 
 class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     """Widget used to configure state change actions"""
@@ -2812,13 +2803,14 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             custom_remove_handler=self._remove_handler,
             custom_filter_handler=self._filter_data,
         )
+
         self.setInputItemListModel(model)
 
         self._filter_widget = StateFilterWidget(model=self.inputItemListModel)
         self._filter_widget.changed.connect(self._filter_changed)
         self._filter_widget.categoryChanged.connect(self._category_filter_changed)
         self._filter_widget.select.connect(self._select_input_item_cb)
-        self._category_filter = self._filter_widget.category  # current category
+        self._category_f = self._filter_widget.category  # current category
 
         self.addLeftPanelHeaderWidget(self._filter_widget)
 
@@ -2868,6 +2860,101 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
         el.find_next.connect(self._handle_find_next)
+
+    def _load_handler(self, model: StateInputItemModel, emit=True) -> bool:
+        """called when the data model for the input list needs to be updated - refreshes the model view"""
+        state = self.profile.state
+        self._input_items = {}
+
+        keys = [key for key in state]
+        keys.sort()
+
+        model.pushSuspend()
+        model.clear(emit=False)
+
+        config = gremlin.config.Configuration()
+        is_filter = config.state_filter_enabled
+
+        cm = StateCategories()
+        default_category = cm.default()
+        category = None
+        if is_filter:
+            category_id = self._category_filter
+            category = cm.findById(category_id)
+            if not category:
+                category = default_category
+
+        changed = False
+        index = 0
+        for key in keys:
+            data = state[key]
+            if category:
+                # apply filter
+                item_category = data.category if data.category else default_category
+                if item_category != category:
+                    continue  # filter out
+
+            input_item = data
+            self._input_items[key] = input_item
+            changed = True
+            model.setItemAt(index, input_item)
+            index += 1
+
+        model.applyFilter()  # update model filters and sort
+        model.popSuspend()
+
+        if changed and emit:
+            model.trigger()  # causes an update
+        return changed
+
+    def _remove_handler(self, model: StateInputItemModel, index, emit_change=True):
+        """clears a single index"""
+
+        sd = StateData()
+
+        if index in model._index_map:
+            del model._index_map[index]
+            item = next((key for key, data in model._item_map.items() if data == index), None)
+            if item:
+                del model._item_map[item]
+
+            # source items
+            source_index = next(
+                (i for i, data in model._source_index_map.items() if data.input_id == item),
+                -1,
+            )
+            if source_index != -1:
+                del model._source_index_map[source_index]
+                item = next(
+                    (key for key, data in model._source_item_map.items() if data == source_index),
+                    None,
+                )
+                if item:
+                    del model._source_item_map[item]
+
+            model._update_filter()
+
+            key = item.key
+            sd = StateData()
+            sd.remove(key)
+            self._load_handler(model, emit_change)
+            self._filter_widget.updateCounts()
+    def _filter_data(self, input_item) -> bool:
+        """custom filter handler - true if the data is included in the filter, false otherwise"""
+        import fnmatch
+
+        if not self._filter:
+            return True  # ok
+        item: StateInputItem = input_item.input_id
+        key = item.key
+        if not key:
+            # no key = match
+            return True
+
+        key = item.key.casefold().strip()
+        if self._filter in key:
+            return True
+        return fnmatch.fnmatch(key, self._filter)
 
     def onInputListViewCreated(self):
         """called when list view is created"""
@@ -2946,22 +3033,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._category_filter = category
         self.refresh()
 
-    def _filter_data(self, input_item) -> bool:
-        """custom filter handler - true if the data is included in the filter, false otherwise"""
-        import fnmatch
-
-        if not self._filter:
-            return True  # ok
-        item: StateInputItem = input_item.input_id
-        key = item.key
-        if not key:
-            # no key = match
-            return True
-
-        key = item.key.casefold().strip()
-        if self._filter in key:
-            return True
-        return fnmatch.fnmatch(key, self._filter)
 
     def _filter_changed(self, filter):
         """called when the filter changes"""
@@ -3112,88 +3183,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         self._blank_input()
 
-    def _load_handler(self, model: StateInputItemModel, emit=True) -> bool:
-        """called when the data model for the input list needs to be updated - refreshes the model view"""
-        state = self.profile.state
-        self._input_items = {}
-
-        keys = [key for key in state]
-        keys.sort()
-
-        model.pushSuspend()
-        model.clear(emit=False)
-
-        config = gremlin.config.Configuration()
-        is_filter = config.state_filter_enabled
-
-        cm = StateCategories()
-        default_category = cm.default()
-        category = None
-        if is_filter:
-            category_id = self._category_filter
-            category = cm.findById(category_id)
-            if not category:
-                category = default_category
-
-        changed = False
-        index = 0
-        for key in keys:
-            data = state[key]
-            if category:
-                # apply filter
-                item_category = data.category if data.category else default_category
-                if item_category != category:
-                    continue  # filter out
-
-            input_item = data
-            self._input_items[key] = input_item
-            changed = True
-            model.setItemAt(index, input_item)
-            index += 1
-
-        model.applyFilter()  # update model filters and sort
-        model.popSuspend()
-
-        if changed and emit:
-            model.trigger()  # causes an update
-        return changed
-
-    def _remove_handler(self, model: StateInputItemModel, index, emit_change=True):
-        """clears a single index"""
-
-        sd = StateData()
-
-        if index in model._index_map:
-            del model._index_map[index]
-            item = next((key for key, data in model._item_map.items() if data == index), None)
-            if item:
-                del model._item_map[item]
-
-            # source items
-            source_index = next(
-                (i for i, data in model._source_index_map.items() if data.input_id == item),
-                -1,
-            )
-            if source_index != -1:
-                del model._source_index_map[source_index]
-                item = next(
-                    (key for key, data in model._source_item_map.items() if data == source_index),
-                    None,
-                )
-                if item:
-                    del model._source_item_map[item]
-
-            model._update_filter()
-
-            key = item.key
-            sd = StateData()
-            sd.remove(key)
-            self._load_handler(model, emit_change)
-            self._filter_widget.updateCounts()
-
-    def itemAt(self, index):
-        """returns the input widget at the given index"""
-        return self.inputItemListView.itemAt(index)
 
     def display_name(self, input_id):
         """returns the name for the given input ID"""

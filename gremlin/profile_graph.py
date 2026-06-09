@@ -20,6 +20,12 @@
 
 Implements the various tree functions to manipulate a profile using a graph data structure
 
+Root
+    Device
+        Mode (has a link to a parent mode, if any)
+            InputType
+                InputItem
+
 """
 
 from __future__ import annotations  # deprecated with python 3.14+
@@ -43,6 +49,7 @@ import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
+
 
 from PySide6 import QtCore, QtWidgets
 
@@ -78,6 +85,7 @@ class ProfileNodeType(enum.Enum):
     Profile = auto()  # root node
     Device = auto()
     Mode = auto()
+    InputType = auto()
     Input = auto()
     Container = auto()
     Action = auto()
@@ -119,6 +127,17 @@ class ProfileRootNode(ProfileBaseNode):
         self._graph_modes = {}  # list of mode definitions in the graph
         self._load_default_devices()
         self._registry = gremlin.base_profile.ProfileRegistry(self)
+
+    @staticmethod
+    def fromProfile(profile: gremlin.base_profile.Profile):
+        """creates a graph from the profile"""
+        root_node = ProfileRootNode()
+        root_node.source_xml = profile.profile_file
+        for profile_device_node in profile.devices:
+            device_node = ProfileDeviceNode.fromProfileDevice(profile_device_node, root_node)
+            root_node.devices[device_node.device_guid] = device_node
+
+        return root_node
 
     @property
     def registry(self):
@@ -367,7 +386,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         self._source_map = {}  # map of source devices keyed by device_guid -> DeviceSummary object
         device_node: ProfileDeviceNode
         mode_node: ProfileModeNode
-        input_node: ProfileInputNode
+        input_node: ProfileInputItemNode
 
         device_nodes = [node for node in profile_node.children if node.nodeType == ProfileNodeType.Device]
 
@@ -654,7 +673,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 class ProfileDeviceNode(ProfileBaseNode):
     """device node"""
 
-    def __init__(self, device=None, parent : ProfileRootNode =None):
+    def __init__(self, device: dinput.DeviceSummary = None, parent: ProfileRootNode = None):
         super().__init__(ProfileNodeType.Device)
         self.modes = []  # list of defined modes for this node
         self.parent = parent
@@ -663,13 +682,17 @@ class ProfileDeviceNode(ProfileBaseNode):
         self.enable_changed_callback = None  # callback when the enabled changed flag changes - callback gets the node as a parameter callback(node)
         self.label = None
 
+    def setModesFromProfileDevice(self, profile_device_node: gremlin.base_profile.ProfileDevice, parent: ProfileRootNode = None):
+        """builds mode nodes from a profile device"""
+        self.children = ()  # clear children
+        for profile_mode_node in profile_device_node.modes.values():
+            ProfileModeNode.fromProfileMode(mode_node=profile_mode_node, parent=self)
 
     @property
     def registry(self):
         if self.parent:
             return self.parent.registry
         return None
-
 
     @property
     def enabled(self) -> bool:
@@ -779,9 +802,11 @@ class ProfileDeviceNode(ProfileBaseNode):
         # load modes
         child: Element
         for child in node:
-            mode_node = ProfileModeNode(self)
+            mode_node = ProfileModeNode()
             mode_node.from_xml(child, data)
+            mode_node.parent = self
             mode_name = mode_node.name
+
             if mode_name not in self.modes:
                 self.modes.append(mode_name)
 
@@ -849,14 +874,93 @@ class ProfileDeviceNode(ProfileBaseNode):
         return f"{self.nodeType.name}: device: {self.device_name} id: {self.device_id} virtual: {self.virtual} remap enabled: {self.enabled}"
 
 
+class ProfileInputTypeNode(ProfileBaseNode):
+    """input type for the profile graph"""
+
+    def __init__(self, input_type: InputType = InputType.NotSet, parent: ProfileModeNode = None):
+        super().__init__(ProfileNodeType.InputType)
+        self.input_type = input_type
+        self.parent: ProfileModeNode = parent
+
+    def __str__(self):
+        return f"{self.nodeType.name}: input type: {self.input_type.name if self.input_type else 'n/a'}"
+
+    def from_xml(self, node: Element, data=None, extra_data=None):
+        value = safe_read(node, "input-type", int, 0)
+        self.input_type = InputType(value)
+        device_node = self.parent.deviceNode
+        for child in node:
+            input_node = ProfileInputItemNode(device_node=device_node, parent=self)
+            input_node.from_xml(child, data, extra_data)
+
+    def to_xml(self) -> Element:
+        node = Element("input-type")
+        node.set("input-type", safe_format(self.input_type.value, int))
+        node.set("name", self.input_type.name)
+
+        child: ProfileInputItemNode
+        for child in self:
+            child_node = child.to_xml()
+            node.append(child_node)
+
+        return node
+
+
 class ProfileModeNode(ProfileBaseNode):
     """mode node"""
 
-    def __init__(self, mode_name=None, parent_mode_name=None, parent: ProfileDeviceNode = None):
+    def __init__(self, mode_name=None, inherit=None, parent: ProfileDeviceNode = None):
         super().__init__(ProfileNodeType.Mode)
+
+        assert isinstance(mode_name, str) if mode_name is not None else True, "invalid mode name"
+        assert isinstance(inherit, str) if inherit is not None else True, "invalid inherit mode"
         self.name = mode_name  # mode name
-        self.inherit = parent_mode_name  # parent mode name
-        self.parent = parent
+        self.inherit = inherit
+
+        if parent:
+            self.parent = parent
+        self.id = gremlin.util.get_guid()
+
+    @staticmethod
+    def fromProfileMode(mode_node: gremlin.base_profile.ProfileMode, parent: ProfileDeviceNode = None):
+        """reads a profile mode node into the graph"""
+        node = ProfileModeNode(mode_name=mode_node.name, inherit=mode_node.inherit)
+        node.id = mode_node.id
+
+        for input_type in mode_node.config:
+            input_type_node = ProfileInputTypeNode(input_type, node)
+            for input_id in mode_node.config[input_type]:
+                input_item = mode_node.config[input_type][input_id]
+                if input_item:
+                    input_item_node = ProfileInputItemNode(parent, input_type_node)
+                    input_item_node.input_item = input_item
+        if parent:
+            node.parent = parent
+        return node
+
+    # @property
+    # def name(self) -> str:
+    #     return self._name
+
+    # @name.setter
+    # def name(self, value: str):
+    #     if value != "Default":
+    #         pass
+    #     self._name = value
+
+    @property
+    def parentMode(self) -> ProfileModeNode:
+        """parent mode if this mode is inherited"""
+        if self.inherit:
+            device_node = self.parent
+            for child in device_node:
+                if isinstance(child, ProfileModeNode) and child.name == self.inherit:
+                    return child
+        return None
+
+    @property
+    def deviceNode(self) -> ProfileDeviceNode:
+        return self.parent
 
     @property
     def registry(self):
@@ -869,16 +973,24 @@ class ProfileModeNode(ProfileBaseNode):
 
         :param node XML node to parse
         """
-        name = safe_read(node, "name", str, "")
+        assert "name" in node.attrib, f"invalid xml - missing name attribute - offending line: {node.sourceline}"
+
+        name = html.unescape(node.get("name"))
         name = name.strip()
         self.name = name
-        self.inherit = safe_read(node, "inherit", str, "")
+
+        if "inherit" in node.attrib:
+            self.inherit = html.unescape(node.get("inherit"))
+
+        if "guid" in node.attrib:
+            self.id = node.get("guid")
 
         if self.parent:
             child: Element
             for child in node:
-                input_node = ProfileInputNode(device_node=self.parent, parent=self)
-                input_node.from_xml(child, data)
+                # input types
+                type_node = ProfileInputTypeNode(parent=self)
+                type_node.from_xml(child, data, extra_data)
 
     def to_xml(self) -> Element:
         """Generates XML code for this DeviceConfiguration.
@@ -886,25 +998,26 @@ class ProfileModeNode(ProfileBaseNode):
         :return XML node representing this object's data
         """
         node = etree.Element("mode")
-        node.set("name", safe_format(self.name, str))
+        node.set("name", html.escape(self.name))
         if self.inherit is not None:
-            node.set("inherit", safe_format(self.inherit, str))
+            node.set("inherit", html.escape(self.inherit))
+        node.set("guid", self.id)  # unique mode ID
 
-        input_node: ProfileInputNode
-        for input_node in self.children:
-            child_node = input_node.to_xml()
+        child: ProfileInputTypeNode
+        for child in self:
+            child_node = child.to_xml()
             node.append(child_node)
-
         return node
 
     def __str__(self):
-        return f"{self.nodeType.name}: mode: {self.name}  parent: {self.inherit}"
+        mode_name = gremlin.shared_state.translateMode(self.name)
+        return f"{self.nodeType.name}: mode: [{mode_name}] parent mode: [{self.inherit if self.inherit else 'n/a'}]"
 
 
-class ProfileInputNode(ProfileBaseNode):
+class ProfileInputItemNode(ProfileBaseNode):
     """input node - represents an input for a device"""
 
-    def __init__(self, device_node: ProfileDeviceNode, parent: ProfileModeNode):
+    def __init__(self, device_node: ProfileDeviceNode, parent: ProfileInputTypeNode):
         super().__init__(ProfileNodeType.Input)
         assert device_node is not None, "device node must be provided"
         self.device_node = device_node  # link to the device node this input belongs to
@@ -1155,9 +1268,10 @@ class ProfileInputNode(ProfileBaseNode):
         return node
 
     def __str__(self):
+
         container_nodes = [node for node in self.children if node.nodeType == ProfileNodeType.Container]
         container_stub = f"{len(container_nodes)}"
-        return f"{self.nodeType.name}: input type: {self.input_type.name} input id: {self.input_id} containers: {container_stub} "
+        return f"{self.nodeType.name}: input item: [{self.input_item.display_name}] containers: {container_stub} "
 
 
 class ProfileContainerNode(ProfileBaseNode):
@@ -1172,7 +1286,7 @@ class ProfileContainerNode(ProfileBaseNode):
         """reads container data from the profile xml"""
         container_type = node.get("type")
 
-        input_node: ProfileInputNode = self.parent
+        input_node: ProfileInputItemNode = self.parent
 
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
         container_tag_map = container_plugins.tag_map
@@ -1262,7 +1376,7 @@ class ProfileGraph:
         device_id = gremlin.util.normalize_guid(device_guid) if not isinstance(device_guid, str) else device_guid
         return next((node for node in self._root.children if node.nodeType == ProfileNodeType.Device and node.device_id == device_id), None)
 
-    def _dump(self):
+    def dump(self):
         """dumps the graph"""
         syslog.info("Profile Graph Tree:")
         root = self._root
@@ -1294,11 +1408,25 @@ class ProfileGraph:
                 ProfileDeviceNode(device=device, parent=self._root)
 
         if verbose:
-            self._dump()
+            self.dump()
 
         # # prompt for mapping if a device is not found
 
         _config = gremlin.config.Configuration()
+
+    @staticmethod
+    def fromProfile(profile: gremlin.base_profile.Profile):
+        """creates a profile graph from a profile"""
+        graph = ProfileGraph()
+        root = graph.root
+        for device_guid, profile_device_node in profile.devices.items():
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if device:
+                node = ProfileDeviceNode(device, parent=root)
+                node.setModesFromProfileDevice(profile_device_node)
+                # graph.dump()
+                # pass
+        return graph
 
     def to_xml(self, target_xml: str) -> bool:
         """writes the profile graph to XML"""
@@ -1351,3 +1479,6 @@ class ProfileGraph:
     def root(self):
         """root node"""
         return self._root
+
+    def __str__(self):
+        return "profile root"

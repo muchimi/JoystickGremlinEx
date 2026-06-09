@@ -3998,7 +3998,10 @@ class AxisState:
 
         assert device_guid is not None, "invalid device id"
         dev: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
-        assert dev is not None, "device not found"
+        if not dev:
+            syslog.warning(f"device not found: [{str(device_guid)}]")
+            return AxisValues(0,0)
+        
         if dev.device_type == gremlin.types.DeviceType.Joystick:
             assert input_id in dev.axis_id_map, "invalid input id"
 

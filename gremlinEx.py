@@ -438,7 +438,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._clear_tabs()
 
     def _clear_tabs(self):
-        gremlin.util.InvokeUiMethod(self._clear_tabs_ui) # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._clear_tabs_ui)  # ensure on UI thread
 
     def getTabCount(self) -> int:
         return self.ui.devices_tab_header_widget.count()
@@ -1022,7 +1022,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _tab_clear_map_cb(self):
         """clears the mappings from the current tab"""
         tab_guid = gremlin.util.parse_guid(self._active_tab_guid())
-        device: gremlin.base_profile.Device = gremlin.shared_state.current_profile.devices[tab_guid]
+        device: gremlin.base_profile.ProfileDevice = gremlin.shared_state.current_profile.devices[tab_guid]
         current_mode = gremlin.shared_state.current_mode
         result = gremlin.ui.ui_common.ConfirmBox(f"Remove all mappings from {device.name}, mode [{current_mode}]?")
         if result:
@@ -1722,7 +1722,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # Create a default mode
         for device in self.profile.devices.values():
-            device.ensure_mode_exists("Default")
+            device.ensure_mode_exists(profile = new_profile, mode_name = "Default", device = device.device_guid)
 
         # Update everything to the new mode
         # self._mode_configuration_changed()
@@ -2793,8 +2793,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             special_devices = data["special"]
             tab_map = data["tab_map"]
 
-
-
             self._vjoy_input_device_guids = [dev.device_guid for dev in vjoy_devices]
 
             # sorted_devices = sorted(all_phys_devices, key=lambda x: x.name)
@@ -2825,7 +2823,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     syslog.info(f"TAB: [{index}] processing device [{device.name}]  [{device.device_id}]")
 
                 if device in physical_devices:
-
                     device_profile = self.profile.get_device_modes(device.device_guid, DeviceType.Joystick, device.name)
 
                     # this needs to be registered before widgets are created because widgets may need this data
@@ -2850,7 +2847,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             )
 
                             self.registerWidget(device_guid, widget)
-
 
                             widget.tabData = ts.getData(device_guid)
 
@@ -3005,7 +3001,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     gremlin.shared_state.device_type_map[device_guid] = DeviceType.Osc
                                     # gremlin.shared_state.device_widget_map[gremlin.ui.osc_device.OscDeviceTabWidget.device_guid] = widget
 
-
                                     widget.data = (
                                         TabDeviceType.Osc,
                                         device_guid,
@@ -3125,7 +3120,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             # add tab header for this device
                             self._add_tab(device_guid, TabDeviceType.Plugins)
                             index += 1
-
 
             self._reindex_tabs()
 

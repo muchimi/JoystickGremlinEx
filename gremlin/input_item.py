@@ -397,7 +397,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         import gremlin.shared_state
         import gremlin.joystick_handling
 
-        assert isinstance(mode_object, str) or isinstance(mode_object, gremlin.base_profile.Mode), "Parent parameter must be a string or mode object"
+        assert isinstance(mode_object, str) or isinstance(mode_object, gremlin.base_profile.ProfileMode), "Parent parameter must be a string or mode object"
         if isinstance(mode_object, str):
             # convert to a mode object
             profile = gremlin.shared_state.current_profile
@@ -456,7 +456,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             while True:
                 # if isinstance(item, Mode):
                 #    self._profile_mode = item.name
-                if isinstance(item, gremlin.base_profile.Device):
+                if isinstance(item, gremlin.base_profile.ProfileDevice):
                     self._device_type = item.type
                     self._device_name = item.name
                     self._device_guid = gremlin.util.to_guid(item.device_guid)
@@ -2588,7 +2588,7 @@ class InputItemListModel(AbstractCallbackModel):
         self.refresh(False)
 
     def _handle_sort(self, items) -> tuple:
-        """returns a sort list for the items if a custom handler was not provided """
+        """returns a sort list for the items if a custom handler was not provided"""
         # sort by input sortkey
         if self._can_sort:
             data = [(item, item.sortKey) for item in items]
@@ -11442,7 +11442,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.setInputItemListModel(model)
 
     def setInputItemListModel(self, model: InputItemListModel):
-        ''' sets the model '''
+        """sets the model"""
         if self._input_item_list_model != model:
             self._input_item_list_model = model
         if self._input_item_list_view is not None:
@@ -11594,7 +11594,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _refresh_ui(self, force=False, emit=False):
         """Refreshes the current selection, ensuring proper synchronization. - ensure on UI thread"""
-
 
         self.inputItemListModel.refresh()
 
