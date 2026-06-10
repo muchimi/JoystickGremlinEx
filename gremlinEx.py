@@ -2555,7 +2555,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         sorted_devices.extend(special_devices)
 
         # build the tab list using existing tab order or default tab order if an existing isn't set
-        id_list = []
+        id_list = tuple()
         has_changes = False
         if tab_map:
             # existing device order configuration data found
@@ -2580,13 +2580,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if not input_enabled:
                         continue
 
-                id_list.append(id)
+                id_list += (id, )
                 ctm[index] = (id, name, a, b)
         else:
             # no sorting data found - create a default map
-            id_list = [id for id, _ in physical_devices]
-            id_list.extend([id for id, _ in vjoy_devices])
-            id_list.extend([id for id, _ in special_devices])
+            id_list = (id for id, _ in physical_devices)
+            if vjoy_devices:
+                id_list = (*id_list, *(id for id, _ in vjoy_devices))
+            id_list = (*id_list, *(id for id, _ in special_devices))
             has_changes = True
 
         # re-sort the sorted list based on the new list

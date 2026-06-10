@@ -4649,10 +4649,10 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
             tab_map[index] = data
         ui.setTabMap(tab_map)
 
+
     @QtCore.Slot()
     def _close_cb(self):
         # validate the mode name
-
         self._update_tabs()
         self.accept()
         self.close()
