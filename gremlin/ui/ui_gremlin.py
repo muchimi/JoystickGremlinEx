@@ -11,6 +11,7 @@ import os
 import shutil
 import logging
 from gremlin.ui.ui_common import QRememberMainWindow
+import gremlin.util
 
 syslog = logging.getLogger("system")
 
@@ -40,9 +41,17 @@ class Ui_Gremlin(object):
         self.tab_bar_layout.addStretch(2)
 
         # holds the device widget
-        self.tab_content_widget, self.tab_content_layout = gremlin.ui.ui_common.getVContainer()
-        self.device_widget = QtWidgets.QStackedWidget()  # holds the device widgets for each device - the index changes with the tab
-        self.tab_content_layout.addWidget(self.device_widget)
+        tab_content_widget = QtWidgets.QWidget()
+        tab_content_widget.setContentsMargins(0,0,0,0)
+        tab_content_layout = QtWidgets.QVBoxLayout(tab_content_widget)
+        tab_content_layout.setContentsMargins(0,0,0,0)
+        self.device_page_widget = QtWidgets.QStackedWidget()  # holds the device widgets for each device - the index changes with the tab
+        # tab_content_layout.addWidget(QtWidgets.QLabel("tab content - top of layout for main window"))
+        tab_content_layout.addWidget(self.device_page_widget)
+        # tab_content_layout.addWidget(QtWidgets.QLabel("tab content - bottom of layout for main window"))
+
+        # blank input for device content
+        self.device_page_widget.addWidget(gremlin.ui.ui_common.QEmptyWidget(mode="wait"))  # index 0
 
         # bottom status bar
         self.statusbar_widget = QtWidgets.QWidget()
@@ -52,8 +61,7 @@ class Ui_Gremlin(object):
         self.statusbar_widget.setMaximumHeight(32)  # constrain height to bottom
 
         main_window.addWidget(self.tab_bar_widget)
-        main_window.addWidget(self.tab_content_widget)
-        main_window.addWidget(self.device_widget)
+        main_window.addWidget(tab_content_widget)
         main_window.addWidget(self.statusbar_widget)
 
         # build the menus
@@ -185,9 +193,9 @@ class Ui_Gremlin(object):
         self.actionReloadDevices.setToolTip("Performs a fresh scan of devices and reloads them")
 
         self.actionReorderDevices = QtGui.QAction(main_window)
-        self.actionReorderDevices.setText("Reorder Devices...")
+        self.actionReorderDevices.setText("Display Options...")
         self.actionReorderDevices.setObjectName("actionReorderDevices")
-        self.actionReorderDevices.setToolTip("Reorders the device tabs")
+        self.actionReorderDevices.setToolTip("Change visibility and order of devices in the device tabs")
 
         self.actionInputViewer = QtGui.QAction(main_window)
         self.actionInputViewer.setObjectName("actionInputViewer")

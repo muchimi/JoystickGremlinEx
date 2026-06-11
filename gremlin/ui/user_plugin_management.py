@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -55,7 +55,7 @@ class ModuleManagementController(QtCore.QObject):
     def inputCount(self) -> int:
         ''' number of inputs in the device '''
         return 0
-    
+
     @property
     def inputWidgetCount(self) -> int:
         ''' number of input widgets currently in the device '''
@@ -126,7 +126,7 @@ class ModuleManagementController(QtCore.QObject):
         import re
         module_data = instance.parent
         new_instance =  gremlin.base_profile.PluginInstance(module_data)
-        
+
         not_unique = True
 
         if instance.name.endswith("copy"):
@@ -147,8 +147,8 @@ class ModuleManagementController(QtCore.QObject):
                 index = int(seq) + 1
                 name_stub = instance.name[:-len(seq)].strip()
                 copy_name = name_stub + f" {index}"
-            
-            
+
+
         while not_unique:
             for item in instance.parent.instances:
                 if item.name == copy_name:
@@ -165,7 +165,7 @@ class ModuleManagementController(QtCore.QObject):
         module_widget = widget.module_widget
         new_instance_widget =  InstanceWidget(new_instance.name)
         new_instance_widget.module_widget = module_widget
-        
+
 
         module_widget.add_instance(new_instance_widget)
         self._connect_instance_signals(new_instance, new_instance_widget)
@@ -224,7 +224,7 @@ class ModuleManagementController(QtCore.QObject):
 
                 if verbose:
                     log.info(f"\t{str(profile_var)}")
-                
+
 
                 ui_element = var.create_ui_element(profile_var.value)
                 var.value_changed.connect(
@@ -347,9 +347,9 @@ class ModuleManagementViewWidget(QtWidgets.QSplitter):
         self.controller = None
 
         # Create the left panel showing the modules and their instances
-        
-        
-        
+
+
+
 
         # Displays the various modules and instances associated with them
         self.module_list = ModuleListWidget()
@@ -371,8 +371,8 @@ Modules get reloaded at every profile start.
 However module dependencies (imports), once loaded, will not be reloaded until GremlinEx is restarted.
 This is due to the way dynamic module loading and packaging works in Python.
 """                                                    )
-        
-        
+
+
         widgets = [self.module_list, widget, info_widget]
         self.left_panel_widget, self.left_panel_layout = gremlin.ui.ui_common.getVContainer(widgets, no_stretch=True)
 
@@ -384,16 +384,19 @@ This is due to the way dynamic module loading and packaging works in Python.
         self.addWidget(self.left_panel_widget)
         self.addWidget(self.right_panel_widget)
 
+
+
     @property
     def inputCount(self) -> int:
         ''' number of inputs in the device '''
         return 0
-    
+
     @property
     def inputWidgetCount(self) -> int:
         ''' number of input widgets currently in the device '''
         return 0
 
+    """ necessary for input handler and navigation """
     def refresh_ui(self):
         pass
 
@@ -401,6 +404,11 @@ This is due to the way dynamic module loading and packaging works in Python.
         # always loaded
         pass
 
+    def refresh(self, emit = True):
+        pass
+
+    def isLoaded(self) -> bool:
+        return True
 
 
     def _handle_add_module(self):
@@ -421,7 +429,7 @@ This is due to the way dynamic module loading and packaging works in Python.
             config.last_plugin_folder = dirname
 
 
-            
+
         self.add_module.emit(fname)
 
 
@@ -478,7 +486,7 @@ class ModuleWidget(QBoxFrame):
 
         background_color = gremlin.ui.ui_common.Color.actionBackgroundColor()
         self.setStyleSheet(f"QFrame {{ background-color : {background_color}; }}")
-        
+
 
         header_layout = QtWidgets.QHBoxLayout()
         header_layout.addWidget(QtWidgets.QLabel(module_name))
@@ -531,7 +539,7 @@ class InstanceWidget(QtWidgets.QWidget):
     def _create_ui(self):
         if not Shiboken.isValid(self):
             return
-        
+
         icon_color = gremlin.ui.ui_common.Color.normalColor()
 
         self.label_name = QtWidgets.QLabel(self.name)

@@ -158,7 +158,7 @@ class Color:
 
     @staticmethod
     def watermarkColor():
-        return "#2B2B2B" if gremlin.shared_state.is_dark_theme else "#D3D3D3"
+        return "#242424" if gremlin.shared_state.is_dark_theme else "#D3D3D3"
 
     @staticmethod
     def tabBackgroundColor():
@@ -1090,6 +1090,12 @@ class Icons:
         if not qta_color:
             qta_color = Color.grayColor()
         return Icons._icon("mdi.circle-off-outline", qta_color=qta_color)
+
+    @staticmethod
+    def waitIcon(qta_color=None):
+        if not qta_color:
+            qta_color = Color.grayColor()
+        return Icons._icon("mdi.refresh", qta_color=qta_color)
 
     @staticmethod
     def collapseAllIcon():
@@ -2920,14 +2926,16 @@ class ModeSelectorWidget(QtWidgets.QWidget):
 
     modeChanged = QtCore.Signal(str)  # occurs whena mode is selected
 
-    def __init__(self, parent=None):
+    def __init__(self, text = "Mode:", parent=None):
         super().__init__(parent)
 
         self._selector_widget = QDataComboBox()
         self._selector_widget.currentIndexChanged.connect(self._handle_mode_changed)
+        if not text:
+            text = "Mode:"
 
         widgets = [self._selector_widget]
-        widget, layout = getHContainer(widgets, "Mode:")
+        widget, layout = getHContainer(widgets, text)
 
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.addWidget(widget)
@@ -9889,6 +9897,7 @@ class QTabHeader(QtWidgets.QTabBar):
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._open_context_menu)
+        self.setExpanding(False)
 
         # self.currentChanged.connect(self._tab_selected)
 
@@ -14494,9 +14503,13 @@ class WidgetManager(QtWidgets.QDialog):
 
 class QEmptyWidget(QtWidgets.QWidget):
     """not loaded visual - indicates something is not loaded """
-    def __init__(self, parent = None):
+    def __init__(self, mode = "empty", parent = None):
         super().__init__(parent = parent)
-        icon = Icons.emptyIcon(Color.watermarkColor())
+        match mode:
+            case "empty":
+                icon = Icons.emptyIcon(Color.watermarkColor())
+            case "wait":
+                icon = Icons.waitIcon(Color.watermarkColor())
         pixmap = icon.pixmap(QSize(96, 96))
         label = QtWidgets.QLabel()
         label.setPixmap(pixmap)

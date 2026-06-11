@@ -852,7 +852,7 @@ class EventListener(QtCore.QObject):
         config = gremlin.config.Configuration()
         self._mouse_hook_stack = 0
         self.mouse_hook = None
-        self.enable_mouse_hook = not config.is_debug  # disable mouse hooks while in debug mode
+        self.enable_mouse_hook = False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
         self.enableMouse()
 
         # Calibration function for each axis of all devices
@@ -1134,6 +1134,7 @@ class EventListener(QtCore.QObject):
 
         # enable mouse hooks
         self.enableMouse(True)
+
 
         # reset keyboard suppression
         gremlin.windows_event_hook.MouseHook().popSuppress(True)
@@ -4001,7 +4002,7 @@ class AxisState:
         if not dev:
             syslog.warning(f"device not found: [{str(device_guid)}]")
             return AxisValues(0,0)
-        
+
         if dev.device_type == gremlin.types.DeviceType.Joystick:
             assert input_id in dev.axis_id_map, "invalid input id"
 

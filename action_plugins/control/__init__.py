@@ -16,6 +16,7 @@ import gremlin.ui.ui_common
 import gremlin.input_item
 from gremlin.types import ControlAction
 from gremlin.util import *
+from shiboken6 import Shiboken
 
 from gremlin.types import SyncMode
 

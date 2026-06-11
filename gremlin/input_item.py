@@ -11163,6 +11163,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.profile.ensure_mode_exists(mode)
         self.device_profile = profile.getDevice(device.device_guid)
 
+
+
         assert isinstance(custom_input_widget_callback, Callable) if custom_input_widget_callback is not None else True, (
             "Invalid custom input widget create callback"
         )
@@ -11208,6 +11210,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.addLeftPanelWidget(self.listview_container)
 
+
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""
         if self._input_item_list_model is not None:
@@ -11245,7 +11248,10 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def ensureLoaded(self):
         """ensures the device has inputs loaded because the inputs are delay loaded until the tab is visible"""
-        if self._input_item_list_view is None or self._input_item_list_model is None:
+        #if self._input_item_list_view is None or self._input_item_list_model is None:
+        if gremlin.util.is_ui_thread():
+            self._ensureLoaded_ui()
+        else:
             gremlin.util.InvokeUiMethod(self._ensureLoaded_ui)
 
     def isLoaded(self) -> bool:
