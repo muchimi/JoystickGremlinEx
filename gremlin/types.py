@@ -220,8 +220,39 @@ _control_action_display = {
     ControlAction.RemoteToggle: "Toggle Remote",
 }
 
+class DeviceCategory(IntEnum):
+    """ holds device categories for possible inputs """
+    NotSet = 0,
+    Physical = 1, # physical device like an HID or DINPUT
+    Virtual = 2 # VIrtual device
+    Special = 3 # special devices that are not joysticks (like keyboard)
+    Config = 4 # configuration device like settings
+
+    @staticmethod
+    def to_string(value):
+        return _device_category_to_string[value]
 
 
+    @staticmethod
+    def from_string(value)  :
+        return _device_category_from_string[value.casefold()]
+
+
+_device_category_from_string = {
+    "notset" : DeviceCategory.NotSet,
+    "physical" :DeviceCategory.Physical,
+    "virtual" :DeviceCategory.Virtual,
+    "special" :DeviceCategory.Special,
+    "config" :DeviceCategory.Config,
+}
+
+_device_category_to_string = {
+    DeviceCategory.NotSet : "notset",
+    DeviceCategory.Physical : "physical",
+    DeviceCategory.Virtual : "virtual" ,
+    DeviceCategory.Special : "special",
+    DeviceCategory.Config : "config"
+}
 class DeviceType(IntEnum):
 
     """Enumeration of the different possible input types."""

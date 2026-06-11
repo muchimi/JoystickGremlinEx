@@ -277,13 +277,13 @@ class AbstractView(QtWidgets.QWidget):
         """disable redraw on model change"""
         self._redraw_suspended_stack += 1
 
-    def popSuspended(self, reset=False):
+    def popSuspended(self, reset=False, emit = True):
         """enable redraw on model change"""
         if reset:
             self._redraw_suspended_stack = 0
         if self._redraw_suspended_stack > 0:
             self._redraw_suspended_stack -= 1
-        if self._redraw_suspended_stack == 0 and self._redraw_pending:
+        if emit and self._redraw_suspended_stack == 0 and self._redraw_pending:
             self._handle_model_changed()
 
     def _handle_model_changed(self, force=False):
@@ -2871,6 +2871,7 @@ class InputItemListView(AbstractView):
         if not device_guid:
             raise ValueError("device_guid is required for InputItemListView")
         assert isinstance(model, InputItemListModel), "invalid model for list view - must be an InputItemListModel base type"
+        assert gremlin.util.is_ui_thread()
 
         self.pushSuspended()
 
@@ -2942,7 +2943,7 @@ class InputItemListView(AbstractView):
             self.addSelectionChangeCallback(selection_changed_handler)
 
         # load data and update
-        self.popSuspended()
+        self.popSuspended(emit = False)
 
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""
@@ -11203,7 +11204,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # holds the input list on the left side below the header
         self.listview_container = QtWidgets.QStackedWidget()
-        self.listview_container.addWidget(QtWidgets.QLabel("Not loaded"))  # index 0 = blank placeholder
+        self.listview_container.addWidget(gremlin.ui.ui_common.QEmptyWidget()) # QtWidgets.QLabel("Not loaded"))  # index 0 = blank placeholder
 
         self.addLeftPanelWidget(self.listview_container)
 
@@ -11325,7 +11326,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             # update the selection if nothing is selected
             selected_index = widget.currentIndex()
-            if selected_index is not None:
+            if selected_index is not None and selected_index != -1:
                 self.selectInputItemIndex(selected_index)
 
         # indicate created

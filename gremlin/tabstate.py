@@ -20,15 +20,10 @@ from __future__ import annotations  # deprecated with python 3.14+
 
 
 import dinput
-
+import json
 import gremlin.util
-
 import gremlin.singleton_decorator
-
-
 from psygnal import Signal
-
-
 from gremlin.types import TabDeviceType
 
 
@@ -57,29 +52,66 @@ class TabData:
         self._dirty = dirty  # true if the tab is dirty and needs to be reloaded
         self._locked = locked
         self._populate_enabled = False  # true if the UI can be populated for this tab
+        self.index = 0  # set by the tab UI
+
+    def to_json(self):
+        """returns a serializable dict"""
+        return {
+            "device_id": self.device_id,
+            "tab_type": self.tab_type,
+            "position": self.position,
+            "index": self.index,
+            "locked": self.locked,
+            "filtered": self.filtered,
+        }
+
+    @staticmethod
+    def from_json(data):
+        import gremlin.joystick_handling
+
+        device_id = data["device_id"]
+        device = gremlin.joystick_handling.getDevice(device_id)
+        item = TabData(
+            position=data["position"],
+            tab_type=data["tab_type"],
+            device=device,
+            locked=data["locked"],
+        )
+        return item
 
     @property
     def position(self) -> int:
         return self._position
 
-    def setPosition(self, value : int):
+    def setPosition(self, value: int):
         self._position = value
-
 
     @property
     def device_guid(self) -> dinput.GUID:
         """gets the associated device GUID"""
-        return self._device.device_guid
+        if self._device:
+            return self._device.device_guid
+        return None
 
     @property
     def device_id(self) -> str:
         """gets the associated device GUID as a string"""
-        return self.device_id
+        if self._device:
+            return self._device.device_id
+        return None
 
     @property
     def device_name(self) -> str:
         """gets the associated device name"""
-        return self._device.name
+        if self._device:
+            return self._device.name
+        return None
+
+    @property
+    def visible(self) -> bool:
+        if self._device:
+            return self._device.visible
+        return True
 
     @property
     def tab_type(self) -> TabDeviceType:
@@ -125,6 +157,43 @@ class TabData:
     @populateEnabled.setter
     def populateEnabled(self, value: bool):
         self._populate_enabled = value
+
+
+# class TabDataEncoder(json.JSONEncoder):
+#     def default(self, obj):
+#         if isinstance(obj, TabData):
+#             # use a subset to reconstruct the data
+#             obj = {
+#                 "type" : TabData.__name__,
+#                 "device_id" : obj.device_id,
+#                 "device_name" : obj.device_name,
+#                 "tab_type" : obj.tab_type,
+#                 "position" : obj.position,
+#                 "filtered" : obj.filtered,
+#                 "locked" : obj.locked,
+#                 "visible" : obj.visible
+#             }
+
+#         return super().default(obj)
+
+# class TabDataDecoder(json.JSONDecoder):
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(object_hook=self.handle_decode, *args, **kwargs)
+
+#     def handle_decode(self, dct):
+#         import gremlin.joystick_handling
+#         if "type" in dct and dct["type"] == TabData.__name__:
+#             data = TabData(
+#                 position = dct["position"],
+#                 tab_type = dct["tab_type"],
+#                 device_id = dct["device_id"],
+#                 device = gremlin.joystick_handling.getDevice(dct["device_id"]),
+#                 filtered = dct["filtered"],
+#                 locked = dct["locked"],
+#                 visible = dct["visible"]
+#             )
+#             return data
+#         return dct
 
 
 @gremlin.singleton_decorator.SingletonDecorator

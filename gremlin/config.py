@@ -1771,14 +1771,32 @@ class Configuration(QtCore.QObject):
             self.changed.emit("input_viewer_disables_repeaters", value)
 
     @property
-    def tab_list(self):
-        """tab order for the UI devices as set by the user"""
-        return self._get_data("tab_order", None)
+    def tab_list(self):# -> dict[Any, TabData] | None:# -> dict[Any, TabData] | None:
+        """tab order for the UI devices as set by the user dict[tab_index : int, data: TabData]"""
+        data = self._get_data("tab_device_order", None)
+        # if data:
+        #     # convert to tab data
+        #     import gremlin.tabstate
+        #     tab_map = {key:gremlin.tabstate.TabData.from_json(item) for key, item in data.items()}
+        #     return tab_map
+        return data
 
     @tab_list.setter
-    def tab_list(self, value):
-        self._data["tab_order"] = value
+    def tab_list(self, tab_map):
+        # convert the tab map to something serializable
+        #data = {key:item.to_json() for key, item in tab_map.items()}
+        self._data["tab_device_order"] = tab_map
         self.save()
+
+
+
+
+    @property
+    def device_visible_map(self) -> dict[str, bool]:
+        return self._get_data("device-visibility", {})
+    @device_visible_map.setter
+    def device_visible_map(self, value : dict[str, bool]):
+        self._set_data("device-visibility", value)
 
     @property
     def show_output_vjoy(self):

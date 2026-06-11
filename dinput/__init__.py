@@ -24,6 +24,7 @@ import os
 import uuid
 import logging
 import traceback
+from gremlin.types import DeviceType, DeviceCategory
 
 syslog = logging.getLogger("system")
 
@@ -431,13 +432,13 @@ class DeviceSummary:
         self.vendor_id = 0  # vendor ID
         self.product_id = 0  # product ID
         self.name = None
-        self.is_special = False
         self._device_type = gremlin.types.DeviceType.NotSet
+        self._device_category = gremlin.types.DeviceCategory.NotSet
         self.data = {}  # tracked data for this device, example, stepped index data for an axis
         self._get_button_callback = None  # custom callback to read a button value from this device if a special device
         self._get_axis_callback = None  # custom callback to read an axis value from this device if a special device
         self._get_hat_callback = None  # custom callback to read a hat value if this device is a special device
-
+        self.visible = True # device is visible by default in the UI
         if data is not None:
             self.device_guid = GUID(data.device_guid)
             self.device_id = gremlin.util.normalize_guid(self.device_guid)
@@ -551,13 +552,38 @@ class DeviceSummary:
             # mapped devices
             return self.linear_id_map[linear_id]
 
+
     @property
     def device_type(self):
+        """device type"""
         return self._device_type
+
+    @property
+    def device_name(self) ->str:
+        return self.name
 
     @device_type.setter
     def device_type(self, value):
         self._device_type = value
+
+    @property
+    def device_category(self):
+        """device category"""
+        return self._device_category
+
+    @device_category.setter
+    def device_category(self, value):
+        self._device_category = value
+
+    @property
+    def is_special(self) -> bool:
+        """true if the device is a special device"""
+        return self._device_category in (DeviceCategory.Special, DeviceCategory.Config)
+
+    @property
+    def is_config(self) -> bool:
+        """true if the device is a configuration device"""
+        return self._device_category == DeviceCategory.Config
 
     @property
     def disabled(self) -> bool:

@@ -157,6 +157,10 @@ class Color:
         return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
 
     @staticmethod
+    def watermarkColor():
+        return "#2B2B2B" if gremlin.shared_state.is_dark_theme else "#D3D3D3"
+
+    @staticmethod
     def tabBackgroundColor():
         return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
 
@@ -1080,6 +1084,12 @@ class Icons:
         if not qta_color:
             qta_color = Color.grayColor()
         return Icons._icon("ph.tag-chevron-fill", qta_color=qta_color)
+
+    @staticmethod
+    def emptyIcon(qta_color=None):
+        if not qta_color:
+            qta_color = Color.grayColor()
+        return Icons._icon("mdi.circle-off-outline", qta_color=qta_color)
 
     @staticmethod
     def collapseAllIcon():
@@ -14480,3 +14490,17 @@ class WidgetManager(QtWidgets.QDialog):
                 if self._stacked_widget.indexOf(widget) != -1:
                     self._stacked_widget.removeWidget(widget)
                 widget.deleteLater()
+
+
+class QEmptyWidget(QtWidgets.QWidget):
+    """not loaded visual - indicates something is not loaded """
+    def __init__(self, parent = None):
+        super().__init__(parent = parent)
+        icon = Icons.emptyIcon(Color.watermarkColor())
+        pixmap = icon.pixmap(QSize(96, 96))
+        label = QtWidgets.QLabel()
+        label.setPixmap(pixmap)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout = QVBoxLayout(self)
+        layout.addWidget(label, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.setLayout(layout)
