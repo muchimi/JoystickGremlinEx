@@ -397,7 +397,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         import gremlin.shared_state
         import gremlin.joystick_handling
 
-        assert isinstance(mode_object, str) or isinstance(mode_object, gremlin.base_profile.ProfileMode), "Parent parameter must be a string or mode object"
+        assert isinstance(mode_object, str) or isinstance(mode_object, gremlin.base_profile.ProfileMode), "Parent parameter must be a string or mode object, cannot be NULL"
         if isinstance(mode_object, str):
             # convert to a mode object
             profile = gremlin.shared_state.current_profile
@@ -530,25 +530,28 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     @property
     def profile_mode(self) -> str:
-        mode = None
-        if self._input_type == InputType.ModeControl:
-            if self._input_id in (
-                gremlin.ui.mode_device.ModeInputModeType.ModeProfileLoad,
-                gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
-                gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
-            ):
-                mode = gremlin.shared_state.master_mode
-        elif self._input_type == InputType.State:
-            mode = gremlin.shared_state.master_mode
-        if not mode:
-            if self._profile_mode_callback:
-                mode = self._profile_mode_callback(self)
-            else:
-                mode_object = self.parent
-                if mode_object:
-                    mode = mode_object.name
+        """gets the mode object"""
+        return self.parent.name
+        # mode = None
+        # if self._input_type == InputType.ModeControl:
+        #     if self._input_id in (
+        #         gremlin.ui.mode_device.ModeInputModeType.ModeProfileLoad,
+        #         gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
+        #         gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
+        #     ):
+        #         mode = gremlin.shared_state.master_mode
+        # elif self._input_type == InputType.State:
+        #     mode = gremlin.shared_state.master_mode
+        # if not mode:
+        #     if self._profile_mode_callback:
+        #         mode = self._profile_mode_callback(self)
+        #     else:
+        #         mode_object = self.parent
+        #         if mode_object:
+        #             mode = mode_object.name
 
-        return mode
+        # return mode
+
 
     @property
     def locked(self) -> bool:
@@ -1140,25 +1143,30 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         if self.is_action:
             return "this action"
         """ gets a display name for this input """
-        if self._input_type == InputType.JoystickAxis:
-            device = gremlin.joystick_handling.getDevice(self.device_guid)
-            return f"{device.get_axis_name(self._input_id)}"
-        elif self._input_type == InputType.JoystickButton:
-            return f"Button {self._input_id}"
-        elif self._input_type == InputType.JoystickHat:
-            return f"Hat {self._input_id}"
-        elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
-            return f"Key {self._input_id.display_name}"
-        elif self._input_type == InputType.OpenSoundControl:
-            return f"OSC {self._input_id.display_name}"
-        elif self._input_type == InputType.Midi:
-            return f"Midi {self._input_id.display_name}"
-        elif self._input_type == InputType.ModeControl:
-            return f"{gremlin.ui.mode_device.ModeInputModeType.to_display_name(self._input_id)}"
-        elif self._input_type == InputType.State:
-            return f"State: {self._input_id}"
-        elif self._input_type == InputType.OctaviIfr1:
-            return f"IFR1: {self._input_id.name}"
+        match self._input_type:
+            case InputType.JoystickAxis:
+                device = gremlin.joystick_handling.getDevice(self.device_guid)
+                return f"{device.get_axis_name(self._input_id)}"
+            case  InputType.JoystickButton:
+                return f"Button {self._input_id}"
+            case  InputType.JoystickHat:
+                return f"Hat {self._input_id}"
+            case InputType.Keyboard | InputType.KeyboardLatched:
+                return f"Key {self._input_id.display_name}"
+            case  InputType.OpenSoundControl:
+                return f"OSC {self._input_id.display_name}"
+            case  InputType.Midi:
+                return f"Midi {self._input_id.display_name}"
+            case  InputType.ModeControl:
+                return f"{gremlin.ui.mode_device.ModeInputModeType.to_display_name(self._input_id)}"
+            case  InputType.State:
+                return f"State: {self._input_id}"
+            case  InputType.OctaviIfr1:
+                return f"IFR1: {self._input_id.name}"
+            case InputType.ModeControl:
+                return f"ModeControl: {self._input_id}"
+
+
         return f"Unknown input: {self._input_type}"
 
     def save_container_to_template(self, fname: str):

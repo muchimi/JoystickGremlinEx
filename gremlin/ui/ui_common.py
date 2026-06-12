@@ -7807,6 +7807,7 @@ class QDelayWidget(QtWidgets.QWidget):
         parent=None,
         label=None,
         tooltip=None,
+        show_zero = False,
     ):
         """
 
@@ -7844,13 +7845,17 @@ class QDelayWidget(QtWidgets.QWidget):
 
         if show_shortcuts:
             widgets = []
+
             shortcuts = {
+                "0s" : 0,
                 "1/10s": 100,
                 "1/4s": 250,
                 "1/2s": 500,
                 "3/4s": 750,
                 "1s": 1000,
             }
+            if not show_zero:
+                del shortcuts["0s"]
 
             for label, value in shortcuts.items():
                 widgets.append(QDataPushButton(label, data=value, callback=self._handle_shortcut))

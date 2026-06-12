@@ -2814,7 +2814,9 @@ class EventHandler(QtCore.QObject):
         # if not is_running:
         # check the UI is updated to the correct mode
         el = EventListener()
-        syslog.info(f"Mode: update selector to: [{mode}]")
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose:
+            syslog.info(f"Mode: update selector to: [{mode}]")
         el.edit_mode_ui_update.emit(mode)
 
     def _change_mode(self, new_mode: str, args: tuple = None):
@@ -2833,8 +2835,8 @@ class EventHandler(QtCore.QObject):
         is_running = gremlin.shared_state.is_running
 
         config = gremlin.config.Configuration()
-        verbose = config.verbose
-        verbose_detail = config.verbose_mode_mode
+        verbose = config.verbose_mode_ui or config.verbose_mode_mode
+        verbose_detail = verbose and config.verbose_mode_detailed
         current_profile = gremlin.shared_state.current_profile
 
         if verbose_detail:

@@ -19,7 +19,7 @@ import logging
 import os
 
 from . import common, error
-from gremlin.util import *
+from gremlin.util import get_guid, toUrl
 
 from gremlin.singleton_decorator import SingletonDecorator
 
@@ -126,7 +126,7 @@ class ContainerPlugins:
         plugin_folder = "container_plugins"
         root_path = gremlin.shared_state.root_path
         walk_path = os.path.join(root_path, plugin_folder)
-        log_sys(f"Using container plugin folder: {walk_path}")
+        syslog.info(f"Containers: Using container plugin folder: {toUrl(walk_path)}")
         if not os.path.isdir(walk_path):
             raise error(f"Unable to find container plugins: {walk_path}")
 
@@ -144,7 +144,7 @@ class ContainerPlugins:
                     plugin = importlib.import_module(f"container_plugins.{module}")
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
-                        log_sys(f"\tLoaded container plugin: {plugin.name}")
+                        syslog.info(f"\tFound: {plugin.name}")
                         loaded_count += 1
                     else:
                         del plugin
@@ -153,7 +153,7 @@ class ContainerPlugins:
                     # anything is wrong with it
                     syslog.warning(f"\tLoading container_plugins '{fname}' failed due to: {e}")
 
-        syslog.info(f"Found {loaded_count} container plugins")
+        syslog.info(f"\tLoaded {loaded_count} container plugins")
 
     def _create_maps(self):
         """Creates a lookup table from container tag to container object."""
@@ -166,7 +166,6 @@ class ContainerPlugins:
         # because containers can be quite complex - we'll just generate the xml and change IDs as needed and reload
         # into a new container of the same type
         from gremlin.input_item import AbstractContainer, InputItem
-        from gremlin.util import get_guid
 
         assert isinstance(container, AbstractContainer), "Invalid container data for duplicate()"
         assert isinstance(input_item, InputItem), "Invalid input item tyhpe for duplicate()"
@@ -278,11 +277,10 @@ class ActionPlugins:
         plugin_folder = "action_plugins"
         root_path = gremlin.shared_state.root_path
         walk_path = os.path.join(root_path, plugin_folder)
-        log_sys(f"Using action plugin folder: {walk_path}")
         if not os.path.isdir(walk_path):
             raise error(f"Unable to find action_plugins: {walk_path}")
 
-        log_sys("Action plugins:")
+        syslog.info(f"Action plugins: {toUrl(walk_path)}")
         plugin_count = 0
         error_count = 0
         for root, dirs, files in os.walk(walk_path):
@@ -297,7 +295,7 @@ class ActionPlugins:
                     plugin = importlib.import_module(f"action_plugins.{module}")
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
-                        log_sys(f"\tLoaded action plugin: {plugin.name}")
+                        syslog.info(f"\tFound: {plugin.name}")
                         plugin_count += 1
 
                     else:
@@ -309,13 +307,13 @@ class ActionPlugins:
                     syslog.error(e)
                     error_count += 1
 
-        log_sys(f"Found {plugin_count} action plugins")
+        syslog.info(f"\tLoaded {plugin_count} action plugins")
         if error_count > 0:
-            log_sys_error(f"{error_count} plugin(s) failed to load")
+            syslog.info_error(f"{error_count} plugin(s) failed to load")
 
     def duplicate(self, action, container, input_item=None, extra_data: dict = None):
         """duplicates an action and gives it a unique ID"""
-        from gremlin.util import get_guid
+        import gremlin.shared_state
 
         if input_item is None:
             input_item = container.parent

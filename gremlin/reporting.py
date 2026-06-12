@@ -270,7 +270,7 @@ class ReportEngine:
         # default path:
 
         self._graphVizInstalled = self._locate_graphviz()
-        syslog.info(f"REPORT: GraphViz {'installed' if self._graphVizInstalled else 'not configured or detected'}")
+        syslog.info(f"GraphViz {'installed' if self._graphVizInstalled else 'not configured or detected'}")
 
     def _locate_graphviz(self):
 

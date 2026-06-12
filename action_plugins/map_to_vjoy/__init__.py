@@ -997,6 +997,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             return
         if not Shiboken.isValid(self):
             return
+        if not self._repeater_axis_widget:
+            # not an axis
+            return
 
         # syslog.info(f"update vjoy remap repeater: {value:0.3f}")
 
@@ -3760,7 +3763,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 case VjoyAction.VJoyHatToButton:
                     # delay load hat mapping UI
                     self.ensureHatMappingLoaded()
-                case VjoyAction.VJoyMerge:
+                case VjoyAction.VJoyMergeAxis:
                     # delay load merge mapping UI
                     self.ensureMergeMappingLoaded()
 

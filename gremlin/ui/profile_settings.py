@@ -254,12 +254,8 @@ class DefaultDelay(QtWidgets.QWidget):
 
         self.delay_widget = gremlin.ui.ui_common.QDelayWidget(max_value_seconds = 10,
                                                               value = self.profile_data.default_delay,
-                                                              callback=self._handle_delay_changed)
-
-        # self.delay_widget.setRange(0.0, 10.0)
-        # self.delay_widget.setSingleStep(0.05)
-        # self.delay_widget.setValue(self.profile_data.default_delay)
-        # self.delay_widget.valueChanged.connect(self._update_delay)
+                                                              callback=self._handle_delay_changed,
+                                                              show_zero = True)
 
         widget = gremlin.ui.ui_common.getHContainer(["Default Macro Action Delay:", self.delay_widget], widget_only=True)
         self.main_layout.addWidget(widget)

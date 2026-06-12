@@ -194,7 +194,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._loading_stack = 0
         self._loading_stack_target = 0  # target index if a call to select a page is done while page cycling is suspended
 
-        self.ui.device_page_widget.currentChanged.connect(self._handle_device_widget_index_changed)
+        # self.ui.device_page_widget.currentChanged.connect(self._handle_device_widget_index_changed)
 
         self._last_selected_device_guid = None
         self._last_selected_input_type = None
@@ -402,8 +402,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         el.ui_initialized.emit()
 
-    def _handle_device_widget_index_changed(self, index):
-        syslog.info(f"device page: index set to [{index}]")
+    # def _handle_device_widget_index_changed(self, index):
+    #     syslog.info(f"device page: index set to [{index}]")
 
     def pushLoading(self):
         if self._loading_stack == 0:
@@ -420,7 +420,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if self._loading_stack == 0:
                 if self._loading_stack_target:
                     self.setDeviceContentIndex(self._loading_stack_target)
-                    syslog.info(f"loading: display saved index [{self._loading_stack_target}]")
+                    # syslog.info(f"loading: display saved index [{self._loading_stack_target}]")
                     self._loading_stack_target = 0
                 else:
                     self.showDeviceContent(device_guid)
@@ -887,7 +887,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         _, restore_input_type, restore_input_id = self.config.get_last_input(device_guid)
         verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose:
-            syslog.info(f"TabSelectedWorker: select device [{device.name}] id [{device.device_id}]")
+            syslog.info(f"TabSelectedWorker: start select device [{device.name}] id [{device.device_id}]")
 
         self._select_input(
             device_guid=device_guid,
@@ -906,7 +906,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         while not self._tab_selection_completed:
             QThread.sleep(0)
 
-        syslog.info("tab selection worker complete")
+        if verbose:
+            syslog.info("tab selection worker complete")
 
     def _tab_selection_complete(self, *args):
         self._tab_selection_completed = True
@@ -2235,7 +2236,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         device_id = gremlin.util.normalize_guid(device_guid)
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
-        verbose = True
+        # verbose = True
 
         index = self.ui.device_page_widget.indexOf(widget)
         if index != -1:
@@ -2557,8 +2558,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         value: same as key
 
         """
-        verbose = self.config.verbose_mode_ui
-        verbose_detailed = verbose and self.config.verbose_mode_detailed
+        verbose = self.config.verbose_mode_ui_level(1)
+        verbose_detailed = self.config.verbose_mode_ui_level(2)
         tab_map = self.config.tab_list
 
         # physical joysticks
@@ -2620,7 +2621,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 id_list.append(device.device_id)
                 sorted_devices.append((device.device_id, device.name, device))
                 category_map[device.device_category].append(device)
-                syslog.info(f"from saved tabs: add index [{index}] [{device.device_name}]")
+                if verbose:
+                    syslog.info(f"from saved tabs: add index [{index}] [{device.device_name}]")
 
             # add any missing devices connected but not in the tab map
 
@@ -2670,7 +2672,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             "index_map": indexed_map,
         }
 
-        verbose = True
+        # verbose = True
         if verbose:
             syslog.info("Derived sorted device list:")
             index = 0
@@ -2696,7 +2698,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_device or config.verbose_mode_ui
             verbose_l1 = verbose and config.verbose_mode_l1
-            verbose_l1 = True
+            # verbose_l1 = True
             verbose_detailed = verbose and config.verbose_mode_extra
 
             if verbose_l1:
@@ -4849,7 +4851,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         )
 
     def _profile_load_completed(self, *args):
-        syslog.info("profile loaded")
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        if verbose:
+            syslog.info("profile loaded")
 
     def _do_load_profile_internal_worker(self, args) -> bool | tuple:
         """Load the profile with the given filename.
@@ -4864,6 +4868,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         source_xml: str
         as_new_profile: bool
         source_xml, as_new_profile, emit = args
+
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+        if verbose:
+            syslog.info("Profile: worker: start loading")
 
         # trap recursive call
         if self._profile_load_stack:
@@ -4976,7 +4984,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         new_profile.setProfileFile(None)
 
                     self._profile_load_stack.pop(0)
-                    syslog.info("Profile: parse completed.")
+                    if verbose:
+                        syslog.info("Profile: worker parse completed.")
 
                 except (KeyError, TypeError) as err:
                     # An error occurred while parsing an existing profile,
