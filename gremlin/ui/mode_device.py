@@ -228,6 +228,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # create the two mode entries in the input
         self.ensureInputItems()
 
+
     @property
     def inputCount(self) -> int:
         """number of inputs in the device"""
@@ -331,6 +332,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             custom_name_handler=self._custom_name_handler,
             autocreate=True,
             create_handler=created_handler,
+            tooltip = f"Triggers on mode [{mode_object.name}] entry",
             # description="Mode Enter",
             # description_readonly=True,
         )
@@ -345,6 +347,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             custom_name_handler=self._custom_name_handler,
             autocreate=True,
             create_handler=created_handler,
+            tooltip = f"Triggers on mode [{mode_object.name}] exit",
             # description="Mode Exit",
             # description_readonly=True,
         )
@@ -359,6 +362,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             custom_name_handler=self._custom_name_handler,
             autocreate=True,
             create_handler=created_handler,
+            tooltip = "Triggers on profile start",
             # description="Profile Start",
             # description_readonly=True,
         )
@@ -373,6 +377,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             custom_name_handler=self._custom_name_handler,
             autocreate=True,
             create_handler=created_handler,
+            tooltip = "Triggers on profile stop",
             # description="Profile Stop",
             # description_readonly=True,
         )

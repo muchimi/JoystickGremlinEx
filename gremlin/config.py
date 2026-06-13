@@ -2344,8 +2344,8 @@ class Configuration(QtCore.QObject):
 
             midi = MidiInterface()
             self._midi_enabled = midi.midi_enabled and self._get_data(
-                "midi_enabled", True
-            )
+                "midi_enabled", False
+            ) # disable by default
         return self._midi_enabled
 
     @midi_enabled.setter

@@ -1932,6 +1932,7 @@ class ProfileRegistry:
         create_handler: Callable = None,
         description: str = None,
         description_readonly: bool = None,
+        tooltip : str = None,
     ):
         """
         Gets the input item - creates it if it does not exist
@@ -1946,6 +1947,7 @@ class ProfileRegistry:
         :param create_handler: optional handler called when the input is created (if created)
         :param description: optional description
         :param description_readonly: flag to indicate if description can be user edite, passes the created input item (input_item) as the parameter
+        :param tooltip: tooltip associated with the input item (on title bar) if the input is created
         """
         verbose = gremlin.config.Configuration().verbose_mode_inputitems
         device_guid = gremlin.util.parse_guid(device_guid)
@@ -2018,6 +2020,8 @@ class ProfileRegistry:
                 input_item.description = description
             if description_readonly is not None:
                 input_item.descriptionReadOnly = description_readonly
+            if tooltip:
+                input_item.setTooltip(tooltip)
 
             self._profile.registerInputItem(input_item)
 
@@ -2038,6 +2042,8 @@ class ProfileRegistry:
                 syslog.info(f"\tinput mode: {input_item.profile_mode}")
                 syslog.info(f"\tinput type: {input_item.input_type.name}")
                 syslog.info(f"\tinput id: {str(input_item.input_id)}")
+
+
 
         return input_item
 

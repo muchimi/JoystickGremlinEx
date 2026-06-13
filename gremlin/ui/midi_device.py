@@ -549,10 +549,20 @@ class MidiInterface(QtCore.QObject):
 
         self._started = False  # true if the interface is actively listening
         self._listeners = {}  # map of port numer to its listener
+        self._port_names = []
+        self._port_map = {}
+        self._port_name_map = {}
+        self._port_count = 0
+        self._initialized = False
 
         self._monitored_ports = set()
         self.midi_enabled = False
+        # config = gremlin.config.Configuration()
+        # if config.midi_enabled:
+        #     self._initialize_midi()
 
+
+    def _initialize_midi(self):
         self._event_handler = gremlin.event_handler.EventHandler()
         self._event_listener = gremlin.event_handler.EventListener()
         self._event_listener.shutdown.connect(self.stop)
@@ -560,9 +570,6 @@ class MidiInterface(QtCore.QObject):
         try:
             # get a list of available devices to listen into
             mido.set_backend("mido.backends.rtmidi")
-            self._port_names = []
-            self._port_map = {}
-            self._port_name_map = {}
             for index, name in enumerate(mido.get_input_names()):
                 self._port_names.append(name)
                 self._port_map[name] = index
@@ -579,6 +586,10 @@ class MidiInterface(QtCore.QObject):
         for port_name in self._port_names:
             syslog.info(f"MIDI: device detected: [{port_name}] on MIDI port: [{self.getPort(port_name)}] ")
 
+        self._initialized = True
+
+
+
     def buildMessageKey(self, command, port_name, message):
         """builds a MIDI message key from data"""
         if command == MidiCommandType.SysEx:
@@ -587,25 +598,28 @@ class MidiInterface(QtCore.QObject):
 
     def getPort(self, name: str) -> int:
         """gets the MIDI port number for the device name"""
-        name = name.casefold()
-        for port_name in self._port_map:
-            if name == port_name.casefold():
-                return self._port_map[port_name]
+        if self.midi_enabled:
+            name = name.casefold()
+            for port_name in self._port_map:
+                if name == port_name.casefold():
+                    return self._port_map[port_name]
         return -1  # not found
 
     def getPortName(self, port: int):
         """gets the port name for a given port number, None if not found"""
-        if port in self._port_name_map:
-            return self._port_name_map[port]
+        if self.midi_enabled:
+            if port in self._port_name_map:
+                return self._port_name_map[port]
         return None
 
     def getPortTuples(self) -> dict:
         """gets a list of (name, port) from the MIDI interface"""
-
-        device_list = [(name, port) for name, port in self._port_map.items()]
-        if device_list:
-            device_list.sort(key=lambda x: x[0])  # sort by name
-        return device_list
+        if self.midi_enabled:
+            device_list = [(name, port) for name, port in self._port_map.items()]
+            if device_list:
+                device_list.sort(key=lambda x: x[0])  # sort by name
+            return device_list
+        return None
 
     def start(self, port_name_or_list=None):
         """starts listeners
@@ -622,6 +636,13 @@ class MidiInterface(QtCore.QObject):
         # request start
         if self._started:
             self.stop()
+
+        if not self.midi_enabled:
+            # disabled
+            return
+
+        if not self._initialized:
+            self._initialize_midi()
 
         self._monitored_ports = set()  # holds the list of active port numbers
         if port_name_or_list is None:
@@ -652,27 +673,28 @@ class MidiInterface(QtCore.QObject):
 
     def stop(self):
         # request stop
-        verbose = gremlin.config.Configuration().verbose_mode_midi
-        if verbose:
-            syslog.info("MIDI Interface: STOP listen requested")
-
-        for port_number in self._listeners:
-            listener: MidiListener
-            listener = self._listeners[port_number]
-            listener.callback = None  # stop callbacks
-            if not listener.stopped():
-                # request exit and wait for it
-
-                listener.stop()
-                listener.join()
+        if self._started:
+            verbose = gremlin.config.Configuration().verbose_mode_midi
             if verbose:
-                syslog.info(f"MIDI Interface: port [{port_number}] stopped")
+                syslog.info("MIDI Interface: STOP listen requested")
 
-        self._listeners.clear()
+            for port_number in self._listeners:
+                listener: MidiListener
+                listener = self._listeners[port_number]
+                listener.callback = None  # stop callbacks
+                if not listener.stopped():
+                    # request exit and wait for it
 
-        # clear
-        self._monitored_ports = set()
-        self._started = False
+                    listener.stop()
+                    listener.join()
+                if verbose:
+                    syslog.info(f"MIDI Interface: port [{port_number}] stopped")
+
+            self._listeners.clear()
+
+            # clear
+            self._monitored_ports = set()
+            self._started = False
 
     @property
     def ports(self):
@@ -831,7 +853,6 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._interface: MidiInterface = MidiInterface()
 
         # MIDI port selector
-
         items = self._interface.getPortTuples()
         self._midi_port_selector_widget = gremlin.ui.ui_common.QDataComboBox(source=items, callback=self._update_port)
 
@@ -1828,11 +1849,13 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _edit_item_cb(self, widget, index, data):
         """called when the edit button is clicked"""
-        self._edit_dialog = MidiInputConfigDialog(self.current_mode, index, data, self)
-        self._edit_dialog.accepted.connect(self._dialog_ok_cb)
-        gremlin.util.centerDialog(self._edit_dialog)
-        self._edit_dialog.showNormal()
-        self._index = index
+        interface = MidiInterface()
+        if interface.enabled:
+            self._edit_dialog = MidiInputConfigDialog(self.current_mode, index, data, self)
+            self._edit_dialog.accepted.connect(self._dialog_ok_cb)
+            gremlin.util.centerDialog(self._edit_dialog)
+            self._edit_dialog.showNormal()
+            self._index = index
 
     def _dialog_ok_cb(self):
         """called when the ok button is pressed on the edit dialog"""

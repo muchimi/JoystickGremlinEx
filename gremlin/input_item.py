@@ -277,7 +277,7 @@ class AbstractView(QtWidgets.QWidget):
         """disable redraw on model change"""
         self._redraw_suspended_stack += 1
 
-    def popSuspended(self, reset=False, emit = True):
+    def popSuspended(self, reset=False, emit=True):
         """enable redraw on model change"""
         if reset:
             self._redraw_suspended_stack = 0
@@ -353,7 +353,6 @@ class AbstractView(QtWidgets.QWidget):
                 self._model.removeCallback(self._handle_model_changed)
             assert isinstance(model, AbstractCallbackModel) if model is not None else True, "invalid model"
             self._model = model
-            self._model.trigger()  # force a model update
 
     def modelChanged(self) -> bool:
         """true if the unrerlying model has changed - used in the context of begin/end to detect model changes if a redraw was suspended"""
@@ -378,6 +377,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     """Represents a single input item such as a button or axis, containers and parameters/options associated with that input mapping"""
 
     lockedChanged = Signal(object)  # (input_item) fires when the lock state changes - passes the input item as the parameter
+    tooltipChanged = QtCore.Signal() # fires when the tooltip changes
 
     def __init__(
         self,
@@ -385,7 +385,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         custom_name_handler: Callable = None,
         custom_mode_name_handler: Callable = None,
         override_input_type=None,
-        device_guid: dinput.GUID | uuid.UUID | str = None,  # noqa: F405
+        device_guid: dinput.GUID | uuid.UUID | str = None,  # noqa: F405,
+        tooltip : str = None
     ):
         """Creates a new InputItem instance.
         :param mode_parent: the parent mode object of this input item (gremlin.base_profile.Mode) - required
@@ -397,7 +398,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         import gremlin.shared_state
         import gremlin.joystick_handling
 
-        assert isinstance(mode_object, str) or isinstance(mode_object, gremlin.base_profile.ProfileMode), "Parent parameter must be a string or mode object, cannot be NULL"
+        assert isinstance(mode_object, str) or isinstance(mode_object, gremlin.base_profile.ProfileMode), (
+            "Parent parameter must be a string or mode object, cannot be NULL"
+        )
         if isinstance(mode_object, str):
             # convert to a mode object
             profile = gremlin.shared_state.current_profile
@@ -448,6 +451,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         self.mapping_widget_id = None  # ID of the mapping widget for this input
 
+        self._tooltip = tooltip
+
         # self._profile_mode = None
         self._enabled = True  # enabled flag
         if mode_object is not None:
@@ -472,6 +477,17 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
         el.reload_axis_state.connect(self._handle_axis_state_request)
+
+    def setTooltip(self, tooltip: str):
+        if tooltip != self._tooltip:
+            self._tooltip = tooltip
+            self.tooltipChanged.emit()
+
+    @property
+    def tooltip(self) -> str:
+        """tooltip"""
+        return self._tooltip
+
 
     def setContainers(self, containers: containerModel):
         """sets the container model for this input item"""
@@ -551,7 +567,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         #             mode = mode_object.name
 
         # return mode
-
 
     @property
     def locked(self) -> bool:
@@ -1147,25 +1162,24 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             case InputType.JoystickAxis:
                 device = gremlin.joystick_handling.getDevice(self.device_guid)
                 return f"{device.get_axis_name(self._input_id)}"
-            case  InputType.JoystickButton:
+            case InputType.JoystickButton:
                 return f"Button {self._input_id}"
-            case  InputType.JoystickHat:
+            case InputType.JoystickHat:
                 return f"Hat {self._input_id}"
             case InputType.Keyboard | InputType.KeyboardLatched:
                 return f"Key {self._input_id.display_name}"
-            case  InputType.OpenSoundControl:
+            case InputType.OpenSoundControl:
                 return f"OSC {self._input_id.display_name}"
-            case  InputType.Midi:
+            case InputType.Midi:
                 return f"Midi {self._input_id.display_name}"
-            case  InputType.ModeControl:
+            case InputType.ModeControl:
                 return f"{gremlin.ui.mode_device.ModeInputModeType.to_display_name(self._input_id)}"
-            case  InputType.State:
+            case InputType.State:
                 return f"State: {self._input_id}"
-            case  InputType.OctaviIfr1:
+            case InputType.OctaviIfr1:
                 return f"IFR1: {self._input_id.name}"
             case InputType.ModeControl:
                 return f"ModeControl: {self._input_id}"
-
 
         return f"Unknown input: {self._input_type}"
 
@@ -1335,6 +1349,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._input_id = input_item.input_id
         self._device_guid = input_item.device_guid
         self._input_type = input_item.input_type
+        if input_item and input_item.tooltip:
+            self.setToolTip(input_item.tooltip)
+
+
 
         if hasattr(self._input_id, "input_mode_changed"):
             # hook identifiers that can change mode from axis to button or vice versa so the repeaters match - example OSC or MIDI
@@ -1371,6 +1389,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         if input_item:
             input_item.lockedChanged.connect(self._handle_input_item_lock_changed)
+            input_item.tooltipChanged.connect(self._handle_tooltip_changed)
         else:
             pass
 
@@ -1394,6 +1413,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._title_text_widget.setContentsMargins(0, 0, 0, 0)
         self._title_text_widget.setText("Input not configured")
         self._title_text_widget.setObjectName("title")
+        if input_item and input_item.tooltip:
+            self._title_text_widget.toolTip = input_item.tooltip
 
         self._title_text_container_widget = gremlin.ui.ui_common.getHContainer([self._lock_widget, self._title_text_widget], widget_only=True)
 
@@ -1606,6 +1627,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         self.ensureStyle()
 
+    def setTooltip(self, tooltip: str):
+        """sets the tooltip on the title bar for the input item"""
+        self._title_text_widget.toolTip = tooltip
+
     def addSelectionChangeCallback(self, callback: Callable):
         """adds a callback to be called when selection flag changes passes the (widget)
         :param callback: the callback to add
@@ -1677,6 +1702,13 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
     def _handle_input_item_lock_changed(self, input_item):
         if input_item == self._input_item:
             gremlin.util.InvokeUiMethod(self._handle_input_item_lock_changed_ui, input_item)
+
+    def _handle_tooltip_changed(self):
+        if self.input_item and self.input_item.tooltip:
+            self.setToolTip(self.input_item.tooltip)
+        else:
+            # clear
+            self.setToolTip(None)
 
     def _handle_input_item_lock_changed_ui(self, input_item):
 
@@ -2951,7 +2983,7 @@ class InputItemListView(AbstractView):
             self.addSelectionChangeCallback(selection_changed_handler)
 
         # load data and update
-        self.popSuspended(emit = False)
+        self.popSuspended(emit=False)
 
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""
@@ -8491,7 +8523,7 @@ class ContainerView(AbstractView):
 
         # blank widget - index 0
         self._blank_widget = QtWidgets.QLabel("Please add a container or action.")
-        widget = gremlin.ui.ui_common.getVContainer(self._blank_widget, widget_only=True)
+        widget = gremlin.ui.ui_common.getVContainer([self._blank_widget, gremlin.ui.ui_common.QEmptyWidget()], widget_only=True)
         self._stacked_widget.addWidget(widget)
 
         self._scroll_area = QtWidgets.QScrollArea()
@@ -11171,8 +11203,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.profile.ensure_mode_exists(mode)
         self.device_profile = profile.getDevice(device.device_guid)
 
-
-
         assert isinstance(custom_input_widget_callback, Callable) if custom_input_widget_callback is not None else True, (
             "Invalid custom input widget create callback"
         )
@@ -11214,10 +11244,9 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         # holds the input list on the left side below the header
         self.listview_container = QtWidgets.QStackedWidget()
-        self.listview_container.addWidget(gremlin.ui.ui_common.QEmptyWidget()) # QtWidgets.QLabel("Not loaded"))  # index 0 = blank placeholder
+        self.listview_container.addWidget(gremlin.ui.ui_common.QEmptyWidget())  # QtWidgets.QLabel("Not loaded"))  # index 0 = blank placeholder
 
         self.addLeftPanelWidget(self.listview_container)
-
 
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""
@@ -11256,7 +11285,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def ensureLoaded(self):
         """ensures the device has inputs loaded because the inputs are delay loaded until the tab is visible"""
-        #if self._input_item_list_view is None or self._input_item_list_model is None:
         if gremlin.util.is_ui_thread():
             self._ensureLoaded_ui()
         else:
@@ -11492,6 +11520,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self.listview_container.addWidget(widget)
             self.onInputListViewCreated()
             self.inputItemListView.setModel(self.inputItemListModel)
+            self.inputItemListView._redraw_ui(force=True)
 
     def setLastSelectedIndex(self, value: int):
         self._last_selected_index = value
