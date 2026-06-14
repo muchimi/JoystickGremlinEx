@@ -38,15 +38,7 @@ from frozendict import frozendict
 
 import gremlin.ui.mode_device
 import gremlin.util
-from gremlin.util import (
-    compare_path,
-    read_bool,
-    safe_format,
-    safe_read,
-    write_guid,
-    parse_guid,
-    read_guid,
-)
+from gremlin.util import compare_path, read_bool, safe_format, safe_read, write_guid, parse_guid, read_guid, TriggerDict
 
 from gremlin.input_types import InputType
 import gremlin.types
@@ -148,10 +140,19 @@ class ProfileDevice:
         """device ID a a string"""
         return str(self.device_guid)
 
-    def getMode(self, mode_name):
-        """gets the mode object for the given mode"""
-        if mode_name in self.modes:
-            return self.modes[mode_name]
+    def getModeNode(self, mode: str, autocreate=False):
+        """gets the mode object for the given mode
+        :param mode: the mode name (case sensitive)
+        :param autocreate: flag to autocreate the node if it does not exist
+
+        """
+        if mode in self.modes:
+            return self.modes[mode]
+        if autocreate:
+            mode_node = ProfileMode()
+            self.modes[mode] = mode_node
+            mode_node.load(profile=self, device_guid=self.device_guid, name=mode, parent=self)
+            return mode_node
         return None
 
     def ensure_mode_exists(self, profile: Profile, mode_name: str, device: dinput.DeviceSummary | dinput.GUID = None, is_system=False) -> ProfileMode:  # noqa: F821
@@ -203,6 +204,7 @@ class ProfileDevice:
             mode_node = ProfileMode()
             mode_node.parent = self
             mode_node.from_xml(child, data, extra_data)
+            # add the mode node
             self.modes[mode_node.name] = mode_node
         pass
 
@@ -627,7 +629,7 @@ class AbstractContainerAction(AbstractAction):
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        input_item = InputItem(mode_object=self)
+        input_item = InputItem(mode_node=self)
         self.item_data = input_item
         registry = gremlin.shared_state.current_profile.registry
         registry.registerInputItem(input_item)
@@ -1928,11 +1930,12 @@ class ProfileRegistry:
         override_input_type: InputType = None,
         custom_name_handler: Callable = None,
         custom_mode_name_handler: Callable = None,
-        autocreate: bool = False,
-        create_handler: Callable = None,
         description: str = None,
         description_readonly: bool = None,
-        tooltip : str = None,
+        tooltip: str = None,
+        autocreate: bool = False,
+        create_handler: Callable = None,
+        created_handler: Callable = None,
     ):
         """
         Gets the input item - creates it if it does not exist
@@ -1944,106 +1947,111 @@ class ProfileRegistry:
         :param input_id: id of input
         :param custom_name_handler: optional handler for new inputs
         :param custom_mode_name_handler: optional handler for new inputs
-        :param create_handler: optional handler called when the input is created (if created)
+        :param create_handler: optional handler called if the input should be created, returns an input_item, gets all the parameters except the create options
+        :param created_handler: optional handler called when the input is created (if created)
         :param description: optional description
         :param description_readonly: flag to indicate if description can be user edite, passes the created input item (input_item) as the parameter
         :param tooltip: tooltip associated with the input item (on title bar) if the input is created
+        :param create_handler: optional callback if the item does not exist, should return an input item.  Parameters passed are the same but without auto-create and the create handler
         """
         verbose = gremlin.config.Configuration().verbose_mode_inputitems
         device_guid = gremlin.util.parse_guid(device_guid)
         assert isinstance(device_guid, dinput.GUID), "invalid id"
         input_item = self._profile.getInputItem(device_guid, mode_name, input_type, input_id)
 
+        # device node
+        profile = self._profile
+        device_node: ProfileDevice = profile.getDeviceNode(device_guid, autocreate=True)
+        assert device_node is not None, "device node not found in profile"
+
         if input_item is None and autocreate:
-            profile = self._profile
-            device_node: ProfileDevice = profile.getDevice(device_guid)
-            if not device_node:
-                # create a device
-                device_node = ProfileDevice(profile)
-                device_node.device_guid = device_guid
-                device_node.device_type = device_type
-                profile.devices[device_guid] = device_node
-
-            assert device_node is not None, "device node not found in profile"
-            assert device_node in self._profile.devices.values(),"device node not found in profile devices"
-
-            mode_object = device_node.getMode(mode_name)
-            if not mode_object:
-                # create a mode
-                mode_object = ProfileMode()
-                device_node.modes[mode_name] = mode_object
-                mode_object.load(profile=self._profile, device_guid=device_node.device_guid, name=mode_name, inherit=True, parent=device_node)
-
-            if mode_name not in device_node.modes:
-                device_node.modes[mode_name] = mode_object
-
-            assert mode_object is not None, "mode object not found in profile"
+            # not found
+            mode_node = device_node.getModeNode(mode_name, autocreate=True)
+            assert mode_node is not None, "mode node not found in profile"
             assert mode_name in device_node.modes, "mode not found in device modes"
 
-            match input_type:
-                case InputType.State:
-                    input_item = gremlin.ui.state_device.StateInputItem(key=input_id)
+            if create_handler:
+                input_item = create_handler(device_guid = device_guid,
+                                            device_type = device_type,
+                                            mode_name = mode_name,
+                                            input_type = input_type,
+                                            input_id = input_id,
+                                            description = description,
+                                            tooltip = tooltip)
+                assert isinstance(input_item, InputItem), "invalid input item on custom callback"
+                mode_config = mode_node.getConfig(input_item.input_type)
+                assert mode_config is not None, f"failed to create mode config for mode [{input_type}]"
+                mode_config[input_item.input_id] = input_item
 
-                case InputType.Keyboard | InputType.KeyboardLatched:
-                    input_item = gremlin.ui.keyboard_device.KeyboardInputItem(mode_object)
-                    input_item.key = input_id
-                    if custom_name_handler:
-                        input_item.setInputNameHandler(custom_name_handler)
+            else:
+                if not mode_node:
+                    # create a mode
+                    mode_node = ProfileMode()
+                    device_node.modes[mode_name] = mode_node
+                    mode_node.load(profile=self._profile, device_guid=device_node.device_guid, name=mode_name, inherit=True, parent=device_node)
 
-                case InputType.OpenSoundControl:
-                    input_item = gremlin.ui.osc_device.OscInputItem(mode_object)
-                    if override_input_type:
-                        input_item.setOverrideInputType(override_input_type)
-                case InputType.Midi:
-                    input_item = gremlin.ui.midi_device.MidiInputItem(mode_object)
-                    if override_input_type:
-                        input_item.setOverrideInputType(override_input_type)
+                if mode_name not in device_node.modes:
+                    device_node.modes[mode_name] = mode_node
 
-                case InputType.ModeControl:
-                    input_item = gremlin.ui.mode_device.ModeInputItem(mode_object)
-                    if override_input_type:
-                        input_item.setOverrideInputType(override_input_type)
+                match input_type:
+                    case InputType.State:
+                        input_item = gremlin.ui.state_device.StateInputItem(key=input_id)
 
-                case _:
-                    input_item = InputItem(
-                        mode_object=mode_object,
-                        device_guid=device_guid,
-                        override_input_type=override_input_type,
-                        custom_name_handler=custom_name_handler,
-                        custom_mode_name_handler=custom_mode_name_handler,
-                    )
-                    input_item.setSortCallback(self._handle_joystick_sort)
+                    case InputType.Keyboard | InputType.KeyboardLatched:
+                        input_item = gremlin.ui.keyboard_device.KeyboardInputItem(mode_node)
+                        input_item.key = input_id
+                        if custom_name_handler:
+                            input_item.setInputNameHandler(custom_name_handler)
 
-            input_item.setInputType(input_type)
-            input_item.setInputId(input_id)
-            if description is not None:
-                input_item.description = description
-            if description_readonly is not None:
-                input_item.descriptionReadOnly = description_readonly
-            if tooltip:
-                input_item.setTooltip(tooltip)
+                    case InputType.OpenSoundControl:
+                        input_item = gremlin.ui.osc_device.OscInputItem(mode_node)
+                        if override_input_type:
+                            input_item.setOverrideInputType(override_input_type)
+                    case InputType.Midi:
+                        input_item = gremlin.ui.midi_device.MidiInputItem(mode_node)
+                        if override_input_type:
+                            input_item.setOverrideInputType(override_input_type)
 
-            self._profile.registerInputItem(input_item)
+                    case InputType.ModeControl:
+                        raise ValueError("mode control cannot be autocreated - use create handler")
 
-            if __debug__:
-                config_map = self._profile.devices[device_node.device_guid].modes[mode_object.name].config
-                assert input_item.input_type in config_map,"input type not found in mode configuration map"
-                assert input_item.input_id in config_map[input_item.input_type],"input id not found in configuration map"
-                assert input_item == config_map[input_item.input_type][input_item.input_id],"input item not found in configuration map"
+                    case _:
+                        input_item = InputItem(
+                            mode_node=mode_node,
+                            device_guid=device_guid,
+                            override_input_type=override_input_type,
+                            custom_name_handler=custom_name_handler,
+                            custom_mode_name_handler=custom_mode_name_handler,
+                        )
+                        input_item.setSortCallback(self._handle_joystick_sort)
 
+                input_item.setInputType(input_type)
+                input_item.setInputId(input_id)
+                if description is not None:
+                    input_item.description = description
+                if description_readonly is not None:
+                    input_item.descriptionReadOnly = description_readonly
+                if tooltip:
+                    input_item.setTooltip(tooltip)
+
+                self._profile.registerInputItem(input_item)
+
+            if __debug__ and mode_node:
+                config_map = mode_node.config
+                assert input_item.input_type in config_map, "input type not found in mode configuration map"
+                assert input_item.input_id in config_map[input_item.input_type], "input id not found in configuration map"
+                assert input_item == config_map[input_item.input_type][input_item.input_id], "input item not found in configuration map"
 
             # run the callback
-            if create_handler:
-                create_handler(input_item)
+            if created_handler:
+                created_handler(input_item)
 
-            if verbose:
-                syslog.info(f"REGISTRY GET INPUT ITEM [{input_item.display_name}] : register new input item:")
-                syslog.info(f"\tid: {input_item.id}")
-                syslog.info(f"\tinput mode: {input_item.profile_mode}")
-                syslog.info(f"\tinput type: {input_item.input_type.name}")
-                syslog.info(f"\tinput id: {str(input_item.input_id)}")
-
-
+        if verbose:
+            syslog.info(f"REGISTRY GET INPUT ITEM [{input_item.display_name}] : register new input item:")
+            syslog.info(f"\tid: {input_item.id}")
+            syslog.info(f"\tinput mode: {input_item.profile_mode}")
+            syslog.info(f"\tinput type: {input_item.input_type.name}")
+            syslog.info(f"\tinput id: {str(input_item.input_id)}")
 
         return input_item
 
@@ -2298,29 +2306,8 @@ class Profile:
         device = gremlin.joystick_handling.getDevice(device_guid)
 
         verbose = gremlin.config.Configuration().verbose_mode_ui
-
-        devices = self.devices
-        if device_guid not in devices:
-            if not autocreate:
-                raise ValueError(f"missing device node for: [{device.name}] [{device.device_id}]")
-            device_node = ProfileDevice(self)
-            device_node.device_guid = device_guid
-            device_node.name = device.name
-            self.devices[device_guid] = device_node
-        else:
-            device_node = self.devices[device_guid]
-
-        input_mode = input_item.profile_mode
-
-        if input_mode not in device_node.modes:
-            if not autocreate:
-                raise ValueError(f"missing mode node for mode: [{input_mode}]")
-            mode_node = ProfileMode()
-            device_node.modes[input_mode] = mode_node
-            mode_node.load(profile=self, device_guid=device_node.device_guid, name=input_mode, parent=device_node)
-
-        else:
-            mode_node = device_node.modes[input_mode]
+        mode_name = input_item.profile_mode
+        mode_node = self.getModeNode(device_guid, mode_name, autocreate=True)
 
         if input_type not in mode_node.config:
             mode_node.config[input_type] = {}
@@ -2328,7 +2315,7 @@ class Profile:
         input_id_key = self.getInputIdKey(input_id)
         mode_node.config[input_type][input_id_key] = input_item
         if verbose:
-            syslog.info(f"Profile: registered input: mode [{input_mode}] [{device.name}] [{input_item.display_name}]")
+            syslog.info(f"Profile: registered input: mode [{mode_name}] [{device.name}] [{input_item.display_name}]")
 
     def getInputItem(self, device_guid, mode, input_type, input_id):
         """gets an input item from the profile model data"""
@@ -2340,35 +2327,13 @@ class Profile:
 
         # ensure joystick inputs exist in the model
         self.ensureInputItems(device_guid)
-        devices = self.devices
-        if device_guid in devices:
-            device_node = devices[device_guid]
-            if mode in device_node.modes:
-                mode_node = device_node.modes[mode]
-                if input_type in mode_node.config:
-                    input_id_key = self.getInputIdKey(input_id)
-                    if input_id_key in mode_node.config[input_type]:
-                        input_item = mode_node.config[input_type][input_id_key]
-                        # if not input_item:
-                        #     # delay load it the item by creating it now
-                        #     match input_type:
-                        #         case InputType.State:
-                        #             input_item = gremlin.ui.state_device.StateInputItem()
-                        #         case InputType.Keyboard | InputType.KeyboardLatched:
-                        #             input_item = gremlin.ui.keyboard_device.KeyboardInputItem(self)
-                        #         case InputType.OpenSoundControl:
-                        #             input_item = gremlin.ui.osc_device.OscInputItem(self)
-                        #         case InputType.Midi:
-                        #             input_item = gremlin.ui.midi_device.MidiInputItem(self)
-                        #         case _:
-                        #             input_item = InputItem(mode_object=self, device_guid=device_guid)
-
-                        #     input_item.setInputId(input_id)
-                        #     input_item.setInputType(input_type)
-                        #     input_item.setDeviceType(device.device_type)
-                        #     input_item.device_guid = device_guid
-                        #     mode_node.config[input_type][input_id_key] = input_item
-                        return input_item
+        mode_node = self.getModeNode(device_guid, mode)
+        if mode_node:
+            if input_type in mode_node.config:
+                input_id_key = self.getInputIdKey(input_id)
+                if input_id_key in mode_node.config[input_type]:
+                    input_item = mode_node.config[input_type][input_id_key]
+                    return input_item
         return None
 
     def setFilterDefaults(self, device_guid: dinput.GUID, force=False):
@@ -2410,6 +2375,7 @@ class Profile:
                             if input_type not in mode_node.config:
                                 mode_node.config[input_type] = {}
 
+                            input_id_list = None
                             match input_type:
                                 case InputType.JoystickAxis:
                                     input_id_list = device.getAxisInputIdList()
@@ -2417,9 +2383,11 @@ class Profile:
                                     input_id_list = range(1, device.hat_count + 1)
                                 case InputType.JoystickButton:
                                     input_id_list = range(1, device.button_count + 1)
-                            for input_id in input_id_list:
-                                if input_id not in mode_node.config[input_type]:
-                                    mode_node.config[input_type][input_id] = None  # delay load but define the input id
+
+                            if input_id_list:
+                                for input_id in input_id_list:
+                                    if input_id not in mode_node.config[input_type]:
+                                        mode_node.config[input_type][input_id] = None  # delay load but define the input id
 
                 # mark loaded
                 self._joystick_inputs_loaded[device_guid] = True
@@ -2446,12 +2414,24 @@ class Profile:
                         for input_id in mode_node.config[input_type]:
                             input_item = mode_node.config[input_type][input_id]
                             if not input_item:
-                                # delay load it
-                                input_item = InputItem(mode_node)
+                                # create delay loaded inputs
+                                match input_type:
+                                    case InputType.State:
+                                        input_item = gremlin.ui.state_device.StateInputItem()
+                                    case InputType.Keyboard | InputType.KeyboardLatched:
+                                        input_item = gremlin.ui.keyboard_device.KeyboardInputItem(self)
+                                    case InputType.OpenSoundControl:
+                                        input_item = gremlin.ui.osc_device.OscInputItem(self)
+                                    case InputType.Midi:
+                                        input_item = gremlin.ui.midi_device.MidiInputItem(self)
+                                    case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
+                                        input_item = InputItem(mode_node=mode_node, input_type=input_type)
+                                    case InputType.ModeControl:
+                                        input_item = gremlin.ui.mode_device.ModeInputItem(self)
+                                    case _:
+                                        raise ValueError(f"don't know how to handle input type: [{input_type}]")
+
                                 input_item.setInputId(input_id)
-                                input_item.setInputType(input_type)
-                                input_item.setDeviceType(device.device_type)
-                                input_item.device_guid = device_guid
                                 mode_node.config[input_type][input_id] = input_item
                             input_list.append(input_item)
         return input_list
@@ -3490,8 +3470,8 @@ class Profile:
 
         return True
 
-    def getDevice(self, device_guid, autocreate=False) -> ProfileDevice:
-        """gets a device entry for this profile
+    def getDeviceNode(self, device_guid, autocreate=False) -> ProfileDevice:
+        """gets a device node for this profile
         :param device_guid: the guid of the device to get a device profile for
         :param autocreate: autocreate the entry if it does not exist in the current profile and the device exists/is connected
         :returns: the device object, or None if does not exist
@@ -3509,6 +3489,30 @@ class Profile:
             return None
 
         return self.devices[device_guid]
+
+    def getModeNode(self, device_guid, mode: str, autocreate=False):
+        """gets a mode node
+        :param device_guid: id of the device containing the mode node
+        :param mode: the mode name (case sensitive)
+        :param autocreate: flag to autocreate the node if it does not exist
+        """
+        device_node = self.getDeviceNode(device_guid, autocreate)
+        if device_node:
+            return device_node.getModeNode(mode, autocreate)
+        return None
+
+    def getModeNodeConfig(self, device_guid, mode: str, input_type: InputType, input_id, autocreate=False):
+        """gets the configuration for the given mode"""
+        device_node = self.getDeviceNode(device_guid, autocreate)
+        if device_node:
+            mode_node = device_node.getModeNode(mode, autocreate)
+            if mode_node:
+                mode_config = mode_node.getConfig(input_type, autocreate)
+                if mode_config is not None:
+                    if input_id in mode_config:
+                        return mode_config[input_id]
+                    mode_config[input_id] = None
+                    return mode_config[input_id]
 
     def is_mode(self, mode) -> bool:
         """true if the mode exists in the current profile"""
@@ -4838,7 +4842,7 @@ class ProfileMode:
     ]
 
     def __init__(self):
-        self._config = {}  # holds a map of input id keys keyed by input type
+        self._config = self.getConfigMap()
         self.id = gremlin.util.get_guid()
         self.parent = None
 
@@ -4847,6 +4851,7 @@ class ProfileMode:
         assert isinstance(device_guid, dinput.GUID), "invalid id"
         assert isinstance(inherit, str) if inherit is not None else True, "invalid inherit mode"
         self._name = name
+        self._config.setName(f"{name}")
         self.inherit = inherit
         self.inherit = inherit  # name of the mode we inherit properties from
         self._name = name  # name of the current mode
@@ -4864,12 +4869,43 @@ class ProfileMode:
                 )
                 self.parent = profile.devices[device_guid]
 
+    def getInputItemMap(self, name : str = None) -> TriggerDict:
+        new_map = TriggerDict(name)
+        new_map.addCallback(self._handle_input_added)
+        return new_map
+
+    def getConfigMap(self, name : str = None) -> TriggerDict:
+        new_map = TriggerDict(name)
+        new_map.addCallback(self._handle_config_added)
+        return new_map
+
+    def _handle_input_added(self, data_map: TriggerDict, key, old_item: InputItem, new_item: InputItem):
+        if key is None:
+            pass
+        syslog.info(f"add/remove input item: [{data_map.name}] key: [{key}] new: [{new_item}]  old [{old_item}]")
+        pass
+
+    def _handle_config_added(self, data_map: TriggerDict, key, old_item, new_item):
+        if key is None:
+            pass
+        syslog.info(f"add/remove config item: [{data_map.name}] key: [{key}] new: [{new_item}]  old [{old_item}]")
+        pass
+
+    def getConfig(self, input_type: InputType, autocreate=False) -> dict:
+        """gets the configuration list for a given input type"""
+        if input_type in self._config:
+            return self.config[input_type]
+        if autocreate:
+            self._config[input_type] = self.getInputItemMap(name = f"{self.name}/{input_type.name}")
+            return self._config[input_type]
+        return None
+
     @property
     def profile(self) -> Profile:
         return self.parent.profile
 
     @property
-    def config(self) -> dict:
+    def config(self) -> TriggerDict:
         return self._config
 
     @property
@@ -4935,6 +4971,7 @@ class ProfileMode:
         import gremlin.ui.midi_device
         import gremlin.ui.osc_device
         import gremlin.joystick_handling
+        import gremlin.ui.mode_device
 
         verbose = gremlin.config.Configuration().verbose_mode_ui
 
@@ -4987,8 +5024,11 @@ class ProfileMode:
                     case InputType.Midi:
                         item = gremlin.ui.midi_device.MidiInputItem(self)
                     case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
-                        item = InputItem(mode_object=self, device_guid=self.parent.device_guid)
-                        item.input_type = input_type
+                        item = InputItem(mode_node=self, input_type=input_type)
+                    case InputType.ModeControl:
+
+                        item = gremlin.ui.mode_device.ModeInputItem(self)
+
                     case _:
                         assert False, f"unhandled input type - got [{input_type}] - offending line: [{child.sourceline}]"
 
@@ -4998,24 +5038,18 @@ class ProfileMode:
 
                 item.from_xml(child, item, extra_data)  # send owner item to sub components as the data member
 
-                # input_item = registry.getInputItem(
-                #     device_guid=device_guid,
-                #     device_type=self.device_type,
-                #     mode_name=mode_name,
-                #     input_type=item.input_type,
-                #     input_id=item.input_id,
-                #     autocreate=False,
-                # )
+                assert item.input_id is not None, "XML: invalid input id on load"
 
                 input_id_key = registry.getInputIdKey(item.input_id)
                 if input_type not in self.config:
-                    self.config[input_type] = {}
+                    self.config[input_type] = self.getInputItemMap(name = f"{mode_name}/{input_type.name}")
 
                 input_item = None
 
                 if input_id_key in self.config[input_type]:
                     input_item = self.config[input_type][input_id_key]
                     if input_item is not None:
+                        input_item.input_id = item.input_id  # sync ids
                         input_item.setContainers(item.containers)
 
                 if input_item is None:

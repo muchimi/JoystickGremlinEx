@@ -2196,7 +2196,7 @@ class OscInputItem(gremlin.input_item.InputItem):
             return self.value < other.value
 
     def __init__(self, mode_object: gremlin.base_profile.ProfileMode = None):
-        super().__init__(mode_object, device_guid=OscDeviceTabWidget.device_guid)  # parent is the mode object this input belongs to
+        super().__init__(mode_object, device_guid=OscDeviceTabWidget.device_guid, input_type = InputType.OpenSoundControl)  # parent is the mode object this input belongs to
 
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_osc
@@ -2209,8 +2209,6 @@ class OscInputItem(gremlin.input_item.InputItem):
         self._title_name = "OSC (not configured)"
         self._display_name = ""
         self._display_tooltip = "Input configuration not set"
-
-        self._input_type = InputType.OpenSoundControl
         self._message_key = None
         self._source_index = 0  # OSC parameter source index - used for multi-argument data
         self.setMessageKey(self._guid)

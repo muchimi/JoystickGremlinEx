@@ -188,7 +188,7 @@ class MidiInputItem(gremlin.input_item.InputItem):
             return "Button"
 
     def __init__(self, parent=None):
-        super().__init__(mode_object=parent, device_guid=MidiDeviceTabWidget.device_guid)  # parent is the mode object this input belongs to
+        super().__init__(mode_object=parent, device_guid=MidiDeviceTabWidget.device_guid, input_type = InputType.Midi)  # parent is the mode object this input belongs to
 
         self._port_name = None
         self._message = None  # the midi message
@@ -198,7 +198,6 @@ class MidiInputItem(gremlin.input_item.InputItem):
         self._command = None  # decoded command
         self._message_key = self._guid  # key for this message category
         self._mode = MidiInputItem.InputMode.Button  # mode is button or axis
-        self._input_type = InputType.Midi
         current_mode = gremlin.shared_state.current_mode
         tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
         tracker.registerWidget(

@@ -390,10 +390,9 @@ class StateInputItem(gremlin.input_item.InputItem):
             DeviceType.to_string(DeviceType.State),
         )
 
-        mode_object = device_modes.ensure_mode_exists(profile = profile, mode_name = master_mode, device = device)
-        self._key = key # ok if None (blank)
-        super().__init__(mode_object=mode_object, device_guid=StateDeviceTabWidget.device_guid)
-        self.input_type = InputType.State
+        mode_object = device_modes.ensure_mode_exists(profile=profile, mode_name=master_mode, device=device)
+        self._key = key  # ok if None (blank)
+        super().__init__(mode_node=mode_object, device_guid=StateDeviceTabWidget.device_guid, input_type=InputType.State, input_id = key)
         self._category = category  # category (StateCategory)
         self._default_value = default_value
         self._last_value = None
@@ -2728,7 +2727,6 @@ class StateInputItemModel(gremlin.input_item.InputItemListModel):
         )
 
 
-
 class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     """Widget used to configure state change actions"""
 
@@ -2939,6 +2937,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             sd.remove(key)
             self._load_handler(model, emit_change)
             self._filter_widget.updateCounts()
+
     def _filter_data(self, input_item) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
         import fnmatch
@@ -2960,7 +2959,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """called when list view is created"""
         self.inputItemListView.item_edit.connect(self._edit_item_cb)
         self.inputItemListView.item_closed.connect(self._close_item_cb)
-
 
     def onInputListViewRemoved(self):
         """called when list view is removed"""
@@ -3032,7 +3030,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """called when the state category filter is changed"""
         self._category_filter = category
         self.refresh()
-
 
     def _filter_changed(self, filter):
         """called when the filter changes"""
@@ -3183,7 +3180,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         self._blank_input()
 
-
     def display_name(self, input_id):
         """returns the name for the given input ID"""
         return input_id.display_name
@@ -3232,7 +3228,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         assert isinstance(data, StateInputItem), f"Unexpected type in widget handler - expected StateInputItem and got [{type(data).__name__}]"
 
         widget = InputItemWidget(
-            input_item = identifier.input_item,
+            input_item=identifier.input_item,
             identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,

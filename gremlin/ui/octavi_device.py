@@ -654,8 +654,8 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # Store parameters
         self.profile = profile
         profile.ensure_mode_exists(mode)
-        self.device_profile = profile.getDevice(self.device_guid, autocreate=True)
-        self.device_profile.ensure_mode_exists(profile = profile, mode_name = mode, device = self.device_guid)
+        self.device_profile = profile.getDeviceNode(self.device_guid, autocreate=True)
+        self.device_profile.ensure_mode_exists(profile=profile, mode_name=mode, device=self.device_guid)
         self.widget_storage = {}
 
         # List of inputs
@@ -765,7 +765,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         """
         current_mode = gremlin.shared_state.edit_mode
-        mode_object = self.device_profile.ensure_mode_exists(profile = self.profile, mode_name = current_mode, device = self.device_guid)
+        mode_object = self.device_profile.ensure_mode_exists(profile=self.profile, mode_name=current_mode, device=self.device_guid)
         config = mode_object.config
 
         changed = False
@@ -805,7 +805,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         import gremlin.input_item
 
         widget = gremlin.input_item.InputItemWidget(
-            input_item = identifier.input_item,
+            input_item=identifier.input_item,
             identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,
@@ -931,7 +931,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def set_mode(self, mode):
         """changes the mode of the tab"""
         self.current_mode = mode
-        self.device_profile.ensure_mode_exists(profile = self.profile, mode_name = self.current_mode, device = self.device_guid)
+        self.device_profile.ensure_mode_exists(profile=self.profile, mode_name=self.current_mode, device=self.device_guid)
         self.inputItemListModel.mode = mode
 
         # self.inputItemListView.select_item(-1)

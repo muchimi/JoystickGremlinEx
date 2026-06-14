@@ -144,6 +144,8 @@ class InputIdentifier(QtCore.QObject):
 
     @input_id.setter
     def input_id(self, value):
+        if self._input_id_callback is not None:
+            raise ValueError("cannot set input id in callback mode")
         self._input_id = value
 
     @property
@@ -377,49 +379,64 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     """Represents a single input item such as a button or axis, containers and parameters/options associated with that input mapping"""
 
     lockedChanged = Signal(object)  # (input_item) fires when the lock state changes - passes the input item as the parameter
-    tooltipChanged = QtCore.Signal() # fires when the tooltip changes
+    tooltipChanged = QtCore.Signal()  # fires when the tooltip changes
 
     def __init__(
         self,
-        mode_object,  # str or profile mode object
+        mode_node,  # str or profile mode object
+        input_type: InputType, # must be provided
+        input_id = None, #
         custom_name_handler: Callable = None,
         custom_mode_name_handler: Callable = None,
         override_input_type=None,
         device_guid: dinput.GUID | uuid.UUID | str = None,  # noqa: F405,
-        tooltip : str = None
+        description: str = None,
+        description_readonly: bool = None,
+        tooltip: str = None,
     ):
         """Creates a new InputItem instance.
-        :param mode_parent: the parent mode object of this input item (gremlin.base_profile.Mode) - required
+        :param mode_node: profile mode node
+        :param input_type : input type of the input item
+        :param input_id : input id of the input item
         :param custom_name_handler: handler() returns a string, whenever the input name is needed
         :param custom_mode_name_handler: handler() returns a string, optional, to override the default mode for special inputs that use special modes
+        :param description: optional description text
+        :param description_readonly: optional flag to indicate if the description of the input can be user edited
+        :param tooltip: optional tooltip text
 
         """
         import gremlin.base_profile
         import gremlin.shared_state
         import gremlin.joystick_handling
 
-        assert isinstance(mode_object, str) or isinstance(mode_object, gremlin.base_profile.ProfileMode), (
+        assert isinstance(mode_node, str) or isinstance(mode_node, gremlin.base_profile.ProfileMode), (
             "Parent parameter must be a string or mode object, cannot be NULL"
         )
-        if isinstance(mode_object, str):
+        if isinstance(mode_node, str):
             # convert to a mode object
             profile = gremlin.shared_state.current_profile
-            mode_object = profile.get_mode_object(mode_object)
+            mode_node = profile.get_mode_object(mode_node)
 
         if not device_guid:
             # grab the device from the mode object
-            device_guid = mode_object.parent.device_guid
+            device_guid = mode_node.parent.device_guid
 
         assert device_guid is not None, "invalid device guid provided"
 
+        assert input_type is not None, "input type must be provided"
+
+
         import gremlin.joystick_handling
 
-        super().__init__(mode_object.name, None)
+        super().__init__(mode_node.name, None)
 
-        self.parent = mode_object  # mode object
+        self.parent = mode_node  # mode object
 
         self._input_item_generating_xml = False  # xml nesting level
         self._override_input_type = override_input_type  # override input type for some types that are different
+
+        self._input_type = input_type
+        self._input_id = input_id
 
         device = gremlin.joystick_handling.getDevice(device_guid)
         self._device_guid = device.device_guid if device else None  # hardware input ID
@@ -452,12 +469,16 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self.mapping_widget_id = None  # ID of the mapping widget for this input
 
         self._tooltip = tooltip
+        if description is not None:
+            self._description = description
+        if description_readonly is not None:
+            self._description_readonly = description_readonly
 
         # self._profile_mode = None
         self._enabled = True  # enabled flag
-        if mode_object is not None:
+        if mode_node is not None:
             # find the missing properties from the parenting hierarchy
-            item = mode_object
+            item = mode_node
             while True:
                 # if isinstance(item, Mode):
                 #    self._profile_mode = item.name
@@ -487,7 +508,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def tooltip(self) -> str:
         """tooltip"""
         return self._tooltip
-
 
     def setContainers(self, containers: containerModel):
         """sets the container model for this input item"""
@@ -548,25 +568,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def profile_mode(self) -> str:
         """gets the mode object"""
         return self.parent.name
-        # mode = None
-        # if self._input_type == InputType.ModeControl:
-        #     if self._input_id in (
-        #         gremlin.ui.mode_device.ModeInputModeType.ModeProfileLoad,
-        #         gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
-        #         gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
-        #     ):
-        #         mode = gremlin.shared_state.master_mode
-        # elif self._input_type == InputType.State:
-        #     mode = gremlin.shared_state.master_mode
-        # if not mode:
-        #     if self._profile_mode_callback:
-        #         mode = self._profile_mode_callback(self)
-        #     else:
-        #         mode_object = self.parent
-        #         if mode_object:
-        #             mode = mode_object.name
 
-        # return mode
 
     @property
     def locked(self) -> bool:
@@ -972,10 +974,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             else:
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
 
-    def from_xml(self, node, data, extra_data=None, skip_root=False):
+    def from_xml(self, node, data, extra_data: dict = None, skip_root=False):
         """Parses an InputItem node.
 
-        :param node XML node to parse
+        :param node: xml element node to parse
+        :param data: data object (context sensitive)
+        :param extra_data: map object (context sensitive)
+        :param skip_root: true if the child node should be processed only for containers (subclass dependent)
         """
 
         # assert data is not None, "InputItem must be provided"
@@ -1000,14 +1005,14 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             else:
                 self._locked = False
 
-            if self.input_type == InputType.ModeControl:
-                # mode control entries - input id is the only item we need
-                self.is_axis = False
-                self.input_id = gremlin.ui.mode_device.ModeInputModeType(safe_read(node, "id", int, 0))
-                self.setOverrideInputType(InputType.JoystickButton)
-                self.descriptionReadOnly = True
+            # if self.input_type == InputType.ModeControl:
+            #     # mode control entries - input id is the only item we need
+            #     self.is_axis = False
+            #     self.input_id = gremlin.ui.mode_device.ModeInputModeType(safe_read(node, "id", int, 0))
+            #     self.setOverrideInputType(InputType.JoystickButton)
+            #     self.descriptionReadOnly = True
 
-            elif self.input_type == InputType.JoystickAxis:
+            if self.input_type == InputType.JoystickAxis:
                 # check for curve data
                 for child in node:
                     if _is_curve_tag(child.tag):
@@ -1155,9 +1160,12 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     @property
     def display_name(self):
+        """gets a display name for this input"""
         if self.is_action:
             return "this action"
-        """ gets a display name for this input """
+        if self._input_id is None:
+            return f"{self._input_type.name}"
+
         match self._input_type:
             case InputType.JoystickAxis:
                 device = gremlin.joystick_handling.getDevice(self.device_guid)
@@ -1351,8 +1359,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._input_type = input_item.input_type
         if input_item and input_item.tooltip:
             self.setToolTip(input_item.tooltip)
-
-
 
         if hasattr(self._input_id, "input_mode_changed"):
             # hook identifiers that can change mode from axis to button or vice versa so the repeaters match - example OSC or MIDI
@@ -2585,7 +2591,7 @@ class InputItemListModel(AbstractCallbackModel):
 
         self._device_guid = device_guid
         self._profile = profile
-        self._device_data = profile.getDevice(device_guid)
+        self._device_data = profile.getDeviceNode(device_guid)
         device = gremlin.joystick_handling.getDevice(device_guid)
         assert device is not None, "invalid device"
         if device.device_type == DeviceType.Joystick:
@@ -8754,6 +8760,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
         assert isinstance(input_item, InputItem), "invalid input type"
+        assert input_item.input_id is not None,"invalid input id on input item"
         assert input_item.input_type is not None, "input type cannot be derived be specified"
 
         if not input_type:
@@ -11201,7 +11208,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.device = device
         self.profile = profile
         self.profile.ensure_mode_exists(mode)
-        self.device_profile = profile.getDevice(device.device_guid)
+        self.device_profile = profile.getDeviceNode(device.device_guid)
 
         assert isinstance(custom_input_widget_callback, Callable) if custom_input_widget_callback is not None else True, (
             "Invalid custom input widget create callback"

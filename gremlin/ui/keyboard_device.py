@@ -52,12 +52,12 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
         super().__init__(
             mode_object,
             device_guid=KeyboardDeviceTabWidget.device_guid,
+            input_type = InputType.KeyboardLatched
         )
 
         self._title_name = "Keyboard input (not configured)"
 
         self._display_tooltip = None
-        self.input_type = InputType.KeyboardLatched
         self._suspend_update = False
         self.setInputIdCallback(self._handle_input_id_callback)
         self.setSortCallback(self._handle_get_sort_key)

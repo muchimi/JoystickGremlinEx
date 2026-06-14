@@ -2803,12 +2803,13 @@ def timeit(callback, *args, **kwargs):
 class TriggerDict(collections.UserDict):
     """hashable dict that fires callbacks when data is changed"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name : str = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._on_change_callbacks = []
         self.id = uuid.uuid4()  # unique ID of this dict
         self._suspend_stack = 0
         self._callback_pending = False
+        self._name = name if name else "TriggerDict"
 
     @staticmethod
     def copyFrom(source : dict):
@@ -2817,8 +2818,12 @@ class TriggerDict(collections.UserDict):
             target[key] = item
         return target
 
+    @property
+    def name(self) -> str:
+        return self._name
 
-
+    def setName(self, name : str):
+        self._name = name
 
 
     def pushSuspend(self):

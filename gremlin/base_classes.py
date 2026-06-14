@@ -284,6 +284,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
             assert device is not None, "device does not exist"
             self._device_type = device.device_type
         self._input_id: int | any = None  # input Id on the hardware (can be a int or a class)
+        self._input_id_readonly : bool = False # true if the input id cannot be changed
         self._input_type: InputType = InputType.NotSet
         self._display_name: str = None
         self._description: str = None
@@ -307,6 +308,9 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         if callback is not None:
             assert callable(callback), "Callback must be a callable method"
         self._input_id_callback = callback
+
+    def setInputIdReadOnly(self, value: bool):
+        self._input_id_readonly = value
 
     @property
     def descriptionReadOnly(self) -> bool:
@@ -437,6 +441,10 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self.setInputId(value)
 
     def setInputId(self, value):
+        if self._input_id_readonly:
+            raise ValueError("Input id is readonly")
+        if self._input_id_callback:
+            raise ValueError("Input id is readonly (callback)")
         if __debug__ and self._device_guid:
             from gremlin.types import DeviceType
 
