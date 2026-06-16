@@ -432,11 +432,14 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         super().__init__(mode_node.name, None)
 
+
+
         # if input_type == InputType.ModeControl:
         #     syslog.info(f"create input item id: [{self.id}]")
         #     pass
 
         self.parent = mode_node  # mode object
+
 
         self._input_item_generating_xml = False  # xml nesting level
         self._override_input_type = override_input_type  # override input type for some types that are different
@@ -8533,8 +8536,7 @@ class ContainerModel(AbstractCallbackModel):
         self.remove(container)
 
     def onItemChanged(self, model: ContainerModel, index: int, new_value: AbstractContainer, old_value: AbstractContainer, operation: str):
-        verbose = gremlin.config.Configuration().verbose_mode_ui
-        verbose = True
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(
                 f"ContainerModel: container changed: operation: [{operation}] new: [{new_value.display_name if new_value else 'n/a'}]  old: [{old_value.display_name if old_value else 'n/a'}]"
@@ -11260,7 +11262,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.device = device
         self.profile = profile
-        self.device_profile = profile.getDeviceNode(device.device_guid)
+        self.device_node = profile.getDeviceNode(device.device_guid)
 
         assert isinstance(custom_input_widget_callback, Callable) if custom_input_widget_callback is not None else True, (
             "Invalid custom input widget create callback"

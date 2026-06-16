@@ -105,6 +105,13 @@ def clearStackedWidget(stacked_widget: QtWidgets.QStackedWidget):
         widget.hide()
         widget.deleteLater()
 
+class Ansi:
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    ORANGE = "\033[38;5;208m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
 
 class Color:
     """general UI color and stylesheet handling"""

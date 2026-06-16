@@ -4594,9 +4594,8 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
 
                 self._list_widget.clear()
                 for data in tab_map.values():
-                    device_guid, device_name, tab_type, index = data
+                    device_name = data.name
                     # validate the device still exists
-
                     item = QListWidgetItem(device_name, self._list_widget)
                     item.setData(1, data)
 
