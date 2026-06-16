@@ -766,7 +766,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """
         current_mode = gremlin.shared_state.edit_mode
         mode_object = self.device_profile.ensure_mode_exists(profile=self.profile, mode_name=current_mode, device=self.device_guid)
-        config = mode_object.config
+        config = mode_object._config
 
         changed = False
         input_type = InputType.OctaviIfr1
@@ -849,76 +849,6 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             index = self.inputItemListModel.indexOf(input_id)
         if index != -1:
             self.selectInputItemIndex(index)
-
-    # def _select_item_cb(self, index, emit = True):
-    #     """Handles the selection of an input item.
-
-    #     :param index the index of the selected item
-    #     """
-    #     import gremlin.ui.input_item
-    #     import gremlin.shared_state
-
-    #     if not Shiboken.isValid(self.inputItemListView):
-    #         return
-
-    #     # self._last_selected_index = index
-    #     input_item = None
-
-    #     if index == -1:
-    #         index = self._last_selected_index
-
-    #     if index == -1:
-    #         # select the first item
-    #         if self.inputItemListModel.rows():
-    #             input_item = self.inputItemListModel.data(0)
-    #             index = 0
-    #         else:
-    #             self._blank_input()
-    #             return
-    #     else:
-    #         input_item = self.inputItemListModel.data(index)
-
-    #     device_guid = self.device_guid
-    #     input_id = input_item.input_id if input_item else None
-    #     input_type = InputType.OctaviIfr1
-
-    #     if input_item:
-    #         device_guid = self.device_guid
-    #         key = self.getWidgetKey(input_type, input_id)
-    #         widget = self.getRegisteredWidget(key)
-    #         if not widget:
-    #             widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"IFR1: {input_item.display_name}")
-    #             self.registerWidget(key, widget)
-    #             widget.redraw() # load the data
-
-    #         # Create new configuration widget
-
-    #         change_cb = self._create_change_cb(index)
-    #         widget._container_model.data_changed.connect(change_cb)
-    #         widget.description_changed.connect(change_cb)
-
-    #         self.selectRegisteredWidget(key)
-    #         self.inputItemListView.scrollToIndex(index)
-    #     else:
-    #         profile = gremlin.shared_state.current_profile
-    #         device_guid = gremlin.shared_state.octavi_tab_guid
-    #         device_modes =  profile.get_device_modes(device_guid, DeviceType.to_string(DeviceType.Joystick))
-    #         mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
-    #         input_item = gremlin.input_item.InputItem(mode_object)
-    #         widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name="IFR1 Blank InputConfigItem (no item data)")
-    #         widget.redraw() # load the data
-
-    #     #self.setRightPanelWidget(widget)
-
-    #     self._last_selected_index = index
-    #     self._item_data = widget
-    #     self._last_selected_input_item = input_item
-
-    #     # ensure visible
-
-    #     if emit:
-    #         el = gremlin.event_handler.EventListener()
-    #         el.input_selection_changed.emit(device_guid, input_type, input_id)
 
     def _create_change_cb(self, index):
         """Creates a callback handling content changes.

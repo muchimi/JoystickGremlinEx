@@ -3261,17 +3261,20 @@ class GateData:
     def _new_item_data(self, is_action=True):
         """creates a new item data from the existing one"""
         current_item_data = self._find_input_item()
-        item_data = gremlin.input_item.InputItem(mode_node=current_item_data.parent)
-        item_data._input_type = current_item_data._input_type
-        item_data._device_guid = current_item_data._device_guid
-        item_data._input_id = current_item_data._input_id
-        item_data._is_action = is_action
+        input_item = gremlin.input_item.InputItem(
+            mode_node=current_item_data.parent,
+            input_type =current_item_data._input_type,
+            device_guid=current_item_data._device_guid,
+            input_id = current_item_data._input_id,
+            )
 
-        item_data._device_name = current_item_data._device_name
+        input_item._is_action = is_action
+
+        input_item._device_name = current_item_data._device_name
 
         # add the input data to the profile
 
-        return item_data
+        return input_item
 
     def get_xml_mode(self, node):
         """walks the xml tree up to get the mode for this gate data object"""

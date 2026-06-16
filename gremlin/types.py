@@ -270,6 +270,8 @@ class DeviceType(IntEnum):
 
     @staticmethod
     def to_string(value):
+        if value is None:
+            return None
         if value in _DeviceType_to_string_lookup:
             return _DeviceType_to_string_lookup[value]
         syslog.error(f"DeviceType lookup failed in to_string(): unable to find type: [{value}] - defaulting to NotSet")

@@ -2195,8 +2195,10 @@ class OscInputItem(gremlin.input_item.InputItem):
         def __lt__(self, other):
             return self.value < other.value
 
-    def __init__(self, mode_object: gremlin.base_profile.ProfileMode = None):
-        super().__init__(mode_object, device_guid=OscDeviceTabWidget.device_guid, input_type = InputType.OpenSoundControl)  # parent is the mode object this input belongs to
+    def __init__(self, mode_object: gremlin.base_profile.ProfileModeNode = None):
+        super().__init__(
+            mode_object, device_guid=OscDeviceTabWidget.device_guid, input_type=InputType.OpenSoundControl
+        )  # parent is the mode object this input belongs to
 
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_osc

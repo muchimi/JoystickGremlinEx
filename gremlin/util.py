@@ -1512,11 +1512,13 @@ def parse_bool(value, default_value=False):
         raise error.ProfileError(f"Invalid type provided: {type(value)}")
 
 
-def read_guid(node, key, default_value=None):
+def read_guid(node, key, default_value=None) -> uuid.UUID:
     """reads a GUID"""
+
     if key in node.attrib:
         try:
             s_guid = node.get(key)
+            #return dinput.GUID(s_guid)
             return uuid.UUID(s_guid)
         except Exception:
             pass

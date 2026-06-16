@@ -1691,72 +1691,6 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.device_mapping_changed.emit(self._device_id)
         self._blank_input()
 
-    # def _handle_create_widget(self, input_item):
-    #     index = self.inputItemListView.indexOf(input_item)
-    #     assert index != -1,"input item is not in the list"
-
-    #     widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"MIDI: {input_item.display_name}")
-    #     device_name = gremlin.joystick_handling.device_name_from_guid(self.device_guid)
-    #     widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} ")
-    #     widget._container_model.data_changed.connect(self._create_change_cb(index))
-
-    #     return widget
-
-    # def _select_item_cb(self, index, emit = True):
-    #     """Handles the selection of an input item.
-
-    #     :param index the index of the selected item
-    #     """
-    #     import gremlin.ui.input_item
-    #     if not Shiboken.isValid(self.inputItemListView):
-    #         return
-
-    #     if index == -1:
-    #         index = self._last_selected_index
-
-    #     if index == -1:
-    #         if self.inputItemListModel.rows() > 0:
-    #             input_item = self.inputItemListModel.data(0)
-    #             index = 0
-    #         else:
-    #             self._blank_input()
-    #             return
-    #     else:
-    #         input_item = self.inputItemListModel.data(index)
-
-    #     device_guid = self.device_guid
-    #     input_id = input_item.input_id if input_item else None
-    #     input_type = InputType.Midi
-
-    #     if input_item:
-    #         device_guid = self.device_guid
-    #         key = self.getWidgetKey(input_type, input_id)
-    #         widget = self.getRegisteredWidget(key)
-    #         if not widget:
-    #             widget = gremlin.input_item.InputItemMappingWidget(input_item = input_item, object_name=f"MIDI: {input_item.display_name}")
-    #             self.registerWidget(key, widget)
-    #             widget.redraw() # load the data
-
-    #         change_cb = self._create_change_cb(index)
-    #         widget._container_model.data_changed.connect(change_cb)
-    #         widget.description_changed.connect(change_cb)
-
-    #         self.selectRegisteredWidget(key)
-
-    #     else:
-    #         input_item = MidiInputItem()
-    #         widget = gremlin.input_item.InputItemMappingWidget(input_item, object_name="MIDI Blank InputConfigItem (no item data)")
-    #         widget.redraw() # load the data
-
-    #     # update container display if blank
-    #     self.updateContainerViewBlankMessage(input_item, " MIDI ")
-
-    #     self._last_selected_index = index
-    #     self._item_data = widget
-
-    #     if emit:
-    #         el = gremlin.event_handler.EventListener()
-    #         el.input_selection_changed.emit(device_guid, input_type, input_id)
 
     def _add_input_cb(self):
         """Adds a new input to the inputs list"""
@@ -1778,12 +1712,6 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # auto edit input
         self._edit_item_cb(None, index, input_item)
-
-    # def _index_for_key(self, input_id):
-    #     ''' returns the index of the selected input id'''
-    #     mode = self.device_profile.modes[self.current_mode]
-    #     sorted_keys = list(mode.config[InputType.Midi].keys())
-    #     return sorted_keys.index(input_id)
 
     def _create_change_cb(self, index):
         """Creates a callback handling content changes.

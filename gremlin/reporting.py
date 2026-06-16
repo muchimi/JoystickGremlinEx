@@ -414,7 +414,7 @@ class ReportEngine:
 
             case ReportNodeType.Mode:
                 # mode node
-                mode_object: gremlin.base_profile.ProfileMode = node.data
+                mode_object: gremlin.base_profile.ProfileModeNode = node.data
                 mode = mode_object.name
                 if mode == gremlin.shared_state.master_mode:
                     mode = gremlin.shared_state.master_mode_name
@@ -593,7 +593,7 @@ class ReportEngine:
                 input_items = [state_data[key].input_item for key in state_data]
                 if input_items:
                     device_node.parent = root
-                    mode_object = gremlin.base_profile.ProfileMode(device)
+                    mode_object = gremlin.base_profile.ProfileModeNode(device)
                     mode_object.name = gremlin.shared_state.master_mode_name
                     mode_node = ReportNode(ReportNodeType.Mode, data=mode_object)
                     mode_node.parent = device_node

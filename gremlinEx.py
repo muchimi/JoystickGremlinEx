@@ -1026,7 +1026,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _tab_clear_map_cb(self):
         """clears the mappings from the current tab"""
         tab_guid = gremlin.util.parse_guid(self._active_tab_guid())
-        device: gremlin.base_profile.ProfileDevice = gremlin.shared_state.current_profile.devices[tab_guid]
+        device: gremlin.base_profile.ProfileDeviceNode = gremlin.shared_state.current_profile.devices[tab_guid]
         current_mode = gremlin.shared_state.current_mode
         result = gremlin.ui.ui_common.ConfirmBox(f"Remove all mappings from {device.name}, mode [{current_mode}]?")
         if result:
@@ -2639,11 +2639,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         else:
             # setup default sorting order is by name (index 1 of id, name, dev triplets)
             # default is sort by physical, vjoy, special and config and by name within these categories
-            physical_devices.sort(key=lambda x: x[1])
-            special_devices.sort(key=lambda x: x[1])
-            config_devices.sort(key=lambda x: x[1])
-            vjoy_devices.sort(key=lambda x: x[1])
-            sorted_devices = physical_devices + vjoy_devices + special_devices + config_devices
+            physical_devices.sort(key=lambda x: x.name)
+            special_devices.sort(key=lambda x: x.name)
+            config_devices.sort(key=lambda x: x.name)
+            vjoy_devices.sort(key=lambda x: x.name)
+            sorted_devices = [(device.device_id, device.name, device) for device in physical_devices + vjoy_devices + special_devices + config_devices]
 
         index = 0
 
@@ -2790,7 +2790,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if not active_device:
                 # not found - pick the first one by tab order
 
-                active_device = sorted_devices[0]
+                _, _, active_device = sorted_devices[0]
                 active_device_guid = active_device.device_guid
                 gremlin.shared_state.setActiveDeviceGuid(active_device_guid)
 
@@ -3097,7 +3097,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     # =======================================================
                     # config devices
                     match device.device_type:
-
                         case DeviceType.Settings:
                             # =======================================================
                             # Add profile configuration tab (special device - must also be registered in gremlin.joystick_handling.RegisterSpecialDevice)

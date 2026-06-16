@@ -44,16 +44,12 @@ syslog = logging.getLogger("system")
 class KeyboardInputItem(gremlin.input_item.InputItem):
     """holds a keyboard input item"""
 
-    def __init__(self, mode_object: gremlin.base_profile.ProfileMode):
+    def __init__(self, mode_object: gremlin.base_profile.ProfileModeNode):
         """Keyboard input id
         :param mode: the profile mode for this input
         """
         self._key = None  # associated primary key (containing latched items)
-        super().__init__(
-            mode_object,
-            device_guid=KeyboardDeviceTabWidget.device_guid,
-            input_type = InputType.KeyboardLatched
-        )
+        super().__init__(mode_object, device_guid=KeyboardDeviceTabWidget.device_guid, input_type=InputType.KeyboardLatched)
 
         self._title_name = "Keyboard input (not configured)"
 

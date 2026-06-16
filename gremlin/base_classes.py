@@ -968,10 +968,13 @@ class AbstractCallbackModel(AbstractModel):
         # ensure the item is hashable
         assert isinstance(item, _collections_abc.Hashable)
         assert isinstance(index, _collections_abc.Hashable)
+        old_item = self._index_map[index] if index in self._index_map else None
+
         self._index_map[index] = item
         self._item_map[item] = index
         self._filtered_index_map[index] = item
         self._filtered_item_map[item] = index
+        self.onItemChanged(self, index, item, old_item, "setItemAt")
         self.markDirty()
 
     def setSortCallback(self, callback):
@@ -1037,12 +1040,18 @@ class AbstractCallbackModel(AbstractModel):
                 index = 0
                 while index in self._index_map:
                     index += 1
+            old_item = self.itemAt(index)
             self.setItemAt(index, item)
+            self.onItemChanged(self, index, item, old_item, "add")
             self.applyFilter()
             self._fireChanged()
 
             return index
         return -1
+
+    def onItemChanged(self, model, index : int, new_item, old_item, operation):
+        """override by derived classes as needed"""
+        pass
 
     def insert(self, i, item, emit=True):
         """inserts an item
@@ -1053,6 +1062,7 @@ class AbstractCallbackModel(AbstractModel):
         if self._allowed_types:
             if not isinstance(item, self._allowed_types):
                 raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
+        old_item = self.itemAt(i)
         if i in self._index_map:
             # bump all the items down 1
             start_index = i
@@ -1066,12 +1076,15 @@ class AbstractCallbackModel(AbstractModel):
         self._index_map[i] = item
         self._item_map[item] = i
 
+        self.onItemChanged(self, index, item, old_item, "insert")
+
         self.applyFilter(emit=emit)
         if emit:
             self._fireChanged()
 
     def place(self, item, index: int, apply_filter=True, emit=True):
         """places an item at a given index - no checking"""
+        old_item = self.itemAt(index)
         if item in self._item_map:
             i = self._index_map[index]
             if i == index:
@@ -1079,12 +1092,17 @@ class AbstractCallbackModel(AbstractModel):
                 return
             # remove the old entry from the model
             del self._index_map[i]
+
         self._index_map[index] = item
         self._item_map[item] = index
         if apply_filter:
             self.applyFilter(emit=emit)
         if emit:
             self._fireChanged()
+
+        self.onItemChanged(self, index, item, old_item, "place")
+
+
 
     def remove(self, item, emit=True):
         """Removes the given entry from the model."""
@@ -1097,6 +1115,8 @@ class AbstractCallbackModel(AbstractModel):
             self.applyFilter(emit=emit)
             if emit:
                 self._fireChanged()
+        self.onItemChanged(self, index, None, item, "remove")
+
 
     def removeAt(self, index: int, emit=True):
         """removes the entry at the given model index"""
@@ -1109,6 +1129,8 @@ class AbstractCallbackModel(AbstractModel):
             self.applyFilter(emit=emit)
             if emit:
                 self._fireChanged()
+            self.onItemChanged(self, index, None, item, "removeAt")
+
 
     def clear(self, emit=True):
         """Removes all the given entry from the model."""
@@ -1121,6 +1143,8 @@ class AbstractCallbackModel(AbstractModel):
             self.popSuspend()
             if emit:
                 self._fireChanged()
+            self.onItemChanged(self, -1, None, None, "clear")
+
 
     def data(self, index: int):
         """returns the item stored at the given index, None if not found

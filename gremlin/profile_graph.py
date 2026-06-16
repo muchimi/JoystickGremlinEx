@@ -682,7 +682,7 @@ class ProfileDeviceNode(ProfileBaseNode):
         self.enable_changed_callback = None  # callback when the enabled changed flag changes - callback gets the node as a parameter callback(node)
         self.label = None
 
-    def setModesFromProfileDevice(self, profile_device_node: gremlin.base_profile.ProfileDevice, parent: ProfileRootNode = None):
+    def setModesFromProfileDevice(self, profile_device_node: gremlin.base_profile.ProfileDeviceNode, parent: ProfileRootNode = None):
         """builds mode nodes from a profile device"""
         self.children = ()  # clear children
         for profile_mode_node in profile_device_node.modes.values():
@@ -922,15 +922,15 @@ class ProfileModeNode(ProfileBaseNode):
         self.id = gremlin.util.get_guid()
 
     @staticmethod
-    def fromProfileMode(mode_node: gremlin.base_profile.ProfileMode, parent: ProfileDeviceNode = None):
+    def fromProfileMode(mode_node: gremlin.base_profile.ProfileModeNode, parent: ProfileDeviceNode = None):
         """reads a profile mode node into the graph"""
         node = ProfileModeNode(mode_name=mode_node.name, inherit=mode_node.inherit)
         node.id = mode_node.id
 
-        for input_type in mode_node.config:
+        for input_type in mode_node._config:
             input_type_node = ProfileInputTypeNode(input_type, node)
-            for input_id in mode_node.config[input_type]:
-                input_item = mode_node.config[input_type][input_id]
+            for input_id in mode_node._config[input_type]:
+                input_item = mode_node._config[input_type][input_id]
                 if input_item:
                     input_item_node = ProfileInputItemNode(parent, input_type_node)
                     input_item_node.input_item = input_item
@@ -1048,7 +1048,7 @@ class ProfileInputItemNode(ProfileBaseNode):
     def input_item(self) -> gremlin.input_item.InputItem:
         if self._input_item is None:
             registry = self.device_node.registry
-            self._input_item = registry.getInputItem(self.device_guid, self.input_type, self.input_id)
+            self._input_item = registry.getInputItem(device_guid=self.device_guid, input_type=self.input_type, input_id=self.input_id)
         return self._input_item
 
     @input_item.setter

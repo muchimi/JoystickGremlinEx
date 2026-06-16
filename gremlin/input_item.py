@@ -144,6 +144,8 @@ class InputIdentifier(QtCore.QObject):
 
     @input_id.setter
     def input_id(self, value):
+        if value == gremlin.ui.mode_device.ModeInputItemType.ModeProfileStart:
+            pass
         if self._input_id_callback is not None:
             raise ValueError("cannot set input id in callback mode")
         self._input_id = value
@@ -384,8 +386,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def __init__(
         self,
         mode_node,  # str or profile mode object
-        input_type: InputType, # must be provided
-        input_id = None, #
+        input_type: InputType,  # must be provided
+        input_id=None,  #
         custom_name_handler: Callable = None,
         custom_mode_name_handler: Callable = None,
         override_input_type=None,
@@ -409,13 +411,14 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         import gremlin.shared_state
         import gremlin.joystick_handling
 
-        assert isinstance(mode_node, str) or isinstance(mode_node, gremlin.base_profile.ProfileMode), (
+        assert isinstance(mode_node, str) or isinstance(mode_node, gremlin.base_profile.ProfileModeNode), (
             "Parent parameter must be a string or mode object, cannot be NULL"
         )
         if isinstance(mode_node, str):
             # convert to a mode object
             profile = gremlin.shared_state.current_profile
-            mode_node = profile.get_mode_object(mode_node)
+            assert device_guid is not None, "device_guid must be provided if mode provided as a name"
+            mode_node = profile.getModeNode(device_guid, mode_node)
 
         if not device_guid:
             # grab the device from the mode object
@@ -425,10 +428,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         assert input_type is not None, "input type must be provided"
 
-
         import gremlin.joystick_handling
 
         super().__init__(mode_node.name, None)
+
+        # if input_type == InputType.ModeControl:
+        #     syslog.info(f"create input item id: [{self.id}]")
+        #     pass
 
         self.parent = mode_node  # mode object
 
@@ -436,7 +442,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._override_input_type = override_input_type  # override input type for some types that are different
 
         self._input_type = input_type
-        self._input_id = input_id
+        self.setInputId(input_id)
 
         device = gremlin.joystick_handling.getDevice(device_guid)
         self._device_guid = device.device_guid if device else None  # hardware input ID
@@ -468,6 +474,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         self.mapping_widget_id = None  # ID of the mapping widget for this input
 
+        self._input_widget = None  # reference to the input widget for this input
+        self._mapping_widget = None  # reference to the mapping widget for this input
+
         self._tooltip = tooltip
         if description is not None:
             self._description = description
@@ -482,7 +491,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             while True:
                 # if isinstance(item, Mode):
                 #    self._profile_mode = item.name
-                if isinstance(item, gremlin.base_profile.ProfileDevice):
+                if isinstance(item, gremlin.base_profile.ProfileDeviceNode):
                     self._device_type = item.type
                     self._device_name = item.name
                     self._device_guid = gremlin.util.to_guid(item.device_guid)
@@ -498,6 +507,18 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
         el.reload_axis_state.connect(self._handle_axis_state_request)
+
+    def setInputWidget(self, widget: InputItemWidget):
+        self._input_widget = widget
+
+    def getInputWidget(self) -> InputItemWidget:
+        return self._input_widget
+
+    def setMappingWidget(self, widget: InputItemMappingWidget):
+        self._mapping_widget = widget
+
+    def getMappingWidget(self) -> InputItemMappingWidget:
+        return self._mapping_widget
 
     def setTooltip(self, tooltip: str):
         if tooltip != self._tooltip:
@@ -568,7 +589,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def profile_mode(self) -> str:
         """gets the mode object"""
         return self.parent.name
-
 
     @property
     def locked(self) -> bool:
@@ -1352,7 +1372,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         assert isinstance(input_item, InputItem), "invalid input item"
         assert isinstance(identifier, InputIdentifier), "Invalid input identifier"
+
         self._input_item = input_item
+        input_item.setInputWidget(self)  # setup reference to the input widget
         self._identifier = identifier
         self._input_id = input_item.input_id
         self._device_guid = input_item.device_guid
@@ -1794,6 +1816,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _cleanup_ui(self):
         """called when widget is removed"""
+
+        if self.input_item:
+            self.input_item.setInputWidget(None)  # clear reference on the input
+
         el = gremlin.event_handler.EventListener()
         el.action_created.disconnect(self._action_changed_cb)
         # el.action_delete.disconnect(self._action_deleted_cb)
@@ -2252,9 +2278,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         if value != self._selected:
             verbose = gremlin.config.Configuration().verbose_mode_ui
             if verbose:
-                syslog.info(f"InputItemWidget: item: [{self.input_item.display_name}] set selected: [{value}]")
+                syslog.info(f"InputItemWidget: input item id [{self.input_item.id}] item: [{self.input_item.display_name}] set selected: [{value}]")
             self._selected = value
             self._update_selected()  # uptate widget style
+
             if emit:
                 # notify of selection change
                 self._fireSelectionChangeCallbacks()
@@ -3285,6 +3312,8 @@ class InputItemListView(AbstractView):
                                 elif input_item.input_type == InputType.JoystickHat:
                                     widget.setIcon("ei.fullscreen")
 
+                            input_item.setInputWidget(widget)  # keep a reference to the input widget
+
                         widget.index = model_index
                         if new_widget:
                             # handle new widget updates
@@ -4096,6 +4125,20 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     @property
     def input_display_name(self):
         return f"{gremlin.shared_state.get_device_name(self.device_guid)} {InputType.to_display_name(self.device_input_type)} {self.device_input_id}"
+
+    @property
+    def display_name(self) -> str:
+        return (
+            f"[{self.input_display_name}] action count: [{self.action_model.count() if self.action_model is not None else 0}] description: [{self.description}]"
+        )
+
+    @property
+    def description(self) -> str:
+        return self._description
+
+    @description.setter
+    def description(self, value: str):
+        self._description = value
 
     def add_action(self, action, index: int = None, create=True) -> int:
         """Adds an action to this container.
@@ -8485,11 +8528,18 @@ class ContainerModel(AbstractCallbackModel):
 
     def removeContainer(self, container: AbstractContainer):
         """Removes an existing container from the model.
-
-
         :param container the container instance to remove
         """
         self.remove(container)
+
+    def onItemChanged(self, model: ContainerModel, index: int, new_value: AbstractContainer, old_value: AbstractContainer, operation: str):
+        verbose = gremlin.config.Configuration().verbose_mode_ui
+        verbose = True
+        if verbose:
+            syslog.info(
+                f"ContainerModel: container changed: operation: [{operation}] new: [{new_value.display_name if new_value else 'n/a'}]  old: [{old_value.display_name if old_value else 'n/a'}]"
+            )
+            pass
 
 
 class ContainerView(AbstractView):
@@ -8760,7 +8810,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
         assert isinstance(input_item, InputItem), "invalid input type"
-        assert input_item.input_id is not None,"invalid input id on input item"
+        assert input_item.input_id is not None, "invalid input id on input item"
         assert input_item.input_type is not None, "input type cannot be derived be specified"
 
         if not input_type:
@@ -8806,8 +8856,9 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
     def fromParams(self, params) -> InputItemMappingWidget:  # noqa: F405
         """recreates the widget from self"""
-        item_data, input_type, object_name, spacer_height, parent = params
-        return InputItemMappingWidget(item_data, input_type, object_name, spacer_height, parent)
+        input_item, input_type, object_name, spacer_height, parent = params
+        widget = InputItemMappingWidget(input_item, input_type, object_name, spacer_height, parent)
+        input_item.setMappingWidget(widget)  # keep a reference
 
     def _mapping_changed(self, input_item: InputItem):
         """occurs when a device mapping changed through user interaction with the UI"""
@@ -8917,7 +8968,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             widget.hide()
             self._stacked_widget.removeWidget(widget)
             widget.deleteLater()
-            item_data.mapping_widget_id = None  # clear the reference ID
+            item_data.setMappingWidget(None)
 
         widgets = []
 
@@ -9010,7 +9061,8 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             syslog.info(f"InputItemMappingWidget: display widget index [{index}] container view for [{container_view_widget.input_item.display_name}]")
         self._stacked_widget.setCurrentIndex(index)
 
-        item_data.mapping_widget_id = container_view_widget.id  # remember the ID of the container widget
+        # save a reference to the visualization of the input mapping
+        item_data.setMappingWidget(container_view_widget)
 
         # setup the container widget reference
         plugin_manager = gremlin.plugin_manager.ContainerPlugins()
@@ -9037,6 +9089,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         if force or not self._drawn_once or self._container_view is None:
             if self._input_item is not None:
+                syslog.info(f"redraw input item id [{self._input_item.id}] container count: [{self._input_item.containers.count()}]")
                 self._drawn_once = True  # indicate drawn at least once since creation
                 self.create_ui()
                 assert self._container_view is not None, "container view should be created after create_ui"
@@ -11207,7 +11260,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.device = device
         self.profile = profile
-        self.profile.ensure_mode_exists(mode)
         self.device_profile = profile.getDeviceNode(device.device_guid)
 
         assert isinstance(custom_input_widget_callback, Callable) if custom_input_widget_callback is not None else True, (
@@ -11397,6 +11449,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         widget.setObjectName(f"InputItemConfig for device {device_name} index: {index} input item: [{input_item.display_name}] ")
         widget.description_changed.connect(lambda x: self._description_changed_cb(index, x))
         widget.description_clear.connect(lambda: self._description_clear_cb(index, widget))
+        input_item.setMappingWidget(widget)  # keep a reference to the mapping widget
         return widget
 
     def _description_changed_cb(self, index, text):
@@ -11739,10 +11792,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.selectInputItemMappingWidget(input_item)
         # update container display if blank
         self.updateContainerViewBlankMessage(input_item)
-
-        # mapped_widget = self.getInputItemMappingWidget(input_item)
-        # if mapped_widget:
-        #     mapped_widget._redraw_ui()
 
         # remember the last selection
         self._last_selected_input_item = input_item  # update selection
