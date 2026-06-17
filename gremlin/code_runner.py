@@ -30,6 +30,7 @@ from gremlin.input_types import InputType
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
+from gremlin.types import DeviceType
 import gremlin.plugin_manager
 import gremlin.ui.state_device
 import gremlin.windows_event_hook
@@ -46,6 +47,7 @@ import gremlin.sendinput as sendinput
 import gremlin.execution_graph
 import gremlin.ui
 import gremlin.remote
+import gremlin.base_profile
 
 import traceback
 
@@ -57,7 +59,7 @@ class CodeRunner:
 
     def __init__(self):
         """Creates a new code runner instance."""
-        self.event_handler = gremlin.event_handler.EventHandler()
+        self.event_handler : gremlin.event_handler.EventHandler = gremlin.event_handler.EventHandler()
         self.event_handler.add_plugin(gremlin.input_devices.JoystickPlugin())
         self.event_handler.add_plugin(gremlin.input_devices.VJoyPlugin())
         self.event_handler.add_plugin(gremlin.input_devices.KeyboardPlugin())
@@ -90,9 +92,11 @@ class CodeRunner:
         return gremlin.shared_state.is_running
 
 
-    def setUIState(self, enabled):
+    def setUIState(self, enabled : bool):
+        """enables/disables UI elements for run/edit modes"""
         ui = gremlin.shared_state.ui.ui
-        ui.devices.setEnabled(enabled)
+        ui.devices_tab_header_widget.setEnabled(enabled) # tab header
+        ui.tab_content_widget.setEnabled(enabled) # content widget
         ui.actionNewProfile.setEnabled(enabled)
         ui.actionOpen.setEnabled(enabled)
         ui.actionLoadProfile.setEnabled(enabled)
@@ -271,8 +275,8 @@ class CodeRunner:
             # Add a fake keyboard action which does nothing to the callbacks
             # in every mode in order to have empty modes be "present"
             for mode_name in gremlin.profile.mode_list():
-                self.event_handler.add_callback(
-                    0,
+                self.event_handler.addCallback(
+                    gremlin.joystick_handling.invalidDeviceGuid(),
                     mode_name,
                     None,
                     lambda x: x,
@@ -291,39 +295,46 @@ class CodeRunner:
 
             assert master_mode in mode_list, "master mode missing"
 
+            # XXX todo: check that callbacks are setup for master mode on profile start as they are missing from the callback stack
+
 
             # ensure all profile modes are in the execution graph if they are defined - this is so we can search them
-            mode_nodes = {}
+            graph_mode_nodes = {}
             for mode in mode_list:
-                mode_node = gremlin.execution_graph.ExecutionGraphModeNode(mode)
-                mode_node.parent = ec.graph
-                mode_nodes[mode] = mode_node
+                graph_mode_node = gremlin.execution_graph.ExecutionGraphModeNode(mode)
+                graph_mode_node.parent = ec.graph
+                graph_mode_nodes[mode] = graph_mode_node
 
             # Create input callbacks based on the profile's content
-            profile.sync()
+            #profile.sync()
 
             verbose = gremlin.config.Configuration().verbose_mode_exec
-            profile_device : gremlin.base_profile.Device
-            for profile_device in profile.devices.values():
-                device = gremlin.joystick_handling.getDevice(profile_device.device_guid)
-                if not device:
+            device_node : gremlin.base_profile.ProfileDeviceNode
+            for device_node in profile.devices.values():
+                device_guid = device_node.device_guid
+                device = gremlin.joystick_handling.getDevice(device_guid)
+                if not device or device.disabled:
                     if verbose:
                         syslog.info("CALLBACK: skipping a device (this is normal if the device is disabled):")
-                        syslog.info(f"\t{str(profile_device)}")
+                        syslog.info(f"\t{str(device_node)}")
                     continue
 
-
+                if device.device_type == DeviceType.ModeControl:
+                    pass
                 device_name = device.name
                 if verbose:
-                    syslog.info(f"CALLBACK: device: {str(profile_device)}")
+                    syslog.info(f"CALLBACK: device: {str(device_node)}")
 
-                for mode in profile_device.modes.values():
-                    if mode.name not in mode_nodes:
+                profile_mode_node: gremlin.base_profile.ProfileModeNode
+                for mode_name, profile_mode_node in device_node.modes.items():
+                    if mode_name not in graph_mode_nodes:
                         # special mode or mode not present in profile
                         continue
-                    mode_node = mode_nodes[mode.name]
-                    for input_items in mode.config.values():
-                        for input_item in input_items.values():
+
+                    graph_mode_node = graph_mode_nodes[mode_name]
+
+                    for input_type, input_map in profile_mode_node.config.items():
+                        for input_item in input_map.values():
                             # Only add callbacks for input items that actually
                             # contain actions
 
@@ -335,12 +346,13 @@ class CodeRunner:
                             if verbose:
                                 syslog.info(f"\t{input_item.display_name}")
 
-                            self.event_handler.registerInputItem(mode.name, input_item)
+                            self.event_handler.registerInputItem(mode_name, input_item)
 
                             event = gremlin.event_handler.Event(
-                                event_type=input_item.input_type,
-                                device_guid=profile_device.device_guid,
-                                identifier=input_item.input_id,
+                                event_type= input_type,
+                                device_guid= device_guid,
+                                mode = mode_name,
+                                identifier= input_item.input_id,
                                 extra_data={"input_item": input_item}
                             )
 
@@ -355,7 +367,7 @@ class CodeRunner:
                                     #test = container.is_valid()
                                     syslog.warning(f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: Incomplete container ignored")
                                     continue
-                                callbacks.extend(container.generate_callbacks(mode_node))
+                                callbacks.extend(container.generate_callbacks(graph_mode_node))
 
                             for cb_data in callbacks:
                                 if cb_data.event is None:
@@ -388,17 +400,17 @@ class CodeRunner:
                                                                     syslog.info(f"\t\t\t\tCommand:: {action.command}")
                                             else:
                                                 syslog.info(f"\t\t\tFunctor: {functor}")
-                                    self.event_handler.add_callback(
-                                        profile_device.device_guid,
-                                        mode.name,
+                                    self.event_handler.addCallback(
+                                        device_node.device_guid,
+                                        mode_name,
                                         event,
                                         cb_data.callback,
                                         input_item.always_execute
                                     )
                                 else:
-                                    self.event_handler.add_callback(
+                                    self.event_handler.addCallback(
                                         dinput.GUID_Virtual,
-                                        mode.name,
+                                        mode_name,
                                         cb_data.event,
                                         cb_data.callback,
                                         input_item.always_execute
@@ -453,9 +465,9 @@ class CodeRunner:
                         identifier= input_item.input_id,
                         extra_data={"input_item": input_item}
                     )
-                    self.event_handler.add_callback(
+                    self.event_handler.addCallback(
                                             state_device_guid,
-                                            mode.name,
+                                            master_mode,
                                             event,
                                             cb_data.callback,
                                             input_item.always_execute)
@@ -479,11 +491,11 @@ class CodeRunner:
 
             # set vjoy from profile defaults
             vjoy_devices = gremlin.joystick_handling.vjoy_devices()
-            for profile_device in vjoy_devices:
-                device_id = profile_device.device_id
+            for device_node in vjoy_devices:
+                device_id = device_node.device_id
 
                 # set axes
-                for id in range(1, profile_device.axis_count + 1):
+                for id in range(1, device_node.axis_count + 1):
                     enabled = profile.getStartAxisEnabled(device_id, id)
                     if enabled:
                         value = profile.getStartAxisValue(device_id, id)
@@ -491,7 +503,7 @@ class CodeRunner:
                             gremlin.joystick_handling.set_axis(device_id, id, value)
 
                 # set buttons
-                for id in range(1, profile_device.button_count + 1):
+                for id in range(1, device_node.button_count + 1):
                     value = profile.getStartButtonState(device_id, id)
                     if value is not None:
                         gremlin.joystick_handling.set_button(device_id, id, value)
@@ -625,13 +637,8 @@ class CodeRunner:
                 mode = profile.get_default_mode() # start the default mode instead
 
 
-            # # memory garbage collection
-            # self._sentry_timer = threading.Timer(self._sentry_tick, self._handle_sentry)
-            # self._sentry_timer.start()
-
 
             # tell listener profiles are starting
-            # start listen
             evt_listener.start()
 
 

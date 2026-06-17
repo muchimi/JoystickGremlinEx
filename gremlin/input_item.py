@@ -18,7 +18,7 @@
 from __future__ import annotations
 from abc import abstractmethod, ABCMeta
 from PySide6 import QtWidgets, QtCore, QtGui
-from PySide6.QtCore import QThread
+from PySide6.QtCore import QThread, QEvent
 from lxml import etree
 import os
 import uuid
@@ -1706,8 +1706,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         return self._input_item
 
     def eventFilter(self, widget, event):
-        # trap mouse click
-        if not self._selected:
+        """UI event handler - trap mouse clicks for selection """
+        if self.isEnabled() and not self._selected:
             t = event.type()
             if t == QtCore.QEvent.Type.MouseButtonPress:
                 button = event.buttons()
@@ -4244,13 +4244,19 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     def generate_callbacks(self, parent=None):
         """Returns a list of callback data entries.
 
+        :param parent: optional parent execution graph node
         :return list of container callback entries
+
         """
+        import gremlin.execution_graph
+
         if not self._callbacks_enabled:
             # callbacks handled a different way by this container
             return []
 
         callbacks = []
+
+        assert isinstance(parent, gremlin.execution_graph.ExecutionGraphNode) if parent is not None else True,"invalid parent: parent must be graph node"
 
         # For a virtual button create a callback that sends VirtualButton
         # events and another callback that triggers of these events

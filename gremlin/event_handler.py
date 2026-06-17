@@ -1153,6 +1153,7 @@ class EventListener(QtCore.QObject):
         event_stop_pressed = Event(
             InputType.ModeControl,
             identifier=gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
+            mode = gremlin.shared_state.master_mode, # runs on master mode
             device_guid=device_guid,
             is_pressed=True,
             extra_data=extra_data,
@@ -1162,6 +1163,7 @@ class EventListener(QtCore.QObject):
         event_stop_released = Event(
             InputType.ModeControl,
             identifier=gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
+            mode = gremlin.shared_state.master_mode, # runs on master mode
             device_guid=device_guid,
             is_pressed=False,
             extra_data=extra_data,
@@ -1181,7 +1183,7 @@ class EventListener(QtCore.QObject):
         gremlin.windows_event_hook.KeyboardHook().popSuppress(True)
 
     def _handle_profile_started(self):
-        """occurs on profile start"""
+        """occurs on profile start - sets profile defaults and executes start mappings"""
         device_guid = gremlin.shared_state.mode_tab_guid
         mode_enter = gremlin.ui.mode_device.ModeInputModeType.ModeEnter
         delay = 0.250  # delay in seconds between press/release events for mode control change
@@ -1189,9 +1191,11 @@ class EventListener(QtCore.QObject):
         master_mode = gremlin.shared_state.master_mode
         extra_data = {"mode": master_mode}  # override execution mode
 
+        # profile start event
         event_start_pressed = Event(
             InputType.ModeControl,
             identifier=gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
+            mode = gremlin.shared_state.master_mode, # runs on master mode
             device_guid=device_guid,
             is_pressed=True,
             extra_data=extra_data,
@@ -1201,12 +1205,15 @@ class EventListener(QtCore.QObject):
         event_start_released = Event(
             InputType.ModeControl,
             identifier=gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
+            mode = gremlin.shared_state.master_mode, # runs on master mode
             device_guid=device_guid,
             is_pressed=False,
             extra_data=extra_data,
             override_input_type=InputType.JoystickButton,
         )
 
+
+        # mode enter events
         event_enter_pressed = Event(
             InputType.ModeControl,
             identifier=mode_enter,
@@ -1229,7 +1236,7 @@ class EventListener(QtCore.QObject):
 
         self._profile_started = True
 
-        # fire mode change for mode enter (press + release)
+        # executes profile start events - fire mode change for mode enter (press + release)
         eh = EventHandler()
 
         m2_list, f2_list = eh.execute_event(event_start_pressed)
@@ -2431,12 +2438,12 @@ class EventHandler(QtCore.QObject):
         if verbose:
             syslog.info(f"Register InputItem: {input_item.display_name} mode {mode} {input_type} magic: {magic}")
 
-    def add_callback(self, device_guid, mode, event, callback, permanent=False, node=None):
+    def addCallback(self, device_guid : dinput.GUID, mode : str , event : Event, callback : Callable, permanent=False, node =None):
         """Installs the provided callback for the given event.
 
         :param device_guid the GUID of the device the callback is
                 associated with
-        :param mode the mode the callback belongs to
+        :param mode the name of the mode the callback belongs to
         :param event the event for which to install the callback
         :param callback the callback function to link to the provided
                 event
@@ -2447,7 +2454,12 @@ class EventHandler(QtCore.QObject):
         import gremlin.config
         import gremlin.keyboard
 
-        assert callback is not None and callable(callback), "Callback must be provided and be a callable"
+
+        assert isinstance(device_guid, dinput.GUID),"invalid device GUID"
+        assert isinstance(callback, Callable), "Callback must be provided and be a callable"
+        assert mode is not None and mode != "","invalid mode"
+        assert isinstance(event, Event) if event is not None else True,"invalid event"
+
 
         valid_devices_map = gremlin.joystick_handling.getValidJoystickDevicesMap()  # list of valid joystick devices
 
@@ -2546,7 +2558,7 @@ class EventHandler(QtCore.QObject):
             else:
                 # regular event - events are stored by the event key
                 verbose = gremlin.config.Configuration().verbose
-                if device_guid not in valid_devices_map:
+                if event.event_type != InputType.ModeControl and device_guid not in valid_devices_map:
                     device = gremlin.joystick_handling.getDevice(device_guid)
                     if verbose:
                         syslog.info(f"CALLBACK: device [{device.name}] [{device.device_id}] is disabled in callbacks ")
@@ -3342,9 +3354,16 @@ class EventHandler(QtCore.QObject):
     def _matching_functors(self, event) -> list:
         """gets the list of matching functors to call when an event occurs"""
         functors_list = []
+
+        # mode we're looking for
+        run_mode = event.mode if event.mode else self.runtime_mode
+        if event.extra_data and "mode" in event.extra_data:
+            # override
+            run_mode = event.extra_data["mode"]
+
         device_guid = event.device_guid
         if device_guid in self.latched_functors:
-            modes = gremlin.shared_state.current_profile.getModeHierarchy(self.runtime_mode)
+            modes = gremlin.shared_state.current_profile.getModeHierarchy(run_mode)
             for mode in modes:
                 if mode in self.latched_functors[device_guid]:
                     key = event.callbackKey
@@ -3366,11 +3385,11 @@ class EventHandler(QtCore.QObject):
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_details  # or config.verbose_mode_condition
-        mode = self.runtime_mode
-        if event.extra_data:
-            # look for options
-            if "mode" in event.extra_data:
-                mode = event.extra_data["mode"]
+        mode = event.mode if event.mode else self.runtime_mode # mode we're looking for
+        if event.extra_data and "mode" in event.extra_data:
+            # override
+            mode = event.extra_data["mode"]
+
 
         # Obtain callbacks matching the event
         callback_list = []

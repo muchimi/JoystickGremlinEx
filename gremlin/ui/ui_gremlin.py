@@ -41,9 +41,9 @@ class Ui_Gremlin(object):
         self.tab_bar_layout.addStretch(2)
 
         # holds the device widget
-        tab_content_widget = QtWidgets.QWidget()
-        tab_content_widget.setContentsMargins(0,0,0,0)
-        tab_content_layout = QtWidgets.QVBoxLayout(tab_content_widget)
+        self.tab_content_widget = QtWidgets.QWidget()
+        self.tab_content_widget.setContentsMargins(0,0,0,0)
+        tab_content_layout = QtWidgets.QVBoxLayout(self.tab_content_widget)
         tab_content_layout.setContentsMargins(0,0,0,0)
         self.device_page_widget = QtWidgets.QStackedWidget()  # holds the device widgets for each device - the index changes with the tab
         # tab_content_layout.addWidget(QtWidgets.QLabel("tab content - top of layout for main window"))
@@ -61,7 +61,7 @@ class Ui_Gremlin(object):
         self.statusbar_widget.setMaximumHeight(32)  # constrain height to bottom
 
         main_window.addWidget(self.tab_bar_widget)
-        main_window.addWidget(tab_content_widget)
+        main_window.addWidget(self.tab_content_widget)
         main_window.addWidget(self.statusbar_widget)
 
         # build the menus

@@ -346,7 +346,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _handle_profile_mode_changed(self, new_mode: str):
         self.current_mode = new_mode
-        ensureModeInputItems(new_mode)
+        ensureModeInputItems(self.profile, new_mode)
         self.ensureInputItems()
 
     def _load_handler(self, model: ModeInputItemModel, emit=True) -> bool:
@@ -359,7 +359,6 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _update_model(self, model: ModeInputItemModel):
         """updates the model with any changed data"""
         # ensure inputs are defined
-        from gremlin.base_profile import ProfileModeNode
         from gremlin.input_item import InputItem
 
         mode = self.current_mode

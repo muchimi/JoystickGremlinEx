@@ -96,14 +96,12 @@ class ProfileDeviceNode:
         """
         self.id = gremlin.util.get_guid()  # unique ID of this node
         self.parent = profile  # profile
-        self.name = None
         self.label = ""
-        self._device_guid: dinput.GUID = None
-        self._device_type: DeviceType = None
+        self._device: dinput.DeviceSummary = None
         self._modes = TriggerDict()  # map of ProfileMode objects keyed by mode name (case sensitive)
         self._modes.addCallback(self._handle_mode_node_changed)
+        self._name: str = None
         self.type = None  # device type
-        self.virtual = False  # true if the device is virtual (vjoy)
         self.connected = False  # true if the device was found in the detected hardware list
         self.masterMode = {}  # master mode
 
@@ -126,11 +124,31 @@ class ProfileDeviceNode:
 
     @property
     def device_guid(self) -> dinput.GUID:
-        """device ID as a GUID"""
+        """device I/D as a GUID"""
         return self._device_guid
 
     @property
+    def name(self) -> str:
+        if self._name:
+            return self._name
+        if self._device:
+            return self._device.name
+        return None
+
+    @name.setter
+    def name(self, value: str):
+        self._name = value
+
+    @property
+    def virtual(self) -> bool:
+        if self._device:
+            return self._device.is_virtual
+        return False
+
+    @property
     def device_type(self) -> DeviceType:
+        if self._device:
+            return self._device.device_type
         return self._device_type
 
     @device_type.setter
@@ -145,11 +163,14 @@ class ProfileDeviceNode:
         assert isinstance(value, dinput.GUID) if value is not None else True
         self._device_guid = value
         device = gremlin.joystick_handling.getDevice(value)
+        self._device = device
         self._device_type = device.device_type if device else None
 
     @property
     def device_id(self) -> str:
         """device ID a a string"""
+        if self._device:
+            return self._device.device_id
         return str(self.device_guid)
 
     def getModeNode(self, mode: str, system: bool = None, autocreate=False):
@@ -165,7 +186,9 @@ class ProfileDeviceNode:
         if autocreate:
             mode_node = ProfileModeNode(name=mode, parent=self, system=system)
             self.modes[mode] = mode_node
-            syslog.info(f"DeviceNode: CREATE NEW MODE NODE mode [{mode}] mode node id: [{mode_node.id}] device id: [{self.id}] profile id: [{self.profile.id}]")
+            syslog.info(
+                f"ModeNode: CREATE mode [{mode}] mode node id: [{mode_node.id}] device id: [{self.id}] profile id: [{self.profile.id}] device: [{str(self)}]"
+            )
             return mode_node
         return None
 
@@ -223,12 +246,13 @@ class ProfileDeviceNode:
         """
         node_tag = "device" if self.type != DeviceType.VJoy else "vjoy-device"
         node = etree.Element(node_tag)
+        if not self.name:
+            pass
         node.set("name", safe_format(self.name, str))
         node.set("label", safe_format(self.label, str))
         node.set("device-guid", write_guid(self.device_guid))  # device GUID
         node.set("guid", write_guid(self.id))  # node ID
-        if self.type == DeviceType.Keyboard:
-            pass
+
         node.set("type", DeviceType.to_string(self.type))
 
         mode_list = sorted(self.modes.values(), key=lambda x: x.name)
@@ -2222,7 +2246,8 @@ class Profile:
 
         self.id = get_guid()
         self._mode_tree = None  # holds the mode tree (anytree, m73 and later) - this holds the profile's mode hiarchy
-        self.devices: dict[dinput.GUID] = {}  # holds devices for this profile keyed by guid -> Device
+        self.devices = TriggerDict(name="profile devices")  # holds devices for this profile keyed by guid -> Device
+        self.devices.addCallback(self._handle_device_node_changed)
         self.vjoy_devices = {}
         self.merge_axes = []
         self.plugins = []
@@ -2262,6 +2287,15 @@ class Profile:
         self.initialize_regular_devices()  # non joystick devices
         gremlin.ui.mode_device.ensureMasterInputItems(self)
         gremlin.ui.mode_device.ensureModeInputItems(self, "Default")
+
+    def _handle_device_node_changed(self, data_map, key, old_value: ProfileDeviceNode, new_value: ProfileDeviceNode):
+        def stub(node: ProfileDeviceNode) -> str:
+            if node:
+                return f"name: {node.name} id: {node.id} guid: {gremlin.util.normalize_guid(node.device_guid)}"
+            return "n/a"
+
+        syslog.info(f"device map: key: [{key}] old value: [{stub(old_value)}] new value: [{stub(new_value)}]")
+        pass
 
     @property
     def registry(self) -> ProfileRegistry:
@@ -3495,12 +3529,16 @@ class Profile:
         if device_guid not in self.devices:
             if autocreate:
                 device = gremlin.joystick_handling.getDevice(device_guid)
-                if device:
-                    device_object = ProfileDeviceNode(self)
-                    device_object.device_guid = device_guid
-                    device_object.device_type = device.device_type
-                    self.devices[device_guid] = device_object
-                    return device_object
+                if device and not device.disabled:
+                    device_node = ProfileDeviceNode(self)
+                    device_node.name = device.name
+                    device_node.type = device.device_type
+
+                    device_node.device_guid = device_guid
+                    device_node.device_type = device.device_type
+                    self.devices[device_guid] = device_node
+                    syslog.info(f"Profile: CREATE device node: [{str(device_node)}] profile id: [{self.id}]")
+                    return device_node
             return None
 
         return self.devices[device_guid]
@@ -3799,7 +3837,7 @@ class Profile:
                 syslog.warning(f"XML: missing device-guid attribute for device - offending line {child.sourceline}")
                 continue
 
-            device_guid = parse_guid(read_guid(child, "device-guid", None))
+            device_guid = parse_guid(child.get("device-guid"))
 
             if device_guid is None:
                 syslog.warning(f"XML: invalid ID format for device: device-guid [{child.get('device-guid')}] - offending line {child.sourceline}")
@@ -3811,7 +3849,9 @@ class Profile:
                 assert device_node is not None, "mode control device should already exist in profile"
             else:
                 device_node = self.getDeviceNode(device_guid, autocreate=True)
-            assert device_node is not None, "invalid device node"
+            if device_node is None:
+                syslog.warning(f"XML: unrecognized device id [{str(device_guid)}] line : {child.sourceline} - skipping this entry")
+                continue
             extra_data["device_node"] = device_node
             device_node.from_xml(child, data, extra_data)
 
@@ -3905,6 +3945,9 @@ class Profile:
         # for physical and virtual joysticks.
         device_list = gremlin.joystick_handling.all_joystick_devices()
         for dev in device_list:
+            if dev.disabled:
+                # ignore disabled devices
+                continue
             add_device = False
             if dev.is_virtual and dev.device_guid not in self.vjoy_devices:
                 add_device = True
@@ -3913,15 +3956,17 @@ class Profile:
 
             if add_device:
                 new_device = self.getDeviceNode(dev.device_guid, autocreate=True)
-                new_device.name = dev.name
-                if dev.is_virtual:
-                    new_device.type = DeviceType.VJoy
-                    new_device.device_guid = dev.device_guid
-                    new_device.virtual = True
+
+                if new_device.virtual:
                     self.vjoy_devices[dev.device_guid] = new_device
-                else:
-                    new_device.type = DeviceType.Joystick
-                    new_device.device_guid = dev.device_guid
+                # if dev.is_virtual:
+                #     new_device.type = DeviceType.VJoy
+                #     new_device.device_guid = dev.device_guid
+
+                #     self.vjoy_devices[dev.device_guid] = new_device
+                # else:
+                #     new_device.type = DeviceType.Joystick
+                #     new_device.device_guid = dev.device_guid
 
         # Parse merge axis entries
         for child in root.iter("merge-axis"):
