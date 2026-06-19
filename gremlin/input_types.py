@@ -36,6 +36,7 @@ class InputType(enum.IntEnum):
     State = 11  # state input
     OctaviIfr1 = 12  # octavi IFR1
 
+
     @staticmethod
     def to_string(value):
         if value is None:

@@ -192,6 +192,11 @@ class ProfileDeviceNode:
             return mode_node
         return None
 
+    def hasInputs(self) -> bool:
+        """true if the device has defined inputs """
+        for mode_node in self.modes.values():
+
+
     def ensure_mode_exists(self, mode_name: str, device: dinput.DeviceSummary | dinput.GUID = None, is_system=False) -> ProfileModeNode:  # noqa: F821
         """Ensures that a specified mode exists, creating it if needed.
 
@@ -244,24 +249,27 @@ class ProfileDeviceNode:
 
         :return xml node of this device's contents
         """
-        node_tag = "device" if self.type != DeviceType.VJoy else "vjoy-device"
-        node = etree.Element(node_tag)
-        if not self.name:
-            pass
-        node.set("name", safe_format(self.name, str))
-        node.set("label", safe_format(self.label, str))
-        node.set("device-guid", write_guid(self.device_guid))  # device GUID
-        node.set("guid", write_guid(self.id))  # node ID
 
-        node.set("type", DeviceType.to_string(self.type))
+        # skip writing if the device has no inputs defined
 
-        mode_list = sorted(self.modes.values(), key=lambda x: x.name)
-        for mode in mode_list:
-            mode_node = mode.to_xml()
-            if mode_node is not None:
-                node.append(mode_node)
+        if DeviceType.isPersistable(self.device_type):
+            node_tag = "device" if self.type != DeviceType.VJoy else "vjoy-device"
+            node = etree.Element(node_tag)
+            node.set("name", safe_format(self.name, str))
+            node.set("label", safe_format(self.label, str))
+            node.set("device-guid", write_guid(self.device_guid))  # device GUID
+            node.set("guid", write_guid(self.id))  # node ID
 
-        return node
+            node.set("type", DeviceType.to_string(self.type))
+
+            mode_list = sorted(self.modes.values(), key=lambda x: x.name)
+            for mode in mode_list:
+                mode_node = mode.to_xml()
+                if mode_node is not None:
+                    node.append(mode_node)
+
+            return node
+        return None
 
     def __str__(self):
         return f"Profile Device: [{self.device_id}] name: [{self.name}] type: [{self.device_type.name}] virtual: [{self.virtual}]"
@@ -4935,8 +4943,6 @@ class ProfileModeNode:
 
     def getInputItem(self, input_type: InputType, input_id):
         """gets the input item for a given entry"""
-        if input_id == gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart:
-            pass
         if input_type not in self._config:
             self._config[input_type] = {}
         input_id_key = self.registry.getInputIdKey(input_id)
@@ -4946,6 +4952,13 @@ class ProfileModeNode:
             )
             self._config[input_type][input_id_key] = None
         return self._config[input_type][input_id_key]
+
+    def hasInputItems(self):
+        """true if the mode has inputs defined"""
+        for input_type in self._config:
+            if self._config[input_type]:
+                return True
+        return False
 
     def setInputItem(self, input_item: InputItem):
         """stores the input item in this mode node"""

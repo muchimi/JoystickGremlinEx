@@ -269,6 +269,24 @@ class DeviceType(IntEnum):
     OctaviIFR1 = 10 # octavi IFR1 special device
 
     @staticmethod
+    def isFixedInput(self, value : DeviceType) -> bool:
+        """ true if the input is not user defined"""
+        return value in (
+            DeviceType.NotSet,
+            DeviceType.Joystick,
+            DeviceType.ModeControl,
+        )
+
+    @staticmethod
+    def isPersistable(self, value : DeviceType) -> bool:
+        """ true if the input is persistable to a profile """
+        return value not in (
+            DeviceType.NotSet,
+            DeviceType.Settings,
+            DeviceType.Plugins,
+        ) 
+
+    @staticmethod
     def to_string(value):
         if value is None:
             return None
