@@ -27,6 +27,8 @@ import json
 # import gremlin.base_classes
 
 from typing import Callable
+
+
 import gremlin.keyboard
 import gremlin.profile
 import gremlin.shared_state
@@ -192,9 +194,15 @@ class ProfileDeviceNode:
             return mode_node
         return None
 
-    def hasInputs(self) -> bool:
-        """true if the device has defined inputs """
+    def hasInputItems(self, has_mappings = False) -> bool:
+        """true if the device has defined inputs
+        :param has_mappings: optional, if true checks for the inputs to have mappings defined instead of just input definitions
+        """
         for mode_node in self.modes.values():
+            if mode_node.hasInputItems(has_mappings):
+                return True
+        return False
+
 
 
     def ensure_mode_exists(self, mode_name: str, device: dinput.DeviceSummary | dinput.GUID = None, is_system=False) -> ProfileModeNode:  # noqa: F821
@@ -250,9 +258,15 @@ class ProfileDeviceNode:
         :return xml node of this device's contents
         """
 
-        # skip writing if the device has no inputs defined
+        verbose = gremlin.config.Configuration().verbose
 
-        if DeviceType.isPersistable(self.device_type):
+        # skip writing if the device has no inputs defined
+        persistable = DeviceType.isPersistable(self.device_type)
+        hasinputs = self.hasInputItems()
+        if verbose:
+            syslog.info(f"device xml: generating XML for device id [{self.id}] name [{self.name}] persistable: [{persistable}] has inputs: [{hasinputs}] skipping: [{not (hasinputs and persistable)}]")
+
+        if persistable and hasinputs:
             node_tag = "device" if self.type != DeviceType.VJoy else "vjoy-device"
             node = etree.Element(node_tag)
             node.set("name", safe_format(self.name, str))
@@ -269,6 +283,7 @@ class ProfileDeviceNode:
                     node.append(mode_node)
 
             return node
+
         return None
 
     def __str__(self):
@@ -4124,6 +4139,9 @@ class Profile:
         # strip the unused nodes that don't contain any data where possible to reduce the size of the profile
         for device in device_list:
             node = device.to_xml()
+            if node is None:
+                continue  # skip devices that do not produce an XML node
+
             depth = gremlin.util.xmlNodeDepth(node)
             if device.device_type in (
                 DeviceType.Joystick,
@@ -4173,6 +4191,8 @@ class Profile:
         vjoy_devices = etree.Element("vjoy-devices")
         for device in self.vjoy_devices.values():
             node = device.to_xml()
+            if node is None:
+                continue  # skip VJoy devices that do not produce an XML node
             has_container = node.xpath("./container")
             if has_container:
                 vjoy_devices.append(node)
@@ -4953,11 +4973,18 @@ class ProfileModeNode:
             self._config[input_type][input_id_key] = None
         return self._config[input_type][input_id_key]
 
-    def hasInputItems(self):
-        """true if the mode has inputs defined"""
+    def hasInputItems(self, has_mappings = False):
+        """true if the mode node contains defined inputs
+        :param has_mappings: optional, if true checks for the inputs to have mappings defined instead of just input definitions
+        """
         for input_type in self._config:
             if self._config[input_type]:
-                return True
+                if has_mappings:
+                    for input_item in self._config[input_type]:
+                        if input_item and len(input_item.containers) > 0:
+                            return True
+                else:
+                    return True
         return False
 
     def setInputItem(self, input_item: InputItem):

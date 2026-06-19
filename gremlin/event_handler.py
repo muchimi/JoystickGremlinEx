@@ -1597,7 +1597,11 @@ class EventListener(QtCore.QObject):
 
         vendor_id = device.vendor_id
         product_id = device.product_id
-        input_type = event.input_type.value[0]
+        input_type = event.input_type
+        try:
+            input_type = event.input_type.value[0]
+        except Exception:
+            input_type = event.input_type
         input_id = event.input_index
         if vendor_id not in self._debounce_map:
             self._debounce_map[vendor_id] = {}

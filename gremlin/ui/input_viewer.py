@@ -188,7 +188,7 @@ class VisualizationSelector(QtWidgets.QWidget):
 
         # get the order of the devices as set by the user for the physical devices
         tab_map = gremlin.shared_state.ui._get_tab_map()
-        tab_ids = [device_id for device_id, _, _, _ in tab_map.values()]
+        tab_ids = list(tab_map.keys())
         d_list = []
         max_index = len(devices)
         for dev in devices:

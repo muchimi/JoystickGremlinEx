@@ -1987,8 +1987,12 @@ class InvokeUiMethod(QtCore.QObject):
             self._exec(method, p0, p1, p2, p3, p4, p5, p6, p7)
 
     def _exec(self, method, p0, p1, p2, p3, p4, p5, p6, p7):
-        sig = inspect.signature(method)
-        pcount = len(sig.parameters)
+        try:
+            sig = inspect.signature(method)
+            pcount = len(sig.parameters)
+        except (ValueError, TypeError):
+            # built in C function, signature cannot be inspected
+            pcount = 0
 
         match pcount:
             case 0:

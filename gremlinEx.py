@@ -3197,7 +3197,20 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 if index is not None:
                     widget = self.getRegisteredWidget(last_device_guid)
+                    if not widget:
+                        # device may not longer be visible, select the first tab
+                        device_guid = self.ui.devices_tab_header_widget.tabData(0).device_guid  # pick first
+                        index = self.getTabIndexForDevice(device_guid)
+                        widget = self.getRegisteredWidget(device_guid)
+                        last_device_guid = device_guid
+                        # get the first input item
+                        input_item = self.profile.first_input(device_guid)
+                        if input_item:
+                            last_input_id = input_item.input_id
+                            last_input_type = input_item.input_type
+
                     assert widget is not None, "invalid widget"
+
                     widget.refresh()
 
                     # self.ui.devices.setCurrentIndex(index)

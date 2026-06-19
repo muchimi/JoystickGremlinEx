@@ -7102,14 +7102,32 @@ class QUsedPushButton(QDataPushButton):
         callback=None,
         callbackEx=None,
         used=False,
+        marker: bool =None,
         used_device_guid=None,
         used_input_type=None,
         used_input_id=None,
         checkable=False,
         checked=None,
     ):
+        """Initializes a QUsedPushButton instance.
+
+        :param text: the button text
+        :param data: associated data
+        :param parent: parent widget
+        :param tooltip: tooltip text
+        :param callback: callback function
+        :param callbackEx: extended callback function
+        :param used: indicates if the button is used
+        :param marker: indicates if the marker is shown (null value indicates not visible)
+        :param used_device_guid: GUID of the used device
+        :param used_input_type: input type of the used device
+        :param used_input_id: input ID of the used device
+        :param checkable: indicates if the button is checkable
+        :param checked: initial checked state
+        """
         super().__init__(text, data, parent, tooltip, callback=callback, callbackEx=callbackEx)
         self._used = used
+        self._marker = marker
         self._device_guid = used_device_guid
         self._input_type = used_input_type
         self._input_id = used_input_id
@@ -7191,8 +7209,20 @@ class QUsedPushButton(QDataPushButton):
     def setUsed(self, value: bool):
         """marks the button as used/unused"""
         self._used = value
-        if Shiboken.isValid(self):
-            self.repaint()
+        gremlin.util.InvokeUiMethod(self._repaint)
+
+    def getUsed(self) -> bool:
+        """returns the used state of the button"""
+        return self._used
+
+    def setMarker(self, value: bool):
+        """sets the marker visibility on/off"""
+        self._marker = value
+        gremlin.util.InvokeUiMethod(self._repaint)
+
+    def getMarker(self) -> bool:
+        """returns the marker visibility state, None means not visible"""
+        return self._marker
 
     def setHighlight(self, value: bool):
         """sets the button highlight effect on/off"""
@@ -7208,8 +7238,7 @@ class QUsedPushButton(QDataPushButton):
         if self._pulse_timer:
             self._pulse_timer.cancel()
             self._pulse_timer = None
-        if Shiboken.isValid(self):
-            self.repaint()
+        self._repaint()
 
 
     def pulseHighlight(self, interval=0.25):
@@ -7220,12 +7249,16 @@ class QUsedPushButton(QDataPushButton):
         self._pulse_timer = threading.Timer(interval, self._stopHighlight)
         self._pulse_timer.start()
         self._highlight = True
-        gremlin.util.InvokeUiMethod(self.repaint)
+        gremlin.util.InvokeUiMethod(self._repaint)
 
     def _stopHighlight(self):
         """stops the highlight effect for pulsed highlights"""
         self._highlight = False
         gremlin.util.InvokeUiMethod(self._repaint)
+
+    def _repaint(self):
+        if Shiboken.isValid(self):
+            self.repaint()
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -7240,15 +7273,23 @@ class QUsedPushButton(QDataPushButton):
 
         painter.setPen(QColor(color))
         painter.setBrush(QColor(color))
-
         painter.drawEllipse(QPoint(9, 9), 3, 3)
+
+        w = self.width()
+        h = self.height()
+
+        if self._marker is not None:
+            # marker visible
+            color = Color.orangeColor() if self._marker else Color.grayColor()
+            painter.setPen(QColor(color))
+            painter.setBrush(QColor(color))
+            painter.drawEllipse(QPoint(w-9, 9), 3, 3) # align RIGHT
 
         # highlight
         if self._highlight:
             c1 = QtGui.QColor(0, 255, 0, 32)
             c2 = QtGui.QColor(0, 255, 0, 64)
-            w = self.width()
-            h = self.height()
+
             w2 = w / 2
             h2 = h / 2
 

@@ -1364,6 +1364,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.parent = parent
         self.widget_width = None  # actual width in pixels
         self.widget_height = None  # actual height in pixels
+        self._interact_enabled = True # true if can be interacted with
 
         self._ui_loaded = False
         self._identifier = data
@@ -1658,6 +1659,14 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         self.ensureStyle()
 
+    def setInteractable(self, interactable: bool):
+        """sets whether the input item can be interacted with"""
+        self._interact_enabled = interactable
+
+    def getInteractable(self) -> bool:
+        """gets whether the input item can be interacted with"""
+        return self._interact_enabled and not gremlin.shared_state.is_running
+
     def setTooltip(self, tooltip: str):
         """sets the tooltip on the title bar for the input item"""
         self._title_text_widget.toolTip = tooltip
@@ -1707,7 +1716,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def eventFilter(self, widget, event):
         """UI event handler - trap mouse clicks for selection """
-        if self.isEnabled() and not self._selected:
+        if self.getInteractable() and not self._selected:
             t = event.type()
             if t == QtCore.QEvent.Type.MouseButtonPress:
                 button = event.buttons()
@@ -3642,13 +3651,10 @@ class InputItemListView(AbstractView):
                 index = widget.index
                 # deselect the old item in the list
                 if self._current_index != index:
-                    if self._current_index != -1:
-                        old_widget = self.getWidgetAt(self._current_index)
-                        if old_widget:
-                            old_widget.setSelected(False, False)  # de-select old
-                            self.item_selected.emit(self._current_index, False)  # trigger the event
-                    else:
-                        old_widget = None
+                    old_widget = self._last_selected_widget
+                    if old_widget:
+                        old_widget.setSelected(False, False)  # de-select old
+                        self.item_selected.emit(self._current_index, False)  # trigger the event
 
                     self._current_index = index  # update to the new selected index in the list
                     self._last_selected_widget = widget  # store the new reference
@@ -4392,7 +4398,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
             if "input_item" in extra_data:
                 input_item: InputItem = extra_data["input_item"]
                 input_name = f"{input_item.device_name} {input_item.display_name}"
-            model_prefix = f"Action Set for [{input_name}] container: {container_type}"
+                model_prefix = f"Action Set for [{input_name}] container: {container_type}"
 
         self.action_sets.clear()
         as_read = False
