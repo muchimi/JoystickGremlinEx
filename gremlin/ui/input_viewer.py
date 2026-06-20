@@ -17,6 +17,7 @@
 
 import threading
 from PySide6 import QtCore, QtWidgets
+
 import dinput
 import traceback
 from shiboken6 import Shiboken
@@ -681,6 +682,8 @@ States can be toggled by clicking on the state button.  Expression states will u
         el.profile_loaded.disconnect(self.refresh)
         el.profile_unhook.disconnect(self.refresh)
 
+        self._cleanup_joystick_widgets()
+
         gremlin.util.clear_layout(self.main_layout)
         self._state_filter_widget = None
         self._state_visualizer_widget = None
@@ -718,10 +721,8 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._delete_widget(self._keyboard_visualizer_widget)
         self._keyboard_visualizer_widget = None
 
-        for widget in self._joystick_widgets.values():
-            self._delete_widget(widget)
+        self._cleanup_joystick_widgets()
 
-        self._joystick_widgets.clear()
 
 
         self.views.clear()
@@ -1090,13 +1091,15 @@ States can be toggled by clicking on the state button.  Expression states will u
         config.input_viewer_combine_buttonhats = checked
 
         # remove the joystick widgets
+        self._cleanup_joystick_widgets()
+
+        self.vis_selector.updateSelector()
+
+    def _cleanup_joystick_widgets(self):
         for widget in self._joystick_widgets.values():
             self.views.remove_widget(widget)
             self._delete_widget(widget)
-
         self._joystick_widgets.clear()
-
-        self.vis_selector.updateSelector()
 
 
     @QtCore.Slot(bool)

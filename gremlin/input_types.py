@@ -46,6 +46,9 @@ class InputType(enum.IntEnum):
         except KeyError:
             raise ValueError("Invalid type in lookup")
 
+    def toInt(self):
+        return int(self)
+
     @staticmethod
     def to_enum(value):
         try:

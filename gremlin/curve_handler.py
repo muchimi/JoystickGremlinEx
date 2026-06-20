@@ -2570,5 +2570,3 @@ class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
         else:
             super().keyPressEvent(event)
 
-    def closeEvent(self, arg__1):
-        return super().closeEvent(arg__1)

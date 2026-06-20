@@ -31,6 +31,7 @@ import gremlin.ui.ui_common as ui_common
 import gremlin.shared_state
 from gremlin.types import DeviceType
 from gremlin.input_types import InputType
+from gremlin.input_item import InputItem, InputIdentifier, InputItemWidget, InputItemListView, BaseDeviceTabWidget
 from gremlin.util import read_guid, safe_read, safe_format, list_to_csv, csv_to_list
 import gremlin.base_profile
 import uuid
@@ -1733,18 +1734,6 @@ class OscClient:
 
 
 class OscServer:
-    def _server_thread_loop(self):
-        """main threading loop"""
-
-        self._dispatcher = OscDispatcher()
-        self._dispatcher.set_default_handler(self._callback)
-        self._server = BlockingOSCUDPServer((self._host_ip, self._input_port), self._dispatcher)
-        syslog.info("OSC: server starting")
-        # this blocks until the server is shutdown
-        self._server.serve_forever()  # blocks until shutdown
-
-        syslog.info("OSC: server shutdown")
-        self._server = None
 
     def __init__(self):
         # syslog.info("OSC: server init")
@@ -1799,16 +1788,14 @@ class OscServer:
         if not config.osc_enabled:
             # disabled
             return
+        if self._running and self._server_thread is not None:
+            return  # already started
 
         if not callback:
             return  # don't start unless there's a callback provided
 
         with self._lock:
             # everything here is now locked until the server start is completed
-
-            # syslog.info("OSC: start requested")
-            if self._running:
-                return
 
             self._host_ip = host_ip
             self._input_port = input_port
@@ -1835,7 +1822,26 @@ class OscServer:
         self._server_thread.join()
         self._server_thread = None
         self._running = False
+        time.sleep(0.1) # allow time for the server thread to fully terminate
         syslog.info("OSC: server stopped")
+
+    def _server_thread_loop(self):
+        """main threading loop"""
+
+        self._dispatcher = OscDispatcher()
+        self._dispatcher.set_default_handler(self._callback)
+        try:
+            syslog.info("OSC: server starting")
+            self._server = BlockingOSCUDPServer((self._host_ip, self._input_port), self._dispatcher)
+            # this blocks until the server is shutdown
+            self._server.serve_forever()  # blocks until shutdown
+            syslog.info("OSC: server shutdown")
+        except Exception as e:
+            syslog.error(f"OSC: server error: {e}")
+
+
+        self._server = None
+
 
 
 """  OscInterface ================================================================================================== """
@@ -2241,6 +2247,10 @@ class OscInputItem(gremlin.input_item.InputItem):
         return self  # whole input
 
     @property
+    def input_id(self):
+        return self
+
+    @property
     def device_guid(self):
         """device ID"""
         return self._device_guid
@@ -2407,6 +2417,21 @@ class OscInputItem(gremlin.input_item.InputItem):
         self._message_data = value
         self._message_data_string = list_to_csv(value)
         self._update()
+
+    def getState(self):
+        """gets the current value of the input item"""
+        osc_client = InputOscClient()
+        if not osc_client.started:
+            osc_client.start()
+        value = osc_client.getData(self.message_key)
+        match self.mode:
+            case OscInputItem.InputMode.Axis:
+                value = value if value is not None else 0.0
+                return gremlin.event_handler.AxisValues(value)
+
+            case OscInputItem.InputMode.Button:
+                return bool(value) if value is not None else False
+        return None
 
     @property
     def data_string(self):
@@ -2722,6 +2747,40 @@ class OscInputItem(gremlin.input_item.InputItem):
 
     def __str__(self):
         return self._title_name
+
+
+class OscInputItemWidget(gremlin.input_item.InputItemWidget):
+    def __init__(
+        self,
+        input_item: OscInputItem,
+        identifier,
+        parent=None,
+        populate_ui_callback=None,
+        populate_name_callback=None,
+        selection_changed_callback=None,
+        update_callback=None,
+        confirm_delete_callback=None,
+        config_external=False,
+        data=None,
+    ):
+        # store the get_state_callback to be used by child widgets
+        get_state_callback = self._handle_get_state
+        super().__init__(
+            input_item,
+            identifier,
+            parent,
+            populate_ui_callback,
+            populate_name_callback,
+            selection_changed_callback,
+            update_callback,
+            confirm_delete_callback,
+            get_state_callback,
+            config_external,
+            data,
+        )
+
+    def _handle_get_state(self, *args, **kwargs):
+        return self.input_item.getState()
 
 
 class OscInputListenerWidget(QtWidgets.QFrame):
@@ -3069,13 +3128,13 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
                 key = input_item.message_key
                 visible_indices = model.getFilteredIndices()
                 for index in range(len(visible_indices)):
-                    widget = parent_widget.itemAt(index)
-                    if not widget:
+                    input_item: OscInputItem = parent_widget.itemAt(index)
+                    if not input_item:
                         continue
                     if index == self.index:
                         continue  # ignore self
                     # grab the input's configured osc message
-                    other_input = widget.identifier.input_id
+                    other_input = input_item
                     other_message = other_input.message
                     if other_message is None:
                         # input not set = ok
@@ -3697,7 +3756,7 @@ class OscInputItemModel(gremlin.input_item.InputItemListModel):
         )
 
 
-class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
+class OscDeviceTabWidget(BaseDeviceTabWidget):
     """Widget used to configure open sound control (OSC) inputs"""
 
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
@@ -3730,7 +3789,6 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         config = gremlin.config.Configuration()
 
-        self._widget_map = {}
         self._filter = gremlin.util.decorate_filter(config.osc_filter)
         self._in_input_dialog = False  # flag to deal with focus issue
 
@@ -4004,7 +4062,7 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     @QtCore.Slot()
     def _add_input_cb(self):
         """Adds a new input to the inputs list"""
-        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        profile: gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         device_node = profile.getDeviceNode(self._device_guid)
         mode_node = device_node.getModeNode(gremlin.shared_state.current_mode)
         input_item = OscInputItem(mode_node)
@@ -4015,16 +4073,6 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.inputItemListModel.refresh()
         index = self.inputItemListModel.indexOf(input_item)
         self.inputItemListView.selectItemAt(index)
-
-        # last index selected, -1 means none
-        self._last_selected_index = -1
-        self._last_selected_input_item = None
-        self._item_data = None
-
-        # redraw the UI
-
-
-        # auto edit new input
 
         self._edit_item_cb(None, index, input_item)
 
@@ -4187,7 +4235,7 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             # display blank page if no item left
             self._blank_input()
 
-    def _custom_widget_handler(self, list_view, index: int, identifier, data, parent=None):
+    def _custom_widget_handler(self, list_view, index: int, identifier: InputIdentifier, data, parent=None):
         """creates a widget for the input
 
         the widget must have a selected property
@@ -4197,9 +4245,8 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         :param data the data associated with this input item
 
         """
-        import gremlin.input_item
 
-        widget = gremlin.input_item.InputItemWidget(
+        widget = OscInputItemWidget(
             input_item=identifier.input_item,
             identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
@@ -4317,7 +4364,7 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _edit_item_cb(self, widget, index, data):
         """called when the edit button is clicked"""
         current_mode = gremlin.shared_state.edit_mode
-        self._edit_dialog = OscInputConfigDialog(current_mode, index, data, parent = self)
+        self._edit_dialog = OscInputConfigDialog(current_mode, index, data, parent=self)
         self._edit_dialog.accepted.connect(self._dialog_ok_cb)
         self._edit_dialog.rejected.connect(self._dialog_rejected_cb)
         gremlin.util.centerDialog(self._edit_dialog)
@@ -4336,8 +4383,7 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         autorelease = self._edit_dialog._trigger_autorelease
         autorelease_delay = self._edit_dialog._pulse_delay
 
-        identifier = self.inputItemListModel.data(index)
-        input_item: OscInputItem = identifier.input_id
+        input_item: OscInputItem = self.inputItemListModel.itemAt(index)
         input_item._message = message  # OSC command message as text
         input_item._message_data = data  # arguments as a list
         input_item.setMode(mode)
@@ -4348,17 +4394,12 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         input_item._autorelease_delay = autorelease_delay
         input_item._source_index = self._edit_dialog.source_index
 
-        self._item_data.is_axis = input_item.is_axis
-        self._item_data._item_data.is_axis = input_item.is_axis
-
         input_item._update()  # refresh other properties
         self.inputItemListView.update_item(index)
 
         el = gremlin.event_handler.EventListener()
+        el.device_mapping_changed.emit(self._device_id)
         el.request_action_list_refresh.emit()  # ask action lists to refresh
-
-        # update container display if blank
-        self._update_blank(input_item)
 
     def _dialog_rejected_cb(self):
         index = self._edit_dialog.index
@@ -4556,6 +4597,11 @@ class InputOscClient(QtCore.QObject):
             self._interface = None
         self._started = False
 
+    @property
+    def started(self) -> bool:
+        """true if listening to OSC messages"""
+        return self._started
+
     def getData(self, address: str):
         if self._started:
             if address in self._state_data:
@@ -4654,7 +4700,7 @@ class InputOscClient(QtCore.QObject):
                     self._event_listener.joystick_event.emit(event)
 
                     if not is_running:
-                        self._event_listener.axis_state_change.emit(event)
+                        self._event_listener.joystick_event_ui.emit(event)
                         continue
 
                 elif input_item.mode == OscInputItem.InputMode.OnChange:
@@ -4716,7 +4762,8 @@ class InputOscClient(QtCore.QObject):
                     self._event_listener.osc_event.emit(event)
 
                     if not gremlin.shared_state.is_running:
-                        self._event_listener.button_state_change.emit(event)
+                        # fire UI event to update the button
+                        self._event_listener.joystick_event_ui.emit(event)
 
                     if autorelease:
                         # schedule an autorelease event

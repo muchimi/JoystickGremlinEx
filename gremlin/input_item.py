@@ -212,6 +212,13 @@ class InputIdentifier(QtCore.QObject):
         return None  # not found
 
 
+def getInputIdKey(input_id):
+    """gets an input id key from a given input id"""
+    if input_id is not None and hasattr(input_id, "message_key"):
+        return input_id.message_key
+    return input_id
+
+
 class AbstractView(QtWidgets.QWidget):
     """
     base view for widget list type objects that show one or more content items.
@@ -1354,10 +1361,24 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         selection_changed_callback: Callable = None,
         update_callback: Callable = None,
         confirm_delete_callback: Callable = None,
+        get_state_callback : Callable = None,
         config_external=False,
         data=None,
     ):
-        """builds the widget"""
+        """builds the widget
+        :param input_item: The input item associated with this widget
+        :param identifier: The input identifier associated with this widget
+        :param parent: Optional parent widget
+        :param populate_ui_callback: Optional callback to populate the UI
+        :param populate_name_callback: Optional callback to populate the name
+        :param selection_changed_callback: Optional callback for selection changes
+        :param update_callback: Optional callback for updates
+        :param confirm_delete_callback: Optional callback for confirming deletion
+        :param get_state_callback: Optional callback to get the current state of the input
+        :param config_external: True if the widget is configured externally
+        :param data: Optional additional data
+
+        """
 
         super().__init__(parent)
 
@@ -1397,6 +1418,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         self._config_external = config_external  # true if the widget is a custom widget configured externally
         self._update_callback = update_callback  # callback to use when a specific widget index must be updated
+
+        self._get_state_callback = get_state_callback  # store the callback to get the current state of the input
 
         self._selection_change_callbacks = []
         if selection_changed_callback:
@@ -1892,12 +1915,16 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         """updates the repeaters based on the type of widget"""
         gremlin.util.assert_ui_thread()
 
-        if self._input_type in (
+        # use the override input type to determine button or axis repeater
+        input_type = self.input_item.getOverrideInputType()
+
+        if self.input_item.input_type in (
             InputType.Keyboard,
             InputType.KeyboardLatched,
             InputType.ModeControl,
             InputType.State,
         ):
+            # button only inputs
             gremlin.util.clear_layout(self._repeater_container_layout)
             self._setWidgetHeight(self._repeater_container_widget, 0)  # turn off repeater for non axis widgets
             self.axis_repeater_widget = None
@@ -1909,9 +1936,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         widget = None  # widget created for the repeater
 
-        # if self._identifier.input_type in (InputType.Keyboard, InputType.KeyboardLatched):
-        #     pass
-        input_type = self._identifier.input_type
 
         if config.show_input_axis:
             # gremlin.util.clear_layout(self._repeater_container_layout)
@@ -1920,25 +1944,31 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                 InputType.JoystickAxis,
                 InputType.JoystickButton,
                 InputType.JoystickHat,
-                InputType.OpenSoundControl,
-                InputType.Midi,
             ):
                 if self._identifier.is_valid:
                     hook_id = gremlin.util.normalize_guid(self._identifier.device_guid)
                     if self._identifier.is_axis:
                         # axis
-                        device_guid = self._identifier.device_guid
-                        device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
-                        input_id = self._identifier.input_id
-                        assert input_id in device.axis_id_map, f"invalid axis id: {input_id} for device: {device.getName()}"
+                        if self._get_state_callback:
+                            values = self._get_state_callback()
+                        else:
+                            device_guid = self._identifier.device_guid
+                            device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
+                            input_id = self._identifier.input_id
+                            assert input_id in device.axis_id_map, f"invalid axis id: [{input_id}] for device: [{device.name}]"
 
-                        astate = gremlin.event_handler.AxisState()
-                        values = astate.getAxisValues(device_guid, input_id)
+                            astate = gremlin.event_handler.AxisState()
+                            values = astate.getAxisValues(device_guid, input_id)
+
+
 
                         if not self.axis_repeater_widget:
                             # create the repeater
                             widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar(
-                                input_item=self._input_item, values=values, description=f"axis repeater for input item: {self.input_item.display_name}"
+                                input_item=self._input_item,
+                                values=values,
+                                callback=self._get_state_callback,
+                                description=f"axis repeater for input item: {self.input_item.display_name}"
                             )
 
                             # widget.unhooked.connect(self._axis_widget_unhooked)
@@ -1960,8 +1990,12 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                         self.axis_repeater_widget.triggerUpdate()  # force an update
                     else:
                         # button
-                        if not self.button_repeater_widget and self._input_item.input_type in (InputType.JoystickButton, InputType.JoystickHat):
-                            widget = gremlin.ui.ui_common.QButtonStateWidget(self._input_item, f"ButtonRepeater for: [{self._input_item.display_name}]")
+
+                        if not self.button_repeater_widget: # and input_type in (InputType.JoystickButton, InputType.JoystickHat):
+                            widget = gremlin.ui.ui_common.QButtonStateWidget(
+                                input_item=self._input_item,
+                                callback=self._get_state_callback,
+                                description=  f"ButtonRepeater for: [{self._input_item.display_name}]")
                             self.button_repeater_widget = widget
                             self._repeater_container_layout.addWidget(widget)
 

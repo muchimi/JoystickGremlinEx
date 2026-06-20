@@ -1971,7 +1971,7 @@ class ProfileRegistry:
 
     def getInputIdKey(self, input_id) -> list:
         """gets an input id key from a given input id"""
-        return self._profile.getInputIdKey(input_id)
+        return gremlin.input_item.getInputIdKey(input_id)
 
     def getInputItem(
         self,
@@ -2350,9 +2350,7 @@ class Profile:
 
     def getInputIdKey(self, input_id) -> list:
         """gets an input id key from a given input id"""
-        if input_id is not None and hasattr(input_id, "message_key"):
-            return input_id.message_key
-        return input_id
+        return gremlin.input_item.getInputIdKey(input_id)
 
     def registerInputItem(
         self,

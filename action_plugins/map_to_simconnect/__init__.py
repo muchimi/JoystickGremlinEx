@@ -2072,7 +2072,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         if profile:
             profile.save()
         self.closed.emit()
-        super().closeEvent(event)
+        return super().closeEvent(event)
 
     @QtCore.Slot(bool)
     def _auto_mode_select_cb(self, checked: bool):

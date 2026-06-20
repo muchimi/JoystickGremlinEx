@@ -241,6 +241,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.update_mode_status_bar.connect(self._update_mode_status_bar)
         el.request_ui_refresh.connect(self.refresh)
         el.shutdown.connect(self.handle_shutdown)
+        el.feature_changed.connect(self._handle_feature_changed)  # handle feature changes
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon(
@@ -392,7 +393,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.update_toolbar()
         self._update_status_bar()
         el.config_option_changed.connect(self._config_option_changed)
-        el.device_change_event.connect(self._device_change_cb)
+        el.device_change_event.connect(self._handle_devices_changed)
         el.ui_initialized.connect(self._update_start_tab)
 
         self.vjoy_state = gremlin.joystick_handling.VJoyUsageState()
@@ -1174,7 +1175,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if dialog:
                 dialog.watcher.stop()
 
-        super().closeEvent(event)
+        return super().closeEvent(event)
 
     # +---------------------------------------------------------------
     # | Modal window creation
@@ -2512,6 +2513,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self.ui.devices_tab_header_widget.setTabTextColor(position, color)
                 self.ui.devices_tab_header_widget.setTabIcon(position, icon)  # clear the icon
 
+
+    def _handle_feature_changed(self, feature):
+        """called when a feature changes"""
+        self.setTabsDirty(update=True)  # mark tabs as dirty and updateD
+
     def setTabsDirty(self, update=False):
         """indicate tabs must be refreshed next time create tabs is called"""
 
@@ -3739,7 +3745,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 self.selectRegisteredWidget(device_guid)
                                 if verbose:
                                     syslog.info(f"SELECT INPUT: select widget {input_type} {input_id}")
-                                if tab_changed or not hasattr(widget, "input_item_list_view"):
+                                if tab_changed or not hasattr(widget, "inputItemListView"):
                                     widget.refresh(emit=False)
                                 if not force_update:
                                     force_update = (
@@ -3750,8 +3756,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                                 _emit = gremlin.shared_state.profile_loading  # True #not has_containers
 
-                                # widget.input_item_list_view.select_input(input_type, input_id, force_update = force_update, emit = emit)
-                                # index = widget.input_item_list_view.current_index
+                                # widget.inputItemListView.select_input(input_type, input_id, force_update = force_update, emit = emit)
+                                # index = widget.inputItemListView.currentIndex()
                                 index = widget.indexOf(input_item)
 
                                 # widget.input_item_list_view.redraw_index(index)
@@ -3867,11 +3873,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _active_input_item(self) -> gremlin.input_item.InputItem:
         """gets the current selected input item"""
         widget = self.getActiveTabWidget()
-        if widget and hasattr(widget, "input_item_list_view"):
-            item_index = widget.input_item_list_view.current_index
-            data = widget.input_item_list_view.model.data(item_index)
-            return data
-
+        if widget and hasattr(widget, "inputItemListView"):
+            return widget.inputItemListView.currentItem()
         return None
 
     def _get_tab_guid(self, index: int) -> str:
@@ -3884,26 +3887,27 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _get_tab_input_type(self, index: int):
         """gets the input type of the tab"""
         widget = self.getWidgetByTabIndex(index)
-        if hasattr(widget, "input_item_list_view"):
-            item_index = widget.input_item_list_view.current_index
-            data = widget.input_item_list_view.model.data(item_index)
+        if hasattr(widget, "inputItemListView"):
+            item_index = widget.inputItemListView.currentIndex()
+            data = widget.inputItemListView.model.data(item_index)
             return data.device_type
         return None
 
+
     def _get_tab_input_id(self, index: int):
         widget = self.getWidgetByTabIndex(index)
-        if hasattr(widget, "input_item_list_view"):
-            item_index = widget.input_item_list_view.current_index
-            data = widget.input_item_list_view.model.data(item_index)
+        if hasattr(widget, "inputItemListView"):
+            item_index = widget.inputItemListView.currentIndex()
+            data = widget.inputItemListView.model.data(item_index)
             return data.input_id
         return None
 
     def _get_tab_input_data(self, index: int):
         """returns (input_type, input_id) for a given tab index"""
         widget = self.getWidgetByTabIndex(index)
-        if hasattr(widget, "input_item_list_view"):
-            item_index = widget.input_item_list_view.current_index
-            data = widget.input_item_list_view.model.data(item_index)
+        if hasattr(widget, "inputItemListView"):
+            item_index = widget.inputItemListView.currentIndex()
+            data = widget.inputItemListView.model.data(item_index)
             if data is not None:
                 return (data.device_type, data.input_id)
         return (None, None)
@@ -4104,7 +4108,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     # | Signal handlers
     # +---------------------------------------------------------------
 
-    def _device_change_cb(self):
+    def _handle_devices_changed(self):
         gremlin.util.InvokeUiMethod(self._device_change_ui)  # ensure the update is on the UI thread
 
     def _device_change_ui(self):

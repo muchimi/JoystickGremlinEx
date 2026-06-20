@@ -40,6 +40,8 @@ import gremlin.util
 from gremlin.ui.ui_common import QBoxFrame
 from psygnal import Signal
 from gremlin.types import DeviceType
+from gremlin.input_item import InputItem, InputIdentifier, InputItemWidget, InputItemListView, BaseDeviceTabWidget
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -187,8 +189,8 @@ class MidiInputItem(gremlin.input_item.InputItem):
 
             return "Button"
 
-    def __init__(self, parent=None):
-        super().__init__(mode_object=parent, device_guid=MidiDeviceTabWidget.device_guid, input_type = InputType.Midi)  # parent is the mode object this input belongs to
+    def __init__(self, mode_object: gremlin.base_profile.ProfileModeNode = None):
+        super().__init__(mode_object, device_guid=MidiDeviceTabWidget.device_guid, input_type=InputType.Midi)  # parent is the mode object this input belongs to
 
         self._port_name = None
         self._message = None  # the midi message
@@ -212,6 +214,10 @@ class MidiInputItem(gremlin.input_item.InputItem):
 
     def _handle_input_id_callback(self):
         """input id is self for MIDI"""
+        return self
+
+    @property
+    def input_id(self):
         return self
 
     @property
@@ -304,6 +310,16 @@ class MidiInputItem(gremlin.input_item.InputItem):
             return InputType.JoystickAxis
         else:
             return InputType.JoystickButton
+
+    def getState(self):
+        """ gets the current value of the input item"""
+        midi_input = MidiClient()
+        value = midi_input.getData(self.message_key)
+        if self.is_axis:
+            return value if value is not None else 0.0
+        elif self.is_button:
+            return bool(value) if value is not None else False
+        return None
 
     @property
     def port_name(self):
@@ -494,6 +510,14 @@ class MidiInputItem(gremlin.input_item.InputItem):
         return False
 
 
+class MidiInputItemWidget(gremlin.input_item.InputItemWidget):
+    def __init__(self, input_item : MidiInputItem, identifier, populate_ui_callback, update_callback, config_external=False, parent=None, data=None):
+        get_state_callback = self._handle_get_state
+        super().__init__(input_item, identifier, populate_ui_callback, update_callback, config_external, parent, data, get_state_callback=get_state_callback)
+
+    def _handle_get_state(self):
+        return self.input_item.getState()
+
 class MidiListener(AbortableThread):
     """midi input object"""
 
@@ -555,10 +579,8 @@ class MidiInterface(QtCore.QObject):
         self._initialized = False
 
         self._monitored_ports = set()
-        self.midi_enabled = False
-        # config = gremlin.config.Configuration()
-        # if config.midi_enabled:
-        #     self._initialize_midi()
+        self.midi_enabled = True  # allow MIDI feature in GEX
+
 
 
     def _initialize_midi(self):
@@ -832,7 +854,7 @@ class MidiInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent  # list view
         assert hasattr(parent, "inputItemListModel"), "MIDI CONFIG: Parent widget does not have required listview model"
-        assert hasattr(parent, "input_item_list_view"), "MIDI CONFIG: Parent widget does not have required listview"
+        assert hasattr(parent, "inputItemListView"), "MIDI CONFIG: Parent widget does not have required listview"
 
         self.config_widget = QtWidgets.QWidget()
         self.config_layout = QtWidgets.QGridLayout(self.config_widget)
@@ -1518,7 +1540,7 @@ class MidiInputItemModel(gremlin.input_item.InputItemListModel):
 
 
 
-class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
+class MidiDeviceTabWidget(BaseDeviceTabWidget):
     """Widget used to configure open sound control (OSC) inputs"""
 
     # IMPORTANT: MUST BE A DID FORMATTED ID ON CUSTOM INPUTS
@@ -1609,6 +1631,8 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._handle_edit_mode_changed)  # edit mode changed or mode added/removed
 
+        self._last_selected_index = -1  # index of last input, -1 if none
+
     def _load_handler(self, model: MidiInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
 
@@ -1668,6 +1692,40 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.inputItemListView.item_closed.disconnect(self._close_item_cb)
         self.inputItemListView.updated.disconnect(self._update_conflicts)
 
+    @property
+    def inputCount(self) -> int:
+        """number of inputs in the device"""
+        return self.inputItemListModel.rows()
+
+    @property
+    def inputWidgetCount(self) -> int:
+        """number of input widgets currently in the device"""
+        return self.inputItemListView.count()
+
+    def _handle_lock_inputs(self, data):
+        gremlin.util.InvokeUiMethod(self._handle_lock_inputs_ui, data)  # ensure on UI thread
+
+    def _handle_unlock_inputs(self, data):
+        gremlin.util.InvokeUiMethod(self._handle_unlock_inputs_ui, data)  # ensure on UI thread
+
+    def _handle_lock_inputs_ui(self, data):
+        """lock all inputs event"""
+        if Shiboken.isValid(self) and data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.inputItemListModel.getFilteredItems():
+                input_item.locked = True
+            self.setUpdatesEnabled(True)
+
+    def _handle_unlock_inputs_ui(self, data):
+        """unlock all inputs event"""
+        if Shiboken.isValid(self) and data == self.device_guid:
+            # ours
+            self.setUpdatesEnabled(False)
+            for input_item in self.inputItemListModel.getFilteredItems():
+                input_item.locked = False
+            self.setUpdatesEnabled(True)
+
     def _handle_edit_mode_changed(self, mode: str):
         """occurs when a new mode is selected"""
         gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode)  # ensure on UI thread
@@ -1694,19 +1752,16 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _add_input_cb(self):
         """Adds a new input to the inputs list"""
-        input_type = InputType.Midi
+        profile: gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        device_node = profile.getDeviceNode(self._device_guid)
+        mode_node = device_node.getModeNode(gremlin.shared_state.current_mode)
 
-        profile = gremlin.shared_state.current_profile
-        device_modes = profile.get_device_modes(self._device_guid, DeviceType.to_string(DeviceType.Midi))
-        mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
 
-        input_item = MidiInputItem(mode_object)
-        input_item.id = uuid.uuid4()  # unique ID for this new item
-        self.device_profile.modes[self.current_mode].get_data(input_type, input_item)
+        input_item = MidiInputItem(mode_node)
+
         self.inputItemListModel.refresh()
-
         index = self.inputItemListModel.indexOf(input_item)
-        self.selectInputItem(input_item)
+        self.inputItemListView.selectItemAt(index)
 
         self._item_data = None
 
@@ -1732,7 +1787,7 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             self.inputItemListModel.refresh()
 
 
-    def _custom_widget_handler(self, list_view, index: int, identifier, data, parent=None):
+    def _custom_widget_handler(self, list_view, index: int, identifier: InputIdentifier, data, parent=None):
         """creates a widget for the input
 
         the widget must have a selected property
@@ -1743,8 +1798,10 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         """
         import gremlin.input_item
+        input_item = identifier.input_item
 
         widget = gremlin.input_item.InputItemWidget(
+            input_item = input_item,
             identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,
@@ -1752,16 +1809,15 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             parent=parent,
             data=data,
         )
-        input_id: MidiInputItem = identifier.input_id
         widget._identifier = data
         widget.create_action_icons(data)
         # widget.setTitle(input_id.title_name)
-        widget.setInputDescription(input_id.display_name)
+        widget.setInputDescription(input_item.display_name)
         # widget.setDescription(data.description)
         # widget.setIcon("mdi.midi")
         widget.enable_close()
         widget.enable_edit()
-        mode = input_id.mode
+        mode = input_item.mode
         if mode == MidiInputItem.InputMode.Button:
             widget.setIcon("mdi.gesture-tap-button")
         elif mode == MidiInputItem.InputMode.Axis:
@@ -1776,13 +1832,13 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _edit_item_cb(self, widget, index, data):
         """called when the edit button is clicked"""
-        interface = MidiInterface()
-        if interface.enabled:
-            self._edit_dialog = MidiInputConfigDialog(self.current_mode, index, data, self)
-            self._edit_dialog.accepted.connect(self._dialog_ok_cb)
-            gremlin.util.centerDialog(self._edit_dialog)
-            self._edit_dialog.showNormal()
-            self._index = index
+        current_mode = gremlin.shared_state.edit_mode
+        self._edit_dialog = MidiInputConfigDialog(current_mode, index, data, parent = self)
+        self._edit_dialog.accepted.connect(self._dialog_ok_cb)
+        self._edit_dialog.rejected.connect(self._dialog_rejected_cb)
+        gremlin.util.centerDialog(self._edit_dialog)
+        self._edit_dialog.showNormal()
+        self._index = index
 
     def _dialog_ok_cb(self):
         """called when the ok button is pressed on the edit dialog"""
@@ -1791,24 +1847,29 @@ class MidiDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         port_name = self._edit_dialog.port_name
         mode = self._edit_dialog.mode
 
-        identifier = self.inputItemListModel.data(index)
-        input_item: MidiInputItem = identifier.input_id
+
+        input_item: MidiInputItem = self.inputItemListModel.itemAt(index)
         input_item.port_name = port_name
         input_item.message = message
         input_item._mode = mode
 
         is_axis = mode == MidiInputItem.InputMode.Axis
-        self._item_data.is_axis = is_axis
-        self._item_data._item_data.is_axis = is_axis
+        input_item.is_axis = is_axis
+        input_item._update()  # refresh other properties
 
         self.inputItemListView.update_item(index)
 
-        # update container display if blank
-        self.updateContainerViewBlankMessage(input_item, " MIDI ")
+        # # update container display if blank
+        # self.updateContainerViewBlankMessage(input_item, " MIDI ")
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
         el.request_action_list_refresh.emit()  # ask action lists to refresh
+
+    def _dialog_rejected_cb(self):
+        index = self._edit_dialog.index
+        self.inputItemListView.update_item(index)
+
 
     def _close_item_cb(self, widget, index, data):
         """called when the close button is clicked"""

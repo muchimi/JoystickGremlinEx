@@ -1665,15 +1665,6 @@ class Configuration(QtCore.QObject):
         """true if verbose mode level 3"""
         return self.verbose and VerboseMode.L3 in self.verbose_mode
 
-    @property
-    def midi_enabled(self):
-        """true if MIDI module is enabled"""
-        return self._get_data("midi_enabled", True)
-
-    @midi_enabled.setter
-    def midi_enabled(self, value):
-        self._data["midi_enabled"] = value
-        self.save()
 
     @property
     def osc_enabled(self):
@@ -2352,6 +2343,7 @@ class Configuration(QtCore.QObject):
     def midi_enabled(self, value: bool):
         self._data["midi_enabled"] = value
         self._midi_enabled = None  # force a re-read
+        self.save()  # save the change
 
     @property
     def osc_enabled(self) -> bool:
@@ -2364,6 +2356,7 @@ class Configuration(QtCore.QObject):
     def osc_enabled(self, value: bool):
         self._data["osc_enabled"] = value
         self._osc_enabled = None  # force a re-read
+        self.save()  # save the change
 
     @property
     def osc_pad_args(self) -> bool:

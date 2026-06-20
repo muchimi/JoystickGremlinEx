@@ -170,7 +170,7 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
         if len(self.devices) > 0:
             el = gremlin.event_handler.EventListener()
             el.joystick_event.disconnect(self._handle_event)
-        super().closeEvent(event)
+        return super().closeEvent(event)
 
 
 class AxisCalibrationWidget(QtWidgets.QWidget):

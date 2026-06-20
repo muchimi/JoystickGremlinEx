@@ -2239,12 +2239,19 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         :param event the close event
         """
-        self.config.save()
+        self.save()
 
         # forcibly garbage collect dialog widgets
         gremlin.util.clear_layout(self.main_layout)
 
-        super().closeEvent(event)
+        if self._reload_needed:
+            el = gremlin.event_handler.EventListener()
+            el.feature_changed.emit(None)  # tell the application to reload
+
+        return super().closeEvent(event)
+
+    def save(self):
+        self.config.save()
 
     def _update_highlight_options(self):
         """enables/disables device highlight options based on state"""
@@ -3218,7 +3225,7 @@ class LogWindowUi(ui_common.BaseDialogUi):
         :param event the closing event
         """
         self.watcher.stop()
-        super().closeEvent(event)
+        return super().closeEvent(event)
 
     def _create_log_display(self, fname, title):
         """Creates a new tab displaying log file contents.
@@ -3375,7 +3382,7 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
 
         if self._profile.add_mode(name, parent_name):
             self.accept()
-            super().closeEvent(event)
+            return super().closeEvent(event)
         return False  # don't close
 
 
@@ -3419,7 +3426,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         el.keyboard_hook.start()
         el.profile_modes_changed.emit()  # tell the UI the profile mode options have changed
 
-        super().closeEvent(event)
+        return super().closeEvent(event)
 
     def _create_ui(self):
         """Creates the required UII elements."""
@@ -4403,17 +4410,15 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
 
 
 class ReorderDeviceListWidget(QtWidgets.QWidget):
-    def __init__(self, name: str, visible: bool, visible_change_callback: Callable, data: object, parent = None):
-        super().__init__(parent = parent)
+    def __init__(self, name: str, visible: bool, visible_change_callback: Callable, data: object, parent=None):
+        super().__init__(parent=parent)
         self.data = data
         name_widget = QtWidgets.QLabel(name)
-        visible_widget = gremlin.ui.ui_common.QDataCheckbox(callbackEx=visible_change_callback, value = visible, tooltip = "Toggle visible", data = data)
-        widget = gremlin.ui.ui_common.getHContainer([visible_widget,name_widget], widget_only=True)
+        visible_widget = gremlin.ui.ui_common.QDataCheckbox(callbackEx=visible_change_callback, value=visible, tooltip="Toggle visible", data=data)
+        widget = gremlin.ui.ui_common.getHContainer([visible_widget, name_widget], widget_only=True)
         layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(0,0,0,0)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(widget)
-
-
 
 
 class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
@@ -4425,8 +4430,6 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
         import gremlin.ui
         import gremlin.shared_state
         import gremlin.joystick_handling
-
-        ui = gremlin.shared_state.ui
 
         super().__init__(self.__class__.__name__, parent=parent)
 
@@ -4440,7 +4443,7 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
         label = QLabel("Device List:")
         self.main_layout.addWidget(label)
 
-        #list_widget = ReorderListWidget()
+        # list_widget = ReorderListWidget()
         list_widget = QListWidget()
         list_widget.setDragEnabled(True)
         list_widget.setAcceptDrops(True)
@@ -4452,13 +4455,26 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
         new_tab_map = {}
         device: TabData
         self.visible_map = self.config.device_visible_map
-        device : dinput.DeviceSummary
+        device: dinput.DeviceSummary
+
+        midi_enabled = self.config.midi_enabled
+        osc_enabled = self.config.osc_enabled
+
         for key, device in all_devices.items():
             if device.disabled:
                 # skip disabled devices
                 continue
+            # hide devices associated with disabled features
+            match device.device_type:
+                case DeviceType.Midi:
+                    if not midi_enabled:
+                        continue
+                case DeviceType.Osc:
+                    if not osc_enabled:
+                        continue
             device_id = device.device_id
             visible = self.visible_map[device_id] if device_id in self.visible_map else True
+
             widget = ReorderDeviceListWidget(device.name, visible=visible, visible_change_callback=self._handle_visible_changed, data=device)
             item = QListWidgetItem(list_widget)
             item.setData(1, device)
@@ -4513,13 +4529,13 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
         tab_map = {}
         items = [self._list_widget.item(i) for i in range(self._list_widget.count())]
         for index, item in enumerate(items):
-            device : dinput.DeviceSummary = item.data(1)
+            device: dinput.DeviceSummary = item.data(1)
             tab_map[index] = device.device_id
 
         return tab_map
 
     def _handle_visible_changed(self, widget, checked: bool):
-        device : dinput.DeviceSummary = widget.data
+        device: dinput.DeviceSummary = widget.data
         self.visible_map[device.device_id] = checked
 
     def _handle_save_order(self, widget):
@@ -4609,17 +4625,12 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
         """orders using the default order"""
 
         import gremlin.shared_state
+
         ui = gremlin.shared_state.ui
 
         # load default device order
-        data = ui._get_sorted_tab_map(reset = True)
-        # sorted_devices = data["sorted"]
-        # physical_devices = data["physical"]
-        # vjoy_devices = data["vjoy"]
-        # special_devices = data["special"]
-        # config_devices = data["config"]
-        #self._tab_map = data["tab_map"]
-        #index_map = data["index_map"]
+        data = ui._get_sorted_tab_map(reset=True)
+
 
         self._list_widget.clear()
 
@@ -4634,7 +4645,6 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
             item.setData(1, device)
             item.setSizeHint(widget.sizeHint())
             self._list_widget.setItemWidget(item, widget)
-
 
     def _update_tabs(self):
         import gremlin.shared_state
@@ -4652,12 +4662,8 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self.config.tab_list = tab_map
 
-
-
         # this will cause tab movement and/or tab redraw if devices visibility changed
         ui._create_tabs_ui()
-
-
 
     @QtCore.Slot()
     def _close_cb(self):
@@ -4670,3 +4676,6 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
     def _cancel_cb(self):
         self.reject()
         self.close()
+
+
+

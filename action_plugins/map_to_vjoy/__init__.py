@@ -5278,9 +5278,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         is_local, is_remote = self.action_data.sendFlags()
 
         verbose = self.verbose
-        verbose = True
+        # verbose = True
         verbose_extra = self.verbose_extra
-        verbose_extra = verbose
+
         # syslog = logging.getLogger("system")
         if event.force_remote:
             # force remote mode on if specified in the event

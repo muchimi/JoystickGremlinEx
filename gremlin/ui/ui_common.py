@@ -82,7 +82,6 @@ from PySide6.QtWidgets import (
 
 from gremlin.util import load_pixmap, load_icon
 import gremlin.util
-import gremlin.ui.ui_common
 import dinput
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import HatDirection
@@ -105,6 +104,7 @@ def clearStackedWidget(stacked_widget: QtWidgets.QStackedWidget):
         widget.hide()
         widget.deleteLater()
 
+
 class Ansi:
     RED = "\033[31m"
     GREEN = "\033[32m"
@@ -112,6 +112,7 @@ class Ansi:
     ORANGE = "\033[38;5;208m"
     BOLD = "\033[1m"
     RESET = "\033[0m"
+
 
 class Color:
     """general UI color and stylesheet handling"""
@@ -1752,7 +1753,6 @@ class StateTracker:
 _state_tracker = StateTracker()
 
 
-
 class LeftRightPushButton(QtWidgets.QPushButton):
     """Implements a push button that distinguishes between left and right
     mouse clicks."""
@@ -2912,8 +2912,6 @@ class VJoySelector(AbstractInputSelector):
         return device.vjoy_id
 
 
-
-
 class ModeStyle(anytree.AbstractStyle):
     """style for anytree mode rendering"""
 
@@ -2933,7 +2931,7 @@ class ModeSelectorWidget(QtWidgets.QWidget):
 
     modeChanged = QtCore.Signal(str)  # occurs whena mode is selected
 
-    def __init__(self, text = "Mode:", parent=None):
+    def __init__(self, text="Mode:", parent=None):
         super().__init__(parent)
 
         self._selector_widget = QDataComboBox()
@@ -3162,11 +3160,7 @@ class ModeWidget(QtWidgets.QWidget):
         min_min_sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         exp_min_sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
 
-        self.profile_options_button_widget = QIconPushButton(
-            icon  = Icons.gearIcon(),
-            tooltip = "Profile Options",
-            callback = self._handle_profile_options_cb)
-
+        self.profile_options_button_widget = QIconPushButton(icon=Icons.gearIcon(), tooltip="Profile Options", callback=self._handle_profile_options_cb)
 
         # Create mode selector and related widgets
         self.edit_label = QtWidgets.QLabel(self._label)
@@ -3656,7 +3650,7 @@ class InputListenerWidget(QBoxFrame):
         self.closed.emit(self._accepted)
 
         # print ("input widget close")
-        super().closeEvent(evt)
+        return super().closeEvent(evt)
 
     def _valid_event_types_string(self):
         """Returns a formatted string containing the valid event types.
@@ -4291,6 +4285,7 @@ class QDataPushButton(QtWidgets.QPushButton):
 
     def on_press(self):
         pass
+
     def on_release(self):
         pass
 
@@ -4298,7 +4293,6 @@ class QDataPushButton(QtWidgets.QPushButton):
         if self.isEnabled():
             t = event.type()
             if t == QtCore.QEvent.Type.MouseButtonPress:
-
                 button = event.buttons()
                 # Check if Control modifier is active
                 is_ctrl = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
@@ -4352,7 +4346,7 @@ class QIconPushButton(QDataPushButton):
 
     def __init__(
         self,
-        icon = None,
+        icon=None,
         text=None,
         data=None,
         parent=None,
@@ -4382,24 +4376,17 @@ class QIconPushButton(QDataPushButton):
         #     sig = inspect.signature(callback_ex)
         #     if len(sig.parameters) != 5:
         #         pass
-        super().__init__(text=text,
-                         data = data,
-                         parent = parent,
-                         tooltip = tooltip,
-                         callback = callback,
-                         callbackEx=callbackEx,
-                         clicked=clicked,
-                         enabled=enabled,
-                         enhanced=enhanced
-                         )
-
+        super().__init__(
+            text=text, data=data, parent=parent, tooltip=tooltip, callback=callback, callbackEx=callbackEx, clicked=clicked, enabled=enabled, enhanced=enhanced
+        )
 
         if icon:
             self.setIcon(icon)
 
     def setIcon(self, icon):
         import gremlin.util
-        icon : QIcon = gremlin.util.load_icon(icon)
+
+        icon: QIcon = gremlin.util.load_icon(icon)
         super().setIcon(icon)
 
         # build the "press" icon
@@ -4408,19 +4395,16 @@ class QIconPushButton(QDataPushButton):
         base_pixmap = icon.pixmap(icon_size)
         offset = QPoint(2, 2)
         offset_pixmap = QPixmap(base_pixmap.size() + QSize(offset.x(), offset.y()))
-        offset_pixmap.fill(Qt.transparent) # Ensure background is clear
+        offset_pixmap.fill(Qt.transparent)  # Ensure background is clear
 
         # 3. Draw the shifted image using QPainter
         painter = QPainter(offset_pixmap)
         painter.drawPixmap(offset, base_pixmap)
         painter.end()
 
-
         # 4. Create the final icon and set it
         self.icon_pressed = QIcon(offset_pixmap)
         self.icon_default = icon
-
-
 
     # def enterEvent(self, event):
     #     self.setIcon(self.icon_pressed)
@@ -4431,14 +4415,14 @@ class QIconPushButton(QDataPushButton):
     #     return super().leaveEvent(event)
 
     def on_press(self):
-        """override when mouse is pressed """
+        """override when mouse is pressed"""
         self.setIcon(self.icon_pressed)
-        self.repaint() # force immediate repaint
-
+        self.repaint()  # force immediate repaint
 
     def on_release(self):
         """override when mouse is released"""
         self.setIcon(self.icon_default)
+
 
 class NoKeyboardPushButton(QIconPushButton):
     """Standard PushButton which does not react to keyboard input."""
@@ -4462,7 +4446,6 @@ class QIconButton(QIconPushButton):
         self.setIconSize(size)
         self.setIcon(icon)
         # self.setStyleSheet("border: none;")
-
 
 
 class QReorderToolbar(QtWidgets.QWidget):
@@ -5106,8 +5089,6 @@ class QProgressBar(QtWidgets.QWidget):
         if value is not None:
             self._set_value_ui(value)
 
-
-
     @property
     def valid(self) -> bool:
         return self._valid
@@ -5595,13 +5576,8 @@ class QJoystickListener:
         if not self._connected and self._device_guid is not None and self._input_id is not None and self._input_type is not None:
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
             jp = gremlin.event_handler.JoystickEventProcessor()
-            jp.registerListenerUICallback(
-                self._device_guid,
-                self._input_type,
-                self._input_id,
-                self._callback,
-                CallbackMode.Edit)
-             # direct to UI thread as these updates are on the UI thread
+            jp.registerListenerUICallback(self._device_guid, self._input_type, self._input_id, self._callback, CallbackMode.Edit)
+            # direct to UI thread as these updates are on the UI thread
             self._connected = True
             device = gremlin.joystick_handling.getDevice(self._device_guid)
             if verbose:
@@ -5655,7 +5631,6 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
         assert self._device_guid is not None and self._input_id is not None, "should not be connected if no inputs"
         assert gremlin.util.is_ui_thread()
         assert event.is_axis, "handler should not be called if the event is not an axis event"
-
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
         if verbose:
@@ -5716,18 +5691,20 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
         self._disconnect()  # disconnect handler
 
 
-class QButtonStateWidget(QJoystickListener,QtWidgets.QWidget):
+class QButtonStateWidget(QJoystickListener, QtWidgets.QWidget):
     """visualizes the state of a button"""
 
-    def __init__(self, input_item, description: str = None, parent=None):
-        super().__init__(
-            input_item=input_item,
-            callback=self._handle_update_ui,
-            description=description,
-            parent = parent
-        )
+    def __init__(self, input_item, description: str = None, callback: Callable = None, parent=None):
+        """Initializes the QButtonStateWidget.
+        :param input_item: The input item associated with this widget (InputItem)
+        :param description: Optional description for the widget
+        :param callback: Optional callback function to get the current button state for non joystick items
+        :param parent: Optional parent widget
+        """
+        super().__init__(input_item=input_item, callback=self._handle_update_ui, description=description, parent=parent)
 
-        assert self._input_type in (InputType.JoystickButton, InputType.JoystickHat),"invalid input type - must be button or hat"
+        input_type = input_item.getOverrideInputType()
+        assert input_type in (InputType.JoystickButton, InputType.JoystickHat), "invalid input type - must be button or hat"
 
         self.setContentsMargins(0, 0, 0, 0)
         self.main_layout = QtWidgets.QHBoxLayout(self)
@@ -5745,20 +5722,20 @@ class QButtonStateWidget(QJoystickListener,QtWidgets.QWidget):
         self._valid = True  # assume ok
         self._hat_icons = {}  # icon hats, keyed by position
         self.main_layout.addWidget(self._button_widget)
+        self._get_state_callback = callback  # store the callback
 
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
 
-        if self._input_type == InputType.JoystickButton:
-            is_pressed = gremlin.joystick_handling.get_button(self._device_guid, self.input_id)
+        if input_type == InputType.JoystickButton:
+            is_pressed = callback() if callback else gremlin.joystick_handling.get_button(self._device_guid, self.input_id)
             self._update_value_ui(is_pressed)
         else:
             # hat
-            position = gremlin.joystick_handling.get_hat_position(self._device_guid, self.input_id)
+            position = callback() if callback else gremlin.joystick_handling.get_hat_position(self._device_guid, self.input_id)
             self._update_hat_ui(position)
 
-
-    def process_event_ui(self, event : gremlin.event_handler.Event):
+    def process_event_ui(self, event: gremlin.event_handler.Event):
         assert gremlin.util.is_ui_thread()
         self._update_value_ui(event.is_pressed)
 
@@ -5777,7 +5754,8 @@ class QButtonStateWidget(QJoystickListener,QtWidgets.QWidget):
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
         if verbose:
             syslog.info(f"state button: {event.is_pressed}")
-        match self.input_type:
+        input_type = event.getInputType()  # use override input type if needed
+        match input_type:
             case InputType.JoystickButton:
                 self._update_value_ui(event.is_pressed)
             case InputType.JoystickHat:
@@ -5932,7 +5910,6 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
         self._max_range = 1.0
         self._step = step
 
-
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
         if device.is_virtual:
@@ -5952,7 +5929,6 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
         name_index = 0
 
         jep = gremlin.event_handler.JoystickEventProcessor()
-
 
         if device.axis_count:
             col = 0  # axis column
@@ -5980,12 +5956,9 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                 axis_widget = QProgressBar(data=input_id, value=values, orientation=QtCore.Qt.Orientation.Vertical)
 
                 # hook the input
-                jep.registerListenerUICallback(device_guid = device.device_guid,
-                                               input_type = InputType.JoystickAxis,
-                                               input_id = input_id,
-                                               callback = self.process_event_ui,
-                                               mode = CallbackMode.All)
-
+                jep.registerListenerUICallback(
+                    device_guid=device.device_guid, input_type=InputType.JoystickAxis, input_id=input_id, callback=self.process_event_ui, mode=CallbackMode.All
+                )
 
                 # el = gremlin.event_handler.EventListener()
                 # el.addUIJoystickEventCallback(self.process_event_ui)
@@ -6045,12 +6018,12 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
 
         jep = gremlin.event_handler.JoystickEventProcessor()
         for input_id in self.axis_widgets:
-            jep.unregisterListenerUICallback(device_guid = self.device.device_guid,
-                                            input_type = InputType.JoystickAxis,
-                                            input_id = input_id,
-                                            callback = self.process_event_ui,
-                                            )
-
+            jep.unregisterListenerUICallback(
+                device_guid=self.device.device_guid,
+                input_type=InputType.JoystickAxis,
+                input_id=input_id,
+                callback=self.process_event_ui,
+            )
 
         # disconnect widgets if needed
         if not self._readonly:
@@ -6339,7 +6312,7 @@ class HatState(QtWidgets.QGroupBox):
         :param device the device of which to display the hat sate
         :param parent the parent of this widget
         """
-        super().__init__(parent)
+        super().__init__(parent=parent)
 
         self._event_times = {}
         self.device = device
@@ -6349,16 +6322,33 @@ class HatState(QtWidgets.QGroupBox):
         else:
             self.setTitle(f"{device.name} - Hats")
 
-        self.hats = [None]
+        jep = gremlin.event_handler.JoystickEventProcessor()
+
+        self._hat_map = {}
         hat_layout = QFlowLayout()
+
         for i in range(device.hat_count):
-            hat = HatWidget(data=i + 1)  # data is the hat #
+            input_id = i + 1
+            hat_widget = HatWidget(data=input_id)  # data is the hat #
             if device.is_virtual:
-                hat.clicked.connect(self._hat_clicked)
-            self.hats.append(hat)
-            hat_layout.addWidget(hat)
+                # trap interaction by the user
+                hat_widget.clicked.connect(self._hat_clicked)
+            self._hat_map[input_id] = hat_widget
+            hat_layout.addWidget(hat_widget)
+
+            jep.registerListenerUICallback(
+                device_guid=device.device_guid, input_type=InputType.JoystickHat, input_id=input_id, callback=self.process_event_ui, mode=CallbackMode.All
+            )
 
         self.setLayout(hat_layout)
+
+    def unhook(self):
+        # cleanup
+        jep = gremlin.event_handler.JoystickEventProcessor()
+        for input_id, hat_widget in self._hat_map.items():
+            jep.unregisterListenerUICallback(
+                device_guid=self.device.device_guid, input_type=InputType.JoystickHat, input_id=input_id, callback=self.process_event_ui
+            )
 
     @QtCore.Slot()
     def _hat_clicked(self, direction):
@@ -6369,7 +6359,7 @@ class HatState(QtWidgets.QGroupBox):
         # syslog.info(f"Set Hat: {input_id}  {direction}")
         gremlin.joystick_handling.set_hat(device_guid, input_id, direction)
 
-    def process_event(self, event : gremlin.event_handler.Event):
+    def process_event(self, event: gremlin.event_handler.Event):
         """Updates state visualization based on the given event.
 
         :param event the event with which to update the state display
@@ -6382,9 +6372,8 @@ class HatState(QtWidgets.QGroupBox):
         :param event the event with which to update the state display
         """
         if event.event_type == InputType.JoystickHat:
-            self.hats[event.identifier].set_angle(event.value)
+            self._hat_map[event.identifier].set_angle(event.value)
             self._event_times[event.identifier] = time.time()
-
 
 
 class AxesTimeline(QtWidgets.QGroupBox):
@@ -6723,60 +6712,27 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         match vis_type:
             case gremlin.types.VisualizationType.AxisCurrent:
                 self._create_current_axis()
-                # #el.joystick_event.connect(self._current_axis_update) # hook runtime event so it works at runtime or edit time
-                # jep.registerListenerUICallback(
-                #     device_guid = self.device_guid,
-                #     input_type = InputType.JoystickAxis,
-                #     input_id = -1, # all inputs of that type
-                #     callback = self._current_axis_update_ui,
-                #     mode = CallbackMode.All ) # event is processed on the UI thread
-                #el.addUIJoystickEventCallback(self._current_axis_update)
-                #el.vjoy_output_event.connect(self._vjoy_current_axis_update)  # hook vjoy separately
-
 
             case gremlin.types.VisualizationType.AxisTemporal:
                 self._create_temporal_axis()
 
             case gremlin.types.VisualizationType.ButtonHat:
                 self._create_button_hat()
-                # el.addUIJoystickEventCallback(self._button_hat_update)
-                # jep.registerListenerUICallback(
-                #     device_guid = self.device_guid,
-                #     input_type = InputType.JoystickButton,
-                #     input_id = -1, # all inputs of that type
-                #     callback = self._button_update_ui,
-                #     mode = CallbackMode.All) # event is processed on the UI thread
-                # jep.registerListenerUICallback(
-                #     device_guid = self.device_guid,
-                #     input_type = InputType.JoystickHat,
-                #     input_id = -1, # all inputs of that type
-                #     callback = self._hat_update_ui,
-                #     mode = CallbackMode.All) # event is processed on the UI thread
-                #el.vjoy_output_event.connect(self._vjoy_button_hat_update)  # hook vjoy separately
+
                 pass
 
             case gremlin.types.VisualizationType.Button:
                 self._create_button()
-                # jep.registerListenerUICallback(
-                #     device_guid = self.device_guid,
-                #     input_type = self.input_type,
-                #     input_id = -1, # all inputs of that type
-                #     callback = self._button_update_ui,
-                #     mode = CallbackMode.All) # event is processed on the UI thread
-                # el.addUIJoystickEventCallback(self._button_update)
-                #el.vjoy_output_event.connect(self._button_update_ui)  # hook vjoy separately
-
 
             case gremlin.types.VisualizationType.Hat:
                 self._create_hat()
                 jep.registerListenerUICallback(
-                    device_guid = self.device_guid,
-                    input_type = self.input_type,
-                    input_id = -1, # all inputs of that type
-                    callback = self._hat_update_ui,
-                    mode = CallbackMode.All) # event is processed on the UI thread
-                #el.addUIJoystickEventCallback(self._hat_update)
-                #el.vjoy_output_event.connect(self._vjoy_hat_update)  # hook vjoy separately
+                    device_guid=self.device_guid,
+                    input_type=self.input_type,
+                    input_id=-1,  # all inputs of that type
+                    callback=self._hat_update_ui,
+                    mode=CallbackMode.All,
+                )  # event is processed on the UI thread
 
         self._hooked = True
 
@@ -6803,7 +6759,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
                 pass
 
             case gremlin.types.VisualizationType.Button:
-                #self._unhook_buttons()
+                # self._unhook_buttons()
                 # jep.unregisterListenerUICallback(
                 #     device_guid = self.device_guid,
                 #     input_type = InputType.JoystickButton,
@@ -6814,9 +6770,8 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
                 # el.vjoy_output_event.disconnect(self._vjoy_button_update)
                 pass
 
-
             case gremlin.types.VisualizationType.ButtonHat:
-                #self._unhook_buttons()
+                # self._unhook_buttons()
                 # jep.unregisterListenerUICallback(
                 #     device_guid = self.device_guid,
                 #     input_type = InputType.JoystickButton,
@@ -6837,12 +6792,11 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             case gremlin.types.VisualizationType.Hat:
                 self._unhook_buttons()
                 jep.unregisterListenerUICallback(
-                    device_guid = self.device_guid,
-                    input_type = self.input_type,
-                    input_id = -1, # all inputs of that type
-                    callback = self._hat_update_ui) # event is processed on the UI thread
-
-
+                    device_guid=self.device_guid,
+                    input_type=self.input_type,
+                    input_id=-1,  # all inputs of that type
+                    callback=self._hat_update_ui,
+                )  # event is processed on the UI thread
 
                 # el.removeUIJoystickEventCallback(self._button_hat_update)
                 # # el.vjoy_event.connect(self._vjoy_button_hat_update)
@@ -6900,6 +6854,13 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
             self.layout().addWidget(widget)
             self._widgets = [widget]
 
+    def _cleanup_ui(self):
+        """cleanup"""
+        if self._widgets:
+            for widget in self._widgets:
+                gremlin.util.delete_widget(widget)
+            self._widgets.clear()
+
     def _create_button(self):
         """Creates display for button and hat data."""
         self._widgets = []
@@ -6910,10 +6871,6 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
 
     def _unhook_buttons(self):
         pass
-        # if self._device.is_virtual:
-        #     widgets = [widget for widget in self.widgets if isinstance(widget, ButtonState)]
-        #     for widget in widgets:
-        #         widget.unhook()
 
     def _create_current_axis(self):
         """Creates display for current axes data."""
@@ -7102,7 +7059,7 @@ class QUsedPushButton(QDataPushButton):
         callback=None,
         callbackEx=None,
         used=False,
-        marker: bool =None,
+        marker: bool = None,
         used_device_guid=None,
         used_input_type=None,
         used_input_id=None,
@@ -7146,21 +7103,16 @@ class QUsedPushButton(QDataPushButton):
             self._hook_requested = True
             self._do_hook()
 
-    def hook(self, device_guid : dinput.GUID, input_type : InputType, input_id : int):
+    def hook(self, device_guid: dinput.GUID, input_type: InputType, input_id: int):
         """hooks the button highlight to a button input"""
         jep = gremlin.event_handler.JoystickEventProcessor()
-        assert isinstance(device_guid, dinput.GUID),"invalid device guid"
-        assert isinstance(input_type, InputType),"invalid type"
-        assert isinstance(input_id,int) and input_id > 0,"invalid input id"
+        assert isinstance(device_guid, dinput.GUID), "invalid device guid"
+        assert isinstance(input_type, InputType), "invalid type"
+        assert isinstance(input_id, int) and input_id > 0, "invalid input id"
         self._device_guid = device_guid
         self._input_type = input_type
         self._input_id = input_id
-        jep.registerListenerUICallback(device_guid,
-                                       input_type,
-                                       input_id,
-                                       self._handle_input_ui,
-                                       mode = CallbackMode.Edit)
-
+        jep.registerListenerUICallback(device_guid, input_type, input_id, self._handle_input_ui, mode=CallbackMode.Edit)
 
     def event(self, event):
         if event.type() == QEvent.Show:
@@ -7181,10 +7133,7 @@ class QUsedPushButton(QDataPushButton):
             el.input_used_changed.disconnect(self._handle_used_changed)
 
         jep = gremlin.event_handler.JoystickEventProcessor()
-        jep.unregisterListenerUICallback(self._device_guid,
-                                         self._input_type,
-                                         self._input_id,
-                                         self._handle_input_ui)
+        jep.unregisterListenerUICallback(self._device_guid, self._input_type, self._input_id, self._handle_input_ui)
 
     def _handle_input_ui(self, event):
         # toggle highlight
@@ -7194,7 +7143,6 @@ class QUsedPushButton(QDataPushButton):
                 self.pulseHighlight()
             case InputType.JoystickButton:
                 self._set_highlight_ui(event.is_pressed)
-
 
     def _handle_used_changed(self, device_guid, input_type, input_id, value: bool):
         # see if it's ours
@@ -7240,7 +7188,6 @@ class QUsedPushButton(QDataPushButton):
             self._pulse_timer = None
         self._repaint()
 
-
     def pulseHighlight(self, interval=0.25):
         """pulses the highlight effect on the button for a given duration"""
         if self._pulse_timer:
@@ -7283,7 +7230,7 @@ class QUsedPushButton(QDataPushButton):
             color = Color.orangeColor() if self._marker else Color.grayColor()
             painter.setPen(QColor(color))
             painter.setBrush(QColor(color))
-            painter.drawEllipse(QPoint(w-9, 9), 3, 3) # align RIGHT
+            painter.drawEllipse(QPoint(w - 9, 9), 3, 3)  # align RIGHT
 
         # highlight
         if self._highlight:
@@ -7369,7 +7316,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
         self.setStyleSheet(css)
 
         css = Color.cssButtonState()
-        self._widgets = {}
+        self._widget_map = {}
         flow_layout = QFlowLayout()
         # button_layout = QtWidgets.QGridLayout()
         profile = gremlin.shared_state.current_profile
@@ -7394,13 +7341,10 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
                 callback=self._button_clicked,
             )
 
-
             # hook the input
-            jep.registerListenerUICallback(device_guid = used_device_guid,
-                                           input_type = InputType.JoystickButton,
-                                           input_id = input_id,
-                                           callback = self.process_event_ui,
-                                           mode = CallbackMode.All)
+            jep.registerListenerUICallback(
+                device_guid=used_device_guid, input_type=InputType.JoystickButton, input_id=input_id, callback=self.process_event_ui, mode=CallbackMode.All
+            )
 
             widget.setStyleSheet(css)
 
@@ -7411,7 +7355,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
             # read the current state
             is_pressed = gremlin.joystick_handling.get_button(device.device_guid, input_id)
             widget.setDown(is_pressed)
-            self._widgets[input_id] = widget
+            self._widget_map[input_id] = widget
             # button_layout.addWidget(btn, int(i / 10), int(i % 10))
             flow_layout.addWidget(widget)
         self.main_layout = flow_layout
@@ -7430,19 +7374,15 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
         gremlin.joystick_handling.set_button(device_guid, input_id, is_pressed, update_remote=True)
 
     def _cleanup_ui(self):
-        ''' called when widget is being cleaned up '''
+        """called when widget is being cleaned up"""
         jep = gremlin.event_handler.JoystickEventProcessor()
-        for input_id, widget in self._widgets.items:
-            jep.unregisterListenerUICallback(device_guid = self._device.device_guid,
-                                input_type = InputType.JoystickButton,
-                                input_id = input_id,
-                                callback = self.process_event_ui
-                                )
+        for input_id, widget in self._widget_map.items():
+            jep.unregisterListenerUICallback(
+                device_guid=self._device.device_guid, input_type=InputType.JoystickButton, input_id=input_id, callback=self.process_event_ui
+            )
             widget.hide()
             self.main_layout.removeWidget(widget)
             gremlin.util.delete_widget(widget)
-
-
 
     # def process_event(self, event):
     #     """Updates state visualization based on the given event.
@@ -7470,13 +7410,12 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
         """
         assert gremlin.util.is_ui_thread()
         input_type = event.getInputType()
-        if input_type == InputType.JoystickButton and event.identifier in self._widgets:
+        if input_type == InputType.JoystickButton and event.identifier in self._widget_map:
             # is_pressed = event.is_pressed if event.is_pressed is not None else event.current
             state = event.is_pressed if event.is_pressed is not None else False
-            widget = self._widgets[event.identifier]
+            widget = self._widget_map[event.identifier]
             widget._set_highlight_ui(state)
             self._event_times[event.identifier] = time.time()
-
 
 
 class QRowSelectorFrame(QtWidgets.QFrame):
@@ -7855,7 +7794,7 @@ class QDelayWidget(QtWidgets.QWidget):
         parent=None,
         label=None,
         tooltip=None,
-        show_zero = False,
+        show_zero=False,
     ):
         """
 
@@ -7895,7 +7834,7 @@ class QDelayWidget(QtWidgets.QWidget):
             widgets = []
 
             shortcuts = {
-                "0s" : 0,
+                "0s": 0,
                 "1/10s": 100,
                 "1/4s": 250,
                 "1/2s": 500,
@@ -9711,7 +9650,7 @@ class QRememberMainWindow(ResizableWindow):
         w = size.width()
         h = size.height()
         config.setWindowSize(self._window_key, w, h)
-        super().closeEvent(event)
+        return super().closeEvent(event)
 
 
 def get_main_window():
@@ -9765,9 +9704,9 @@ class QShowAtCursorDialog(QtWidgets.QDialog):
 
         super().showEvent(event)
 
-    def closeEvent(self, arg__1):
+    def closeEvent(self, event):
         self.dialog_closed.emit(self)
-        return super().closeEvent(arg__1)
+        return super().closeEvent(event)
 
 
 class QRememberDialog(QtWidgets.QDialog):
@@ -9833,25 +9772,26 @@ class QRememberDialog(QtWidgets.QDialog):
 
     def closeEvent(self, event):
         """occurs when window is closed"""
-        config = gremlin.config.Configuration()
+        self.save()
 
-        # save position information
-        pos = self.frameGeometry()  # save the position
-        config.setWindowLocation(self._window_key, pos.x(), pos.y())
-
-        # save size information
-        size = self.size()
-        w = size.width()
-        h = size.height()
-        config.setWindowSize(self._window_key, w, h)
         self.dialog_closed.emit(self)
-        return super().closeEvent(event)
+        super().closeEvent(event)
 
     def hasConfig(self) -> bool:
         """checks if the window has saved geometry/position data"""
         config = gremlin.config.Configuration()
         window_location = config.getWindowLocation(self._window_key)
         return window_location is not None
+
+    def save(self):
+        """saves the current configuration"""
+        config = gremlin.config.Configuration()
+
+        config.save()
+
+    def close(self):
+        self.save()
+        super().close()
 
 
 class MarkdownDialog(QRememberDialog):
@@ -9911,7 +9851,7 @@ class BaseDialogUi(QRememberDialog):
         if hasattr(self, "confirmClose"):
             self.confirmClose(event)
         self.closed.emit()
-        super().closeEvent(event)
+        return super().closeEvent(event)
 
 
 class QDataTab(QtWidgets.QTabWidget):
@@ -12402,15 +12342,12 @@ class QJoystickInputWidget(QtWidgets.QWidget):
                 icon_color=QtGui.QColor(warning_color),
                 text="All inputs filtered.",
                 use_wrap=False,
-                )
+            )
 
             self._widget = widget
             self.main_layout.addWidget(widget)
 
             return
-
-
-
 
         if device:
             if device.axis_count:
@@ -12465,7 +12402,6 @@ class QJoystickInputWidget(QtWidgets.QWidget):
                 widget.setToolTip(tooltip)
                 widgets.append(widget)
 
-
             if widgets:
                 widget = getHContainer(widgets, widget_only=True)
 
@@ -12515,27 +12451,23 @@ class QInputLockWidget(QtWidgets.QWidget):
         self._filter = filter
 
         lock_widget = QIconPushButton(
-            icon = Icons.lockIcon(),
-            tooltip = "Lock all inputs",
-            callback = self._handle_lock,
+            icon=Icons.lockIcon(),
+            tooltip="Lock all inputs",
+            callback=self._handle_lock,
         )
-
 
         unlock_widget = QIconPushButton(
-            icon = Icons.unlockIcon(),
-            tooltip = "Unlock all inputs",
-            callback = self._handle_unlock,
+            icon=Icons.unlockIcon(),
+            tooltip="Unlock all inputs",
+            callback=self._handle_unlock,
         )
-
 
         widgets = [lock_widget, unlock_widget]
 
         if filter_enabled:
             icon = Icons.filterIcon() if filter else Icons.noFilterIcon()
-            self._filter_widget = QIconPushButton(icon = icon,
-                                                  tooltip = self._get_filter_tooltip(filter),
-                                                  callback = self._handle_used,
-                                                  callbackEx = self._handle_context
+            self._filter_widget = QIconPushButton(
+                icon=icon, tooltip=self._get_filter_tooltip(filter), callback=self._handle_used, callbackEx=self._handle_context
             )
 
             widgets.insert(0, self._filter_widget)
@@ -14555,9 +14487,10 @@ class WidgetManager(QtWidgets.QDialog):
 
 
 class QEmptyWidget(QtWidgets.QWidget):
-    """not loaded visual - indicates something is not loaded """
-    def __init__(self, mode = "empty", parent = None):
-        super().__init__(parent = parent)
+    """not loaded visual - indicates something is not loaded"""
+
+    def __init__(self, mode="empty", parent=None):
+        super().__init__(parent=parent)
         match mode:
             case "empty":
                 icon = Icons.emptyIcon(Color.watermarkColor())
