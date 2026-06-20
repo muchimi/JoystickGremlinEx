@@ -1379,6 +1379,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         self._input_item = input_item
         input_item.setInputWidget(self)  # setup reference to the input widget
+        self._input_item = input_item
         self._identifier = identifier
         self._input_id = input_item.input_id
         self._device_guid = input_item.device_guid
@@ -1711,7 +1712,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         super().resizeEvent(event)
 
     @property
-    def input_item(self):
+    def input_item(self) -> 'InputItem':
         return self._input_item
 
     def eventFilter(self, widget, event):

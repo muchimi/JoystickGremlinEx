@@ -2840,7 +2840,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent  # list view
         assert hasattr(parent, "inputItemListModel"), "OSC CONFIG: Parent widget does not have required listview model"
-        assert hasattr(parent, "input_item_list_view"), "OSC CONFIG: Parent widget does not have required listview"
+        assert hasattr(parent, "inputItemListView"), "OSC CONFIG: Parent widget does not have required listview"
 
         profile = gremlin.shared_state.current_profile
         device_guid = gremlin.shared_state.osc_tab_guid
@@ -4004,25 +4004,17 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     @QtCore.Slot()
     def _add_input_cb(self):
         """Adds a new input to the inputs list"""
-        input_type = InputType.OpenSoundControl
+        profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        device_node = profile.getDeviceNode(self._device_guid)
+        mode_node = device_node.getModeNode(gremlin.shared_state.current_mode)
+        input_item = OscInputItem(mode_node)
+        input_item.input_type_changed.connect(self._refresh_mappings)
 
-        profile = gremlin.shared_state.current_profile
-        registry = profile.registry
-        device_modes = profile.get_device_modes(self._device_guid, DeviceType.to_string(DeviceType.Osc))
-        mode_object = device_modes.ensure_mode_exists(gremlin.shared_state.current_mode)
-
-        input_id = OscInputItem(mode_object)
-        input_id.input_type_changed.connect(self._refresh_mappings)
-
-        self.device_profile.modes[self.current_mode].get_data(input_type, input_id)  # adds the item
-        registry.sync()
+        mode_node.setInputItem(input_item)
 
         self.inputItemListModel.refresh()
-        index = self.inputItemListModel.indexOf(input_id)
-
-        self.inputItemListView.select_item(index, False)
-
-        # index = self.inputItemListView.current_index
+        index = self.inputItemListModel.indexOf(input_item)
+        self.inputItemListView.selectItemAt(index)
 
         # last index selected, -1 means none
         self._last_selected_index = -1
@@ -4030,10 +4022,11 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._item_data = None
 
         # redraw the UI
-        self.selectInputItemIndex(index, False)
+
 
         # auto edit new input
-        self._edit_item_cb(None, index, input_id)
+
+        self._edit_item_cb(None, index, input_item)
 
     @QtCore.Slot()
     def _handle_bulk_load(self):
@@ -4293,7 +4286,7 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         """called when the widget has to update itself on a data change"""
-        input_item: OscInputItem = input_widget.identifier.input_item
+        input_item: OscInputItem = input_widget.input_item
         input_item._update_display_name()
         input_widget.setTitle(input_item.title_name)
         input_widget.setInputDescription(input_item.display_name)
@@ -4323,7 +4316,8 @@ class OscDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _edit_item_cb(self, widget, index, data):
         """called when the edit button is clicked"""
-        self._edit_dialog = OscInputConfigDialog(self.current_mode, index, data, self)
+        current_mode = gremlin.shared_state.edit_mode
+        self._edit_dialog = OscInputConfigDialog(current_mode, index, data, parent = self)
         self._edit_dialog.accepted.connect(self._dialog_ok_cb)
         self._edit_dialog.rejected.connect(self._dialog_rejected_cb)
         gremlin.util.centerDialog(self._edit_dialog)

@@ -205,7 +205,7 @@ class ProfileDeviceNode:
 
 
 
-    def ensure_mode_exists(self, mode_name: str, device: dinput.DeviceSummary | dinput.GUID = None, is_system=False) -> ProfileModeNode:  # noqa: F821
+    def ensure_mode_exists(self, mode_name: str, is_system=False) -> ProfileModeNode:  # noqa: F821
         """Ensures that a specified mode exists, creating it if needed.
 
         :param mode_name the name of the mode being checked
@@ -214,8 +214,8 @@ class ProfileDeviceNode:
         :returns: Mode object
         """
         assert mode_name is not None, "mode must be provided"
-        assert isinstance(device, (dinput.DeviceSummary, dinput.GUID)), "invalid id or device"
         mode_node = self.getModeNode(mode_name, autocreate=True)
+        assert mode_node is not None, "unable to retrieve mode node"
         mode_node.system = is_system
         return mode_node
 
