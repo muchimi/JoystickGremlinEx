@@ -18,7 +18,7 @@
 from __future__ import annotations
 from abc import abstractmethod, ABCMeta
 from PySide6 import QtWidgets, QtCore, QtGui
-from PySide6.QtCore import QThread, QEvent
+from PySide6.QtCore import QThread
 from lxml import etree
 import os
 import uuid
@@ -392,11 +392,12 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     def __init__(
         self,
-        mode_node,  # str or profile mode object
+        mode_node: str | gremlin.base_profile.ProfileModeNode,  # profile mode object (required)
         input_type: InputType,  # must be provided
         input_id=None,  #
         custom_name_handler: Callable = None,
         custom_mode_name_handler: Callable = None,
+        custom_input_id_handler: Callable = None,
         override_input_type=None,
         device_guid: dinput.GUID | uuid.UUID | str = None,  # noqa: F405,
         description: str = None,
@@ -409,6 +410,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         :param input_id : input id of the input item
         :param custom_name_handler: handler() returns a string, whenever the input name is needed
         :param custom_mode_name_handler: handler() returns a string, optional, to override the default mode for special inputs that use special modes
+        :param custom_input_id_handler: handler() returns the input id, optional, to override the default input id handling
         :param description: optional description text
         :param description_readonly: optional flag to indicate if the description of the input can be user edited
         :param tooltip: optional tooltip text
@@ -439,14 +441,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         super().__init__(mode_node.name, None)
 
-
-
         # if input_type == InputType.ModeControl:
         #     syslog.info(f"create input item id: [{self.id}]")
         #     pass
 
         self.parent = mode_node  # mode object
-
 
         self._input_item_generating_xml = False  # xml nesting level
         self._override_input_type = override_input_type  # override input type for some types that are different
@@ -475,6 +474,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._containers.addCallback(self._handle_containers_changed)  # called when containers are changed
         self._selected = False  # true if the item is selected
         self._is_action = False  # true if the object is a sub-item for a sub-action (GateHandler for example)
+
+        self._custom_input_id_handler = custom_input_id_handler  # custom handler for input id
+        self._input_id = input_id  # input id for this input item
 
         self._is_axis = False  # true if the item is an axis input
         self._is_button = False  # true if the item is a button input
@@ -517,6 +519,24 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
         el.reload_axis_state.connect(self._handle_axis_state_request)
+
+    @property
+    def input_id(self) -> int:
+        """returns the input id for this input item"""
+        if self._custom_input_id_handler is not None:
+            return self._custom_input_id_handler()
+        return self._input_id
+
+    @input_id.setter
+    def input_id(self, value: int):
+        """sets the input id for this input item"""
+        if self._custom_input_id_handler is not None:
+            raise AttributeError("Cannot set input_id when a custom input id handler is set")
+        self._input_id = value
+
+    def getCurrentMode(self) -> str:
+        """gets the current profile mode for this input item"""
+        return gremlin.shared_state.current_mode if self._profile_mode_callback is None else self._profile_mode_callback()
 
     def setInputWidget(self, widget: InputItemWidget):
         self._input_widget = widget
@@ -1038,13 +1058,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             else:
                 self._locked = False
 
-            # if self.input_type == InputType.ModeControl:
-            #     # mode control entries - input id is the only item we need
-            #     self.is_axis = False
-            #     self.input_id = gremlin.ui.mode_device.ModeInputModeType(safe_read(node, "id", int, 0))
-            #     self.setOverrideInputType(InputType.JoystickButton)
-            #     self.descriptionReadOnly = True
-
             if self.input_type == InputType.JoystickAxis:
                 # check for curve data
                 for child in node:
@@ -1325,6 +1338,118 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         return super().__hash__()
 
 
+class InputItemMessage(InputItem):
+    """represents a message associated with an input item"""
+
+    message_key_changed = Signal(str)  # fires when message key changes (message_key)
+
+    def __init__(
+        self,
+        mode_node: str | gremlin.base_profile.ProfileModeNode,  # str or profile mode object
+        input_type: InputType,  # must be provided
+        input_id=None,  #
+        custom_name_handler: Callable = None,
+        custom_mode_name_handler: Callable = None,
+        override_input_type: Callable=None,
+        custom_input_id_handler: Callable = None,
+        device_guid: dinput.GUID | uuid.UUID | str = None,  # noqa: F405,
+        description: str = None,
+        description_readonly: bool = None,
+        tooltip: str = None,
+        on_message_key_changed: Callable = None,  # callback when the message key is changed (old_key, new_key)
+    ):
+        """Creates a new InputItem instance.
+        :param mode_node: profile mode node
+        :param input_type : input type of the input item
+        :param input_id : input id of the input item
+        :param custom_name_handler: handler() returns a string, whenever the input name is needed
+        :param custom_mode_name_handler: handler() returns a string, optional, to override the default mode for special inputs that use special modes
+        :param description: optional description text
+        :param description_readonly: optional flag to indicate if the description of the input can be user edited
+        :param tooltip: optional tooltip text
+
+        """
+        super().__init__(
+            mode_node=mode_node,
+            input_type=input_type,
+            input_id=input_id,
+            custom_name_handler=custom_name_handler,
+            custom_mode_name_handler=custom_mode_name_handler,
+            override_input_type=override_input_type,
+            device_guid=device_guid,
+            description=description,
+            description_readonly=description_readonly,
+            tooltip=tooltip,
+            custom_input_id_handler= custom_input_id_handler,
+        )
+
+        self._message = None
+        self._message_key: str = None
+        self._title_name = "MIDI (not configured)"
+        self._display_name = None
+        self._display_tooltip = "Input configuration not set"
+        self._on_message_key_changed = on_message_key_changed
+
+        current_mode = gremlin.shared_state.current_mode
+        tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
+        tracker.registerWidget(
+            self,
+            self._device_guid,
+            current_mode,
+            self._input_type,
+            self.message_key,
+            self._guid,
+        )
+
+    @property
+    def message(self):
+        return self._message
+
+    @message.setter
+    def message(self, value):
+        self._message = value
+        self._update()
+
+    @property
+    def message_key(self) -> str:
+        return self._message_key if self._message_key else self._guid  # get a unique key
+
+    def setMessageKey(self, message_key: str):
+        """registers a new message key for this MIDI input item"""
+        if message_key:
+            if self._message_key != message_key:
+                current_mode = gremlin.shared_state.current_mode
+                tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
+
+                if self._on_message_key_changed:
+                    # uregister the old
+                    tracker.unregisterWidget(
+                        self._device_guid,
+                        current_mode,
+                        self._input_type,
+                        self._message_key,
+                        self._guid,
+                    )
+
+                    self._on_message_key_changed(self._message_key, message_key)
+
+                    tracker.registerWidget(
+                        self,
+                        self._device_guid,
+                        current_mode,
+                        self._input_type,
+                        self._message_key,
+                        self._guid,
+                    )
+
+                self.message_key_changed.emit(self._message_key)
+
+    @abstractmethod
+    def _update(self):
+
+        pass
+
+
 class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
     """holds the input widget (left side of the interface) for available inputs that get mapped.
 
@@ -1364,7 +1489,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         selection_changed_callback: Callable = None,
         update_callback: Callable = None,
         confirm_delete_callback: Callable = None,
-        get_state_callback : Callable = None,
+        get_state_callback: Callable = None,
         config_external=False,
         data=None,
     ):
@@ -1388,7 +1513,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.parent = parent
         self.widget_width = None  # actual width in pixels
         self.widget_height = None  # actual height in pixels
-        self._interact_enabled = True # true if can be interacted with
+        self._interact_enabled = True  # true if can be interacted with
 
         self._ui_loaded = False
         self._identifier = data
@@ -1716,14 +1841,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _fireSelectionChangeCallbacks(self):
         """fires the selection change callbacks  callback(InputItemWidget) - the parameter is the widget that has changed state"""
-        # verbose_perf = gremlin.config.Configuration().verbose_mode_perf
-
-        # if verbose_perf:
-        #     for callback in self._selection_change_callbacks:
-        #         gremlin.util.timeit(callback, self)
-        # else:
-        #     for callback in self._selection_change_callbacks:
-        #         callback(self)
         for callback in self._selection_change_callbacks:
             callback(self)
 
@@ -1738,11 +1855,11 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         super().resizeEvent(event)
 
     @property
-    def input_item(self) -> 'InputItem':
+    def input_item(self) -> "InputItem":
         return self._input_item
 
     def eventFilter(self, widget, event):
-        """UI event handler - trap mouse clicks for selection """
+        """UI event handler - trap mouse clicks for selection"""
         if self.getInteractable() and not self._selected:
             t = event.type()
             if t == QtCore.QEvent.Type.MouseButtonPress:
@@ -1939,7 +2056,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         widget = None  # widget created for the repeater
 
-
         if config.show_input_axis:
             # gremlin.util.clear_layout(self._repeater_container_layout)
 
@@ -1963,15 +2079,13 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                             astate = gremlin.event_handler.AxisState()
                             values = astate.getAxisValues(device_guid, input_id)
 
-
-
                         if not self.axis_repeater_widget:
                             # create the repeater
                             widget = gremlin.ui.ui_common.QAxisRepeaterProgressbar(
                                 input_item=self._input_item,
                                 values=values,
                                 callback=self._get_state_callback,
-                                description=f"axis repeater for input item: {self.input_item.display_name}"
+                                description=f"axis repeater for input item: {self.input_item.display_name}",
                             )
 
                             # widget.unhooked.connect(self._axis_widget_unhooked)
@@ -1994,11 +2108,12 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                     else:
                         # button
 
-                        if not self.button_repeater_widget: # and input_type in (InputType.JoystickButton, InputType.JoystickHat):
+                        if not self.button_repeater_widget:  # and input_type in (InputType.JoystickButton, InputType.JoystickHat):
                             widget = gremlin.ui.ui_common.QButtonStateWidget(
                                 input_item=self._input_item,
                                 callback=self._get_state_callback,
-                                description=  f"ButtonRepeater for: [{self._input_item.display_name}]")
+                                description=f"ButtonRepeater for: [{self._input_item.display_name}]",
+                            )
                             self.button_repeater_widget = widget
                             self._repeater_container_layout.addWidget(widget)
 
@@ -4300,7 +4415,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
         callbacks = []
 
-        assert isinstance(parent, gremlin.execution_graph.ExecutionGraphNode) if parent is not None else True,"invalid parent: parent must be graph node"
+        assert isinstance(parent, gremlin.execution_graph.ExecutionGraphNode) if parent is not None else True, "invalid parent: parent must be graph node"
 
         # For a virtual button create a callback that sends VirtualButton
         # events and another callback that triggers of these events
@@ -8631,7 +8746,7 @@ class ContainerView(AbstractView):
 
         # blank widget - index 0
         self._blank_widget = QtWidgets.QLabel("Please add a container or action.")
-        widget = gremlin.ui.ui_common.getVContainer([self._blank_widget, gremlin.ui.ui_common.QEmptyWidget()], widget_only=True)
+        widget = gremlin.ui.ui_common.getVContainer([self._blank_widget, "||", gremlin.ui.ui_common.QEmptyWidget(),"||"], widget_only=True)
         self._stacked_widget.addWidget(widget)
 
         self._scroll_area = QtWidgets.QScrollArea()

@@ -18,16 +18,18 @@
 from __future__ import annotations  # deprecated with python 3.14+
 import threading
 import logging
+from PySide6 import QtCore
 
 syslog = logging.getLogger("system")
 
 
-class AbortableThread(threading.Thread):
+class AbortableThread(threading.Thread, QtCore.QObject):
     """killable thread"""
 
     def __init__(self, *args, **kwargs):
 
-        super().__init__(*args, **kwargs)
+        QtCore.QObject.__init__(self)
+        threading.Thread.__init__(self, *args, **kwargs)
 
         if "eh" in kwargs:
             eh = kwargs["eh"]

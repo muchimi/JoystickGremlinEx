@@ -2178,7 +2178,7 @@ class OscInterface(QtCore.QObject):
 
 
 # class OscInputItem(AbstractInputItem):
-class OscInputItem(gremlin.input_item.InputItem):
+class OscInputItem(gremlin.input_item.InputItemMessage):
     """holds OSC input data"""
 
     message_key_changed = Signal(str, str)  # fires when message key changes
@@ -2203,7 +2203,11 @@ class OscInputItem(gremlin.input_item.InputItem):
 
     def __init__(self, mode_object: gremlin.base_profile.ProfileModeNode = None):
         super().__init__(
-            mode_object, device_guid=OscDeviceTabWidget.device_guid, input_type=InputType.OpenSoundControl
+            mode_object,
+            device_guid=OscDeviceTabWidget.device_guid,
+            input_type=InputType.OpenSoundControl,
+            custom_input_id_handler=self._handle_input_id_callback,
+            on_message_key_changed=self._on_message_key_changed,
         )  # parent is the mode object this input belongs to
 
         config = gremlin.config.Configuration()
@@ -2217,7 +2221,6 @@ class OscInputItem(gremlin.input_item.InputItem):
         self._title_name = "OSC (not configured)"
         self._display_name = ""
         self._display_tooltip = "Input configuration not set"
-        self._message_key = None
         self._source_index = 0  # OSC parameter source index - used for multi-argument data
         self.setMessageKey(self._guid)
         self._min_range = 0.0
@@ -2246,14 +2249,6 @@ class OscInputItem(gremlin.input_item.InputItem):
         """input id is self for OSC"""
         return self  # whole input
 
-    @property
-    def input_id(self):
-        return self
-
-    @property
-    def device_guid(self):
-        """device ID"""
-        return self._device_guid
 
     def to_html(self) -> str:
         """returns reporting graphviz data for this action"""
@@ -2353,14 +2348,6 @@ class OscInputItem(gremlin.input_item.InputItem):
     def autorelease_delay(self, value: int):
         self._autorelease_delay = value
 
-    @property
-    def message(self) -> str:
-        return self._message
-
-    @message.setter
-    def message(self, value):
-        self._message = value
-        self._update()
 
     @property
     def mode(self) -> OscInputItem.InputMode:
@@ -2543,44 +2530,16 @@ class OscInputItem(gremlin.input_item.InputItem):
             self._message_key = OscInputItem.toMessageKey(self._command_mode, self._message, self._source_index)
         return self._message_key
 
-    def setMessageKey(self, value):
-        if self._message_key is None or self._message_key != value:
-            # ensure OSC is started so we can listen to OSC inputs
-            if self._message_key != value:
-                tracker = gremlin.ui.ui_common.DeviceWidgetTracker()
-                current_mode = gremlin.shared_state.current_mode
-                tracker.unregisterWidget(
-                    self._device_guid,
-                    current_mode,
-                    self._input_type,
-                    self._message_key,
-                    self._guid,
-                )
-                client = InputOscClient()
-                client.unregisterInput(self)
+    def _on_message_key_changed(self, old_key, new_key):
 
-                # indicate key changed
-                self.message_key_changed.emit(self._message_key, value)
+        client = InputOscClient()
 
-                osc_input = InputOscClient()
-                if self._message_key:
-                    osc_input.unregisterInput(self)
+        if self._message_key:
+            client.unregisterInput(self)
 
-                if self.verbose:
-                    syslog.info(f"OSC update message key from {self._message_key} to {value}")
+        self._message_key = new_key
+        client.registerInput(self)
 
-                self._message_key = value
-
-                osc_input.registerInput(self)
-                tracker.registerWidget(
-                    self,
-                    self._device_guid,
-                    current_mode,
-                    self._input_type,
-                    self._message_key,
-                    self._guid,
-                )
-                client.registerInput(self)
 
     @staticmethod
     def data_to_string(data):

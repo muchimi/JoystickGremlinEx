@@ -855,9 +855,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             self.main_layout.setContentsMargins(0, 0, 0, 0)
 
+            # listen to vjoy button map events to update the button grid
             el = gremlin.event_handler.EventListener()
-            # el.button_usage_changed.connect(self._button_usage_changed) # listen to grid button changes
-            el.set_vjoy_button_usage.connect(self._handle_vjoy_button_usage_changed)  # listen to grid button changes # called when a button actually flips
+            el.set_vjoy_button_usage.connect(self._handle_vjoy_button_usage_changed)
 
 
             # set the action type from the input type
@@ -2044,33 +2044,46 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 action_name = f"Vjoy device {vjoy_id} button {vjoy_input_id}"
 
         is_axis = self.action_data.input_is_axis()
+
+        prefix = ""
         if is_axis:
             if not action_name:
                 action_name = f"Vjoy device {vjoy_id} axis {vjoy_input_id} ({joystick_handling.get_axis_name(vjoy_input_id)})"
             if input_type != InputType.JoystickAxis:
-                name = f"Input axis -> {action_name}"
+                prefix = "Input axis"
+
             else:
                 axis_name = joystick_handling.get_axis_name(input_id)
-                name = f"Axis {input_id} ({axis_name}) -> {action_name}"
+                prefix = f"Axis {input_id} ({axis_name})"
+
+
+
         elif input_type in VJoyRemapWidget.input_type_buttons:
             if not action_name:
                 action_name = f"Vjoy device {vjoy_id} button {vjoy_input_id}"
-            name = f"Button {input_id} -> {action_name}"
+            prefix = f"Button {input_id}"
+
+
         elif input_type == InputType.JoystickHat:
             if not action_name:
                 action_name = f"Vjoy device {vjoy_id} hat {vjoy_input_id}"
-            name = f"Hat {input_id} -> {action_name}"
+            prefix = f"Hat {input_id}"
+
+
         else:
             if not action_name:
                 action_name = f"Vjoy device {vjoy_id} button {vjoy_input_id}"
-            name = f"Input trigger -> {action_name}"
+            prefix = f"Input trigger {input_id}"
+
+
 
         if self._info_widget:
-            self._info_widget.setText(name)
+            suffix = f"{action_name}"
+            self._info_widget.setText(prefix, suffix)
 
     def _create_info(self):
         """shows what device is currently selected"""
-        self._info_widget = QtWidgets.QLabel()
+        self._info_widget = gremlin.ui.ui_common.QArrowPairWidget()
         box = gremlin.ui.ui_common.getHContainer(self._info_widget, widget_only=True)
         self.main_layout.addWidget(box)
         self._update_info()
@@ -4730,7 +4743,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             trigger = True
                             is_pressed = False
                 case InputType.Midi:
-                    message = self.action_data.input_item.midi_message_key
+                    message = self.action_data.input_item.message_key
                     match self.action_mode:
                         case VjoyAction.VJoyButton:
                             midi_client = gremlin.ui.midi_device.MidiClient()

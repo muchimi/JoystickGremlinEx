@@ -2485,33 +2485,34 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if position is not None:
             # determine the status
             device = gremlin.joystick_handling.getDevice(device_id)
-            device.update()  # update connection state
-            if not device.connected:
-                # indicate device is disconnected
-                color = gremlin.ui.ui_common.Color.tabMissingForegroundColor()
-                icon = gremlin.ui.ui_common.Icons.disconnectedIcon()  # .load_icon("mdi.power-plug-off", qta_color = color)
-                self.ui.devices_tab_header_widget.setTabIcon(position, icon)
-                self.ui.devices_tab_header_widget.setTabTextColor(position, color)
-            else:
-                # tab color based on mapping
-                mode_map = self._get_mappings(device_id)
-                edit_mode = gremlin.shared_state.edit_mode
-                has_active_map = edit_mode in mode_map and mode_map[edit_mode]
-                has_map = False
-                if has_active_map:
-                    color = gremlin.ui.ui_common.Color.tabUsedForegroundColor()
-                    icon = gremlin.ui.ui_common.Icons.mappedIcon(qta_color=color)
+            if device:
+                device.update()  # update connection state
+                if not device.connected:
+                    # indicate device is disconnected
+                    color = gremlin.ui.ui_common.Color.tabMissingForegroundColor()
+                    icon = gremlin.ui.ui_common.Icons.disconnectedIcon()  # .load_icon("mdi.power-plug-off", qta_color = color)
+                    self.ui.devices_tab_header_widget.setTabIcon(position, icon)
+                    self.ui.devices_tab_header_widget.setTabTextColor(position, color)
                 else:
-                    has_map = sum(mode_map.values()) > 0
-                    if has_map:
-                        color = gremlin.ui.ui_common.Color.tabUsedOtherForegroundColor()
-                        icon = gremlin.ui.ui_common.Icons.mappedOtherIcon(qta_color=color)
+                    # tab color based on mapping
+                    mode_map = self._get_mappings(device_id)
+                    edit_mode = gremlin.shared_state.edit_mode
+                    has_active_map = edit_mode in mode_map and mode_map[edit_mode]
+                    has_map = False
+                    if has_active_map:
+                        color = gremlin.ui.ui_common.Color.tabUsedForegroundColor()
+                        icon = gremlin.ui.ui_common.Icons.mappedIcon(qta_color=color)
                     else:
-                        color = gremlin.ui.ui_common.Color.tabForegroundColor()
-                        icon = QtGui.QIcon()
+                        has_map = sum(mode_map.values()) > 0
+                        if has_map:
+                            color = gremlin.ui.ui_common.Color.tabUsedOtherForegroundColor()
+                            icon = gremlin.ui.ui_common.Icons.mappedOtherIcon(qta_color=color)
+                        else:
+                            color = gremlin.ui.ui_common.Color.tabForegroundColor()
+                            icon = QtGui.QIcon()
 
-                self.ui.devices_tab_header_widget.setTabTextColor(position, color)
-                self.ui.devices_tab_header_widget.setTabIcon(position, icon)  # clear the icon
+                    self.ui.devices_tab_header_widget.setTabTextColor(position, color)
+                    self.ui.devices_tab_header_widget.setTabIcon(position, icon)  # clear the icon
 
 
     def _handle_feature_changed(self, feature):

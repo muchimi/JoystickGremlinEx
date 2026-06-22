@@ -1121,6 +1121,17 @@ class Icons:
     def remoteControlIcon():
         return Icons._icon("mdi.remote")
 
+    @staticmethod
+    def arrowIcon(direction : str = "right", qta_color=None):
+        icon_map = {
+            "right": "ei.arrow-right",
+            "left": "ei.arrow-left",
+            "up": "ei.arrow-up",
+            "down": "ei.arrow-down"
+        }
+        icon_value = icon_map.get(direction, "mdi.arrow-right")
+        return Icons._icon(icon_value, qta_color=qta_color)
+
     def _icon(value: str, qta_color=None):
         if qta_color and isinstance(qta_color, str):
             qta_color = QtGui.QColor(qta_color)
@@ -14508,3 +14519,35 @@ class QEmptyWidget(QtWidgets.QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(label, alignment=Qt.AlignmentFlag.AlignCenter)
         self.setLayout(layout)
+
+
+class QArrowPairWidget(QtWidgets.QWidget):
+    """widget showing a prefix and suffix separately with an arrow in between"""
+
+    def __init__(self, direction="right", prefix : str = None, suffix : str = None, parent=None, size = 24, qta_color=None):
+        super().__init__(parent=parent)
+
+
+        icon = Icons.arrowIcon(direction, qta_color = qta_color if qta_color is not None else Color.normalColor())
+        pixmap = icon.pixmap(QSize(size, size))
+        label = QtWidgets.QLabel()
+        label.setPixmap(pixmap)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout = QVBoxLayout(self)
+        self.prefix_widget = QtWidgets.QLabel(prefix)
+        self.suffix_widget = QtWidgets.QLabel(suffix)
+
+        widget = getHContainer([self.prefix_widget,label,self.suffix_widget], widget_only=True)
+
+        layout.addWidget(widget)
+        self.setLayout(layout)
+
+    def setPrefix(self, value : str):
+        self.prefix_widget.setText(value)
+
+    def setSuffix(self, value : str):
+        self.suffix_widget.setText(value)
+
+    def setText(self, prefix: str, suffix: str):
+        self.setPrefix(prefix)
+        self.setSuffix(suffix)

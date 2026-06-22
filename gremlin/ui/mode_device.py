@@ -160,6 +160,7 @@ class ModeInputItem(gremlin.input_item.InputItem):
 
         assert mode_node is not None, "mode must be provided"
         assert mode_node.device_guid is not None, "mode node must have a valid device ID"
+        assert isinstance(input_id, ModeInputModeType), "invalid input id"
 
         super().__init__(
             mode_node,
@@ -177,6 +178,9 @@ class ModeInputItem(gremlin.input_item.InputItem):
 
         # syslog.info(f"InputItem: CREATE MODE INPUT ITEM: input item id: {Ansi.YELLOW}[{self._id}]{Ansi.RESET} input id: {Ansi.GREEN}[{input_id.name}/{input_id}]{Ansi.RESET} mode name: [{mode_node.name}] mode node id: [{mode_node.id}] device node id: [{mode_node.parent.id}] profile id: [{mode_node.profile.id}]")
         #pass
+
+
+
 
 
     def from_xml(self, node, data=None, extra_data: dict = None):
