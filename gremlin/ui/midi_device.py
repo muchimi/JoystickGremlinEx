@@ -306,13 +306,14 @@ class MidiInputItem(gremlin.input_item.InputItem):
 
     def mode_from_string(self, value):
         if value == "axis":
-            self._mode = MidiInputItem.InputMode.Axis
+            mode = MidiInputItem.InputMode.Axis
         elif value == "button":
-            self._mode = MidiInputItem.InputMode.Button
+            mode = MidiInputItem.InputMode.Button
         elif value == "change":
-            self._mode = MidiInputItem.InputMode.OnChange
+            mode = MidiInputItem.InputMode.OnChange
         else:
             raise ValueError(f"mode_from_string(): don't know how to handle {value}")
+        return mode
 
     @property
     def is_axis(self) -> bool:
@@ -378,8 +379,8 @@ class MidiInputItem(gremlin.input_item.InputItem):
                 return
 
             self.setPort(port)
-
-            mode = self.mode_from_string(safe_read(node, "mode", str, ""))
+            mode_name = safe_read(node, "mode", str, "")
+            mode = self.mode_from_string(mode_name)
             if mode is not None:
                 self.setMode(mode)
             data = safe_read(node, "data", str, "")
@@ -559,18 +560,20 @@ class MidiInputItemWidget(gremlin.input_item.InputItemWidget):
 class MidiListener(AbortableThread):
     """midi input object"""
 
-    def __init__(self, port_name, port_number, callback, parent=None):
+    def __init__(self, port_name : str, port_number : int, callback, port_display_name : str, parent=None):
         """creates a MIDI input port listener - messages received will be sent via the message_received event
         :param device - the midi device (rtmidi.device)
         :param port_name - the midi port name
         :param port_number - the midi port number returned by the port scan, zero based index
+        :param port_display_name - the display name of the midi port
         """
 
         super().__init__()
         self.port_number = port_number
         self.port_name = port_name
+        self.port_display_name = port_display_name
         self.callback = callback
-        self.name = f"MIDI listener - port [{port_number}]"
+        self.name = f"MIDI listener - port [{port_number}] {port_display_name}"
         self.verbose = gremlin.config.Configuration().verbose_mode_midi
         el = gremlin.event_handler.EventListener()
         el.config_changed.connect(self._on_config_changed)
@@ -618,6 +621,7 @@ class MidiInterface(QtCore.QObject):
         super().__init__()
 
         self._started = False  # true if the interface is actively listening
+        self._starting = False  # true if the interface is in the process of starting listeners
         self._listeners = {}  # map of port numer to its listener
         self._port_names = []
         self._port_map = {}
@@ -631,6 +635,7 @@ class MidiInterface(QtCore.QObject):
         el.config_changed.connect(self._on_config_changed)
         self._monitored_ports = set()
         self.midi_enabled = True  # allow MIDI feature in GEX
+
 
     def _on_config_changed(self):
         self.verbose = gremlin.config.Configuration().verbose_mode_midi
@@ -663,8 +668,10 @@ class MidiInterface(QtCore.QObject):
 
         syslog.info("MIDI: port detection:")
         for port_name in self._port_names:
-            syslog.info(f"\tname: [{port_name}] on port: [{self.getPort(port_name)}] display name: [{self.getPortDisplayName(port_name)}] ")
-
+            port_number = self.getPort(port_name)
+            port_display_name = self.getPortDisplayName(port_name)
+            syslog.info(f"\tname: [{port_name}] on port: [{port_number}] display name: [{self.getPortDisplayName(port_name)}] ")
+            self._listeners[port_name] = MidiListener(port_name, port_number, self._handle_midi_message_received, port_display_name)
         self._initialized = True
 
     def getPorts(self):
@@ -805,43 +812,55 @@ class MidiInterface(QtCore.QObject):
 
         """
 
-        # request start
-        if self._started:
-            self.stop()
 
         if not self.midi_enabled:
             # disabled
             return
 
-        if not self._initialized:
-            self._initialize_midi()
+        # request start
+        if self._started:
+            return
 
-        self._monitored_ports = set()  # holds the list of active port numbers
-        if port_name_or_list is None:
-            # open all ports
-            self._monitored_ports = set(range(self._port_count))
-        else:
-            if isinstance(port_name_or_list, str):
-                port_list = [port_name_or_list]
-            elif isinstance(port_name_or_list, list):
-                port_list = port_name_or_list
+        if self._starting:
+            return
+
+        try:
+            self._starting = True
+
+
+            if not self._initialized:
+                self._initialize_midi()
+
+            self._monitored_ports = set()  # holds the list of active port numbers
+            if port_name_or_list is None:
+                # open all ports
+                self._monitored_ports = set(range(self._port_count))
             else:
-                raise ValueError(f"MIDI: don't know how to handle start parameter {port_name_or_list}")
+                if isinstance(port_name_or_list, str):
+                    port_list = [port_name_or_list]
+                elif isinstance(port_name_or_list, list):
+                    port_list = port_name_or_list
+                else:
+                    raise ValueError(f"MIDI: don't know how to handle start parameter {port_name_or_list}")
 
-            for port_name in port_list:
-                port_number = self._port_map[port_name]
-                self._monitored_ports.add(port_number)
+                for port_name in port_list:
+                    port_number = self._port_map[port_name]
+                    self._monitored_ports.add(port_number)
 
-        # start the listeners
-        for port_number in self._monitored_ports:
-            port_name = self._port_names[port_number]
-            if self.verbose:
-                syslog.info(f"MIDI Interface: START listen requested on port: {port_name} [{port_number}]")
-            listener = MidiListener(port_name, port_number, self._handle_midi_message_received)
-            listener.start()
-            self._listeners[port_number] = listener
+                self._monitored_ports = list(self._port_map.values())
 
-        self._started = True
+
+            # start the listeners
+            for listener in self._listeners.values():
+                listener.start()
+
+
+            self._started = True
+        except Exception as e:
+            syslog.error(f"MIDI Interface: Error while starting listeners: {e}")
+        finally:
+            self._starting = False
+
 
     def stop(self):
         # request stop

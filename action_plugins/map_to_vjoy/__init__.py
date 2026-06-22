@@ -846,7 +846,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             verbose_perf = gremlin.config.Configuration().verbose_mode_perf
             if verbose_perf:
-                _container = self.action_data.get_container()
                 syslog.info(f"VJOYREMAP: create UI: [{self.action_data.debug_name}]")
                 for callback in steps:
                     gremlin.util.timeit(callback)
@@ -860,15 +859,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             # el.button_usage_changed.connect(self._button_usage_changed) # listen to grid button changes
             el.set_vjoy_button_usage.connect(self._handle_vjoy_button_usage_changed)  # listen to grid button changes # called when a button actually flips
 
-            # jp = gremlin.event_handler.JoystickEventProcessor()
-            # jp.registerListenerCallback(
-            #     device_guid = self.action_data.device_guid,
-            #     input_type = self.action_data.input_type,
-            #     input_id = self.action_data.input_id,
-            #     callback = self._joystick_event_handler
-            # )
-
-            # el.joystick_event_ui.connect(self._joystick_event_handler)
 
             # set the action type from the input type
             self.load_actions_from_input_type()
@@ -3957,7 +3947,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             grid.addWidget(QtWidgets.QWidget(), 0, max_col)
             grid.setColumnStretch(max_col, 2)
 
-        self.button_grid_stack_widget.addWidget(grid_container_widget)  # index 1
+            self.button_grid_stack_widget.addWidget(grid_container_widget)  # index 1
         self.main_layout.addWidget(self.button_grid_stack_widget)
 
     @QtCore.Slot()
@@ -4740,10 +4730,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             trigger = True
                             is_pressed = False
                 case InputType.Midi:
-                    message = self.action_data.input_item.message_key
+                    message = self.action_data.input_item.midi_message_key
                     match self.action_mode:
                         case VjoyAction.VJoyButton:
-                            is_pressed = gremlin.ui.midi_device.midi_client.getData(message)
+                            midi_client = gremlin.ui.midi_device.MidiClient()
+                            is_pressed =  midi_client.getData(message)
                         case VjoyAction.VJoyButton.VJoyButtonPress:
                             is_pressed = True
                         case VjoyAction.VJoyButton.VJoyButtonRelease:
