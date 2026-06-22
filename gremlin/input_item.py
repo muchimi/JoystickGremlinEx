@@ -215,7 +215,7 @@ class InputIdentifier(QtCore.QObject):
 def getInputIdKey(input_id):
     """gets an input id key from a given input id"""
     if input_id is not None and hasattr(input_id, "message_key"):
-        return input_id.message_key
+        return input_id.message_key if input_id.message_key is not None else input_id.guid
     return input_id
 
 
@@ -616,9 +616,12 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     @property
     def message_key(self):
+        """unique key for this input item, can be overriden in derived classes"""
         # joystick inputs only - returns id of axis or button
-        if self._input_id is not None and hasattr(self._input_id, "message_key"):
-            return self._input_id.message_key
+        # if self._input_id is not None and hasattr(self._input_id, "message_key"):
+        #     return self._input_id.message_key
+        if self._message_key:
+            return self._message_key
         return self._input_id
 
     def callbackKey(self):
@@ -8801,7 +8804,8 @@ class ContainerView(AbstractView):
                     if verbose:
                         syslog.info("\tno containers to display")
                     msg = f"Please add a container or action for <span style ='color: {gremlin.ui.ui_common.Color.textHighlightColor()}; font-weight: bold;'>{self.input_item.display_name}</span>"
-                    syslog.info(f"container view redraw ui: {msg}  input item id: {self.input_item.id}")
+                    if verbose:
+                        syslog.info(f"container view redraw ui: {msg}  input item id: {self.input_item.id}")
                     self._blank_widget.setText(msg)
                     self._show_blank()
 
@@ -9138,7 +9142,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         if force or not self._drawn_once or self._container_view is None:
             if self._input_item is not None:
-                syslog.info(f"redraw input item id [{self._input_item.id}] container count: [{self._input_item.containers.count()}]")
+                # syslog.info(f"redraw input item id [{self._input_item.id}] container count: [{self._input_item.containers.count()}]")
                 self._drawn_once = True  # indicate drawn at least once since creation
                 self.create_ui()
                 assert self._container_view is not None, "container view should be created after create_ui"

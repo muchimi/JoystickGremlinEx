@@ -188,9 +188,9 @@ class ProfileDeviceNode:
         if autocreate:
             mode_node = ProfileModeNode(name=mode, parent=self, system=system)
             self.modes[mode] = mode_node
-            syslog.info(
-                f"ModeNode: CREATE mode [{mode}] mode node id: [{mode_node.id}] device id: [{self.id}] profile id: [{self.profile.id}] device: [{str(self)}]"
-            )
+            # syslog.info(
+            #     f"ModeNode: CREATE mode [{mode}] mode node id: [{mode_node.id}] device id: [{self.id}] profile id: [{self.profile.id}] device: [{str(self)}]"
+            # )
             return mode_node
         return None
 
@@ -249,8 +249,8 @@ class ProfileDeviceNode:
                 mode_node = self.getModeNode(mode_name, autocreate=True)
             assert mode_node is not None  # shuld always exist in the profile as it's created on start
             mode_node.from_xml(child, data, extra_data)
-            syslog.info(f"device xml: storing mode id [{mode_node.id}] to device id [{self.id}] mode name: [{mode_node.name}]")
-            pass
+            # syslog.info(f"device xml: storing mode id [{mode_node.id}] to device id [{self.id}] mode name: [{mode_node.name}]")
+            # pass
 
     def to_xml(self):
         """Returns a XML node representing this device's contents.
@@ -258,7 +258,7 @@ class ProfileDeviceNode:
         :return xml node of this device's contents
         """
 
-        verbose = gremlin.config.Configuration().verbose
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
 
         # skip writing if the device has no inputs defined
         persistable = DeviceType.isPersistable(self.device_type)
@@ -2312,12 +2312,12 @@ class Profile:
         gremlin.ui.mode_device.ensureModeInputItems(self, "Default")
 
     def _handle_device_node_changed(self, data_map, key, old_value: ProfileDeviceNode, new_value: ProfileDeviceNode):
-        def stub(node: ProfileDeviceNode) -> str:
-            if node:
-                return f"name: {node.name} id: {node.id} guid: {gremlin.util.normalize_guid(node.device_guid)}"
-            return "n/a"
+        # def stub(node: ProfileDeviceNode) -> str:
+        #     if node:
+        #         return f"name: {node.name} id: {node.id} guid: {gremlin.util.normalize_guid(node.device_guid)}"
+        #     return "n/a"
 
-        syslog.info(f"device map: key: [{key}] old value: [{stub(old_value)}] new value: [{stub(new_value)}]")
+        # syslog.info(f"device map: key: [{key}] old value: [{stub(old_value)}] new value: [{stub(new_value)}]")
         pass
 
     @property
@@ -2396,9 +2396,9 @@ class Profile:
             mode_node = device_node.getModeNode(mode_name)
             if mode_node:
                 input_item = mode_node.getInputItem(input_type, input_id)
-                syslog.info(
-                    f"getInputItem: device node id: {device_node.id} mode node id: {mode_node.id} mode name: [{mode_name}] config size: [{len(mode_node._config)}] input item: [{input_item.id if input_item else 'not found'}]"
-                )
+                # syslog.info(
+                #     f"getInputItem: device node id: {device_node.id} mode node id: {mode_node.id} mode name: [{mode_name}] config size: [{len(mode_node._config)}] input item: [{input_item.id if input_item else 'not found'}]"
+                # )
                 if input_id == gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart:
                     pass
                 return input_item
@@ -3546,6 +3546,7 @@ class Profile:
         :param autocreate: autocreate the entry if it does not exist in the current profile and the device exists/is connected
         :returns: the device object, or None if does not exist
         """
+        verbose = gremlin.config.Configuration().verbose_mode_execution
         device_guid = gremlin.util.parse_guid(device_guid)
         if device_guid not in self.devices:
             if autocreate:
@@ -3558,7 +3559,8 @@ class Profile:
                     device_node.device_guid = device_guid
                     device_node.device_type = device.device_type
                     self.devices[device_guid] = device_node
-                    syslog.info(f"Profile: CREATE device node: [{str(device_node)}] profile id: [{self.id}]")
+                    if verbose:
+                        syslog.info(f"Profile: CREATE device node: [{str(device_node)}] profile id: [{self.id}]")
                     return device_node
             return None
 
@@ -4965,9 +4967,9 @@ class ProfileModeNode:
             self._config[input_type] = {}
         input_id_key = self.registry.getInputIdKey(input_id)
         if input_id_key not in self._config[input_type]:
-            syslog.info(
-                f"input type: [{input_type.name}] create input id [{input_id_key}] mode node id: [{self.id}] mode name: [{self.name}]  device id: [{self.parent.id}] device name: [{self.parent.name}] profile id: [{self.profile.id}]"
-            )
+            # syslog.info(
+            #     f"input type: [{input_type.name}] create input id [{input_id_key}] mode node id: [{self.id}] mode name: [{self.name}]  device id: [{self.parent.id}] device name: [{self.parent.name}] profile id: [{self.profile.id}]"
+            # )
             self._config[input_type][input_id_key] = None
         return self._config[input_type][input_id_key]
 
@@ -4996,9 +4998,9 @@ class ProfileModeNode:
         assert input_id is not None, "invalid input id"
         mode_config = self.getConfig(input_type)
         mode_config[input_id_key] = input_item
-        syslog.info(
-            f"store input item in mode: input item id: {Ansi.YELLOW}[{input_item.id}]{Ansi.RESET} input type: [{input_type.name}] input id {Ansi.GREEN}[{input_id_key}]{Ansi.RESET} mode node id: [{self.id}] mode name: [{self.name}]  device id: [{self.parent.id}] device name: [{self.parent.name}] profile id: [{self.profile.id}]"
-        )
+        # syslog.info(
+        #     f"store input item in mode: input item id: {Ansi.YELLOW}[{input_item.id}]{Ansi.RESET} input type: [{input_type.name}] input id {Ansi.GREEN}[{input_id_key}]{Ansi.RESET} mode node id: [{self.id}] mode name: [{self.name}]  device id: [{self.parent.id}] device name: [{self.parent.name}] profile id: [{self.profile.id}]"
+        # )
 
     def getConfig(self, input_type: InputType) -> dict:
         """gets the configuration list for a given input type"""
@@ -5081,7 +5083,7 @@ class ProfileModeNode:
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui
-        verbose = True
+        # verbose = True
         assert node.tag == "mode", f"not a valid mode entry - offending line: {node.sourceline}"
 
         if not self._name:
@@ -5137,10 +5139,10 @@ class ProfileModeNode:
                         item = InputItem(mode_node=self, input_type=input_type)
                     case InputType.ModeControl:
                         item = gremlin.ui.mode_device.ModeInputItem(self)
-                        syslog.info(
-                            f"load mode input id: input item id: {Ansi.YELLOW}[{item.id}]{Ansi.RESET} mode name: [{self.name}] input id: {Ansi.GREEN}[{item.input_id.name}/{item.input_id}]{Ansi.RESET}"
-                        )
-                        pass
+                        # syslog.info(
+                        #     f"load mode input id: input item id: {Ansi.YELLOW}[{item.id}]{Ansi.RESET} mode name: [{self.name}] input id: {Ansi.GREEN}[{item.input_id.name}/{item.input_id}]{Ansi.RESET}"
+                        # )
+                        # pass
 
                     case _:
                         assert False, f"unhandled input type - got [{input_type}] - offending line: [{child.sourceline}]"

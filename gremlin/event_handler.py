@@ -4500,12 +4500,19 @@ class JoystickEventProcessor:
         """
 
         import gremlin.input_item
+        assert gremlin.input_item is not None, "gremlin.input_item module not available"
+        assert isinstance(device_guid, (str, dinput.GUID)), "invalid device_guid"
+
+        assert isinstance(input_type, InputType), "invalid input_type"
 
         if not device_guid:
             # nothing to do
             return
 
         assert isinstance(callback, Callable), "invalid callback"
+        if input_type == InputType.Midi:
+            pass
+
 
         input_id_key = gremlin.input_item.getInputIdKey(input_id)
 

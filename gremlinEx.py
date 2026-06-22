@@ -5905,7 +5905,7 @@ if __name__ == "__main__":
     try:
         # integrate twisted with QT framework
         # twisted framework
-        syslog.info("starting app exec")
+        #syslog.info("starting app exec")
         app.exec()
     except Exception as err:
         syslog.error(f"{err}\n{traceback.format_exc()}")

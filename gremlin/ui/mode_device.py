@@ -172,11 +172,11 @@ class ModeInputItem(gremlin.input_item.InputItem):
             override_input_type=InputType.JoystickButton,
         )  # parent is the mode object this input belongs to
 
-        if input_id == ModeInputModeType.ModeProfileStart:
-            pass
+        # if input_id == ModeInputModeType.ModeProfileStart:
+        #     pass
 
-        syslog.info(f"InputItem: CREATE MODE INPUT ITEM: input item id: {Ansi.YELLOW}[{self._id}]{Ansi.RESET} input id: {Ansi.GREEN}[{input_id.name}/{input_id}]{Ansi.RESET} mode name: [{mode_node.name}] mode node id: [{mode_node.id}] device node id: [{mode_node.parent.id}] profile id: [{mode_node.profile.id}]")
-        pass
+        # syslog.info(f"InputItem: CREATE MODE INPUT ITEM: input item id: {Ansi.YELLOW}[{self._id}]{Ansi.RESET} input id: {Ansi.GREEN}[{input_id.name}/{input_id}]{Ansi.RESET} mode name: [{mode_node.name}] mode node id: [{mode_node.id}] device node id: [{mode_node.parent.id}] profile id: [{mode_node.profile.id}]")
+        #pass
 
 
     def from_xml(self, node, data=None, extra_data: dict = None):
@@ -187,18 +187,17 @@ class ModeInputItem(gremlin.input_item.InputItem):
         if node.tag in ("modecontrol", "mode-control"):
             self.parse_xml(node, data, extra_data)
 
-        syslog.info(f"read input id: {self.input_id.name}")
+
 
         # read containers
         super().from_xml(node, data, extra_data, skip_root=True)
 
-        syslog.info(f"after super read input id: {self.input_id.name}")
         assert self.input_id is not None, "ModeInputItem: input id load failed"
         assert self.input_id != ModeInputModeType.DelayLoad, "invalid input read from XML data"
 
-        syslog.info(
-            f"loaded xml for ModeInput id {Ansi.YELLOW}[{self.id}]{Ansi.RESET}  input id: {Ansi.GREEN}[{self.input_id.name}]{Ansi.RESET} container count: [{self.containers.count()}]"
-        )
+        # syslog.info(
+        #     f"loaded xml for ModeInput id {Ansi.YELLOW}[{self.id}]{Ansi.RESET}  input id: {Ansi.GREEN}[{self.input_id.name}]{Ansi.RESET} container count: [{self.containers.count()}]"
+        # )
 
         self.setInputIdReadOnly(True)  # ensure it cannot be changed
 
@@ -387,7 +386,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             assert input_item is not None,"invalid input item - should be defined here"
             assert input_item.input_id is not None, "invalid input id for input item"
             model.setItemAt(index,input_item)
-            syslog.info(f"Mode model: index [{index}] contains input item id {Ansi.YELLOW}[{input_item.id}]{Ansi.RESET} [{input_item.display_name}] container count: [{input_item.containers.count()}]")
+            # syslog.info(f"Mode model: index [{index}] contains input item id {Ansi.YELLOW}[{input_item.id}]{Ansi.RESET} [{input_item.display_name}] container count: [{input_item.containers.count()}]")
 
         model.popSuspend()
 

@@ -1336,7 +1336,7 @@ class Buttons:
 
     @staticmethod
     def getRefreshWidget(label=None, tooltip="Refresh", callback=None, no_keyboard=True, data=None):
-        icon = Icons.refreshIcon()
+        icon = Icons.refreshIcon(Color.greenColor())
         return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
 
     @staticmethod
@@ -4379,6 +4379,8 @@ class QIconPushButton(QDataPushButton):
         super().__init__(
             text=text, data=data, parent=parent, tooltip=tooltip, callback=callback, callbackEx=callbackEx, clicked=clicked, enabled=enabled, enhanced=enhanced
         )
+        self.icon_pressed = None
+        self.icon_default = None
 
         if icon:
             self.setIcon(icon)
@@ -4416,12 +4418,15 @@ class QIconPushButton(QDataPushButton):
 
     def on_press(self):
         """override when mouse is pressed"""
-        self.setIcon(self.icon_pressed)
-        self.repaint()  # force immediate repaint
+        if self.icon_pressed:
+            self.setIcon(self.icon_pressed)
+            self.repaint()  # force immediate repaint
 
     def on_release(self):
         """override when mouse is released"""
-        self.setIcon(self.icon_default)
+        if self.icon_default:
+            self.setIcon(self.icon_default)
+            self.repaint()  # force immediate repaint
 
 
 class NoKeyboardPushButton(QIconPushButton):
