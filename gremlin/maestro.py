@@ -16,10 +16,107 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import clr
+import logging
+import os
 import sys
+import gremlin.util
+# os.environ["PYTHONNET_PYDLL"] = r"C:\Python\python313\python313.dll"
+from pythonnet import load
 
+import gremlin
 from gremlin.singleton_decorator import SingletonDecorator
+
+syslog = logging.getLogger("system")
+
+@SingletonDecorator
+class Maestro():
+  def __init__(self):
+
+
+    # root = r"C:\HIDMaestro\dist"
+    # sys.path.append(root)
+    # clr.AddReference("HIDMaestro")
+
+    # 1. Path to your HIDMaestro release folder
+    hid_maestro_path = r"C:\HIDMaestro\dist"
+
+    # 2. Configure pythonnet to use CoreCLR with HIDMaestro's runtime configuration
+    runtime_config = os.path.join(hid_maestro_path, "HidMaestro.Core.runtimeconfig.")
+    load("coreclr") #, runtime_config=runtime_config)
+
+    # 3. Append the folder to the path so pythonnet can find the assembly dependencies
+    sys.path.append(hid_maestro_path)
+    import clr
+    clr.AddReference("HIDMaestro.Core")
+
+
+    import HIDMaestro
+
+    self.ctx = HIDMaestro.HMContext()
+
+    if gremlin.util.is_user_admin():
+      syslog.info("User is admin, creating device.")
+      self.createDevice()
+    else:
+      syslog.warning("User is not admin, device creation skipped.")
+
+  def createDevice(self, axis_count : int = 8, button_count : int = 128, hat_count : int = 4, vid = 0x1209, pid = 0x1000):
+
+
+
+      import HIDMaestro
+      descriptor = HIDMaestro.HidDescriptorBuilder()
+      descriptor = descriptor.Joystick()
+      descriptor = descriptor.AddStick("X", bits = 16)
+      descriptor = descriptor.AddStick("Y", bits = 16)
+      descriptor = descriptor.AddStick("Z", bits = 16)
+      descriptor = descriptor.AddStick("RX", bits = 16)
+      descriptor = descriptor.AddStick("RY", bits = 16)
+      descriptor = descriptor.AddStick("RZ", bits = 16)
+      descriptor = descriptor.AddStick("S1", bits = 16)
+      descriptor = descriptor.AddStick("S2", bits = 16)
+      descriptor = descriptor.AddButtons(128)
+      descriptor = descriptor.AddHat()
+      descriptor = descriptor.AddHat()
+      descriptor = descriptor.AddHat()
+      descriptor = descriptor.AddHat()
+      descriptor = descriptor.AddPidFfbBlock()
+
+
+
+      builder = HIDMaestro.HMProfileBuilder()
+      builder = builder.Id("gex device") # .Id("gex device").name("GEX Custom Device").vendor("GEX").Vid(0x1209).Pid(0x1000).ProductString("GEX Custom Device").Type("flightstick").Build()
+      builder = builder.Name("GEX Custom Device")
+      builder = builder.Vendor("GEX")
+      builder = builder.Vid(0x1209)
+      builder = builder.Pid(0x1000)
+      builder = builder.ProductString("GEX Custom Device")
+      builder = builder.Type("flightstick")
+      builder = builder.FromDescriptorBuilder(descriptor)
+      builder = builder.Build()
+
+
+      # builder = HIDMaestro.HMProfileBuilder().
+      # builder.Id = "gex device"
+      # builder.Name = "GEX Custom device"
+      # builder.vendor = "GEX"
+      # builder.Vid = 0x045E
+      # builder.ProductString = "custom device 1"
+      # builder.Pid = pid
+      # builder.ManufacturerString = "GremlinEx"
+      # builder.Type = "flightstick"
+      # builder.Connection = "usb"
+      # builder.ButtonCount = 16
+      # builder.AxisCount = 8
+
+      # builder.FromDescriptorBuilder(descriptor)
+      # builder.Build()
+
+      self.controller : HIDMaestro.HMController = self.ctx.CreateController(builder)
+
+
+
+
 
 
 left_vpc_json = '''
@@ -58,50 +155,3 @@ vjoy_128_json = '''
   "notes": "Extracted by HMDeviceExtractor on 2026-05-30 23:06:56 UTC. Descriptor reconstructed from Windows preparsed data (HIDAPI algorithm); logically equivalent to the physical device's HID report descriptor but not guaranteed byte-identical."
 }
 '''
-
-@SingletonDecorator
-class HIDMaestro():
-  def __init__(self):
-    root = "C:\\HIDMaestro\\build"
-    sys.path.append(root)
-    clr.AddReference("HIDMaestro")
-    import HIDMaestro
-    self.ctx = HIDMaestro.HMContext()
-    self.createDevice()
-
-  def createDevice(self, axis_count : int = 8, button_count : int = 128, hat_count : int = 4, vid = 0x1209, pid = 0x1000):
-
-      descriptor = HIDMaestro.HidDescriptorBuilder()
-      descriptor = descriptor.Joystick()
-      descriptor = descriptor.AddStick("X", bits = 16)
-      descriptor = descriptor.AddStick("Y", bits = 16)
-      descriptor = descriptor.AddStick("Z", bits = 16)
-      descriptor = descriptor.AddStick("RX", bits = 16)
-      descriptor = descriptor.AddStick("RY", bits = 16)
-      descriptor = descriptor.AddStick("RZ", bits = 16)
-      descriptor = descriptor.AddStick("S1", bits = 16)
-      descriptor = descriptor.AddStick("S2", bits = 16)
-      descriptor = descriptor.AddButtons(128)
-      descriptor = descriptor.AddHat()
-      descriptor = descriptor.AddHat()
-      descriptor = descriptor.AddHat()
-      descriptor = descriptor.AddHat()
-      descriptor = descriptor.AddPidFfbBlock()
-
-
-      device = HIDMaestro.HMProfileBuilder()
-      device.Id = "gex device"
-      device.Name = "GEX Custom device"
-      device.vendor = "GEX"
-      device.Vid = vid
-      device.ProductString = "custom device 1"
-      device.Pid = pid
-      device.ManufacturerString = "GremlinEx"
-      device.Type = "flightstick"
-      device.Connection = "usb"
-      device.FromDescriptorBuilder(descriptor)
-      device.Build()
-
-      self.controller : HIDMaestro.HMController = self.ctx.CreateController(device)
-
-

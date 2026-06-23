@@ -629,6 +629,7 @@ class MidiInterface(QtCore.QObject):
 
         self._started = False  # true if the interface is actively listening
         self._starting = False  # true if the interface is in the process of starting listeners
+        self._stopping = False
         self._listeners = {}  # map of port numer to its listener
         self._port_names = []
         self._port_map = {}
@@ -642,6 +643,7 @@ class MidiInterface(QtCore.QObject):
         el.config_changed.connect(self._on_config_changed)
         self._monitored_ports = set()
         self.midi_enabled = True  # allow MIDI feature in GEX
+
 
 
     def _on_config_changed(self):
@@ -881,17 +883,22 @@ class MidiInterface(QtCore.QObject):
 
     def _stop_listeners(self):
         """stops all active MIDI listeners"""
-        for listener in self._listeners.values():
+        self._stopping = True
+
+        listeners = list(self._listeners.values())  # make a copy of the listeners list
+
+        for listener in listeners:  # iterate over the copy of the listeners list
 
             if not listener.stopped():
                 # request exit and wait for it
-                listener.callback = None
-                listener.stop()
-                listener.join()
+                if listener.is_alive():
+                    listener.callback = None
+                    listener.stop()
+                    listener.join()
 
         self._listeners.clear()  # clear the listeners dictionary
 
-
+        self._stopping = False
     @property
     def started(self):
         """returns True if the MIDI interface has been started"""

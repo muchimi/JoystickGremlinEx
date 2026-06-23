@@ -2636,9 +2636,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             for category, section in section_map.items():
                 missing_devices = [dev for dev in section if dev not in category_map[category]]
                 # index of the last item per section
-                for dev in missing_devices:
+                for device in missing_devices:
                     # next index
-                    if dev.disabled:
+                    if device.disabled:
                         # skip
                         continue
                     sorted_devices.append((device.device_id, device.name, device))
@@ -5876,7 +5876,7 @@ if __name__ == "__main__":
         gremlin.remote.remote_client.start()
 
     # HID maestro
-    # maestro = gremlin.maestro.HIDMaestro()
+    maestro = gremlin.maestro.Maestro()
 
     # Run UI
 

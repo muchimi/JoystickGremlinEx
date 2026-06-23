@@ -2765,6 +2765,8 @@ class InputItemListModel(AbstractCallbackModel):
         import gremlin.base_profile
         import gremlin.joystick_handling
 
+
+
         if profile is None:
             raise ValueError("Profile cannot be None")
         assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
@@ -2774,6 +2776,8 @@ class InputItemListModel(AbstractCallbackModel):
             raise ValueError("Mode cannot be None")
 
         device = gremlin.joystick_handling.getDevice(device_guid)
+        if device is None:
+            raise ValueError("Device not found")
 
         super().__init__(
             allowed_types=(InputItem,),
@@ -2784,7 +2788,7 @@ class InputItemListModel(AbstractCallbackModel):
         self._device_guid = device_guid
         self._profile = profile
         self._device_data = profile.getDeviceNode(device_guid)
-        device = gremlin.joystick_handling.getDevice(device_guid)
+
         assert device is not None, "invalid device"
         if device.device_type == DeviceType.Joystick:
             # ensure all possible inputs are pre-loaded for joysticks before filtered
