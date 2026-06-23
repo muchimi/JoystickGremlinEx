@@ -488,7 +488,7 @@ class DeviceSummary:
                 else:
                     logical_count += 1
 
-                syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
+                # syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
                 self.axis_names.append(axis_name)
 
             # auto disable invalid joystick devices that are not in spec
@@ -939,6 +939,16 @@ class DILL:
             dev = DILL.get_device_information_by_index(index)
             syslog.info(f"\tIndex: [{index}] {str(dev)}")
         syslog.info("DILL: end device detection summary")
+
+    @staticmethod
+    def getDevices() -> list[DeviceSummary]:
+        '''gets the maestro devices created by GEX'''
+        device_list = []
+        device_count = DILL.get_device_count()
+        for index in range(device_count):
+            dev = DILL.get_device_information_by_index(index)
+            device_list.append(dev)
+        return device_list
 
     @staticmethod
     def getVjoyDeviceMap() -> dict:

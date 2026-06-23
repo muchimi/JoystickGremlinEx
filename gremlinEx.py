@@ -721,6 +721,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """checks to see if the device tab is the current tab or not"""
 
         tab_device_guid = gremlin.shared_state.current_tab_device_guid
+        if tab_device_guid is None:
+            # no tab selected yet
+            return True
         device_guid = gremlin.util.to_guid(device_guid)
         assert isinstance(tab_device_guid, uuid.UUID) and isinstance(device_guid, uuid.UUID), "device id comparison mismatch"
 

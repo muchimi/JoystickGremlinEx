@@ -3419,7 +3419,8 @@ class InputItemListView(AbstractView):
                             f"ListView: create widgets for [{self.model.display_name}] - included: [{self.model.filteredCount()}] unincluded: [{self.model.unfilteredCount()}]"
                         )
 
-                    for model_index, input_item in self.model.getFilteredMap():
+                    data = list(self.model.getFilteredMap())
+                    for model_index, input_item in data:
                         assert isinstance(input_item, InputItem), "invalid input item"
                         assert isinstance(model_index, int), "invalid index"
                         new_widget = True  # assume creating a new widget

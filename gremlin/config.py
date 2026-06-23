@@ -3326,3 +3326,29 @@ class Configuration(QtCore.QObject):
     @last_reorder_file.setter
     def last_reorder_file(self, value: str):
         self._set_data("last_reorder_file", value)
+
+
+    @property
+    def maestro_device_count(self) -> int:
+        """returns the number of Maestro devices currently created"""
+        return self._get_data("maestro_device_count", 4) # defaults to 4
+    @maestro_device_count.setter
+    def maestro_device_count(self, value: int):
+        self._set_data("maestro_device_count", value)
+
+    @property
+    def maestro_enabled(self) -> bool:
+        """returns true if Maestro is enabled"""
+        return self._get_data("maestro_enabled", True)
+    @maestro_enabled.setter
+    def maestro_enabled(self, value: bool):
+        self._set_data("maestro_enabled", value)
+
+    @property
+    def maestro_dist_path(self) -> str:
+        """returns the path to the Maestro distribution"""
+        return self._get_data("maestro_dist_path", r"C:\HIDMaestro\dist")
+    @maestro_dist_path.setter
+    def maestro_dist_path(self, value: str):
+        self._set_data("maestro_dist_path", value)
+
