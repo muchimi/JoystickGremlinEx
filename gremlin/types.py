@@ -267,6 +267,7 @@ class DeviceType(IntEnum):
     State = 8 # state special device
     Plugins = 9 # plugins special device
     OctaviIFR1 = 10 # octavi IFR1 special device
+    Maestro = 11 # maestro special device
 
     @staticmethod
     def isFixedInput(value : DeviceType) -> bool:
@@ -325,7 +326,8 @@ _DeviceType_to_display_name = {
     DeviceType.Settings : "Settings",
     DeviceType.State : "State",
     DeviceType.Plugins : "Plugins",
-    DeviceType.OctaviIFR1 : "Octavi IFR1"
+    DeviceType.OctaviIFR1 : "Octavi IFR1",
+    DeviceType.Maestro : "Maestro"
 }
 
 _DeviceType_to_string_lookup = {
@@ -339,7 +341,8 @@ _DeviceType_to_string_lookup = {
     DeviceType.Settings: "settings",
     DeviceType.State: "state",
     DeviceType.Plugins: "plugins",
-    DeviceType.OctaviIFR1: "octaviifr1"
+    DeviceType.OctaviIFR1: "octaviifr1",
+    DeviceType.Maestro: "maestro"
 }
 
 
@@ -354,7 +357,8 @@ _DeviceType_to_enum_lookup = {
     "settings": DeviceType.Settings,
     "state" : DeviceType.State,
     "plugins" : DeviceType.Plugins,
-    "octaviifr1" : DeviceType.OctaviIFR1
+    "octaviifr1" : DeviceType.OctaviIFR1,
+    "maestro" : DeviceType.Maestro
 
 }
 

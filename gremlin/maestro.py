@@ -38,7 +38,9 @@ import logging
 import os
 import sys
 import time
+import threading
 
+#from clr_loader.util.coreclr_errors import self
 from sympy.physics.mechanics import System
 import gremlin.util
 import dinput
@@ -50,6 +52,7 @@ import gremlin
 from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.config
 import gremlin.util
+from dinput import GEX_VID, GEX_ID_STRING, GEX_MAX_DEVICES, GEX_PID_BASE, GEX_VENDOR_STRING, GEX_PRODUCT_STRING, GEX_MAX_DEVICES
 
 syslog = logging.getLogger("system")
 
@@ -89,12 +92,7 @@ except Exception as e:
     _maestro_initialized = False
 
 
-GEX_VID = 0x1209 # vendor ID for GEX managed devices
-GEX_PID_BASE = 0x1000 # base product id (sequential) for GEX managed devices
-GEX_ID_STRING = "GEX"
-GEX_VENDOR_STRING = "GEX"  # vendor string for GEX managed devices
-GEX_PRODUCT_STRING = "GEX Custom Device"
-GEX_MAX_DEVICES = 16  # maximum number of GEX managed devices
+
 
 @SingletonDecorator
 class Maestro:
@@ -105,22 +103,110 @@ class Maestro:
         self._descriptor_map = {}  # map of the created descriptors by index
         self._buffer_map = {}  # map of the buffers for each device by index
         self.ctx = None # maestro context
-        self.reset()
+        self._dirty = False # true if a controller was created and we need a resync
+        self._sync_worker = None # synchronization thread used to syn dinput devices with changed maestro devices
+        self._sync_lock = threading.Lock()  # lock to synchronize access to the sync worker
+
+
+        config = gremlin.config.Configuration()
+        self._maestro_enabled = config.maestro_enabled
+
+        if not self._maestro_enabled:
+            syslog.info("Maestro: disabled")
+            return
+        syslog.info("Maestro: enabled")
+        maestro_count = config.maestro_device_count
+
+        # supress device change notices
+        el = gremlin.event_handler.EventListener()
+        el.pushDeviceChangeSuppression()
+
+        self.ctx = HIDMaestro.HMContext()
+
+        self.removeAllControllers() # clean slate
+
+        # ensure maestro devices exist
+        for i in range(maestro_count):
+            if i not in self._controller_map:
+                self.createJoystickController()
+
+        # synchronize
+        self.sync(force=True)
+
+        # pop device change suppression after initialization
+        el.popDeviceChangeSuppression()
+
+    def LoadActiveControllers(self):
+        """loads the active maestro controllers"""
+        if self._maestro_enabled and _maestro_initialized:
+            for controller in self.ctx.ActiveControllers:
+                if controller.Index not in self._controller_map:
+                    self._controller_map[controller.Index] = controller
+
+
 
     def reset(self):
         """ resets the maestro configuration """
-        config = gremlin.config.Configuration()
-        if config.maestro_enabled:
-            if _maestro_initialized:
-                if self.ctx is None:
-                    self.ctx = HIDMaestro.HMContext()
-                if gremlin.util.is_user_admin():
-                    # self.removeAllControllers()
 
-                    # syslog.info("User is admin, creating device.")
-                    self.syncControllers()
-                else:
-                    syslog.warning("User is not admin, device creation skipped.")
+        if self._maestro_enabled and _maestro_initialized:
+            if gremlin.util.is_user_admin():
+                # self.removeAllControllers()
+
+                # syslog.info("User is admin, creating device.")
+                self.sync(True)
+            else:
+                syslog.warning("User is not admin, device creation skipped.")
+
+    def sync(self, force = False):
+        """ syncs dinput with maestro """
+        if self._dirty or force:
+            diff = self._compare_list()
+            if diff and self._sync_worker is None:
+                with self._sync_lock:
+                    self._sync_worker = threading.Thread(target=self._sync_worker_runner)
+                self._sync_worker.start()
+
+
+
+    def _sync_worker_runner(self):
+        """worker thread to sync dinput devices with changed maestro devices"""
+        el = gremlin.event_handler.EventListener()
+        el.pushDeviceChangeSuppression()
+        syslog.info("Maestro: Starting sync worker")
+        timeout = time.time() + 20
+        diff = self._compare_list()
+        while diff and time.time() < timeout:
+            self.syncControllers()
+            diff = self._compare_list()
+
+        if diff:
+            syslog.warning("Maestro: sync worker timed out before all changes were applied")
+
+
+        syslog.info("Maestro: sync completed")
+
+        with self._sync_lock:
+            self._sync_worker = None  # reset the sync worker when done
+
+        # reload the joystick configuration
+        gremlin.joystick_handling.joystick_devices_initialization()
+
+        el.popDeviceChangeSuppression()
+
+    def _compare_list(self) -> bool:
+        """compares the maestro device list to the dinput maestro list to see if all dinput devices are accounted for"""
+        maestro_pid_set = set([controller.Profile.ProductId for controller in self._controller_map.values()])
+        maestro_count = len(maestro_pid_set)
+        if maestro_count == 0:
+            # mo maestro devices yet
+            return True
+        device_pid_set = set([device.product_id for device in dinput.DILL.getMaestroDevices()])
+        if len(device_pid_set) != maestro_count:
+            # not the same
+            return True
+
+        diff = maestro_pid_set != device_pid_set
+        return diff
 
 
 
@@ -143,29 +229,29 @@ class Maestro:
         devices = HIDMaestro.HMDeviceExtractor.ListDevices()
         return devices
 
-    def syncControllers(self, gex_only = True):
+    def syncControllers(self):
         """gets a list of defined controllers via direct input """
-        all_devices = dinput.DILL.getDevices()
-        # filter the devices to only include GEX managed devices if gex_only is True
-        if gex_only:
-            devices = [d for d in all_devices if d.vendor_id == GEX_VID and GEX_PID_BASE <= d.product_id < GEX_PID_BASE + GEX_MAX_DEVICES]
 
-            for device in devices:
+        # acquire the sync lock to ensure thread safety while syncing controllers
+        with self._sync_lock:
+            all_devices = dinput.DILL.getMaestroDevices()
+            for device in all_devices:
                 syslog.info(f"Found GEX managed device: 0x{device.product_id:x}.0x{device.vendor_id:x} {device.name}")
                 # check if we already have a controller for this device
                 index = device.product_id - GEX_PID_BASE
                 if index not in self._controller_map:
                     syslog.info(f"Creating controller for GEX managed device: 0x{device.product_id:x}.0x{device.vendor_id:x} {device.name}")
                     self.createJoystickController(at_index = index)
+                self._device_map[index] = device
 
+            self._dirty = False
 
-            # add any missing controllers
-            for i in range(4):
-                if i not in self._controller_map:
-                    syslog.info(f"Creating missing controller for GEX managed device at index {i}")
-                    self.createJoystickController(at_index=i)
-
-        return []
+    def addMissingControllers(self):
+        """adds any missing controllers for GEX managed devices"""
+        for i in range(4):
+            if i not in self._controller_map:
+                syslog.info(f"Creating missing controller for GEX managed device at index {i}")
+                self.createJoystickController(at_index=i)
 
     def removeController(self, controller):
         """removes the given controller"""
@@ -174,19 +260,17 @@ class Maestro:
             del self._controller_map[index]
             del self._device_map[index]
         controller.Dispose()
+        self._dirty = True
 
     def removeAllControllers(self):
         if not gremlin.util.is_user_admin():
             syslog.warning("Maestro: removing controllers requires GEX to run in admin mode")
             return
         self.ctx.RemoveAllVirtualControllers()
-        # controllers = self.getControllers()
-        # for controller in controllers:
-        #     syslog.info(f"Maestro: removing device 0x{controller.Pid():x}.0x{controller.Vid():x} {controller.product_string()}")
-        #     controller.Dispose()
         self._controller_map.clear()
         self._descriptor_map.clear()
         self._device_map.clear()
+        self._dirty = True
         syslog.info("Maestro: all devices removed.")
 
     def createJoystickController(self, axis_count: int = 8, button_count: int = 128, hat_count: int = 4, at_index : int = None):
@@ -252,19 +336,8 @@ class Maestro:
             profile = profile.Build()
 
 
-            device_count = dinput.DILL.get_device_count()
             controller: HMController = self.ctx.CreateControllerAt(index, profile)
             self._controller_map[index] = controller
-
-            # wait until DINPUT catches up
-            while dinput.DILL.get_device_count() == device_count:
-                time.sleep(0.01)  # sleep for 10ms
-
-            # get the correspnding dinput device
-            dinput_device : dinput.DeviceSummary = self.getDevice(pid)  # use the PID to find the corresponding dinput device
-            assert dinput_device is not None
-            self._device_map[index] = dinput_device
-
 
             state = HMGamepadState()
             # set the initial state of each axis to center
@@ -279,15 +352,25 @@ class Maestro:
             state.Buttons = HMButton(buttons)
 
             controller.SubmitState(state)  # update the controller with the initial state
+            self._dirty = True
             return controller
 
         except Exception as e:
             syslog.error(f"Maestro: failed to create device: {e}")
 
+
+
     def getDevice(self, pid: int):
         """gets the dinput device for the given pid """
         devices = dinput.DILL.getDevices()
         dev : dinput.DeviceSummary
+        index = self.pidToIndex(pid)
+        if self._dirty:
+            self.syncControllers()
+            self._dirty = False  # reset the dirty flag after syncing controllers
+        if index in self._device_map:
+            return self._device_map[index]
+
         max_pid = GEX_PID_BASE + GEX_MAX_DEVICES - 1
         for dev in devices:
             syslog.info(f"Maestro: checking device [{dev.name}] product: [0x{dev.product_id:04X}] vendor: [0x{dev.vendor_id:04X}] axis count: [{dev.axis_count}] button count: [{dev.button_count}] hat count: [{dev.hat_count}]")

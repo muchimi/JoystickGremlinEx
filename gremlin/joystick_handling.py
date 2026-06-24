@@ -43,11 +43,15 @@ import gremlin.config
 
 from PySide6 import QtWidgets, QtCore
 
+
+
 # List of all joystick devices
 _joystick_devices = []  # detected devices only (including virtual devices that exist all the time like OSC or Modes)
 _all_joystick_devices = []  # [DeviceSummary] of all devices, virtual, connected and disconnected
 _vjoy_devices_map = {}  #  connected vjoy devices (int) -> device
+_maestro_devices_map = {} # connected maestro devices (int) -> device
 _all_vjoy_devices_map = {}  # all vjoy devices (int) -> device
+
 _joystick_device_guid_map = {}  # map of DeviceSummary objects keyed by dInput GUID (special devices)
 _special_devices_map = {}  # map of special devices dinput.GUID -> device
 _special_devices = []  # list of special devices
@@ -960,7 +964,8 @@ def joystick_devices_initialization():
         _all_joystick_devices, \
         _invalid_device_guid, \
         _all_vjoy_devices_map, \
-        _all_devices_map
+        _all_devices_map, \
+        _maestro_devices_map
 
     _joystick_initialized = False
     config = gremlin.config.Configuration()
@@ -1009,7 +1014,7 @@ def joystick_devices_initialization():
                 if last_count != device_count:
                     attempt += 1
                     last_count = device_count
-                    time.sleep(0.5)
+                    time.sleep(0.25)
                 else:
                     break
 
@@ -1020,6 +1025,7 @@ def joystick_devices_initialization():
         _joystick_device_guid_map.clear()
         _all_vjoy_devices_map.clear()
         _vjoy_devices_map.clear()
+        _maestro_devices_map.clear()  # connected maestro devices (int) -> device
         _all_devices_map.clear()
         virtual_count = 0
         real_count = 0
@@ -1061,9 +1067,17 @@ def joystick_devices_initialization():
             if dev.is_virtual:
                 virtual_count += 1
                 virtual_devices[dev.hashkey] = dev
-                dev.device_type = DeviceType.VJoy
+                if dev.vendor_id == dinput.VJOY_VID and  dev.product_id == dinput.VJOY_PID:
+                    dev.device_type = DeviceType.VJoy
+                    dinput_vjoy_device_map[dev.hashkey] = dev
+                elif dev.vendor_id == dinput.MAESTRO_VID and dev.product_id >= dinput.MAESTRO_PID_BASE and dev.product_id < dinput.MAESTRO_PID_BASE + dinput.GEX_MAX_DEVICES:
+                    dev.device_type = DeviceType.Maestro
+                    index = dev.product_id - dinput.MAESTRO_PID_BASE
+                    _maestro_devices_map[index] = dev
+                else:
+                    raise ValueError(f"Unknown virtual device with vendor ID: 0x{dev.vendor_id:X} product ID: 0x{dev.product_id:X}")
                 dev.device_category = DeviceCategory.Virtual
-                dinput_vjoy_device_map[dev.hashkey] = dev
+
             else:
                 real_count += 1
 
@@ -1210,12 +1224,12 @@ def joystick_devices_initialization():
             # If the device can be acquired, configure the mapping from
             # vJoy axis id, which may not be sequential, to the
             # sequential SDL axis id
-            if dev.connected and hash_value in vjoy_lookup:
-                try:
-                    # register the vjoy device with the proxy
-                    _vjoy_dev = vjoy_proxy[vjoy_index]
-                except error.VJoyError:
-                    syslog.error(f"vJoy id {vjoy_index:} can't be acquired")
+            # if dev.connected and hash_value in vjoy_lookup:
+            #     try:
+            #         # register the vjoy device with the proxy
+            #         _vjoy_dev = vjoy_proxy[vjoy_index]
+            #     except error.VJoyError:
+            #         syslog.error(f"vJoy id {vjoy_index:} can't be acquired")
 
         if not should_terminate:
             if len(_joystick_device_guid_map) == 0:
@@ -1237,12 +1251,15 @@ def joystick_devices_initialization():
         # device: dinput.DILL.DeviceSummary
         syslog.info("Input device summary:")
         regular_devices_list = [dev for dev in _joystick_devices if not dev.is_virtual]
-        vjoy_devices_list = [dev for dev in _joystick_devices if dev.is_virtual]
+        vjoy_devices_list = [dev for dev in _joystick_devices if dev.device_type == DeviceType.VJoy]
         vjoy_devices_list.sort(key=lambda x: x.vjoy_id)
+        maestro_devices_list = [dev for dev in _joystick_devices if dev.device_type == DeviceType.Maestro]
         for dev in regular_devices_list:
             syslog.info(f"\tDevice: (regular) {str(dev)}")
         for dev in vjoy_devices_list:
             syslog.info(f"\tDevice: (vjoy) {str(dev)}")
+        for dev in maestro_devices_list:
+            syslog.info(f"\tDevice: (maestro) {str(dev)}")
 
         _joystick_initialized = True
         syslog.info("Joystick input initialized")

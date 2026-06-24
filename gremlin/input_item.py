@@ -2776,12 +2776,9 @@ class InputItemListModel(AbstractCallbackModel):
             raise ValueError("Mode cannot be None")
 
         device = gremlin.joystick_handling.getDevice(device_guid)
-        if device is None:
-            raise ValueError("Device not found")
-
         super().__init__(
             allowed_types=(InputItem,),
-            model_description=f"InputItemListModel for mode: [{mode}] device: [{device.name}]",
+            model_description=f"InputItemListModel for mode: [{mode}] device: [{device.name if device else 'n/a'}]",
             filter_callback=custom_filter_handler,
         )
 
@@ -2789,8 +2786,8 @@ class InputItemListModel(AbstractCallbackModel):
         self._profile = profile
         self._device_data = profile.getDeviceNode(device_guid)
 
-        assert device is not None, "invalid device"
-        if device.device_type == DeviceType.Joystick:
+
+        if device and device.device_type == DeviceType.Joystick:
             # ensure all possible inputs are pre-loaded for joysticks before filtered
             profile.ensureInputItems(device_guid)
 
@@ -2818,7 +2815,7 @@ class InputItemListModel(AbstractCallbackModel):
             self.setSortCallback(custom_sort_handler)
             self._sort_enabled = True
         else:
-            if device.device_type in (
+            if device and device.device_type in (
                 DeviceType.Keyboard,
                 DeviceType.Midi,
                 DeviceType.Osc,
@@ -2827,7 +2824,8 @@ class InputItemListModel(AbstractCallbackModel):
                 # enable input sorting for state, OSC, MIDI and keyboard only
                 self.setSortCallback(self._handle_sort)  # also enables sort
 
-        self.refresh(False)
+        if device:
+            self.refresh(False)
 
     def _handle_sort(self, items) -> tuple:
         """returns a sort list for the items if a custom handler was not provided"""

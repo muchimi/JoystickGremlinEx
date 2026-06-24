@@ -862,6 +862,8 @@ class EventListener(QtCore.QObject):
 
         # Joystick device change update timeout timer
         self._device_update_timer = None
+        self._device_change_suppressed = 0 # suppression counter for device change events
+        self._device_change_pending = False # true if a device change occured while suppressed
 
         self._running = True
 
@@ -928,6 +930,21 @@ class EventListener(QtCore.QObject):
         self.profile_unload.connect(self.reset)  # reset data on profile unload before a new profile is loaded
 
         self._handle_options_changed() # load verbose modes
+
+    def pushDeviceChangeSuppression(self):
+        """increments the device change suppression counter"""
+        self._device_change_suppressed += 1
+
+    def popDeviceChangeSuppression(self, force=False):
+        """decrements the device change suppression counter"""
+        if force:
+            self._device_change_suppressed = 0
+        elif self._device_change_suppressed > 0:
+            self._device_change_suppressed -= 1
+        if self._device_change_suppressed == 0 and self._device_change_pending:
+            self._device_change_pending = False
+            self.device_change_event.emit()  # trigger the pending device change event
+
 
     def addUIJoystickEventCallback(self, callback):
         """adds a callback to update UI when a joystick event arrives"""
@@ -1440,7 +1457,7 @@ class EventListener(QtCore.QObject):
         if not dinput.DILL.initalized:
             dinput.DILL.init()
         syslog.info("DILL: start listen")
-        dinput.DILL.set_device_change_callback(self._joystick_device_handler)
+        dinput.DILL.set_device_change_callback(self._dinput_device_change_handler)
         dinput.DILL.set_input_event_callback(self._dinput_event_handler)  # DINPUT event handler
         while self._running and not self._run_event.is_set():
             # Keep this thread alive until we are done
@@ -1879,7 +1896,7 @@ class EventListener(QtCore.QObject):
         if event_list:
             self.queueJoystickEventList(event_list)
 
-    def _joystick_device_handler(self, data, action):
+    def _dinput_device_change_handler(self, data, action):
         """Callback for device change events.
 
         This is called when a device is added or removed from the system. This
@@ -1891,9 +1908,15 @@ class EventListener(QtCore.QObject):
         :param action whether the device was added or removed
         """
 
+        if self._device_change_suppressed:
+            self._device_change_pending = True  # mark that a device change occurred while suppressed
+            return
+
         # ignore if a VIGEM device - these are handled, for the moment, directly by the action
         if data.vendor_id == 0x045E and data.product_id == 0x28E and data.button_count == 10 and data.name == b"Controller (XBOX 360 For Windows)":
             return
+
+        self.device_change_event.emit()
 
         if self._device_update_timer is not None:
             self._device_update_timer.cancel()

@@ -26,6 +26,17 @@ import logging
 import traceback
 from gremlin.types import DeviceType, DeviceCategory
 
+MAESTRO_VID = 0x1209 # vendor ID for GEX managed devices
+GEX_VID = MAESTRO_VID # vendor ID for GEX managed devices
+MAESTRO_PID_BASE = 0x1000 # base product ID for Maestro devices
+GEX_PID_BASE = MAESTRO_PID_BASE # base product id (sequential) for GEX managed devices
+GEX_ID_STRING = "GEX"
+GEX_VENDOR_STRING = "GEX"  # vendor string for GEX managed devices
+GEX_PRODUCT_STRING = "GEX Custom Device"
+GEX_MAX_DEVICES = 16  # maximum number of GEX managed devices
+VJOY_VID = 0x1234 # vendor ID for vJoy devices
+VJOY_PID = 0x5678 # product ID for vJoy devices
+
 syslog = logging.getLogger("system")
 
 
@@ -421,6 +432,7 @@ class DeviceSummary:
         self.axis_count = 0
         self.button_count = 0
         self.hat_count = 0
+        self._is_virtual = None
         self.linear_id_map = {}  # map of linear ID to axis ID
         self.usage_page = 0  # HID usage page
         self.usage = 0  # HID usage
@@ -614,10 +626,9 @@ class DeviceSummary:
         bool
             True if the device is a virtual vJoy device, False otherwise
         """
-        if self.vendor_id == 0x1234:  # and self.product_id == 0xBEAD
-            return True
-        # if self.vendor_id == 0x
-        return False
+        if self._is_virtual is None:
+            self._is_virtual = self.vendor_id in (VJOY_VID, GEX_VID)
+        return self._is_virtual
 
     def set_vjoy_id(self, vjoy_id):
         """Sets the vJoy id for this device summary.
@@ -948,6 +959,17 @@ class DILL:
         for index in range(device_count):
             dev = DILL.get_device_information_by_index(index)
             device_list.append(dev)
+        return device_list
+
+    @staticmethod
+    def getMaestroDevices() -> list[DeviceSummary]:
+        '''gets the maestro devices created by GEX'''
+        device_list = []
+        device_count = DILL.get_device_count()
+        for index in range(device_count):
+            dev = DILL.get_device_information_by_index(index)
+            if dev.vendor_id == GEX_VID and GEX_PID_BASE <= dev.product_id < GEX_PID_BASE + GEX_MAX_DEVICES:
+                device_list.append(dev)
         return device_list
 
     @staticmethod

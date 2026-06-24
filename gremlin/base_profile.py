@@ -718,7 +718,7 @@ class JoystickInputStats:
     def __init__(self, device_guid: UUID | dinput.GUID | str | int, input_filter: dict):
         assert isinstance(input_filter, dict), "invalid input filter"
         device = gremlin.joystick_handling.getDevice(device_guid)
-        device_guid = device.device_guid
+        device_guid = device.device_guid if device else gremlin.util.to_guid(device_guid)
         self.input_filter = input_filter
         self.device_guid = device_guid
         self.device_counts = {}  # device count [input_type] -> int

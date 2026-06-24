@@ -608,26 +608,18 @@ class VJoy:
         :param vjoy_id id of the vJoy device to initialize.
         """
         self.vjoy_id = None
+        self._enabled = True
 
         if not VJoyInterface.vJoyEnabled():
             syslog.error("vJoy is not currently running")
-            raise VJoyError("vJoy is not currently running")
-        # vjoy_version = VJoyInterface.GetvJoyVersion()
-        # if vjoy_version < 0x218:
-        #     syslog.error(
-        #         f"Running incompatible vJoy version, 2.1.8+ is required - found {vjoy_version:x}"
-        #     )
-        #     raise VJoyError("Running incompatible vJoy version, 2.1.8  or later required")
+            self._enabled = False
+            return
+
         if VJoyInterface.GetVJDStatus(vjoy_id) != VJoyState.Free.value:
             syslog.error(f"Requested vJoy device is not available - vid: {vjoy_id}")
-            # raise VJoyError(
-            #     f"Requested vJoy device is not available - vid: {vjoy_id}"
-            # )
+
         elif not VJoyInterface.AcquireVJD(vjoy_id):
             syslog.error(f"Failed to acquire the vJoy device - vid: {vjoy_id}")
-            # raise VJoyError(
-            #     f"Failed to acquire the vJoy device - vid: {vjoy_id}"
-            # )
 
         self._acquired = True
 
@@ -655,6 +647,8 @@ class VJoy:
     @property
     def acquired(self) -> bool:
         """true if GremlinEx controls the VJOY device"""
+        if not self._enabled:
+            return False
         return self._acquired
 
     def ensure_ownership(self):
@@ -694,10 +688,14 @@ class VJoy:
             return False
 
     def ensure_released(self):
+        if not self._enabled:
+            return
         gremlin.util.InvokeUiMethod(self._ensure_released_ui)  # ui thread
 
     def _ensure_released_ui(self):
         """ensures the VJOY device is not acquired"""
+        if not self._enabled:
+            return
         vjoy_id = self.vjoy_id
         if self.vjoy_id is None:
             return

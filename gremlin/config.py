@@ -3330,7 +3330,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def maestro_device_count(self) -> int:
-        """returns the number of Maestro devices currently created"""
+        """returns the number of Maestro devices to create """
         return self._get_data("maestro_device_count", 4) # defaults to 4
     @maestro_device_count.setter
     def maestro_device_count(self, value: int):
