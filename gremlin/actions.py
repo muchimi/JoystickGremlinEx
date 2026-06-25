@@ -202,7 +202,9 @@ class StateCondition(AbstractCondition):
 
         if verbose:
             logtabs = gremlin.shared_state.logTabs(True)
-            state_stub = f"StateCondition: key: [{self.key}] comparison: [{self.comparison}] current state value: [{value}] ignore release: [{self.ignore_release}]"
+            state_stub = (
+                f"StateCondition: key: [{self.key}] comparison: [{self.comparison}] current state value: [{value}] ignore release: [{self.ignore_release}]"
+            )
 
         if value is None:
             # success if the state is not found
@@ -220,9 +222,7 @@ class StateCondition(AbstractCondition):
             state = True
 
         if verbose:
-            syslog.info(
-                f"{logtabs}{state_stub} - condition return state: {'PASS' if state else 'FAIL'}"
-            )
+            syslog.info(f"{logtabs}{state_stub} - condition return state: {'PASS' if state else 'FAIL'}")
         return state
 
     def condition_name(self) -> str:
@@ -268,9 +268,7 @@ class ModeCondition(AbstractCondition):
         if current_mode is None:
             # success if the mode is not found
             if verbose:
-                syslog.info(
-                    f"{logtabs}ModeCondition: key: [N/A] condition return state: PASS"
-                )
+                syslog.info(f"{logtabs}ModeCondition: key: [N/A] condition return state: PASS")
             return True
 
         state = False
@@ -314,9 +312,7 @@ class JoystickCondition(AbstractCondition):
         self.input_type = condition.input_type
         self.input_id = condition.input_id
         # hat number or 0 for axis and buttons
-        self.input_index = (
-            condition.input_index if hasattr(condition, "input_index") else 0
-        )
+        self.input_index = condition.input_index if hasattr(condition, "input_index") else 0
         self.condition = condition
         self.ignore_release = condition.ignore_release
         self.delay = condition.delay  # delay in seconds
@@ -350,21 +346,13 @@ class JoystickCondition(AbstractCondition):
 
             if self.condition.use_calibrated_data:
                 # calibrated value
-                value = gremlin.joystick_handling.get_curved_axis(
-                    self.device_guid, self.input_id
-                )
+                value = gremlin.joystick_handling.get_curved_axis(self.device_guid, self.input_id)
                 if verbose:
-                    raw = gremlin.joystick_handling.get_axis(
-                        self.device_guid, self.input_id
-                    )
-                    syslog.info(
-                        f"{logtabs}condition input value (filtered): raw: {raw:0.3f} included: {value:0.3f}"
-                    )
+                    raw = gremlin.joystick_handling.get_axis(self.device_guid, self.input_id)
+                    syslog.info(f"{logtabs}condition input value (filtered): raw: {raw:0.3f} included: {value:0.3f}")
             else:
                 # raw value
-                value = gremlin.joystick_handling.get_axis(
-                    self.device_guid, self.input_id
-                )
+                value = gremlin.joystick_handling.get_axis(self.device_guid, self.input_id)
                 if verbose:
                     syslog.info(f"{logtabs}condition input value (raw): {value:0.3f}")
                 # value = joy.axis(self.input_id).value
@@ -381,9 +369,7 @@ class JoystickCondition(AbstractCondition):
             return retval
 
         elif self.input_type == InputType.JoystickButton:
-            is_pressed = gremlin.joystick_handling.get_button(
-                self.device_guid, self.input_id
-            )
+            is_pressed = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
             if not event.is_pressed and not is_pressed and self.ignore_release:
                 # succeed on release
                 if verbose:
@@ -401,9 +387,7 @@ class JoystickCondition(AbstractCondition):
                     retval = not is_pressed
                 case "notchangedin":
                     reg = gremlin.event_handler.EventRegistry()
-                    last_timestamp = reg.getLastEvent(
-                        self.device_guid, self.input_type, self.input_id
-                    )
+                    last_timestamp = reg.getLastEvent(self.device_guid, self.input_type, self.input_id)
                     if last_timestamp:
                         now = time.time()
                         retval = now - last_timestamp > self.delay
@@ -411,9 +395,7 @@ class JoystickCondition(AbstractCondition):
                         retval = True  # pass
                 case "changedin":
                     reg = gremlin.event_handler.EventRegistry()
-                    last_timestamp = reg.getLastEvent(
-                        self.device_guid, self.input_type, self.input_id
-                    )
+                    last_timestamp = reg.getLastEvent(self.device_guid, self.input_type, self.input_id)
                     if last_timestamp:
                         now = time.time()
                         retval = now - last_timestamp <= self.delay
@@ -421,9 +403,7 @@ class JoystickCondition(AbstractCondition):
                         retval = False  # fail
 
                 case _:
-                    syslog.error(
-                        f"Don't know how to handle joystick condition: {self.comparison}"
-                    )
+                    syslog.error(f"Don't know how to handle joystick condition: {self.comparison}")
                     return False
             if verbose:
                 syslog.info(
@@ -432,9 +412,7 @@ class JoystickCondition(AbstractCondition):
             return retval
 
         elif self.input_type == InputType.JoystickHat:
-            direction = gremlin.joystick_handling.get_hat_position(
-                self.device_guid, self.input_id
-            )  # tuple
+            direction = gremlin.joystick_handling.get_hat_position(self.device_guid, self.input_id)  # tuple
             if not event.is_pressed and direction == (0, 0) and self.ignore_release:
                 # succeed on release
                 if verbose:
@@ -450,22 +428,16 @@ class JoystickCondition(AbstractCondition):
                 )
             return retval
         else:
-            syslog.warning(
-                f"{logtabs}JoystickCondition: Invalid input_type {self.input_type} received"
-            )
+            syslog.warning(f"{logtabs}JoystickCondition: Invalid input_type {self.input_type} received")
             return False
 
     def condition_name(self) -> str:
         info = gremlin.joystick_handling.getDevice(self.device_guid)
         match self.input_type:
             case InputType.JoystickButton:
-                state = gremlin.joystick_handling.get_button(
-                    self.device_guid, self.input_id
-                )
+                state = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
             case InputType.JoystickHat:
-                state = gremlin.joystick_handling.get_hat(
-                    self.device_guid, self.input_id
-                )
+                state = gremlin.joystick_handling.get_hat(self.device_guid, self.input_id)
             case InputType.JoystickAxis:
                 state = f"{gremlin.joystick_handling.get_axis(self.device_guid, self.input_id):0.3f}"
             case _:
@@ -495,15 +467,13 @@ class VJoyCondition(AbstractCondition):
 
         self.vjoy_id = condition.vjoy_id
         self.device_guid = None
-        for dev in gremlin.joystick_handling.vjoy_devices():
+        for dev in gremlin.joystick_handling.virtual_devices():
             if dev.vjoy_id == self.vjoy_id:
                 self.device_guid = dev.device_guid
                 break
         self.input_type = condition.input_type
         self.input_id = condition.input_id
-        self.input_index = (
-            condition.input_index if hasattr(condition, "input_index") else 0
-        )
+        self.input_index = condition.input_index if hasattr(condition, "input_index") else 0
         self.condition = condition
         self.ignore_release = condition.ignore_release
 
@@ -557,9 +527,7 @@ class VJoyCondition(AbstractCondition):
             return retval
 
         elif self.input_type == InputType.JoystickButton:
-            is_pressed = gremlin.joystick_handling.get_button(
-                self.device_guid, self.input_id
-            )
+            is_pressed = gremlin.joystick_handling.get_button(self.device_guid, self.input_id)
             if not event.is_pressed and not is_pressed and self.ignore_release:
                 # succeed on release
                 if verbose:
@@ -575,9 +543,7 @@ class VJoyCondition(AbstractCondition):
             elif self.comparison == "released":
                 retval = not is_pressed  # true if the vjoy button is not pressed
             else:
-                syslog.error(
-                    f"{logtabs}VjoyCondition: Button {self.comparison} is not a valid condition for a button"
-                )
+                syslog.error(f"{logtabs}VjoyCondition: Button {self.comparison} is not a valid condition for a button")
 
             if verbose:
                 syslog.info(
@@ -587,9 +553,7 @@ class VJoyCondition(AbstractCondition):
             return retval
 
         elif self.input_type == InputType.JoystickHat:
-            direction = gremlin.joystick_handling.get_hat(
-                self.device_guid, self.input_id
-            )
+            direction = gremlin.joystick_handling.get_hat(self.device_guid, self.input_id)
             if not event.is_pressed and direction == (0, 0) and self.ignore_release:
                 # succeed on release
                 if verbose:
@@ -604,9 +568,7 @@ class VJoyCondition(AbstractCondition):
                     f"{logtabs}VjoyCondition: Hat Device {info.name} input: {self.input_id} comparison: {self.comparison} direction: {direction} return: {'PASS' if retval else 'FAIL'}"
                 )
         else:
-            syslog.warning(
-                f"VjoyCondition: Invalid input_type {self.input_type} received"
-            )
+            syslog.warning(f"VjoyCondition: Invalid input_type {self.input_type} received")
             return False
 
     def condition_name(self) -> str:
@@ -626,9 +588,7 @@ class VirtualButtonCondition(AbstractCondition):
         super().__init__()
         if isinstance(data, gremlin.base_buttons.VirtualAxisButton):
             # convert to the processing button
-            self.virtual_button = AxisButton(
-                data.lower_limit, data.upper_limit, data.direction
-            )
+            self.virtual_button = AxisButton(data.lower_limit, data.upper_limit, data.direction)
         elif isinstance(data, gremlin.base_buttons.VirtualHatButton):
             self.virtual_button = HatButton(data.directions)
         else:
@@ -729,9 +689,7 @@ class InputActionCondition(AbstractCondition):
 
         if verbose:
             logtabs = gremlin.shared_state.logTabs(True)
-            syslog.info(
-                f"{logtabs}InputActionCondition: comparison {self.comparison}: return: {'PASS' if retval else 'FAIL'}"
-            )
+            syslog.info(f"{logtabs}InputActionCondition: comparison {self.comparison}: return: {'PASS' if retval else 'FAIL'}")
         return retval
 
     def condition_name(self) -> str:
@@ -904,10 +862,7 @@ class AxisButton(VirtualButton):
                 is_pressed = True
                 result = True
 
-            if (
-                direction != AxisButtonDirection.Anywhere
-                and self._direction != AxisButtonDirection.Anywhere
-            ):
+            if direction != AxisButtonDirection.Anywhere and self._direction != AxisButtonDirection.Anywhere:
                 # Ensure we can only press a button by moving in the desired
                 # direction, however, allow releasing in any direction
                 if inside_range and direction != self._direction:
@@ -953,9 +908,7 @@ class HatButton(VirtualButton):
         :return True if a state transition occurred, False otherwise
         """
 
-        self.is_pressed = (
-            gremlin.util.hat_tuple_to_direction(event.value) in self._directions
-        )
+        self.is_pressed = gremlin.util.hat_tuple_to_direction(event.value) in self._directions
         return True
 
     def __str__(self):

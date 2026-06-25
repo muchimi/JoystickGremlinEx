@@ -2309,7 +2309,7 @@ class Mapper:
 
             self.button_mapper = "Vjoy Remap"
 
-            devices = sorted(gremlin.joystick_handling.vjoy_devices(), key=lambda x: x.vjoy_id)
+            devices = sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id)
             if not devices:
                 # no vjoy devices to map
                 ui_common.MessageBox(prompt="No VJOY devices found to map to")

@@ -194,7 +194,7 @@ class ProfileDeviceNode:
             return mode_node
         return None
 
-    def hasInputItems(self, has_mappings = False) -> bool:
+    def hasInputItems(self, has_mappings=False) -> bool:
         """true if the device has defined inputs
         :param has_mappings: optional, if true checks for the inputs to have mappings defined instead of just input definitions
         """
@@ -202,8 +202,6 @@ class ProfileDeviceNode:
             if mode_node.hasInputItems(has_mappings):
                 return True
         return False
-
-
 
     def ensure_mode_exists(self, mode_name: str, is_system=False) -> ProfileModeNode:  # noqa: F821
         """Ensures that a specified mode exists, creating it if needed.
@@ -264,7 +262,9 @@ class ProfileDeviceNode:
         persistable = DeviceType.isPersistable(self.device_type)
         hasinputs = self.hasInputItems()
         if verbose:
-            syslog.info(f"device xml: generating XML for device id [{self.id}] name [{self.name}] persistable: [{persistable}] has inputs: [{hasinputs}] skipping: [{not (hasinputs and persistable)}]")
+            syslog.info(
+                f"device xml: generating XML for device id [{self.id}] name [{self.name}] persistable: [{persistable}] has inputs: [{hasinputs}] skipping: [{not (hasinputs and persistable)}]"
+            )
 
         if persistable and hasinputs:
             node_tag = "device" if self.type != DeviceType.VJoy else "vjoy-device"
@@ -869,7 +869,8 @@ class Settings:
         if verbose:
             syslog.info("profile settings init...")
         self.profile: Profile = profile
-        self.vjoy_as_input = {}
+        self.vjoy_as_input = {}  # key by index : int, boolean, true if the vjoy device can be used as input to GEX
+        self.maestro_as_input = {}  # key by index : int, boolean, true if the maestro device can be used as input to GEX
         self.vjoy_initial_values = {}
         self.startup_mode = None
         self.default_delay = 0.05
@@ -884,6 +885,7 @@ class Settings:
         if verbose:
             syslog.info("profile settings reset...")
         self.vjoy_as_input.clear()
+        self.maestro_as_input.clear()
         self.vjoy_initial_values.clear()
         self.startup_mode = None
         self.default_delay = 0.05
@@ -921,6 +923,13 @@ class Settings:
                 vjoy_node = etree.Element("vjoy-input")
                 vjoy_node.set("id", safe_format(vid, int))
                 node.append(vjoy_node)
+
+        # proces maestro as input settings
+        for mid, visible in self.maestro_as_input.items():
+            if visible is True:
+                maestro_node = etree.Element("maestro-input")
+                maestro_node.set("id", safe_format(mid, int))
+                node.append(maestro_node)
 
         # Process vJoy axis initial values
         for vid, data in self.vjoy_initial_values.items():
@@ -992,7 +1001,7 @@ class Settings:
             self.default_delay = float(node.find("default-delay").text)
 
         # vJoy as input settings
-        self.vjoy_as_input = {}
+        self.vjoy_as_input.clear()
 
         for vjoy_node in node.findall("vjoy-input"):
             vid = safe_read(vjoy_node, "id", int, 0)
@@ -1002,6 +1011,17 @@ class Settings:
                 sd.setOutputEnabled(device_guid, True)  # allow as output
                 sd.setInputEnabled(device_guid, True)  # allow as input
             self.vjoy_as_input[vid] = True
+
+        # maestro as input settings
+        self.maestro_as_input.clear()
+        for maestro_node in node.findall("maestro-input"):
+            mid = safe_read(maestro_node, "id", int, 0)
+            device = gremlin.joystick_handling.maestro_info_from_index(mid)
+            if device:
+                device_guid = device.device_guid
+                sd.setOutputEnabled(device_guid, True)  # allow as output
+                sd.setInputEnabled(device_guid, True)  # allow as input
+            self.maestro_as_input[mid] = True
 
         # vjoy initialization values
         self.vjoy_initial_values = {}
@@ -2388,21 +2408,13 @@ class Profile:
             # ignore joysticks that are disabled
             return None
 
-        # ensure joystick inputs exist in the model
-        # self.ensureInputItems(device_guid)
 
         device_node = self.getDeviceNode(device_guid)
         if device_node:
             mode_node = device_node.getModeNode(mode_name)
             if mode_node:
                 input_item = mode_node.getInputItem(input_type, input_id)
-                # syslog.info(
-                #     f"getInputItem: device node id: {device_node.id} mode node id: {mode_node.id} mode name: [{mode_name}] config size: [{len(mode_node._config)}] input item: [{input_item.id if input_item else 'not found'}]"
-                # )
-                if input_id == gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart:
-                    pass
                 return input_item
-
         return None
 
     def setFilterDefaults(self, device_guid: dinput.GUID, force=False):
@@ -2768,18 +2780,7 @@ class Profile:
         self.devices[device.device_guid] = new_device
 
         for mode in modes:
-            new_device.ensure_mode_exists(profile=self, mode_name=mode, device=device.device_guid)
-            # new_mode = new_device.modes[mode]
-            # # Touch every input to ensure it gets default initialized
-            # for i in range(device.axis_count):
-            #     if i >= len(device.axismap_list):
-            #         syslog.error(f"{(device.name,)} invalid axis request {device.axis_count} < {i}")
-            #     else:
-            #         new_mode.get_data(InputType.JoystickAxis, device.axismap_list[i].axis_index)
-            # for i in range(1, device.button_count + 1):
-            #     new_mode.get_data(InputType.JoystickButton, i)
-            # for i in range(1, device.hat_count + 1):
-            #     new_mode.get_data(InputType.JoystickHat, i)
+            new_device.ensure_mode_exists(mode_name=mode)
 
     def initialize_regular_devices(self):
         """setup suported non joystick devices"""
@@ -3095,8 +3096,9 @@ class Profile:
         device_node: ProfileDeviceNode
 
         for device_node in self.devices.values():
-            autocreate = device_node.device_type != DeviceType.ModeControl
-            new_mode = device_node.getModeNode(name, autocreate=autocreate)
+            # autocreate = device_node.device_type != DeviceType.ModeControl
+            new_mode = device_node.getModeNode(name, autocreate=True)
+            assert new_mode is not None, f"Failed to create or retrieve mode {name}"
             if parent_name is not None:
                 new_mode.inherit = parent_name
             else:
@@ -3719,7 +3721,7 @@ class Profile:
 
         :return dictionary of unused inputs for each input type  [vjoy_dev_id: int]["axis" | "button" | "hat"] = list[input_id : int]
         """
-        vjoy_devices = gremlin.joystick_handling.vjoy_devices()
+        vjoy_devices = gremlin.joystick_handling.virtual_devices()
 
         # Create list of all inputs provided by the vjoy devices
         vjoy = {}
@@ -4973,7 +4975,7 @@ class ProfileModeNode:
             self._config[input_type][input_id_key] = None
         return self._config[input_type][input_id_key]
 
-    def hasInputItems(self, has_mappings = False):
+    def hasInputItems(self, has_mappings=False):
         """true if the mode node contains defined inputs
         :param has_mappings: optional, if true checks for the inputs to have mappings defined instead of just input definitions
         """

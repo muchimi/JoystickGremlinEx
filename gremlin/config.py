@@ -2330,19 +2330,11 @@ class Configuration(QtCore.QObject):
     @property
     def midi_enabled(self) -> bool:
         """true if MIDI support is enabled"""
-        if self._midi_enabled is None:
-            from gremlin.ui.midi_device import MidiInterface
-
-            midi = MidiInterface()
-            self._midi_enabled = midi.midi_enabled and self._get_data(
-                "midi_enabled", False
-            ) # disable by default
-        return self._midi_enabled
+        return self._data.get("midi_enabled", False)  # disabled by default
 
     @midi_enabled.setter
     def midi_enabled(self, value: bool):
         self._data["midi_enabled"] = value
-        self._midi_enabled = None  # force a re-read
         self.save()  # save the change
 
     @property
@@ -3339,7 +3331,8 @@ class Configuration(QtCore.QObject):
     @property
     def maestro_enabled(self) -> bool:
         """returns true if Maestro is enabled"""
-        return self._get_data("maestro_enabled", True)
+        # return self._get_data("maestro_enabled", False)
+        return False # disable for now while Maestro integration is being worked on
     @maestro_enabled.setter
     def maestro_enabled(self, value: bool):
         self._set_data("maestro_enabled", value)

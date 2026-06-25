@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-""" HIDMaestro Python interface
+"""HIDMaestro Python interface
 
 This module lets GEX create and manage virtual controllers created through HIDMaestro.
 
@@ -40,7 +40,6 @@ import sys
 import time
 import threading
 
-#from clr_loader.util.coreclr_errors import self
 from sympy.physics.mechanics import System
 import gremlin.util
 import dinput
@@ -52,7 +51,7 @@ import gremlin
 from gremlin.singleton_decorator import SingletonDecorator
 import gremlin.config
 import gremlin.util
-from dinput import GEX_VID, GEX_ID_STRING, GEX_MAX_DEVICES, GEX_PID_BASE, GEX_VENDOR_STRING, GEX_PRODUCT_STRING, GEX_MAX_DEVICES
+from dinput import GEX_VID, GEX_ID_STRING, GEX_MAX_DEVICES, GEX_PID_BASE, GEX_VENDOR_STRING, GEX_PRODUCT_STRING
 
 syslog = logging.getLogger("system")
 
@@ -65,7 +64,6 @@ try:
         syslog.info(f"HIDMaestro disabled: no distribution files found in path not found: {hid_maestro_path}")
         _maestro_initialized = False
     else:
-
         # load the .NET Core runtime using pythonnet
         load("coreclr")
 
@@ -83,15 +81,12 @@ try:
         import System
         from System.Collections.Generic import Dictionary
 
-
         _maestro_initialized = True
 
 
 except Exception as e:
     syslog.error(f"Failed to initialize Maestro context: {e}")
     _maestro_initialized = False
-
-
 
 
 @SingletonDecorator
@@ -102,39 +97,50 @@ class Maestro:
         self._device_map = {}  # map of the created devices by index to dinput.DeviceSummary device
         self._descriptor_map = {}  # map of the created descriptors by index
         self._buffer_map = {}  # map of the buffers for each device by index
-        self.ctx = None # maestro context
-        self._dirty = False # true if a controller was created and we need a resync
-        self._sync_worker = None # synchronization thread used to syn dinput devices with changed maestro devices
+        self.ctx = None  # maestro context
+        self._dirty = False  # true if a controller was created and we need a resync
+        self._sync_worker = None  # synchronization thread used to syn dinput devices with changed maestro devices
         self._sync_lock = threading.Lock()  # lock to synchronize access to the sync worker
 
+        # self.ctx = HIDMaestro.HMContext()
+        # self.removeAllControllers() # clean slate
+        # sys.exit(0)
 
         config = gremlin.config.Configuration()
         self._maestro_enabled = config.maestro_enabled
 
         if not self._maestro_enabled:
-            syslog.info("Maestro: disabled")
+            syslog.info("MAESTRO: disabled")
             return
-        syslog.info("Maestro: enabled")
+
+        syslog.info("MAESTRO: starting...")
         maestro_count = config.maestro_device_count
 
         # supress device change notices
         el = gremlin.event_handler.EventListener()
         el.pushDeviceChangeSuppression()
+        el.shutdown.connect(self._handle_shutdown)
+        gremlin.shared_state.ui.pushSuspendTabUpdate()
 
         self.ctx = HIDMaestro.HMContext()
-
         self.removeAllControllers() # clean slate
-
-        # ensure maestro devices exist
+        # map the existing devices
         for i in range(maestro_count):
             if i not in self._controller_map:
                 self.createJoystickController()
 
-        # synchronize
-        self.sync(force=True)
+        syslog.info(f"Maestro: devices created: {len(self._controller_map)}")
 
-        # pop device change suppression after initialization
-        el.popDeviceChangeSuppression()
+        # synchronize
+        if not self.sync(force=True):
+            # sync not required
+            el.popDeviceChangeSuppression()
+            gremlin.shared_state.ui.popSuspendTabUpdate()
+
+    def _handle_shutdown(self):
+        if self._maestro_enabled and self.ctx:
+            syslog.info("MAESTRO: shutdown")
+            self.ctx.Dispose() # cleanup
 
     def LoadActiveControllers(self):
         """loads the active maestro controllers"""
@@ -143,10 +149,8 @@ class Maestro:
                 if controller.Index not in self._controller_map:
                     self._controller_map[controller.Index] = controller
 
-
-
     def reset(self):
-        """ resets the maestro configuration """
+        """resets the maestro configuration"""
 
         if self._maestro_enabled and _maestro_initialized:
             if gremlin.util.is_user_admin():
@@ -157,16 +161,16 @@ class Maestro:
             else:
                 syslog.warning("User is not admin, device creation skipped.")
 
-    def sync(self, force = False):
-        """ syncs dinput with maestro """
+    def sync(self, force=False) -> bool:
+        """syncs dinput with maestro"""
         if self._dirty or force:
             diff = self._compare_list()
             if diff and self._sync_worker is None:
                 with self._sync_lock:
                     self._sync_worker = threading.Thread(target=self._sync_worker_runner)
                 self._sync_worker.start()
-
-
+                return True
+        return False  # sync not required
 
     def _sync_worker_runner(self):
         """worker thread to sync dinput devices with changed maestro devices"""
@@ -178,10 +182,10 @@ class Maestro:
         while diff and time.time() < timeout:
             self.syncControllers()
             diff = self._compare_list()
+            syslog.info("waiting for sync...")
 
         if diff:
             syslog.warning("Maestro: sync worker timed out before all changes were applied")
-
 
         syslog.info("Maestro: sync completed")
 
@@ -192,6 +196,7 @@ class Maestro:
         gremlin.joystick_handling.joystick_devices_initialization()
 
         el.popDeviceChangeSuppression()
+        gremlin.shared_state.ui.popSuspendTabUpdate()
 
     def _compare_list(self) -> bool:
         """compares the maestro device list to the dinput maestro list to see if all dinput devices are accounted for"""
@@ -207,8 +212,6 @@ class Maestro:
 
         diff = maestro_pid_set != device_pid_set
         return diff
-
-
 
     @property
     def initialized(self):
@@ -230,7 +233,7 @@ class Maestro:
         return devices
 
     def syncControllers(self):
-        """gets a list of defined controllers via direct input """
+        """gets a list of defined controllers via direct input"""
 
         # acquire the sync lock to ensure thread safety while syncing controllers
         with self._sync_lock:
@@ -241,7 +244,7 @@ class Maestro:
                 index = device.product_id - GEX_PID_BASE
                 if index not in self._controller_map:
                     syslog.info(f"Creating controller for GEX managed device: 0x{device.product_id:x}.0x{device.vendor_id:x} {device.name}")
-                    self.createJoystickController(at_index = index)
+                    self.createJoystickController(at_index=index)
                 self._device_map[index] = device
 
             self._dirty = False
@@ -273,7 +276,7 @@ class Maestro:
         self._dirty = True
         syslog.info("Maestro: all devices removed.")
 
-    def createJoystickController(self, axis_count: int = 8, button_count: int = 128, hat_count: int = 4, at_index : int = None):
+    def createJoystickController(self, axis_count: int = 8, button_count: int = 128, hat_count: int = 4, at_index: int = None):
         """creates a joystick controller with the specified number of axes, buttons, and hats.
         If at_index is specified, attempts to create the controller at the given index.
 
@@ -295,23 +298,27 @@ class Maestro:
         pid = GEX_PID_BASE + index  # build the PID as an index
         product_string = f"{GEX_PRODUCT_STRING} {index}"
 
+
+
         try:
             # build a joystick descriptor for the HID device
-            axis_data = [HIDMaestro.HMAxis.X,
-                         HIDMaestro.HMAxis.Y,
-                         HIDMaestro.HMAxis.Z,
-                         HIDMaestro.HMAxis.Rx,
-                         HIDMaestro.HMAxis.Ry,
-                         HIDMaestro.HMAxis.Rz,
-                         HIDMaestro.HMAxis.Slider,
-                         HIDMaestro.HMAxis.Dial][:axis_count]
+            axis_data = [
+                HIDMaestro.HMAxis.X,
+                HIDMaestro.HMAxis.Y,
+                HIDMaestro.HMAxis.Z,
+                HIDMaestro.HMAxis.Rx,
+                HIDMaestro.HMAxis.Ry,
+                HIDMaestro.HMAxis.Rz,
+                HIDMaestro.HMAxis.Slider,
+                HIDMaestro.HMAxis.Dial,
+            ][:axis_count]
 
             descriptor = HidDescriptorBuilder()
             # setup as a joystick
             descriptor = descriptor.Joystick()
             # add axes by role
             for role in axis_data:
-                descriptor = descriptor.AddAxis(role, bits=16) # use 16 bit resolution for the axis
+                descriptor = descriptor.AddAxis(role, bits=16)  # use 16 bit resolution for the axis
             # add buttons
             descriptor = descriptor.AddButtons(button_count)
             # add hats
@@ -322,7 +329,6 @@ class Maestro:
 
             report_size = (axis_count * 16 + button_count + hat_count * 4) // 8  # 16 bits per axis, 1 bit per button, 4 bits per hat, convert to bytes
 
-
             profile = HMProfileBuilder()
             profile = profile.Id(GEX_ID_STRING)
             profile = profile.Name(product_string)
@@ -332,16 +338,15 @@ class Maestro:
             profile = profile.ProductString(product_string)
             profile = profile.Type("flightstick")
             profile = profile.FromDescriptorBuilder(descriptor)
-            profile = profile.InputReportSize(report_size) # 8 axes
+            profile = profile.InputReportSize(report_size)  # 8 axes
             profile = profile.Build()
-
 
             controller: HMController = self.ctx.CreateControllerAt(index, profile)
             self._controller_map[index] = controller
 
             state = HMGamepadState()
             # set the initial state of each axis to center
-            axis_values = Dictionary[HIDMaestro.HMAxis,System.Single]()
+            axis_values = Dictionary[HIDMaestro.HMAxis, System.Single]()
             for role in axis_data:
                 axis_values[role] = 0.5  # 0.5 represents the center position for the axis
 
@@ -353,17 +358,17 @@ class Maestro:
 
             controller.SubmitState(state)  # update the controller with the initial state
             self._dirty = True
+
+
             return controller
 
         except Exception as e:
             syslog.error(f"Maestro: failed to create device: {e}")
 
-
-
     def getDevice(self, pid: int):
-        """gets the dinput device for the given pid """
+        """gets the dinput device for the given pid"""
         devices = dinput.DILL.getDevices()
-        dev : dinput.DeviceSummary
+        dev: dinput.DeviceSummary
         index = self.pidToIndex(pid)
         if self._dirty:
             self.syncControllers()
@@ -373,13 +378,12 @@ class Maestro:
 
         max_pid = GEX_PID_BASE + GEX_MAX_DEVICES - 1
         for dev in devices:
-            syslog.info(f"Maestro: checking device [{dev.name}] product: [0x{dev.product_id:04X}] vendor: [0x{dev.vendor_id:04X}] axis count: [{dev.axis_count}] button count: [{dev.button_count}] hat count: [{dev.hat_count}]")
+            syslog.info(
+                f"Maestro: checking device [{dev.name}] product: [0x{dev.product_id:04X}] vendor: [0x{dev.vendor_id:04X}] axis count: [{dev.axis_count}] button count: [{dev.button_count}] hat count: [{dev.hat_count}]"
+            )
             if dev.vendor_id == GEX_VID and dev.product_id >= GEX_PID_BASE and dev.product_id <= max_pid:
                 return dev
         return None
-
-
-
 
     def pidToIndex(self, pid: int) -> int:
         """converts a product id to a controller index"""
@@ -389,11 +393,11 @@ class Maestro:
         return index
 
     def getBuffer(self, device_index):
-        '''gets a byte buffer for the given device '''
+        """gets a byte buffer for the given device"""
         if device_index in self._buffer_map:
             return self._buffer_map[device_index]
         if device_index in self._device_map:
-            device : dinput.DeviceSummary = self._device_map[device_index]
+            device: dinput.DeviceSummary = self._device_map[device_index]
             axis_count = device.axis_count
             button_count = device.button_count
             hat_count = device.hat_count
@@ -402,10 +406,10 @@ class Maestro:
             return self._buffer_map[device_index]
         return None
 
-    def syncBuffer(self, device_index : int):
-        """synchronizes a dinput device state with the report buffer """
+    def syncBuffer(self, device_index: int):
+        """synchronizes a dinput device state with the report buffer"""
         buffer = self.getBuffer(device_index)
-        device : dinput.DeviceSummary = self._device_map.get(device_index, None)
+        device: dinput.DeviceSummary = self._device_map.get(device_index, None)
         if device is None or buffer is None:
             return
         axis_count = device.axis_count
@@ -423,19 +427,17 @@ class Maestro:
             value = gremlin.joystick_handling.getHat(device_guid, hat)
             self._set_hat(buffer, hat, value)
 
-
-    def _set_axis(self, buffer, axis_index : int, value : float):
+    def _set_axis(self, buffer, axis_index: int, value: float):
         axis_index -= 1  # convert to 0-based index
         scaled_value = gremlin.util.scale_to_range(value, -1.0, 1.0, 0, 1)
         # calculate the byte and bit offset for the axis
         byte_offset = axis_index * 2  # 16 bits per axis
         # little endian format
-        buffer[byte_offset] = (scaled_value & 0xFF)
-        buffer[byte_offset + 1] = ((scaled_value >> 8) & 0xFF)
+        buffer[byte_offset] = scaled_value & 0xFF
+        buffer[byte_offset + 1] = (scaled_value >> 8) & 0xFF
         return buffer
 
-
-    def setAxis(self, device_index : int, axis_index: int, value : float):
+    def setAxis(self, device_index: int, axis_index: int, value: float):
         """sets a maestro controller 16 bit axis
         :param device_index: the index of the maestro controller device
         :param axis_index: the index of the axis to set (1-based)
@@ -449,20 +451,19 @@ class Maestro:
             self._set_axis(buffer, axis_index - 1, value)  # convert to 0-based index
             # update the controller with the new buffer state
 
-            controller : HIDMaestro.HMController = self._controller_map[device_index]
+            controller: HIDMaestro.HMController = self._controller_map[device_index]
             controller.SubmitRawReport(buffer)
 
-
-    def _set_button(self, device_index : int, button_index: int, is_pressed: bool):
+    def _set_button(self, device_index: int, button_index: int, is_pressed: bool):
         buffer = self.getBuffer(device_index)
         if buffer is None:
             return
-        device : dinput.DeviceSummary = self._device_map.get(device_index, None)
+        device: dinput.DeviceSummary = self._device_map.get(device_index, None)
         if device is None or buffer is None:
             return
         axis_count = device.axis_count
         button_offset = axis_count * 16 // 8  # calculate the byte offset where the button bytes start
-        button_index -= 1 # 0 based button index
+        button_index -= 1  # 0 based button index
         byteOffset = button_index // 8  # calculate the byte offset for the button index
         bitOffset = button_index % 8  # calculate the bit offset within the byte for the button index
         targetByteIndex = button_offset + byteOffset  # calculate the target byte index within the report buffer
@@ -475,25 +476,24 @@ class Maestro:
             buffer[targetByteIndex] &= ~mask
         return buffer
 
-
-    def setButton(self, device_index : int, button_index: int, is_pressed: bool):
-        """sets a maestro controller button """
+    def setButton(self, device_index: int, button_index: int, is_pressed: bool):
+        """sets a maestro controller button"""
         if device_index in self._device_map:
             buffer = self.getBuffer(device_index)
             if buffer is None:
                 return
             buffer = self._set_button(device_index, button_index, is_pressed)
-            controller : HIDMaestro.HMController = self._controller_map[device_index]
+            controller: HIDMaestro.HMController = self._controller_map[device_index]
             controller.SubmitRawReport(buffer)
         else:
             button_count = self._device_map[device_index].button_count
             syslog.info(f"Error: button index {button_index} out of range (0-{button_count - 1})")
 
-    def _set_hat(self, device_index : int, hat_index : int, value : int):
+    def _set_hat(self, device_index: int, hat_index: int, value: int):
         buffer = self.getBuffer(device_index)
         if buffer is None:
             return
-        device : dinput.DeviceSummary = self._device_map.get(device_index, None)
+        device: dinput.DeviceSummary = self._device_map.get(device_index, None)
         if device is None or buffer is None:
             return
         axis_count = device.axis_count
@@ -510,14 +510,11 @@ class Maestro:
         buffer[targetByteIndex] |= (value & 0xF) << bitOffset
         return buffer
 
-
-    def setHat(self, device_index : int, hat_index : int, position : tuple):
-        """sets a maestro controller hat position using a GEX hat position """
+    def setHat(self, device_index: int, hat_index: int, position: tuple):
+        """sets a maestro controller hat position using a GEX hat position"""
         if device_index in self._device_map:
-            device : dinput.DeviceSummary = self._device_map[device_index]
-            controller : HIDMaestro.HMController = self._controller_map[device_index]
-
-
+            device: dinput.DeviceSummary = self._device_map[device_index]
+            controller: HIDMaestro.HMController = self._controller_map[device_index]
 
             """HMHat enum values:
             None      = 0,
@@ -561,13 +558,9 @@ class Maestro:
                 case _:
                     hat_position = 0  # Default to None if an unknown position is provided
 
-
             buffer = self._set_hat(device_index, hat_index, hat_position)
-            controller : HIDMaestro.HMController = self._controller_map[device_index]
+            controller: HIDMaestro.HMController = self._controller_map[device_index]
             controller.SubmitRawReport(buffer)
-
-
-
 
     def removeDevice(self):
         if hasattr(self, "controller") and self.controller is not None:

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,12 +35,14 @@ from psygnal import Signal
 
 syslog = logging.getLogger("system")
 
+
 def load_module(module_name, file_path):
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
+
 
 def get_variable_definitions(fname):
     """Returns all variable definitions contained in the provided module.
@@ -58,24 +60,20 @@ def get_variable_definitions(fname):
     """
     if not os.path.isfile(fname):
         return {}
-    
+
     user_package = "user_plugins"
 
-    spec = importlib.util.spec_from_file_location(user_package + "." +
-        "".join(random.choices(string.ascii_lowercase, k=16)),
-        fname
-    )
+    spec = importlib.util.spec_from_file_location(user_package + "." + "".join(random.choices(string.ascii_lowercase, k=16)), fname)
 
     # see if there is a package to load
-    fname_init = os.path.join(os.path.dirname(fname),"__init__.py")
+    fname_init = os.path.join(os.path.dirname(fname), "__init__.py")
     if not os.path.isfile(fname_init):
         # create the file so we have a package
-        open (fname_init,'a').close
-    
+        open(fname_init, "a").close
+
     # load the package for the plugins
     load_module("user_plugins", fname_init)
-        
-    
+
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
@@ -83,9 +81,7 @@ def get_variable_definitions(fname):
     for key, value in module.__dict__.items():
         if isinstance(value, AbstractVariable):
             if value.label in variables:
-                syslog.error(
-                    f"Plugin: Duplicate label {value.label} present in {fname}"
-                )
+                syslog.error(f"Plugin: Duplicate label {value.label} present in {fname}")
             variables[value.label] = value
     return variables.values()
 
@@ -113,7 +109,6 @@ def clamp_value(value, min_val, max_val):
 
 
 class VariableRegistry:
-
     """Stores variables of plugin instances."""
 
     def __init__(self):
@@ -217,7 +212,6 @@ def _init_numerical(var, default_value, min_value, max_value):
 
 
 class AbstractVariable(QtCore.QObject):
-
     """Represents the base class of all variables used in plugins."""
 
     # Signal emitted when the value of the variable changes
@@ -277,11 +271,7 @@ class AbstractVariable(QtCore.QObject):
             content from the variable registry
         """
         if identifier is not None:
-            val = variable_registry.get(
-                identifier[0],
-                identifier[1],
-                self.label
-            )
+            val = variable_registry.get(identifier[0], identifier[1], self.label)
             if val is not None:
                 self.value = self._process_registry_value(val)
                 self.variable_set = True
@@ -321,19 +311,9 @@ class AbstractVariable(QtCore.QObject):
 
 
 class NumericalVariable(AbstractVariable):
-
     """Base class for numerical variable types."""
 
-    def __init__(
-            self,
-            label,
-            description,
-            variable_type,
-            initial_value=None,
-            min_value=None,
-            max_value=None,
-            is_optional=False
-    ):
+    def __init__(self, label, description, variable_type, initial_value=None, min_value=None, max_value=None, is_optional=False):
         super().__init__(label, description, variable_type, is_optional)
 
         # Store properties before further constructor business happens which
@@ -352,22 +332,14 @@ class NumericalVariable(AbstractVariable):
         if self.variable_type == gremlin.types.PluginVariableType.Int:
             value_widget = QtWidgets.QSpinBox()
             value_widget.setRange(self.min_value, self.max_value)
-            value_widget.setValue(clamp_value(
-                int(value),
-                self.min_value,
-                self.max_value
-            ))
-            value_widget.valueChanged.connect(
-                lambda x: self.value_changed.emit({"value": x})
-            )
+            value_widget.setValue(clamp_value(int(value), self.min_value, self.max_value))
+            value_widget.valueChanged.connect(lambda x: self.value_changed.emit({"value": x}))
         elif self.variable_type == gremlin.types.PluginVariableType.Float:
             value_widget = QtWidgets.QDoubleSpinBox()
             value_widget.setDecimals(3)
             value_widget.setRange(self.min_value, self.max_value)
             value_widget.setValue(float(value))
-            value_widget.valueChanged.connect(
-                lambda x: self.value_changed.emit({"value": x})
-            )
+            value_widget.valueChanged.connect(lambda x: self.value_changed.emit({"value": x}))
 
         if value_widget is not None:
             layout.addWidget(value_widget, 0, 1)
@@ -378,88 +350,37 @@ class NumericalVariable(AbstractVariable):
         return layout
 
     def _process_registry_value(self, value):
-        return clamp_value(
-            _cast_variable[self.variable_type](value),
-            self.min_value,
-            self.max_value
-        )
-    
+        return clamp_value(_cast_variable[self.variable_type](value), self.min_value, self.max_value)
+
     def __str__(self):
         return f"NumericalVariable: {self.description} min: {self.min_value} max: {self.max_value} value: {self.value}"
 
 
 class IntegerVariable(NumericalVariable):
-
     """Variable representing an integer value."""
 
-    def __init__(
-            self,
-            label,
-            description,
-            initial_value=None,
-            min_value=None,
-            max_value=None,
-            is_optional=False
-    ):
-        super().__init__(
-            label,
-            description,
-            gremlin.types.PluginVariableType.Int,
-            initial_value,
-            min_value,
-            max_value,
-            is_optional
-        )
+    def __init__(self, label, description, initial_value=None, min_value=None, max_value=None, is_optional=False):
+        super().__init__(label, description, gremlin.types.PluginVariableType.Int, initial_value, min_value, max_value, is_optional)
 
         _init_numerical(self, 0, 0, 10)
         self._load_from_registry(self._get_identifier())
 
 
-
 class FloatVariable(NumericalVariable):
-
     """Variable representing an float value."""
 
-    def __init__(
-            self,
-            label,
-            description,
-            initial_value=None,
-            min_value=None,
-            max_value=None,
-            is_optional=False
-    ):
-        super().__init__(
-            label,
-            description,
-            gremlin.types.PluginVariableType.Float,
-            initial_value,
-            min_value,
-            max_value,
-            is_optional
-        )
+    def __init__(self, label, description, initial_value=None, min_value=None, max_value=None, is_optional=False):
+        super().__init__(label, description, gremlin.types.PluginVariableType.Float, initial_value, min_value, max_value, is_optional)
 
         _init_numerical(self, 0.0, -1.0, 1.0)
         self._load_from_registry(self._get_identifier())
 
 
 class BoolVariable(AbstractVariable):
-
     """Variable representing a boolean value."""
 
-    def __init__(
-            self,
-            label,
-            description,
-            initial_value=False,
-            is_optional=False
-    ):
-        super().__init__(
-            label,
-            description,
-            gremlin.types.PluginVariableType.Bool,
-            is_optional
-        )
+    def __init__(self, label, description, initial_value=False, is_optional=False):
+        super().__init__(label, description, gremlin.types.PluginVariableType.Bool, is_optional)
 
         self.value = initial_value
         if not isinstance(self.value, bool):
@@ -475,12 +396,8 @@ class BoolVariable(AbstractVariable):
 
         value_widget = QtWidgets.QCheckBox()
         if isinstance(value, bool):
-            value_widget.setCheckState(
-                QtCore.Qt.Checked if value else QtCore.Qt.Unchecked
-            )
-        value_widget.stateChanged.connect(
-            lambda x: self.value_changed.emit({"value": x})
-        )
+            value_widget.setCheckState(QtCore.Qt.Checked if value else QtCore.Qt.Unchecked)
+        value_widget.stateChanged.connect(lambda x: self.value_changed.emit({"value": x}))
 
         if value_widget is not None:
             layout.addWidget(value_widget, 0, 1)
@@ -492,28 +409,16 @@ class BoolVariable(AbstractVariable):
 
     def _process_registry_value(self, value):
         return value
-    
+
     def __str__(self):
         return f"BoolVariable: {self.description} value: {self.value}"
 
 
 class StringVariable(AbstractVariable):
-
     """Variable representing a string value."""
 
-    def __init__(
-            self,
-            label,
-            description,
-            initial_value=None,
-            is_optional=False
-    ):
-        super().__init__(
-            label,
-            description,
-            gremlin.types.PluginVariableType.String,
-            is_optional
-        )
+    def __init__(self, label, description, initial_value=None, is_optional=False):
+        super().__init__(label, description, gremlin.types.PluginVariableType.String, is_optional)
 
         self.value = initial_value
         if not isinstance(self.value, str):
@@ -529,9 +434,7 @@ class StringVariable(AbstractVariable):
 
         value_widget = QtWidgets.QLineEdit()
         value_widget.setText(str(value))
-        value_widget.textChanged.connect(
-            lambda x: self.value_changed.emit({"value": x})
-        )
+        value_widget.textChanged.connect(lambda x: self.value_changed.emit({"value": x}))
 
         if value_widget is not None:
             layout.addWidget(value_widget, 0, 1)
@@ -546,21 +449,10 @@ class StringVariable(AbstractVariable):
 
 
 class ModeVariable(AbstractVariable):
-
     """Variable representing a mode present in a profile."""
 
-    def __init__(
-            self,
-            label,
-            description,
-            is_optional=False
-    ):
-        super().__init__(
-            label,
-            description,
-            gremlin.types.PluginVariableType.Mode,
-            is_optional
-        )
+    def __init__(self, label, description, is_optional=False):
+        super().__init__(label, description, gremlin.types.PluginVariableType.Mode, is_optional)
 
         self.value = profile.mode_list(shared_state.current_profile)[0]
 
@@ -577,9 +469,7 @@ class ModeVariable(AbstractVariable):
         value_widget.setShowProfileOptions(False)
         value_widget.setLabelText("")
         value_widget.populate_selector(shared_state.current_profile, value)
-        value_widget.edit_mode_changed.connect(
-            lambda x: self.value_changed.emit({"value": x})
-        )
+        value_widget.edit_mode_changed.connect(lambda x: self.value_changed.emit({"value": x}))
 
         layout.addWidget(value_widget, 0, 1)
         layout.setColumnStretch(1, 1)
@@ -593,29 +483,17 @@ class ModeVariable(AbstractVariable):
 
 
 class VirtualInputVariable(AbstractVariable):
-
     """Variable representing a vJoy input."""
 
     def __init__(self, label, description, valid_types=None, is_optional=False):
-        super().__init__(
-            label,
-            description,
-            gremlin.types.PluginVariableType.VirtualInput,
-            is_optional
-        )
+        super().__init__(label, description, gremlin.types.PluginVariableType.VirtualInput, is_optional)
 
-        joystick_handling.vjoy_devices()
+        joystick_handling.virtual_devices()
 
         self.valid_types = valid_types
         if self.valid_types is None:
-            self.valid_types = [
-                InputType.JoystickAxis,
-                InputType.JoystickButton,
-                InputType.JoystickHat
-            ]
-        self.value = joystick_handling.select_first_valid_vjoy_input(
-            self.valid_types
-        )
+            self.valid_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat]
+        self.value = joystick_handling.select_first_valid_vjoy_input(self.valid_types)
 
         self._load_from_registry(self._get_identifier())
 
@@ -636,7 +514,7 @@ class VirtualInputVariable(AbstractVariable):
     def set(self, vjoy, event):
         if event.event_type != self.value["input_type"]:
             syslog.warning(
-                f"Invalid types for vJoy set action for vjoy {str(self.value["device_id"]),} {InputType.to_string(self.value["input_type"])} {self.value["input_id"]:d}"
+                f"Invalid types for vJoy set action for vjoy {(str(self.value['device_id']),)} {InputType.to_string(self.value['input_type'])} {self.value['input_id']:d}"
             )
             return
 
@@ -654,16 +532,9 @@ class VirtualInputVariable(AbstractVariable):
         label.setToolTip(self.description)
         layout.addWidget(label, 0, 0)
 
-        value_widget = gremlin.ui.ui_common.VJoySelector(
-            lambda data: self.value_changed.emit(data),
-            self.valid_types
-        )
+        value_widget = gremlin.ui.ui_common.VJoySelector(lambda data: self.value_changed.emit(data), self.valid_types)
         if value is not None:
-            value_widget.set_selection(
-                value["input_type"],
-                value["device_id"],
-                value["input_id"]
-            )
+            value_widget.set_selection(value["input_type"], value["device_id"], value["input_id"])
 
         layout.addWidget(value_widget, 0, 1)
         layout.setColumnStretch(1, 1)
@@ -678,26 +549,17 @@ class VirtualInputVariable(AbstractVariable):
     def __str__(self):
         return f"VirtualInputVariable: {self.value}  vjoy_id: {self.vjoy_id} input_id: {self.input_id} description: {self.description}"
 
-class PhysicalInputVariable(AbstractVariable):
 
+class PhysicalInputVariable(AbstractVariable):
     """Variable representing a physical device input."""
 
     def __init__(self, label, description, valid_types=None, is_optional=False):
-        super().__init__(
-            label,
-            description,
-            gremlin.types.PluginVariableType.PhysicalInput,
-            is_optional
-        )
+        super().__init__(label, description, gremlin.types.PluginVariableType.PhysicalInput, is_optional)
 
         self.value = None
         self.valid_types = valid_types
         if self.valid_types is None:
-            self.valid_types = [
-                InputType.JoystickAxis,
-                InputType.JoystickButton,
-                InputType.JoystickHat
-            ]
+            self.valid_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat]
 
         self._load_from_registry(self._get_identifier())
 
@@ -724,15 +586,9 @@ class PhysicalInputVariable(AbstractVariable):
 
     def create_decorator(self, mode_name):
         if self.value is None:
-            return gremlin.input_devices.JoystickDecorator(
-                "", str(dinput.GUID_Invalid), ""
-            )
+            return gremlin.input_devices.JoystickDecorator("", str(dinput.GUID_Invalid), "")
         else:
-            return gremlin.input_devices.JoystickDecorator(
-                self.value["device_name"],
-                str(self.value["device_id"]),
-                mode_name
-            )
+            return gremlin.input_devices.JoystickDecorator(self.value["device_name"], str(self.value["device_id"]), mode_name)
 
     def create_ui_element(self, value):
         layout = QtWidgets.QGridLayout()
@@ -742,14 +598,10 @@ class PhysicalInputVariable(AbstractVariable):
 
         value_widget = QtWidgets.QPushButton("Press")
         if value is not None:
-            input_id = f"{value["input_id"]:d}"
+            input_id = f"{value['input_id']:d}"
             if value["input_type"] == InputType.JoystickAxis:
-                input_id = gremlin.types.AxisNames.to_string(
-                    gremlin.types.AxisNames(value["input_id"])
-                )
-            value_widget.setText(
-                f"{value["device_name"]} {InputType.to_string(value["input_type"]).capitalize()} {input_id}"
-                )
+                input_id = gremlin.types.AxisNames.to_string(gremlin.types.AxisNames(value["input_id"]))
+            value_widget.setText(f"{value['device_name']} {InputType.to_string(value['input_type']).capitalize()} {input_id}")
         value_widget.clicked.connect(self._record_user_input)
 
         layout.addWidget(value_widget, 0, 1)
@@ -760,30 +612,25 @@ class PhysicalInputVariable(AbstractVariable):
         return layout
 
     def _record_user_input(self):
-        widget = gremlin.ui.ui_common.InputListenerWidget(
-            self.valid_types
-        )
+        widget = gremlin.ui.ui_common.InputListenerWidget(self.valid_types)
 
         widget.item_selected.connect(self._user_input)
 
         # Display the dialog centered in the middle of the UI
         geom = QtWidgets.QApplication.topLevelWindows()[0].geometry()
-        widget.setGeometry(
-            int(geom.x() + geom.width() / 2 - 150),
-            int(geom.y() + geom.height() / 2 - 75),
-            300,
-            150
-        )
+        widget.setGeometry(int(geom.x() + geom.width() / 2 - 150), int(geom.y() + geom.height() / 2 - 75), 300, 150)
 
         widget.show()
 
     def _user_input(self, event):
-        self.value_changed.emit({
-            "device_id": event.device_guid,
-            "device_name": dinput.DILL.get_device_name(event.device_guid),
-            "input_id": event.identifier,
-            "input_type": event.event_type,
-        })
+        self.value_changed.emit(
+            {
+                "device_id": event.device_guid,
+                "device_name": dinput.DILL.get_device_name(event.device_guid),
+                "input_id": event.identifier,
+                "input_type": event.event_type,
+            }
+        )
 
     def _process_registry_value(self, value):
         return value
@@ -791,27 +638,15 @@ class PhysicalInputVariable(AbstractVariable):
     def __str__(self):
         return f"PhysicalInputVariable: device_name: {self.device_name}  device_id: {str(self.device_guid)}  input_id: {self.input_id}"
 
-class SelectionVariable(AbstractVariable):
 
+class SelectionVariable(AbstractVariable):
     """Permits selecting a value out of a list of possibilities."""
 
-    def __init__(
-            self,
-            label,
-            description,
-            option_list,
-            default_index=0,
-            is_optional=False
-    ):
-        super().__init__(
-            label,
-            description,
-            gremlin.types.PluginVariableType.Selection,
-            is_optional
-        )
+    def __init__(self, label, description, option_list, default_index=0, is_optional=False):
+        super().__init__(label, description, gremlin.types.PluginVariableType.Selection, is_optional)
 
-        assert(isinstance(option_list, list))
-        assert(len(option_list) > 0)
+        assert isinstance(option_list, list)
+        assert len(option_list) > 0
 
         self.options = list(sorted(set(option_list)))
         self.value = option_list[default_index]
@@ -834,9 +669,7 @@ class SelectionVariable(AbstractVariable):
             value_widget.setCurrentIndex(self.options.index(value))
 
         # Hookup selection change callback
-        value_widget.currentTextChanged.connect(
-            lambda x: self.value_changed.emit({"value": x})
-        )
+        value_widget.currentTextChanged.connect(lambda x: self.value_changed.emit({"value": x}))
 
         if value_widget is not None:
             layout.addWidget(value_widget, 0, 1)
@@ -845,6 +678,6 @@ class SelectionVariable(AbstractVariable):
         layout.setColumnMinimumWidth(0, 150)
 
         return layout
-    
+
     def __str__(self):
         return f"SelectionVariable: description: {self.description} values: {self.options}"

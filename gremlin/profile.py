@@ -686,7 +686,7 @@ class ProfileConverter:
                     self.hwid_to_guid[hwid] = str(dev.device_guid)
                     self.dev_info[str(dev.device_guid)] = dev
                 self.vjoy_to_guid = {}
-                for dev in joystick_handling.vjoy_devices():
+                for dev in joystick_handling.virtual_devices():
                     self.vjoy_to_guid[dev.vjoy_id] = str(dev.device_guid)
 
             def axis_lookup(self, device_guid, linear_id):

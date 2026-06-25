@@ -638,18 +638,28 @@ class MidiInterface(QtCore.QObject):
         self._port_display_name_map = {}  # map of port index to its display name
         self._port_count = 0
         self._initialized = False
+        config = gremlin.config.Configuration()
+        self.midi_enabled = config.midi_enabled  # if enabled
         self.verbose = gremlin.config.Configuration().verbose_mode_midi
         el = gremlin.event_handler.EventListener()
         el.config_changed.connect(self._on_config_changed)
         self._monitored_ports = set()
-        self.midi_enabled = True  # allow MIDI feature in GEX
+
 
 
 
     def _on_config_changed(self):
-        self.verbose = gremlin.config.Configuration().verbose_mode_midi
+        config = gremlin.config.Configuration()
+        self.midi_enabled = config.midi_enabled  # update MIDI enabled status based on configuration
+        if not self.midi_enabled:
+            self.stop()
+        self.verbose = config.verbose_mode_midi
 
     def _initialize_midi(self):
+
+        if not self.midi_enabled:
+            return
+
         self._event_handler = gremlin.event_handler.EventHandler()
         self._event_listener = gremlin.event_handler.EventListener()
         self._event_listener.shutdown.connect(self.stop)

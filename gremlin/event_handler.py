@@ -693,7 +693,7 @@ class EventListener(QtCore.QObject):
     # called when vjoy button usage has changed in the profile so displays can update themselves
     button_usage_changed = Signal(int)  # (vjoy_id) fires when a vjoy device button has changed
     vjoy_button_usage = Signal(int, int, bool)  # called when an action uses a vjoy button (vjoy_id, button_id, state)
-    set_vjoy_button_usage = Signal(int, int, bool, str)  # called when a button state should be set (vjoy_id, button_id, state, key)
+    set_vjoy_button_usage = Signal(dinput.DeviceSummary, int, bool, str)  # called when a button state should be set (vjoy_id, button_id, state, key)
 
     # selection event - tells the UI to show a different input
     select_input = Signal(
@@ -3884,7 +3884,7 @@ class AxisState:
         self._last_axis_time = {}  # time when last modified
 
         self._registered_devices = []  # guid of registered devices
-        self.usage_data = gremlin.joystick_handling.VJoyUsageState()
+        self.usage_data = gremlin.joystick_handling.VirtualDeviceUsageState()
         self.perf = gremlin.config.Configuration().verbose_mode_perf
         self._delay = 1 / 1000  # delay in seconds for filter - 0 = disabled
         self._delta = 0.001  # delta to trigger a difference

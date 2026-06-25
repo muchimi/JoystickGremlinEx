@@ -30,8 +30,8 @@ import logging
 
 syslog = logging.getLogger("system")
 
-class Repeater(QtCore.QObject):
 
+class Repeater(QtCore.QObject):
     """Responsible to repeatedly emit a set of given events.
 
     The class receives a list of events that are to be emitted in
@@ -56,7 +56,7 @@ class Repeater(QtCore.QObject):
         self._stop_timer = threading.Timer(5.0, self.stop)
         self._update_func = update_func
         self._timeout = time.time()
-        self._vjoy_device_guids = [dev.device_guid for dev in joystick_handling.vjoy_devices()]
+        self._vjoy_device_guids = [dev.device_guid for dev in joystick_handling.virtual_devices()]
         self._event_registry = {}
 
     @property
@@ -109,10 +109,7 @@ class Repeater(QtCore.QObject):
             return
 
         event_list = []
-        if event.event_type in [
-            common.InputType.Keyboard,
-            common.InputType.JoystickButton
-        ]:
+        if event.event_type in [common.InputType.Keyboard, common.InputType.JoystickButton]:
             event_list = [event.clone(), event.clone()]
             event_list[0].is_pressed = False
             event_list[1].is_pressed = True
@@ -120,12 +117,7 @@ class Repeater(QtCore.QObject):
             event_list[1].value = False
 
         elif event.event_type == common.InputType.JoystickAxis:
-            event_list = [
-                event.clone(),
-                event.clone(),
-                event.clone(),
-                event.clone()
-            ]
+            event_list = [event.clone(), event.clone(), event.clone(), event.clone()]
             event_list[0].value = -0.75
             event_list[1].value = 0.0
             event_list[2].value = 0.75
@@ -133,7 +125,7 @@ class Repeater(QtCore.QObject):
 
         elif event.event_type == common.InputType.JoystickHat:
             event_list = [event.clone(), event.clone()]
-            event_list[0].value = (0,0)
+            event_list[0].value = (0, 0)
 
         # mark events as repeater events so actions handle forced values correctly
         for event in event_list:
@@ -164,8 +156,6 @@ class Repeater(QtCore.QObject):
         el = event_handler.EventListener()
         syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_outputs
-
-
 
         # Repeatedly send events until the thread is interrupted
         while self.is_running:
@@ -206,13 +196,11 @@ class Repeater(QtCore.QObject):
         self._update_func("Waiting for input")
 
 
+# class PulseWorker(QtCore.QObject):
+class PulseWorker:
+    """helper object to schedule repeated triggers (callback) at a given interval until the object is stopped."""
 
-
-#class PulseWorker(QtCore.QObject):
-class PulseWorker():
-    ''' helper object to schedule repeated triggers (callback) at a given interval until the object is stopped. '''
-
-    def __init__(self, pulse_duration : float, repeat_interval : float, on_callback, off_callback = None, data = None, count : int = None):
+    def __init__(self, pulse_duration: float, repeat_interval: float, on_callback, off_callback=None, data=None, count: int = None):
         """Creates a new instance.
 
         :param pulse_duration: duration in seconds of the pulse
@@ -221,30 +209,31 @@ class PulseWorker():
         :param off_callback: function to call when the pusle if off (optional) - if data is provided, that will be passed as an argument
         :param count: number of pulses, set to 0 to disable
         """
-        #QtCore.QObject.__init__(self)
+        # QtCore.QObject.__init__(self)
         self.is_running = False
-        self._pulse_duration = pulse_duration # singleton if none or 0
-        self._repeat_interval = repeat_interval # repeat delay, none
+        self._pulse_duration = pulse_duration  # singleton if none or 0
+        self._repeat_interval = repeat_interval  # repeat delay, none
         self._on_callback = on_callback
         self._off_callback = off_callback
-        self._is_pulse = False # true when the signal is active
-        self._thread = None # holds the running thread
-        self._data = data # any data
+        self._is_pulse = False  # true when the signal is active
+        self._thread = None  # holds the running thread
+        self._data = data  # any data
         self._repeat_count = count
 
         el = gremlin.event_handler.EventListener()
-        el.profile_stop.connect(self.stop) # stop processing on profile stop
-        el.shutdown.connect(self.stop) # stop processing on app shutdown
+        el.profile_stop.connect(self.stop)  # stop processing on profile stop
+        el.shutdown.connect(self.stop)  # stop processing on app shutdown
 
     @property
     def data(self):
         return self._data
+
     @data.setter
     def data(self, value):
         self._data = value
 
     def start(self):
-        ''' request a start '''
+        """request a start"""
         if self._thread and self._thread.is_alive():
             return
         self._thread = threading.Thread(target=self._run, daemon=False)
@@ -252,13 +241,10 @@ class PulseWorker():
         self._keep_running = True
         self._thread.start()
 
-
-
     def stop(self):
-        ''' request a stop '''
+        """request a stop"""
 
         if self._thread:
-
             if self._off_callback:
                 # fire the pulse off callback (or abort)
                 if self.data:
@@ -266,27 +252,27 @@ class PulseWorker():
                 else:
                     self._off_callback()
 
-            self._keep_running = False # tell the worker to stop whatever it's doing
+            self._keep_running = False  # tell the worker to stop whatever it's doing
             # wait for the thread to terminate
             if self._thread.is_alive():
                 self._thread.join()
             self._thread = None
-            self._is_pulse = False # true if we're pulsing
-            self._is_interval = False # true if we're waiting for the next pulse
+            self._is_pulse = False  # true if we're pulsing
+            self._is_interval = False  # true if we're waiting for the next pulse
             self.is_running = False
 
     def _run(self):
-        ''' pulse worker '''
+        """pulse worker"""
         syslog = logging.getLogger("system")
         # verbose = gremlin.config.Configuration().verbose
         verbose = False
         if not self._thread.is_alive():
             return
         while self._keep_running:
-            self._is_pulse = True # indicate pulsing phase
+            self._is_pulse = True  # indicate pulsing phase
             self._is_interval = False
 
-            #if verbose: syslog.info("Fire on callback")
+            # if verbose: syslog.info("Fire on callback")
             if self._on_callback:
                 if self.data:
                     # has a callback data param
@@ -303,7 +289,7 @@ class PulseWorker():
 
             self._is_pulse = False
 
-            #if verbose: syslog.info("Stop pulse")
+            # if verbose: syslog.info("Stop pulse")
             if self._off_callback:
                 # fire the pulse off callback (or abort)
                 if verbose:
@@ -312,7 +298,6 @@ class PulseWorker():
                     self._off_callback(self.data)
                 else:
                     self._off_callback()
-
 
             if self._repeat_count is not None:
                 self._repeat_count -= 1
@@ -333,13 +318,10 @@ class PulseWorker():
                 if verbose:
                     syslog.info("Stop wait")
 
-
-
         if verbose:
             syslog.info("End pulse worker")
 
     @property
     def is_pulse(self) -> bool:
-        ''' true if we're pulsing '''
+        """true if we're pulsing"""
         return self._is_pulse
-

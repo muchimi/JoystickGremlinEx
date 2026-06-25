@@ -188,6 +188,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._active_process_path = None  # active mapped process path
         self._last_toast_message = None
         self._change_input_lock = threading.Lock()  # true when changing inputs
+        self._ui_update_pending = False  # flag = if True, UI updates are pending
+        self._suspend_ui_update = 0  # stack = if non zero, UI updates should be suspended
 
         self._comparative_file = os.path.join(os.getenv("temp"), "8c71a5a6eae74f989cf903816868028e.xml")
 
@@ -396,7 +398,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.device_change_event.connect(self._handle_devices_changed)
         el.ui_initialized.connect(self._update_start_tab)
 
-        self.vjoy_state = gremlin.joystick_handling.VJoyUsageState()
+        self.vjoy_state = gremlin.joystick_handling.VirtualDeviceUsageState()
 
         self.initialized = True
         gremlin.shared_state.initialized = True
@@ -405,6 +407,20 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     # def _handle_device_widget_index_changed(self, index):
     #     syslog.info(f"device page: index set to [{index}]")
+
+    def pushSuspendTabUpdate(self):
+        self._suspend_ui_update += 1
+
+    def popSuspendTabUpdate(self, reset = False):
+        if reset:
+            self._suspend_ui_update = 0
+        if self._suspend_ui_update > 0:
+            self._suspend_ui_update -= 1
+        if self._suspend_ui_update == 0 and self._ui_update_pending:
+            self._ui_update_pending = False
+            self._create_tabs()  # recreate the UI tabs
+
+
 
     def pushLoading(self):
         if self._loading_stack == 0:
@@ -1730,7 +1746,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # Create a default mode
         for device in self.profile.devices.values():
-            device.ensure_mode_exists(profile=new_profile, mode_name="Default", device=device.device_guid)
+            device.ensure_mode_exists(mode_name="Default")
 
         # Update everything to the new mode
         # self._mode_configuration_changed()
@@ -2517,7 +2533,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     self.ui.devices_tab_header_widget.setTabTextColor(position, color)
                     self.ui.devices_tab_header_widget.setTabIcon(position, icon)  # clear the icon
 
-
     def _handle_feature_changed(self, feature):
         """called when a feature changes"""
         self.setTabsDirty(update=True)  # mark tabs as dirty and updateD
@@ -2547,7 +2562,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if device:
             if device.vjoy_id in self.profile.settings.vjoy_as_input:
                 return self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
+        return False
 
+    def _get_maestro_input_enabled(self, device):
+        """gets the maestro input enabled state"""
+        if device:
+            if device.virtual_id in self.profile.settings.maestro_as_input:
+                return self.profile.settings.maestro_as_input.get(device.virtual_id, False)
         return False
 
     def _map_insert(self, data: dict, index: int, count: int, value):
@@ -2577,6 +2598,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # add vjoy input devices
         vjoy_devices = [dev for dev in gremlin.joystick_handling.all_vjoy_devices() if self._get_vjoy_input_enabled(dev)]
+        maestro_devices = [dev for dev in gremlin.joystick_handling.all_maestro_devices() if self._get_maestro_input_enabled(dev)]
 
         # add special devices
         sd = gremlin.joystick_handling.getSpecialDevices()
@@ -2588,7 +2610,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         section_map = {
             DeviceCategory.Physical: physical_devices,
-            DeviceCategory.Virtual: vjoy_devices,
+            DeviceCategory.Virtual: vjoy_devices + maestro_devices,
             DeviceCategory.Special: special_devices,
             DeviceCategory.Config: config_devices,
         }
@@ -2653,7 +2675,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             special_devices.sort(key=lambda x: x.name)
             config_devices.sort(key=lambda x: x.name)
             vjoy_devices.sort(key=lambda x: x.name)
-            sorted_devices = [(device.device_id, device.name, device) for device in physical_devices + vjoy_devices + special_devices + config_devices]
+            maestro_devices.sort(key=lambda x: x.name)
+            sorted_devices = [
+                (device.device_id, device.name, device) for device in physical_devices + vjoy_devices + maestro_devices + special_devices + config_devices
+            ]
 
         index = 0
 
@@ -2677,6 +2702,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             "sorted": sorted_devices,
             "physical": physical_devices,
             "vjoy": vjoy_devices,
+            "maestro": maestro_devices,
             "special": special_devices,
             "config": config_devices,
             "index_map": indexed_map,
@@ -2697,6 +2723,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """Creates the tabs of the configuration dialog representing
         the different connected devices.
         """
+
+        # record the update requirement
+        if self._suspend_ui_update:
+            self._ui_update_pending = True
+            return
+
         try:
             self.pushLoading()
             gremlin.shared_state.push_redraw()
@@ -2743,7 +2775,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # update device lists
             phys_devices = gremlin.joystick_handling.physical_devices()
-            vjoy_devices = gremlin.joystick_handling.vjoy_devices()
+            vjoy_devices = gremlin.joystick_handling.virtual_devices()
+            maestro_devices = gremlin.joystick_handling.all_maestro_devices()
             self._active_devices = gremlin.joystick_handling.all_joystick_devices()
 
             # get list of devices in the profile that do not exist or are not connected
@@ -2762,11 +2795,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 for dev in graph_devices
                 if dev.device_guid not in [d.device_guid for d in vjoy_devices] and dev.device_type == gremlin.types.DeviceType.VJoy
             ]
+            missing_maestro_devices = [
+                dev
+                for dev in graph_devices
+                if dev.device_guid not in [d.device_guid for d in maestro_devices] and dev.device_type == gremlin.types.DeviceType.Maestro
+            ]
 
             self._missing_phys_devices = missing_phys_devices
             self._missing_vjoy_devices = missing_vjoy_devices
+            self._missing_maestro_devices = missing_maestro_devices
 
-            for device in self._missing_phys_devices + self._missing_vjoy_devices:
+            for device in self._missing_phys_devices + self._missing_vjoy_devices + self._missing_maestro_devices:
                 gremlin.joystick_handling.registerSpecialDevice(device)
 
             if verbose:
@@ -2775,9 +2814,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             all_phys_devices = missing_phys_devices + phys_devices
             all_vjoy_devices = missing_vjoy_devices + vjoy_devices
+            all_maestro_devices = missing_maestro_devices + maestro_devices
 
             self._all_devices_map = {}
-            for device in all_phys_devices + all_vjoy_devices:
+            for device in all_phys_devices + all_vjoy_devices + all_maestro_devices:
                 self._all_devices_map[device.device_id] = device
 
             # index of the current tab being addded
@@ -2787,6 +2827,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             sorted_devices = data["sorted"]
             physical_devices = data["physical"]
             vjoy_devices = data["vjoy"]
+            maestro_devices = data["maestro"]
             special_devices = data["special"]
             config_devices = data["config"]
             self._tab_map = data["tab_map"]
@@ -2894,7 +2935,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                     device_guid = gremlin.util.normalize_guid(device.device_guid)
                     device_name = device.name
-                    # input_enabled = sd.inputEnabled(device.device_guid) #  self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
                     input_enabled = self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
 
                     if not input_enabled:
@@ -2932,6 +2972,49 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         index += 1
                         if verbose_l1:
                             syslog.info(f"Added vjoy tab: {device_name} index {index}")
+
+                elif device in maestro_devices:
+                    # =======================================================
+                    # Maestro input devices
+
+                    # Create Maestro as input device tabs
+
+                    device_guid = gremlin.util.normalize_guid(device.device_guid)
+                    device_name = device.name
+                    input_enabled = self.profile.settings.maestro_as_input.get(device.virtual_id, False)
+
+                    if not input_enabled:
+                        if verbose_l1:
+                            syslog.info(f"MAESTRO TAB: {device_name} not created because input is disabled on this device.")
+                        continue
+                    if not device.connected:
+                        if verbose_l1:
+                            syslog.info(f"MAESTRO TAB: {device_name} not created because device is not connected.")
+                        continue
+
+                    index += 1
+
+                    # Maestro as input enabled
+                    widget = self.getRegisteredWidget(device_guid)
+                    if widget is not None and Shiboken.isValid(widget):
+                        # found cached widget for this device
+                        continue
+
+                    if not widget:
+                        widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
+                            device=device, profile=self.profile, mode=self.current_mode, object_name=device_name
+                        )
+
+                        self.registerWidget(device_guid, widget)
+
+                    widget.data = (TabDeviceType.MaestroInput, device_guid, index)
+                    # add tab header for this device
+                    if device not in tab_device_list:
+                        self._add_tab(device.device_guid, TabDeviceType.MaestroInput)
+                        tab_device_list.append(device)
+                        index += 1
+                        if verbose_l1:
+                            syslog.info(f"Added Maestro tab: {device_name} index {index}")
 
                 elif device in special_devices:
                     # =======================================================
@@ -3896,7 +3979,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             data = widget.inputItemListView.model.data(item_index)
             return data.device_type
         return None
-
 
     def _get_tab_input_id(self, index: int):
         widget = self.getWidgetByTabIndex(index)
@@ -5909,7 +5991,7 @@ if __name__ == "__main__":
     try:
         # integrate twisted with QT framework
         # twisted framework
-        #syslog.info("starting app exec")
+        # syslog.info("starting app exec")
         app.exec()
     except Exception as err:
         syslog.error(f"{err}\n{traceback.format_exc()}")

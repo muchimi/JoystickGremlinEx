@@ -569,7 +569,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
                         selected_index = index
 
             case DeviceType.VJoy:
-                devices = gremlin.joystick_handling.vjoy_devices()
+                devices = gremlin.joystick_handling.virtual_devices()
                 device: DeviceSummary
                 for index, device in enumerate(devices):
                     widget.addItem(device.name, device)

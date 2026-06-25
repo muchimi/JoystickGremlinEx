@@ -29,11 +29,13 @@ from gremlin.types import DeviceType, DeviceCategory
 MAESTRO_VID = 0x1209 # vendor ID for GEX managed devices
 GEX_VID = MAESTRO_VID # vendor ID for GEX managed devices
 MAESTRO_PID_BASE = 0x1000 # base product ID for Maestro devices
-GEX_PID_BASE = MAESTRO_PID_BASE # base product id (sequential) for GEX managed devices
+
 GEX_ID_STRING = "GEX"
 GEX_VENDOR_STRING = "GEX"  # vendor string for GEX managed devices
 GEX_PRODUCT_STRING = "GEX Custom Device"
 GEX_MAX_DEVICES = 16  # maximum number of GEX managed devices
+GEX_PID_BASE = MAESTRO_PID_BASE # base product id (sequential) for GEX managed devices
+GEX_PID_MAX = GEX_PID_BASE + GEX_MAX_DEVICES - 1 # maximum product id for GEX managed devices
 VJOY_VID = 0x1234 # vendor ID for vJoy devices
 VJOY_PID = 0x5678 # product ID for vJoy devices
 
@@ -441,6 +443,7 @@ class DeviceSummary:
         self.axis_id_map = {}  # map of axis ID to linear ID
         self.input_enabled = False
         self.vjoy_id = -1
+        self.virtual_id = -1
         self.vendor_id = 0  # vendor ID
         self.product_id = 0  # product ID
         self.name = None
@@ -454,10 +457,19 @@ class DeviceSummary:
         if data is not None:
             self.device_guid = GUID(data.device_guid)
             self.device_id = gremlin.util.normalize_guid(self.device_guid)
-            self._device_type = gremlin.types.DeviceType.Joystick
+
             self.vendor_id = data.vendor_id
             self.product_id = data.product_id
             self.joystick_id = data.joystick_id
+
+            # map device subtypes
+            if data.vendor_id == VJOY_VID:
+                self._device_type = gremlin.types.DeviceType.VJoy
+            elif data.vendor_id == MAESTRO_VID and self.product_id >= GEX_PID_BASE and self.product_id <= GEX_PID_MAX:
+                self._device_type = gremlin.types.DeviceType.Maestro
+                self.virtual_id = self.product_id - GEX_PID_BASE # index of maestro is kept in the product ID
+            else:
+                self._device_type = gremlin.types.DeviceType.Joystick
 
             # try various encodings of the byte string as it can be finicky
             encodings = ["utf-8", "unicode_escape", "latin-1"]
@@ -630,20 +642,24 @@ class DeviceSummary:
             self._is_virtual = self.vendor_id in (VJOY_VID, GEX_VID)
         return self._is_virtual
 
-    def set_vjoy_id(self, vjoy_id):
+    def set_vjoy_id(self, vjoy_id : int):
         """Sets the vJoy id for this device summary.
 
         Settings the vJoy device id is necessary, as DILL cannot know these
         ids, and as such this has to be entered when DirectInput devices and
         vJoy devices are linked.
 
+        A value of -1 indicates that the vJoy device id is not used for this device.
+        Also sets the virtual_id.
+
         Parameters
         ==========
         vjoy_id : int
-            Index of the vJoy device corresponding to this DirectInput device
+            Index of the vJoy device corresponding to this DirectInput device, -1 if not used
         """
         assert self.is_virtual is True
         self.vjoy_id = vjoy_id
+        self.virtual_id = vjoy_id
         self.name = f"VJoy {self.axis_count}/{self.button_count}/{self.hat_count} ({vjoy_id:d})"
 
     def get_axis_name(self, index : int, is_linear=False, short_name=False):
@@ -968,23 +984,35 @@ class DILL:
         device_count = DILL.get_device_count()
         for index in range(device_count):
             dev = DILL.get_device_information_by_index(index)
-            if dev.vendor_id == GEX_VID and GEX_PID_BASE <= dev.product_id < GEX_PID_BASE + GEX_MAX_DEVICES:
+            if dev.device_type == DeviceType.Maestro:
                 device_list.append(dev)
         return device_list
 
     @staticmethod
     def getVjoyDeviceMap() -> dict:
         """does a re-read of vjoy devices from the DINPUT api
-        returns a dictionary keyed by vjoyid holding the vjoy device detected
+        returns a dictionary keyed by vjoyid holding the vjoy/maestro device detected
         """
         device_count = DILL.get_device_count()
         vjoy_map = {}
         for index in range(device_count):
             dev = DILL.get_device_information_by_index(index)
-            if dev.is_virtual and dev.vjoy_id >= 0:
+            if dev.device_type == DeviceType.VJoy:
                 vjoy_map[dev.vjoy_id] = dev
-
         return vjoy_map
+
+    @staticmethod
+    def getVirtualDeviceMap() -> dict:
+        """does a re-read of virtual devices from the DINPUT api
+        returns a dictionary keyed by virtual device id holding the virtual/maestro device detected
+        """
+        device_count = DILL.get_device_count()
+        virtual_map = {}
+        for index in range(device_count):
+            dev = DILL.get_device_information_by_index(index)
+            if dev.is_virtual and dev.device_type in (DeviceType.VJoy, DeviceType.Maestro):
+                virtual_map[dev.virtual_id] = dev
+        return virtual_map
 
     @staticmethod
     def set_input_event_callback(callback):

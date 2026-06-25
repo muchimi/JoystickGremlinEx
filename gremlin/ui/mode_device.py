@@ -246,10 +246,12 @@ def ensureMasterInputItems(profile : gremlin.base_profile.Profile):
     device_guid = ModeDeviceTabWidget.device_guid
     device_node = profile.getDeviceNode(device_guid, autocreate=True)
     mode_node = device_node.getModeNode(gremlin.shared_state.master_mode, True, autocreate=True)
-    input_item = ModeInputItem(mode_node, input_id = ModeInputModeType.ModeProfileStart)
-    mode_node.setInputItem(input_item)
-    input_item = ModeInputItem(mode_node, input_id = ModeInputModeType.ModeProfileStop)
-    mode_node.setInputItem(input_item)
+    if not mode_node.getInputItem(InputType.ModeControl, ModeInputModeType.ModeProfileStart):
+        input_item = ModeInputItem(mode_node, input_id = ModeInputModeType.ModeProfileStart)
+        mode_node.setInputItem(input_item)
+    if not mode_node.getInputItem(InputType.ModeControl, ModeInputModeType.ModeProfileStop):
+        input_item = ModeInputItem(mode_node, input_id = ModeInputModeType.ModeProfileStop)
+        mode_node.setInputItem(input_item)
 
 def ensureModeInputItems(profile : gremlin.base_profile.Profile, mode : str):
     device_guid = ModeDeviceTabWidget.device_guid
@@ -366,11 +368,16 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         mode = self.current_mode
         master_mode = gremlin.shared_state.master_mode
+        registry = self.profile.registry
 
-        input_enter = self.profile.getInputItem(self.device_guid, mode, InputType.ModeControl, ModeInputModeType.ModeEnter)
-        input_exit = self.profile.getInputItem(self.device_guid, mode, InputType.ModeControl, ModeInputModeType.ModeExit)
-        input_start = self.profile.getInputItem(self.device_guid, master_mode, InputType.ModeControl, ModeInputModeType.ModeProfileStart)
-        input_stop = self.profile.getInputItem(self.device_guid, master_mode, InputType.ModeControl, ModeInputModeType.ModeProfileStop)
+
+        ensureMasterInputItems(self.profile)
+        ensureModeInputItems(self.profile, mode)
+
+        input_enter = registry.getInputItem(self.device_guid, mode, InputType.ModeControl, ModeInputModeType.ModeEnter)
+        input_exit = registry.getInputItem(self.device_guid, mode, InputType.ModeControl, ModeInputModeType.ModeExit)
+        input_start = registry.getInputItem(self.device_guid, master_mode, InputType.ModeControl, ModeInputModeType.ModeProfileStart)
+        input_stop = registry.getInputItem(self.device_guid, master_mode, InputType.ModeControl, ModeInputModeType.ModeProfileStop)
 
         assert input_enter is not None, "invalid mode enter input"
         assert input_exit is not None, "invalid mode exit input"

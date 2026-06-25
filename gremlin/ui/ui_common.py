@@ -1122,13 +1122,8 @@ class Icons:
         return Icons._icon("mdi.remote")
 
     @staticmethod
-    def arrowIcon(direction : str = "right", qta_color=None):
-        icon_map = {
-            "right": "ei.arrow-right",
-            "left": "ei.arrow-left",
-            "up": "ei.arrow-up",
-            "down": "ei.arrow-down"
-        }
+    def arrowIcon(direction: str = "right", qta_color=None):
+        icon_map = {"right": "ei.arrow-right", "left": "ei.arrow-left", "up": "ei.arrow-up", "down": "ei.arrow-down"}
         icon_value = icon_map.get(direction, "mdi.arrow-right")
         return Icons._icon(icon_value, qta_color=qta_color)
 
@@ -2898,7 +2893,7 @@ class VJoySelector(AbstractInputSelector):
         super().__init__(selected_callback=change_cb, valid_types=valid_types, parent=parent)
 
     def _initialize(self):
-        potential_devices = sorted(gremlin.joystick_handling.vjoy_devices(), key=lambda x: x.vjoy_id)
+        potential_devices = sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id)
         for dev in potential_devices:
             input_counts = {
                 InputType.JoystickAxis: dev.axis_count,
@@ -7324,7 +7319,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
         if device.is_virtual:
             self.setTitle(f"{device.name} #{device.vjoy_id:d} - Buttons")
             is_disabled = False
-            usage_state = gremlin.joystick_handling.VJoyUsageState()
+            usage_state = gremlin.joystick_handling.VirtualDeviceUsageState()
         else:
             self.setTitle(f"{device.name} - Buttons")
 
@@ -14524,11 +14519,10 @@ class QEmptyWidget(QtWidgets.QWidget):
 class QArrowPairWidget(QtWidgets.QWidget):
     """widget showing a prefix and suffix separately with an arrow in between"""
 
-    def __init__(self, direction="right", prefix : str = None, suffix : str = None, parent=None, size = 24, qta_color=None):
+    def __init__(self, direction="right", prefix: str = None, suffix: str = None, parent=None, size=24, qta_color=None):
         super().__init__(parent=parent)
 
-
-        icon = Icons.arrowIcon(direction, qta_color = qta_color if qta_color is not None else Color.normalColor())
+        icon = Icons.arrowIcon(direction, qta_color=qta_color if qta_color is not None else Color.normalColor())
         pixmap = icon.pixmap(QSize(size, size))
         label = QtWidgets.QLabel()
         label.setPixmap(pixmap)
@@ -14537,15 +14531,15 @@ class QArrowPairWidget(QtWidgets.QWidget):
         self.prefix_widget = QtWidgets.QLabel(prefix)
         self.suffix_widget = QtWidgets.QLabel(suffix)
 
-        widget = getHContainer([self.prefix_widget,label,self.suffix_widget], widget_only=True)
+        widget = getHContainer([self.prefix_widget, label, self.suffix_widget], widget_only=True)
 
         layout.addWidget(widget)
         self.setLayout(layout)
 
-    def setPrefix(self, value : str):
+    def setPrefix(self, value: str):
         self.prefix_widget.setText(value)
 
-    def setSuffix(self, value : str):
+    def setSuffix(self, value: str):
         self.suffix_widget.setText(value)
 
     def setText(self, prefix: str, suffix: str):

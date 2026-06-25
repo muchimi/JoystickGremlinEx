@@ -70,6 +70,8 @@ is_dark_theme = False # true if windows is in dark theme
 _suspend_input_highlighting = False
 _suspend_input_highlighting_enabled = 0
 
+_suspend_ui_update = 0  # stack = if non zero, UI updates should be suspended
+
 # Timer used to disable input highlighting with a delay
 _suspend_timer = None
 
@@ -320,7 +322,6 @@ def pop_repeater(reset = False):
         _repeater_suspended -= 1
     if reset:
         _repeater_suspended = 0
-
 
 
 def ui_keyinput_suspended():

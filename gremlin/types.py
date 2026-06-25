@@ -1109,6 +1109,8 @@ class TabDeviceType(int, Enum):
     ModeControl = 9
     State = 10
     OctaviIFR1 = 11
+    MaestroInput = 12
+    MaestroOutput = 13
 
 
 class GamePadOutput(Enum):
