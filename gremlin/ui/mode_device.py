@@ -352,8 +352,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _handle_profile_mode_changed(self, new_mode: str):
         self.current_mode = new_mode
         ensureModeInputItems(self.profile, new_mode)
-        self.ensureInputItems()
-
+        
     def _load_handler(self, model: ModeInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
         self._update_model(model)  # load the model

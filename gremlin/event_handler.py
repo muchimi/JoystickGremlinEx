@@ -39,6 +39,7 @@ from PySide6 import QtCore, QtWidgets
 import dinput
 import gremlin.config
 from gremlin.input_types import InputType
+from gremlin.types import DeviceType
 import gremlin.shared_state
 
 import gremlin.util
@@ -691,9 +692,9 @@ class EventListener(QtCore.QObject):
     virtual_button_changed = Signal(object, object, object)  # runs when the action has modified its input mode (input_item, container, action) as parameters
 
     # called when vjoy button usage has changed in the profile so displays can update themselves
-    button_usage_changed = Signal(int)  # (vjoy_id) fires when a vjoy device button has changed
+    button_usage_changed = Signal(DeviceType, int)  # (device_type : DeviceType, virtual_id : int) fires when a vjoy device button has changed
     vjoy_button_usage = Signal(int, int, bool)  # called when an action uses a vjoy button (vjoy_id, button_id, state)
-    set_vjoy_button_usage = Signal(dinput.DeviceSummary, int, bool, str)  # called when a button state should be set (vjoy_id, button_id, state, key)
+    set_virtual_button_usage = Signal(dinput.DeviceSummary, int, bool, object)  # called when a button state should be set (device_guid, virtual_id : int, state : bool, key) - the key is the action key
 
     # selection event - tells the UI to show a different input
     select_input = Signal(
@@ -862,8 +863,8 @@ class EventListener(QtCore.QObject):
 
         # Joystick device change update timeout timer
         self._device_update_timer = None
-        self._device_change_suppressed = 0 # suppression counter for device change events
-        self._device_change_pending = False # true if a device change occured while suppressed
+        self._device_change_suppressed = 0  # suppression counter for device change events
+        self._device_change_pending = False  # true if a device change occured while suppressed
 
         self._running = True
 
@@ -929,7 +930,7 @@ class EventListener(QtCore.QObject):
 
         self.profile_unload.connect(self.reset)  # reset data on profile unload before a new profile is loaded
 
-        self._handle_options_changed() # load verbose modes
+        self._handle_options_changed()  # load verbose modes
 
     def pushDeviceChangeSuppression(self):
         """increments the device change suppression counter"""
@@ -944,7 +945,6 @@ class EventListener(QtCore.QObject):
         if self._device_change_suppressed == 0 and self._device_change_pending:
             self._device_change_pending = False
             self.device_change_event.emit()  # trigger the pending device change event
-
 
     def addUIJoystickEventCallback(self, callback):
         """adds a callback to update UI when a joystick event arrives"""
@@ -1131,7 +1131,6 @@ class EventListener(QtCore.QObject):
         self._vjoy_events_delay = config.vjoy_loopback_delay / 1000  # quarter second delay for event loopback checking
         self._vjoy_events_use_time = config.vjoy_loopback_use_time
 
-
         import gremlin.windows_event_hook
 
         hook = gremlin.windows_event_hook.KeyboardHook()
@@ -1154,7 +1153,6 @@ class EventListener(QtCore.QObject):
         # enable mouse hooks
         self.enableMouse(True)
 
-
         # reset keyboard suppression
         gremlin.windows_event_hook.MouseHook().popSuppress(True)
         gremlin.windows_event_hook.KeyboardHook().popSuppress(True)
@@ -1172,7 +1170,7 @@ class EventListener(QtCore.QObject):
         event_stop_pressed = Event(
             InputType.ModeControl,
             identifier=gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
-            mode = gremlin.shared_state.master_mode, # runs on master mode
+            mode=gremlin.shared_state.master_mode,  # runs on master mode
             device_guid=device_guid,
             is_pressed=True,
             extra_data=extra_data,
@@ -1182,7 +1180,7 @@ class EventListener(QtCore.QObject):
         event_stop_released = Event(
             InputType.ModeControl,
             identifier=gremlin.ui.mode_device.ModeInputModeType.ModeProfileStop,
-            mode = gremlin.shared_state.master_mode, # runs on master mode
+            mode=gremlin.shared_state.master_mode,  # runs on master mode
             device_guid=device_guid,
             is_pressed=False,
             extra_data=extra_data,
@@ -1214,7 +1212,7 @@ class EventListener(QtCore.QObject):
         event_start_pressed = Event(
             InputType.ModeControl,
             identifier=gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
-            mode = gremlin.shared_state.master_mode, # runs on master mode
+            mode=gremlin.shared_state.master_mode,  # runs on master mode
             device_guid=device_guid,
             is_pressed=True,
             extra_data=extra_data,
@@ -1224,13 +1222,12 @@ class EventListener(QtCore.QObject):
         event_start_released = Event(
             InputType.ModeControl,
             identifier=gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart,
-            mode = gremlin.shared_state.master_mode, # runs on master mode
+            mode=gremlin.shared_state.master_mode,  # runs on master mode
             device_guid=device_guid,
             is_pressed=False,
             extra_data=extra_data,
             override_input_type=InputType.JoystickButton,
         )
-
 
         # mode enter events
         event_enter_pressed = Event(
@@ -1665,7 +1662,6 @@ class EventListener(QtCore.QObject):
         value = event.value
         match event.input_type:
             case dinput.InputType.Axis:  # joystick
-
                 value_threshold = 0.01
                 if abs(value - data.value) >= value_threshold:
                     # axis deviation sufficient to trigger
@@ -1711,7 +1707,7 @@ class EventListener(QtCore.QObject):
 
         from gremlin.util import dill_hat_lookup
 
-        verbose = self._verbose_dinput # or (self._verbose_perf and self._verbose_extra)
+        verbose = self._verbose_dinput  # or (self._verbose_perf and self._verbose_extra)
         verbose_extra = self._verbose_dinput_extra
 
         event = dinput.InputEvent(data)
@@ -2482,7 +2478,7 @@ class EventHandler(QtCore.QObject):
         if verbose:
             syslog.info(f"Register InputItem: {input_item.display_name} mode {mode} {input_type} magic: {magic}")
 
-    def addCallback(self, device_guid : dinput.GUID, mode : str , event : Event, callback : Callable, permanent=False, node =None):
+    def addCallback(self, device_guid: dinput.GUID, mode: str, event: Event, callback: Callable, permanent=False, node=None):
         """Installs the provided callback for the given event.
 
         :param device_guid the GUID of the device the callback is
@@ -2498,12 +2494,10 @@ class EventHandler(QtCore.QObject):
         import gremlin.config
         import gremlin.keyboard
 
-
-        assert isinstance(device_guid, dinput.GUID),"invalid device GUID"
+        assert isinstance(device_guid, dinput.GUID), "invalid device GUID"
         assert isinstance(callback, Callable), "Callback must be provided and be a callable"
-        assert mode is not None and mode != "","invalid mode"
-        assert isinstance(event, Event) if event is not None else True,"invalid event"
-
+        assert mode is not None and mode != "", "invalid mode"
+        assert isinstance(event, Event) if event is not None else True, "invalid event"
 
         valid_devices_map = gremlin.joystick_handling.getValidJoystickDevicesMap()  # list of valid joystick devices
 
@@ -3429,11 +3423,10 @@ class EventHandler(QtCore.QObject):
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_details  # or config.verbose_mode_condition
-        mode = event.mode if event.mode else self.runtime_mode # mode we're looking for
+        mode = event.mode if event.mode else self.runtime_mode  # mode we're looking for
         if event.extra_data and "mode" in event.extra_data:
             # override
             mode = event.extra_data["mode"]
-
 
         # Obtain callbacks matching the event
         callback_list = []
@@ -4066,7 +4059,7 @@ class AxisState:
         dev: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
         if not dev:
             syslog.warning(f"device not found: [{str(device_guid)}]")
-            return AxisValues(0,0)
+            return AxisValues(0, 0)
 
         if dev.device_type == gremlin.types.DeviceType.Joystick:
             assert input_id in dev.axis_id_map, "invalid input id"
@@ -4503,10 +4496,10 @@ class JoystickEventProcessor:
 
         # self.start()
 
-
     def getInputIdKey(self, input_id):
         """gets an input id key from a given input id"""
         import gremlin.input_item
+
         return gremlin.input_item.getInputIdKey(input_id)
 
     def registerListenerUICallback(
@@ -4523,6 +4516,7 @@ class JoystickEventProcessor:
         """
 
         import gremlin.input_item
+
         assert gremlin.input_item is not None, "gremlin.input_item module not available"
         assert isinstance(device_guid, (str, dinput.GUID)), "invalid device_guid"
 
@@ -4536,11 +4530,9 @@ class JoystickEventProcessor:
         if input_type == InputType.Midi:
             pass
 
-
         input_id_key = gremlin.input_item.getInputIdKey(input_id)
 
         assert input_id_key is not None, "invalid input id"
-
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
 
@@ -4664,7 +4656,6 @@ class JoystickEventProcessor:
     def process_vjoy_ui(self, event: Event):
         """process received joystick event - UI thread"""
         self._fireCallbacks_ui(event)
-
 
     def handle_config_changed(self):
         pass
@@ -4827,7 +4818,7 @@ class EventRegistry:
             self._registry.clear()
 
     def getInputIdKey(self, input_id):
-       return gremlin.input_item.getInputIdKey(input_id)
+        return gremlin.input_item.getInputIdKey(input_id)
 
     def update(self, event: Event):
         input_type = event.event_type

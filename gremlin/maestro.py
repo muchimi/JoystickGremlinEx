@@ -58,30 +58,31 @@ syslog = logging.getLogger("system")
 # initialize Maestro context
 try:
     # path to the HIDMaestro compiled distributables
+    _maestro_initialized = False
     config = gremlin.config.Configuration()
-    hid_maestro_path = config.maestro_dist_path
-    if not os.path.exists(hid_maestro_path):
-        syslog.info(f"HIDMaestro disabled: no distribution files found in path not found: {hid_maestro_path}")
-        _maestro_initialized = False
-    else:
-        # load the .NET Core runtime using pythonnet
-        load("coreclr")
+    if not config.maestro_enabled:
+        hid_maestro_path = config.maestro_dist_path
+        if not os.path.exists(hid_maestro_path):
+            syslog.info(f"HIDMaestro disabled: no distribution files found in path not found: {hid_maestro_path}")
+        else:
+            # load the .NET Core runtime using pythonnet
+            load("coreclr")
 
-        # ensure it can find the dependencies for the HIDMaestro assembly
-        sys.path.append(hid_maestro_path)
+            # ensure it can find the dependencies for the HIDMaestro assembly
+            sys.path.append(hid_maestro_path)
 
-        import clr
+            import clr
 
-        clr.AddReference("HIDMaestro.Core")
+            clr.AddReference("HIDMaestro.Core")
 
-        # .net imports
-        import HIDMaestro
-        from HIDMaestro import *
-        from HIDMaestro import HMGamepadState
-        import System
-        from System.Collections.Generic import Dictionary
+            # .net imports
+            import HIDMaestro
+            from HIDMaestro import *
+            from HIDMaestro import HMGamepadState
+            import System
+            from System.Collections.Generic import Dictionary
 
-        _maestro_initialized = True
+            _maestro_initialized = True
 
 
 except Exception as e:
@@ -109,7 +110,7 @@ class Maestro:
         config = gremlin.config.Configuration()
         self._maestro_enabled = config.maestro_enabled
 
-        if not self._maestro_enabled:
+        if not _maestro_initialized or not self._maestro_enabled:
             syslog.info("MAESTRO: disabled")
             return
 
@@ -121,6 +122,7 @@ class Maestro:
         el.pushDeviceChangeSuppression()
         el.shutdown.connect(self._handle_shutdown)
         gremlin.shared_state.ui.pushSuspendTabUpdate()
+
 
         self.ctx = HIDMaestro.HMContext()
         self.removeAllControllers() # clean slate

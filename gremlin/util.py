@@ -533,6 +533,12 @@ def delete_widget(widget: QtWidgets.QWidget):
         widget.setParent(None)  # removes the widget from the containing layout
         widget.deleteLater()  # tell QT to free the widget from memory
 
+def clear_widget_references(instance):
+    """cleans up widget references in instances"""
+    for name, value in list(vars(instance).items()):
+        if isinstance(value, QtWidgets.QWidget):
+            setattr(instance, name, None)
+
 
 def get_layout_widgets(layout: QtWidgets.QLayout) -> list:
     """returns a list of layout widgets"""

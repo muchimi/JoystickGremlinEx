@@ -3373,17 +3373,8 @@ class InputItemListView(AbstractView):
         self._widget_map.clear()
         self._input_item_map.clear()
         for widget in widgets:
-            widget.hide()
-            self._scroll_layout.removeWidget(widget)
             gremlin.util.delete_widget(widget)
-
-        if self._scroll_spacer_widget:
-            self._scroll_layout.removeWidget(self._scroll_spacer_widget)
-            self._scroll_spacer_widget.deleteLater()
-            self._scroll_spacer_widget = None
-
-        # remove spacers
-        gremlin.util.clear_layout(self._scroll_layout)
+        gremlin.util.clear_widget_references(self)
 
     def _cleanup_ui(self):
         """clears this list view"""
@@ -3521,12 +3512,13 @@ class InputItemListView(AbstractView):
                     if existing_input_items:
                         # some widgets were removed - delete them
                         for input_item in existing_input_items:
-                            widget = self._input_item_map[input_item]
-                            widget.hide()
-                            self._scroll_layout.removeWidget(widget)
-                            gremlin.util.delete_widget(widget)
+                            if input_item in self._input_item_map:
+                                widget = self._input_item_map[input_item]
+                                widget.hide()
+                                self._scroll_layout.removeWidget(widget)
+                                gremlin.util.delete_widget(widget)
 
-                            del self._input_item_map[input_item]
+                                del self._input_item_map[input_item]
 
                     # move the spacer to the bottom of the scroll area
                     if self._scroll_spacer_widget:
@@ -8743,7 +8735,33 @@ class ContainerView(AbstractView):
         if verbose:
             self._main_layout.addWidget(QtWidgets.QLabel(f"ContainerView: [{input_item.display_name}]"))
 
-        # use a two page widget - one that shows blank content, the other that shows the contents
+        self._create_ui()
+
+        self.popSuspended()  # allow updates
+
+
+    @property
+    def input_item(self):
+        """gets the associated input item for the container view"""
+        return self._input_item
+
+    def _cleanup_ui(self):
+        """widget cleanup"""
+        self._deleted = True
+        self._clear_widgets()
+        gremlin.util.clear_widget_references(self)
+
+    def _clear_widgets(self):
+        """clears the scroll area widgets"""
+        widgets = list(self._widget_map.values())
+        for widget in widgets:
+            gremlin.util.delete_widget(widget)
+        self._widget_map.clear()
+        self._show_blank()
+
+
+    def _create_ui(self):
+          # use a two page widget - one that shows blank content, the other that shows the contents
         self._stacked_widget = QtWidgets.QStackedWidget()
         self._main_layout.addWidget(self._stacked_widget)
 
@@ -8769,36 +8787,13 @@ class ContainerView(AbstractView):
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
-            syslog.info(f"create ContainerView [{input_item.display_name if input_item else 'no input'}]")
+            syslog.info(f"create ContainerView [{self._input_item.display_name if self._input_item else 'no input'}]")
 
         self._widget_map = {}  # map of container ID to container widget
 
         self._show_blank()
 
         self._drawn_once = False  # draw on demand only on first redraw
-
-        self.popSuspended()  # allow updates
-
-    @property
-    def input_item(self):
-        """gets the associated input item for the container view"""
-        return self._input_item
-
-    def _cleanup_ui(self):
-        """widget cleanup"""
-        self._deleted = True
-        self._clear_widgets()
-
-    def _clear_widgets(self):
-        """clears the scroll area widgets"""
-        for widget in self._widget_map.values():
-            widget.hide()
-            self._scroll_layout.removeWidget(widget)
-            if hasattr(widget, "_cleanup_ui"):
-                widget._cleanup_ui()
-            widget.deleteLater()
-        self._widget_map.clear()
-        self._show_blank()
 
     def create_ui(self):
         """creates the UI for the container contents"""
@@ -9052,6 +9047,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         if self._container_view:
             self._container_view._cleanup_ui()
             self._container_view = None
+        gremlin.util.clear_widget_references(self)
 
     @property
     def deleted(self):

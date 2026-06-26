@@ -582,6 +582,42 @@ class Color:
         return css
 
     @staticmethod
+    def cssCheckbox():
+        if gremlin.config.Configuration().is_debug:
+            relative_path = "icons/"
+        else:
+            relative_path = "_internal/icons/"
+        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+
+        checkbox_unchecked = f"{prefix}checkbox_blank_outline.png"
+        checkbox_unchecked_disabled = f"{prefix}checkbox_blank_outline_disabled.png"
+        checkbox_checked = f"{prefix}checkbox_intermediate.png"
+        checkbox_checked_disabled = f"{prefix}checkbox_intermediate_disabled.png"
+
+
+        css = f"""
+            QCheckBox::indicator {{
+                width: 18px;
+                height: 18px;
+            }}
+            QCheckBox::indicator:checked {{
+                image: url({relative_path}{checkbox_checked});
+            }}
+            QCheckBox::indicator:unchecked {{
+                image: url({relative_path}{checkbox_unchecked});
+            }}
+            QCheckBox::indicator:disabled {{
+                image: url({relative_path}{checkbox_unchecked_disabled});
+            }}
+            QCheckBox::indicator:checked:disabled {{
+                image: url({relative_path}{checkbox_checked_disabled});
+            }}
+
+            """
+        return css
+
+
+    @staticmethod
     def cssApplication():
         border_color = Color.borderColor()
         _background_color = Color.backgroundColor()
@@ -595,7 +631,11 @@ class Color:
         prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
 
         checkbox_unchecked = f"{prefix}checkbox_blank_outline.png"
+        checkbox_unchecked_disabled = f"{prefix}checkbox_blank_outline_disabled.png"
         checkbox_checked = f"{prefix}checkbox_intermediate.png"
+        checkbox_checked_disabled = f"{prefix}checkbox_intermediate_disabled.png"
+
+
 
         radio_unchecked = f"{prefix}radiobox_blank.png"
         radio_checked = f"{prefix}radiobox_marked.png"
@@ -611,6 +651,14 @@ class Color:
             QCheckBox::indicator:unchecked {{
                 image: url({relative_path}{checkbox_unchecked});
             }}
+            QCheckBox::indicator:disabled {{
+                image: url({relative_path}{checkbox_unchecked_disabled});
+            }}
+            QCheckBox::indicator:checked:disabled {{
+                image: url({relative_path}{checkbox_checked_disabled});
+            }}
+
+
             QRadioButton::indicator {{
                 width: 18px;
                 height: 18px;
@@ -4130,11 +4178,15 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         self.installEventFilter(self)
         self._callback = callback
         self._callbackEx = callbackEx
+        assert isinstance(value, (bool, type(None))), "value must be a boolean or None"
         if value is not None:
             self.setChecked(value)
         self.stateChanged.connect(self._handle_clicked)
         if tooltip:
             self.setToolTip(tooltip)
+
+        # css = Color.cssCheckbox()
+        # self.setStyleSheet(css)
 
     def _handle_clicked(self):
         checked = self.isChecked()

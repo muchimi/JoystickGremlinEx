@@ -260,12 +260,12 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
                 # clear the old button if it was previously selected
                 if verbose:
                     syslog.info(f"LEGACY MAP: send button clear {vjoy_id} {self._last_button_id} {self.action_data.id}")
-                el.set_vjoy_button_usage.emit(device_guid, self._last_button_id, False, self.action_data.id)
+                el.set_virtual_button_usage.emit(device_guid, self._last_button_id, False, self.action_data.id)
             # send select
             self._last_button_id = button_id
             if verbose:
                 syslog.info(f"LEGACY MAP: send button select {vjoy_id} {button_id} {self.action_data.id}")
-            el.set_vjoy_button_usage.emit(device_guid, button_id, True, self.action_data.id)
+            el.set_virtual_button_usage.emit(device_guid, button_id, True, self.action_data.id)
 
     def notify_device_changed(self, emit_profile_changed=True, emit_icon=True):
         state = gremlin.joystick_handling.VirtualDeviceUsageState()
@@ -412,7 +412,7 @@ Use Vjoy Remap instead."""
         device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self._vjoy_id)
         if self._input_type == InputType.JoystickButton:
             el = gremlin.event_handler.EventListener()
-            el.set_vjoy_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
+            el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
 
     @property
     def vjoy_input_id(self) -> int:
@@ -424,9 +424,9 @@ Use Vjoy Remap instead."""
         if value != self._vjoy_input_id:
             if self._input_type == InputType.JoystickButton:
                 el = gremlin.event_handler.EventListener()
-                el.set_vjoy_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
+                el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
                 self._vjoy_input_id = value
-                el.set_vjoy_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
+                el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
             else:
                 self._vjoy_input_id = value
 
@@ -440,9 +440,9 @@ Use Vjoy Remap instead."""
         if value != self._vjoy_id:
             if self._input_type == InputType.JoystickButton:
                 el = gremlin.event_handler.EventListener()
-                el.set_vjoy_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
+                el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
                 self._vjoy_id = value
-                el.set_vjoy_button_usage.emit(device_guid, self._vjoy_input_id, True, self.id)
+                el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, True, self.id)
             else:
                 self._vjoy_id = value
 

@@ -749,7 +749,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
-        self.id = gremlin.util.get_guid()  # unique id
         config = gremlin.config.Configuration()
         self.verbose_inputs = config.verbose_mode_inputs
         self.verbose = config.verbose
@@ -762,7 +761,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.container_repeater_layout = None
 
         self._info_widget = None
-
 
         self._grid_widgets = {}  # holds button grid widgets keyed by button id 1..128
 
@@ -860,7 +858,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             # listen to vjoy button map events to update the button grid
             el = gremlin.event_handler.EventListener()
-            el.set_vjoy_button_usage.connect(self._handle_vjoy_button_usage_changed)
+            el.button_usage_changed.connect(self._handle_virtual_button_usage_changed)
 
             # set the action type from the input type
             self.load_actions_from_input_type()
@@ -875,8 +873,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             VJoyRemapWidget.locked = False
             self._ui_loaded = True
 
-    def _handle_vjoy_button_usage_changed(self, device_guid, button_id, state):
-        if device_guid != self.action_data.virtual_device_guid:
+    def _handle_virtual_button_usage_changed(self, device_type: DeviceType, virtual_id: int):
+        """called when a virtual button assignment changes in the profile"""
+        if device_type != self.action_data.virtual_device.device_type:
+            return  # not ours
+        if virtual_id != self.action_data.virtual_device.virtual_id:
             return  # not ours
         gremlin.util.InvokeUiMethod(self._populate_grid)
 
@@ -1305,13 +1306,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _cleanup_ui(self):
         """called when widget is destroyed"""
-        # jp = gremlin.event_handler.JoystickEventProcessor()
-        # jp.registerListenerCallback(
-        #     device_guid = self.action_data.device_guid,
-        #     input_type = self.action_data.input_type,
-        #     input_id = self.action_data.input_id,
-        #     callback = self._joystick_event_handler
-        #     )
+        self._grid_widgets.clear()
+        gremlin.util.clear_widget_references(self)
+
         pass
 
     @QtCore.Slot(bool)
@@ -3241,8 +3238,15 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     return_position = self.cb_hat_return_selector.currentData()
                     self.action_data.vjoy_hat_return_position = return_position
                 else:
+
+                    # mark the old button as unused
+                    self._update_button_state(self.action_data.vjoy_input_id, False)
+
                     input_id = self.virtual_output_selector_widget.itemData(index)
                     self.action_data.set_input_id(input_id)
+                    self._update_button_state(input_id, True)
+
+
 
                 if self.is_button_mode:
                     self.select_button(self.action_data.virtual_id, input_id)
@@ -3310,6 +3314,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             index = self.virtual_output_selector_widget.findData(next_unused)
             if index != -1:
                 self.virtual_output_selector_widget.setCurrentIndex(index)
+                if VjoyAction.is_button_action(self.action_data.action_mode):
+                    self._update_button_state(next_unused, True)
 
     def refresh_grid(self):
         """refreshes the grid"""
@@ -3340,6 +3346,13 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self._update_info()
 
+    def _update_button_state(self, input_id, state : bool):
+        """send a state update to the button usage tracker"""
+        if input_id >= 0:
+            assert VjoyAction.is_button_action(self.action_data.action_mode), "should not be called if this mode"
+            el = gremlin.event_handler.EventListener()
+            el.set_virtual_button_usage.emit(self.action_data.virtual_device_guid, input_id, state, self.id)
+
     def _update_device_input_list(self):
         """loads a list of valid outputs for the current vjoy device based on the mode"""
         with QtCore.QSignalBlocker(self.virtual_output_selector_widget):
@@ -3354,7 +3367,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 if self.action_data.virtual_device is None:
                     self.setWarning(f"Virtual configuration has changed and GremlinEx is unable to find requested Vjoy device [{self.action_data.virtual_id}]")
                     return
-
 
             if not gremlin.joystick_handling.is_vjoy_connected(self.action_data.virtual_id):
                 self.setWarning(f"VJOY device [{self.action_data.virtual_id}] is not currently connected or available.")
@@ -3376,6 +3388,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 output_index = self.virtual_output_selector_widget.findData(self.action_data.vjoy_input_id)
                 if output_index != -1:
                     self.virtual_output_selector_widget.setCurrentIndex(output_index)
+
             elif input_type in VJoyRemapWidget.input_type_buttons:
                 if action_mode in (
                     VjoyAction.VJoyButton,
@@ -3395,6 +3408,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     if index != -1:
                         with QtCore.QSignalBlocker(self.virtual_output_selector_widget):
                             self.virtual_output_selector_widget.setCurrentIndex(index)
+                            self._update_button_state(input_id, True)
 
                     if input_id < 1 or input_id > count:
                         self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy button # {input_id}")
@@ -3708,7 +3722,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         # self.button_grid_widget.setVisible(self.action_data.grid_visible)
 
-
         if self._hat_mapping_ui_loaded:
             self.container_hat_widget.setVisible(hat_visible)
 
@@ -3832,8 +3845,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         if self.action_data.virtual_device and self.action_data.grid_visible and not self.button_grid_widget:
             # create the widget if requested
-            self._create_grid_widgets()
 
+
+            self._create_grid_widgets()
 
         self.main_layout.addWidget(self.button_grid_stack_widget)
 
@@ -3848,6 +3862,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if not button_count:
             # no buttons = no grid
             return
+
+
 
         if self.button_grid_stack_widget.count() > 1:
             # delete
@@ -3889,7 +3905,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self._last_button_id = -1
 
-
         grid = QtWidgets.QGridLayout(self.button_grid_widget)
         grid.setSpacing(2)
         self.remap_type_layout = grid
@@ -3898,7 +3913,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         col = 0
         row = 0
 
-        #vjoy_id = dev.vjoy_id  # use joystick id as vjoy_id is -1 if disconnected
+        # vjoy_id = dev.vjoy_id  # use joystick id as vjoy_id is -1 if disconnected
         # input_type = self.action_data.input_type
         css = gremlin.ui.ui_common.Color.cssButtonState()
 
@@ -4018,20 +4033,15 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def select_button(self, vjoy_id, button_id, emit=False):
         """selects a button"""
 
+        if self._last_button_id == button_id:
+            return # already selected
+
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_vjoy and config.verbose_mode_extra
 
-        el = gremlin.event_handler.EventListener()
-        if self._last_button_id != -1 and self._last_button_id != button_id:
-            # clear the old button if it was previously selected
 
-            if verbose:
-                syslog.info(f"VJOYREMAP: send button clear {vjoy_id} {self._last_button_id} {self.action_data.id}")
-            el.set_vjoy_button_usage.emit(self.action_data.virtual_device_guid, self._last_button_id, False, self.action_data.id)
-
-        if self._last_button_id == button_id:
-            # already selected
-            return
+        # clear the last button
+        self._update_button_state(self._last_button_id, False)
 
         # set the new
         self._last_button_id = button_id
@@ -4041,10 +4051,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self.virtual_output_selector_widget):
             self.virtual_output_selector_widget.setCurrentIndex(button_id - 1)
 
+        self._update_button_state(button_id, True)
+
         # set the usage state for this button
         if verbose:
-            syslog.info(f"VJOYREMAP: send button select {vjoy_id} {button_id} {self.action_data.id}")
-        el.set_vjoy_button_usage.emit(self.action_data.virtual_device_guid, button_id, True, self.action_data.id)
+            syslog.info(f"VJOYREMAP: send button select {vjoy_id} {button_id} {self.action_data.key}")
+
 
         # update the UI when a state change occurs
         if emit:
@@ -4298,8 +4310,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             # nothing to do
             return
 
-
-
         count = len(self._grid_widgets)  # number of button grid widgets
         if count != self.action_data.virtual_device.button_count:
             self._create_grid_widgets()
@@ -4329,13 +4339,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         #         lbl = self.icon_map[button_id]
         #         lbl.setPixmap(used_pixmap if used else unused_pixmap)
         # else:
-        used_list = self.usage_state.used_button_list(self.action_data.virtual_device.device_guid)
 
+        used_list = self.usage_state.used_button_list(self.action_data.virtual_device.device_guid)
+        syslog.info(f"populate grid button: [{self.action_data.virtual_device.virtual_id}]  used_list: {used_list}")
         for button_id, widget in self._grid_widgets.items():
-            used = button_id in used_list
-            widget.setMarker(used)  # used somewhere
+            marker = button_id in used_list
             used = button_id == self.action_data.vjoy_input_id
             widget.setUsed(used)  # local
+            widget.setMarker(marker)  # used somewhere
             widget.setChecked(used)  # update the checkbox state
 
 
@@ -6274,12 +6285,16 @@ Supports axis merging, curved output, command, hat and button mappings.
         super().__init__(parent)
         self.parent = parent
         self.setPriority(9)
+        self._unique_key = gremlin.util.get_guid()  # unique key for this action
+
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
 
-        self.virtual_device_map = None  # list of all virtual devices that can be used as output   [device_type:DeviceType][index:int] -> device : dinput.DeviceSummary
+        self.virtual_device_map = (
+            None  # list of all virtual devices that can be used as output   [device_type:DeviceType][index:int] -> device : dinput.DeviceSummary
+        )
         self._virtual_device = None  # the actual virtual device object assigned to the action output
-        self.refresh_virtual_inputs() # this also picks a default device
+        self.refresh_virtual_inputs()  # this also picks a default device
 
         self._vjoy_input_id: int = 1
         self._vjoy_axis_id = 1
@@ -6412,9 +6427,14 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     def actionDeleted(self):
         """called if the action is being deleted"""
-        if self._input_type == InputType.JoystickButton:
+        if VjoyAction.is_button(self.action_mode):
             el = gremlin.event_handler.EventListener()
-            el.set_vjoy_button_usage.emit(self.virtual_device_guid, self._vjoy_input_id, False, self.id)
+            el.set_virtual_button_usage.emit(self.virtual_device_guid, self._vjoy_input_id, False, self.key)
+
+    @property
+    def key(self) -> str:
+        """unique key for this action"""
+        return self._unique_key
 
     @property
     def virtual_id(self):
@@ -6426,19 +6446,16 @@ Supports axis merging, curved output, command, hat and button mappings.
         """virtual device GUID"""
         return self.virtual_device.device_guid if self.virtual_device else None
 
-
     @property
     def virtual_device(self) -> dinput.DeviceSummary:
         """gets the virtual device for this action"""
         return self._virtual_device
-
 
     @virtual_device.setter
     def virtual_device(self, device: dinput.DeviceSummary):
         """sets the virtual device for this action"""
         if device:
             self._virtual_device = device
-
 
     @property
     def input_type(self) -> InputType:
@@ -6450,13 +6467,13 @@ Supports axis merging, curved output, command, hat and button mappings.
             if self._input_type == InputType.JoystickButton:
                 # notify of button usage change for the tracking
                 el = gremlin.event_handler.EventListener()
-                el.vjoy_button_usage.emit(self.virtual_id, self._vjoy_input_id, False, self.id)
+                el.vjoy_button_usage.emit(self.virtual_id, self._vjoy_input_id, False, self.key)
 
             self._input_type = value
 
             if self._input_type == InputType.JoystickButton:
                 el = gremlin.event_handler.EventListener()
-                el.vjoy_button_usage.emit(self.virtual_id, self._vjoy_input_id, True, self.id)
+                el.vjoy_button_usage.emit(self.virtual_id, self._vjoy_input_id, True, self.key)
 
     @property
     def vjoy_button_id(self) -> int:
@@ -6464,16 +6481,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     @vjoy_button_id.setter
     def vjoy_button_id(self, value: int):
-        if value != self._vjoy_button_id:
-            if self._vjoy_button_id == InputType.JoystickButton:
-                # notify of button usage change for the tracking
-                device_guid = self.virtual_device_guid
-                el = gremlin.event_handler.EventListener()
-                el.set_vjoy_button_usage.emit(device_guid, self._vjoy_button_id, False, self.id)
-                self._vjoy_button_id = value
-                el.set_vjoy_button_usage.emit(device_guid, self._vjoy_button_id, True, self.id)
-            else:
-                self._vjoy_button_id = value
+        self._vjoy_button_id = value
 
     @property
     def axis_start_value_enabled(self) -> bool:
@@ -6537,14 +6545,10 @@ Supports axis merging, curved output, command, hat and button mappings.
                         self.virtual_device = device
                         return
 
-
-
     def get_raw_axis_value(self):
         if self.input_is_hardware():
             return gremlin.joystick_handling.get_curved_axis(self.hardware_device_guid, self.hardware_input_id)
         return self.hardware_input_id.getAxisValue()
-
-
 
     def get_filtered_axis_value(self, value: float = None, curves: list = None, channels=False) -> float:
         """computes the output value for the current configuration - applies curves if curves are provided
@@ -6924,10 +6928,15 @@ Supports axis merging, curved output, command, hat and button mappings.
     def vjoy_input_id(self, value):
         if self._vjoy_input_id != value:
             self._vjoy_input_id = value
-            # input_type = self._get_input_type()
-            # if input_type == InputType.JoystickAxis:
-            #     syslog.info(f"vjoy axis set to : {value}")
-            # self.data_changed.emit()
+
+
+    def update_vjoy_input_usage(self):
+        """updates the vjoy input usage for the action"""
+        if VjoyAction.is_button_action(self.action_mode):
+            el = gremlin.event_handler.EventListener()
+            # update new usage data
+            el.set_virtual_button_usage.emit(self.virtual_device_guid, self._vjoy_input_id, True, self.key)
+
 
     @property
     def vjoy_axis_id(self):
@@ -6991,19 +7000,25 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     @action_mode.setter
     def action_mode(self, value: VjoyAction):
-        self._action_mode = value
-        # print (f"action mode set to : {value}")
 
-        # sync the button mode with drop down style mode
-        match self.action_mode:
-            case VjoyAction.VJoyPulse:
-                self.button_mode == ButtonOutputMode.Pulse
-            case VjoyAction.VJoyButtonPress:
-                self.button_mode == ButtonOutputMode.Press
-            case VjoyAction.VJoyButton:
-                self.button_mode == ButtonOutputMode.Hold
-            case VjoyAction.VJoyButtonRelease:
-                self.button_mode == ButtonOutputMode.Release
+
+        if self._action_mode != value:
+            new_action_is_button = VjoyAction.is_button_action(value)
+            self._action_mode = value
+            # print (f"action mode set to : {value}")
+
+            # sync the button mode with drop down style mode
+            match self.action_mode:
+                case VjoyAction.VJoyPulse:
+                    self.button_mode == ButtonOutputMode.Pulse
+                case VjoyAction.VJoyButtonPress:
+                    self.button_mode == ButtonOutputMode.Press
+                case VjoyAction.VJoyButton:
+                    self.button_mode == ButtonOutputMode.Hold
+                case VjoyAction.VJoyButtonRelease:
+                    self.button_mode == ButtonOutputMode.Release
+            self.clear_vjoy_input_usage()
+            self.update_vjoy_input_usage()
 
     @property
     def reverse(self):
@@ -7180,12 +7195,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                 self.vjoy_hat_id = index
         else:
             # button
-            device_guid = self.virtual_device_guid
             if self.vjoy_button_id != index:
-                # notify of button usage change for the tracking
-                el.set_vjoy_button_usage.emit(device_guid, self.vjoy_button_id, False, self.id)
                 self.vjoy_button_id = index
-                el.set_vjoy_button_usage.emit(device_guid, self.vjoy_button_id, True, self.id)
+
         self.vjoy_input_id = index
 
     def get_input_id(self):
@@ -7232,7 +7244,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                         syslog.warning(f"Profile load: virtual device {virtual_id} of type {device_type} was not found in the list of valid virtual devices")
                         virtual_id = next((id for id in device_map[device_type]), 1)
                         if virtual_id not in device_map[device_type]:
-                            syslog.warning(f"Profile load: virtual device {virtual_id} of type {device_type} was not found in the list of valid virtual devices, selecting the first available device")
+                            syslog.warning(
+                                f"Profile load: virtual device {virtual_id} of type {device_type} was not found in the list of valid virtual devices, selecting the first available device"
+                            )
                         else:
                             self.virtual_device = device_map[device_type][virtual_id]
                             self.vjoy_axis_id = 1
@@ -7240,11 +7254,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                             self.vjoy_hat_id = 1
 
             else:
-
                 vjoy_id = safe_read(node, "vjoy", int, 1)
                 if vjoy_id not in self.virtual_device_map[DeviceType.VJoy]:
                     self.refresh_virtual_inputs()  # ensure we have the latest device list
-
 
                 if vjoy_id not in self.virtual_device_map:
                     syslog.error(f"Profile load: vjoy device {vjoy_id} was not found in the list of valid VJOY devices")
@@ -7256,7 +7268,6 @@ Supports axis merging, curved output, command, hat and button mappings.
                 device = self.virtual_device_map[DeviceType.VJoy].get(vjoy_id, None)
                 if device:
                     self.virtual_device = device
-
 
             if "mode" in node.attrib:
                 value = node.attrib["mode"]
@@ -7522,6 +7533,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                 if "hat_sticky" in node.attrib:
                     self.hat_sticky = safe_read(node, "hat_sticky", bool, False)
 
+            self.update_vjoy_input_usage()
+
+
         except ProfileError:
             self.vjoy_input_id = None
             self.virtual_id = None
@@ -7536,7 +7550,6 @@ Supports axis merging, curved output, command, hat and button mappings.
         if self.virtual_device:
             node.set("device-type", self.virtual_device.device_type.name)
             node.set("virtual-id", safe_format(self.virtual_device.virtual_id, int))
-
 
         save_exec_on_release = VjoyAction.is_command(self.action_mode) or self.action_mode in (
             VjoyAction.VJoyButtonPress,
