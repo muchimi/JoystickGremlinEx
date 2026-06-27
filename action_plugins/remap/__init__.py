@@ -22,7 +22,7 @@ import time
 from lxml import etree as ElementTree
 import traceback
 import gremlin.joystick_handling
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtCore, QtGui
 
 from gremlin.input_types import InputType
 from gremlin import input_devices, joystick_handling, util
@@ -31,8 +31,9 @@ from gremlin.profile import safe_format, safe_read
 from gremlin.ui import ui_common
 import gremlin.input_item
 import os
-from gremlin.util import *
+from gremlin.util import get_guid, safe_format, safe_read
 import gremlin.event_handler
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
@@ -173,7 +174,7 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
         # input_type information
         if input_type is None:
             input_type = InputType.JoystickButton
-            log_sys_warn("None as input type encountered")
+            syslog.warning("None as input type encountered")
 
         # If no valid input item is selected get the next unused one
         if self.action_data.vjoy_input_id in [0, None]:
@@ -246,7 +247,7 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
             self.notify_device_changed(emit_profile_changed=False)
 
         except gremlin.error.GremlinError as e:
-            log_sys_error(e)
+            syslog.error(f"{e}\n{traceback.format_exc()}")
 
     def _notify_button_changed(self):
         if self.action_data.input_type == InputType.JoystickButton:
@@ -394,6 +395,9 @@ Use Vjoy Remap instead."""
         :param parent the container to which this action belongs
         """
         super().__init__(parent)
+        self._unique_key = gremlin.util.get_guid()
+        state = gremlin.joystick_handling.VirtualDeviceUsageState()
+        state.registerAction(self._unique_key)
 
         self.setPriority(9)
         # Set vjoy ids to None so we know to pick the next best one
@@ -404,15 +408,19 @@ Use Vjoy Remap instead."""
         input_type = self.get_input_type()
         self._input_type = input_type
 
+
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
 
+    @property
+    def key(self):
+        """unique key for this action"""
+        return self._unique_key
+
     def actionDeleted(self):
         """called if the action is being deleted"""
-        device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self._vjoy_id)
-        if self._input_type == InputType.JoystickButton:
-            el = gremlin.event_handler.EventListener()
-            el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
+        state = gremlin.joystick_handling.VirtualDeviceUsageState()
+        state.unregisterAction(self._unique_key)
 
     @property
     def vjoy_input_id(self) -> int:
@@ -420,15 +428,22 @@ Use Vjoy Remap instead."""
 
     @vjoy_input_id.setter
     def vjoy_input_id(self, value: int):
-        device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self._vjoy_id)
         if value != self._vjoy_input_id:
-            if self._input_type == InputType.JoystickButton:
-                el = gremlin.event_handler.EventListener()
-                el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
-                self._vjoy_input_id = value
-                el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, False, self.id)
-            else:
-                self._vjoy_input_id = value
+            self._vjoy_input_id = value
+            self.update_button_used()
+
+
+    def update_button_used(self):
+        """updates the vjoy input usage for the action"""
+        if self._input_type == InputType.JoystickButton:
+            self.set_button_used(self.vjoy_input_id, True) # mark used
+
+    def set_button_used(self, input_id, used : bool):
+        """send a state update to the button usage tracker"""
+        if input_id >= 0:
+            assert self._input_type == InputType.JoystickButton,"invalid action mode for button usage tracking"
+            state = gremlin.joystick_handling.VirtualDeviceUsageState()
+            state.set_usage_state(device_guid=self.virtual_device_guid, button_id=input_id, used=used, key=self._unique_key)
 
     @property
     def vjoy_id(self) -> int:
@@ -529,8 +544,8 @@ Use Vjoy Remap instead."""
                 if os.path.isfile(icon_path):
                     return icon_file
 
-            log_sys_warn(f"Icon file: {icon_file}")
-            log_sys_warn(f"Warning: unable to determine icon type: {self.input_type} for id {self.vjoy_input_id}")
+            syslog.warning(f"Icon file: {icon_file}")
+            syslog.warning(f"Warning: unable to determine icon type: {self.input_type} for id {self.vjoy_input_id}")
             return fallback
         return None
 
@@ -582,6 +597,7 @@ Use Vjoy Remap instead."""
             if self.get_input_type() == InputType.JoystickAxis and self.input_type == InputType.JoystickAxis:
                 self.axis_mode = safe_read(node, "axis-type", str, "absolute")
                 self.axis_scaling = safe_read(node, "axis-scaling", float, 1.0)
+
         except ProfileError:
             self.vjoy_input_id = None
             self.vjoy_id = None

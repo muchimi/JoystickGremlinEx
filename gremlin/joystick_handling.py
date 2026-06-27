@@ -1380,11 +1380,11 @@ class VirtualDeviceUsageState:
     """holds axis and button usage data for virtual output devices"""
 
     class MappingData:
-        def __init__(self, device_guid: dinput.GUID, input_type: InputType, vjoy_input_id: int, action_id: int):
+        def __init__(self, device_guid: dinput.GUID, input_type: InputType, vjoy_input_id: int, action_id):
             assert isinstance(device_guid, dinput.GUID), "invalid device GUID"
             assert isinstance(input_type, InputType), "invalid input type"
             assert isinstance(vjoy_input_id, int), "invalid vjoy input ID"
-            assert isinstance(action_id, int), "invalid action ID"
+            assert action_id is not None, "invalid action ID"
             self.device_guid = device_guid
             self.vjoy_input_type = input_type
             self.vjoy_input_id = vjoy_input_id
@@ -1411,9 +1411,10 @@ class VirtualDeviceUsageState:
         self._load_list = []
         # self._button_usage = {}  # list of used buttons and by what action / input  index is the [vjoy_id][button_index] = true if used, false if not - tracks if the output button is used by the profile
         self._button_usage_map = {}  # list of used buttons [vjoy_id][button_index] = [action id, ...] - tracks how many actions in the profile are using the output button
+        self._action_map = {} # list of action ids to devices
 
         # holds the mapping by vjoy device, input and ID to a list of raw hardware defining the mapping
-        self._action_map = None
+        self._action_map = {}
 
         # list of users buttons by vjoy device ID
         self._used_map = {}
@@ -1443,6 +1444,24 @@ class VirtualDeviceUsageState:
         el.set_virtual_button_usage.connect(self._handle_set_virtual_button_usage)
         el.shutdown.connect(self._handle_shutdown)
         self.reset()
+
+    def registerAction(self, key):
+        assert key not in self._action_map, "action already registered"
+        self._action_map[key] = {}
+        syslog.info(f"Button State: registered action {key}")
+
+    def getRegisteredActions(self):
+        return list(self._action_map.keys())
+
+    def unregisterAction(self, key):
+        syslog.info(f"Button State: registered action {key}")
+        assert key in self._action_map, "action not registered"
+        del self._action_map[key]
+        for device_type in self._button_usage_map:
+            for virtual_id in self._button_usage_map[device_type]:
+                for button_id in self._button_usage_map[device_type][virtual_id]:
+                    if key in self._button_usage_map[device_type][virtual_id][button_id]:
+                        self._button_usage_map[device_type][virtual_id][button_id].remove(key)
 
     def _handle_shutdown(self):
         pass
@@ -1595,17 +1614,8 @@ class VirtualDeviceUsageState:
         if input_id not in self._axis_range_map[device_type][virtual_id]:
             self._axis_range_map[device_type][virtual_id][input_id] = [-1.0, 1.0]
 
-        # if device_type not in self._button_usage:
-        #     self._button_usage[device_type] = {}
-
         if device_type not in self._button_usage_map:
             self._button_usage_map[device_type] = {}
-
-        # if virtual_id not in self._button_usage[device_type]:
-        #     self._button_usage[device_type][virtual_id] = {}
-
-        # if input_id not in self._button_usage[device_type][virtual_id]:
-        #     self._button_usage[device_type][virtual_id][input_id] = False
 
         if virtual_id not in self._button_usage_map[device_type]:
             self._button_usage_map[device_type][virtual_id] = {}
@@ -1689,8 +1699,8 @@ class VirtualDeviceUsageState:
             syslog.info(f"Button State: load new profile: {profile.name}")
             self._profile = profile
             # self._button_usage.clear()
-            self._button_usage_map.clear()  # blits state data on profile change
-            self._load_inputs()  # load mappings from the profile
+            #self._button_usage_map.clear()  # blits state data on profile change
+            # self._load_inputs()  # load mappings from the profile
 
     def map_input_type(self, input_type) -> str:
         if isinstance(input_type, InputType):
@@ -1760,13 +1770,13 @@ class VirtualDeviceUsageState:
         if device_type in self._button_usage_map:
             if virtual_id in self._button_usage_map[device_type]:
                 if input_id in self._button_usage_map[device_type][virtual_id]:
-                    if key in self._button_usage_map[device_type][virtual_id][input_id]:
-                        current_state = self.get_usage_state(target_device_guid, input_id) # self._button_usage[device_type][virtual_id][input_id]
-                        self._button_usage_map[device_type][virtual_id][input_id].remove(key)
+                    usage_map = self._button_usage_map[device_type][virtual_id][input_id]
+                    if key in usage_map:
+                        current_state = self.get_usage_state(target_device_guid, input_id)
+                        usage_map.remove(key)
 
-                        new_state = len(self._button_usage_map[device_type][virtual_id][input_id]) > 0
+                        new_state = len(usage_map) > 0
                         if current_state != new_state:
-                            # self._button_usage[device_type][virtual_id][input_id] = new_state
                             emit_list.add(target_device_guid)
 
         if emit_list and emit and not gremlin.shared_state.is_running:
@@ -1778,6 +1788,8 @@ class VirtualDeviceUsageState:
     def _set_usage_state(self, device_type : DeviceType, virtual_id : int, button_id: int, key, used: bool, emit=True):
         """sets the usage state for a virtual button"""
 
+        assert key in self._action_map, "action not registered"
+
         current_state = self._get_usage_state(device_type, virtual_id, button_id)
 
         if device_type not in self._button_usage_map:
@@ -1786,20 +1798,28 @@ class VirtualDeviceUsageState:
             self._button_usage_map[device_type][virtual_id] = {}
         if button_id not in self._button_usage_map[device_type][virtual_id]:
             self._button_usage_map[device_type][virtual_id][button_id] = []
+        if device_type not in self._action_map[key]:
+            self._action_map[key][device_type] = {}
+        if virtual_id not in self._action_map[key][device_type]:
+            self._action_map[key][device_type][virtual_id] = None
 
-        usage_map = self._button_usage_map[device_type][virtual_id][button_id]
+
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_vjoy and config.verbose_mode_extra
         verbose = True
 
+
+        usage_map = self._button_usage_map[device_type][virtual_id][button_id]
         if used:
             if key not in usage_map:
                 usage_map.append(key)
+            self._action_map[key][device_type][virtual_id] = button_id
         else:
             # remove the data
             if key in usage_map:
                 usage_map.remove(key)
+            self._action_map[key][device_type][virtual_id] = None
 
         is_mapped = len(usage_map) > 0
 
@@ -1810,6 +1830,10 @@ class VirtualDeviceUsageState:
 
 
         if __debug__:
+            if not used:
+                pass
+            # used_list =  set(self._action_map.get(key, {}).get(device_type, {}).get(virtual_id, None) for key in self._action_map if self._action_map.get(key, {}).get(device_type, {}).get(virtual_id, None) is not None)
+
             used_list = self._used_button_list(device_type, virtual_id)
             syslog.info(f"Used button list: {used_list}")
             if used:
@@ -1960,7 +1984,7 @@ class VirtualDeviceUsageState:
                                             button_id = action.vjoy_input_id
 
                                         if trigger:
-                                            key = action.id
+                                            key = action.key
                                             self.set_usage_state(target_device_guid, button_id, key, True, emit=False)
                                             target_deviceguid_list.add(target_device_guid)
 

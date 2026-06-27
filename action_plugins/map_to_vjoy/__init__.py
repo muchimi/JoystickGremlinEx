@@ -974,16 +974,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         values = self.action_data.get_filtered_axis_value(event.value, channels=True)
         return values
 
-    # def _update_repeater_value(self, value):
-    #     """callback for the output repeater when it changes values"""
-    #     if self._repeater_value_widget and Shiboken.isValid(
-    #         self._repeater_value_widget
-    #     ):
-    #         if hasattr(value, "__iter__"):
-    #             # compound value
-    #             value = value[0]
 
-    #         self._repeater_value_widget.setText(f"{value:0.4f}")
 
     def _update_repeater(self, value=None):
         """updates the input repeater section"""
@@ -3348,10 +3339,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _update_button_state(self, input_id, state : bool):
         """send a state update to the button usage tracker"""
-        if input_id >= 0:
-            assert VjoyAction.is_button_action(self.action_data.action_mode), "should not be called if this mode"
-            el = gremlin.event_handler.EventListener()
-            el.set_virtual_button_usage.emit(self.action_data.virtual_device_guid, input_id, state, self.id)
+        self.action_data.set_button_used(input_id, state)
 
     def _update_device_input_list(self):
         """loads a list of valid outputs for the current vjoy device based on the mode"""
@@ -4343,9 +4331,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         used_list = self.usage_state.used_button_list(self.action_data.virtual_device.device_guid)
         syslog.info(f"populate grid button: [{self.action_data.virtual_device.virtual_id}]  used_list: {used_list}")
         for button_id, widget in self._grid_widgets.items():
-            marker = button_id in used_list
+
             used = button_id == self.action_data.vjoy_input_id
             widget.setUsed(used)  # local
+            marker = not used and button_id in used_list
             widget.setMarker(marker)  # used somewhere
             widget.setChecked(used)  # update the checkbox state
 
@@ -6286,9 +6275,10 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.parent = parent
         self.setPriority(9)
         self._unique_key = gremlin.util.get_guid()  # unique key for this action
+        state = gremlin.joystick_handling.VirtualDeviceUsageState()
+        state.registerAction(self._unique_key)
 
-        # Set vjoy ids to None so we know to pick the next best one
-        # automatically
+        syslog.info(f"VJOY REMAP: create action [{self._unique_key}]")
 
         self.virtual_device_map = (
             None  # list of all virtual devices that can be used as output   [device_type:DeviceType][index:int] -> device : dinput.DeviceSummary
@@ -6425,16 +6415,17 @@ Supports axis merging, curved output, command, hat and button mappings.
         curve = gremlin.curve_handler.AxisCurveData()
         self.trim_curve = curve
 
+    @property
+    def key(self):
+        """unique key for this action"""
+        return self._unique_key
+
     def actionDeleted(self):
         """called if the action is being deleted"""
         if VjoyAction.is_button(self.action_mode):
-            el = gremlin.event_handler.EventListener()
-            el.set_virtual_button_usage.emit(self.virtual_device_guid, self._vjoy_input_id, False, self.key)
+            state = gremlin.joystick_handling.VirtualDeviceUsageState()
+            state.unregisterAction(self._unique_key)
 
-    @property
-    def key(self) -> str:
-        """unique key for this action"""
-        return self._unique_key
 
     @property
     def virtual_id(self):
@@ -6930,14 +6921,6 @@ Supports axis merging, curved output, command, hat and button mappings.
             self._vjoy_input_id = value
 
 
-    def update_vjoy_input_usage(self):
-        """updates the vjoy input usage for the action"""
-        if VjoyAction.is_button_action(self.action_mode):
-            el = gremlin.event_handler.EventListener()
-            # update new usage data
-            el.set_virtual_button_usage.emit(self.virtual_device_guid, self._vjoy_input_id, True, self.key)
-
-
     @property
     def vjoy_axis_id(self):
         return self._vjoy_axis_id
@@ -7003,7 +6986,6 @@ Supports axis merging, curved output, command, hat and button mappings.
 
 
         if self._action_mode != value:
-            new_action_is_button = VjoyAction.is_button_action(value)
             self._action_mode = value
             # print (f"action mode set to : {value}")
 
@@ -7017,8 +6999,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     self.button_mode == ButtonOutputMode.Hold
                 case VjoyAction.VJoyButtonRelease:
                     self.button_mode == ButtonOutputMode.Release
-            self.clear_vjoy_input_usage()
-            self.update_vjoy_input_usage()
+            self.update_button_used(self)
 
     @property
     def reverse(self):
@@ -7533,12 +7514,25 @@ Supports axis merging, curved output, command, hat and button mappings.
                 if "hat_sticky" in node.attrib:
                     self.hat_sticky = safe_read(node, "hat_sticky", bool, False)
 
-            self.update_vjoy_input_usage()
+            self.update_button_used()
 
 
         except ProfileError:
             self.vjoy_input_id = None
             self.virtual_id = None
+
+
+    def update_button_used(self):
+        """updates the vjoy input usage for the action"""
+        if VjoyAction.is_button_action(self.action_mode):
+            self.set_button_used(self.vjoy_input_id, True) # mark used
+
+    def set_button_used(self, input_id, used : bool):
+        """send a state update to the button usage tracker"""
+        if input_id >= 0:
+            assert VjoyAction.is_button_action(self.action_mode), "should not be called if this mode"
+            state = gremlin.joystick_handling.VirtualDeviceUsageState()
+            state.set_usage_state(device_guid=self.virtual_device_guid, button_id=input_id, used=used, key=self._unique_key)
 
     def _generate_xml(self):
         """Returns an XML node encoding this action's data.
