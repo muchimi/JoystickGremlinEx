@@ -811,7 +811,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self.button_layout = QtWidgets.QHBoxLayout()
         self.button_widget.setLayout(self.button_layout)
 
-        self.clear_widget = QtWidgets.QPushButton("Clear")
+        self.clear_widget = gremlin.ui.ui_common.QDataPushButton("Clear")
         self.clear_widget.clicked.connect(self._clear_button_cb)
         self.clear_widget.setToolTip("Clears the selection")
 

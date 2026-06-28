@@ -1710,18 +1710,18 @@ class EventListener(QtCore.QObject):
         verbose = self._verbose_dinput  # or (self._verbose_perf and self._verbose_extra)
         verbose_extra = self._verbose_dinput_extra
 
-        event = dinput.InputEvent(data)
-        device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(event.device_guid)
+        dinput_event = dinput.InputEvent(data)
+        device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(dinput_event.device_guid)
 
         if device is None:
             if verbose:
-                syslog.info(f"DINPUT EVENT: device not found: [{device.name}]: {event}")
+                syslog.info(f"DINPUT EVENT: device not found: [{device.name}]: {dinput_event}")
             return
 
-        if self._dinput_event_filter(device, event):
+        if self._dinput_event_filter(device, dinput_event):
             # filtered out
             if verbose:
-                syslog.info(f"DINPUT EVENT: event filtered: [{device.name}]: {event}")
+                syslog.info(f"DINPUT EVENT: event filtered: [{device.name}]: {dinput_event}")
             return
 
         # if device.vendor_id == 0x31e3 and event.input_type.value[0] == 2 and event.input_index > 16:
@@ -1729,7 +1729,7 @@ class EventListener(QtCore.QObject):
         #     return
 
         if verbose:
-            syslog.info(f"DINPUT EVENT: device [{device.name}] data: {event}")
+            syslog.info(f"DINPUT EVENT: device [{device.name}] data: {dinput_event}")
 
         event_list = []
         astate = AxisState()
@@ -1742,27 +1742,27 @@ class EventListener(QtCore.QObject):
             if self.js.inputIgnored(data.device_guid):
                 # ignore if the device is set to input ignore
                 if verbose:
-                    syslog.info(f"Ignore input: {device.name} input: {event.input_index} type: {event.input_type}")
+                    syslog.info(f"Ignore input: {device.name} input: {dinput_event.input_index} type: {dinput_event.input_type}")
                 return
 
             if self.js.vjoyAsInput(vjoy_id):
                 # update the event tracker for loop back devices
                 # we need to record the event because vjoy can sometimes trigger, or not trigger a DINPUT event when it's receiving commands.
                 verbose_vjoy = self._verbose_vjoy
-                input_id = event.input_index
-                value = event.value
-                if event.input_type == dinput.InputType.Axis:
+                input_id = dinput_event.input_index
+                value = dinput_event.value
+                if dinput_event.input_type == dinput.InputType.Axis:
                     input_type = InputType.JoystickAxis
-                elif event.input_type == dinput.InputType.Button:
+                elif dinput_event.input_type == dinput.InputType.Button:
                     input_type = InputType.JoystickButton
                     value = value != 0  # convert to boolean - true if pressed, false if not
-                elif event.input_type == dinput.InputType.Hat:
+                elif dinput_event.input_type == dinput.InputType.Hat:
                     input_type = InputType.JoystickHat
                     # convert value to tuple for hat value comparisons
                     value = vjoy.vjoy.Hat.getDirection(value)
                 else:
                     if verbose_vjoy:
-                        syslog.error(f"DINPUT VJOY LOOPBACK: don't know how to handle input type: {event.input_type}")
+                        syslog.error(f"DINPUT VJOY LOOPBACK: don't know how to handle input type: {dinput_event.input_type}")
                     input_type = None
 
             if input_type:
@@ -1774,36 +1774,36 @@ class EventListener(QtCore.QObject):
                 if not self.shouldProcessVjoy(vjoy_id, input_type, input_id, value):
                     return  # skip DINPUT event
 
-        if event.input_type == dinput.InputType.Axis:
+        if dinput_event.input_type == dinput.InputType.Axis:
             if verbose and verbose_extra:
-                syslog.info(f"DINPUT AXIS: {event}")
+                syslog.info(f"DINPUT AXIS: {dinput_event}")
 
-            # get the curved input if the input is curved
-            raw_value = event.value
+            # normalize dinput to GEX range -1.0 to 1.0
+            raw_value = gremlin.util.scale_to_range(dinput_event.value, source_min=-32768, source_max=32767, target_min=-1.0, target_max=1.0)
             value = raw_value
 
             # apply spam filter
-            if not astate.shouldProcess(event):
+            if not astate.shouldProcess(dinput_event):
                 # filtered out
                 return
 
             extra_data = {}
 
-            if self._has_calibration(event.device_guid, event.input_index):
+            if self._has_calibration(dinput_event.device_guid, dinput_event.input_index):
                 # apply input calibration
-                value, _ = self._apply_calibration(event, True)
+                value, _ = self._apply_calibration(dinput_event, True)
                 extra_data["calibrated"] = True
                 extra_data["calibrated_value"] = value
 
             # apply input curve on calibrated data if any
-            curved_value, has_curve = self._apply_curve_ex(event.device_guid, event.input_index, value)
+            curved_value, has_curve = self._apply_curve_ex(dinput_event.device_guid, dinput_event.input_index, value)
             if has_curve:
                 extra_data["curved"] = True
 
-            event = Event(
+            dinput_event = Event(
                 event_type=InputType.JoystickAxis,
-                device_guid=event.device_guid,
-                identifier=event.input_index,
+                device_guid=dinput_event.device_guid,
+                identifier=dinput_event.input_index,
                 value=value,
                 curved_value=curved_value,
                 raw_value=raw_value,
@@ -1812,40 +1812,40 @@ class EventListener(QtCore.QObject):
                 extra_data=extra_data,
             )
 
-            event_list.append(event)
+            event_list.append(dinput_event)
 
             # notify axis change for tab switches
             if not gremlin.shared_state.is_running:
                 # if AxisState().shouldProcess(event,"state_change"):
-                self.axis_state_change.emit(event)
+                self.axis_state_change.emit(dinput_event)
 
-        elif event.input_type == dinput.InputType.Button:
+        elif dinput_event.input_type == dinput.InputType.Button:
             if verbose:
-                syslog.info(f"DINPUT BUTTON: {event}")
+                syslog.info(f"DINPUT BUTTON: {dinput_event}")
 
             # apply spam filter
-            if not dstate.shouldProcess(event):
+            if not dstate.shouldProcess(dinput_event):
                 # filtered out
                 return
-            is_pressed = event.value == 1
-            event = Event(
+            is_pressed = dinput_event.value == 1
+            dinput_event = Event(
                 event_type=InputType.JoystickButton,
-                device_guid=event.device_guid,
-                identifier=event.input_index,
+                device_guid=dinput_event.device_guid,
+                identifier=dinput_event.input_index,
                 is_pressed=is_pressed,
                 is_virtual=is_virtual,
                 value=is_pressed,
             )
 
-            event_list.append(event)
+            event_list.append(dinput_event)
 
-        elif event.input_type == dinput.InputType.Hat:
+        elif dinput_event.input_type == dinput.InputType.Hat:
             # hats trigger two events, one for the changed from the original position (release)
             # and the other for the move to the new position (press)
 
-            device_id = str(event.device_guid)
-            input_id = event.input_index
-            value = dill_hat_lookup[event.value]
+            device_id = str(dinput_event.device_guid)
+            input_id = dinput_event.input_index
+            value = dill_hat_lookup[dinput_event.value]
 
             key = (device_id, input_id)
 
@@ -1860,8 +1860,8 @@ class EventListener(QtCore.QObject):
                 # release the old value
                 release_event = Event(
                     event_type=InputType.JoystickHat,
-                    device_guid=event.device_guid,
-                    identifier=event.input_index,
+                    device_guid=dinput_event.device_guid,
+                    identifier=dinput_event.input_index,
                     is_pressed=False,
                     is_virtual=is_virtual,
                     value=current,
@@ -1878,8 +1878,8 @@ class EventListener(QtCore.QObject):
                 # press the new value
                 new_event = Event(
                     event_type=InputType.JoystickHat,
-                    device_guid=event.device_guid,
-                    identifier=event.input_index,
+                    device_guid=dinput_event.device_guid,
+                    identifier=dinput_event.input_index,
                     is_pressed=True,
                     is_virtual=is_virtual,
                     value=value,
@@ -3691,6 +3691,14 @@ class AxisValues:
     def __getitem__(self, key):
         return self.toList()[key]
 
+    def __str__(self):
+        actual_stub = f"{self.actual:0.3f}" if self.actual is not None else "None"
+        raw_stub = f"{self.raw:0.3f}" if self.raw is not None else "None"
+        calibrated_stub = f"{self.calibrated:0.3f}" if self.calibrated is not None else "None"
+        curved_stub = f"{self.curved:0.3f}" if self.curved is not None else "None"
+        merged_stub = f"{self.merged:0.3f}" if self.merged is not None else "None"
+        return f"AxisValues: actual: {actual_stub} raw: {raw_stub} calibrated: {calibrated_stub} curved: {curved_stub} merged: {merged_stub}"
+
 
 class AxisData:
     """holds axis data"""
@@ -3818,6 +3826,9 @@ class AxisData:
         # no curve, no calibration
         data = AxisValues(actual=self.actual_value)
         return data
+
+    def __str__(self):
+        return f"AxisData: device: {self.device.name} input_id: {self.input_id} linear_id: {self.linear_id} actual: {self.actual_value} raw: {self.raw_value} calibrated: {self.calibrated_value} curve: {self.curve_value}"
 
 
 class DInputData:
@@ -4061,14 +4072,25 @@ class AxisState:
             syslog.warning(f"device not found: [{str(device_guid)}]")
             return AxisValues(0, 0)
 
-        if dev.device_type == gremlin.types.DeviceType.Joystick:
+        if dev.axis_count:
             assert input_id in dev.axis_id_map, "invalid input id"
 
         # special handling of OSC input devices
-        if dev.device_type == gremlin.types.DeviceType.Osc:
+        if dev.device_type == DeviceType.Osc:
             osc = gremlin.ui.osc_device.InputOscClient()
             osc.start()  # ensure started
             data = osc.getData(input_id.message)  # gets data arguments or None if no data
+            if data is None:
+                value = 0
+            else:
+                value = data
+            values = AxisValues(value, value)
+            return values
+        elif dev.device_type == DeviceType.Midi:
+            # special handling of MIDI input devices
+            midi = gremlin.ui.midi_device.InputMidiClient()
+            midi.start()  # ensure started
+            data = midi.getData(input_id.message)  # gets data arguments or None if no data
             if data is None:
                 value = 0
             else:
@@ -4237,172 +4259,6 @@ class AxisState:
         self._last_axis_values[key] = current_value
         self._last_axis_time[key] = now
         return True
-
-
-# class JoystickHook:
-#     """base class for hooking joysticks
-
-#     provides update hooks for axis inputs using the hookDevice() and unhookDevice()
-#     inputs are suspended while a profile is running
-
-#     when hooked, the current device value is read and updated via the callback
-
-#     """
-
-#     def __init__(self):
-#         """
-
-#         :param callback: the callback, signature (float) - passes the axis or button value back
-#         :param device_guid: optional, id of the device to hook - if not set, use hookDevice() later
-#         :param input_type: optional, input type of the device
-#         :param input_id: optional, input id (usually a number)
-
-#         """
-#         self._hook_id = None
-#         self._hooked = False
-#         self._hook_connected = False
-#         self._hook_enabled = True  # hook updates by default
-#         self._hook_value = 0.0  # current value
-#         self._hook_calibrated_value = 0.0  # current calibrated value
-#         self._is_state = False  # true if the hook is attached to axis state widget
-#         self._last_state_value = None  # value for the last highlight event trigger
-#         # el = gremlin.event_handler.EventListener()
-#         # el.ui_ready.connect(self._hook_ui_ready)
-#         self._input_id = None
-#         self._device_guid = None
-#         self._input_type = None
-#         self._is_virtual = False
-#         self._calibrate = True  # calibrate the data by default, false = do not apply calibration
-#         self._last_value = 0.0  # last value
-#         self._astate = gremlin.event_handler.AxisState()
-#         self._callback = None
-#         self._ui_only = False
-#         self._ui_thread = False  # true if the hook should run on the UI thread only
-
-#         config = gremlin.config.Configuration()
-#         config.changed.connect(self._config_changed)
-
-#     def _config_changed(self, option, value):
-#         """called when a configuration option changes"""
-#         match option:
-#             case "highlight_input_axis":
-#                 self._last_state_value = None
-#             case "highlight_device":
-#                 self._last_state_value = None
-
-#     @property
-#     def input_id(self) -> object:
-#         return self._input_id
-
-#     @property
-#     def device_guid(self) -> str:
-#         return self._device_guid
-
-#     @property
-#     def input_type(self) -> InputType:
-#         return self._input_type
-
-#     def _cleanup_ui(self):
-#         """item is being deleted"""
-#         self.unhookDevice()
-
-#     def triggerUpdate(self):
-#         """triggers a hook update by forcing a data read without an event"""
-#         self._hook_update_value()
-
-#     def unhookDevice(self):
-#         """unhooks the device"""
-
-#         if self._hooked:
-#             jep = JoystickEventProcessor()
-#             jep.unregisterCallback(self._hook_id)
-#             config = gremlin.config.Configuration()
-#             verbose = config.verbose_mode_events or config.verbose_mode_perf
-#             if verbose:
-#                 device = gremlin.joystick_handling.getDevice(self._device_guid)
-#                 syslog.info(f"JOYSTICK HOOK: hook id: [{self._hook_id}] unhook [{device.name}] [{device.device_id}] [{self._input_type.name}] [{self._input_id}]")
-
-#             self._hooked = False
-
-#     def hookDevice(
-#         self,
-#         hook_id,
-#         callback,
-#         device_guid,
-#         input_type,
-#         input_id,
-#         ui_only=True,
-#         persist=False,
-#         ui_thread=False,
-#     ):
-#         """hooks the device and the registered callback"""
-#         if self._hooked:
-#             # unhook first
-#             self.unhookDevice()
-#         self._hook_id = hook_id
-#         self._callback = callback
-#         self._ui_only = ui_only
-#         self._ui_thread = ui_thread
-#         # jep = JoystickEventProcessor()
-#         # if hasattr(self, "getDescription"):
-#         #     description = self.getDescription()
-#         # else:
-#         #     description = None
-#         # jep.registerCallback(
-#         #     self._hook_id,
-#         #     callback,
-#         #     device_guid=device_guid,
-#         #     input_type=input_type,
-#         #     input_id=input_id,
-#         #     ui_only=ui_only,
-#         #     persist=persist,
-#         #     description=description,
-#         #     ui_thread=ui_thread,
-#         # )
-#         el = gremlin.event_handler.EventListener()
-#         el.joystick_event.connect(callback)
-#         self._hooked = True
-#         self._device_guid = device_guid
-#         device = gremlin.joystick_handling.getDevice(device_guid)
-#         self._input_type = input_type
-#         self._input_id = input_id
-#         self._is_virtual = device.is_virtual
-#         self.device = device
-
-#         verbose = gremlin.config.Configuration().verbose_mode_events
-#         if verbose:
-#             syslog.info(f"JOYSTICK HOOK: hook [{device.name}] [{device.device_id}] [{input_type.name}] [{input_id}]")
-
-#     def getValueChangedCallback(self):
-#         """gets the callback used for value change"""
-#         return self._value_changed_callback
-
-#     def _hook_update_value(self):
-#         if self._hooked:
-#             self._is_hardware_input = gremlin.joystick_handling.is_hardware_device(self.device_guid)
-#             if self._input_type in (InputType.OpenSoundControl, InputType.Midi):
-#                 raw_value = self.input_id.axis_value
-#                 self._hook_value = raw_value
-#             elif self._input_type == InputType.JoystickAxis or self._is_hardware_input:
-#                 sdata = gremlin.event_handler.AxisState()
-
-#                 # get the values as [actual, raw, calibrated, curved]
-#                 values = sdata.getAxisValues(self.device_guid, self.input_id, linear=False)
-#                 if values is None:
-#                     self._hook_value = 0.0
-#                 else:
-#                     self._hook_value = values
-
-#             if self._callback:
-#                 # call the callback with the requested data on the correct thread
-#                 if self._ui_thread and not gremlin.util.is_ui_thread():
-#                     gremlin.util.InvokeUiMethod(self._run_callback_ui)
-#                 else:
-#                     self._run_callback_ui()
-
-#     def _run_callback_ui(self):
-#         self._callback(None, self._hook_value)
-
 
 class JoystickCallback:
     __slots__ = [
@@ -4622,8 +4478,9 @@ class JoystickEventProcessor:
         gremlin.util.InvokeUiMethod(self._fireCallbacks_ui, event)
 
     def _fireCallbacks_ui(self, event: Event):
-        """fires all the callbacks (ui thread)"""
+        """fires all the registered callbacks (ui thread)"""
         gremlin.util.assert_ui_thread()
+        # syslog.info(f"JEP: fire callbacks: event: {str(event)}")
         device_guid = event.device_guid
         input_type = event.event_type
         input_id = event.identifier

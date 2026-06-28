@@ -34,6 +34,7 @@ import os
 from gremlin.util import get_guid, safe_format, safe_read
 import gremlin.event_handler
 from shiboken6 import Shiboken
+import dinput
 
 syslog = logging.getLogger("system")
 
@@ -395,15 +396,19 @@ Use Vjoy Remap instead."""
         :param parent the container to which this action belongs
         """
         super().__init__(parent)
-        self._unique_key = gremlin.util.get_guid()
+        self.id_changed.connect(self._on_id_changed)
+
+        # button tracking
         state = gremlin.joystick_handling.VirtualDeviceUsageState()
-        state.registerAction(self._unique_key)
+        state.registerAction(self.id)
 
         self.setPriority(9)
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
         self.parent = parent
-        self._vjoy_id = 1
+        self._vjoy_id = 1 # vjoy device #
+        device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self._vjoy_id)
+        self.virtual_device = gremlin.joystick_handling.getDevice(device_guid)
         self._vjoy_input_id = None
         input_type = self.get_input_type()
         self._input_type = input_type
@@ -412,30 +417,31 @@ Use Vjoy Remap instead."""
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
 
+        self.update_button_used()
+
+    def _on_id_changed(self, old_id: str, new_id: str):
+        """called when the id changes"""
+        state = gremlin.joystick_handling.VirtualDeviceUsageState()
+        syslog.info(f"Action ID changed from [{old_id}] to [{new_id}]")
+        state.unregisterAction(old_id)
+        state.registerAction(new_id)
+        self.update_button_used()
+
     @property
     def key(self):
         """unique key for this action"""
-        return self._unique_key
+        return self.id
 
     def actionDeleted(self):
         """called if the action is being deleted"""
         state = gremlin.joystick_handling.VirtualDeviceUsageState()
-        state.unregisterAction(self._unique_key)
+        state.unregisterAction(self.id)
 
-    @property
-    def vjoy_input_id(self) -> int:
-        return self._vjoy_input_id
-
-    @vjoy_input_id.setter
-    def vjoy_input_id(self, value: int):
-        if value != self._vjoy_input_id:
-            self._vjoy_input_id = value
-            self.update_button_used()
 
 
     def update_button_used(self):
         """updates the vjoy input usage for the action"""
-        if self._input_type == InputType.JoystickButton:
+        if self._input_type == InputType.JoystickButton and self.vjoy_input_id is not None:
             self.set_button_used(self.vjoy_input_id, True) # mark used
 
     def set_button_used(self, input_id, used : bool):
@@ -443,7 +449,28 @@ Use Vjoy Remap instead."""
         if input_id >= 0:
             assert self._input_type == InputType.JoystickButton,"invalid action mode for button usage tracking"
             state = gremlin.joystick_handling.VirtualDeviceUsageState()
-            state.set_usage_state(device_guid=self.virtual_device_guid, button_id=input_id, used=used, key=self._unique_key)
+            state.set_usage_state(device_guid=self.virtual_device_guid, button_id=input_id, used=used, key=self.id)
+
+    @property
+    def virtual_id(self):
+        """virtual device number"""
+        return self.virtual_device.virtual_id if self.virtual_device else -1
+
+    @property
+    def virtual_device_guid(self) -> dinput.GUID:
+        """virtual device GUID"""
+        return self.virtual_device.device_guid if self.virtual_device else None
+
+    @property
+    def virtual_device(self) -> dinput.DeviceSummary:
+        """gets the virtual device for this action"""
+        return self._virtual_device
+
+    @virtual_device.setter
+    def virtual_device(self, device: dinput.DeviceSummary):
+        """sets the virtual device for this action"""
+        if device:
+            self._virtual_device = device
 
     @property
     def vjoy_id(self) -> int:
@@ -460,6 +487,29 @@ Use Vjoy Remap instead."""
                 el.set_virtual_button_usage.emit(device_guid, self._vjoy_input_id, True, self.id)
             else:
                 self._vjoy_id = value
+        self.virtual_device = gremlin.joystick_handling.getDevice(device_guid)
+
+    @property
+    def vjoy_input_id(self) -> int:
+        return self._vjoy_input_id
+
+    @vjoy_input_id.setter
+    def vjoy_input_id(self, value: int):
+        if value != self._vjoy_input_id:
+            self._vjoy_input_id = value
+            self.update_button_used()
+
+
+    @property
+    def virtual_input_id(self) -> int:
+        """returns the virtual input id for this action"""
+        return self._vjoy_button_id
+
+    @virtual_input_id.setter
+    def virtual_input_id(self, value: int):
+        """sets the virtual input id for this action"""
+        self._vjoy_button_id = value
+        self.update_button_used()
 
     @property
     def is_axis(self):

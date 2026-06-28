@@ -469,8 +469,9 @@ _cleaned_widgets = []
 
 def clear_layout(layout):
     """removes all widgets and layouts from the given layout"""
-    _clear_layout(layout)
-    # gc.collect()
+    if isinstance(layout, QtWidgets.QLayout):
+        _clear_layout(layout)
+    
 
 
 def _clear_layout(layout):

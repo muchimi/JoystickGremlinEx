@@ -305,134 +305,134 @@ class HostIpDialog(ui_common.BaseDialogUi):
         self.close()
 
 
-class RemovedDeviceUi(ui_common.BaseDialogUi):
-    """dialog controlling which devices are removed from a particular profile"""
+# class RemovedDeviceUi(ui_common.BaseDialogUi):
+#     """dialog controlling which devices are removed from a particular profile"""
 
-    def __init__(self, parent=None):
-        super().__init__(self.__class__.__name__, parent)
+#     def __init__(self, parent=None):
+#         super().__init__(self.__class__.__name__, parent)
 
-        self.setWindowTitle("Profile Device List")
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.setModal(True)
+#         self.setWindowTitle("Profile Device List")
+#         self.main_layout = QtWidgets.QVBoxLayout(self)
+#         self.setModal(True)
 
-        self.scroll_area = QtWidgets.QScrollArea()
-        self.scroll_widget = QtWidgets.QWidget()
-        self.scroll_layout = QtWidgets.QVBoxLayout()
+#         self.scroll_area = QtWidgets.QScrollArea()
+#         self.scroll_widget = QtWidgets.QWidget()
+#         self.scroll_layout = QtWidgets.QVBoxLayout()
 
-        # Configure the widget holding the layout with all the buttons
-        self.scroll_widget.setLayout(self.scroll_layout)
-        self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+#         # Configure the widget holding the layout with all the buttons
+#         self.scroll_widget.setLayout(self.scroll_layout)
+#         self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+#         self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+#         self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
-        # Configure the scroll area
-        self.scroll_area.setMinimumWidth(300)
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setWidget(self.scroll_widget)
+#         # Configure the scroll area
+#         self.scroll_area.setMinimumWidth(300)
+#         self.scroll_area.setWidgetResizable(True)
+#         self.scroll_area.setWidget(self.scroll_widget)
 
-        profile = gremlin.shared_state.current_profile
-        removed_map = profile.removedDeviceMap()
+#         profile = gremlin.shared_state.current_profile
+#         removed_map = profile.removedDeviceMap()
 
-        # list all devices that can be removed from the profile
-        devices = gremlin.joystick_handling.getDevices()
-        devices.sort(key=lambda x: x.name)
-        self.device_widgets = []
-        always_on_devices = [
-            gremlin.shared_state.mode_tab_id,
-            gremlin.shared_state.settings_tab_id,
-        ]
-        for device in devices:
-            # filter devices that cannot be removed
-            if device.device_id in always_on_devices or device.disabled or device.is_virtual:
-                continue
+#         # list all devices that can be removed from the profile
+#         devices = gremlin.joystick_handling.getDevices()
+#         devices.sort(key=lambda x: x.name)
+#         self.device_widgets = []
+#         always_on_devices = [
+#             gremlin.shared_state.mode_tab_id,
+#             gremlin.shared_state.settings_tab_id,
+#         ]
+#         for device in devices:
+#             # filter devices that cannot be removed
+#             if device.device_id in always_on_devices or device.disabled or device.is_virtual:
+#                 continue
 
-            widget = gremlin.ui.ui_common.QDataCheckbox(device.name, data=device, value=device.device_id not in removed_map)
-            self.device_widgets.append(widget)
+#             widget = gremlin.ui.ui_common.QDataCheckbox(device.name, data=device, value=device.device_id not in removed_map)
+#             self.device_widgets.append(widget)
 
-        widget = gremlin.ui.ui_common.getVContainer(self.device_widgets, widget_only=True)
+#         widget = gremlin.ui.ui_common.getVContainer(self.device_widgets, widget_only=True)
 
-        self.scroll_layout.addWidget(widget)
-        self.scroll_layout.addStretch()
+#         self.scroll_layout.addWidget(widget)
+#         self.scroll_layout.addStretch()
 
-        cancel_button_widget = QtWidgets.QPushButton("Cancel")
-        cancel_button_widget.clicked.connect(self._cancel_cb)
+#         cancel_button_widget = QtWidgets.QPushButton("Cancel")
+#         cancel_button_widget.clicked.connect(self._cancel_cb)
 
-        all_widget = QtWidgets.QPushButton("All")
-        all_widget.setToolTip("Selects all")
-        all_widget.clicked.connect(self._select_all)
+#         all_widget = QtWidgets.QPushButton("All")
+#         all_widget.setToolTip("Selects all")
+#         all_widget.clicked.connect(self._select_all)
 
-        none_widget = QtWidgets.QPushButton("None")
-        none_widget.setToolTip("Deselects all")
-        none_widget.clicked.connect(self._select_none)
+#         none_widget = QtWidgets.QPushButton("None")
+#         none_widget.setToolTip("Deselects all")
+#         none_widget.clicked.connect(self._select_none)
 
-        mapped_widget = QtWidgets.QPushButton("Mapped")
-        mapped_widget.setToolTip("Selects only mapped devices")
-        mapped_widget.clicked.connect(self._select_mapped)
+#         mapped_widget = QtWidgets.QPushButton("Mapped")
+#         mapped_widget.setToolTip("Selects only mapped devices")
+#         mapped_widget.clicked.connect(self._select_mapped)
 
-        ok_button_widget = QtWidgets.QPushButton("Ok")
-        ok_button_widget.clicked.connect(self._ok_cb)
+#         ok_button_widget = QtWidgets.QPushButton("Ok")
+#         ok_button_widget.clicked.connect(self._ok_cb)
 
-        widget = gremlin.ui.ui_common.getHContainer(
-            [
-                all_widget,
-                none_widget,
-                mapped_widget,
-                "||",
-                ok_button_widget,
-                cancel_button_widget,
-            ],
-            widget_only=True,
-        )
-        button_container_widget = widget
+#         widget = gremlin.ui.ui_common.getHContainer(
+#             [
+#                 all_widget,
+#                 none_widget,
+#                 mapped_widget,
+#                 "||",
+#                 ok_button_widget,
+#                 cancel_button_widget,
+#             ],
+#             widget_only=True,
+#         )
+#         button_container_widget = widget
 
-        self.main_layout.addWidget(self.scroll_area)
+#         self.main_layout.addWidget(self.scroll_area)
 
-        info_widget = gremlin.ui.ui_common.QInfoBox(
-            "Unselected devices will not show on the available device list for this profile.<br>You can re-enable them later if needed."
-        )
-        self.main_layout.addWidget(info_widget)
-        self.main_layout.addWidget(button_container_widget)
-        self.setModal(True)
+#         info_widget = gremlin.ui.ui_common.QInfoBox(
+#             "Unselected devices will not show on the available device list for this profile.<br>You can re-enable them later if needed."
+#         )
+#         self.main_layout.addWidget(info_widget)
+#         self.main_layout.addWidget(button_container_widget)
+#         self.setModal(True)
 
-    def _select_all(self):
-        """selects all the items in the list"""
-        for widget in self.device_widgets:
-            widget.setChecked(True)
+#     def _select_all(self):
+#         """selects all the items in the list"""
+#         for widget in self.device_widgets:
+#             widget.setChecked(True)
 
-    def _select_none(self):
-        """deselects all items"""
-        for widget in self.device_widgets:
-            widget.setChecked(False)
+#     def _select_none(self):
+#         """deselects all items"""
+#         for widget in self.device_widgets:
+#             widget.setChecked(False)
 
-    def _select_mapped(self):
-        """deselects all items"""
-        profile = gremlin.shared_state.current_profile
-        for widget in self.device_widgets:
-            device = widget.data
-            mapped = profile.hasMapping(device.device_guid, any_mode=True)
-            widget.setChecked(mapped)
+#     def _select_mapped(self):
+#         """deselects all items"""
+#         profile = gremlin.shared_state.current_profile
+#         for widget in self.device_widgets:
+#             device = widget.data
+#             mapped = profile.hasMapping(device.device_guid, any_mode=True)
+#             widget.setChecked(mapped)
 
-    @QtCore.Slot()
-    def _ok_cb(self):
+#     @QtCore.Slot()
+#     def _ok_cb(self):
 
-        # commit the changes to the profile and re-load
-        for widget in self.device_widgets:
-            device = widget.data
-            removed = not widget.isChecked()
-            profile = gremlin.shared_state.current_profile
-            profile.setDeviceRemoved(device.device_id, removed)
+#         # commit the changes to the profile and re-load
+#         for widget in self.device_widgets:
+#             device = widget.data
+#             removed = not widget.isChecked()
+#             profile = gremlin.shared_state.current_profile
+#             profile.setDeviceRemoved(device.device_id, removed)
 
-        ec = gremlin.execution_graph.ExecutionContext()
-        ec.reset(True)  # reset and rebuild data around the profile
+#         ec = gremlin.execution_graph.ExecutionContext()
+#         ec.reset(True)  # reset and rebuild data around the profile
 
-        el = gremlin.event_handler.EventListener()
-        el.request_reload.emit()
+#         el = gremlin.event_handler.EventListener()
+#         el.request_reload.emit()
 
-        self.close()
+#         self.close()
 
-    @QtCore.Slot()
-    def _cancel_cb(self):
-        self.close()
+#     @QtCore.Slot()
+#     def _cancel_cb(self):
+#         self.close()
 
 
 class OptionsUi(ui_common.BaseDialogUi):
@@ -4414,12 +4414,11 @@ class ReorderDeviceListWidget(QtWidgets.QWidget):
         super().__init__(parent=parent)
         self.data = data
         name_widget = QtWidgets.QLabel(name)
-        self.visible_widget = gremlin.ui.ui_common.QDataCheckbox(callbackEx=visible_change_callback, value=visible, tooltip="Toggle visible", data = self)
-        widget = gremlin.ui.ui_common.getHContainer([self.visible_widget,name_widget], widget_only=True)
+        self.visible_widget = gremlin.ui.ui_common.QDataCheckbox(callbackEx=visible_change_callback, value=visible, tooltip="Toggle visible", data=self)
+        widget = gremlin.ui.ui_common.getHContainer([self.visible_widget, name_widget], widget_only=True)
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(widget)
-
 
         self._list_widget = None
 
@@ -4436,14 +4435,14 @@ class ReorderDeviceListWidget(QtWidgets.QWidget):
         with QtCore.QSignalBlocker(self.visible_widget):
             self.visible_widget.setValue(visible)
 
-    def setVisibleEnabled(self, value : bool):
+    def setVisibleEnabled(self, value: bool):
         gremlin.util.InvokeUiMethod(self._set_visible_enabled_ui, value)
 
-    def _set_visible_enabled_ui(self, value : bool):
+    def _set_visible_enabled_ui(self, value: bool):
         self.visible_widget.setEnabled(value)
 
 
-class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
+class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
     """dialog for drag drop re-ordering of device tabs"""
 
     def __init__(self, parent=None):
@@ -4462,7 +4461,7 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        label = QLabel("Device List:")
+        label = QLabel("Visibility and Device List:")
         self.main_layout.addWidget(label)
 
         # list_widget = ReorderListWidget()
@@ -4504,9 +4503,7 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self._populate_list_widget(tab_map)
 
-
         self.main_layout.addWidget(list_widget)
-
 
         default_order_widget = gremlin.ui.ui_common.QDataPushButton("Default", tooltip="Default device order", callback=self._handle_default_order)
 
@@ -4552,17 +4549,16 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
         items = [self._list_widget.item(i) for i in range(self._list_widget.count())]
         for index, item in enumerate(items):
             device, visible = item.data(QtCore.Qt.UserRole)
-            tab_map[index] = (device.device_id, visible) # use the string ID for JSON serialization
+            tab_map[index] = (device.device_id, visible)  # use the string ID for JSON serialization
 
         return tab_map
 
     def _handle_visible_changed(self, widget, checked: bool):
-        reorder_widget : ReorderDeviceListWidget = widget.data
+        reorder_widget: ReorderDeviceListWidget = widget.data
         device_id = reorder_widget.data.device_id
         self.visible_map[device_id] = checked
-        list_widget : QListWidgetItem = reorder_widget.getListWidget()
+        list_widget: QListWidgetItem = reorder_widget.getListWidget()
         list_widget.setData(QtCore.Qt.UserRole, (reorder_widget.data, checked))
-
 
     def _handle_save_order(self, widget):
         """saves the order to a configuration file"""
@@ -4644,8 +4640,6 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
                 # load the list
                 self._populate_list_widget(tab_map)
 
-
-
                 # save the file
                 self.config.last_reorder_file = fname
             except Exception as err:
@@ -4664,8 +4658,6 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
         tab_map = {index: (device, visible) for index, (device_id, device, visible) in enumerate(data["sorted"])}
         self._populate_list_widget(tab_map)
 
-
-
     def _populate_list_widget(self, tab_map):
         """populates the list widget with the tab_map"""
         self._list_widget.clear()
@@ -4678,7 +4670,7 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
             item.setData(QtCore.Qt.UserRole, (device, visible))
             item.setSizeHint(widget.sizeHint())
             widget.setListWidget(item)
-            enabled = device.device_type not in(DeviceType.Plugins, DeviceType.Settings)
+            enabled = device.device_type not in (DeviceType.Plugins, DeviceType.Settings)
             widget.setVisibleEnabled(enabled)
             self._list_widget.setItemWidget(item, widget)
 
@@ -4713,6 +4705,3 @@ class ReorderDeviceDialog(gremlin.ui.ui_common.QRememberDialog):
     def _cancel_cb(self):
         self.reject()
         self.close()
-
-
-

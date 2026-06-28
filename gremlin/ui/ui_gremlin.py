@@ -11,7 +11,7 @@ import os
 import shutil
 import logging
 from gremlin.ui.ui_common import QRememberMainWindow
-import gremlin.util
+
 
 syslog = logging.getLogger("system")
 
@@ -32,13 +32,26 @@ class Ui_Gremlin(object):
         self.tab_bar_layout.setContentsMargins(0, 0, 0, 0)
         self.tab_bar_widget.setMaximumHeight(30)
 
+
+
+        # self.tab_filter_widget = gremlin.ui.ui_common.QIconPushButton(icon = gremlin.ui.ui_common.Icons.tabIcon(),
+        #                                                               icon_size=24,
+        #                                                               tooltip="Device display Options",
+        #                                                               callback=self._handle_tab_filter)
+
+        self.tab_filter_widget = gremlin.ui.ui_common.Buttons.getTabFilterWidget(callback=self._handle_tab_filter, tooltip="Device display Options")
+
         # tab header for the device selection
         self.devices_tab_header_widget = gremlin.ui.ui_common.QTabHeader(parent=self.tab_bar_widget)
         self.devices_tab_header_widget.setMovable(True)
         self.devices_tab_header_widget.setUsesScrollButtons(True)
         self.devices_tab_header_widget.setObjectName("devices")
-        self.tab_bar_layout.addWidget(self.devices_tab_header_widget)
-        self.tab_bar_layout.addStretch(2)
+
+
+        tab_container_widget = gremlin.ui.ui_common.getHContainer([self.tab_filter_widget, self.devices_tab_header_widget],widget_only=True)
+
+        self.tab_bar_layout.addWidget(tab_container_widget)
+        #self.tab_bar_layout.addStretch(2)
 
         # holds the device widget
         self.tab_content_widget = QtWidgets.QWidget()
@@ -134,8 +147,8 @@ class Ui_Gremlin(object):
         self.actionOpenGremlinExFolder = QtGui.QAction(main_window)
         self.actionOpenGremlinExFolder.setObjectName("actionOpenGremlinExFolder")
 
-        self.actionProfileDevices = QtGui.QAction(main_window)
-        self.actionProfileDevices.setObjectName("actionProfileDevice")
+        #self.actionProfileDevices = QtGui.QAction(main_window)
+        #self.actionProfileDevices.setObjectName("actionProfileDevice")
 
         self.actionGenerate = QtGui.QAction(main_window)
         self.actionGenerate.setObjectName("actionGenerate")
@@ -240,7 +253,7 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionManageModes)
         self.menuTools.addAction(self.actionInputRepeater)
         self.menuTools.addAction(self.actionDeviceInformation)
-        self.menuTools.addAction(self.actionProfileDevices)
+        # self.menuTools.addAction(self.actionProfileDevices)
         self.menuTools.addAction(self.actionReloadDevices)
         self.menuTools.addAction(self.actionReorderDevices)
 
@@ -307,6 +320,12 @@ class Ui_Gremlin(object):
 
         self.retranslateUi(main_window)
         QtCore.QMetaObject.connectSlotsByName(main_window)
+
+    def _handle_tab_filter(self, widget):
+        import gremlin.ui.dialogs
+        dialog = gremlin.ui.dialogs.DeviceDisplayDialog()
+        dialog.exec()
+
 
     def _handle_convert_legacy(self):
         import gremlin.profile
@@ -407,7 +426,7 @@ class Ui_Gremlin(object):
         self.actionOpenXmlProfile.setText(_translate("GremlinEx", "&Open profile XML in Editor..."))
         self.actionOpenGremlinExFolder.setText(_translate("GremlinEx", "&Open GremlinEx Folder..."))
         self.actionGenerate.setText(_translate("GremlinEx", "Generate"))
-        self.actionProfileDevices.setText(_translate("GremlinEx", "Change Visible Devices..."))
+        #self.actionProfileDevices.setText(_translate("GremlinEx", "Change Visible Devices..."))
         self.actionDeviceInformation.setText(_translate("GremlinEx", "Device Information"))
         self.actionAbout.setText(_translate("GremlinEx", "&About..."))
         self.actionManageCustomModules.setText(_translate("GremlinEx", "&Manage Custom Modules"))

@@ -4710,6 +4710,8 @@ class AbstractAction(BaseProfileData):
     input_types = InputType.to_list()
     # data_changed = QtCore.Signal() # indicates the action data changed
 
+    id_changed = Signal(str, str)  # triggers when the ID changes (old_id, new_id)
+
     def __init__(self, parent):
         """Creates a new instance.
 
@@ -4833,9 +4835,19 @@ class AbstractAction(BaseProfileData):
         """unique ID for this condition, persisted"""
         return self._id
 
+    @id.setter
+    def id(self, value: str):
+        """sets the ID"""
+        self.setId(value)
+
     def setId(self, value: str):
         """sets the ID"""
-        self._id = value
+        if self._id != value:
+            old_id = self._id
+            self._id = value
+            self.id_changed.emit(old_id, value)
+        else:
+            self._id = value
 
     @property
     def priority(self):
@@ -4981,7 +4993,7 @@ class AbstractAction(BaseProfileData):
         _import_data = gremlin.base_profile.ProfileImportData()
 
         if "action_id" in node.attrib:
-            self._id = node.get("action_id")
+            self.id = node.get("action_id")
 
         if "send-mode" in node.attrib:
             mode_int = safe_read(node, "send-mode", int, 0)
@@ -5133,7 +5145,7 @@ class ActionSet(AbstractCallbackModel):
         """reads an action set"""
         if node.tag == "action-set":
             if "guid" in node.attrib:
-                self._id = read_guid(node, "guid")
+                self.id = read_guid(node, "guid")
             if "description" in node.attrib:
                 self.description = html.unescape(node.get("description"))
 

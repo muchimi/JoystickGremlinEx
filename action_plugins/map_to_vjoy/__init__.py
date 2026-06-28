@@ -631,7 +631,7 @@ _merge_operation_to_description_lookup = {
 }
 
 
-# class GridPopupWindow(gremlin.ui.ui_common.QRememberDialog):
+
 class GridPopupWindow(gremlin.ui.ui_common.QShowAtCursorDialog):
     def __init__(self, device_guid, input_type, vjoy_input_id, parent=None):
         super().__init__(self.__class__.__name__, parent=parent)
@@ -3231,11 +3231,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 else:
 
                     # mark the old button as unused
-                    self._update_button_state(self.action_data.vjoy_input_id, False)
-
-                    input_id = self.virtual_output_selector_widget.itemData(index)
-                    self.action_data.set_input_id(input_id)
-                    self._update_button_state(input_id, True)
+                    if VjoyAction.is_button_action(self.action_data.action_mode):
+                        self._update_button_state(self.action_data.vjoy_input_id, False)
+                        input_id = self.virtual_output_selector_widget.itemData(index)
+                        self.action_data.set_input_id(input_id)
+                        self._update_button_state(input_id, True)
+                    else:
+                        input_id = self.virtual_output_selector_widget.itemData(index)
+                        self.action_data.set_input_id(input_id)
 
 
 
@@ -3879,7 +3882,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         used_here_widget = gremlin.ui.ui_common.getHContainer([icon_used_here_widget, label_used_here_widget], widget_only=True)
         used_somewhere_widget = gremlin.ui.ui_common.getHContainer([icon_used_somewhere_widget, label_used_somewhere_widget], widget_only=True)
         unused_widget = gremlin.ui.ui_common.getHContainer([icon_unused_widget, label_unused_widget], widget_only=True)
-        legend_widget = gremlin.ui.ui_common.getHContainer(["Legend:", used_here_widget, used_somewhere_widget, unused_widget, "||"], widget_only=True)
+        legend_widget = gremlin.ui.ui_common.getHContainer(["Usage Map:", used_here_widget, used_somewhere_widget, unused_widget, "||"], widget_only=True)
 
         self.button_grid_widget = QtWidgets.QWidget()
 
@@ -3966,7 +3969,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             widget.setStyleSheet(css)  # apply the button state CSS
             container = gremlin.ui.ui_common.getVContainer(widget, widget_only=True)
-            container.setFixedSize(42, 42)
+            container.setFixedSize(38, 38)
             grid.addWidget(container, row, col)
             self._grid_widgets[id] = widget
             self.button_group.addButton(widget)
@@ -4605,7 +4608,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         if self.input_type == InputType.JoystickAxis:
             # send initial axis values to the output
 
-            self.usage_data.set_range(self.vjoy_id, self.vjoy_input_id, self.range_low, self.range_high)
+            self.usage_data.set_range(self.action_data.virtual_device_guid, self.vjoy_input_id, self.range_low, self.range_high)
             # print(f"Axis start value: vjoy: {self.vjoy_id} axis: {self.vjoy_input_id}  value: {self.axis_start_value}")
 
             match self.action_mode:
@@ -6274,11 +6277,13 @@ Supports axis merging, curved output, command, hat and button mappings.
         super().__init__(parent)
         self.parent = parent
         self.setPriority(9)
-        self._unique_key = gremlin.util.get_guid()  # unique key for this action
-        state = gremlin.joystick_handling.VirtualDeviceUsageState()
-        state.registerAction(self._unique_key)
 
-        syslog.info(f"VJOY REMAP: create action [{self._unique_key}]")
+        self.id_changed.connect(self._on_id_changed)
+
+        state = gremlin.joystick_handling.VirtualDeviceUsageState()
+        state.registerAction(self.id)
+
+        syslog.info(f"VJOY REMAP: create action [{self.id}]")
 
         self.virtual_device_map = (
             None  # list of all virtual devices that can be used as output   [device_type:DeviceType][index:int] -> device : dinput.DeviceSummary
@@ -6415,16 +6420,24 @@ Supports axis merging, curved output, command, hat and button mappings.
         curve = gremlin.curve_handler.AxisCurveData()
         self.trim_curve = curve
 
+    def _on_id_changed(self, old_id: str, new_id: str):
+        """called when the id changes"""
+        syslog.info(f"VJOY REMAP: action id changed from [{old_id}] to [{new_id}]")
+        state = gremlin.joystick_handling.VirtualDeviceUsageState()
+        state.unregisterAction(old_id)
+        state.registerAction(new_id)
+        self.update_button_used()
+
     @property
     def key(self):
         """unique key for this action"""
-        return self._unique_key
+        return self.id
 
     def actionDeleted(self):
         """called if the action is being deleted"""
         if VjoyAction.is_button(self.action_mode):
             state = gremlin.joystick_handling.VirtualDeviceUsageState()
-            state.unregisterAction(self._unique_key)
+            state.unregisterAction(self.id)
 
 
     @property
@@ -6473,6 +6486,17 @@ Supports axis merging, curved output, command, hat and button mappings.
     @vjoy_button_id.setter
     def vjoy_button_id(self, value: int):
         self._vjoy_button_id = value
+
+    @property
+    def virtual_input_id(self) -> int:
+        """returns the virtual input id for this action"""
+        return self.vjoy_input_id
+
+    @virtual_input_id.setter
+    def virtual_input_id(self, value: int):
+        """sets the virtual input id for this action"""
+        self._vjoy_button_id = value
+
 
     @property
     def axis_start_value_enabled(self) -> bool:
@@ -7532,7 +7556,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         if input_id >= 0:
             assert VjoyAction.is_button_action(self.action_mode), "should not be called if this mode"
             state = gremlin.joystick_handling.VirtualDeviceUsageState()
-            state.set_usage_state(device_guid=self.virtual_device_guid, button_id=input_id, used=used, key=self._unique_key)
+            state.set_usage_state(device_guid=self.virtual_device_guid, button_id=input_id, used=used, key=self.id)
 
     def _generate_xml(self):
         """Returns an XML node encoding this action's data.

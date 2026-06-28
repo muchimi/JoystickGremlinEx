@@ -411,7 +411,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def pushSuspendTabUpdate(self):
         self._suspend_ui_update += 1
 
-    def popSuspendTabUpdate(self, reset = False):
+    def popSuspendTabUpdate(self, reset=False):
         if reset:
             self._suspend_ui_update = 0
         if self._suspend_ui_update > 0:
@@ -419,8 +419,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if self._suspend_ui_update == 0 and self._ui_update_pending:
             self._ui_update_pending = False
             self._create_tabs()  # recreate the UI tabs
-
-
 
     def pushLoading(self):
         if self._loading_stack == 0:
@@ -482,7 +480,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.tab_guids = []
 
         self._clear_tabs()
-
 
     def _clear_tabs(self):
         gremlin.util.InvokeUiMethod(self._clear_tabs_ui)  # ensure on UI thread
@@ -658,7 +655,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         tab_count = self.ui.devices_tab_header_widget.count()
         tab_map = {}
         for index in range(tab_count):
-            data : TabData = self.ui.devices_tab_header_widget.tabData(index)
+            data: TabData = self.ui.devices_tab_header_widget.tabData(index)
             tab_map[index] = data
         return tab_map
 
@@ -945,8 +942,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self._actionTabClearMap = QtGui.QAction("Clear Mappings", self, triggered=self._tab_clear_map_cb)
         self._actionTabClearMap.setToolTip("Clears all mappings from the current device")
-        self._actionTabRemoveDevice = QtGui.QAction("Change Visible Device...", self, triggered=self._tab_remove_device_cb)
-        self._actionTabRemoveDevice.setToolTip("Removes the device from the profile")
+        # tab remove device moved to display options in m77
+        # self._actionTabRemoveDevice = QtGui.QAction("Change Visible Device...", self, triggered=self._tab_remove_device_cb)
+        # self._actionTabRemoveDevice.setToolTip("Removes the device from the profile")
         # self._actionTabImport = QtGui.QAction("Import Profile...", self, triggered = self._tab_import_cb)
         # self._actionTabImport.setToolTip("Import profile data into the current device")
 
@@ -955,7 +953,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         menuTools.addAction(self._ationTabCopyAssignments)
         # menuTools.addAction(self._actionTabSubstitute)
 
-        menuTools.addAction(self._actionTabRemoveDevice)
+        # menuTools.addAction(self._actionTabRemoveDevice)
         # menuTools.addAction(self._actionTabImport)
         menuTools.addAction(self._actionTabClearMap)
 
@@ -976,7 +974,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         menu.addAction(self._ationTabCopyAssignments)
         # menu.addAction(self._actionTabSubstitute)
         # menu.addAction(self._actionTabImport)
-        menu.addAction(self._actionTabRemoveDevice)
+        # menu.addAction(self._actionTabRemoveDevice)
         menu.addAction(self._actionTabClearMap)
 
         advanced_menu = menu.addMenu("Advanced...")
@@ -1051,9 +1049,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if result:
             self._tab_clear_map_execute(device, current_mode)
 
-    def _tab_remove_device_cb(self):
-        """removes a disconnected device from the menu"""
-        self.change_visible_profile_devices()
+    # def _tab_remove_device_cb(self):
+    #     """removes a disconnected device from the menu"""
+    #     self.change_visible_profile_devices()
 
     def _tab_import_cb(self):
         """imports a profile into the device"""
@@ -1219,19 +1217,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # indicate the feature has been deprecated
         return
 
-    def change_visible_profile_devices(self):
-        """opens the profile device dialog"""
-        dialog = gremlin.ui.dialogs.RemovedDeviceUi()
-        geom = self.geometry()
-        w = 600
-        h = 400
-        dialog.setGeometry(
-            int(geom.x() + geom.width() / 2 - w / 2),
-            int(geom.y() + geom.height() / 2 - h / 2),
-            w,
-            h,
-        )
-        dialog.exec()
+    # def change_visible_profile_devices(self):
+    #     """opens the profile device dialog"""
+    #     dialog = gremlin.ui.dialogs.RemovedDeviceUi()
+    #     geom = self.geometry()
+    #     w = 600
+    #     h = 400
+    #     dialog.setGeometry(
+    #         int(geom.x() + geom.width() / 2 - w / 2),
+    #         int(geom.y() + geom.height() / 2 - h / 2),
+    #         w,
+    #         h,
+    #     )
+    #     dialog.exec()
 
     def device_information(self):
         """Opens the device information window."""
@@ -1834,7 +1832,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # Tools
         self.ui.actionDeviceInformation.triggered.connect(self.device_information)
-        self.ui.actionProfileDevices.triggered.connect(self.change_visible_profile_devices)
+        # self.ui.actionProfileDevices.triggered.connect(self.change_visible_profile_devices)
         self.ui.actionManageModes.triggered.connect(self.manage_modes)
         self.ui.actionInputRepeater.triggered.connect(self.input_repeater)
         # self.ui.actionCalibration.triggered.connect(self.calibration)
@@ -2310,9 +2308,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             del self._widget_device_index_map[device_guid]
             del self._widget_index_device_map[index]
 
-
-
-
     def getCurrentRegisteredWidgetDevice(self):
         """gets the device ID for the currently selected device widget"""
         index = self.ui.device_page_widget.currentIndex()
@@ -2345,8 +2340,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self._widget_device_index_map.clear()
         self._widget_index_device_map.clear()
-
-
 
     def getRegisteredWidget(self, device_guid) -> QtWidgets.QWidget:
         """gets the widget for the given device id, None if not found"""
@@ -4922,7 +4915,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         import gremlin.ui.ui_common
         import gremlin.ui.dialogs
 
-        dialog = gremlin.ui.dialogs.ReorderDeviceDialog(parent=self)
+        dialog = gremlin.ui.dialogs.DeviceDisplayDialog(parent=self)
         dialog.exec()
 
     def _view_input_map(self):

@@ -17,7 +17,6 @@
 
 import threading
 from PySide6 import QtCore, QtWidgets
-
 import dinput
 import traceback
 from shiboken6 import Shiboken
@@ -37,6 +36,7 @@ import logging
 import gremlin.ui.ui_common
 import gremlin.ui.state_device
 from psygnal import Signal
+from gremlin.types import DeviceType
 
 syslog = logging.getLogger("system")
 
@@ -74,7 +74,7 @@ class VisualizationConfig:
                 fname = self.get_config()
 
                 syslog = logging.getLogger("system")
-                verbose = gremlin.config.Configuration().verbose
+                verbose = gremlin.config.Configuration().verbose_mode_inputs
                 if verbose:
                     syslog.info("INPUT VIEWER: save configuration")
 
@@ -169,12 +169,14 @@ class VisualizationSelector(QtWidgets.QWidget):
         """
         super().__init__(parent)
 
-        devices = gremlin.joystick_handling.joystick_devices()
+        devices = gremlin.joystick_handling.joystick_devices() + gremlin.joystick_handling.virtual_devices()
+
         self.viewer = viewer
         self._selector_widgets = []
         self._selector_callbacks = {}
         self._change_callback = change_callback
         self._callbacks = []  # list of registered callbacks in the selector
+        self._view_map = {} # list of visualizations by key
 
         # get the order of the devices as set by the user for the physical devices
         tab_map = gremlin.shared_state.ui._get_tab_map()
@@ -182,6 +184,8 @@ class VisualizationSelector(QtWidgets.QWidget):
         d_list = []
         max_index = len(devices)
         for dev in devices:
+            if dev.disabled:
+                continue
             if dev.device_id in tab_ids:
                 index = tab_ids.index(dev.device_id)
                 d_list.append((index, dev))
@@ -189,13 +193,22 @@ class VisualizationSelector(QtWidgets.QWidget):
                 # add to the end (vjoy devices)
                 d_list.append((max_index, dev))
 
-        d_list.sort(key=lambda x: (x[0], x[1].vjoy_id, x[1].name))
+        d_list.sort(key=lambda x: (x[0], x[1].virtual_id, x[1].name))
         self._devices = [dev for _, dev in d_list]
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.updateSelector()
+
+    def getViewMap(self):
+        return self._view_map
+
+    def widgetAt(self, index):
+        """gets the widget at the specified index"""
+        try:
+            return self._selector_widgets[index]
+        except IndexError:
+            return None
 
     def updateSelector(self):
         gremlin.util.InvokeUiMethod(self._update_selector_ui)  # ensure on UI thread
@@ -210,7 +223,8 @@ class VisualizationSelector(QtWidgets.QWidget):
 
         for widget in gremlin.util.get_layout_widgets(self.main_layout):
             self.main_layout.removeWidget(widget)
-            widget.deleteLater()
+            gremlin.util.delete_widget(widget)
+
 
         # gremlin.util.clear_layout(self.main_layout)
         change_callback = self._change_callback
@@ -221,30 +235,41 @@ class VisualizationSelector(QtWidgets.QWidget):
         bo_cb = None
         ho_cb = None
 
-        dev: dinput.DeviceSummary
-        for dev in self._devices:
-            box = QtWidgets.QGroupBox(dev.name)
+        index = 0
+
+        device: dinput.DeviceSummary
+        for device in self._devices:
+            if device.disabled:
+                continue # skip disabled devices
+            device_id = device.device_id
+
+
+            box = QtWidgets.QGroupBox(device.name)
             layout = QtWidgets.QVBoxLayout()
 
-            if dev.axis_count:
-                at_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Temporal", data=(VisualizationType.AxisTemporal, dev))
+            if device.axis_count:
+                at_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Temporal", data=(VisualizationType.AxisTemporal, device))
                 at_cb.setIgnoreKeyboard(True)
-                callback = self._create_callback(dev, VisualizationType.AxisTemporal, at_cb)
+                callback = self._create_callback(device, VisualizationType.AxisTemporal, at_cb)
                 at_cb.clicked.connect(callback)
                 self._selector_callbacks[at_cb] = callback
                 layout.addWidget(at_cb)
                 self._selector_widgets.append(at_cb)
+                self._view_map[(device_id, VisualizationType.AxisTemporal)] = index
+                index+=1
 
-                ac_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Current", data=(VisualizationType.AxisCurrent, dev))
+                ac_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Current", data=(VisualizationType.AxisCurrent, device))
                 ac_cb.setIgnoreKeyboard(True)
-                callback = self._create_callback(dev, VisualizationType.AxisCurrent, ac_cb)
+                callback = self._create_callback(device, VisualizationType.AxisCurrent, ac_cb)
                 ac_cb.clicked.connect(callback)
                 self._selector_callbacks[ac_cb] = callback
                 layout.addWidget(ac_cb)
                 self._selector_widgets.append(ac_cb)
+                self._view_map[(device_id, VisualizationType.AxisCurrent)] = index
+                index+=1
 
-            has_buttons = dev.button_count > 0
-            has_hats = dev.hat_count > 0
+            has_buttons = device.button_count > 0
+            has_hats = device.hat_count > 0
 
             if combine_button_hats:
                 # combination button/hat
@@ -258,77 +283,83 @@ class VisualizationSelector(QtWidgets.QWidget):
 
                 if stub:
                     # has button or hats
-                    bh_cb = gremlin.ui.ui_common.QDataCheckbox(stub, data=(VisualizationType.ButtonHat, dev))
+                    bh_cb = gremlin.ui.ui_common.QDataCheckbox(stub, data=(VisualizationType.ButtonHat, device))
                     bh_cb.setIgnoreKeyboard(True)
-                    callback = self._create_callback(dev, VisualizationType.ButtonHat, bh_cb)
+                    callback = self._create_callback(device, VisualizationType.ButtonHat, bh_cb)
                     bh_cb.clicked.connect(callback)
                     self._selector_callbacks[bh_cb] = callback
                     layout.addWidget(bh_cb)
                     self._selector_widgets.append(bh_cb)
+                    self._view_map[(device_id, VisualizationType.ButtonHat)] = index
+                    index+=1
             else:
                 # buttons only
                 if has_buttons:
-                    bo_cb = gremlin.ui.ui_common.QDataCheckbox("Buttons", data=(VisualizationType.Button, dev))
+                    bo_cb = gremlin.ui.ui_common.QDataCheckbox("Buttons", data=(VisualizationType.Button, device))
                     bo_cb.setIgnoreKeyboard(True)
-                    callback = self._create_callback(dev, VisualizationType.Button, bo_cb)
+                    callback = self._create_callback(device, VisualizationType.Button, bo_cb)
                     bo_cb.clicked.connect(callback)
                     self._selector_callbacks[bo_cb] = callback
                     layout.addWidget(bo_cb)
                     self._selector_widgets.append(bo_cb)
+                    self._view_map[(device_id, VisualizationType.Button)] = index
+                    index+=1
 
                 # hats only
                 if has_hats:
-                    ho_cb = gremlin.ui.ui_common.QDataCheckbox("Hats", data=(VisualizationType.Hat, dev))
+                    ho_cb = gremlin.ui.ui_common.QDataCheckbox("Hats", data=(VisualizationType.Hat, device))
                     ho_cb.setIgnoreKeyboard(True)
-                    callback = self._create_callback(dev, VisualizationType.Hat, ho_cb)
+                    callback = self._create_callback(device, VisualizationType.Hat, ho_cb)
                     ho_cb.clicked.connect(callback)
                     self._selector_callbacks[ho_cb] = callback
                     layout.addWidget(ho_cb)
                     self._selector_widgets.append(ho_cb)
+                    self._view_map[(device_id, VisualizationType.Hat)] = index
+                    index+=1
 
             box.setLayout(layout)
 
             self.main_layout.addWidget(box)
 
             # update based on settings
-            device_guid = dev.device_guid
-            checked = config.getValue(device_guid, VisualizationType.AxisTemporal, False)
+            device_id = device.device_guid
+            checked = config.getValue(device_id, VisualizationType.AxisTemporal, False)
             at_cb.setChecked(checked)
             if checked:
-                change_callback(dev, VisualizationType.AxisTemporal, True)
+                change_callback(device, VisualizationType.AxisTemporal, True)
 
-            checked = config.getValue(device_guid, VisualizationType.AxisCurrent, False)
+            checked = config.getValue(device_id, VisualizationType.AxisCurrent, False)
             ac_cb.setChecked(checked)
             if checked:
-                change_callback(dev, VisualizationType.AxisCurrent, True)
+                change_callback(device, VisualizationType.AxisCurrent, True)
 
             if combine_button_hats:
                 # combined button/hat
-                checked = config.getValue(device_guid, VisualizationType.ButtonHat, False)
+                checked = config.getValue(device_id, VisualizationType.ButtonHat, False)
                 if bh_cb:
                     bh_cb.setChecked(checked)
                 if checked:
-                    change_callback(dev, VisualizationType.ButtonHat, True)
+                    change_callback(device, VisualizationType.ButtonHat, True)
             else:
                 # button only
                 if has_buttons:
-                    checked = config.getValue(device_guid, VisualizationType.Button, False)
+                    checked = config.getValue(device_id, VisualizationType.Button, False)
                     if bo_cb:
                         bo_cb.setChecked(checked)
                     if checked:
-                        change_callback(dev, VisualizationType.ButtonHat, True)
+                        change_callback(device, VisualizationType.ButtonHat, True)
 
                 # hat only
                 if has_hats:
-                    checked = config.getValue(device_guid, VisualizationType.Hat, False)
+                    checked = config.getValue(device_id, VisualizationType.Hat, False)
                     if ho_cb:
                         ho_cb.setChecked(checked)
                     if checked:
-                        change_callback(dev, VisualizationType.Hat, True)
+                        change_callback(device, VisualizationType.Hat, True)
 
         # fire all the callbacks to update
-        for dev, vis in self._callbacks:
-            change_callback(dev, vis, None)
+        for device, vis in self._callbacks:
+            change_callback(device, vis, None)
 
     @QtCore.Slot()
     def _clear_selection(self):
@@ -404,8 +435,71 @@ class VisualizationSelector(QtWidgets.QWidget):
         config.setValue(device.device_id, vis_type, checked)
         self.changed.emit(device, vis_type, checked)
 
+class InputViewerWidget(QtWidgets.QWidget):
+    """Widget for the input viewer."""
+
+    def __init__(self, key, widget = None, parent=None):
+        """Creates a new instance.
+
+        :param parent the parent of this widget
+        """
+        super().__init__(parent)
+
+        self._stacked_widget = gremlin.ui.ui_common.ResizingStackedWidget(zero_hide=True)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._stacked_widget)
+        self._key = key
+        self._widget = None
+
+        #self._stacked_widget.addWidget(QtWidgets.QLabel(str(key)))
+        blank_widget = QtWidgets.QWidget()
+        blank_widget.setFixedHeight(0)
+        self._stacked_widget.addWidget(blank_widget) # blank widget
+
+        if widget:
+            self.setWidget(widget)
+
+    @property
+    def key(self):
+        return self._key
+
+    @property
+    def widget(self):
+        """returns the current widget"""
+        return self._widget
+
+    def setWidget(self, widget):
+        """sets the widget to display"""
+        if widget is None:
+            while self._stacked_widget.count() > 1:
+                widget = self._stacked_widget.widget(1)
+                self._stacked_widget.removeWidget(widget)
+                gremlin.util.delete_widget(widget)
+            self._stacked_widget.setCurrentIndex(0) # blank
+
+        else:
+            container = gremlin.ui.ui_common.getVContainer([gremlin.ui.ui_common.QHorizontalLine(), widget], widget_only=True)
+            self._stacked_widget.addWidget(container)
+            self._stacked_widget.setCurrentWidget(widget)
+            self._stacked_widget.setCurrentIndex(self._stacked_widget.count() - 1)
+            widget.show()
+        self._widget = widget
+
+    def hideWidget(self):
+        """hides the widget"""
+        self._stacked_widget.setCurrentIndex(0) # blank
+
+    def clearWidget(self):
+        """clears the widget"""
+        self.setWidget(None)
 
 class InputViewerUi(ui_common.BaseDialogUi):
+
+
+
+
+
     """Main UI dialog for the input viewer."""
 
     def __init__(self, parent=None):
@@ -415,7 +509,14 @@ class InputViewerUi(ui_common.BaseDialogUi):
         """
         super().__init__(self.__class__.__name__, parent)
 
-        self._joystick_widgets = {}  # holds display widgets
+        self.setStyleSheet("QGroupBox { border: 0px }") # turn group box borders off
+
+        self.vis_selector = VisualizationSelector(self._add_remove_visualization_widget, viewer=self)
+        self.vis_selector.changed.connect(self._add_remove_visualization_widget)
+        self.vis_selector.clear.connect(self._clear)
+
+        self._widget_map = {} # holds all the view items
+
         self._lock = threading.Lock()
         self.setMinimumHeight(800)
 
@@ -490,9 +591,7 @@ class InputViewerUi(ui_common.BaseDialogUi):
         )
         self.combine_widget.setIgnoreKeyboard(True)
 
-        self.vis_selector = VisualizationSelector(self._add_remove_visualization_widget, viewer=self)
-        self.vis_selector.changed.connect(self._add_remove_visualization_widget)
-        self.vis_selector.clear.connect(self._clear)
+
 
         options_widget = QtWidgets.QGroupBox("Options")
         options_layout = QtWidgets.QVBoxLayout(options_widget)
@@ -510,15 +609,15 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.scroll_selector_layout.addWidget(system_selector_widget)
         self.scroll_selector_layout.addWidget(self.vis_selector)
 
-        clear_widget = QtWidgets.QPushButton("Clear")
+        clear_widget = gremlin.ui.ui_common.QDataPushButton("Clear")
         clear_widget.setToolTip("Clears the selection")
         clear_widget.clicked.connect(self._clear_all)
 
-        select_all_widget = QtWidgets.QPushButton("Select All")
+        select_all_widget = gremlin.ui.ui_common.QDataPushButton("Select All")
         select_all_widget.setToolTip("Selects all inputs")
         select_all_widget.clicked.connect(self._select_all)
 
-        select_real_widget = QtWidgets.QPushButton("Select Hardware")
+        select_real_widget = gremlin.ui.ui_common.QDataPushButton("Select Hardware")
         select_real_widget.setToolTip("Selects all hardware inputs")
         select_real_widget.clicked.connect(self.vis_selector._select_real)
 
@@ -570,15 +669,70 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         self._event_data = {}
 
+        self.load_viewer_widgets()
+
         if show_state:
             self.showState()
 
         if show_keyboard:
             self.showKeyboard()
 
+
+
+
+
+        # update the visualizer
+        self.vis_selector.updateSelector()
+
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.connect(self.refresh)
         el.profile_unhook.connect(self.reload)
+
+    def load_viewer_widgets(self):
+        """loads the view widgets for all device inputs"""
+
+        # build all possible visualizations for the devices - this is used to determine if a visualization is available for a device
+        self.views.clear()
+        self._widget_map = {}
+
+        # special devices
+        key = (gremlin.shared_state.state_tab_guid, VisualizationType.State)
+        self._widget_map[key] = InputViewerWidget(key)
+
+        key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+        self._widget_map[key] = InputViewerWidget(key)
+
+        devices = gremlin.joystick_handling.joystick_devices() + gremlin.joystick_handling.virtual_devices()
+
+        for device in devices:
+            if device.disabled:
+                continue
+            syslog.info(f"INPUT VIEWER: load_viewer_widgets - device {device.name} ({device.device_id}) axes: {device.axis_count} buttons: {device.button_count} hats: {device.hat_count}")
+            if device.axis_count:
+                self._widget_map[(device.device_id, VisualizationType.AxisTemporal)] = None
+                syslog.info("\ttemporal axis")
+                self._widget_map[(device.device_id, VisualizationType.AxisCurrent)] = None
+                syslog.info("\tcurrent axis")
+            if device.button_count or device.hat_count:
+                self._widget_map[(device.device_id, VisualizationType.ButtonHat)] = None
+                syslog.info("\tbutton hat")
+            if device.button_count:
+                self._widget_map[(device.device_id, VisualizationType.Button)] = None
+                syslog.info("\tbutton")
+            if device.hat_count:
+                self._widget_map[(device.device_id, VisualizationType.Hat)] = None
+                syslog.info("\that")
+
+
+
+        for key in self._widget_map:
+            widget = InputViewerWidget(key)
+            self.views.add_widget(widget)
+            self._widget_map[key] = widget
+
+        self.devices = devices
+
+
 
     def _clear_all(self):
         """clears all items"""
@@ -587,6 +741,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         config.clear()
         config.setValue(gremlin.shared_state.state_tab_guid, VisualizationType.State, False)
         config.setValue(gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard, False)
+        self.load_viewer_widgets() # reload devices
 
     def _select_all(self):
         # select keyboard and state
@@ -632,7 +787,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._state_filter_widget = None
         self._state_visualizer_widget = None
         self._state_buttons.clear()
-        self._joystick_widgets.clear()
+        self._widget_map.clear()
         self._event_data.clear()
 
         sd = gremlin.ui.state_device.StateData()
@@ -684,6 +839,13 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         self.vis_selector.updateSelector()
 
+    def getVisualizerIndex(self, key):
+        """returns the index of the visualizer in the view container"""
+        view_map = self.vis_selector.getViewMap()
+        if key in view_map:
+            return view_map[key]
+        return None
+
     @QtCore.Slot(dinput.DeviceSummary, VisualizationType, bool)
     def _add_remove_visualization_widget(self, device, visualization: VisualizationType, enabled: bool | None):
         """Adds or removes a visualization widget.
@@ -694,8 +856,6 @@ States can be toggled by clicking on the state button.  Expression states will u
         """
         assert gremlin.util.is_ui_thread()
         if not Shiboken.isValid(self):
-            return
-        if not Shiboken.isValid(self.views):
             return
 
         key = (device.device_id, visualization)
@@ -717,37 +877,31 @@ States can be toggled by clicking on the state button.  Expression states will u
             vconfig = VisualizationConfig()
             enabled = vconfig.getValue(device.device_id, visualization)
         if enabled:
-            if key not in self._joystick_widgets:
-                # create the widget
-                widget = ui_common.JoystickDeviceWidget(device, visualization)
-                self.views.add_widget(widget)
-                # self._lock.acquire()
-                self._joystick_widgets[key] = widget
-                # self._lock.release()
-                widget.hook()
-                if visualization in (gremlin.types.VisualizationType.AxisCurrent, gremlin.types.VisualizationType.AxisTemporal):
-                    widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Preferred)
+            assert self._widget_map[key] is not None, f"widget map for {key} does not exist - did you call load_viewer_widgets() first?"
 
-                if verbose:
-                    syslog.info(f"Create new vis: {device.name}: {visualization.name}  key: {key}")
-            else:
-                # already visible
-                widget = self._joystick_widgets[key]
-                if verbose:
-                    syslog.info(f"Use existing vis: {device.name}: {visualization.name}")
-                widget.setVisible(True)
+            widget = ui_common.JoystickDeviceWidget(device, visualization)
+            viewer_widget = self._widget_map[key]
+            viewer_widget.setWidget(widget)
+
+            widget.hook()
+            if visualization in (gremlin.types.VisualizationType.AxisCurrent, gremlin.types.VisualizationType.AxisTemporal):
+                widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Preferred)
+
+            if verbose:
+                syslog.info(f"Create new vis: {device.name}: {visualization.name}  key: {key}")
 
         else:
-            if key in self._joystick_widgets:
+            if key in self._widget_map:
                 # remove the widget
-                widget = self._joystick_widgets[key]
-                del self._joystick_widgets[key]
-                if verbose:
-                    syslog.info(f"Remove existing vis: {device.name}: {visualization.name} key: {key}")
-                widget.unhook()
-                widget.hide()
-                self.views.remove_widget(widget)
-                gremlin.util.delete_widget(widget)
+                viewer_widget = self._widget_map[key]
+                widget = viewer_widget.widget
+                if widget:
+                    widget.hide()
+                    viewer_widget.clearWidget()
+                    widget.unhook()
+                    if verbose:
+                        syslog.info(f"Remove existing vis: {device.name}: {visualization.name} key: {key}")
+                    gremlin.util.delete_widget(widget)
 
     def populateState(self):
         """execute on UI thread"""
@@ -841,6 +995,10 @@ States can be toggled by clicking on the state button.  Expression states will u
         assert gremlin.util.is_ui_thread()
         if self._keyboard_visible:
             return
+
+        viewer_widget = self._widget_map.get((gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard))
+        assert viewer_widget is not None,"keyboard view widget not in list yet - did you call load_viewer_widgets() first?"
+
         if not self._keyboard_visualizer_widget:
             group_widget = QtWidgets.QGroupBox("Keyboard")
             layout = QtWidgets.QVBoxLayout(self._keyboard_visualizer_widget)
@@ -854,9 +1012,8 @@ States can be toggled by clicking on the state button.  Expression states will u
             self.keyboard_widget.hook()
             self._keyboard_visualizer_widget = gremlin.ui.ui_common.getHContainer(group_widget, widget_only=True)
             self._keyboard_visible = True
-            self.views.add_widget(self._keyboard_visualizer_widget, 0)
 
-        self._keyboard_visualizer_widget.setVisible(True)
+        viewer_widget.setWidget(self._keyboard_visualizer_widget)
 
         with QtCore.QSignalBlocker(self.keyboard_widget_selector):
             self.keyboard_widget_selector.setChecked(True)
@@ -865,8 +1022,11 @@ States can be toggled by clicking on the state button.  Expression states will u
 
     def hideKeyboard(self):
         if self._keyboard_visible:
-            if self._keyboard_visualizer_widget:
-                self._keyboard_visualizer_widget.setVisible(False)
+            key = (gremlin.shared_state.keyboard_tab_guid, VisualizationType.Keyboard)
+            viewer_widget = self._widget_map.get(key)
+            assert viewer_widget is not None,"keyboard view widget not in list yet - did you call load_viewer_widgets() first?"
+            viewer_widget.clearWidget()
+            self._keyboard_visualizer_widget = None
 
             with QtCore.QSignalBlocker(self.keyboard_widget_selector):
                 self.keyboard_widget_selector.setChecked(False)
@@ -877,6 +1037,11 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         if self._state_visible:
             return
+
+        key = (gremlin.shared_state.state_tab_guid, VisualizationType.State)
+        viewer_widget = self._widget_map.get(key)
+        assert viewer_widget is not None,"state view widget not in list yet - did you call load_viewer_widgets() first?"
+
 
         if not self._state_visualizer_widget:
             self._state_visualizer_widget = QtWidgets.QGroupBox("States")
@@ -909,19 +1074,21 @@ States can be toggled by clicking on the state button.  Expression states will u
             self._state_button_layout = gremlin.ui.ui_common.QFlowLayout()
             layout.addLayout(self._state_button_layout)
 
-            self.views.add_widget(self._state_visualizer_widget, 0)
-
         self.populateState()
-        self._state_visualizer_widget.setVisible(True)
+        viewer_widget.setWidget(self._state_visualizer_widget)
         self._state_visible = True
 
     def hideState(self):
         """hides the state device"""
-        if self._state_visualizer_widget and Shiboken.isValid(self._state_visualizer_widget):
-            self._state_visualizer_widget.setVisible(False)
-        self._state_visible = False
-        with QtCore.QSignalBlocker(self.state_widget_selector):
-            self.state_widget_selector.setChecked(False)
+        if self._state_visible:
+            key = (gremlin.shared_state.state_tab_guid, VisualizationType.State)
+            viewer_widget = self._widget_map.get(key)
+            assert viewer_widget is not None,"state view widget not in list yet - did you call load_viewer_widgets() first?"
+            viewer_widget.clearWidget()
+            self._state_visualizer_widget = None
+            self._state_visible = False
+            with QtCore.QSignalBlocker(self.state_widget_selector):
+                self.state_widget_selector.setChecked(False)
 
     @QtCore.Slot(object)
     def _category_filter_changed(self, category):
@@ -1001,10 +1168,18 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.vis_selector.updateSelector()
 
     def _cleanup_joystick_widgets(self):
-        for widget in self._joystick_widgets.values():
-            self.views.remove_widget(widget)
-            self._delete_widget(widget)
-        self._joystick_widgets.clear()
+        for viewer_widget in self._widget_map.values():
+            widget = viewer_widget.widget
+            if hasattr(widget, "unhook"):
+                widget.unhook()
+            if widget and Shiboken.isValid(widget):
+                widget.hide()
+                viewer_widget.clearWidget()
+                gremlin.util.delete_widget(widget)
+                self.views.remove_widget(viewer_widget)
+                gremlin.util.delete_widget(viewer_widget)
+
+        self.load_viewer_widgets()
 
     @QtCore.Slot(bool)
     def _toggle_flow_layout(self, checked: bool):
@@ -1028,24 +1203,41 @@ class InputViewerArea(QtWidgets.QScrollArea):
         self.setWidgetResizable(True)
         self.scroll_widget = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout()
+        self.scroll_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
         self.scroll_widget.setLayout(self.scroll_layout)
         self._is_flow = False  # true if using the flow layout
-        self.container_widget, self.container_layout = gremlin.ui.ui_common.getVContainer()
-        # self.container_layout = gremlin.ui.ui_common.QFlowLayout(self.container_widget)
+
+        self.container_widget = QtWidgets.QWidget()
+        self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
+        self.container_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        self.spacer = QtWidgets.QSpacerItem(0, 50, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.container_layout.addItem(self.spacer)
+
 
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         self.setWidget(self.scroll_widget)
         self.scroll_layout.addWidget(self.container_widget)
-        self.scroll_layout.addStretch()
+        self.installEventFilter(self)
+
+
+    def eventFilter(self, widget, event):
+
+        if event.type() == QtCore.QEvent.Type.Wheel:
+            # trap mouse wheel events and pass them to the hovered widget because the scroll area eats these events
+            hovered_widget = QtWidgets.QApplication.widgetAt(event.globalPosition().toPoint())
+            if hovered_widget and hasattr(hovered_widget, "handle_wheel_event"):
+                hovered_widget.handle_wheel_event(event)
+                return True
+        return super().eventFilter(widget, event)
+
+
 
     def unhook(self):
-        for widget in self.widgets:
-            gremlin.util.delete_widget(widget)
-        self.widgets.clear()
-        gremlin.util.clear_layout(self.container_widget)
+        pass
+
 
     def sizeHint(self):
         return QtCore.QSize(200, 200)
@@ -1056,29 +1248,22 @@ class InputViewerArea(QtWidgets.QScrollArea):
         :param widget the widget to add
         """
         assert gremlin.util.is_ui_thread()
-        if not Shiboken.isValid(self) or not Shiboken.isValid(self.container_widget):
+        if not Shiboken.isValid(self):
             return
 
+
         self.widgets.append(widget)
-        if index is not None:
-            self.container_layout.insertWidget(index, widget)
-        else:
-            self.container_layout.addWidget(widget)
-        widget.setParent(self.container_widget)
-        widget.show()
+        self.container_layout.removeItem(self.spacer)
+        self.container_layout.addWidget(widget)
+        self.container_layout.addItem(self.spacer)
 
-        width = 0
-        height = 0
-        widgets = [w for w in self.widgets]
-        for widget in widgets:
-            if Shiboken.isValid(widget):
-                hint = widget.minimumSizeHint()
-                height = max(height, hint.height())
-                width = max(width, hint.width())
-            else:
-                self.widgets.remove(widget)
 
-        self.setMinimumWidth(width + 40)
+
+
+
+    def addStretch(self):
+        """Adds a stretch to the visualization area."""
+        self.container_layout.addStretch()
 
     def remove_widget(self, widget):
         """Removes a widget from the visualization area.
@@ -1091,14 +1276,35 @@ class InputViewerArea(QtWidgets.QScrollArea):
         if hasattr(widget, "unhook"):
             widget.unhook()
         self.container_layout.removeWidget(widget)
+
         if widget is self.widgets:
             self.widgets.remove(widget)
+
+        gremlin.util.delete_widget(widget)
 
     def clear(self):
         """clears all widgets"""
         if not Shiboken.isValid(self):
             return
-        self.unhook()
+        while self.container_layout.count():
+            item = self.container_layout.takeAt(0)
+            if item:
+                widget = item.widget()
+                if widget:
+                    gremlin.util.delete_widget(widget)
+
+        self.scroll_layout.removeWidget(self.container_widget)
+        gremlin.util.delete_widget(self.container_widget)
+        self.container_widget = QtWidgets.QWidget()
+        self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
+        self.container_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        self.scroll_layout.addWidget(self.container_widget)
+        self.spacer = QtWidgets.QSpacerItem(0, 50, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.container_layout.addItem(self.spacer)
+
+
+
+
 
 
 _visualization_config = VisualizationConfig()

@@ -624,14 +624,15 @@ def removeDevice(dev: dinput.DeviceSummary):
         _joystick_devices = [d for d in _joystick_devices if d.device_guid != device_guid]
 
 
-def device_name_from_guid(device_guid) -> str:
+def device_name_from_guid(device_guid, refresh=False) -> str:
     """gets device name from GUID"""
 
     dev = get_device(device_guid, False)
     if not dev:
         # not found - check for any updated devices
-        refresh_devices()
-        dev = get_device(device_guid)
+        if refresh:
+            refresh_devices()
+            dev = get_device(device_guid)
     if dev:
         return dev.name
     return ""
@@ -1448,13 +1449,13 @@ class VirtualDeviceUsageState:
     def registerAction(self, key):
         assert key not in self._action_map, "action already registered"
         self._action_map[key] = {}
-        syslog.info(f"Button State: registered action {key}")
+        syslog.info(f"Button State: register action [{key}]")
 
     def getRegisteredActions(self):
         return list(self._action_map.keys())
 
     def unregisterAction(self, key):
-        syslog.info(f"Button State: registered action {key}")
+        syslog.info(f"Button State: unregister action [{key}]")
         assert key in self._action_map, "action not registered"
         del self._action_map[key]
         for device_type in self._button_usage_map:
@@ -1833,13 +1834,14 @@ class VirtualDeviceUsageState:
             if not used:
                 pass
             # used_list =  set(self._action_map.get(key, {}).get(device_type, {}).get(virtual_id, None) for key in self._action_map if self._action_map.get(key, {}).get(device_type, {}).get(virtual_id, None) is not None)
-
             used_list = self._used_button_list(device_type, virtual_id)
             syslog.info(f"Used button list: {used_list}")
             if used:
                 assert button_id in used_list, f"button {button_id} should be in used list {used_list}"
             else:
-                assert button_id not in used_list, f"button {button_id} should not be in used list {used_list}"
+                action_list = [k for k in self._action_map if self._action_map.get(k, {}).get(device_type, {}).get(virtual_id, None) == button_id]
+                assert key not in action_list, f"action {key} should not be in action list {action_list}"
+
 
         if changed:
             # self._button_usage[device_type][virtual_id][button_id] = is_mapped

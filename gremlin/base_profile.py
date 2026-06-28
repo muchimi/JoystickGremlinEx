@@ -3748,11 +3748,12 @@ class Profile:
                 continue
 
             type_name = InputType.to_string(act.input_type)
-            if act.vjoy_id not in vjoy or act.vjoy_input_id in [0, None] or act.vjoy_id in [0, None] or act.vjoy_input_id not in vjoy[act.vjoy_id][type_name]:
+            virtual_id = act.virtual_id
+            if virtual_id not in vjoy or act.vjoy_input_id in [0, None] or virtual_id in [0, None] or act.vjoy_input_id not in vjoy[virtual_id][type_name]:
                 continue
 
-            idx = vjoy[act.vjoy_id][type_name].index(act.vjoy_input_id)
-            del vjoy[act.vjoy_id][type_name][idx]
+            idx = vjoy[virtual_id][type_name].index(act.vjoy_input_id)
+            del vjoy[virtual_id][type_name][idx]
 
         return vjoy
 
@@ -3845,10 +3846,12 @@ class Profile:
 
         # removed devices
         self._removed_devices.clear()
-        removed_nodes = root.xpath("//removed-devices/device")
-        for node in removed_nodes:
-            id = node.get("id")
-            self._removed_devices.append(id)
+
+        # moved to display options
+        # removed_nodes = root.xpath("//removed-devices/device")
+        # for node in removed_nodes:
+        #     id = node.get("id")
+        #     self._removed_devices.append(id)
 
         # Parse each device into separate DeviceConfiguration objects
         device_nodes = root.xpath("//profile/devices/device")
@@ -4121,15 +4124,16 @@ class Profile:
             parent_mode = tree_node.parent.name if tree_node.parent else None
             root_mode_node.append(node)
 
+        # moved to display preferences - removed as of m76t101
         # new as m76t101 - removed mode list
         # this is the list of devices removed by the user
-        if self._removed_devices:
-            removed_device_node = etree.Element("removed-devices")
-            for id in self._removed_devices:
-                id_node = etree.Element("device")
-                id_node.set("id", id)
-                removed_device_node.append(id_node)
-            root.append(removed_device_node)
+        # if self._removed_devices:
+        #     removed_device_node = etree.Element("removed-devices")
+        #     for id in self._removed_devices:
+        #         id_node = etree.Element("device")
+        #         id_node.set("id", id)
+        #         removed_device_node.append(id_node)
+        #     root.append(removed_device_node)
 
         # sync registry
         self.registry.sync()

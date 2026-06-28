@@ -747,7 +747,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
 class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
     # class JoystickInputDialog(QtWidgets.QDialog):
-    """handles the filtering of inputs"""
+    """joystick filter dialog"""
 
     def __init__(self, device_guid, callback=None, parent=None):
         """
@@ -1077,13 +1077,10 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
         self._input_widgets.clear()  # remove all widget references
         for widget in self._widgets:
             widget.unhook()
+            gremlin.util.delete_widget(widget)
 
-        self._widgets.clear()
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event.disconnect(self._joystick_event_handler)
-
-        gremlin.util.clear_layout(self.main_layout)  # free up QT resources
-        return super().closeEvent(event)
+        gremlin.util.clear_widget_references(self)
+        super().closeEvent(event)
 
     def _joystick_event_handler(self, event):
         """handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time"""
