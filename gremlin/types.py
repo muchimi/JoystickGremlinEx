@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from __future__ import annotations # deprecated with python 3.14+
+from __future__ import annotations  # deprecated with python 3.14+
 
 from enum import Enum, auto, IntFlag, IntEnum, unique
 
@@ -30,8 +30,8 @@ import enum
 
 syslog = logging.getLogger("system")
 
-class VisualizationType(IntEnum):
 
+class VisualizationType(IntEnum):
     """Enumeration of possible visualization types."""
 
     AxisTemporal = 1
@@ -43,31 +43,25 @@ class VisualizationType(IntEnum):
     Hat = 7
 
 
-class KeyboardOutputMode(Enum): # order is that of the display order for keyboard mapper options
-    Pulse = 0 # keyboard make and break (press/release) (pulse mode)
-    AutoRepeat = 1 # pulse mode - key pulses while the input is held
-    Press = 2 # keyboard make only
-    Release = 3 # keyboard release only
-    Hold = 4 # press while held (default GremlinEx behavior)
-    Toggle = 5 # toggles make / break
+class KeyboardOutputMode(Enum):  # order is that of the display order for keyboard mapper options
+    Pulse = 0  # keyboard make and break (press/release) (pulse mode)
+    AutoRepeat = 1  # pulse mode - key pulses while the input is held
+    Press = 2  # keyboard make only
+    Release = 3  # keyboard release only
+    Hold = 4  # press while held (default GremlinEx behavior)
+    Toggle = 5  # toggles make / break
 
     @staticmethod
-    def to_displayname(value : KeyboardOutputMode):  # noqa: F821
+    def to_displayname(value: KeyboardOutputMode):  # noqa: F821
         match value:
-            case  KeyboardOutputMode.Pulse:
+            case KeyboardOutputMode.Pulse:
                 return "Pulse Single"
-            case  KeyboardOutputMode.AutoRepeat:
+            case KeyboardOutputMode.AutoRepeat:
                 return "Pulse Repeat"
         return value.name
 
 
-
-
-
-
-
 class AxisNames(Enum):
-
     """Names associated with axis indices."""
 
     X = 1
@@ -108,7 +102,7 @@ _AxisNames_to_string_lookup = {
     AxisNames.RY: "Y Rotation (5)",
     AxisNames.RZ: "Z Rotation (6)",
     AxisNames.SLIDER: "Slider (7)",
-    AxisNames.DIAL: "Dial (8)"
+    AxisNames.DIAL: "Dial (8)",
 }
 _AxisNames_to_enum_lookup = {
     "X Axis (1)": AxisNames.X,
@@ -118,50 +112,42 @@ _AxisNames_to_enum_lookup = {
     "Y Rotation (5)": AxisNames.RY,
     "Z Rotation (6)": AxisNames.RZ,
     "Slider (7)": AxisNames.SLIDER,
-    "Dial (8)": AxisNames.DIAL
+    "Dial (8)": AxisNames.DIAL,
 }
 
 
 class AxisButtonDirection(Enum):
-
     """Possible activation directions for axis button instances."""
 
     Anywhere = 1
     Below = 2
-    Above = 3,
+    Above = (3,)
 
     @staticmethod
     def to_string(value: AxisButtonDirection) -> str:  # noqa: F821
         try:
             return _AxisButtonDirection_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                f"Invalid AxisButtonDirection lookup, {value}"
-            )
+            raise gremlin.error.GremlinError(f"Invalid AxisButtonDirection lookup, {value}")
 
     @staticmethod
     def to_enum(value: str) -> AxisButtonDirection:  # noqa: F821
         try:
             return _AxisButtonDirection_to_enum_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                f"Invalid AxisButtonDirection lookup, {value}"
-            )
+            raise gremlin.error.GremlinError(f"Invalid AxisButtonDirection lookup, {value}")
 
 
 _AxisButtonDirection_to_string_lookup = {
     AxisButtonDirection.Anywhere: "anywhere",
     AxisButtonDirection.Above: "above",
     AxisButtonDirection.Below: "below",
-
-
 }
 _AxisButtonDirection_to_enum_lookup = {
     "anywhere": AxisButtonDirection.Anywhere,
     "above": AxisButtonDirection.Above,
     "below": AxisButtonDirection.Below,
 }
-
 
 
 class xIntEnum(IntEnum):
@@ -175,19 +161,20 @@ class xIntEnum(IntEnum):
     def __hash__(self) -> int:
         return hash(self.value)
 
-class ControlAction(IntEnum):
-    ''' defines the available control actions for the control plugin'''
-    EnableInput = 0 # enables an input
-    DisableInput = 1 # disable an input
-    ToggleInput = 2 # toggle the input
-    TTSAbort = 3 # abort current text to speech (clears queue and aborts current speech if any)
-    RemoteEnable = 4 # enable remote output
-    RemoteDisable = 5 # disable remote output
-    RemoteToggle = 6 # toggle remote control
-    LocalEnable = 7 # enable local output
-    LocalDisable = 8 # disable local output
-    ProfileStop = 9 # stop current profile
 
+class ControlAction(IntEnum):
+    """defines the available control actions for the control plugin"""
+
+    EnableInput = 0  # enables an input
+    DisableInput = 1  # disable an input
+    ToggleInput = 2  # toggle the input
+    TTSAbort = 3  # abort current text to speech (clears queue and aborts current speech if any)
+    RemoteEnable = 4  # enable remote output
+    RemoteDisable = 5  # disable remote output
+    RemoteToggle = 6  # toggle remote control
+    LocalEnable = 7  # enable local output
+    LocalDisable = 8  # disable local output
+    ProfileStop = 9  # stop current profile
 
     @staticmethod
     def to_string(action):
@@ -200,7 +187,6 @@ class ControlAction(IntEnum):
             if action.name.casefold() == name:
                 return action
         return None
-
 
     @staticmethod
     def to_display_name(action):
@@ -220,58 +206,61 @@ _control_action_display = {
     ControlAction.RemoteToggle: "Toggle Remote",
 }
 
+
 class DeviceCategory(IntEnum):
-    """ holds device categories for possible inputs """
-    NotSet = 0,
-    Physical = 1, # physical device like an HID or DINPUT
-    Virtual = 2 # VIrtual device
-    Special = 3 # special devices that are not joysticks (like keyboard)
-    Config = 4 # configuration device like settings
+    """holds device categories for possible inputs"""
+
+    NotSet = (0,)
+    Physical = (1,)  # physical device like an HID or DINPUT
+    Virtual = 2  # VIrtual device
+    Special = 3  # special devices that are not joysticks (like keyboard)
+    Config = 4  # configuration device like settings
 
     @staticmethod
     def to_string(value):
         return _device_category_to_string[value]
 
-
     @staticmethod
-    def from_string(value)  :
+    def from_string(value):
         return _device_category_from_string[value.casefold()]
 
 
 _device_category_from_string = {
-    "notset" : DeviceCategory.NotSet,
-    "physical" :DeviceCategory.Physical,
-    "virtual" :DeviceCategory.Virtual,
-    "special" :DeviceCategory.Special,
-    "config" :DeviceCategory.Config,
+    "notset": DeviceCategory.NotSet,
+    "physical": DeviceCategory.Physical,
+    "virtual": DeviceCategory.Virtual,
+    "special": DeviceCategory.Special,
+    "config": DeviceCategory.Config,
 }
 
 _device_category_to_string = {
-    DeviceCategory.NotSet : "notset",
-    DeviceCategory.Physical : "physical",
-    DeviceCategory.Virtual : "virtual" ,
-    DeviceCategory.Special : "special",
-    DeviceCategory.Config : "config"
+    DeviceCategory.NotSet: "notset",
+    DeviceCategory.Physical: "physical",
+    DeviceCategory.Virtual: "virtual",
+    DeviceCategory.Special: "special",
+    DeviceCategory.Config: "config",
 }
-class DeviceType(IntEnum):
 
+
+class DeviceType(IntEnum):
     """Enumeration of the different possible input types."""
-    NotSet = 0 # not set
-    Keyboard = 1 # keyboard special device
-    Joystick = 2 # joystick or game controller
-    VJoy = 3 # vjoy (virtual)
-    Midi = 4 # midi special device
-    Osc = 5 # open source control special device
-    ModeControl = 6 # mode control special device
-    Settings = 7 # settings special device
-    State = 8 # state special device
-    Plugins = 9 # plugins special device
-    OctaviIFR1 = 10 # octavi IFR1 special device
-    Maestro = 11 # maestro special device
+
+    NotSet = 0  # not set
+    Keyboard = 1  # keyboard special device
+    Joystick = 2  # joystick or game controller
+    VJoy = 3  # vjoy (virtual)
+    Midi = 4  # midi special device
+    Osc = 5  # open source control special device
+    ModeControl = 6  # mode control special device
+    Settings = 7  # settings special device
+    State = 8  # state special device
+    Plugins = 9  # plugins special device
+    OctaviIFR1 = 10  # octavi IFR1 special device
+    Maestro = 11  # maestro special device
 
     @staticmethod
-    def isFixedInput(value : DeviceType) -> bool:
-        """ true if the input is not user defined"""
+    def isFixedInput(value: DeviceType) -> bool:
+        """true if the input is not user defined"""
         return value in (
             DeviceType.NotSet,
             DeviceType.Joystick,
@@ -279,8 +268,8 @@ class DeviceType(IntEnum):
         )
 
     @staticmethod
-    def isPersistable(value : DeviceType) -> bool:
-        """ true if the input is persistable to a profile """
+    def isPersistable(value: DeviceType) -> bool:
+        """true if the input is persistable to a profile"""
         return value not in (
             DeviceType.NotSet,
             DeviceType.Settings,
@@ -296,7 +285,6 @@ class DeviceType(IntEnum):
         syslog.error(f"DeviceType lookup failed in to_string(): unable to find type: [{value}] - defaulting to NotSet")
         return "invalid"
 
-
     @staticmethod
     def to_enum(value):
         if isinstance(value, int):
@@ -307,13 +295,13 @@ class DeviceType(IntEnum):
         syslog.error(f"DeviceType lookup failed in to_enum(): unable to find type: [{value}] - defaulting to NotSet")
         return DeviceType.NotSet
 
-
     @staticmethod
     def to_display_name(value):
         if value in _DeviceType_to_display_name:
             return _DeviceType_to_display_name[value]
         syslog.error(f"DeviceType lookup failed in to_display_name(): unable to find : [{value}]")
         return f"Unknown device type: [{value}]"
+
 
 _DeviceType_to_display_name = {
     DeviceType.NotSet: "(invalid)",
@@ -323,11 +311,11 @@ _DeviceType_to_display_name = {
     DeviceType.Midi: "MIDI",
     DeviceType.Osc: "OSC",
     DeviceType.ModeControl: "Mode Control",
-    DeviceType.Settings : "Settings",
-    DeviceType.State : "State",
-    DeviceType.Plugins : "Plugins",
-    DeviceType.OctaviIFR1 : "Octavi IFR1",
-    DeviceType.Maestro : "Maestro"
+    DeviceType.Settings: "Settings",
+    DeviceType.State: "State",
+    DeviceType.Plugins: "Plugins",
+    DeviceType.OctaviIFR1: "Octavi IFR1",
+    DeviceType.Maestro: "Maestro",
 }
 
 _DeviceType_to_string_lookup = {
@@ -342,7 +330,7 @@ _DeviceType_to_string_lookup = {
     DeviceType.State: "state",
     DeviceType.Plugins: "plugins",
     DeviceType.OctaviIFR1: "octaviifr1",
-    DeviceType.Maestro: "maestro"
+    DeviceType.Maestro: "maestro",
 }
 
 
@@ -355,16 +343,14 @@ _DeviceType_to_enum_lookup = {
     "osc": DeviceType.Osc,
     "mode": DeviceType.ModeControl,
     "settings": DeviceType.Settings,
-    "state" : DeviceType.State,
-    "plugins" : DeviceType.Plugins,
-    "octaviifr1" : DeviceType.OctaviIFR1,
-    "maestro" : DeviceType.Maestro
-
+    "state": DeviceType.State,
+    "plugins": DeviceType.Plugins,
+    "octaviifr1": DeviceType.OctaviIFR1,
+    "maestro": DeviceType.Maestro,
 }
 
 
 class PluginVariableType(xIntEnum):
-
     """Enumeration of all supported variable types."""
 
     Int = 1
@@ -380,23 +366,17 @@ class PluginVariableType(xIntEnum):
     def to_string(value: PluginVariableType) -> str:  # noqa: F821
         try:
             v = value.value
-            data = next((item for item in PluginVariableType if item.value == v),None)
+            data = next((item for item in PluginVariableType if item.value == v), None)
             return _PluginVariableType_to_string_lookup[data]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PluginVariableType in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
     @staticmethod
     def to_enum(value: str) -> PluginVariableType:  # noqa: F821
         try:
             return _PluginVariableType_to_enum_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PluginVariableType in lookup"
-            )
-
-
+            raise gremlin.error.GremlinError("Invalid PluginVariableType in lookup")
 
 
 _PluginVariableType_to_string_lookup = {
@@ -407,7 +387,7 @@ _PluginVariableType_to_string_lookup = {
     PluginVariableType.PhysicalInput: "PhysicalInput",
     PluginVariableType.VirtualInput: "VirtualInput",
     PluginVariableType.Mode: "Mode",
-    PluginVariableType.Selection: "Selection"
+    PluginVariableType.Selection: "Selection",
 }
 _PluginVariableType_to_enum_lookup = {
     "Int": PluginVariableType.Int,
@@ -417,12 +397,11 @@ _PluginVariableType_to_enum_lookup = {
     "PhysicalInput": PluginVariableType.PhysicalInput,
     "VirtualInput": PluginVariableType.VirtualInput,
     "Mode": PluginVariableType.Mode,
-    "Selection": PluginVariableType.Selection
+    "Selection": PluginVariableType.Selection,
 }
 
 
 class MergeAxisOperation(Enum):
-
     """Possible merge axis operation modes."""
 
     Average = 1
@@ -435,36 +414,31 @@ class MergeAxisOperation(Enum):
         try:
             return _MergeAxisOperation_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid MergeAxisOperation in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid MergeAxisOperation in lookup")
 
     @staticmethod
     def to_enum(value: str) -> MergeAxisOperation:  # noqa: F821
         try:
             return _MergeAxisOperation_to_enum_lookup[value.lower()]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid MergeAxisOperation in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid MergeAxisOperation in lookup")
 
 
 _MergeAxisOperation_to_string_lookup = {
     MergeAxisOperation.Average: "average",
     MergeAxisOperation.Minimum: "minimum",
     MergeAxisOperation.Maximum: "maximum",
-    MergeAxisOperation.Sum: "sum"
+    MergeAxisOperation.Sum: "sum",
 }
 _MergeAxisOperation_to_enum_lookup = {
     "average": MergeAxisOperation.Average,
     "minimum": MergeAxisOperation.Minimum,
     "maximum": MergeAxisOperation.Maximum,
-    "sum": MergeAxisOperation.Sum
+    "sum": MergeAxisOperation.Sum,
 }
 
 
 class PropertyType(Enum):
-
     """Enumeration of all known property types."""
 
     String = 1
@@ -489,18 +463,15 @@ class PropertyType(Enum):
         try:
             return _PropertyType_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PropertyType in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid PropertyType in lookup")
 
     @staticmethod
     def to_enum(value: str) -> PropertyType:  # noqa: F821
         try:
             return _PropertyType_to_enum_lookup[value.lower()]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid PropertyType in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid PropertyType in lookup")
+
 
 _PropertyType_to_string_lookup = {
     PropertyType.String: "string",
@@ -536,12 +507,11 @@ _PropertyType_to_enum_lookup = {
     "uuid": PropertyType.UUID,
     "axis_mode": PropertyType.AxisMode,
     "hat_direction": PropertyType.HatDirection,
-    "list": PropertyType.List
+    "list": PropertyType.List,
 }
 
 
 class AxisMode(Enum):
-
     Absolute = 1
     Relative = 2
 
@@ -550,31 +520,21 @@ class AxisMode(Enum):
         try:
             return _AxisMode_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid AxisMode in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid AxisMode in lookup")
 
     @staticmethod
     def to_enum(value: str) -> AxisMode:  # noqa: F821
         try:
             return _AxisMode_to_enum_lookup[value.lower()]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid AxisMode in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid AxisMode in lookup")
 
-_AxisMode_to_string_lookup = {
-    AxisMode.Absolute: "absolute",
-    AxisMode.Relative: "relative"
-}
-_AxisMode_to_enum_lookup = {
-    "absolute": AxisMode.Absolute,
-    "relative": AxisMode.Relative
-}
+
+_AxisMode_to_string_lookup = {AxisMode.Absolute: "absolute", AxisMode.Relative: "relative"}
+_AxisMode_to_enum_lookup = {"absolute": AxisMode.Absolute, "relative": AxisMode.Relative}
 
 
 class HatDirection(Enum):
-
     """Represents the possible directions a hat can take on."""
 
     Center = (0, 0)
@@ -592,9 +552,7 @@ class HatDirection(Enum):
         try:
             return _HatDirection_to_string_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid HatDirection in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid HatDirection in lookup")
 
     @staticmethod
     def to_enum(value: Union[str, Tuple[int, int]]) -> HatDirection:  # noqa: F821
@@ -606,17 +564,16 @@ class HatDirection(Enum):
             else:
                 return _HatDirection_to_enum_lookup[value]
         except KeyError:
-            raise gremlin.error.GremlinError(
-                "Invalid HatDirection in lookup"
-            )
+            raise gremlin.error.GremlinError("Invalid HatDirection in lookup")
 
     @staticmethod
-    def to_position(value : HatDirection) -> tuple:  # noqa: F821
+    def to_position(value: HatDirection) -> tuple:  # noqa: F821
         return value.value
 
     @staticmethod
     def to_display_name(value: HatDirection) -> str:  # noqa: F821
         return value.name
+
 
 _HatDirection_to_string_lookup = {
     HatDirection.Center: "center",
@@ -654,9 +611,7 @@ _HatDirection_to_enum_lookup = {
 }
 
 
-
 class LogicalOperator(Enum):
-
     """Enumeration of possible condition combinations."""
 
     Any = 1
@@ -664,46 +619,30 @@ class LogicalOperator(Enum):
 
     @staticmethod
     def to_display(instance: LogicalOperator) -> str:  # noqa: F821
-        lookup = {
-            LogicalOperator.Any: "Any",
-            LogicalOperator.All: "All"
-        }
+        lookup = {LogicalOperator.Any: "Any", LogicalOperator.All: "All"}
         value = lookup.get(instance, None)
         if value is None:
-            raise gremlin.error.GremlinError(
-                f"Invalid logical operator type: {str(instance)}"
-            )
+            raise gremlin.error.GremlinError(f"Invalid logical operator type: {str(instance)}")
         return value
 
     @staticmethod
     def to_string(instance: LogicalOperator) -> str:  # noqa: F821
-        lookup = {
-            LogicalOperator.Any: "any",
-            LogicalOperator.All: "all"
-        }
+        lookup = {LogicalOperator.Any: "any", LogicalOperator.All: "all"}
         value = lookup.get(instance, None)
         if value is None:
-            raise gremlin.error.GremlinError(
-                f"Invalid logical operator type: {str(instance)}"
-            )
+            raise gremlin.error.GremlinError(f"Invalid logical operator type: {str(instance)}")
         return value
 
     @staticmethod
     def to_enum(string: str) -> LogicalOperator:  # noqa: F821
-        lookup = {
-            "any": LogicalOperator.Any,
-            "all": LogicalOperator.All
-        }
+        lookup = {"any": LogicalOperator.Any, "all": LogicalOperator.All}
         value = lookup.get(string, None)
         if value is None:
-            raise gremlin.error.GremlinError(
-                f"Invalid logical operator type: {str(string)}"
-            )
+            raise gremlin.error.GremlinError(f"Invalid logical operator type: {str(string)}")
         return value
 
 
 class ConditionType(Enum):
-
     """Enumeration of possible condition types."""
 
     Joystick = 1
@@ -719,9 +658,7 @@ class ConditionType(Enum):
         }
         value = lookup.get(instance, None)
         if value is None:
-            raise gremlin.error.GremlinError(
-                f"Invalid condition operator type: {str(instance)}"
-            )
+            raise gremlin.error.GremlinError(f"Invalid condition operator type: {str(instance)}")
         return value
 
     @staticmethod
@@ -733,9 +670,7 @@ class ConditionType(Enum):
         }
         value = lookup.get(instance, None)
         if value is None:
-            raise gremlin.error.GremlinError(
-                f"Invalid condition operator type: {str(instance)}"
-            )
+            raise gremlin.error.GremlinError(f"Invalid condition operator type: {str(instance)}")
         return value
 
     @staticmethod
@@ -747,18 +682,15 @@ class ConditionType(Enum):
         }
         value = lookup.get(string, None)
         if value is None:
-            raise gremlin.error.GremlinError(
-                f"Invalid condition operator type: {str(string)}"
-            )
+            raise gremlin.error.GremlinError(f"Invalid condition operator type: {str(string)}")
         return value
 
 
-
 class MouseClickMode(Enum):
-    Normal = 0 # click on/off
-    Press = 1 # press only
-    Release = 2 # release only
-    DoubleClick = 3 # double click
+    Normal = 0  # click on/off
+    Press = 1  # press only
+    Release = 2  # release only
+    DoubleClick = 3  # double click
 
     @staticmethod
     def to_string(mode):
@@ -776,7 +708,7 @@ class MouseClickMode(Enum):
 
     @staticmethod
     def from_string(str):
-        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        """converts from a string representation (text or numeric) to the enum, not case sensitive"""
         str = str.casefold().strip()
         if str.isnumeric():
             mode = int(str)
@@ -789,7 +721,7 @@ class MouseClickMode(Enum):
 
     @staticmethod
     def to_description(action):
-        ''' returns a descriptive string for the action '''
+        """returns a descriptive string for the action"""
         if action == MouseClickMode.Normal:
             return "Normal Click"
         elif action == MouseClickMode.Press:
@@ -800,10 +732,9 @@ class MouseClickMode(Enum):
             return "Double Click"
         return f"Unknown {action}"
 
-
     @staticmethod
     def to_name(action):
-        ''' returns the name from the action '''
+        """returns the name from the action"""
         if action == MouseClickMode.Normal:
             return "Normal Click"
         elif action == MouseClickMode.Press:
@@ -814,11 +745,12 @@ class MouseClickMode(Enum):
             return "Double click"
         return f"Unknown {action}"
 
+
 class MouseAction(Enum):
-    MouseButton = 0 # output a mouse button
-    MouseMotion = 1 # output a mouse motion
-    MousePosition = 2 # set the exact mouse position (via setcursorposition)
-    MouseSetPrecisionPosition = 3 # set the exact mouse position via send input precision
+    MouseButton = 0  # output a mouse button
+    MouseMotion = 1  # output a mouse motion
+    MousePosition = 2  # set the exact mouse position (via setcursorposition)
+    MouseSetPrecisionPosition = 3  # set the exact mouse position via send input precision
 
     @staticmethod
     def to_string(mode):
@@ -836,7 +768,7 @@ class MouseAction(Enum):
 
     @staticmethod
     def from_string(str):
-        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        """converts from a string representation (text or numeric) to the enum, not case sensitive"""
         str = str.lower().strip()
         if str.isnumeric():
             mode = int(str)
@@ -849,7 +781,7 @@ class MouseAction(Enum):
 
     @staticmethod
     def to_description(action):
-        ''' returns a descriptive string for the action '''
+        """returns a descriptive string for the action"""
         match action:
             case MouseAction.MouseButton:
                 return "Maps a mouse button"
@@ -858,12 +790,11 @@ class MouseAction(Enum):
             case MouseAction.MousePosition:
                 return "Sets the mouse position"
 
-
         return f"Unknown [{action}]"
 
     @staticmethod
     def to_name(action):
-        ''' returns the name from the action '''
+        """returns the name from the action"""
         match action:
             case MouseAction.MouseButton:
                 return "Mouse button"
@@ -874,31 +805,27 @@ class MouseAction(Enum):
             case MouseAction.MouseSetPrecisionPosition:
                 return "Mouse position (precision)"
 
-
-
-
-
         return f"Unknown [{action}]"
 
-class MouseButton(IntEnum):
 
+class MouseButton(IntEnum):
     """Enumeration of all possible mouse buttons."""
-    NotSet = 0, # not a button
+
+    NotSet = (0,)  # not a button
     Left = 1
     Right = 2
     Middle = 3
-    DoubleLeft = 0x101 # add 0x100
-    DoubleRight = 0x102 # add 0x100
-    DoubleMiddle = 0x103 # add 0x100
+    DoubleLeft = 0x101  # add 0x100
+    DoubleRight = 0x102  # add 0x100
+    DoubleMiddle = 0x103  # add 0x100
     Forward = 4
     Back = 5
     WheelUp = 10
     WheelDown = 11
     WheelLeft = 12
     WheelRight = 13
-    Wheel = 14 # up down wheel
-    HWheel = 15# left right wheel
-
+    Wheel = 14  # up down wheel
+    HWheel = 15  # left right wheel
 
     @staticmethod
     def to_string(value):
@@ -918,7 +845,7 @@ class MouseButton(IntEnum):
 
     @staticmethod
     def to_lookup_string(value):
-        ''' mouse button to key lookup name'''
+        """mouse button to key lookup name"""
         try:
             return _MouseButton_to_lookup_string_lookup[value]
         except KeyError:
@@ -935,15 +862,14 @@ class MouseButton(IntEnum):
 
     def to_short_name(value):
         if value in _MouseButton_to_enum_lookup:
-            value = _MouseButton_to_enum_lookup[value] # to enum
+            value = _MouseButton_to_enum_lookup[value]  # to enum
         if value in _MouseButton_to_short_string_lookup:
-            return _MouseButton_to_short_string_lookup[value] # to short name
+            return _MouseButton_to_short_string_lookup[value]  # to short name
         return value
 
     def is_lookup_valid(value):
         # true if the enum is a mouse button
         return value in _MouseButton_to_enum_lookup
-
 
 
 _MouseButton_to_string_lookup = {
@@ -961,7 +887,7 @@ _MouseButton_to_string_lookup = {
     MouseButton.DoubleRight: "Mouse DClick Right",
     MouseButton.DoubleMiddle: "Mouse DClick Middle",
     MouseButton.Wheel: "Vertical Wheel",
-    MouseButton.HWheel: "Horizontal Wheel"
+    MouseButton.HWheel: "Horizontal Wheel",
 }
 
 _MouseButton_to_short_string_lookup = {
@@ -979,7 +905,7 @@ _MouseButton_to_short_string_lookup = {
     MouseButton.DoubleRight: "DC2",
     MouseButton.DoubleMiddle: "DC3",
     MouseButton.Wheel: "VW",
-    MouseButton.HWheel: "HW"
+    MouseButton.HWheel: "HW",
 }
 
 _MouseButton_to_lookup_string_lookup = {
@@ -997,14 +923,13 @@ _MouseButton_to_lookup_string_lookup = {
     MouseButton.DoubleRight: "mouse_d_2",
     MouseButton.DoubleMiddle: "mouse_d_3",
     MouseButton.Wheel: "v_wheel",
-    MouseButton.HWheel: "h_wheel"
+    MouseButton.HWheel: "h_wheel",
 }
 
 
-
 _MouseButton_to_enum_lookup = {
-    "N/A" : MouseButton.NotSet,
-    "null" : MouseButton.NotSet,
+    "N/A": MouseButton.NotSet,
+    "null": MouseButton.NotSet,
     "Mouse Left": MouseButton.Left,
     "Mouse Right": MouseButton.Right,
     "Mouse Middle": MouseButton.Middle,
@@ -1025,44 +950,42 @@ _MouseButton_to_enum_lookup = {
     "wheel_left": MouseButton.WheelLeft,
     "Wheel Right": MouseButton.WheelRight,
     "wheel_right": MouseButton.WheelRight,
-    "mouse_d_1" : MouseButton.DoubleLeft,
-    "mouse_d_2" : MouseButton.DoubleRight,
-    "mouse_d_3" : MouseButton.DoubleMiddle,
+    "mouse_d_1": MouseButton.DoubleLeft,
+    "mouse_d_2": MouseButton.DoubleRight,
+    "mouse_d_3": MouseButton.DoubleMiddle,
     "v_wheel": MouseButton.Wheel,
     "h_wheel": MouseButton.HWheel,
     "VW": MouseButton.Wheel,
     "HW": MouseButton.HWheel,
-
 }
-
 
 
 @unique
 class VerboseMode(IntFlag):
     NotSet = 0
-    Keyboard = auto() # keyboard input only
-    Joystick = auto() # joystick input
-    Inputs = auto() # list inputs
-    Mouse = auto() # mouse output
-    MouseInput = auto() # mouse input
-    SimConnect = auto() # simconnect interface
-    Details = auto() # user interface details
-    Condition = auto() # conditions diagnostics / execution graph
-    OSC = auto() # OSC data
-    Process = auto() # process changes
-    Exec = auto() # execution trees
-    Midi = auto() # midi mode
-    Device = auto() # device change modes
-    Macro = auto() # macro
-    Gate = auto() # auto
-    Outputs = auto() # list outputs
-    UI = auto() # UI mode
+    Keyboard = auto()  # keyboard input only
+    Joystick = auto()  # joystick input
+    Inputs = auto()  # list inputs
+    Mouse = auto()  # mouse output
+    MouseInput = auto()  # mouse input
+    SimConnect = auto()  # simconnect interface
+    Details = auto()  # user interface details
+    Condition = auto()  # conditions diagnostics / execution graph
+    OSC = auto()  # OSC data
+    Process = auto()  # process changes
+    Exec = auto()  # execution trees
+    Midi = auto()  # midi mode
+    Device = auto()  # device change modes
+    Macro = auto()  # macro
+    Gate = auto()  # auto
+    Outputs = auto()  # list outputs
+    UI = auto()  # UI mode
     ExecDetails = auto()
     VJoy = auto()
-    State = auto() # state management
-    Extra = auto() # extra info for any other mode
-    Remote = auto() # remote receive
-    Container = auto() # container debug mode
+    State = auto()  # state management
+    Extra = auto()  # extra info for any other mode
+    Remote = auto()  # remote receive
+    Container = auto()  # container debug mode
     Octavi = auto()
     dinput = auto()
     Curve = auto()
@@ -1082,21 +1005,58 @@ class VerboseMode(IntFlag):
     L1 = auto()
     L2 = auto()
     L3 = auto()
-    All = Keyboard | Joystick | Inputs | Mouse | MouseInput | Details | \
-          SimConnect | Condition | Process | Exec | Midi | \
-          Device | Macro | Gate | Outputs | UI | ExecDetails |\
-          VJoy | State | Extra | Remote | Container | Octavi |\
-          dinput | Curve | TTS | Sound | Filter | Perf | Events |\
-          Calib | Hooks | Merge | Sequence | Mode | InputItems | Switch |\
-          Select | L1 | L2 | L3
+    All = (
+        Keyboard
+        | Joystick
+        | Inputs
+        | Mouse
+        | MouseInput
+        | Details
+        | SimConnect
+        | Condition
+        | Process
+        | Exec
+        | Midi
+        | Device
+        | Macro
+        | Gate
+        | Outputs
+        | UI
+        | ExecDetails
+        | VJoy
+        | State
+        | Extra
+        | Remote
+        | Container
+        | Octavi
+        | dinput
+        | Curve
+        | TTS
+        | Sound
+        | Filter
+        | Perf
+        | Events
+        | Calib
+        | Hooks
+        | Merge
+        | Sequence
+        | Mode
+        | InputItems
+        | Switch
+        | Select
+        | L1
+        | L2
+        | L3
+    )
 
     def __contains__(self, item):
-        return  (self.value & item.value) == item.value
+        return (self.value & item.value) == item.value
 
 
 @unique
 class TabDeviceType(int, Enum):
-    ''' types of devices shown on device tabs '''
+    """types of devices shown on device tabs"""
+
     NotSet = 0
     Joystick = 1
     Keyboard = 2
@@ -1114,7 +1074,8 @@ class TabDeviceType(int, Enum):
 
 
 class GamePadOutput(Enum):
-    ''' outputs for gamepads '''
+    """outputs for gamepads"""
+
     NotSet = auto()
     LeftStickX = auto()
     LeftStickY = auto()
@@ -1150,8 +1111,9 @@ class GamePadOutput(Enum):
     def to_display_name(value):
         return _gamepad_output_to_display_name[value]
 
+
 _gamepad_output_to_string = {
-    GamePadOutput.NotSet : "none",
+    GamePadOutput.NotSet: "none",
     GamePadOutput.LeftStickX: "left_x",
     GamePadOutput.LeftStickY: "left_y",
     GamePadOutput.RightStickX: "right_x",
@@ -1159,24 +1121,24 @@ _gamepad_output_to_string = {
     GamePadOutput.LeftTrigger: "left_trigger",
     GamePadOutput.RightTrigger: "right_trigger",
     GamePadOutput.ButtonA: "button_a",
-    GamePadOutput.ButtonB:"button_b",
+    GamePadOutput.ButtonB: "button_b",
     GamePadOutput.ButtonX: "button_x",
-    GamePadOutput.ButtonY:"button_y",
-    GamePadOutput.ButtonStart:"button_start",
-    GamePadOutput.ButtonBack:"button_back",
-    GamePadOutput.ButtonThumbLeft:"button_thumb_left",
-    GamePadOutput.ButtonThumbRight:"button_thumb_right",
-    GamePadOutput.ButtonGuide:"button_guide",
-    GamePadOutput.ButtonShoulderLeft:"button_shoulder_left",
-    GamePadOutput.ButtonShoulderRight:"button_shoulder_right",
-    GamePadOutput.ButtonDpadUp:"button_dpad_up",
-    GamePadOutput.ButtonDpadDown:"button_dpad_down",
-    GamePadOutput.ButtonDpadLeft:"button_dpad_left",
-    GamePadOutput.ButtonDpadRight:"button_dpad_right",
+    GamePadOutput.ButtonY: "button_y",
+    GamePadOutput.ButtonStart: "button_start",
+    GamePadOutput.ButtonBack: "button_back",
+    GamePadOutput.ButtonThumbLeft: "button_thumb_left",
+    GamePadOutput.ButtonThumbRight: "button_thumb_right",
+    GamePadOutput.ButtonGuide: "button_guide",
+    GamePadOutput.ButtonShoulderLeft: "button_shoulder_left",
+    GamePadOutput.ButtonShoulderRight: "button_shoulder_right",
+    GamePadOutput.ButtonDpadUp: "button_dpad_up",
+    GamePadOutput.ButtonDpadDown: "button_dpad_down",
+    GamePadOutput.ButtonDpadLeft: "button_dpad_left",
+    GamePadOutput.ButtonDpadRight: "button_dpad_right",
 }
 
 _gamepad_output_to_display_name = {
-    GamePadOutput.NotSet : "N/A",
+    GamePadOutput.NotSet: "N/A",
     GamePadOutput.LeftStickX: "Left Stick X",
     GamePadOutput.LeftStickY: "Left Stick Y",
     GamePadOutput.RightStickX: "Right Stick X",
@@ -1184,27 +1146,27 @@ _gamepad_output_to_display_name = {
     GamePadOutput.LeftTrigger: "Left Trigger",
     GamePadOutput.RightTrigger: "Right Trigger",
     GamePadOutput.ButtonA: "A",
-    GamePadOutput.ButtonB:"B",
+    GamePadOutput.ButtonB: "B",
     GamePadOutput.ButtonX: "X",
-    GamePadOutput.ButtonY:"Y",
-    GamePadOutput.ButtonStart:"Start",
-    GamePadOutput.ButtonBack:"Back",
-    GamePadOutput.ButtonThumbLeft:"Thumb Left",
-    GamePadOutput.ButtonThumbRight:"Thumb Right",
-    GamePadOutput.ButtonGuide:"Guide",
-    GamePadOutput.ButtonShoulderLeft:"Shoulder Left",
-    GamePadOutput.ButtonShoulderRight:"Shoulder Right",
-    GamePadOutput.ButtonDpadUp:"Dpad Up",
-    GamePadOutput.ButtonDpadDown:"Dpad Down",
-    GamePadOutput.ButtonDpadLeft:"Dpad Left",
-    GamePadOutput.ButtonDpadRight:"Dpad Right",
+    GamePadOutput.ButtonY: "Y",
+    GamePadOutput.ButtonStart: "Start",
+    GamePadOutput.ButtonBack: "Back",
+    GamePadOutput.ButtonThumbLeft: "Thumb Left",
+    GamePadOutput.ButtonThumbRight: "Thumb Right",
+    GamePadOutput.ButtonGuide: "Guide",
+    GamePadOutput.ButtonShoulderLeft: "Shoulder Left",
+    GamePadOutput.ButtonShoulderRight: "Shoulder Right",
+    GamePadOutput.ButtonDpadUp: "Dpad Up",
+    GamePadOutput.ButtonDpadDown: "Dpad Down",
+    GamePadOutput.ButtonDpadLeft: "Dpad Left",
+    GamePadOutput.ButtonDpadRight: "Dpad Right",
 }
 
 _gamepad_output_to_enum = {
-    "none": GamePadOutput.NotSet ,
-    "left_x" : GamePadOutput.LeftStickX,
-    "left_y": GamePadOutput.LeftStickY ,
-    "right_x" : GamePadOutput.RightStickX,
+    "none": GamePadOutput.NotSet,
+    "left_x": GamePadOutput.LeftStickX,
+    "left_y": GamePadOutput.LeftStickY,
+    "right_x": GamePadOutput.RightStickX,
     "right_y": GamePadOutput.RightStickY,
     "left_trigger": GamePadOutput.LeftTrigger,
     "right_trigger": GamePadOutput.RightTrigger,
@@ -1227,7 +1189,6 @@ _gamepad_output_to_enum = {
 
 
 class ActivationRule(Enum):
-
     """Activation rules for collections of conditions.
 
     All requires all the conditions in a collection to evaluate to True while
@@ -1238,25 +1199,23 @@ class ActivationRule(Enum):
     Any = 2
 
 
+class ButtonOutputMode(IntEnum):
+    """modes for input hats"""
 
-class ButtonOutputMode (IntEnum):
-    ''' modes for input hats '''
-    Hold = 0 # hold while pressed
-    Pulse = 1 # pulse once
-    Press = 2 # press / on
-    Release = 3 # release / off
-    NoOp = 4 # do nothing
-    Latch = 5 # latch mode (triggers on, sets a timer, an ignores ON retriggers until OFF or until timer lapses)
-
-
+    Hold = 0  # hold while pressed
+    Pulse = 1  # pulse once
+    Press = 2  # press / on
+    Release = 3  # release / off
+    NoOp = 4  # do nothing
+    Latch = 5  # latch mode (triggers on, sets a timer, an ignores ON retriggers until OFF or until timer lapses)
 
 
 class SyncMode(IntEnum):
-    Ignore = 0 # no sync mode
-    Default = 1 # use default value
-    Input = 2 # sync to input
-    LastOrDefault = 3 # sync to last value if there is one, else to the default state
-    LastOrInput = 4 # sync to last value if there is one, else to the input state
+    Ignore = 0  # no sync mode
+    Default = 1  # use default value
+    Input = 2  # sync to input
+    LastOrDefault = 3  # sync to last value if there is one, else to the default state
+    LastOrInput = 4  # sync to last value if there is one, else to the input state
 
     @staticmethod
     def to_description(value):
@@ -1264,60 +1223,59 @@ class SyncMode(IntEnum):
             return _syncmode_to_description[value]
         return f"Unknown mode: {value}"
 
+
 _syncmode_to_description = {
-    SyncMode.Ignore : "Do nothing",
-    SyncMode.Default : "Use the default value on profile start.",
-    SyncMode.Input : "Sync with the current input value",
-    SyncMode.LastOrDefault : "Use the last value at profile stop or the default value",
-    SyncMode.LastOrInput : "Use the Last value at profile stop or the current input value "
+    SyncMode.Ignore: "Do nothing",
+    SyncMode.Default: "Use the default value on profile start.",
+    SyncMode.Input: "Sync with the current input value",
+    SyncMode.LastOrDefault: "Use the last value at profile stop or the default value",
+    SyncMode.LastOrInput: "Use the Last value at profile stop or the current input value ",
 }
 
 
-
-
 class VjoyAction(enum.Enum):
-    ''' defines available vjoy actions supported by the vjoy mapper plugins'''
-    VJoyButton = 0 # hold state
-    VJoyToggle = 1 # toggle function on/off
-    VJoyPulse = 2 # pulse function (pulses a button),
-    VJoyInvertAxis = 3 # invert axis function
-    VJoySetAxis = 4 # set axis value
-    VJoyAxis = 5 # normal map to axis
-    VJoyHat = 6 #  normal map to hat (hold mode)
-    VJoyRangeAxis = 7 # scale axis
-    VJoyAxisToButton = 8 # axis to button mapping
-    VJoyToggleRemote = 9 # toggle remote control
-    VJoyEnableRemoteOnly = 10 # enables remote control, disables local control
-    VJoyEnableLocalOnly = 11 # enables local control, disables remote control
-    VJoyDisableRemote = 12 # turns remote control off
-    VJoyDisableLocal = 13 # turns local control off
-    VJoyEnableRemote = 14 # enables remote control (does not impact local control)
-    VJoyEnableLocal = 15 # enables local control (does not impact remote control)
-    VJoyEnableLocalAndRemote = 16 # enables concurrent local/remote control
-    VJoyEnablePairedRemote = 17 # enables primary fire one and two on remote client
-    VJoyDisablePairedRemote = 18 # disable primary fire one and two on remote client
-    VJoyButtonRelease = 19 # action button release (clear a button if set)
-    VJoyMergeAxis = 20 # action to merge another axis
-    VJoyHatToButton = 21 # action to map a hat to a button
-    VJoySetAxisStepped = 22 # like VjoySetAxis but uses a list of values to bump the index
-    VJoyButtonPress = 23 # action on button press
-    VJoyButtonInverted = 24 # hold state (inverted = off means pressed, on means released)
-    VJoyHatPress = 25 # hat press mode
-    VJoyHatPulse = 26 # hat pulse mode
+    """defines available vjoy actions supported by the vjoy mapper plugins"""
+
+    VJoyButton = 0  # hold state
+    VJoyToggle = 1  # toggle function on/off
+    VJoyPulse = 2  # pulse function (pulses a button),
+    VJoyInvertAxis = 3  # invert axis function
+    VJoySetAxis = 4  # set axis value
+    VJoyAxis = 5  # normal map to axis
+    VJoyHat = 6  #  normal map to hat (hold mode)
+    VJoyRangeAxis = 7  # scale axis
+    VJoyAxisToButton = 8  # axis to button mapping
+    VJoyToggleRemote = 9  # toggle remote control
+    VJoyEnableRemoteOnly = 10  # enables remote control, disables local control
+    VJoyEnableLocalOnly = 11  # enables local control, disables remote control
+    VJoyDisableRemote = 12  # turns remote control off
+    VJoyDisableLocal = 13  # turns local control off
+    VJoyEnableRemote = 14  # enables remote control (does not impact local control)
+    VJoyEnableLocal = 15  # enables local control (does not impact remote control)
+    VJoyEnableLocalAndRemote = 16  # enables concurrent local/remote control
+    VJoyEnablePairedRemote = 17  # enables primary fire one and two on remote client
+    VJoyDisablePairedRemote = 18  # disable primary fire one and two on remote client
+    VJoyButtonRelease = 19  # action button release (clear a button if set)
+    VJoyMergeAxis = 20  # action to merge another axis
+    VJoyHatToButton = 21  # action to map a hat to a button
+    VJoySetAxisStepped = 22  # like VjoySetAxis but uses a list of values to bump the index
+    VJoyButtonPress = 23  # action on button press
+    VJoyButtonInverted = 24  # hold state (inverted = off means pressed, on means released)
+    VJoyHatPress = 25  # hat press mode
+    VJoyHatPulse = 26  # hat pulse mode
 
     @staticmethod
     def is_button_action(mode):
-        ''' true if the mode is a button output mode '''
-        return mode in (VjoyAction.VJoyButton,
-                        VjoyAction.VJoyButtonInverted,
-                        VjoyAction.VJoyAxisToButton,
-                        VjoyAction.VJoyButtonPress,
-                        VjoyAction.VJoyButtonRelease,
-                        VjoyAction.VJoyPulse,
-                        VjoyAction.VJoyToggle,
+        """true if the mode is a button output mode"""
+        return mode in (
+            VjoyAction.VJoyButton,
+            VjoyAction.VJoyButtonInverted,
+            VjoyAction.VJoyAxisToButton,
+            VjoyAction.VJoyButtonPress,
+            VjoyAction.VJoyButtonRelease,
+            VjoyAction.VJoyPulse,
+            VjoyAction.VJoyToggle,
         )
-
-
 
     @staticmethod
     def to_string(mode):
@@ -1333,10 +1291,9 @@ class VjoyAction(enum.Enum):
                 return item
             return cls.VJoyButtonPress
 
-
     @staticmethod
     def from_string(str):
-        ''' converts from a string representation (text or numeric) to the enum, not case sensitive'''
+        """converts from a string representation (text or numeric) to the enum, not case sensitive"""
         str = str.lower().strip()
         if str.isnumeric():
             mode = int(str)
@@ -1349,7 +1306,7 @@ class VjoyAction(enum.Enum):
 
     @staticmethod
     def to_description(action):
-        ''' returns a descriptive string for the action '''
+        """returns a descriptive string for the action"""
         match action:
             case VjoyAction.VJoyAxis:
                 return "Maps a vjoy axis"
@@ -1408,64 +1365,63 @@ class VjoyAction(enum.Enum):
             case VjoyAction.VJoyButtonInverted:
                 return "Presses or releases a button by inverted input state"
 
-
-        msg  = f"Unknown [{action}]"
+        msg = f"Unknown [{action}]"
         syslog.warning(f"Warning: missing action description mapping: {msg}")
         return msg
 
     @staticmethod
     def to_name(action):
-        ''' returns a name string for the action '''
+        """returns a name string for the action"""
         match action:
-            case  VjoyAction.VJoyAxis:
+            case VjoyAction.VJoyAxis:
                 return "Axis"
-            case  VjoyAction.VJoyButtonPress:
+            case VjoyAction.VJoyButtonPress:
                 return "Button (Press)"
-            case  VjoyAction.VJoyHat:
+            case VjoyAction.VJoyHat:
                 return "Hat (Hold)"
-            case  VjoyAction.VJoyHatPress:
+            case VjoyAction.VJoyHatPress:
                 return "Hat (Press)"
-            case  VjoyAction.VJoyHatPulse:
+            case VjoyAction.VJoyHatPulse:
                 return "Hat (Pulse)"
-            case  VjoyAction.VJoyHatToButton:
+            case VjoyAction.VJoyHatToButton:
                 return "Hat to Button"
-            case  VjoyAction.VJoyInvertAxis:
+            case VjoyAction.VJoyInvertAxis:
                 return "Invert Axis"
-            case  VjoyAction.VJoyPulse:
+            case VjoyAction.VJoyPulse:
                 return "Button (Pulse)"
-            case  VjoyAction.VJoySetAxis:
+            case VjoyAction.VJoySetAxis:
                 return "Set Fixed Axis Value"
-            case  VjoyAction.VJoyToggle:
+            case VjoyAction.VJoyToggle:
                 return "Button (Toggle)"
             case VjoyAction.VJoyRangeAxis:
                 return "Set Axis Range"
-            case  VjoyAction.VJoyAxisToButton:
+            case VjoyAction.VJoyAxisToButton:
                 return "Axis to Button"
-            case  VjoyAction.VJoyEnableLocalOnly:
+            case VjoyAction.VJoyEnableLocalOnly:
                 return "Enable Local Control (exclusive)"
-            case  VjoyAction.VJoyEnableRemoteOnly:
+            case VjoyAction.VJoyEnableRemoteOnly:
                 return "Enable Remote Control (exclusive)"
-            case  VjoyAction.VJoyEnableLocal:
+            case VjoyAction.VJoyEnableLocal:
                 return "Enables Local Control"
-            case  VjoyAction.VJoyEnableRemoteOnly:
+            case VjoyAction.VJoyEnableRemoteOnly:
                 return "Enables Remote Control (exclusive)"
-            case  VjoyAction.VJoyEnableLocalAndRemote:
+            case VjoyAction.VJoyEnableLocalAndRemote:
                 return "Enable Concurrent Local and Remote control"
-            case  VjoyAction.VJoyToggleRemote:
+            case VjoyAction.VJoyToggleRemote:
                 return "Toggle Remote Control"
-            case  VjoyAction.VJoyEnablePairedRemote:
+            case VjoyAction.VJoyEnablePairedRemote:
                 return "Enable remote pairing"
-            case  VjoyAction.VJoyDisablePairedRemote:
+            case VjoyAction.VJoyDisablePairedRemote:
                 return "Disable remote pairing"
-            case  VjoyAction.VJoyEnableRemote:
+            case VjoyAction.VJoyEnableRemote:
                 return "Enable remote control"
-            case  VjoyAction.VJoyDisableLocal:
+            case VjoyAction.VJoyDisableLocal:
                 return "Disable local control"
-            case  VjoyAction.VJoyDisableRemote:
+            case VjoyAction.VJoyDisableRemote:
                 return "Disable remote control"
-            case  VjoyAction.VJoyButtonRelease:
+            case VjoyAction.VJoyButtonRelease:
                 return "Button (Release)"
-            case  VjoyAction.VJoyMergeAxis:
+            case VjoyAction.VJoyMergeAxis:
                 return "Merge Axis"
             case VjoyAction.VJoySetAxisStepped:
                 return "Stepped/Linear Axis Value"
@@ -1474,36 +1430,33 @@ class VjoyAction(enum.Enum):
             case VjoyAction.VJoyButtonInverted:
                 return "Button (Inverted)"
 
-
-        msg  = f"Unknown [{action}]"
+        msg = f"Unknown [{action}]"
         syslog.warning(f"Warning: missing action name mapping: {msg}")
         return msg
-
 
     @staticmethod
     def is_command(value):
         return value in (
-        VjoyAction.VJoyDisableLocal,
-        VjoyAction.VJoyDisableRemote,
-        VjoyAction.VJoyEnableLocalOnly,
-        VjoyAction.VJoyEnableRemoteOnly,
-        VjoyAction.VJoyEnableLocalAndRemote,
-        VjoyAction.VJoyEnableLocal,
-        VjoyAction.VJoyEnableRemote,
-        VjoyAction.VJoyToggleRemote,
-        VjoyAction.VJoyEnablePairedRemote,
-        VjoyAction.VJoyDisablePairedRemote,
+            VjoyAction.VJoyDisableLocal,
+            VjoyAction.VJoyDisableRemote,
+            VjoyAction.VJoyEnableLocalOnly,
+            VjoyAction.VJoyEnableRemoteOnly,
+            VjoyAction.VJoyEnableLocalAndRemote,
+            VjoyAction.VJoyEnableLocal,
+            VjoyAction.VJoyEnableRemote,
+            VjoyAction.VJoyToggleRemote,
+            VjoyAction.VJoyEnablePairedRemote,
+            VjoyAction.VJoyDisablePairedRemote,
         )
 
 
-
 class SendType(enum.IntEnum):
-    ''' send type overrides '''
-    Normal = 0 # send normal
-    LocalOnly = 1 # local only
-    RemoteOnly = 2 # remote only
-    LocalAndRemote = 3 # send to both always
+    """send type overrides"""
 
+    Normal = 0  # send normal
+    LocalOnly = 1  # local only
+    RemoteOnly = 2  # remote only
+    LocalAndRemote = 3  # send to both always
 
     @staticmethod
     def to_description(value):
@@ -1518,7 +1471,6 @@ class SendType(enum.IntEnum):
                 return "Local and remote clients regardless of profile setting."
             case _:
                 return f"Don't know how to handle: [{value}]"
-
 
 
 class ContainerViewTypes(enum.Enum):
@@ -1545,6 +1497,7 @@ class ContainerViewTypes(enum.Enum):
 
 _ContainerView_to_enum_lookup = {
     "action": ContainerViewTypes.Action,
+    "actions": ContainerViewTypes.Action,
     "conditions": ContainerViewTypes.Conditions,
     "virtual button": ContainerViewTypes.VirtualButton,
 }
@@ -1558,19 +1511,30 @@ _ContainerView_to_string_lookup = {
 
 
 class Interactions(enum.Enum):
-    """Enumeration of possible interactions in the UI """
+    """Enumeration of possible interactions in the UI"""
 
-    Up = 1 # move item up
-    Down = 2 # move item down
-    Delete = 3 # delete item
-    Edit = 4 # edit item
-    Add = 5 # add item
-    Count = 6 # count item
+    Up = 1  # move item up
+    Down = 2  # move item down
+    Delete = 3  # delete item
+    Edit = 4  # edit item
+    Add = 5  # add item
+    Count = 6  # count item
     Copy = 7  # copy to clipboard
 
 
-class CallbackMode (enum.IntEnum):
-    """ callback execute mode """
+class CallbackMode(enum.IntEnum):
+    """callback execute mode"""
+
     Edit = 1
     Run = 2
     All = Edit | Run
+
+
+class EventSourceType(enum.Enum):
+    """Enumeration of possible event source types."""
+
+    notSet = 0
+    dInput = 1
+    Virtual = 2
+    Midi = 3
+    OSC = 4

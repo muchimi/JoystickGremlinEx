@@ -39,7 +39,7 @@ from PySide6 import QtCore, QtWidgets
 import dinput
 import gremlin.config
 from gremlin.input_types import InputType
-from gremlin.types import DeviceType
+from gremlin.types import DeviceType, EventSourceType
 import gremlin.shared_state
 
 import gremlin.util
@@ -98,6 +98,7 @@ class Event:
         "extra_data",
         "timestamp",
         "is_remote",
+        "source",
         "client_list",
     ]
 
@@ -121,6 +122,7 @@ class Event:
         extra_data: dict = None,  # extra data to pass on (dict)
         is_remote: bool = False,  # true if remote
         client_list=None,  # list of remote clients if remote
+        source: EventSourceType = EventSourceType.dInput,  # source of the event
     ):
         """Creates a new Event object.
 
@@ -158,13 +160,7 @@ class Event:
         self.timestamp = time.time()
         self.is_remote = is_remote
         self.client_list = client_list
-
-    # @property
-    # def is_pressed(self):
-    # 	return self._is_pressed
-    # @is_pressed.setter
-    # def is_pressed(self, value):
-    # 	self._is_pressed = value
+        self.source = source  # source of the event (dinput, vjoy, midi, osc)
 
     @property
     def curve_value(self) -> float:
@@ -688,6 +684,7 @@ class EventListener(QtCore.QObject):
 
     # remove action
     action_delete = Signal(object, object, object)  # fires when an action is about to be deleted, passes the (input_item, container, action) as a parameters
+    action_deleted = Signal(object) # fires when an action is deleted, passes the action as a parameter
 
     virtual_button_changed = Signal(object, object, object)  # runs when the action has modified its input mode (input_item, container, action) as parameters
 
@@ -729,6 +726,9 @@ class EventListener(QtCore.QObject):
 
     # container deleted
     container_delete = Signal(object, object)  # fires when a container is about to be deleted, passes the input item, container as parameters
+
+
+
 
     # update input curve icons
     update_input_icons = Signal()  # fires when the UI needs to refresh input calibration and curve icons
@@ -4359,7 +4359,7 @@ class JoystickEventProcessor:
         return gremlin.input_item.getInputIdKey(input_id)
 
     def registerListenerUICallback(
-        self, device_guid: str | dinput.GUID, input_type: InputType, input_id: int, callback: Callable = None, mode=CallbackMode.Edit
+        self, device_guid: str | dinput.GUID, input_type: InputType, input_id: int, callback: Callable = None, mode=CallbackMode.Edit, source = EventSourceType.dInput
     ):
         """register a joystick listener
 
@@ -4368,6 +4368,7 @@ class JoystickEventProcessor:
         :param input_id: the input id, -1 for any of that type
         :param callback: the handler to call  callback(event)
         :param edit_mode_only: true if the callback is only called when in edit mode
+        :param source: the source of the event to listen for (dinput, vjoy, midi, osc)
 
         """
 
@@ -4392,7 +4393,7 @@ class JoystickEventProcessor:
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
 
-        key = (mode, device_guid, input_type, input_id_key)
+        key = (source, mode, device_guid, input_type, input_id_key)
 
         mode_list = [CallbackMode.Edit, CallbackMode.Run] if mode == CallbackMode.All else [mode]
 
@@ -4403,21 +4404,23 @@ class JoystickEventProcessor:
         else:
             self._callback_map[callback] = []
         self._callback_map[callback].append(key)
+        if source not in self._listener_callbacks:
+            self._listener_callbacks[source] = {}
         for mode in mode_list:
-            if mode not in self._listener_callbacks:
-                self._listener_callbacks[mode] = {}
-            if device_guid not in self._listener_callbacks[mode]:
-                self._listener_callbacks[mode][device_guid] = {}
-            if input_type not in self._listener_callbacks[mode][device_guid]:
-                self._listener_callbacks[mode][device_guid][input_type] = {}
-            if input_id_key not in self._listener_callbacks[mode][device_guid][input_type]:
-                self._listener_callbacks[mode][device_guid][input_type][input_id_key] = []
-            if callback not in self._listener_callbacks[mode][device_guid][input_type][input_id_key]:
-                self._listener_callbacks[mode][device_guid][input_type][input_id_key].append(callback)
+            if mode not in self._listener_callbacks[source]:
+                self._listener_callbacks[source][mode] = {}
+            if device_guid not in self._listener_callbacks[source][mode]:
+                self._listener_callbacks[source][mode][device_guid] = {}
+            if input_type not in self._listener_callbacks[source][mode][device_guid]:
+                self._listener_callbacks[source][mode][device_guid][input_type] = {}
+            if input_id_key not in self._listener_callbacks[source][mode][device_guid][input_type]:
+                self._listener_callbacks[source][mode][device_guid][input_type][input_id_key] = []
+            if callback not in self._listener_callbacks[source][mode][device_guid][input_type][input_id_key]:
+                self._listener_callbacks[source][mode][device_guid][input_type][input_id_key].append(callback)
 
         if verbose:
             syslog.info(
-                f"JEP: add listener: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] queue size: [{len(self._listener_callbacks[mode][device_guid][input_type][input_id_key])}]"
+                f"JEP: add listener: source: [{source.name}] callback: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] queue size: [{len(self._listener_callbacks[source][mode][device_guid][input_type][input_id_key])}]"
             )
             obj = callback.__self__
             if hasattr(obj, "_description"):
@@ -4429,12 +4432,14 @@ class JoystickEventProcessor:
         input_type: InputType = None,
         input_id: int = None,
         callback: Callable = None,
+        source: EventSourceType = EventSourceType.dInput,
     ):
         """removes a registered callback - if input data is provided only looks for that one - if not provided, removes all inputs associated with the callback
         :param device_guid: the id of the device
         :param input_type: the input type
         :param input_id: the input id, -1 for any of that type
         :param callback: the handler to call  callback(event)
+        :param source: the source of the event to listen for (dinput, vjoy, midi, osc)
 
         """
         assert isinstance(callback, Callable), "invalid callback"
@@ -4450,25 +4455,28 @@ class JoystickEventProcessor:
             assert isinstance(device_guid, dinput.GUID), "invalid device guid"
 
         if callback in self._callback_map and self._callback_map[callback]:
-            for l_mode in self._listener_callbacks:
-                for l_device_guid in self._listener_callbacks[l_mode]:
-                    for l_input_type in self._listener_callbacks[l_mode][l_device_guid]:
-                        for l_input_id in self._listener_callbacks[l_mode][l_device_guid][l_input_type]:
-                            if callback in self._listener_callbacks[l_mode][l_device_guid][l_input_type][l_input_id]:
-                                if device_guid is not None and input_type is not None and input_id_key is not None:
-                                    if not (l_device_guid == device_guid and l_input_type == input_type and l_input_id == input_id_key):
-                                        continue
+            for l_source in self._listener_callbacks:
+                if l_source != source:
+                    continue
+                for l_mode in self._listener_callbacks[source]:
+                    for l_device_guid in self._listener_callbacks[source][l_mode]:
+                        for l_input_type in self._listener_callbacks[source][l_mode][l_device_guid]:
+                            for l_input_id in self._listener_callbacks[source][l_mode][l_device_guid][l_input_type]:
+                                if callback in self._listener_callbacks[source][l_mode][l_device_guid][l_input_type][l_input_id]:
+                                    if device_guid is not None and input_type is not None and input_id_key is not None:
+                                        if not (l_device_guid == device_guid and l_input_type == input_type and l_input_id == input_id_key):
+                                            continue
 
-                                self._listener_callbacks[l_mode][l_device_guid][l_input_type][l_input_id].remove(callback)
-                                key = (l_device_guid, l_input_type, l_input_id)
-                                if key in self._callback_map[callback]:
-                                    self._callback_map[callback].remove(key)
+                                    self._listener_callbacks[source][l_mode][l_device_guid][l_input_type][l_input_id].remove(callback)
+                                    key = (l_device_guid, l_input_type, l_input_id)
+                                    if key in self._callback_map[callback]:
+                                        self._callback_map[callback].remove(key)
 
-                                if verbose:
-                                    syslog.info(f"JEP: remove listener: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}]")
-                                    obj = callback.__self__
-                                    if hasattr(obj, "_description"):
-                                        syslog.info(f"\t{obj._description}")
+                                    if verbose:
+                                        syslog.info(f"JEP: remove listener: source: [{source.name}] callback: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}]")
+                                        obj = callback.__self__
+                                        if hasattr(obj, "_description"):
+                                            syslog.info(f"\t{obj._description}")
 
             if not self._callback_map[callback]:
                 del self._callback_map[callback]
@@ -4488,21 +4496,23 @@ class JoystickEventProcessor:
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_events or config.verbose_mode_ui_level(3)
         mode = CallbackMode.Run if gremlin.shared_state.is_running else CallbackMode.Edit
+        source = event.source
 
-        if mode in self._listener_callbacks:
-            if device_guid in self._listener_callbacks[mode]:
-                if input_type in self._listener_callbacks[mode][device_guid]:
-                    if -1 in self._listener_callbacks[mode][device_guid][input_type]:
-                        for callback in self._listener_callbacks[mode][device_guid][input_type][-1]:
-                            if verbose:
-                                syslog.info(f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}")
-                            callback(event)
+        if source in self._listener_callbacks:
+            if mode in self._listener_callbacks[source]:
+                if device_guid in self._listener_callbacks[source][mode]:
+                    if input_type in self._listener_callbacks[source][mode][device_guid]:
+                        if -1 in self._listener_callbacks[source][mode][device_guid][input_type]:
+                            for callback in self._listener_callbacks[source][mode][device_guid][input_type][-1]:
+                                if verbose:
+                                    syslog.info(f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}")
+                                callback(event)
 
-                    if input_id_key in self._listener_callbacks[mode][device_guid][input_type]:
-                        for callback in self._listener_callbacks[mode][device_guid][input_type][input_id_key]:
-                            if verbose:
-                                syslog.info(f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}")
-                            callback(event)
+                        if input_id_key in self._listener_callbacks[source][mode][device_guid][input_type]:
+                            for callback in self._listener_callbacks[source][mode][device_guid][input_type][input_id_key]:
+                                if verbose:
+                                    syslog.info(f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}")
+                                callback(event)
 
     @QtCore.Slot(Event)
     def process_event_ui(self, event: Event):

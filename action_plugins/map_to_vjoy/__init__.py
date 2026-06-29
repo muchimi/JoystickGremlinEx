@@ -770,8 +770,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if VJoyRemapWidget.locked:
             return
 
-        el = gremlin.event_handler.EventListener()
-
         self._ui_loaded = False
 
         # if not gremlin.shared_state.vjoy_enabled:
@@ -872,6 +870,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         finally:
             VJoyRemapWidget.locked = False
             self._ui_loaded = True
+
 
     def _handle_virtual_button_usage_changed(self, device_type: DeviceType, virtual_id: int):
         """called when a virtual button assignment changes in the profile"""
@@ -1297,10 +1296,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _cleanup_ui(self):
         """called when widget is destroyed"""
-        self._grid_widgets.clear()
+        el = gremlin.event_handler.EventListener()
+        el.button_usage_changed.disconnect(self._handle_virtual_button_usage_changed)
         gremlin.util.clear_widget_references(self)
 
-        pass
+
+
 
     @QtCore.Slot(bool)
     def _hat_sticky_changed(self, checked: bool):
@@ -3581,11 +3582,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             output_range_visible = action == VjoyAction.VJoyRangeAxis
             sync_on_start_visible = True
             pulse_visible = action in (VjoyAction.VJoyPulse, VjoyAction.VJoyHatPulse)
-            _start_visible = action in (
-                VjoyAction.VJoyButton,
-                VjoyAction.VJoyButtonPress,
-                VjoyAction.VJoyButtonRelease,
-            )
+            # _start_visible = action in (
+            #     VjoyAction.VJoyButton,
+            #     VjoyAction.VJoyButtonPress,
+            #     VjoyAction.VJoyButtonRelease,
+            # )
             if action in (
                 VjoyAction.VJoyPulse,
                 VjoyAction.VJoyButtonPress,
@@ -3594,9 +3595,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 VjoyAction.VJoyButton,
             ):
                 grid_visible = True
-                _start_visible = True
+                #_start_visible = True
             paired_visible = action == VjoyAction.VJoyButtonPress
-            _exec_on_release_visible = action_data.input_type in VJoyRemapWidget.input_type_buttons
+            #_exec_on_release_visible = action_data.input_type in VJoyRemapWidget.input_type_buttons
             options_visible = True
 
             hat_position_visible = action in (
@@ -4289,6 +4290,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.action_data.auto_release = checked
 
     def _populate_grid(self):
+
         if not self.action_data.grid_visible:
             # nothing to do
             return
@@ -4309,30 +4311,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         if verbose:
             syslog.info(f"populate grid {self.action_data.id}")
 
-        # if self._use_radio:
-        #     used_pixmap = load_pixmap("used.png")
-        #     unused_pixmap = load_pixmap("unused.png")
-        #     self._grid_widgets = {}
-        #     vjoy_id = self.action_data.virtual_id
-
-        #     used_list = self.usage_state.used_button_list(vjoy_id)
-
-        #     for cb in self.button_group.buttons():
-        #         button_id = self.button_group.id(cb)
-        #         self._grid_widgets[button_id] = cb
-        #         used = button_id in used_list
-
-        #         if used and button_id == self.action_data.vjoy_input_id:
-        #             # update OURS only for the CB
-        #             with QtCore.QSignalBlocker(cb):
-        #                 cb.setChecked(True)
-
-        #         lbl = self.icon_map[button_id]
-        #         lbl.setPixmap(used_pixmap if used else unused_pixmap)
-        # else:
-
         used_list = self.usage_state.used_button_list(self.action_data.virtual_device.device_guid)
-        syslog.info(f"populate grid button: [{self.action_data.virtual_device.virtual_id}]  used_list: {used_list}")
+        # syslog.info(f"populate grid button: [{self.action_data.virtual_device.virtual_id}]  used_list: {used_list}")
         for button_id, widget in self._grid_widgets.items():
 
             used = button_id == self.action_data.vjoy_input_id
@@ -6435,9 +6415,20 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     def actionDeleted(self):
         """called if the action is being deleted"""
-        if VjoyAction.is_button(self.action_mode):
+        if VjoyAction.is_button_action(self.action_mode):
             state = gremlin.joystick_handling.VirtualDeviceUsageState()
+            state.set_usage_state(self.virtual_device_guid, self._vjoy_input_id, self.key, False)
             state.unregisterAction(self.id)
+
+            # if __debug__:
+            #     used_list = state.used_button_list(self.virtual_device_guid)
+            #     action_usage_list = state.get_usage_list(self.virtual_device_guid, self._vjoy_input_id)
+            #     assert self.id not in action_usage_list, "action should not be marked in use if action is deleted"
+            #     assert self._vjoy_input_id not in used_list, "button should not be marked in use if action is deleted"
+
+
+        super().actionDeleted()
+
 
 
     @property
@@ -7023,7 +7014,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     self.button_mode == ButtonOutputMode.Hold
                 case VjoyAction.VJoyButtonRelease:
                     self.button_mode == ButtonOutputMode.Release
-            self.update_button_used(self)
+            self.update_button_used()
 
     @property
     def reverse(self):

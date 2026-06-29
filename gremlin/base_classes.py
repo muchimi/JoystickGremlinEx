@@ -912,6 +912,7 @@ class AbstractCallbackModel(AbstractModel):
         removed_callback: Callable = None,
         allowed_types: tuple = None,
         model_description: str = None,
+        data = None,
     ):
         """callback enabled model
         :param callback: optional initial callback
@@ -929,6 +930,7 @@ class AbstractCallbackModel(AbstractModel):
         self._index_map = TriggerDict()  # map of input_id to index
         self._index_map.addCallback(self._handle_data_changed)  # only track one of the two maps as a change in one also changes the other
         self._item_map = TriggerDict()  # map of input_id to index
+        self._data = data  # optional data to store with the model
 
         # assume no filters
         self._filtered_index_map = TriggerDict()
@@ -1107,12 +1109,15 @@ class AbstractCallbackModel(AbstractModel):
     def remove(self, item, emit=True):
         """Removes the given entry from the model."""
         if item in self._item_map:
+            syslog.info(f"removing item {item.id} from model {self.id} current count: {self.count()}")
             index = self._item_map[item]
             if hasattr(item, "_cleanup"):
                 item._cleanup()
             del self._item_map[item]
             del self._index_map[index]
             self.applyFilter(emit=emit)
+            assert item not in self._item_map, "item not removed from model"
+            syslog.info(f"item {item.id} removed from model {self.id} new count: {self.count()}")
             if emit:
                 self._fireChanged()
         self.onItemChanged(self, index, None, item, "remove")
@@ -1217,6 +1222,8 @@ class AbstractCallbackModel(AbstractModel):
         """
         if not self._can_filter():
             # model is not filtered
+            self._filtered_index_map = TriggerDict.copyFrom(self._index_map)
+            self._filtered_item_map = TriggerDict.copyFrom(self._item_map)
             return
 
         if not self._filtered_enabled:
@@ -1232,9 +1239,7 @@ class AbstractCallbackModel(AbstractModel):
         if verbose:
             device = gremlin.joystick_handling.getDevice(self._device_guid)
             syslog.info(f"MODEL INPUT FILTER: for [{device.name}]")
-            if "left" in device.name.casefold():
-                pass
-
+  
         # filtering enabled
 
         new_index_map = TriggerDict()
@@ -1508,7 +1513,7 @@ class AbstractCallbackModel(AbstractModel):
             self._old_hash = new_hash
 
             for callback in self._data_changed_callbacks:
-                callback()
+                callback(self._data)
 
             if emit:
                 self.data_changed.emit()  # indicate the model changed

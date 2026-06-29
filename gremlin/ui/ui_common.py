@@ -39,7 +39,7 @@ import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
-from gremlin.types import SyncMode, CallbackMode
+from gremlin.types import SyncMode, CallbackMode, EventSourceType
 from PySide6.QtCore import (
     Qt,
     QSize,
@@ -166,26 +166,6 @@ class Color:
     @staticmethod
     def watermarkColor():
         return "#242424" if gremlin.shared_state.is_dark_theme else "#D3D3D3"
-
-    @staticmethod
-    def tabBackgroundColor():
-        return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
-
-    @staticmethod
-    def tabForegroundColor():
-        return "#B6B6B6" if gremlin.shared_state.is_dark_theme else "#303030"
-
-    @staticmethod
-    def tabMissingForegroundColor():
-        return "#8a761c" if gremlin.shared_state.is_dark_theme else "#725919"
-
-    @staticmethod
-    def tabUsedForegroundColor():
-        return "#FFFFFF" if gremlin.shared_state.is_dark_theme else "#000000"
-
-    @staticmethod
-    def tabUsedOtherForegroundColor():
-        return "#B9B9B9" if gremlin.shared_state.is_dark_theme else "#777777"
 
     @staticmethod
     def blueColor():
@@ -407,7 +387,7 @@ class Color:
 
     @staticmethod
     def buttonBorderColor():
-         return "#424242" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+        return "#424242" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
 
     @staticmethod
     def buttonHoverBorderColor():
@@ -416,8 +396,6 @@ class Color:
     @staticmethod
     def buttonHoverBackgroundColor():
         return Color.keyHoverBackgroundColor()
-
-
 
     @staticmethod
     def warningColor():  # color for the warning flag
@@ -502,7 +480,42 @@ class Color:
         return "\033[0m"
 
     @staticmethod
+    def tabBackgroundColor():
+        return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
 
+    @staticmethod
+    def tabForegroundColor():
+        return "#B6B6B6" if gremlin.shared_state.is_dark_theme else "#303030"
+
+    @staticmethod
+    def tabMissingForegroundColor():
+        return "#8a761c" if gremlin.shared_state.is_dark_theme else "#725919"
+
+    @staticmethod
+    def tabUsedForegroundColor():
+        return "#FFFFFF" if gremlin.shared_state.is_dark_theme else "#000000"
+
+    @staticmethod
+    def tabUsedOtherForegroundColor():
+        return "#B9B9B9" if gremlin.shared_state.is_dark_theme else "#777777"
+
+    @staticmethod
+    def tabSelectedTextColor():
+        return "#FFFFFF" if gremlin.shared_state.is_dark_theme else "#000000"
+
+    @staticmethod
+    def tabHoverColor():
+        return "#303030" if gremlin.shared_state.is_dark_theme else "#E0E0E0"
+
+    @staticmethod
+    def tabTextColor():
+        return "#B6B6B6" if gremlin.shared_state.is_dark_theme else "#303030"
+
+    @staticmethod
+    def tabSelectedBackgroundColor():
+        return "#2b2b2b" if gremlin.shared_state.is_dark_theme else "#DDDDDD"
+
+    @staticmethod
     def getHoverColor(base_color: QColor, percent: float = 1.15) -> QColor:
         """Calculates a hover color by scaling the base color's lightness.
         percent > 1.0 lightens, percent < 1.0 darkens.
@@ -517,17 +530,18 @@ class Color:
         return hover_color
 
     @staticmethod
-    def cssInputHeader():
-        background_color = Color.inputTitleColor()
+    def cssSelectedInputHeader():
+        # background_color = Color.inputTitleColor()
         button_background_color = Color.buttonBackgroundColor()
-        css = f"#title_bar {{ background: {background_color}; max-height = 32px;}} QPushButton {{ background: {button_background_color};}}"
+        bar_color = gremlin.ui.ui_common.Color.getHoverColor(gremlin.ui.ui_common.Color.selectColor()).name()
+        css = f"#title_bar {{ background: {bar_color}; max-height = 32px; border: none;}} QPushButton {{ background: {button_background_color};}}"
         return css
 
     @staticmethod
     def cssUnselectedInputHeader():
-        background_color = Color.inputTitleUnselectedColor()
+        bar_color = Color.inputTitleUnselectedColor()
         button_background_color = Color.buttonBackgroundColor()
-        css = f"#title_bar {{ background: {background_color}; max-height = 32px; }} QPushButton {{ background: {button_background_color};}}"
+        css = f"#title_bar {{ background: {bar_color}; max-height = 32px; }} QPushButton {{ background: {button_background_color};}}"
         return css
 
     @staticmethod
@@ -601,6 +615,71 @@ class Color:
         return css
 
     @staticmethod
+    def cssTab():
+        background_color = gremlin.ui.ui_common.Color.backgroundColor()
+        tab_color = gremlin.ui.ui_common.Color.tabBackgroundColor()
+        selected_tab_color = gremlin.ui.ui_common.Color.tabSelectedBackgroundColor()
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+        text_color = gremlin.ui.ui_common.Color.tabTextColor()
+        select_text_color = gremlin.ui.ui_common.Color.tabSelectedTextColor()
+        hover_color = gremlin.ui.ui_common.Color.tabHoverColor()
+
+        css = f"""
+
+
+        QTabWidget {{
+            background-color: {background_color};
+        }}
+
+        QTabBar::tab {{
+            background-color: {tab_color};
+            border: 1px solid {border_color};
+            border-top-left-radius: 4px;
+            border-top-right-radius: 12px;
+            padding: 4px 6px;
+            min-width: 80px;
+            color: {text_color};
+            }}
+
+        QTabBar::tab:selected {{
+            background-color: {selected_tab_color};
+            border: 0px;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 12px;
+            border-bottom: none;
+            color: {select_text_color};
+            }}
+
+        QTabBar::tab:hover {{
+            background: {hover_color};
+        }}
+
+        """
+
+        return css
+
+    @staticmethod
+    def cssTabContent():
+        background_color = Color.tabSelectedBackgroundColor()
+        # background_color = "green"
+        css = f"""
+            background-color: {background_color};
+
+        """
+        return css
+
+    @staticmethod
+    def cssItemSelected():
+
+        css = f"""
+            {{
+                background-color: {Color.selectColor()};
+                border: 2px solid {Color.selectBorderColor()};
+            }}
+        """
+        return css
+
+    @staticmethod
     def cssCheckbox():
         if gremlin.config.Configuration().is_debug:
             relative_path = "icons/"
@@ -612,7 +691,6 @@ class Color:
         checkbox_unchecked_disabled = f"{prefix}checkbox_blank_outline_disabled.png"
         checkbox_checked = f"{prefix}checkbox_intermediate.png"
         checkbox_checked_disabled = f"{prefix}checkbox_intermediate_disabled.png"
-
 
         css = f"""
             QCheckBox::indicator {{
@@ -635,7 +713,6 @@ class Color:
             """
         return css
 
-
     @staticmethod
     def cssApplication():
         border_color = Color.borderColor()
@@ -653,8 +730,6 @@ class Color:
         checkbox_unchecked_disabled = f"{prefix}checkbox_blank_outline_disabled.png"
         checkbox_checked = f"{prefix}checkbox_intermediate.png"
         checkbox_checked_disabled = f"{prefix}checkbox_intermediate_disabled.png"
-
-
 
         radio_unchecked = f"{prefix}radiobox_blank.png"
         radio_checked = f"{prefix}radiobox_marked.png"
@@ -732,37 +807,6 @@ class Color:
             }}
 
             """
-        # print (css)
-
-        # css = '''
-        #     QCheckBox::indicator {
-        #         width: 18px;
-        #         height: 18px;
-        #     }
-        #     QCheckBox::indicator:checked {
-        #         image: url(gfx/dark_checkbox_intermediate.png);
-        #     }
-        #     QCheckBox::indicator:unchecked {
-        #         image: url(gfx/dark_checkbox_blank_outline.png);
-        #     }
-        #     QRadioButton::indicator {
-        #         width: 18px;
-        #         height: 18px;
-        #     }
-        #     QRadioButton::indicator:checked {
-        #         image: url(gfx/dark_radiobox_marked.png);
-        #     }
-        #     QRadioButton::indicator:unchecked {
-        #         image: url(gfx/dark_radiobox_blank.png);
-        #     }
-        #     QPlainTextEdit {
-        #          border: 1px solid #444444;
-        #     }
-        #     QMenu::separator {
-        #         border: #444444;
-        #     }
-
-        # '''
 
         return css
 
@@ -1393,7 +1437,7 @@ class Buttons:
             data,
             width=width,
             height=height,
-    )
+        )
 
     @staticmethod
     def getSaveWidget(
@@ -6058,7 +6102,6 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
         self._max_range = 1.0
         self._step = step
 
-
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
         if device.is_virtual:
@@ -6098,8 +6141,6 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                     syslog.error(f"AxisCurrentState: unregistered axis {device.getAxisName(input_id)}")
                     continue
 
-
-
                 # get initial data
                 astate = gremlin.event_handler.AxisState()
                 values = astate.getAxisValues(device.device_guid, input_id)
@@ -6110,8 +6151,14 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                 #     syslog.info(f"AxisCurrentState: virtual device {device.name} axis {device.getAxisName(input_id)} value: {str(values)}")
 
                 # hook the input both runtime and design time
+                source = EventSourceType.Virtual if device.is_virtual else EventSourceType.DirectInput  # event comes from virtual device or directinput device
                 jep.registerListenerUICallback(
-                    device_guid=device.device_guid, input_type=InputType.JoystickAxis, input_id=input_id, callback=self.process_event_ui, mode=CallbackMode.All
+                    device_guid=device.device_guid,
+                    input_type=InputType.JoystickAxis,
+                    input_id=input_id,
+                    callback=self.process_event_ui,
+                    mode=CallbackMode.All,
+                    source=source,
                 )
 
                 if not self._readonly:
@@ -6198,10 +6245,6 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
         astate = gremlin.event_handler.AxisState()
         input_id = event.identifier
         values = astate.getAxisValues(event.device_guid, input_id, event.value)
-
-        # if self.device.is_virtual:
-        #     syslog.info(f"AxisCurrentState: virtual device {self.device.name} axis {self.device.getAxisName(input_id)} value: {str(values)}")
-
 
         if values is not None:
             if input_id in self.axis_widgets:
@@ -6544,8 +6587,6 @@ class AxesTimeline(QtWidgets.QGroupBox):
         """
         super().__init__(parent)
 
-
-
         if device.is_virtual:
             self.setTitle(f"{device.name} #{device.vjoy_id:d} - Axes")
         else:
@@ -6887,7 +6928,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
                 self._create_hat()
                 jep.registerListenerUICallback(
                     device_guid=self.device_guid,
-                    input_type = InputType.JoystickHat,
+                    input_type=InputType.JoystickHat,
                     input_id=-1,  # all inputs of that type
                     callback=self._hat_update_ui,
                     mode=CallbackMode.All,
@@ -6952,7 +6993,7 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
                 self._unhook_buttons()
                 jep.unregisterListenerUICallback(
                     device_guid=self.device_guid,
-                    input_type= InputType.JoystickHat,
+                    input_type=InputType.JoystickHat,
                     input_id=-1,  # all inputs of that type
                     callback=self._hat_update_ui,
                 )  # event is processed on the UI thread
@@ -7263,8 +7304,8 @@ class QUsedPushButton(QDataPushButton):
             self._hook_requested = True
             self._do_hook()
 
-        self._is_hovered = False # true when the button is hovered
-        self._is_interactive = interactive # true when the button is disabled
+        self._is_hovered = False  # true when the button is hovered
+        self._is_interactive = interactive  # true when the button is disabled
 
     def setInteractive(self, value: bool):
         self._is_interactive = value
@@ -7392,17 +7433,11 @@ class QUsedPushButton(QDataPushButton):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-
-
         color = Color.greenColor() if self._used else Color.grayColor()
-
 
         painter.setPen(QColor(color))
         painter.setBrush(QColor(color))
         painter.drawEllipse(QPoint(9, 9), 3, 3)
-
-
-
 
         w = self.width()
         h = self.height()
@@ -7442,12 +7477,10 @@ class QUsedPushButton(QDataPushButton):
             w2 = w / 2
             h2 = h / 2
 
-
             painter.setPen(QtCore.Qt.NoPen)
             painter.setBrush(color)
             rect = QtCore.QRect(0, 0, w, h)
             painter.drawEllipse(rect)
-
 
         painter.end()
 
@@ -7524,8 +7557,6 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
 
         jep = gremlin.event_handler.JoystickEventProcessor()
 
-
-
         for i in range(device.button_count):
             input_id = i + 1
             is_used = profile.isInputMapped(device.device_guid, InputType.JoystickButton, input_id)
@@ -7541,7 +7572,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
                 used_input_type=InputType.JoystickButton,
                 used_input_id=input_id,
                 callback=None if is_disabled else self._button_clicked,
-                interactive=not is_disabled
+                interactive=not is_disabled,
             )
 
             # hook the input
@@ -9248,6 +9279,9 @@ class QSplitTabWidget(QDataWidget):
         super().__init__(parent)
         self.setObjectName(object_name)
 
+        self.setStyleSheet(gremlin.ui.ui_common.Color.cssTabContent())
+        self.setContentsMargins(0, 0, 0, 0)
+
         self._id = gremlin.util.get_guid()  # unique ID
         self._blank_input_id = "blank_c9a484aedbab4f518e5bab7ec402df65"  # input ID to use for the blank pages
         self._device_guid = device_guid
@@ -9286,7 +9320,7 @@ class QSplitTabWidget(QDataWidget):
         # input configuration content - new in m76 - have QT track the widgets itself to avoid reference problems in pyside
         self._right_panel_stacked_widget = QtWidgets.QStackedWidget()
         self._right_panel_stacked_widget.addWidget(QtWidgets.QLabel("No input selected"))  # index 0
-        self._right_panel_stacked_widget.setProperty("class", "hack")
+        # self._right_panel_stacked_widget.setProperty("class", "hack")
 
         self.addRightPanelWidget(self._right_panel_stacked_widget)
 
@@ -9957,8 +9991,6 @@ class QRememberDialog(QtWidgets.QDialog):
             pos = QtCore.QPoint(x, y)
             # syslog.info(f"recall move window {self.window_key} to {x},{y}")
             self.move(pos)
-
-
 
     def preferredSize(self) -> QtCore.QSize:
         """preferred window size"""
@@ -14782,8 +14814,8 @@ class WheelForwarder(QWidget):
 
 
 class ResizingStackedWidget(QtWidgets.QStackedWidget):
-    def __init__(self, zero_hide = False, parent=None):
-        super().__init__( parent=parent)
+    def __init__(self, zero_hide=False, parent=None):
+        super().__init__(parent=parent)
         self._zero_hide = zero_hide
         # Connect the page change signal to recalculate geometry
         self.currentChanged.connect(self.update_geometry)
@@ -14791,7 +14823,6 @@ class ResizingStackedWidget(QtWidgets.QStackedWidget):
     def update_geometry(self):
         # Notify the parent layout that sizes have changed
         self.updateGeometry()
-
 
     def sizeHint(self):
         # Use the active widget's size hint instead of the largest page

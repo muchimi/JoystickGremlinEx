@@ -29,6 +29,7 @@ from vjoy.vjoy_interface import VJoyState, VJoyInterface
 from gremlin.error import VJoyError
 import gremlin.spline
 import gremlin.types
+from gremlin.types import EventSourceType
 from gremlin.singleton_decorator import SingletonDecorator
 
 syslog = logging.getLogger("system")
@@ -234,6 +235,8 @@ class Axis:
         # if self.axis_id == 3 and self.vjoy_id == 1 and p_value == 0.0:
         #     pass
 
+        # syslog.info(f"VJOY API: axis [{self.vjoy_id}:{self.axis_id}] - value: [{p_value:.3f}]")
+
         if p_value is None:
             syslog.warning("Invalid null value provided")
             return
@@ -259,18 +262,14 @@ class Axis:
         self.vjoy_dev.used()
 
         el = gremlin.event_handler.EventListener()
-        # event = gremlin.event_handler.VjoyEvent(self.vjoy_id, InputType.JoystickAxis, self.axis_id - 0x30 + 1, self._value)
-        # el.vjoy_event.emit(event) # this is used by external plugins to trigger on vjoy output events
-        # el.vjoy_callback(event)  test for lag
-
-
 
         event = gremlin.event_handler.Event(
             device_guid=self.device_guid,
             event_type = InputType.JoystickAxis,
             identifier= self.axis_id - 0x30 + 1, # convert vjoy ID to input id 1 to 8
             is_axis = True,
-            value = self._value
+            value = self._value,
+            source = EventSourceType.Virtual
 
         )
         el.vjoy_output_event.emit(event)

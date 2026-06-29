@@ -481,7 +481,7 @@ class InputViewerWidget(QtWidgets.QWidget):
         else:
             container = gremlin.ui.ui_common.getVContainer([gremlin.ui.ui_common.QHorizontalLine(), widget], widget_only=True)
             self._stacked_widget.addWidget(container)
-            self._stacked_widget.setCurrentWidget(widget)
+            self._stacked_widget.setCurrentWidget(container)
             self._stacked_widget.setCurrentIndex(self._stacked_widget.count() - 1)
             widget.show()
         self._widget = widget

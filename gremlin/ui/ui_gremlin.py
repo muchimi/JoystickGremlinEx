@@ -10,6 +10,9 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import os
 import shutil
 import logging
+
+
+import gremlin
 from gremlin.ui.ui_common import QRememberMainWindow
 
 
@@ -26,45 +29,45 @@ class Ui_Gremlin(object):
 
         # main content panel - holds the device tabs
         self.tab_bar_widget = QtWidgets.QWidget()
-        self.tab_bar_widget.setContentsMargins(0, 0, 0, 0)
-
         self.tab_bar_layout = QtWidgets.QVBoxLayout(self.tab_bar_widget)
         self.tab_bar_layout.setContentsMargins(0, 0, 0, 0)
-        self.tab_bar_widget.setMaximumHeight(30)
-
-
-
-        # self.tab_filter_widget = gremlin.ui.ui_common.QIconPushButton(icon = gremlin.ui.ui_common.Icons.tabIcon(),
-        #                                                               icon_size=24,
-        #                                                               tooltip="Device display Options",
-        #                                                               callback=self._handle_tab_filter)
-
-        self.tab_filter_widget = gremlin.ui.ui_common.Buttons.getTabFilterWidget(callback=self._handle_tab_filter, tooltip="Device display Options")
-
-        # tab header for the device selection
-        self.devices_tab_header_widget = gremlin.ui.ui_common.QTabHeader(parent=self.tab_bar_widget)
-        self.devices_tab_header_widget.setMovable(True)
-        self.devices_tab_header_widget.setUsesScrollButtons(True)
-        self.devices_tab_header_widget.setObjectName("devices")
-
-
-        tab_container_widget = gremlin.ui.ui_common.getHContainer([self.tab_filter_widget, self.devices_tab_header_widget],widget_only=True)
-
-        self.tab_bar_layout.addWidget(tab_container_widget)
-        #self.tab_bar_layout.addStretch(2)
+        self.tab_bar_layout.setSpacing(0)
 
         # holds the device widget
         self.tab_content_widget = QtWidgets.QWidget()
         self.tab_content_widget.setContentsMargins(0,0,0,0)
         tab_content_layout = QtWidgets.QVBoxLayout(self.tab_content_widget)
         tab_content_layout.setContentsMargins(0,0,0,0)
+        tab_content_layout.setSpacing(0)
+
+
+        self.tab_filter_widget = gremlin.ui.ui_common.Buttons.getTabFilterWidget(callback=self._handle_tab_filter, tooltip="Device display Options")
+
+        # tab header for the device selection
+        self.devices_tab_header_widget = gremlin.ui.ui_common.QTabHeader()
+        self.devices_tab_header_widget.setContentsMargins(0, 0, 0, 0)
+        self.devices_tab_header_widget.setMovable(True)
+        self.devices_tab_header_widget.setUsesScrollButtons(True)
+        self.devices_tab_header_widget.setObjectName("devices")
+        self.devices_tab_header_widget.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
+
+
+        tab_container_widget = gremlin.ui.ui_common.getHContainer([self.tab_filter_widget, self.devices_tab_header_widget],widget_only=True)
+        tab_container_widget.setContentsMargins(0, 0, 0, 0)
+        tab_container_widget.setMaximumHeight(30)
+
+
+
         self.device_page_widget = QtWidgets.QStackedWidget()  # holds the device widgets for each device - the index changes with the tab
-        # tab_content_layout.addWidget(QtWidgets.QLabel("tab content - top of layout for main window"))
+        self.device_page_widget.setContentsMargins(0, 0, 0, 0)
+
+
+        tab_content_layout.addWidget(tab_container_widget)
         tab_content_layout.addWidget(self.device_page_widget)
-        # tab_content_layout.addWidget(QtWidgets.QLabel("tab content - bottom of layout for main window"))
 
         # blank input for device content
         self.device_page_widget.addWidget(gremlin.ui.ui_common.QEmptyWidget(mode="wait"))  # index 0
+
 
         # bottom status bar
         self.statusbar_widget = QtWidgets.QWidget()

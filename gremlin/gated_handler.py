@@ -4262,6 +4262,8 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
 
         super().__init__(self.__class__.__name__, parent=parent)
 
+
+
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self._id = gremlin.util.get_guid()
 
@@ -4295,6 +4297,8 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_condition_layout = QtWidgets.QVBoxLayout(self.container_condition_widget)
         self.container_condition_layout.setContentsMargins(0, 0, 0, 0)
         self.container_condition_layout.addWidget(self._condition_tab)
+
+        self.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
 
         self._icon_enabled = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
@@ -4698,7 +4702,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
                 container_widget = self._cache.retrieve_by_data(item_data)
 
                 stack_widget = QtWidgets.QStackedWidget()
-                stack_widget.setProperty("class", "hack")
+                #stack_widget.setProperty("class", "hack")
 
                 # if not container_widget:
                 # create the container, cache it
