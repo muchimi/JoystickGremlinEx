@@ -1067,13 +1067,13 @@ class Settings:
                         input_type = InputType.to_enum(safe_read(filter_node, "type", str, ""))
                         input_id = safe_read(filter_node, "id", int, -1)
                         visible = safe_read(filter_node, "filter", bool, False)
-                        self.setInputvisible(device_id, input_type, input_id, visible)
+                        self.setInputVisible(device_id, input_type, input_id, visible)
                 case 1:
                     for filter_node in device_node.xpath(".//filter"):
                         input_type = InputType.to_enum(safe_read(filter_node, "type", str, ""))
                         input_id = safe_read(filter_node, "id", int, -1)
                         visible = safe_read(filter_node, "visible", bool, False)
-                        self.setInputvisible(device_id, input_type, input_id, visible)
+                        self.setInputVisible(device_id, input_type, input_id, visible)
 
                 case _:
                     raise ValueError(f"don't know how to handle filter version [{version}] in profile settings")
@@ -1263,7 +1263,7 @@ class Settings:
         # update with new defaults
 
         for input_id in map_data:
-            self.setInputvisible(device_guid, input_type, input_id, True)
+            self.setInputVisible(device_guid, input_type, input_id, True)
 
     def setMappedVisible(self, current_mode: str = None, additive=False):
         """includes all inputs for a specific mode or all modes"""
@@ -1279,15 +1279,15 @@ class Settings:
         for index in range(device.axis_count):
             input_id = device.axis_sequence_to_input_id(index)
             is_used = self.profile.isInputMapped(device_guid, InputType.JoystickAxis, input_id, current_mode)
-            self.setInputvisible(device_guid, InputType.JoystickAxis, input_id, is_used)
+            self.setInputVisible(device_guid, InputType.JoystickAxis, input_id, is_used)
         for index in range(device.button_count):
             input_id = index + 1
             is_used = self.profile.isInputMapped(device_guid, InputType.JoystickButton, input_id, current_mode)
-            self.setInputvisible(device_guid, InputType.JoystickButton, input_id, is_used)
+            self.setInputVisible(device_guid, InputType.JoystickButton, input_id, is_used)
         for index in range(device.hat_count):
             input_id = index + 1
             is_used = self.profile.isInputMapped(device_guid, InputType.JoystickHat, input_id, current_mode)
-            self.setInputvisible(device_guid, InputType.JoystickHat, input_id, is_used)
+            self.setInputVisible(device_guid, InputType.JoystickHat, input_id, is_used)
 
     def setAllVisibleDevice(self, device: dinput.DeviceSummary, additive=False):
         """sets all inputs to visible (unfiltered) for a specific device"""
@@ -1297,13 +1297,13 @@ class Settings:
         device_guid = device.device_guid
         for index in range(device.axis_count):
             input_id = device.axis_sequence_to_input_id(index)
-            self.setInputvisible(device_guid, InputType.JoystickAxis, input_id, True)
+            self.setInputVisible(device_guid, InputType.JoystickAxis, input_id, True)
         for index in range(device.button_count):
             input_id = index + 1
-            self.setInputvisible(device_guid, InputType.JoystickButton, input_id, True)
+            self.setInputVisible(device_guid, InputType.JoystickButton, input_id, True)
         for index in range(device.hat_count):
             input_id = index + 1
-            self.setInputvisible(device_guid, InputType.JoystickHat, input_id, True)
+            self.setInputVisible(device_guid, InputType.JoystickHat, input_id, True)
 
     def setAllvisible(self):
         """sets all inputs to visible (unfiltered) for all devices"""
@@ -1316,13 +1316,13 @@ class Settings:
         device_guid = device.device_guid
         for index in range(device.axis_count):
             input_id = device.axis_sequence_to_input_id(index)
-            self.setInputvisible(device_guid, InputType.JoystickAxis, input_id, False)
+            self.setInputVisible(device_guid, InputType.JoystickAxis, input_id, False)
         for index in range(device.button_count):
             input_id = index + 1
-            self.setInputvisible(device_guid, InputType.JoystickButton, input_id, False)
+            self.setInputVisible(device_guid, InputType.JoystickButton, input_id, False)
         for index in range(device.hat_count):
             input_id = index + 1
-            self.setInputvisible(device_guid, InputType.JoystickHat, input_id, False)
+            self.setInputVisible(device_guid, InputType.JoystickHat, input_id, False)
 
     def setallHidden(self):
         """sets all inputs to hidden (filtered) for all devices"""
@@ -1352,15 +1352,15 @@ class Settings:
             case InputType.JoystickAxis:
                 for index in range(device.axis_count):
                     input_id = device.axis_sequence_to_input_id(index)
-                    self.setInputvisible(device_guid, InputType.JoystickAxis, input_id, visible)
+                    self.setInputVisible(device_guid, InputType.JoystickAxis, input_id, visible)
             case InputType.JoystickButton:
                 for index in range(device.button_count):
                     input_id = index + 1
-                    self.setInputvisible(device_guid, InputType.JoystickButton, input_id, visible)
+                    self.setInputVisible(device_guid, InputType.JoystickButton, input_id, visible)
             case InputType.JoystickHat:
                 for index in range(device.hat_count):
                     input_id = index + 1
-                    self.setInputvisible(device_guid, InputType.JoystickHat, input_id, visible)
+                    self.setInputVisible(device_guid, InputType.JoystickHat, input_id, visible)
 
     def getFilterMap(self):
         """gets a copy of the current input filter map"""
@@ -1484,7 +1484,7 @@ class Settings:
 
         syslog.info(f"Found {count} total entries")
 
-    def setInputvisible(
+    def setInputVisible(
         self,
         device_guid: dinput.GUID | str | int,
         input_type: InputType,
@@ -1524,6 +1524,7 @@ class Settings:
         if emit:
             el = gremlin.event_handler.EventListener()
             el.input_filtered_change.emit(device_id)  # tell the widget the input list has changed
+            
 
     def setDefaultInputVisible(
         self,
@@ -1688,7 +1689,7 @@ class Settings:
             for input_type in input_filter[device_guid]:
                 for input_id in input_filter[device_guid][input_type]:
                     filtered = input_filter[device_guid][input_type][input_id]
-                    self.setInputvisible(device_guid, input_type, input_id, filtered, False)
+                    self.setInputVisible(device_guid, input_type, input_id, filtered, False)
 
     def applyFilterDefaults(self):
         """applies defaults to missing device if any"""
@@ -1741,7 +1742,7 @@ class Settings:
                 if count:
                     for input_id in range(1, count + 1):
                         self.setDefaultInputVisible(device_guid, input_type, input_id, True)
-                        self.setInputvisible(device_guid, input_type, input_id, True)
+                        self.setInputVisible(device_guid, input_type, input_id, True)
 
         pass
 
@@ -1759,7 +1760,7 @@ class Settings:
             for input_type in self.default_input_visible_map[device_id]:
                 for input_id in self.default_input_visible_map[device_id][input_type]:
                     visible = self.default_input_visible_map[device_id][input_type][input_id]
-                    self.setInputvisible(device_guid, input_type, input_id, visible)
+                    self.setInputVisible(device_guid, input_type, input_id, visible)
 
     def loadFilterDefaults(self) -> bool:
         """load default input filters from the configuration file"""
@@ -1810,7 +1811,7 @@ class Settings:
                                 else:
                                     syslog.info(f"\t{input_type.name} [{input_id}] visible: {visible}")
                             self.setDefaultInputVisible(device_guid, input_type, input_id, visible)
-                            self.setInputvisible(device_guid, input_type, input_id, visible)
+                            self.setInputVisible(device_guid, input_type, input_id, visible)
                 case 1:
                     # load v1 nodes
                     if verbose:
@@ -1840,7 +1841,7 @@ class Settings:
                             input_id = safe_read(filter_node, "id", int, -1)
                             visible = safe_read(filter_node, "visible", bool, False)
                             self.setDefaultInputVisible(device_id, input_type, input_id, visible)
-                            self.setInputvisible(device_id, input_type, input_id, visible)
+                            self.setInputVisible(device_id, input_type, input_id, visible)
                             if verbose:
                                 if input_type == InputType.JoystickAxis:
                                     syslog.info(f"\t{input_type.name} [{device.getAxisName(input_id)}] visible: {visible}")
@@ -2407,7 +2408,6 @@ class Profile:
         if device.disabled:
             # ignore joysticks that are disabled
             return None
-
 
         device_node = self.getDeviceNode(device_guid)
         if device_node:

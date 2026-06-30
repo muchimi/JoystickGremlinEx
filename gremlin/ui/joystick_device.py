@@ -327,6 +327,11 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             syslog.info("JoystickDevice: update stats on model change")
         self.update_stats_display(refresh=True)
 
+    def setInputVisible(self, input_item: InputItem, visible: bool, emit = False):
+        """ensures the given input item is visible in the list view"""
+        settings = self.profile.settings
+        settings.setInputVisible(input_item.device_guid, input_item.input_type, input_item.input_id, visible, emit = emit)
+
     def getDefaultFilter(self) -> dict:
         """gets the default filter for the given device"""
 
@@ -521,23 +526,6 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         value = gremlin.joystick_handling.get_axis(data.device_guid, data.input_id)
         self._curve_update_handler(value)
 
-        # device_name = gremlin.joystick_handling.getDeviceName(data.device_guid)
-        # description = (
-        #     f"curve position update: device: [{device_name}] input: [{data.input_id}]"
-        # )
-
-        # hook joystick queue to update position on the curve
-        # jep = gremlin.event_handler.JoystickEventProcessor()
-        # jep.registerCallback(
-        #     self.hook_id,
-        #     callback=self._handle_curve_update,
-        #     device_guid=data.device_guid,
-        #     input_type=InputType.JoystickAxis,
-        #     input_id=data.input_id,
-        #     ui_only=True,
-        #     description=description,
-        # )
-
         el = gremlin.event_handler.EventListener()
         el.joystick_event_ui.connect(self._handle_curve_update)
 
@@ -545,13 +533,11 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         gremlin.shared_state.push_suspend_highlighting()
         dialog.exec()
         self.curve_update_handler[index] = None
-        # print ("update curve data")
+
         data.curve_data.curve_update()
 
         # renable highlighting
         gremlin.shared_state.pop_suspend_highlighting()
-
-        # jep.unregisterCallback(self.hook_id)
 
         self._update_curve_icon(index, data)
 
@@ -636,10 +622,10 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             if widget.axis_repeater_widget is not None and identifier.is_axis:
                 widget.axis_repeater_widget.valueChanged.connect(lambda x: self._update_input_value_changed_cb(index, x))
         elif data.input_type == InputType.JoystickButton:
-            widget = gremlin.input_item.InputItemWidget(input_item=identifier.input_item,  parent=parent, data=data)
+            widget = gremlin.input_item.InputItemWidget(input_item=identifier.input_item, parent=parent, data=data)
             widget.setIcon("mdi.gesture-tap-button")
         elif data.input_type == InputType.JoystickHat:
-            widget = gremlin.input_item.InputItemWidget(input_item=identifier.input_item,  parent=parent, data=data)
+            widget = gremlin.input_item.InputItemWidget(input_item=identifier.input_item, parent=parent, data=data)
             widget.setIcon("ei.fullscreen")
         widget.create_action_icons(data)
         widget.disable_close()
@@ -670,14 +656,6 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if gremlin.shared_state.isDeviceTabActive(self.device_guid):
             self.inputItemListModel.refresh()
             self.selectInputItemIndex(self._last_selected_index)
-
-    # def _create_change_cb(self, index):
-    #     """Creates a callback handling content changes.
-
-    #     :param index the index of the content being changed
-    #     :return callback function redrawing changed content
-    #     """
-    #     return lambda: self.inputItemListView.redraw_index(index)
 
     def _create_description_change_cb(self, index):
         """Creates a callback handling content changes.

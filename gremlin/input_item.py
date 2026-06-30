@@ -1876,16 +1876,14 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.ensureStyle()
 
         self._autohide_widgets = gremlin.util.get_widget_references(self, gremlin.ui.ui_common.AutoHideStackedWidget)
+        self.widget_height= self.sizeHint().height()
 
-       #self._update_height()
+    def resizeEvent(self, event):
+        # update the size record when the widget is resized
+        super().resizeEvent(event)
+        size = self.size()
+        self.widget_height = size.height()
 
-    # def _update_height(self):
-    #     """updates the height of the widget based on the content"""
-    #     tbh = self._title_bar_widget.sizeHint().height()
-    #     csh = self._content_widget.sizeHint().height()
-    #     h = csh + tbh
-    #     self.setFixedHeight(h)
-    #     syslog.info(f"InputItemWidget: updated height to {h} [title: {tbh}, content: {csh}]")
 
     def setInputItem(self, input_item: InputItem):
         """sets the input item for this widget"""
@@ -1952,11 +1950,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         """triggers the widget to send the selection state again"""
         self._fireSelectionChangeCallbacks()
 
-    def resizeEvent(self, event):
-        size = self.size()
-        self.widget_width = size.width()
-        self.widget_height = size.height()
-        super().resizeEvent(event)
+
 
     @property
     def input_item(self) -> "InputItem":
@@ -3206,6 +3200,7 @@ class InputItemListView(AbstractView):
 
         self._scroll_area = QtWidgets.QScrollArea()
         self._scroll_area.setWidgetResizable(True)
+        self._scroll_area.verticalScrollBar().valueChanged.connect(self._on_scrollbar_value_changed)
 
         self._scroll_widget, self._scroll_layout = gremlin.ui.ui_common.getVContainer()
         self._scroll_widget.setContentsMargins(2, 2, 2, 2)
@@ -3964,11 +3959,15 @@ class InputItemListView(AbstractView):
                 widget = self.widget(index)
 
             assert widget is not None, "widget not found in list"
-            widget.setSelected(True)  # this fires the updates and callbacks via the _handle_widget_selection_changed callback
+            widget.setSelected(True, emit=True)  # this fires the updates and callbacks via the _handle_widget_selection_changed callback
             self._current_index = index
             self._requested_selected_index = -1  # indicate no more request
             self._last_selected_widget = widget
             self._fireSelectionChangeCallbacks(last_widget, widget)  # trigger updates on selection change if any
+
+
+            self.ensureVisible(widget)  # ensure the selected widget is visible in the scroll area
+
 
         return widget
 
@@ -3996,17 +3995,44 @@ class InputItemListView(AbstractView):
         return lambda: self._scroll_to_item(widget)
 
     def ensureVisible(self, widget):
-        gremlin.util.singleShot(self._create_scroll_callback(widget))
+        """makes the widget visible in the scroll area, if it is not already visible"""
+        #gremlin.util.singleShot(self._create_scroll_callback(widget))
+        if gremlin.util.is_ui_thread():
+            self._scroll_to_item_ui(widget)
+        else:
+            gremlin.util.InvokeUiMethod(self._scroll_to_item_ui, widget)
+
+
+    def ensureVisibleIndex(self, index):
+        """makes the widget at the given index visible in the scroll area, if it is not already visible"""
+        widget = self.widget(index)
+        if widget:
+            self.ensureVisible(widget)
 
     def _scroll_to_item(self, widget):
         gremlin.util.InvokeUiMethod(self._scroll_to_item_ui, widget)
 
     def _scroll_to_item_ui(self, widget):
         # runs on UI thread
-        QtWidgets.QApplication.processEvents()  # allow UI to catch up
-        if widget.visibleRegion().isEmpty():
-            if Shiboken.isValid(self._scroll_area) and Shiboken.isValid(widget):
-                self._scroll_area.ensureWidgetVisible(widget)
+        if Shiboken.isValid(self):
+            # update layout just in case the widgets have changed size
+            self._scroll_widget.layout().activate() 
+
+            count = len(self._widget_map)
+            bar = self._scroll_area.verticalScrollBar()
+            if bar:
+                # compute the position of the widget
+                y = 0
+                for i in range(count):
+                    w = self._widget_map[i]
+                    if w == widget:
+                        break
+                    y += w.widget_height
+                bar.setValue(y)
+
+    def _on_scrollbar_value_changed(self, value):
+        """called when the scroll bar value changes"""
+        syslog.info(f"scroll bar value changed: [{value}]")
 
     def __len__(self):
         return self.count()
@@ -11989,14 +12015,9 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             if verbose:
                 syslog.info(f"DeviceTabWidget: select input index [{index}]")
             self._input_item_list_view.selectItemAt(index, force=force, emit=emit)
+            self._input_item_list_view.ensureVisibleIndex(index)
 
-            # widget = self.getInputWidgetAt(index)
-            # if not widget:
-            #     self._input_item_list_view.redraw()
-            # widget = self.getInputWidgetAt(index)
-            # if widget and not widget.selected:
-            #     # widget found and not already selected
-            #     widget.setSelected(True, emit)
+
         else:
             if verbose:
                 syslog.info("DeviceTabWidget: select input index - nothing to select")

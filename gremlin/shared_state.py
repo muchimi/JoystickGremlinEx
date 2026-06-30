@@ -160,7 +160,8 @@ def translateMode(mode: str) -> str:
 
 
 # holds the current selected device guid (string) for a tab
-current_tab_device_guid = None
+current_tab_device_guid = None # dinput.GUID format
+current_tab_device_id : str = None # string format
 
 def isDeviceTabActive(device_guid):
     ''' compares the given device and returns True if it's the current selected tab
@@ -169,6 +170,7 @@ def isDeviceTabActive(device_guid):
     '''
     global current_tab_device_guid
     return gremlin.util.compare_guid(device_guid, current_tab_device_guid)
+
 
 
 # map of virtual devics to their input types
