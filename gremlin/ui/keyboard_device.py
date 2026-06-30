@@ -791,7 +791,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         widget = InputItemWidget(
             input_item=identifier.input_item,
-            identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,
             config_external=True,
@@ -882,7 +881,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         input_widget.setStatus(status_text, icon)
 
-    def _populate_input_widget_ui(self, input_widget, container_widget, data):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data = None):
         """called when a button is created for custom content"""
 
         self._update_input_widget(input_widget, container_widget)

@@ -630,16 +630,16 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """
 
         if data.input_type == InputType.JoystickAxis:
-            widget = gremlin.input_item.InputItemWidget(input_item=identifier.input_item, identifier=identifier, parent=parent, data=data)
+            widget = gremlin.input_item.InputItemWidget(input_item=identifier.input_item, parent=parent, data=data)
             prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
             widget.setIcon(f"{prefix}joystick.png", use_qta=False)
             if widget.axis_repeater_widget is not None and identifier.is_axis:
                 widget.axis_repeater_widget.valueChanged.connect(lambda x: self._update_input_value_changed_cb(index, x))
         elif data.input_type == InputType.JoystickButton:
-            widget = gremlin.input_item.InputItemWidget(input_item=identifier.input_item, identifier=identifier, parent=parent, data=data)
+            widget = gremlin.input_item.InputItemWidget(input_item=identifier.input_item,  parent=parent, data=data)
             widget.setIcon("mdi.gesture-tap-button")
         elif data.input_type == InputType.JoystickHat:
-            widget = gremlin.input_item.InputItemWidget(input_item=identifier.input_item, identifier=identifier, parent=parent, data=data)
+            widget = gremlin.input_item.InputItemWidget(input_item=identifier.input_item,  parent=parent, data=data)
             widget.setIcon("ei.fullscreen")
         widget.create_action_icons(data)
         widget.disable_close()

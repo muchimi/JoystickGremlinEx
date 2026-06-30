@@ -25,6 +25,7 @@ from gremlin.input_types import InputType
 import gremlin.shared_state
 
 import gremlin.input_item
+from gremlin.input_item import InputItem
 
 
 import gremlin.util
@@ -511,7 +512,7 @@ class GateInfo:
     def itemData(self, condition: GateConditionType):
         """gets the inputitem for the given condition"""
         if condition not in self.item_data_map.keys():
-            data = self.parent._new_item_data()
+            data = self.parent._new_input_item()
             data.input_type = InputType.JoystickButton
             data.input_id = 1
             self.item_data_map[condition] = data
@@ -770,7 +771,7 @@ class RangeInfo:
     def itemData(self, condition: GateConditionType):
         """gets the inputitem for the given condition"""
         if condition not in self.item_data_map.keys():
-            item_data = self.parent._new_item_data()
+            item_data = self.parent._new_input_item()
             # use ranged containers/actions for range conditions, buttons for the others
             input_type = InputType.JoystickAxis if condition in (GateConditionType.InRange, GateConditionType.OutsideRange) else InputType.JoystickButton
             item_data.input_type = input_type
@@ -1366,6 +1367,22 @@ class GateData:
 
         # self.updateRanges()
         self._update_ranges()
+
+    def getOverrideInputType(self, condition : GateConditionType) -> InputType:
+        """gets the override input type for the given condition"""
+        assert isinstance(condition, GateConditionType), "invalid condition"
+        match condition:
+            case GateConditionType.InRange | GateConditionType.OutsideRange:
+                # condition is an axis input
+                return InputType.JoystickAxis
+            case GateConditionType.EnterRange | GateConditionType.ExitRange:
+                # range exit/enter conditions are momentary
+                return InputType.JoystickButton
+            case GateConditionType.OnCross | GateConditionType.OnCrossIncrease | GateConditionType.OnCrossDecrease:
+                # gate crossing conditions are momentary
+                return InputType.JoystickButton
+            case _:
+                return None
 
     @property
     def valid_mode_list(self) -> list:
@@ -3258,19 +3275,23 @@ class GateData:
     def _find_input_item(self):
         return gremlin.input_item._get_input_item(self._action_data)
 
-    def _new_item_data(self, is_action=True):
+    def _new_input_item(self, source_input_item : InputItem = None, is_action=True):
         """creates a new item data from the existing one"""
-        current_item_data = self._find_input_item()
+
+        if source_input_item is None:
+            source_input_item = self._find_input_item()
+
         input_item = gremlin.input_item.InputItem(
-            mode_node=current_item_data.parent,
-            input_type =current_item_data._input_type,
-            device_guid=current_item_data._device_guid,
-            input_id = current_item_data._input_id,
+            mode_node=source_input_item.parent,
+            input_type =source_input_item._input_type,
+            device_guid=source_input_item._device_guid,
+            input_id = source_input_item._input_id,
             )
 
+        # indicate the input item is for a action and not a direct hardware mapping - such as gated axis
         input_item._is_action = is_action
 
-        input_item._device_name = current_item_data._device_name
+        input_item._device_name = source_input_item._device_name
 
         # add the input data to the profile
 
@@ -3410,7 +3431,7 @@ class GateData:
 
         return node
 
-    def from_xml(self, node, data=None, extra_data=None):
+    def from_xml(self, node, data, extra_data=None):
         """loads XML data for axis to gate"""
         if not node.tag == "gate":
             syslog.error(f"GateData: Invalid node type {node.tag} {node}")
@@ -3458,6 +3479,8 @@ class GateData:
         self._gates = []  # remove all gates
         self._ranges = []  # remove all ranges
 
+
+        input_item = self._find_input_item()
         for node_range in node_gates:
             gate_id = safe_read(node_range, "id", str, "")
             if not gate_id:
@@ -3507,20 +3530,27 @@ class GateData:
             gate_info.item_data_map = {}
             for item_node in item_nodes:
                 if item_node is not None:
-                    item_data = self._new_item_data()
                     if "condition" not in item_node.attrib:
                         condition = gate_condition
                     else:
                         condition_str = item_node.get("condition")
                         condition = GateConditionType.to_enum(condition_str)
-                    item_node.tag = item_node.get("type")
-                    item_data.from_xml(item_node, data, extra_data=extra_data)
-                    if paste_mode:
-                        item_data.generateGuids()
 
-                    gate_info.item_data_map[condition] = item_data
+                    new_input_item = self._new_input_item(input_item)
+                    new_input_type = self.getOverrideInputType(condition)
+                    new_input_item.setOverrideInputType(new_input_type)
+                    if extra_data is None:
+                        extra_data = {}
+                    extra_data["override_input_type"] = new_input_type
+
+                    item_node.tag = item_node.get("type")
+                    new_input_item.from_xml(item_node, data, extra_data=extra_data)
+                    if paste_mode:
+                        new_input_item.generateGuids()
+
+                    gate_info.item_data_map[condition] = new_input_item
                     if verbose:
-                        syslog.info(f"\tLoading condition: {condition.name}: {str(item_data)}")
+                        syslog.info(f"\tLoading condition: {condition.name}: {str(new_input_item)}")
 
             # remember added gate
             gate_list.append(gate_info)
@@ -3631,14 +3661,14 @@ class GateData:
                     else:
                         condition_str = item_node.get("condition")
                         condition = GateConditionType.to_enum(condition_str)
-                    item_data = self._new_item_data()
+                    new_input_item = self._new_input_item()
                     # use ranged containers/actions for range conditions, buttons for the others
                     input_type = (
                         InputType.JoystickAxis if condition in (GateConditionType.InRange, GateConditionType.OutsideRange) else InputType.JoystickButton
                     )
-                    item_data.input_type = input_type
-                    item_data.from_xml(item_node, data, extra_data)
-                    range_info.item_data_map[condition] = item_data
+                    new_input_item.input_type = input_type
+                    new_input_item.from_xml(item_node, data, extra_data)
+                    range_info.item_data_map[condition] = new_input_item
 
             # remember the created range
             range_list.append(range_info)

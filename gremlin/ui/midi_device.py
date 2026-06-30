@@ -538,9 +538,20 @@ class MidiInputItem(gremlin.input_item.InputItemMessage):
 
 
 class MidiInputItemWidget(gremlin.input_item.InputItemWidget):
-    def __init__(self, input_item: MidiInputItem, identifier, populate_ui_callback, update_callback, config_external=False, parent=None, data=None):
+    def __init__(self, input_item: MidiInputItem, populate_ui_callback, update_callback, config_external=False, data=None, parent=None):
         get_state_callback = self._handle_get_state
-        super().__init__(input_item, identifier, populate_ui_callback, update_callback, config_external, parent, data, get_state_callback=get_state_callback)
+        super().__init__(
+            input_item = input_item,
+            populate_ui_callback = populate_ui_callback,
+            populate_name_callback = None,
+            selection_changed_callback = None,
+            update_callback = update_callback,
+            confirm_delete_callback = None,
+            get_state_callback = get_state_callback,
+            config_external = config_external,
+            data = data,
+            parent = parent
+        )
 
     def _handle_get_state(self):
         return self.input_item.getState()
@@ -2178,7 +2189,7 @@ class MidiDeviceTabWidget(BaseDeviceTabWidget):
 
         input_widget.setStatus(status_text, icon)
 
-    def _populate_input_widget_ui(self, input_widget, container_widget, data):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data = None):
         """called when a button is created for custom content"""
 
         layout = QtWidgets.QVBoxLayout(container_widget)

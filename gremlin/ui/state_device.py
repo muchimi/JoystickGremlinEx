@@ -3229,7 +3229,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         widget = InputItemWidget(
             input_item=identifier.input_item,
-            identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,
             confirm_delete_callback=self._handle_confirm_delete,
@@ -3320,7 +3319,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """called when the widget has to update itself on a data change"""
         pass
 
-    def _populate_input_widget_ui(self, input_widget, container_widget, data):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data = None):
         """called when a button is created for custom content"""
         layout = QtWidgets.QVBoxLayout(container_widget)
         status_widget = gremlin.ui.ui_common.QIconLabel()

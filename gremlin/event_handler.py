@@ -4443,7 +4443,16 @@ class JoystickEventProcessor:
 
         """
         assert isinstance(callback, Callable), "invalid callback"
-        assert isinstance(input_id, int) if input_id is not None else True, "invalid input id"
+        if __debug__:
+            if input_type is not None:
+                assert isinstance(input_type, InputType), "invalid input type"
+                match input_type:
+                    case InputType.Midi:
+                        assert isinstance(input_id, gremlin.ui.midi_device.MidiInputItem), "invalid midi input item"
+                    case InputType.OpenSoundControl:
+                        assert isinstance(input_id, gremlin.ui.osc_device.OscInputItem), "invalid osc input item"
+                    case _:
+                        assert isinstance(input_id, int), "invalid input id"
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
 

@@ -129,7 +129,7 @@ class Color:
 
     @staticmethod
     def offColor():
-        return "#08420B" if gremlin.shared_state.is_dark_theme else "#8c8c8c"
+        return "#6D6D6D" if gremlin.shared_state.is_dark_theme else "#8c8c8c"
 
     @staticmethod
     def normalColor():
@@ -201,6 +201,11 @@ class Color:
     @staticmethod
     def selectedBackgroundColor():
         return Color.selectColor()
+
+    @staticmethod
+    def unselectedBackgroundColor():
+        return "#3F3F3F" if gremlin.shared_state.is_dark_theme else "#BDBDBD"
+
 
     @staticmethod
     def highlightBackgroundColor():
@@ -14969,10 +14974,10 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
     def sizeHint(self):
         if not self._widget:
             # hide if no content
-            syslog.info(f"{self.data}: AutoHideStackedWidget has no widget, returning QSize(0, 0)")
+            # syslog.info(f"{self.data}: AutoHideStackedWidget has no widget, returning QSize(0, 0)")
             return QSize(0, 0)
         hint = super().sizeHint()
-        syslog.info(f"{self.data}: AutoHideStackedWidget has widget, returning {hint}")
+        #syslog.info(f"{self.data}: AutoHideStackedWidget has widget, returning {hint}")
         return hint
 
     def minimumSizeHint(self):
@@ -15099,7 +15104,7 @@ class AutohideContainer(QtWidgets.QWidget):
             h += widget.sizeHint().height()
         self._computed_height = h
         self.setFixedHeight(h)
-        syslog.info(f"AutohideContainer: computed height: {h}")
+        # syslog.info(f"AutohideContainer: computed height: {h}")
         self.sizeChanged.emit()
 
 

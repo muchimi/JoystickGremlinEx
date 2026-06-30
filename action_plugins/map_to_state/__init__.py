@@ -22,9 +22,9 @@ from gremlin.types import ButtonOutputMode
 import vjoy.vjoy
 import random
 import gremlin.util
-from gremlin.util import *
 import gremlin.ui.state_device
 import html
+from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 

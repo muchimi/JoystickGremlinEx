@@ -732,20 +732,21 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _tabswitch_needed(self, device_guid) -> bool:
         """checks to see if the device tab is the current tab or not"""
 
-        tab_device_guid = gremlin.shared_state.current_tab_device_guid
+        tab_device_guid = self._tab_index_map.get(self.ui.devices_tab_header_widget.currentIndex())
         if tab_device_guid is None:
             # no tab selected yet
             return True
+
         device_guid = gremlin.util.to_guid(device_guid)
-        assert isinstance(tab_device_guid, uuid.UUID) and isinstance(device_guid, uuid.UUID), "device id comparison mismatch"
+        assert isinstance(tab_device_guid, dinput.GUID) and isinstance(device_guid, dinput.GUID), "device id comparison mismatch data types"
 
         return tab_device_guid != device_guid
 
     def _inputswitch_needed(self, device_guid, input_id) -> bool:
         """checks to see if an input switch is needed"""
         tab_device_guid = gremlin.shared_state.current_tab_device_guid
-        device_guid = gremlin.util.to_guid(device_guid)
-        assert isinstance(tab_device_guid, uuid.UUID) and isinstance(device_guid, uuid.UUID), "device id comparison mismatch"
+        device_guid = gremlin.util.normalize_guid(device_guid)
+        assert isinstance(tab_device_guid, str) and isinstance(device_guid, str), "device id comparison mismatch"
         tab_input_id = self._current_tab_input_id
         return tab_device_guid != device_guid or tab_input_id != input_id
 
@@ -795,7 +796,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if verbose:
             syslog.info(f"Button input switch to {device_guid} button {input_id}")
 
-        self._select_input_handler(device_guid, input_type, input_id)
+        self._select_input_handler(device_guid, input_type, input_id, force_switch=True)
 
     def _axis_state_change(self, event):
         """axis changed - triggered only at design time - HIGHLIGHT SYSTEM"""

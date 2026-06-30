@@ -806,7 +806,6 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         widget = gremlin.input_item.InputItemWidget(
             input_item=identifier.input_item,
-            identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,
             config_external=True,
@@ -832,7 +831,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         input_widget.setInputDescription(None)
         input_widget.setToolTip(tooltip)
 
-    def _populate_input_widget_ui(self, input_widget, container_widget, data):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data = None):
         """called when a button is created for custom content"""
         layout = QtWidgets.QVBoxLayout(container_widget)
         status_widget = gremlin.ui.ui_common.QIconLabel()

@@ -2712,8 +2712,6 @@ class OscInputItemWidget(gremlin.input_item.InputItemWidget):
     def __init__(
         self,
         input_item: OscInputItem,
-        identifier,
-        parent=None,
         populate_ui_callback=None,
         populate_name_callback=None,
         selection_changed_callback=None,
@@ -2721,21 +2719,21 @@ class OscInputItemWidget(gremlin.input_item.InputItemWidget):
         confirm_delete_callback=None,
         config_external=False,
         data=None,
+        parent = None
     ):
         # store the get_state_callback to be used by child widgets
         get_state_callback = self._handle_get_state
         super().__init__(
-            input_item,
-            identifier,
-            parent,
-            populate_ui_callback,
-            populate_name_callback,
-            selection_changed_callback,
-            update_callback,
-            confirm_delete_callback,
-            get_state_callback,
-            config_external,
-            data,
+            input_item = input_item,
+            populate_ui_callback = populate_ui_callback,
+            populate_name_callback = populate_name_callback,
+            selection_changed_callback = selection_changed_callback,
+            update_callback = update_callback,
+            confirm_delete_callback = confirm_delete_callback,
+            get_state_callback = get_state_callback,
+            config_external = config_external,
+            data = data,
+            parent = parent
         )
 
     def _handle_get_state(self, *args, **kwargs):
@@ -4207,7 +4205,6 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
         widget = OscInputItemWidget(
             input_item=identifier.input_item,
-            identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,
             config_external=True,
@@ -4312,7 +4309,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
         input_widget.setStatus(status_text, icon)
 
-    def _populate_input_widget_ui(self, input_widget, container_widget, data):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data = None):
         """called when a button is created for custom content"""
         layout = QtWidgets.QVBoxLayout(container_widget)
         status_widget = gremlin.ui.ui_common.QIconLabel()

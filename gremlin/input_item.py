@@ -1672,6 +1672,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._container_layout = QtWidgets.QVBoxLayout(self._container_widget)
         self._container_layout.setContentsMargins(0, 0, 0, 0)
         self._container_layout.setSpacing(0)
+        self._container_widget.setObjectName("container_widget")
 
         self.main_layout.addWidget(self._container_widget)
 
@@ -1822,7 +1823,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._content_widget = QtWidgets.QWidget()
         self._content_layout = QtWidgets.QVBoxLayout(self._content_widget)
         self._content_layout.setContentsMargins(4, 4, 4, 4)
-        self._content_layout.setSpacing(4)
+        self._content_layout.setSpacing(0)
 
         items = {
             # "top": QtWidgets.QLabel("top widget"),
@@ -2447,7 +2448,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
             # description field
             self.setDescription(self.input_item.description)
-
+            display_text = None
             if not self._config_external or self.populate_name is not None:
                 display_text = self.populate_name(self, self.input_item) if self.populate_name is not None else self.input_item.input_name
             if not display_text:
@@ -2528,7 +2529,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             css_bar = f"background-color: {bar_color}; border:none; padding: 0px; margin: 0px; border-radius: 0px;"
 
         else:
-            self._container_widget.setStyleSheet("border: none;")  # clear the style
+            css = f"background-color: {gremlin.ui.ui_common.Color.unselectedBackgroundColor()};"
+            self._container_widget.setStyleSheet(css)
+
             self._default_style()
             # css_bar = gremlin.ui.ui_common.Color.cssUnselectedInputHeader()
             bar_color = gremlin.ui.ui_common.Color.inputTitleUnselectedColor()
@@ -3182,7 +3185,7 @@ class InputItemListView(AbstractView):
 
         self._blank_message = blank_message
         self._enable_filter = enable_filter
-        self.setMinimumWidth(230)
+        self.setMinimumWidth(200)
 
         # Create required UI items
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -3477,10 +3480,11 @@ class InputItemListView(AbstractView):
                             new_widget = False
 
                             # re-use existing
-                            widget = self._input_item_map[input_item]
-                            self._scroll_layout.removeWidget(
-                                widget
-                            )  # remove the existing widget because position may have changed so it's added at the right spot
+                            if input_item in self._input_item_map:
+                                widget = self._input_item_map[input_item]
+                                self._scroll_layout.removeWidget(
+                                    widget
+                                )  # remove the existing widget because position may have changed so it's added at the right spot
 
                         else:
                             # create new input widget
@@ -4961,11 +4965,13 @@ class AbstractAction(BaseProfileData):
     def input_is_axis(self):
         """true if the input is an axis type input"""
         input_item = self.input_item
+
         if hasattr(input_item, "is_axis"):
             return input_item.is_axis
         is_axis = False
-        if hasattr(self, "hardware_input_type"):
-            input_type: InputType = self.hardware_input_type
+
+        if hasattr(self, "input_type"):
+            input_type: InputType = self.input_type
             if input_type == InputType.JoystickAxis:
                 return True
 
@@ -4981,12 +4987,14 @@ class AbstractAction(BaseProfileData):
         """true if the input is a button"""
         is_button = False
         input_item = self.input_item
+        input_type = input_item.input_type
+
         # check hat first
         hardware_input_type = self.hardware_raw_input_type
 
-        input_type = None
-        if hasattr(self.parent_container, "get_input_type"):
-            input_type = self.parent_container.get_input_type()  # container override input type
+        if not input_type:
+            if hasattr(self.parent_container, "get_input_type"):
+                input_type = self.parent_container.get_input_type()  # container override input type
 
         if input_type:
             return input_type == InputType.JoystickButton
@@ -5062,6 +5070,14 @@ class AbstractAction(BaseProfileData):
             priority = safe_read(node, "priority", int, 5)
             priority = gremlin.util.clamp(priority, 0, 1000)
             self._priority = priority
+
+        if extra_data:
+            # pickup any input types to use for this action
+            if "override_input_type" in extra_data:
+                self.input_type = extra_data["override_input_type"]
+
+            elif "input_type" in extra_data:
+                self.input_type = extra_data["input_type"]
 
         nodes = node.xpath(".//remote-config")
         if nodes:

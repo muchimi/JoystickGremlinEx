@@ -19,6 +19,7 @@ from __future__ import annotations  # deprecated with python 3.14+
 import logging
 import threading
 import time
+
 from lxml import etree as ElementTree
 import traceback
 from PySide6 import QtWidgets, QtCore, QtGui
@@ -2008,8 +2009,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
     def _update_info(self):
         """updates the output display info widget"""
-        input_type = self.action_data._get_input_type()  # self.action_data.hardware_input_type # state._active_device_input_type
-        input_id = self.action_data.hardware_input_id  # state._active_device_input_id
+        input_type = self.action_data._get_input_type()
+        input_id = self.action_data.hardware_input_id
 
         vjoy_id = self.action_data.virtual_id
         vjoy_input_id = self.action_data.vjoy_input_id
@@ -3141,7 +3142,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             input_type = self.action_data.get_input_type()
 
             actions = ()
-            if self.action_data.input_is_axis() or input_type == InputType.JoystickAxis:
+            if input_type == InputType.JoystickAxis:
                 # axis can only set an axis
                 actions = (
                     VjoyAction.VJoyAxis,
@@ -3178,7 +3179,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     VjoyAction.VJoyDisablePairedRemote,
                 )
 
-            elif self.action_data.hardware_input_type == InputType.JoystickHat:
+            elif self.action_data.input_type == InputType.JoystickHat:
                 # hat actions
                 actions = [VjoyAction.VJoyHat, VjoyAction.VJoyHatToButton]
 
@@ -6282,12 +6283,13 @@ Supports axis merging, curved output, command, hat and button mappings.
         )  # hat return position - center is the default
 
         self.usage_data = gremlin.joystick_handling.VirtualDeviceUsageState()
-        self._input_type: InputType = self.get_input_type()
-        if self._input_type in (InputType.ModeControl, InputType.VirtualButton):
-            self._input_type = InputType.JoystickButton
+        input_type: InputType = self.get_input_type()
+        if input_type in (InputType.ModeControl, InputType.VirtualButton):
+            input_type = InputType.JoystickButton
+        self._input_type = input_type
         self.device_guid = self.hardware_device_guid
         self.input_id = self.hardware_input_id
-        self.input_type = self.hardware_input_type
+
 
         # default hat map table setup and default mapping for new hats
         self.hat_map = {}  # map of button id keyed by hat position tuple
@@ -7229,6 +7231,9 @@ Supports axis merging, curved output, command, hat and button mappings.
                         device_type = DeviceType.VJoy
                     case "maestro":
                         device_type = DeviceType.Maestro
+
+
+
 
             virtual_id = safe_read(node, "virtual-id", int, -1)
             if virtual_id != -1:
