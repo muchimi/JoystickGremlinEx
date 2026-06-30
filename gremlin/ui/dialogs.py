@@ -3862,34 +3862,38 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
 
         self.table.setRowCount(len(self.devices))
 
-        for i, entry in enumerate(self.devices):
-            self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(entry.name))
-            self.table.setItem(i, 1, QtWidgets.QTableWidgetItem(str(entry.axis_count)))
-            self.table.setItem(i, 2, QtWidgets.QTableWidgetItem(str(entry.button_count)))
-            self.table.setItem(i, 3, QtWidgets.QTableWidgetItem(str(entry.hat_count)))
-            self.table.setItem(i, 4, QtWidgets.QTableWidgetItem(f"{entry.vendor_id:04X}"))
-            self.table.setItem(i, 5, QtWidgets.QTableWidgetItem(f"{entry.product_id:04X}"))
-            self.table.setItem(i, 6, QtWidgets.QTableWidgetItem(str(entry.device_guid)))
-            self.table.setItem(i, 7, QtWidgets.QTableWidgetItem(entry.name.lower()))
-            self.table.setItem(i, 8, QtWidgets.QTableWidgetItem(f"{'Y' if entry.connected else 'N'}"))
+        device: dinput.DeviceSummary
+        row = 0
+        for device in self.devices:
+            if device.disabled:
+                continue
+            self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(device.name))
+            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(device.axis_count)))
+            self.table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(device.button_count)))
+            self.table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(device.hat_count)))
+            self.table.setItem(row, 4, QtWidgets.QTableWidgetItem(f"{device.vendor_id:04X}"))
+            self.table.setItem(row, 5, QtWidgets.QTableWidgetItem(f"{device.product_id:04X}"))
+            self.table.setItem(row, 6, QtWidgets.QTableWidgetItem(str(device.device_guid)))
+            self.table.setItem(row, 7, QtWidgets.QTableWidgetItem(device.name.lower()))
+            self.table.setItem(row, 8, QtWidgets.QTableWidgetItem(f"{'Y' if device.connected else 'N'}"))
 
             # row color
             is_dark = gremlin.shared_state.is_dark_theme
 
-            if entry.is_virtual:
+            if device.is_virtual:
                 if is_dark:
-                    color = "#466333" if entry.connected else "#49451D"
+                    color = "#466333" if device.connected else "#49451D"
                 else:
-                    color = "#7BAC5A" if entry.connected else "#9C923C"
+                    color = "#7BAC5A" if device.connected else "#9C923C"
             else:
                 if is_dark:
-                    color = "#354927" if entry.connected else "#5C432C"
+                    color = "#354927" if device.connected else "#5C432C"
                 else:
-                    color = "#7BAC5A" if entry.connected else "#B38255"
+                    color = "#7BAC5A" if device.connected else "#B38255"
             qc = QtGui.QColor(color)
             for col in range(9):
-                self.table.item(i, col).setBackground(qc)
-
+                self.table.item(row, col).setBackground(qc)
+            row += 1
         # resize
         self.table.resizeColumnsToContents()
 

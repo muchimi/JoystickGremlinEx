@@ -471,7 +471,7 @@ def clear_layout(layout):
     """removes all widgets and layouts from the given layout"""
     if isinstance(layout, QtWidgets.QLayout):
         _clear_layout(layout)
-    
+
 
 
 def _clear_layout(layout):
@@ -539,6 +539,16 @@ def clear_widget_references(instance):
     for name, value in list(vars(instance).items()):
         if isinstance(value, QtWidgets.QWidget):
             setattr(instance, name, None)
+
+
+def get_widget_references(instance, type: type = QtWidgets.QWidget) -> list:
+    """returns a list of widget references in the given instance"""
+    widgets = []
+    for name, value in list(vars(instance).items()):
+        if isinstance(value, QtWidgets.QWidget):
+            if type is None or isinstance(value, type):
+                widgets.append(value)
+    return widgets
 
 
 def get_layout_widgets(layout: QtWidgets.QLayout) -> list:

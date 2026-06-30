@@ -103,7 +103,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
 
         self.id = gremlin.util.get_guid()  # unique ID for this widget
 
-        self._deleted = False
+
         self._stack = []  # save stack for saved state
         self.setObjectName(f"{object_name} [{self.id}]" if object_name else f"GateAxisWidget: [{self.id}]")
         config = gremlin.config.Configuration()
@@ -480,14 +480,14 @@ making changes that impact the order of gates or ranges."""
     def _cleanup_ui(self):
         if not Shiboken.isValid(self):
             return
-        if not self._deleted:
-            verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-            if verbose_ui:
-                syslog.info(f"GATE Widget: {self.objectName()} cleanup")
-            self.unhook()
-            self._gate_data.unhook()
-            gremlin.util.clear_layout(self.main_layout)
-            self._deleted = True
+
+        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+        if verbose_ui:
+            syslog.info(f"GATE Widget: {self.objectName()} cleanup")
+        self.unhook()
+        self._gate_data.unhook()
+        gremlin.util.clear_layout(self.main_layout)
+
 
     def _pushState(self):
         """saves the current gate data to the stack"""
@@ -1181,11 +1181,6 @@ making changes that impact the order of gates or ranges."""
         # print (f"update marker: {value} input id: {self.action_data.hardware_input_id}")
         if not Shiboken.isValid(self):
             return
-        verbose_ui = gremlin.config.Configuration().verbose_mode_ui
-        if self._deleted:
-            if verbose_ui:
-                syslog.info(f"GATE Widget: update slider marker : {self.objectName()} ignored - object marked deleted ")
-            return
 
         if self._lock:
             return
@@ -1193,6 +1188,8 @@ making changes that impact the order of gates or ranges."""
         try:
             self._lock = True
             self._axis_value = value
+            verbose_ui = gremlin.config.Configuration().verbose_mode_ui
+
             if Shiboken.isValid(self._slider_widget):
                 verbose_ui = gremlin.config.Configuration().verbose_mode_ui
                 if verbose_ui:
@@ -1623,7 +1620,7 @@ class GatedAxisWidget(gremlin.input_item.AbstractActionWidget):
     def _create_ui(self):
         if not Shiboken.isValid(self):
             return
-        self._deleted = False
+
 
         self.container_widget = QtWidgets.QWidget()
         self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)

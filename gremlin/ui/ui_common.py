@@ -28,7 +28,6 @@ from PySide6.QtGui import QPixmap, QPainter, QIcon
 import collections
 from typing import Callable
 
-
 import gremlin.config
 import gremlin.error
 import qtawesome as qta
@@ -311,6 +310,10 @@ class Color:
 
     @staticmethod
     def keyHoverBackgroundColor():
+        return Color.hoverBackgroundColor()
+
+    @staticmethod
+    def hoverBackgroundColor():
         return "#525252" if gremlin.shared_state.is_dark_theme else "#F0F0F0"
 
     @staticmethod
@@ -330,8 +333,12 @@ class Color:
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#000000"
 
     @staticmethod
-    def keyHoverBorderColor():
+    def hoverBorderColor():
         return "#CCCCCC" if gremlin.shared_state.is_dark_theme else "#222222"
+
+    @staticmethod
+    def keyHoverBorderColor():
+        return Color.hoverBorderColor()
 
     @staticmethod
     def containerBackgroundColor():
@@ -391,11 +398,15 @@ class Color:
 
     @staticmethod
     def buttonHoverBorderColor():
-        return Color.keyHoverBorderColor()
+        return Color.hoverBorderColor()
 
     @staticmethod
     def buttonHoverBackgroundColor():
-        return Color.keyHoverBackgroundColor()
+        return Color.hoverBackgroundColor()
+
+
+
+
 
     @staticmethod
     def warningColor():  # color for the warning flag
@@ -583,6 +594,22 @@ class Color:
 
             """
         return css
+
+    @staticmethod
+    def cssInputHeaderButton(selected = False):
+        background_color = Color.buttonBackgroundColor()
+        if selected:
+            background_color = Color.selectColor()
+        hover_color = Color.buttonHoverBackgroundColor()
+        border_hover_color = Color.buttonHoverBorderColor()
+        border_normal_color = Color.buttonBorderColor()
+        css = f"""
+            QWidget  {{ background-color: {background_color}; border: {border_normal_color}; border-radius: 6px; }}
+            QWidget:hover {{ background-color: {hover_color}; border: 1px {border_hover_color}; }}
+            """
+        return css
+
+
 
     @staticmethod
     def cssFrameBox():
@@ -805,6 +832,31 @@ class Color:
             QStackedWidget[class="hack"] {{
                 margin-top: -30px;
             }}
+
+            QMenuBar {{
+                background-color: {Color.backgroundColor()};
+            }}
+            QMenuBar::item {{
+                background-color: {Color.backgroundColor()};
+                padding: 4px 10px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }}
+            QMenuBar::item:hover {{
+                background-color: {Color.buttonHoverBackgroundColor()};
+                padding: 4px 10px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }}
+
+            QmenuBar::item:selected {{
+                background-color: {Color.selectedBackgroundColor()};
+            }}
+
+            QMenu::item:selected {{
+                background-color: {Color.selectedBackgroundColor()};
+            }}
+
 
             """
 
@@ -4365,19 +4417,22 @@ class QDataPushButton(QtWidgets.QPushButton):
 
     def __init__(
         self,
-        text=None,
+        text : str=None,
         data=None,
         parent=None,
-        tooltip=None,
-        callback=None,
-        callbackEx=None,
-        clicked=None,
-        enabled=None,
-        enhanced=False,
+        tooltip : str =None,
+        callback : Callable=None,
+        callbackEx : Callable=None,
+        clicked : Callable=None,
+        enabled:bool=None,
+        enhanced : bool =False,
+        css : str= None,
+        icon : QtGui.QIcon = None,
+        size : int | QtCore.QSize = None,
     ):
         """custom push button
 
-        :param text: label for the button (optiona)
+        :param text: label for the button (optional )
         :param data: data object tracked with the button (optional)
         :param parent: parent widget (optional)
         :param tooltip: tooltip (optional)
@@ -4406,7 +4461,7 @@ class QDataPushButton(QtWidgets.QPushButton):
         self._callback_ex = callbackEx
         self._enhanced = enhanced or callbackEx is not None
 
-        # self.setStyleSheet(Color.cssButton())
+
 
         if enabled is not None:
             self.setEnabled(enabled)
@@ -4415,7 +4470,23 @@ class QDataPushButton(QtWidgets.QPushButton):
 
         self.installEventFilter(self)
 
-        self.setStyleSheet(Color.cssButton())
+        if size:
+            if isinstance(size, int):
+                self.setFixedSize(QtCore.QSize(size, size))
+            elif isinstance(size, QtCore.QSize):
+                self.setFixedSize(size)
+
+        if icon:
+            if isinstance(icon, str):
+                icon = gremlin.util.load_icon(icon)
+            if isinstance(icon, QtGui.QIcon):
+                self.setIcon(icon)
+
+
+        if css:
+            self.setStyleSheet(css)
+        else:
+            self.setStyleSheet(Color.cssButton())
 
     def _handle_callback(self):
         if self._callback:
@@ -14845,3 +14916,204 @@ class ResizingStackedWidget(QtWidgets.QStackedWidget):
         if current_widget:
             return current_widget.minimumSizeHint()
         return super().minimumSizeHint()
+
+
+class AutoHideStackedWidget(QtWidgets.QStackedWidget):
+    """stacked widget that automatically hides itself if no widget is set"""
+
+    widgetChanged = QtCore.Signal()
+    sizeChanged = QtCore.Signal()
+    def __init__(self, widget : QtWidgets.QWidget = None, data = None, parent=None):
+        super().__init__(parent=parent)
+        self._widget = widget
+        self.data = data
+        if widget is not None:
+            self.addWidget(widget)
+        # prevent style sheet propagation
+        self.setStyleSheet("QWidget { background: transparent; }")
+
+    def widget(self):
+        return self._widget
+
+    def setWidget(self, widget : QtWidgets.QWidget):
+        if self._widget is not None:
+            # delete the old widget
+            self.removeWidget(self._widget)
+            gremlin.util.delete_widget(self._widget)
+
+        # set the new widget
+        self._widget = widget
+        if widget is not None:
+            self.addWidget(widget)
+            self.setCurrentWidget(widget)
+        self.widgetChanged.emit()
+
+    def layout(self):
+        if not self._widget:
+            # create a container for the widgets to get a layout
+            self._widget = QtWidgets.QWidget()
+            QtWidgets.QVBoxLayout(self._widget)
+        if self._widget is not None:
+            return self._widget.layout()
+
+    def _cleanup_ui(self):
+        self.setWidget(None)
+
+    def hasWidget(self):
+        return self._widget is not None
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.sizeChanged.emit()
+
+    def sizeHint(self):
+        if not self._widget:
+            # hide if no content
+            syslog.info(f"{self.data}: AutoHideStackedWidget has no widget, returning QSize(0, 0)")
+            return QSize(0, 0)
+        hint = super().sizeHint()
+        syslog.info(f"{self.data}: AutoHideStackedWidget has widget, returning {hint}")
+        return hint
+
+    def minimumSizeHint(self):
+        if not self._widget:
+            # hide if no content
+            return QSize(0, 0)
+        return super().minimumSizeHint()
+
+
+class AutoHideIconTextWidget(AutoHideStackedWidget):
+    """autohide label widget - shows a label if text is set, otherwise hides the widget"""
+    def __init__(self, text : str = None, icon : QtGui.QIcon = None, size : int = 16, style : str = None, tooltip : str = None, data = None, parent=None):
+        super().__init__(data=data, parent=parent)
+        self._text = text
+        self._icon = icon
+        self._size = size
+        self._css = style
+        self._tooltip = tooltip
+        if text is not None:
+            widget =  QtWidgets.QLabel(text)
+            if self._css is not None:
+                widget.setStyleSheet(self._css)
+            if icon is not None:
+                widget.setPixmap(icon.pixmap(self._size, self._size))
+            if tooltip is not None:
+                widget.setToolTip(tooltip)
+            self.setWidget(widget)
+
+
+
+    def text(self):
+        return self._widget.text() if self._widget is not None else None
+
+    def setText(self, text : str, icon : QtGui.QIcon = None, size : int = 16, style : str = None):
+        if text or icon is not None:
+            if self._widget is None:
+                widget =  QtWidgets.QLabel(text)
+                self.setWidget(widget)
+                if self._tooltip:
+                    widget.setToolTip(self._tooltip)
+            else:
+                widget = self._widget
+            if style is not None:
+                self._css = style
+            if self._css is not None:
+                widget.setStyleSheet(self._css)
+            if icon:
+                self._icon = icon
+            if size is not None:
+                self._size = size
+            if self._icon is not None:
+                widget.setPixmap(self._icon.pixmap(self._size, self._size))
+            self._widget.setText(text)
+        else:
+            self.setWidget(None) # hides the widget
+
+    def setIcon(self, icon : QtGui.QIcon):
+        self._icon = icon
+        if self._widget is not None:
+            self._widget.setPixmap(icon.pixmap(self._size, self._size))
+
+    def setTooltip(self, tooltip : str):
+        self._tooltip = tooltip
+        if self._widget is not None:
+            self._widget.setToolTip(tooltip)
+
+    def setStyleSheet(self, style : str):
+        self._css = style
+        if self._widget is not None:
+            self._widget.setStyleSheet(style)
+
+    def setIconSize(self, size : int):
+        self._size = size
+        if self._widget is not None and self._icon is not None:
+            self._widget.setPixmap(self._icon.pixmap(self._size, self._size))
+
+
+class AutohideContainer(QtWidgets.QWidget):
+    """container that automatically hides itself if no widget is set"""
+    sizeChanged = QtCore.Signal()
+    def __init__(self, data = None, parent=None):
+        super().__init__(parent=parent)
+        self._widget_map = {}
+        self._key_map = {}
+        self._computed_height = 0
+
+
+    def addWidget(self, key, widget : QtWidgets.QWidget ):
+        layout = self.layout()
+        if layout is None:
+            layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(widget)
+        if key in self._widget_map:
+            self.removeWidget(self._widget_map[key])
+        self._widget_map[key] = widget
+        self._key_map[widget] = key
+        if isinstance(widget, AutoHideStackedWidget):
+            widget.sizeChanged.connect(self._update_height)
+        self._update_height()
+
+    def removeWidget(self, widget : QtWidgets.QWidget):
+
+        if widget in self._key_map:
+            key = self._key_map[widget]
+            widget = self._widget_map[key]
+            layout = self.layout()
+            if layout is not None:
+                layout.removeWidget(widget)
+                if isinstance(widget, AutoHideStackedWidget):
+                    widget.sizeChanged.disconnect(self._update_height)
+                widget.setParent(None)
+            del self._key_map[widget]
+            del self._widget_map[key]
+            self._update_height()
+
+    def addWidgets(self, widget_map : dict):
+        for key, widget in widget_map.items():
+            self.addWidget(key, widget)
+
+    def _update_height(self):
+        """updates the height of the widget based on the content"""
+        h = 0
+        for widget in self._widget_map.values():
+            h += widget.sizeHint().height()
+        self._computed_height = h
+        self.setFixedHeight(h)
+        syslog.info(f"AutohideContainer: computed height: {h}")
+        self.sizeChanged.emit()
+
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        hint.setHeight(self._computed_height)
+        return hint
+
+    def minimumSizeHint(self):
+        hint = super().minimumSizeHint()
+        hint.setHeight(self._computed_height)
+        return hint
+
+
+
+
+

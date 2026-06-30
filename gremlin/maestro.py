@@ -45,7 +45,7 @@ import gremlin.util
 import dinput
 
 # os.environ["PYTHONNET_PYDLL"] = r"C:\Python\python313\python313.dll"
-from pythonnet import load
+
 
 import gremlin
 from gremlin.singleton_decorator import SingletonDecorator
@@ -59,30 +59,31 @@ syslog = logging.getLogger("system")
 try:
     # path to the HIDMaestro compiled distributables
     _maestro_initialized = False
-    config = gremlin.config.Configuration()
-    if not config.maestro_enabled:
-        hid_maestro_path = config.maestro_dist_path
-        if not os.path.exists(hid_maestro_path):
-            syslog.info(f"HIDMaestro disabled: no distribution files found in path not found: {hid_maestro_path}")
-        else:
-            # load the .NET Core runtime using pythonnet
-            load("coreclr")
+    # config = gremlin.config.Configuration()
+    # if not config.maestro_enabled:
+    #     hid_maestro_path = config.maestro_dist_path
+    #     if not os.path.exists(hid_maestro_path):
+    #         syslog.info(f"HIDMaestro disabled: no distribution files found in path not found: {hid_maestro_path}")
+    #     else:
+    #         # load the .NET Core runtime using pythonnet
+    #         from pythonnet import load
+    #         load("coreclr")
 
-            # ensure it can find the dependencies for the HIDMaestro assembly
-            sys.path.append(hid_maestro_path)
+    #         # ensure it can find the dependencies for the HIDMaestro assembly
+    #         sys.path.append(hid_maestro_path)
 
-            import clr
+    #         import clr
 
-            clr.AddReference("HIDMaestro.Core")
+    #         clr.AddReference("HIDMaestro.Core")
 
-            # .net imports
-            import HIDMaestro
-            from HIDMaestro import *
-            from HIDMaestro import HMGamepadState
-            import System
-            from System.Collections.Generic import Dictionary
+    #         # .net imports
+    #         import HIDMaestro
+    #         from HIDMaestro import *
+    #         from HIDMaestro import HMGamepadState
+    #         import System
+    #         from System.Collections.Generic import Dictionary
 
-            _maestro_initialized = True
+    #         _maestro_initialized = True
 
 
 except Exception as e:
