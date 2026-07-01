@@ -20,11 +20,10 @@ from lxml import etree as ElementTree
 import gremlin
 import gremlin.config
 from gremlin.input_types import InputType
-
 import gremlin.ui.ui_common
 
 import gremlin.types
-from gremlin.types import ContainerViewTypes
+from gremlin.types import ContainerViewTypes, ActivationRule
 import gremlin.input_item
 import gremlin.execution_graph
 from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActivationConditionWidget, ActionSelector
@@ -289,11 +288,11 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     gremlin.shared_state.popLog()
 
                 match self.rule:
-                    case gremlin.actions.ActivationRule.Any:
+                    case ActivationRule.Any:
                         if result:
                             # one condition succeeded
                             break
-                    case gremlin.actions.ActivationRule.All:
+                    case ActivationRule.All:
                         if not result:
                             # any one condition failed failes the whole stack
                             break

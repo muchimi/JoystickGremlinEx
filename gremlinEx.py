@@ -753,13 +753,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         assert isinstance(tab_device_guid, dinput.GUID), "current tab device guid is not a dinput.GUID"
         return tab_device_guid
 
-    def _inputswitch_needed(self, device_guid, input_id) -> bool:
+    def _inputswitch_needed(self, device_guid : dinput.GUID, input_id) -> bool:
         """checks to see if an input switch is needed"""
 
         tab_device_guid = self.getCurrentTabDeviceGuid()
-
-        device_guid = gremlin.util.normalize_guid(device_guid)
-        assert isinstance(tab_device_guid, str) and isinstance(device_guid, str), "device id comparison mismatch"
+        assert isinstance(tab_device_guid, dinput.GUID) and isinstance(device_guid, dinput.GUID), "device id comparison mismatch"
         tab_input_id = self._current_tab_input_id
         return tab_device_guid != device_guid or tab_input_id != input_id
 
@@ -3524,8 +3522,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 return (input_item.input_type, input_item.input_id)
         return (input_type, input_id)
 
-    def _get_input_item(self, device_guid: str, index: int) -> gremlin.input_item.InputItem:
+    def _get_input_item(self, device_guid: str | dinput.GUID, index: int) -> gremlin.input_item.InputItem:
         """get the input item at the specified index in the device - index is 0 based"""
+        assert index >= 0,f"invalid index {index}"
         widget: gremlin.input_item.BaseDeviceTabWidget = self._get_tab_widget_guid(device_guid)
         if widget is None or not hasattr(widget, "inputItemListModel") or not widget.isLoaded():
             return None
@@ -3535,7 +3534,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             return None
         return widget.inputItemListModel.data(index)
 
-    def _get_input_items(self, device_guid: str) -> list[gremlin.input_item.InputItem]:
+    def _get_input_items(self, device_guid: str | dinput.GUID) -> list[gremlin.input_item.InputItem]:
         """gets the list of all input items for a given device"""
         widget = self._get_tab_widget_guid(device_guid)
         if widget is None or not hasattr(widget, "inputItemListModel") or not widget.isLoaded():
@@ -3544,7 +3543,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         row_count = widget.inputItemListModel.rows()
         return [widget.inputItemListModel.data(index) for index in range(row_count)]
 
-    def _find_input_item(self, device_guid: str, input_type, input_id) -> gremlin.input_item.InputItem:
+    def _find_input_item(self, device_guid: str | dinput.GUID, input_type, input_id) -> gremlin.input_item.InputItem:
         """find the input item matching the input id for a given device"""
         if not device_guid or input_id is None or input_type is None:
             # nothing to match
@@ -3672,7 +3671,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if self._change_input_lock.locked():
                 return
 
-            verbose = gremlin.config.Configuration().verbose_mode_select
+            verbose = self.config.verbose_mode_select
 
             widget = None
             _push_cursor = False
@@ -3757,7 +3756,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     device_guid = device.device_guid
                                     # get a default input for that device (first axis or first button)
                                     if device.axis_count:
-                                        input_id = device.getAxisInputId(0)
+                                        input_id = device.getAxisInputId(1)
                                     elif device.button_count:
                                         input_item = self._get_input_item(device_guid, 0)
                                     else:
@@ -3892,7 +3891,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 index = widget.indexOf(input_item)
                                 if index == -1:
                                     device = gremlin.joystick_handling.getDevice(device_guid)
-                                    if device.device_type == DeviceType.Joystick and self.is_highligthing_enabled:
+                                    if device.device_type == DeviceType.Joystick and self.is_highligthing_enabled and self.config.filter_auto_unhide:
+                                        # auto unhide the input and select it
                                         widget.setInputVisible(input_item, True, emit=True)
                                         index = widget.indexOf(input_item)
                                         if verbose:

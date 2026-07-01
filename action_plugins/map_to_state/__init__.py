@@ -1218,7 +1218,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         if "key" in node.attrib:
             key = node.get("key")
         if "state-id" in node.attrib:
-            state_id = node.get("state-id")
+            state_id = gremlin.util.to_uuid(node.get("state-id"))
             state = sd.getStateById(state_id)
 
         if not state and key:
@@ -1292,7 +1292,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
         if self.key:
             node.set("key", html.escape(self.key))
             if self.state:
-                node.set("state-id", self.state.id)
+                node.set("state-id", gremlin.util.normalize_guid(self.state.id))
             if self.description:
                 node.set("description", html.escape(self.description))
             node.set("mode", self.mode)

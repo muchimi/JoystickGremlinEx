@@ -511,7 +511,8 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
 
     def _create_mouse_button_ui(self):
         self.mouse_button_listen_widget = gremlin.ui.ui_common.NoKeyboardPushButton(
-            gremlin.types.MouseButton.to_string(self.action_data.button_id), tooltip="Listen for a mouse button"
+            gremlin.types.MouseButton.to_string(self.action_data.button_id),
+            tooltip="Listen for a mouse button"
         )
         self.mouse_button_listen_widget.clicked.connect(self._handle_button_listen)
 

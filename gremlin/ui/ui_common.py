@@ -31,6 +31,7 @@ from typing import Callable
 import gremlin.config
 import gremlin.error
 import qtawesome as qta
+import inspect
 
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
@@ -684,6 +685,10 @@ class Color:
 
         QTabBar::tab:hover {{
             background: {hover_color};
+        }}
+
+        QTabWidget::pane {{
+            background-color: {selected_tab_color};
         }}
 
         """
@@ -4495,7 +4500,12 @@ class QDataPushButton(QtWidgets.QPushButton):
 
     def _handle_callback(self):
         if self._callback:
-            self._callback(self)
+            sig = inspect.signature(self._callback)
+            takes_parameters = len(sig.parameters) > 0
+            if takes_parameters:
+                self._callback(self)
+            else:
+                self._callback()
 
     def _handle_callback_ex(self, widget, is_ctrl: bool, is_shft: bool, is_alt: bool, is_right: bool):
         if self._callback_ex:
@@ -4570,17 +4580,17 @@ class QIconPushButton(QDataPushButton):
 
     def __init__(
         self,
-        icon=None,
-        text=None,
+        text : str =None,
+        icon : str =None,
         data=None,
         parent=None,
-        tooltip=None,
-        callback=None,
-        callbackEx=None,
-        clicked=None,
-        enabled=None,
-        enhanced=False,
-        icon_size=None,
+        tooltip : str =None,
+        callback : Callable =None,
+        callbackEx : Callable =None,
+        clicked : Callable =None,
+        enabled : bool =None,
+        enhanced : bool =False,
+        icon_size : int  = 24,
     ):
         """custom push button
 
@@ -4660,9 +4670,9 @@ class QIconPushButton(QDataPushButton):
 class NoKeyboardPushButton(QIconPushButton):
     """Standard PushButton which does not react to keyboard input."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, text : str = None, icon: str = None, icon_size=24, data=None, parent=None, tooltip=None):
         """Creates a new instance."""
-        super().__init__(*args, **kwargs)
+        super().__init__(text = text, icon=icon, icon_size=icon_size, data=data, parent=parent, tooltip=tooltip)
 
     def keyPressEvent(self, event):
         """Handles key press events by ignoring them.
@@ -4673,12 +4683,8 @@ class NoKeyboardPushButton(QIconPushButton):
 
 
 class QIconButton(QIconPushButton):
-    def __init__(self, icon: str, icon_size=24, text=None, data=None, parent=None, tooltip=None):
-        super().__init__(text, data, parent, tooltip)
-        size = QtCore.QSize(icon_size, icon_size)
-        self.setIconSize(size)
-        self.setIcon(icon)
-        # self.setStyleSheet("border: none;")
+    def __init__(self, text=None, icon: str = None, icon_size=24,  data=None, parent=None, tooltip=None):
+        super().__init__(text = text, icon=icon, icon_size=icon_size, data=data, parent=parent, tooltip=tooltip)
 
 
 class QReorderToolbar(QtWidgets.QWidget):
@@ -5281,6 +5287,7 @@ class QProgressBar(QtWidgets.QWidget):
         if orientation == Qt.Orientation.Vertical:
             self._desired_width = 10
             self._desired_height = 100
+
         else:
             self._desired_width = 100
             self._desired_height = 10
@@ -5320,8 +5327,17 @@ class QProgressBar(QtWidgets.QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.WheelFocus)
         self.installEventFilter(self)
 
+        self._update_cursor()
+
         if value is not None:
             self._set_value_ui(value)
+
+    def _update_cursor(self):
+        """updates the cursor based on the readonly state"""
+        if self._readOnly:
+            self.setCursor(QtCore.Qt.CursorShape.ArrowCursor)
+        else:
+            self.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
 
     @property
     def valid(self) -> bool:
@@ -5367,6 +5383,7 @@ class QProgressBar(QtWidgets.QWidget):
             self.installEventFilter(self)
         else:
             self.removeEventFilter(self)
+        self._update_cursor()
 
     def isReadOnly(self):
         return self._readOnly
@@ -6227,7 +6244,7 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
                 #     syslog.info(f"AxisCurrentState: virtual device {device.name} axis {device.getAxisName(input_id)} value: {str(values)}")
 
                 # hook the input both runtime and design time
-                source = EventSourceType.Virtual if device.is_virtual else EventSourceType.DirectInput  # event comes from virtual device or directinput device
+                source = EventSourceType.Virtual if device.is_virtual else EventSourceType.dInput  # event comes from virtual device or directinput device
                 jep.registerListenerUICallback(
                     device_guid=device.device_guid,
                     input_type=InputType.JoystickAxis,
@@ -9089,13 +9106,28 @@ class ActionLabel(QtWidgets.QLabel):
     def __init__(self, action_entry, parent=None):
         """Creates a new label for the given entry.
 
-        :param action_entry the entry to create the label for
-        :param parent the parent
+        :param action_entry: the entry to create the label for
+        :param parent: the parent
         """
         QtWidgets.QLabel.__init__(self, parent)
-        icon = action_entry.icon()
+        self._action = action_entry
+        if self._action is not None:
+            self._action.icon_changed.connect(self._update_icon)
+
+        background_color = Color.actionIconBackgroundColor()
+        border_color = Color.keyBorderColor()
+        self.setStyleSheet(f"QLabel {{ border: 1px solid {border_color}; border-radius: 4px; padding: 1px; background-color: {background_color}; }}")
+        self._update_icon()
+
+    def _update_icon(self):
+        """updates the icon"""
+        icon = self._action.icon()
+        if self._action:
+            is_valid = self._action.icon_valid()
+            self.setToolTip(self._action.display_name())
+
         if icon is None:
-            icon = gremlin.util.load_icon("fa6.circle-question")
+            icon = load_icon("fa6.circle-question")
 
         self._width = 20
         if isinstance(icon, str):
@@ -9106,24 +9138,26 @@ class ActionLabel(QtWidgets.QLabel):
             pixmap = icon.pixmap(self._width)
         else:
             pixmap = QtGui.QPixmap(icon)
+
+        # mark the icon if not valid
+
         pixmap = pixmap.scaled(self._width, self._width, QtCore.Qt.KeepAspectRatio)
+
+        if not is_valid:
+            # mark the icon with a red border
+            painter = QtGui.QPainter(pixmap)
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            painter.setPen(QtGui.QPen(QtCore.Qt.red, 2))
+            painter.drawLine(0, 0, pixmap.width(), pixmap.height())
+            painter.end()
+
         self.setPixmap(pixmap)
         self.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
-        self.action_entry = action_entry
 
-        background_color = Color.actionIconBackgroundColor()
-        border_color = Color.keyBorderColor()
-        self.setStyleSheet(f"QLabel {{ border: 1px solid {border_color}; border-radius: 4px; padding: 1px; background-color: {background_color}; }}")
 
-    def _icon_change(self, event):
-        icon = self.action_entry.icon()
-        if icon is None:
-            icon = gremlin.util.load_icon("fa6.circle-question")
-        if isinstance(icon, QtGui.QIcon):
-            self.setPixmap(QtGui.QPixmap(icon.pixmap(self._width)))
-        else:
-            self.setPixmap(QtGui.QPixmap(icon))
+
+
 
 
 class QContentWidget(QtWidgets.QWidget):
@@ -10337,6 +10371,7 @@ class QHorizontalLine(QtWidgets.QFrame):
         if color is not None:
             self.setStyleSheet(f"color: {color};")
         self.setLineWidth(size)
+        self.setFixedHeight(8)
 
 
 def get_layout_widgets(layout: QtWidgets.QLayout) -> list:
@@ -14890,6 +14925,7 @@ class WheelForwarder(QWidget):
 
 
 class ResizingStackedWidget(QtWidgets.QStackedWidget):
+    heightChanged = QtCore.Signal(int)
     def __init__(self, zero_hide=False, parent=None):
         super().__init__(parent=parent)
         self._zero_hide = zero_hide
@@ -15120,5 +15156,89 @@ class AutohideContainer(QtWidgets.QWidget):
 
 
 
+class QScrollLayout(QtWidgets.QLayout):
+    """custom layout for scroll layouts that fills the scroll area width and positions items at the correct height as a workaround to QT not positioning items correctly"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._items = []
+
+    def __del__(self):
+        """ cleanup """
+        while self._items:
+            item = self.takeAt(0)
+            if item:
+                del item
 
 
+    def addItem(self, item):
+        self._items.append(item)
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, index):
+        if 0 <= index < len(self._items):
+            return self._items[index]
+        return None
+
+    def takeAt(self, index):
+        if 0 <= index < len(self._items):
+            return self._items.pop(index)
+        return None
+
+    def setGeometry(self, rect):
+        """compute the geometry of the layout and set the geometry of each item"""
+        if self._items:
+            # mx = self.contentsMargins().left()
+            # mr = self.contentsMargins().right()
+            x = rect.x() # + mx
+            y = rect.y()
+            rw = rect.width() # fill the available width
+            height = 0
+            for index, item in enumerate(self._items):
+                hint = item.sizeHint()
+                h = hint.height()
+                w = hint.width() # + mx + mr  # use the hint width for the item
+                if w < rw:
+                    w = rw  # minimum width
+                item_rect = QtCore.QRect(x, y, w, h)
+                item.setGeometry(item_rect)
+                # syslog.info(f"QScrollLayout: setting geometry for item [{index}] to {item_rect} rw: {rw}")
+                height += h
+                y += h
+            rect.setHeight(height)  # update the height of the rect to fit all items
+        super().setGeometry(rect)
+
+
+    def _get_total_height(self):
+        total_height = 0
+        for item in self._items:
+            hint = item.sizeHint()
+            total_height += hint.height()
+        return total_height
+
+
+
+    def sizeHint(self):
+        if not self._items:
+            return QSize(0, 0)
+        width = 0
+        height = 0
+        for item in self._items:
+            hint = item.sizeHint()
+            width = max(width, hint.width())
+            height += hint.height()
+
+        # syslog.info(f"QScrollLayout: sizeHint: width={width}, height={height} for {len(self._items)} items")
+        return QSize(width, height)
+
+    def minimumSize(self):
+        if not self._items:
+            return QSize(0, 0)
+        width = 0
+        height = 0
+        for item in self._items:
+            hint = item.minimumSize()
+            width = max(width, hint.width())
+            height += hint.height()
+        return QSize(width, height)

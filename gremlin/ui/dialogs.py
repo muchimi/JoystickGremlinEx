@@ -118,7 +118,7 @@ class ProfileOptionsUi(gremlin.ui.ui_common.QRememberDialog):
         self.activate_restore_mode.setChecked(self.profile.get_restore_mode())
         self.activate_restore_mode.setToolTip("""When set, the last mode used by this profile will be set whenever the profile is activated.""")
 
-        self.close_button = QtWidgets.QPushButton("Close")
+        self.close_button = gremlin.ui.ui_common.QDataPushButton("Close")
         self.close_button.clicked.connect(self._close_cb)
 
         close_button_widget = QtWidgets.QWidget()
@@ -226,7 +226,7 @@ class HostIpDialog(ui_common.BaseDialogUi):
 
         self._instruction_widget = QtWidgets.QLabel()
 
-        refresh_widget = QtWidgets.QPushButton()
+        refresh_widget = gremlin.ui.ui_common.QDataPushButton()
         refresh_widget.setToolTip("Refresh")
         refresh_widget.clicked.connect(self._update_ip)
         icon = gremlin.util.load_icon("ei.refresh")
@@ -250,10 +250,10 @@ class HostIpDialog(ui_common.BaseDialogUi):
         grid_layout.setColumnStretch(3, 2)
         self.main_layout.addLayout(grid_layout)
 
-        ok_widget = QtWidgets.QPushButton("Ok")
+        ok_widget = gremlin.ui.ui_common.QDataPushButton("Ok")
         ok_widget.clicked.connect(self._ok_cb)
 
-        cancel_widget = QtWidgets.QPushButton("Cancel")
+        cancel_widget = gremlin.ui.ui_common.QDataPushButton("Cancel")
         cancel_widget.clicked.connect(self._cancel_cb)
 
         widget = gremlin.ui.ui_common.getHContainer([ok_widget, cancel_widget], left_stretch=True, widget_only=True)
@@ -354,22 +354,22 @@ class HostIpDialog(ui_common.BaseDialogUi):
 #         self.scroll_layout.addWidget(widget)
 #         self.scroll_layout.addStretch()
 
-#         cancel_button_widget = QtWidgets.QPushButton("Cancel")
+#         cancel_button_widget = gremlin.ui.ui_common.QDataPushButton("Cancel")
 #         cancel_button_widget.clicked.connect(self._cancel_cb)
 
-#         all_widget = QtWidgets.QPushButton("All")
+#         all_widget = gremlin.ui.ui_common.QDataPushButton("All")
 #         all_widget.setToolTip("Selects all")
 #         all_widget.clicked.connect(self._select_all)
 
-#         none_widget = QtWidgets.QPushButton("None")
+#         none_widget = gremlin.ui.ui_common.QDataPushButton("None")
 #         none_widget.setToolTip("Deselects all")
 #         none_widget.clicked.connect(self._select_none)
 
-#         mapped_widget = QtWidgets.QPushButton("Mapped")
+#         mapped_widget = gremlin.ui.ui_common.QDataPushButton("Mapped")
 #         mapped_widget.setToolTip("Selects only mapped devices")
 #         mapped_widget.clicked.connect(self._select_mapped)
 
-#         ok_button_widget = QtWidgets.QPushButton("Ok")
+#         ok_button_widget = gremlin.ui.ui_common.QDataPushButton("Ok")
 #         ok_button_widget.clicked.connect(self._ok_cb)
 
 #         widget = gremlin.ui.ui_common.getHContainer(
@@ -464,6 +464,7 @@ class OptionsUi(ui_common.BaseDialogUi):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.addLayout(self.dialog_layout)
         self.tab_container = QtWidgets.QTabWidget()
+        self.tab_container.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
         self.main_layout.addWidget(self.tab_container)
 
         self.closed.connect(self._save_on_close_cb)
@@ -483,11 +484,11 @@ class OptionsUi(ui_common.BaseDialogUi):
         self._create_runtime_page()
 
         # closing bar
-        close_button = QtWidgets.QPushButton("Close")
+        close_button = gremlin.ui.ui_common.QDataPushButton("Close")
         close_button.clicked.connect(self.close)
         close_button.setToolTip("Save options and close")
 
-        clear_windows = QtWidgets.QPushButton("Clear Window Data")
+        clear_windows = gremlin.ui.ui_common.QDataPushButton("Clear Window Data")
         clear_windows.clicked.connect(self.config.clearWindowData)
         clear_windows.setToolTip("Clear dialog position and size data")
 
@@ -1172,7 +1173,7 @@ class OptionsUi(ui_common.BaseDialogUi):
             tooltip="Enable to make this the GremlinEx server on the network.\nClients should point to this machine as the broadcast host.\nOnly one machine should act as the server.",
         )
 
-        self.remote_control_select_ip_widget = QtWidgets.QPushButton("Select")
+        self.remote_control_select_ip_widget = gremlin.ui.ui_common.QDataPushButton("Select")
         self.remote_control_select_ip_widget.setToolTip(
             "Selects a different IP address for the GremlinEx Broadcast server if the host has more than one IP address."
         )
@@ -1306,6 +1307,18 @@ There should only be one GremlinEx master server on the subnet.
             ),
             gremlin.ui.ui_common.getGridContainer(hat_widget, "Default Hat count:", widget_only=True, left_margin=margin),
         ]
+
+        # options
+        widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Auto unhide on highlight",
+            value=self.config.filter_auto_unhide,
+            callback=self._handle_checkbox_filter,
+            tooltip="Makes the input automatically visible if it has been filtered (hidden) and highlighting mode is enabled for that input (input is triggered).\nWhen enabled, this will automatically unhide that input.  Defaults to enabled.",
+            data="unhide_on_highlight",
+        )
+        widgets.append(widget)
+
+
         for widget in widgets:
             box1.addWidget(widget)
 
@@ -1356,16 +1369,23 @@ There should only be one GremlinEx master server on the subnet.
         widget = gremlin.ui.ui_common.QDataPushButton(
             "Hide All",
             callback=self._handle_filter,
-            tooltip="Set filter for all joystick devices to mapped (used)",
+            tooltip="Set filter for all joystick devices to hide all inputs",
             data="hide_all",
         )
         widgets.append(widget)
+
+
 
         widget = gremlin.ui.ui_common.getFlowContainer(widgets, widget_only=True)
         page_layout.addWidget(widget)
 
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Filter")
+
+    @QtCore.Slot()
+    def _handle_checkbox_filter(self, widget, checked : bool):
+        if widget.data == "unhide_on_highlight":
+            self.config.filter_auto_unhide = checked
 
     @QtCore.Slot()
     def _handle_filter(self, widget):
@@ -1529,15 +1549,15 @@ There should only be one GremlinEx master server on the subnet.
             self.voice_widget.setCurrentIndex(index)
         self.voice_widget.currentIndexChanged.connect(self._voice_change_cb)
 
-        self.apply_voice_index_widget = QtWidgets.QPushButton("Apply")
+        self.apply_voice_index_widget = gremlin.ui.ui_common.QDataPushButton("Apply")
         self.apply_voice_index_widget.setToolTip("Applies default selection to all TTS entries in the profile")
         self.apply_voice_index_widget.clicked.connect(self._handle_apply_voice_index)
 
-        self.apply_voice_volume_widget = QtWidgets.QPushButton("Apply")
+        self.apply_voice_volume_widget = gremlin.ui.ui_common.QDataPushButton("Apply")
         self.apply_voice_volume_widget.setToolTip("Applies default volume to all TTS entries in the profile")
         self.apply_voice_volume_widget.clicked.connect(self._handle_apply_voice_volume)
 
-        self.apply_voice_rate_widget = QtWidgets.QPushButton("Apply")
+        self.apply_voice_rate_widget = gremlin.ui.ui_common.QDataPushButton("Apply")
         self.apply_voice_rate_widget.setToolTip("Applies default playback rate (wpm) to all TTS entries in the profile")
         self.apply_voice_rate_widget.clicked.connect(self._handle_apply_voice_rate)
 
@@ -1738,15 +1758,15 @@ This setting is also available on a profile by profile basis on the profile tab,
         self.scroll_layout.setContentsMargins(6, 0, 6, 0)
         self.scroll_layout.addStretch()
 
-        sort_profile_widget = QtWidgets.QPushButton("Sort Profile")
+        sort_profile_widget = gremlin.ui.ui_common.QDataPushButton("Sort Profile")
         sort_profile_widget.clicked.connect(self._sort_profile_cb)
         sort_profile_widget.setToolTip("Sorts mappings by profile")
 
-        sort_process_widget = QtWidgets.QPushButton("Sort Process")
+        sort_process_widget = gremlin.ui.ui_common.QDataPushButton("Sort Process")
         sort_process_widget.clicked.connect(self._sort_process_cb)
         sort_process_widget.setToolTip("Sorts mappings by process")
 
-        add_map_widget = QtWidgets.QPushButton("Add mapping")
+        add_map_widget = gremlin.ui.ui_common.QDataPushButton("Add mapping")
         icon = gremlin.ui.ui_common.Icons.addIcon()
         add_map_widget.setIcon(icon)
         add_map_widget.clicked.connect(self._add_profile_map_cb)
@@ -2000,7 +2020,7 @@ Avoid detailed/extra mode unless directed to as these are very verbose.
         self._local_host_ip_widget.setMinimumWidth(w)
         self._local_host_ip_widget.setMaximumWidth(w)
 
-        self._select_ip_widget = QtWidgets.QPushButton("Select")
+        self._select_ip_widget = gremlin.ui.ui_common.QDataPushButton("Select")
         self._select_ip_widget.setToolTip("Selects a different IP address for the GremlinEx OSC listener if the host has more than one IP address.")
         self._select_ip_widget.clicked.connect(self._change_host_ip)
 
@@ -2240,6 +2260,8 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         :param event the close event
         """
         self.save()
+
+        gremlin.util.clear_widget_references(self)
 
         # forcibly garbage collect dialog widgets
         gremlin.util.clear_layout(self.main_layout)
@@ -3111,20 +3133,20 @@ class ProcessWindow(ui_common.BaseDialogUi):
         self.button_bar_layout = QtWidgets.QHBoxLayout()
         self.button_bar_widget.setLayout(self.button_bar_layout)
 
-        self.refresh_button = QtWidgets.QPushButton("Refresh")
+        self.refresh_button = gremlin.ui.ui_common.QDataPushButton("Refresh")
         self.refresh_button.setIcon(load_icon("ei.refresh", qta_color=gremlin.ui.ui_common.Color.activeColor()))
         self.refresh_button.clicked.connect(self._refresh)
 
         self.main_layout.addWidget(self.list_view)
 
-        self.select_button = QtWidgets.QPushButton("Select")
+        self.select_button = gremlin.ui.ui_common.QDataPushButton("Select")
         self.select_button.clicked.connect(self._select)
         self.main_layout.addWidget(self.select_button)
 
-        self.browse_button = QtWidgets.QPushButton("Browse...")
+        self.browse_button = gremlin.ui.ui_common.QDataPushButton("Browse...")
         self.browse_button.clicked.connect(self._browse)
 
-        self.cancel_button = QtWidgets.QPushButton("Cancel")
+        self.cancel_button = gremlin.ui.ui_common.QDataPushButton("Cancel")
         self.cancel_button.clicked.connect(self._cancel)
 
         self.button_bar_layout.addWidget(self.refresh_button)
@@ -3238,7 +3260,7 @@ class LogWindowUi(ui_common.BaseDialogUi):
         layout = QtWidgets.QVBoxLayout(page)
         log_display = QtWidgets.QTextEdit()
         log_display.setText(open(fname).read())
-        button = QtWidgets.QPushButton("Clear log")
+        button = gremlin.ui.ui_common.QDataPushButton("Clear log")
         button.clicked.connect(lambda: self._clear_log(fname))
         layout.addWidget(log_display)
         layout.addWidget(button)
@@ -3338,10 +3360,10 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
 
         self.main_layout.addWidget(widget)
 
-        cancel_button_widget = QtWidgets.QPushButton("Cancel")
+        cancel_button_widget = gremlin.ui.ui_common.QDataPushButton("Cancel")
         cancel_button_widget.clicked.connect(self._cancel_cb)
 
-        ok_button_widget = QtWidgets.QPushButton("Ok")
+        ok_button_widget = gremlin.ui.ui_common.QDataPushButton("Ok")
         ok_button_widget.clicked.connect(self._close_cb)
 
         widget = gremlin.ui.ui_common.getHContainer(
@@ -3454,7 +3476,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         self.scroll_layout.addWidget(self.mode_widget)
         self.scroll_layout.addStretch()
 
-        self.add_button = QtWidgets.QPushButton("Add Mode")
+        self.add_button = gremlin.ui.ui_common.QDataPushButton("Add Mode")
         self.add_button.clicked.connect(self._add_mode_cb)
         self.add_button.setToolTip("Adds a new mode to the profile")
 
@@ -3464,7 +3486,7 @@ class ModeManagerUi(ui_common.BaseDialogUi):
         label.setFrameShape(QtWidgets.QFrame.Box)
         label.setMargin(10)
 
-        close_button_widget = QtWidgets.QPushButton("Close")
+        close_button_widget = gremlin.ui.ui_common.QDataPushButton("Close")
         close_button_widget.clicked.connect(self._close_cb)
 
         self.mode_default_selector = gremlin.ui.ui_common.QDataComboBox()
@@ -3574,14 +3596,14 @@ The setting can be overriden by the global mode reload option set in Options for
             self.mode_dropdowns[mode].setCurrentText(inherit)
 
             # Rename mode button
-            self.mode_rename[mode] = QtWidgets.QPushButton(load_icon("ei.edit"), "")
+            self.mode_rename[mode] = gremlin.ui.ui_common.QDataPushButton(load_icon("ei.edit"), "")
             self.mode_rename[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_rename[mode], row, 2)
             self.mode_rename[mode].clicked.connect(self._create_rename_mode_cb(mode))
             self.mode_rename[mode].setToolTip("Edit")
 
             # Delete mode button
-            self.mode_delete[mode] = QtWidgets.QPushButton(load_icon("mdi.delete"), "")
+            self.mode_delete[mode] = gremlin.ui.ui_common.QDataPushButton(load_icon("mdi.delete"), "")
             self.mode_delete[mode].setMaximumWidth(20)
             self.mode_delete[mode].setToolTip("Delete")
             self.mode_layout.addWidget(self.mode_delete[mode], row, 3)
@@ -3812,10 +3834,10 @@ class DeviceInformationUi(ui_common.BaseDialogUi):
 
         # toolbar
 
-        self.script_copy_button = QtWidgets.QPushButton("Generate plugin script header")
+        self.script_copy_button = gremlin.ui.ui_common.QDataPushButton("Generate plugin script header")
         self.script_copy_button.clicked.connect(self._copy_to_script)
 
-        self.close_button = QtWidgets.QPushButton("Close")
+        self.close_button = gremlin.ui.ui_common.QDataPushButton("Close")
         self.close_button.clicked.connect(lambda: self.close())
 
         widgets = [
@@ -4029,7 +4051,7 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
             labels = QtWidgets.QLabel("Containers\nConditions\nMerge Axis")
             counts = QtWidgets.QLabel(f"{data.containers:d}\n{data.conditions:d}\n{data.merge_axis:d}")
             counts.setAlignment(QtCore.Qt.AlignRight)
-            record_button = QtWidgets.QPushButton(f"Assigned to: {data.device_guid} - {data.name}")
+            record_button = gremlin.ui.ui_common.QDataPushButton(f"Assigned to: {data.device_guid} - {data.name}")
             record_button.clicked.connect(self._create_request_user_input_cb(data.device_guid))
 
             # Combine labels and counts into it's own layout
@@ -4047,9 +4069,9 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
         self.option_container_widget = QtWidgets.QWidget()
         self.option_container_layout = QtWidgets.QHBoxLayout(self.option_container_widget)
 
-        self.ok_widget = QtWidgets.QPushButton("Ok")
+        self.ok_widget = gremlin.ui.ui_common.QDataPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok)
-        self.cancel_widget = QtWidgets.QPushButton("Cancel")
+        self.cancel_widget = gremlin.ui.ui_common.QDataPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel)
         self.option_container_layout.addStretch()
         self.option_container_layout.addWidget(self.ok_widget)
@@ -4158,7 +4180,7 @@ class SubstituteDialog(gremlin.ui.ui_common.QRememberDialog):
         self.profile_device_widget = gremlin.ui.ui_common.QDataComboBox()
         self.hardware_device_widget = gremlin.ui.ui_common.QDataComboBox()
 
-        self.replace_button_widget = QtWidgets.QPushButton("Replace")
+        self.replace_button_widget = gremlin.ui.ui_common.QDataPushButton("Replace")
         self.replace_button_widget.clicked.connect(self._replace_cb)
 
         self.header_container_widget = QtWidgets.QWidget()
@@ -4367,10 +4389,10 @@ class CreateReportDialog(gremlin.ui.ui_common.QRememberDialog):
         widget.setContentsMargins(4, 0, 0, 0)
         self.main_layout.addWidget(widget)
 
-        self.ok_widget = QtWidgets.QPushButton("Ok")
+        self.ok_widget = gremlin.ui.ui_common.QDataPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
 
-        self.cancel_widget = QtWidgets.QPushButton("Cancel")
+        self.cancel_widget = gremlin.ui.ui_common.QDataPushButton("Cancel")
         self.cancel_widget.clicked.connect(self._cancel_button_cb)
 
         widget, layout = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True)
@@ -4525,10 +4547,10 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self.main_layout.addWidget(action_container_widget)
 
-        cancel_button_widget = QtWidgets.QPushButton("Cancel")
+        cancel_button_widget = gremlin.ui.ui_common.QDataPushButton("Cancel")
         cancel_button_widget.clicked.connect(self._cancel_cb)
 
-        ok_button_widget = QtWidgets.QPushButton("Ok")
+        ok_button_widget = gremlin.ui.ui_common.QDataPushButton("Ok")
         ok_button_widget.clicked.connect(self._close_cb)
 
         button_container_widget = gremlin.ui.ui_common.getHContainer(

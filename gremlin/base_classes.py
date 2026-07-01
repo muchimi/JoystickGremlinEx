@@ -438,6 +438,8 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     @input_id.setter
     def input_id(self, value):
+        if self._input_id_callback:
+            raise ValueError("Input id is readonly (callback)")
         self.setInputId(value)
 
     def setInputId(self, value):
@@ -1239,7 +1241,7 @@ class AbstractCallbackModel(AbstractModel):
         if verbose:
             device = gremlin.joystick_handling.getDevice(self._device_guid)
             syslog.info(f"MODEL INPUT FILTER: for [{device.name}]")
-  
+
         # filtering enabled
 
         new_index_map = TriggerDict()

@@ -378,21 +378,21 @@ class StateInputItem(gremlin.input_item.InputItem):
         autorelease_delay=1,
         autorelease_mode="toggle",
         autorelease_trigger_mode="on",
+
     ):
         master_mode = gremlin.shared_state.master_mode
 
         # get the mode object for this state input
         profile = gremlin.shared_state.current_profile
-        device = gremlin.joystick_handling.getDevice(StateDeviceTabWidget.device_guid)
+        # device = gremlin.joystick_handling.getDevice(StateDeviceTabWidget.device_guid)
         device_modes = profile.get_device_modes(
             gremlin.shared_state.state_tab_guid,
             DeviceType.State,
             DeviceType.to_string(DeviceType.State),
         )
-
-        mode_object = device_modes.ensure_mode_exists(profile=profile, mode_name=master_mode, device=device)
+        mode_object = device_modes.ensure_mode_exists(master_mode)
         self._key = key  # ok if None (blank)
-        super().__init__(mode_node=mode_object, device_guid=StateDeviceTabWidget.device_guid, input_type=InputType.State, input_id = key)
+        super().__init__(mode_node=mode_object, device_guid=StateDeviceTabWidget.device_guid, input_type=InputType.State, custom_input_id_handler = self._handle_input_id_callback)
         self._category = category  # category (StateCategory)
         self._default_value = default_value
         self._last_value = None
@@ -419,7 +419,7 @@ class StateInputItem(gremlin.input_item.InputItem):
         self._hooked = False
         self.hook()  # hook on creation
         self._profile_mode = gremlin.shared_state.master_mode_name  # states all belong to the master mode
-        self.setInputIdCallback(self._handle_input_id_callback)
+
 
     def _handle_input_id_callback(self):
         """input id is self for STATE"""

@@ -446,8 +446,10 @@ class InputViewerWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
         self._stacked_widget = gremlin.ui.ui_common.ResizingStackedWidget(zero_hide=True)
+        # self._stacked_widget.setStyleSheet("background: red; border: 1px solid orange;")
+        self._stacked_widget.heightChanged.connect(self._on_height_changed)
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(4, 0, 4, 0)
         layout.addWidget(self._stacked_widget)
         self._key = key
         self._widget = None
@@ -459,6 +461,10 @@ class InputViewerWidget(QtWidgets.QWidget):
 
         if widget:
             self.setWidget(widget)
+
+    def _on_height_changed(self, height):
+        """called when the stacked widget changes size"""
+        self.setFixedHeight(height)
 
     @property
     def key(self):
@@ -483,6 +489,7 @@ class InputViewerWidget(QtWidgets.QWidget):
             self._stacked_widget.addWidget(container)
             self._stacked_widget.setCurrentWidget(container)
             self._stacked_widget.setCurrentIndex(self._stacked_widget.count() - 1)
+            #ontainer.setStyleSheet("background: green; border: 1px solid yellow;")
             widget.show()
         self._widget = widget
 
@@ -543,11 +550,9 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self._state_category_filter = None
         self.keyboard_widget = None  # keyboard widget
 
-        widget, layout = gremlin.ui.ui_common.getVContainer()
-        self.view_container_widget = widget
-        self.view_container_layout = layout
+        self.view_container_widget = QtWidgets.QWidget()
+        self.view_container_layout = QtWidgets.QVBoxLayout(self.view_container_widget)
         self.views = InputViewerArea()
-
         self.view_container_layout.addWidget(self.views)
 
         # configure the scroll area for the selectors
@@ -639,11 +644,13 @@ class InputViewerUi(ui_common.BaseDialogUi):
         self.main_layout.addWidget(options_widget)
         self.main_layout.addWidget(self._splitter)
 
-        self._left_panel_widget, self._left_panel_layout = gremlin.ui.ui_common.getVContainer()
+        self._left_panel_widget = QtWidgets.QWidget()
+        self._left_panel_layout = QtWidgets.QVBoxLayout(self._left_panel_widget)
         self._left_panel_widget.setMinimumWidth(150)
         self._left_panel_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Expanding)
 
-        self._right_panel_widget, self._right_panel_layout = gremlin.ui.ui_common.getVContainer()
+        self._right_panel_widget = QtWidgets.QWidget()
+        self._right_panel_layout = QtWidgets.QVBoxLayout(self._right_panel_widget)
 
         self._splitter.addWidget(self._left_panel_widget)
         self._splitter.addWidget(self._right_panel_widget)
@@ -662,7 +669,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 """
 
         info_box = gremlin.ui.ui_common.QInfoBox(msg, wrap=True, hide_key="input_viewer")
-        self._right_panel_layout.addWidget(info_box)
+        self.view_container_layout.addWidget(info_box)
 
         self.closed.connect(self._closed)
         self.installEventFilter(self)
@@ -703,25 +710,32 @@ States can be toggled by clicking on the state button.  Expression states will u
         self._widget_map[key] = InputViewerWidget(key)
 
         devices = gremlin.joystick_handling.joystick_devices() + gremlin.joystick_handling.virtual_devices()
+        verbose = False
 
         for device in devices:
             if device.disabled:
                 continue
-            syslog.info(f"INPUT VIEWER: load_viewer_widgets - device {device.name} ({device.device_id}) axes: {device.axis_count} buttons: {device.button_count} hats: {device.hat_count}")
+            if verbose:
+                syslog.info(f"INPUT VIEWER: load_viewer_widgets - device {device.name} ({device.device_id}) axes: {device.axis_count} buttons: {device.button_count} hats: {device.hat_count}")
             if device.axis_count:
                 self._widget_map[(device.device_id, VisualizationType.AxisTemporal)] = None
-                syslog.info("\ttemporal axis")
+                if verbose:
+                    syslog.info("\ttemporal axis")
                 self._widget_map[(device.device_id, VisualizationType.AxisCurrent)] = None
-                syslog.info("\tcurrent axis")
+                if verbose:
+                    syslog.info("\tcurrent axis")
             if device.button_count or device.hat_count:
                 self._widget_map[(device.device_id, VisualizationType.ButtonHat)] = None
-                syslog.info("\tbutton hat")
+                if verbose:
+                    syslog.info("\tbutton hat")
             if device.button_count:
                 self._widget_map[(device.device_id, VisualizationType.Button)] = None
-                syslog.info("\tbutton")
+                if verbose:
+                    syslog.info("\tbutton")
             if device.hat_count:
                 self._widget_map[(device.device_id, VisualizationType.Hat)] = None
-                syslog.info("\that")
+                if verbose:
+                    syslog.info("\that")
 
 
 
@@ -1052,7 +1066,9 @@ States can be toggled by clicking on the state button.  Expression states will u
             self._state_filter_widget.changed.connect(self._category_filter_changed)
             self._state_filter_widget.enabledChanged.connect(self._reload_states)
 
-            widgets = [self._state_filter_widget, gremlin.ui.ui_common.QHorizontalLine()]
+            filter_container = gremlin.ui.ui_common.getHContainer([self._state_filter_widget], widget_only=True)
+
+            widgets = [filter_container, gremlin.ui.ui_common.QHorizontalLine()]
             container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
             layout.addWidget(container)
 
@@ -1188,7 +1204,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         self.views.updateLayout()
 
 
-class InputViewerArea(QtWidgets.QScrollArea):
+class InputViewerArea(QtWidgets.QWidget):
     """Holds individual input visualization widgets."""
 
     def __init__(self, parent=None):
@@ -1197,34 +1213,28 @@ class InputViewerArea(QtWidgets.QScrollArea):
         :param parent the parent of this widget
         """
         super().__init__(parent)
+        layout = QtWidgets.QVBoxLayout(self)
+        #layout.setContentsMargins(4, 0, 4, 0)
 
         self.widgets = []
 
-        self.setWidgetResizable(True)
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+
         self.scroll_widget = QtWidgets.QWidget()
-        self.scroll_layout = QtWidgets.QVBoxLayout()
-        self.scroll_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        self.scroll_layout = gremlin.ui.ui_common.QScrollLayout(self.scroll_widget)
+        self.scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
 
-        self.scroll_widget.setLayout(self.scroll_layout)
-        self._is_flow = False  # true if using the flow layout
-
-        self.container_widget = QtWidgets.QWidget()
-        self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
-        self.container_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-        self.spacer = QtWidgets.QSpacerItem(0, 50, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.container_layout.addItem(self.spacer)
-
-
-        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-
-        self.setWidget(self.scroll_widget)
-        self.scroll_layout.addWidget(self.container_widget)
+        self.scroll_area.setWidget(self.scroll_widget)
         self.installEventFilter(self)
+
+        layout.addWidget(self.scroll_area)
 
 
     def eventFilter(self, widget, event):
-
         if event.type() == QtCore.QEvent.Type.Wheel:
             # trap mouse wheel events and pass them to the hovered widget because the scroll area eats these events
             hovered_widget = QtWidgets.QApplication.widgetAt(event.globalPosition().toPoint())
@@ -1239,9 +1249,6 @@ class InputViewerArea(QtWidgets.QScrollArea):
         pass
 
 
-    def sizeHint(self):
-        return QtCore.QSize(200, 200)
-
     def add_widget(self, widget, index=None):
         """Adds the specified widget to the visualization area.
 
@@ -1251,19 +1258,9 @@ class InputViewerArea(QtWidgets.QScrollArea):
         if not Shiboken.isValid(self):
             return
 
-
         self.widgets.append(widget)
-        self.container_layout.removeItem(self.spacer)
-        self.container_layout.addWidget(widget)
-        self.container_layout.addItem(self.spacer)
+        self.scroll_layout.addWidget(widget)
 
-
-
-
-
-    def addStretch(self):
-        """Adds a stretch to the visualization area."""
-        self.container_layout.addStretch()
 
     def remove_widget(self, widget):
         """Removes a widget from the visualization area.
@@ -1275,9 +1272,9 @@ class InputViewerArea(QtWidgets.QScrollArea):
             return
         if hasattr(widget, "unhook"):
             widget.unhook()
-        self.container_layout.removeWidget(widget)
+        self.scroll_layout.removeWidget(widget)
 
-        if widget is self.widgets:
+        if widget in self.widgets:
             self.widgets.remove(widget)
 
         gremlin.util.delete_widget(widget)
@@ -1286,24 +1283,12 @@ class InputViewerArea(QtWidgets.QScrollArea):
         """clears all widgets"""
         if not Shiboken.isValid(self):
             return
-        while self.container_layout.count():
-            item = self.container_layout.takeAt(0)
+        while self.scroll_layout.count():
+            item = self.scroll_layout.takeAt(0)
             if item:
                 widget = item.widget()
                 if widget:
                     gremlin.util.delete_widget(widget)
-
-        self.scroll_layout.removeWidget(self.container_widget)
-        gremlin.util.delete_widget(self.container_widget)
-        self.container_widget = QtWidgets.QWidget()
-        self.container_layout = QtWidgets.QVBoxLayout(self.container_widget)
-        self.container_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-        self.scroll_layout.addWidget(self.container_widget)
-        self.spacer = QtWidgets.QSpacerItem(0, 50, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.container_layout.addItem(self.spacer)
-
-
-
 
 
 

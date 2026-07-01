@@ -394,7 +394,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self,
         mode_node: str | gremlin.base_profile.ProfileModeNode,  # profile mode object (required)
         input_type: InputType,  # must be provided
-        input_id=None,  #
+        input_id=None,
         custom_name_handler: Callable = None,
         custom_mode_name_handler: Callable = None,
         custom_input_id_handler: Callable = None,
@@ -406,7 +406,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     ):
         """Creates a new InputItem instance.
         :param mode_node: profile mode node
-        :param input_type : input type of the input item
+        :param input_type : input type of the input item (do not use this if the input item has a callback to get that value)
         :param input_id : input id of the input item
         :param custom_name_handler: handler() returns a string, whenever the input name is needed
         :param custom_mode_name_handler: handler() returns a string, optional, to override the default mode for special inputs that use special modes
@@ -451,6 +451,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._override_input_type = override_input_type  # override input type for some types that are different
 
         self._input_type = input_type
+        self._custom_input_id_handler = custom_input_id_handler  # custom handler for input id
+        if self._custom_input_id_handler is not None and input_id is not None:
+            raise ValueError("input_id should not be provided when a custom input id handler is set")
         self.setInputId(input_id)
 
         device = gremlin.joystick_handling.getDevice(device_guid)
@@ -475,8 +478,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._selected = False  # true if the item is selected
         self._is_action = False  # true if the object is a sub-item for a sub-action (GateHandler for example)
 
-        self._custom_input_id_handler = custom_input_id_handler  # custom handler for input id
-        self._input_id = input_id  # input id for this input item
+
 
         self._is_axis = False  # true if the item is an axis input
         self._is_button = False  # true if the item is a button input
@@ -2097,7 +2099,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._status_widget.setWidget(None)
         self._description_widget.setWidget(None)
         self._input_description_widget.setWidget(None)
-        self._status_container_widget.setWidget(None)
+        # self._status_container_widget.setWidget(None)
         self._container_id_widget.setWidget(None)
         self._repeater_container_widget.setWidget(None)
         self._custom_container_widget.setWidget(None)
@@ -2544,12 +2546,12 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _default_style(self):
         """sets the default style"""
-        css = f"""
-                    #main_layout {{
-                        background: {gremlin.ui.ui_common.Color.backgroundColor()};
-                        border: 1px solid {gremlin.ui.ui_common.Color.borderColor()};
-                        }}
-                        """
+        # css = f"""
+        #             #main_layout {{
+        #                 background: {gremlin.ui.ui_common.Color.backgroundColor()};
+        #                 border: 1px solid {gremlin.ui.ui_common.Color.borderColor()};
+        #                 }}
+        #                 """
         self.setStyleSheet(None)
 
     def enable_close(self):
@@ -2630,7 +2632,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         widget, layout = gremlin.ui.ui_common.getGridContainer()
         layout.addWidget(QtWidgets.QWidget(), 0, 0)
         layout.setColumnStretch(0, 1) # right align the icons
-        rh = self._getRowHeight()
         self._action_icon_widget.setWidget(widget)
 
         if input_item.containers:
@@ -2675,7 +2676,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         row = 0
         col = 1
         max_col = 5
-        rh = self._getRowHeight()
+        # rh = self._getRowHeight()
         if input_item.containers:
             for container in input_item.containers:
                 action_sets = container.get_action_sets()
@@ -3200,7 +3201,7 @@ class InputItemListView(AbstractView):
 
         self._scroll_area = QtWidgets.QScrollArea()
         self._scroll_area.setWidgetResizable(True)
-        self._scroll_area.verticalScrollBar().valueChanged.connect(self._on_scrollbar_value_changed)
+        # self._scroll_area.verticalScrollBar().valueChanged.connect(self._on_scrollbar_value_changed)
 
         self._scroll_widget, self._scroll_layout = gremlin.ui.ui_common.getVContainer()
         self._scroll_widget.setContentsMargins(2, 2, 2, 2)
@@ -4016,7 +4017,7 @@ class InputItemListView(AbstractView):
         # runs on UI thread
         if Shiboken.isValid(self):
             # update layout just in case the widgets have changed size
-            self._scroll_widget.layout().activate() 
+            self._scroll_widget.layout().activate()
 
             count = len(self._widget_map)
             bar = self._scroll_area.verticalScrollBar()
@@ -4030,9 +4031,9 @@ class InputItemListView(AbstractView):
                     y += w.widget_height
                 bar.setValue(y)
 
-    def _on_scrollbar_value_changed(self, value):
-        """called when the scroll bar value changes"""
-        syslog.info(f"scroll bar value changed: [{value}]")
+    # def _on_scrollbar_value_changed(self, value):
+    #     """called when the scroll bar value changes"""
+    #     syslog.info(f"scroll bar value changed: [{value}]")
 
     def __len__(self):
         return self.count()
@@ -4794,6 +4795,7 @@ class AbstractAction(BaseProfileData):
     # data_changed = QtCore.Signal() # indicates the action data changed
 
     id_changed = Signal(str, str)  # triggers when the ID changes (old_id, new_id)
+    icon_changed = Signal()  # triggers when the icon changes
 
     def __init__(self, parent):
         """Creates a new instance.
@@ -5067,6 +5069,14 @@ class AbstractAction(BaseProfileData):
     def display_name(self):
         """display name for this action"""
         return "N/A"
+
+    def icon_valid(self):
+        """returns true if the action is valid"""
+        return True
+
+    def fireIconChanged(self):
+        """fires the icon changed event"""
+        self.icon_changed.emit()
 
     def from_xml(self, node, data=None, extra_data=None):
         """Populates the instance with data from the given XML node.
@@ -9097,6 +9107,8 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
         assert isinstance(input_item, InputItem), "invalid input type"
+        if input_item.input_id is None:
+            pass
         assert input_item.input_id is not None, "invalid input id on input item"
         assert input_item.input_type is not None, "input type cannot be derived be specified"
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,15 +26,17 @@ from gremlin.input_devices import CallbackActions
 
 from gremlin.profile import safe_format, safe_read
 from gremlin.keyboard import Key
-from gremlin.ui.virtual_keyboard import *
+from gremlin.ui.virtual_keyboard import InputKeyboardDialog
 import gremlin.config
 import logging
 import threading
 import time
-from gremlin.util import log_info
+from gremlin.util import log_info, load_icon
+from gremlin.base_classes import TraceableList
+import gremlin.input_item
 from shiboken6 import Shiboken
 import html
-from gremlin.types import *
+from gremlin.types import KeyboardOutputMode, SyncMode, SendType
 import gremlin.remote
 import vjoy.vjoy
 import gremlin.process
@@ -54,7 +56,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
         """
         super().__init__(action_data, parent=parent)
         self.action_data = action_data
-        
+
 
     def _create_ui(self):
         """Creates the UI components."""
@@ -74,13 +76,13 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
         self._key_height = widget.desiredHeight
         self.display_container_widget.setMinimumHeight(self._key_height + 4)
         self.display_container_layout.addWidget(self.key_combination_widget)
-        
+
         self.listen_multi_widget = gremlin.ui.ui_common.Buttons.getListenWidget(label="Listen (multi)", callback = self._record_multi_keys_cb)
         self.listen_multi_widget.setToolTip("Listen for multiple inputs.  Click on ok when done.  Clicks on the buttons will not be included in the recorded list.")
 
         self.listen_widget = gremlin.ui.ui_common.Buttons.getListenWidget(callback = self._record_keys_cb)
         self.listen_widget.setToolTip("Listen for a single input.")
-        
+
         self.show_keyboard_widget = QtWidgets.QPushButton("Select...")
         self.show_keyboard_widget.setIcon(load_icon("mdi.keyboard-settings-outline", qta_color = gremlin.ui.ui_common.Color.listenColor()))
         self.show_keyboard_widget.clicked.connect(self._select_keys_cb)
@@ -91,9 +93,9 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
 
 
-        self.delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.delay) 
-        self.autorepeat_delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.autorepeat_delay) 
-        
+        self.delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.delay)
+        self.autorepeat_delay_box = gremlin.ui.ui_common.QDelayWidget(self.action_data.autorepeat_delay)
+
         self.delay_box.setValue(self.action_data.delay)
         self.autorepeat_delay_box.setValue(self.action_data.autorepeat_delay)
 
@@ -104,9 +106,9 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
             rb.clicked.connect(self._mode_changed)
             widgets.append(rb)
 
-        
+
         self.description_widget = gremlin.ui.ui_common.QInfoBox(hide_key=self.__class__.__name__)
-        
+
 
 
         self.delay_box.valueChanged.connect(self._delay_changed)
@@ -124,7 +126,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
             gremlin.ui.ui_common.getGridContainer(self.delay_box, "Duration (ms):", widget_only = True),
             gremlin.ui.ui_common.getGridContainer(self.autorepeat_delay_box, "Interval (ms):", widget_only = True),
         ]
-        
+
         self.container_delay_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True, left_margin=12)
         widgets.append(self.container_options_widget)
         gremlin.ui.ui_common.synchronize_grids(widgets)
@@ -132,8 +134,8 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
         widgets = [
             self.clear_widget,
-            self.listen_widget,  
-            self.listen_multi_widget, 
+            self.listen_widget,
+            self.listen_multi_widget,
             self.show_keyboard_widget
         ]
 
@@ -154,7 +156,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
         exec_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
 
         sync_container = gremlin.ui.ui_common.getHContainer(self._sync_widget, left_margin =12, widget_only = True)
-        
+
 
         widget = gremlin.ui.ui_common.QIntLineEdit(value = self.action_data.wheel_factor,
                                                    min_range = 1,
@@ -194,7 +196,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_sendmode_changed(self, mode : SendType):
         ''' sets the send mode'''
-        self.action_data.sendMode = mode        
+        self.action_data.sendMode = mode
 
     def _handle_wheel_factor_changed(self, value : int):
         self.action_data.wheel_factor = value
@@ -205,11 +207,11 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
     @QtCore.Slot(bool)
     def _execute_on_release_changed(self, checked : bool):
-        self.action_data.exec_on_release = checked        
+        self.action_data.exec_on_release = checked
 
 
     def _sync_changed(self, mode):
-        self.action_data.sync_mode = mode        
+        self.action_data.sync_mode = mode
 
     def _select_keys_cb(self):
         ''' display the keyboard input dialog '''
@@ -229,7 +231,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
         ''' callled when the virtual dialog completes '''
 
         # grab the new data
-        self.action_data.keys = gremlin.keyboard.sort_keys(self._keyboard_dialog.keys)
+        self.action_data.setKeys(gremlin.keyboard.sort_keys(self._keyboard_dialog.keys))
         self.action_modified.emit()
         self._populate_ui()
         gremlin.shared_state.pop_suspend_ui_keyinput()
@@ -239,7 +241,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
         """Populates the UI components."""
 
         gremlin.util.clear_layout(self.key_combination_layout)
-        
+
 
 
         keys = self.action_data._get_keys()
@@ -252,11 +254,11 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
                 assert key.name,"Invalid key provided"
                 if key not in self.keys:
                     self._add_key(key)
-                
+
         else:
             self.key_combination_layout.addWidget(gremlin.ui.ui_common.QWarningWidget("No input selected. Please select at least one input."))
             self.key_combination_layout.addStretch()
-            
+
 
     def _add_key(self, key):
         ''' adds a key (must run on UI thread) '''
@@ -283,7 +285,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
         self.key_map[key] = widget # remember keys created
         self.keys.append(key)
-        
+
 
     def _handle_key_context(self, widget):
         gremlin.util.InvokeUiMethod(self._handle_key_context_ui, widget)
@@ -310,7 +312,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
     def _update_keys(self, keys):
         gremlin.util.InvokeUiMethod(self._update_keys_ui, keys)
 
-    
+
 
     def _update_keys_ui(self, keys):
         """Updates the storage with a new set of keys.
@@ -320,7 +322,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
         if isinstance(keys, gremlin.windows_event_hook.MouseEvent):
             # if not keys.is_pressed:
-            #     return # ignore releases 
+            #     return # ignore releases
             # mouse input
             key = gremlin.keyboard.key_from_mousebutton(keys.button_id)
             syslog.info(f"keyboard <- mouse: {keys.button_id}")
@@ -328,7 +330,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
                 return
             keys = [key]
 
-        
+
 
         data = []
         for code in keys:
@@ -342,7 +344,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
                 assert True, f"Don't know how to handle: {code}"
             data.append(key)
 
-        self.action_data.keys = gremlin.keyboard.sort_keys(data)
+        self.action_data.setKeys(gremlin.keyboard.sort_keys(data))
         gremlin.util.InvokeUiMethod(self._populate_ui) # reload new keys
 
         self.action_modified.emit()
@@ -358,8 +360,8 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
             self.key_map.clear()
             self.keys.clear()
             gremlin.util.clear_layout(self.key_combination_layout)
-            # note: this does not clear the action data so it can be restored 
-            
+            # note: this does not clear the action data so it can be restored
+
 
 
     def _handle_key_input(self, key : gremlin.keyboard.Key | list[gremlin.keyboard.Key]):
@@ -369,13 +371,13 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
         # handles an input key on the UI thread
         if not self.keys:
             gremlin.util.clear_layout(self.key_combination_layout) # clear the prior message
-        
+
         key_list = key if hasattr(key,"__iter__") else [key]
-        
+
         for key in key_list:
             if key not in self.keys:
                 self._add_key(key)
-        
+
 
 
     def _mode_changed(self):
@@ -424,19 +426,19 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
     def _delay_changed(self):
         self.action_data.delay = self.delay_box.value()
-        
+
 
     def _autorepeat_changed(self):
         self.action_data.autorepeat_delay = self.autorepeat_delay_box.value()
-        
+
 
     def _quarter_sec_delay(self):
         self.delay_box.setValue(250)
-        
+
 
     def _half_sec_delay(self):
         self.delay_box.setValue(500)
-        
+
 
     def _sec_delay(self):
         self.delay_box.setValue(1000)
@@ -447,7 +449,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
     def _clear_keys_ui(self):
         self.action_data.keys.clear()
         self._populate_ui()
-        
+
     def _record_keys_cb(self):
         gremlin.util.InvokeUiMethod(self._record_keys_ui, False)
 
@@ -532,7 +534,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         if self.autorepeat_delay < 0:
             self.autorepeat_delay = 0
 
-        # order the keys so 
+        # order the keys so
 
         # build the macro that will play when the action is called
         key: Key
@@ -552,17 +554,17 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         self._release_keys = key_list.copy()
         self._release_keys.reverse()
 
-        
+
         for key in key_list:
             self.press_macro.press(key)
-            
+
 
         self.release = gremlin.macro.Macro()
 
         # Execute release in reverse order
         for key in reversed(key_list):
             self.release.release(key)
-     
+
 
         self.delay_press_release = gremlin.macro.Macro()
 
@@ -589,7 +591,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 syslog.info(f"{logtabs}KEY ACTION: Key press: {stub}")
                 stub = "".join([f"{key.name}, " for key in self._release_keys])
                 syslog.info(f"{logtabs}KEY ACTION: Key release: {stub}")
-            
+
 
         # tell the time delay or release macros to inform us when they are done running
         self.release.completed_callback = self._macro_completed
@@ -637,7 +639,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         remote_config = self.action_data.remote_config
         self.client_list = remote_config.getClientList()
 
-        
+
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
         if remote_config.isProcess:
             process_name = remote_config.process
@@ -673,14 +675,14 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                 else:
                     self.hat_position = (0,0)
                 is_pressed = self.hat_position != (0,0)
-                
+
             case InputType.JoystickButton:
                 is_pressed = gremlin.joystick_handling.get_button(device_guid, input_id)
 
             case InputType.JoystickAxis:
                 pass
-        
-        # determine the startup state 
+
+        # determine the startup state
         match self.action_data.sync_mode:
             case SyncMode.Ignore:
                 pass
@@ -713,7 +715,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                         gremlin.keyboard.send_key_up(key, is_local, is_remote, client_list = self.client_list, target_hwnd = self.target_hwnd, extra_data = self.extra_data)
                 self._hold_keys.clear()
 
-        
+
 
         # terminate any autorepeat
         self._autorepeat_clear()
@@ -746,7 +748,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
     def _manual_release(self):
         ''' callback for manual releases '''
         (is_local, is_remote) = self.action_data.sendFlags()
-        
+
         for key in self._release_keys:
             if key.is_mouse:
                 gremlin.macro._send_mouse_button(key.mouse_button, False, is_local, is_remote, wheel_factor=self.action_data.wheel_factor)
@@ -759,7 +761,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         press_keys, release_keys = data
         key : gremlin.keyboard.Key
         (is_local, is_remote) = self.action_data.sendFlags()
-        
+
         for key in press_keys:
             if self.verbose:
                 syslog.info(f"Pulse ON [{key.debug_name}]")
@@ -770,7 +772,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         press_keys, release_keys = data
         key : gremlin.keyboard.Key
         (is_local, is_remote) = self.action_data.sendFlags()
-        
+
         for key in release_keys:
             if self.verbose:
                 syslog.info(f"Pulse OFF [{key.debug_name}]")
@@ -781,7 +783,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         if self.verbose:
             syslog.info(f"Pulse START keyboard [{self.id}] duration: {duration:0.3f} interval: {interval:0.3f}")
         key = self.id
-        worker : gremlin.repeater.PulseWorker 
+        worker : gremlin.repeater.PulseWorker
         if key in self.pulse_worker_map:
             worker = self.pulse_worker_map[key]
             if worker.is_running:
@@ -814,7 +816,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, value, extra_data = None):
         ''' handles inbound input event to process '''
-        
+
         if not self.output_enabled:
             # ignore if output is disabled
             return
@@ -828,28 +830,28 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         is_local, is_remote = self.action_data.sendFlags()
         is_pressed = event.is_pressed
         mode = self.action_data.mode
-        
+
 
         if self.action_data.mode == KeyboardOutputMode.Hold:
-            trigger = True # always trigger in hold mode to match the input 
+            trigger = True # always trigger in hold mode to match the input
             auto_release = False # disable auto-release for hold mode
         else:
             trigger = (is_pressed and self.action_data.exec_on_press) or \
                     (not is_pressed and self.action_data.exec_on_release)
-  
+
             if trigger and self.action_data.exec_on_release:
                 # if exec on release, must use auto-release
                 is_pressed = True
                 auto_release = True
 
 
-        
+
         if is_pressed:
             # joystick values or virtual button
             # verbose = True
             if not trigger:
                 # nothing to process
-                return True 
+                return True
 
             match mode:
                 case KeyboardOutputMode.Release:
@@ -857,7 +859,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                         syslog.info("MapToKeyboardEx: release")
                     # kill off any auto-repeat as well
                     if not self.has_keys:
-                        # clear autorepeat if no keys are provided 
+                        # clear autorepeat if no keys are provided
                         if verbose:
                             syslog.info("MapToKeyboardEx: clear autorepeat")
                         eh = gremlin.event_handler.EventListener()
@@ -896,7 +898,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
                 case KeyboardOutputMode.Hold:
                     if self.has_keys:
-                        
+
                         if event.is_virtual_button:
                             # if using a virtual button to trigger - disable the auto-release
                             auto_release = False
@@ -920,11 +922,12 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
 
 
 
-                        if is_pressed and auto_release: 
+                        if is_pressed and auto_release:
                             if self.use_macros:
                                 id = gremlin.macro.MacroManager().queue_macro(self.press_macro, is_local, is_remote)
                                 self.registerMacro(id)
-                                callback = lambda : gremlin.macro.MacroManager().queue_macro(self.release, is_local, is_remote, client_list = self.client_list)
+                                def callback():
+                                    return gremlin.macro.MacroManager().queue_macro(self.release, is_local, is_remote, client_list = self.client_list)
                                 CallbackActions().register_callback(callback, event)
                             else:
                                 key : gremlin.keyboard.Key
@@ -969,7 +972,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                                         # key is up, send down
                                         gremlin.keyboard.send_key_down(key, is_local, is_remote, client_list = self.client_list, target_hwnd = self.target_hwnd, extra_data = self.extra_data)
 
-                               
+
 
                 case KeyboardOutputMode.AutoRepeat:
                     # setup autorepeat thread
@@ -998,11 +1001,11 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
                             syslog.info("AUTOREPEAT: stop")
                         self.pulse_stop()
                         self._autorepeat_clear()
-                    
 
-        
+
+
         return True
-    
+
 
 
     def _ar_execute(self):
@@ -1020,11 +1023,11 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         if verbose:
             log_info("autorepeat stop...")
         macro_mgr.clear_queue()
-            
-            
-        
 
-            
+
+
+
+
 
 
 class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
@@ -1059,7 +1062,7 @@ Can also send mouse buttons, mouse wheel events.'''
         """
         super().__init__(parent)
         self.parent = parent
-        self.keys = []
+        self._keys = []
         self.mode = KeyboardOutputMode.Hold # hold by default
         #self._mode = KeyboardOutputMode.Both # pulse by default
         config = gremlin.config.Configuration()
@@ -1069,6 +1072,31 @@ Can also send mouse buttons, mouse wheel events.'''
         self.exec_on_press = True # true if trigger should execute on input press event
         self.exec_on_release = False # true if trigger should execute on input release event
         self.wheel_factor = 1 # factor for wheel motion
+
+
+    @property
+    def keys(self):
+        return self._keys
+
+    @keys.setter
+    def keys(self, value):
+        raise AttributeError("Cannot set keys directly.")
+
+    def setKeys(self, value):
+        self._keys.clear()
+        for key in value:
+            self._keys.append(key)
+        self.fireIconChanged()
+
+    def addKey(self, key):
+        if key not in self._keys:
+            self._keys.append(key)
+            self.fireIconChanged()
+
+    def removeKey(self, key):
+        if key in self._keys:
+            self._keys.remove(key)
+            self.fireIconChanged()
 
     @property
     def delay(self):
@@ -1092,13 +1120,13 @@ Can also send mouse buttons, mouse wheel events.'''
 
     def _update_config(self):
         config = gremlin.config.Configuration()
-        
+
         config.last_keyboard_mapper_interval_value =self.autorepeat_delay_box.value()
-        
+
     def _get_keys(self) -> list:
         ''' gets the list of keys for the action (Key)'''
         keys = []
-        for code in self.keys:
+        for code in self._keys:
             key = None
             if isinstance(code, tuple):
                 key = gremlin.keyboard.KeyMap.find(code[0], code[1])
@@ -1108,7 +1136,7 @@ Can also send mouse buttons, mouse wheel events.'''
                 key = code
             else:
                 assert True, f"Don't know how to handle: {code}"
-            
+
             if not key.name:
                 syslog.error(f"Invalid key: {code}")
                 continue
@@ -1119,7 +1147,7 @@ Can also send mouse buttons, mouse wheel events.'''
         text = ''
         names = []
 
-        for code in self.keys:
+        for code in self._keys:
             key = None
             if isinstance(code, tuple):
                 key = gremlin.keyboard.KeyMap.find(code[0], code[1])
@@ -1140,9 +1168,9 @@ Can also send mouse buttons, mouse wheel events.'''
         stub = ""
         match self.mode:
             case KeyboardOutputMode.Pulse:
-                stub = f" (pulse) delay (ms): [{self._delay}] repeat (ms): [{self._autorepeat_delay}]"  
-            
-        return f"KeyboardEx: ({self.mode.name}) {self._get_display_keys()}{stub}"
+                stub = f" (pulse) delay (ms): [{self._delay}] repeat (ms): [{self._autorepeat_delay}]"
+
+        return f"KeyboardEx:  {self._get_display_keys()}{stub}"
 
 
     def icon(self):
@@ -1207,7 +1235,8 @@ Can also send mouse buttons, mouse wheel events.'''
         if "interval" in node.attrib:
             self.autorepeat_delay = safe_read(node, "interval", int, 250) # pulse interval milliseconds
 
-        for child in node.findall("key"):
+        key_nodes = node.xpath(".//key")
+        for child in key_nodes:
             key = None
             virtual_code = safe_read(child, "virtual-code", int, 0)
             if virtual_code > 0:
@@ -1219,8 +1248,13 @@ Can also send mouse buttons, mouse wheel events.'''
             if key:
                 keys.append(key)
 
+        if not keys:
+            input_item : gremlin.input_item.InputItem = extra_data.get("input_item", None) if extra_data else None
+            syslog.warning(f"MapToKeyboardEx: device: [{input_item.device_name if input_item else 'n/a'}] input: [{input_item.display_name if input_item else 'n/a'}] No keys found in XML.  This action will not do anything.: source line: [{node.sourceline}]")
+            pass
+
         # sort the keys for display purposes
-        self.keys = gremlin.keyboard.sort_keys(keys)
+        self._keys = gremlin.keyboard.sort_keys(keys)
 
         if "sync-mode" in node.attrib:
             self.sync_mode = SyncMode(safe_read(node,"sync-mode", int, 0))
@@ -1228,9 +1262,11 @@ Can also send mouse buttons, mouse wheel events.'''
         if "exec_on_press" in node.attrib:
             self.exec_on_press = safe_read(node,"exec_on_press",bool, True)
         if "exec_on_release" in node.attrib:
-            self.exec_on_release = safe_read(node,"exec_on_release",bool, False)       
+            self.exec_on_release = safe_read(node,"exec_on_release",bool, False)
 
-        self.wheel_factor = safe_read(node,"wheel-factor",int, 1)     
+        self.wheel_factor = safe_read(node,"wheel-factor",int, 1)
+
+        self.fireIconChanged() # notify the UI that the icon may have changed
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
@@ -1245,7 +1281,7 @@ Can also send mouse buttons, mouse wheel events.'''
 
 
 
-        for code in self.keys:
+        for code in self._keys:
             if isinstance(code, tuple): # key ID (scan_code, extended)
                 scan_code = code[0]
                 is_extended = code[1]
@@ -1277,9 +1313,9 @@ Can also send mouse buttons, mouse wheel events.'''
                 node.append(node_comment)
                 node.append(key_node)
 
-        node.set("sync-mode", safe_format(self.sync_mode, int))     
+        node.set("sync-mode", safe_format(self.sync_mode, int))
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
-        node.set("exec_on_release", safe_format(self.exec_on_release, bool))                   
+        node.set("exec_on_release", safe_format(self.exec_on_release, bool))
         node.set("wheel-factor", safe_format(self.wheel_factor, int))
 
         return node
@@ -1292,7 +1328,13 @@ Can also send mouse buttons, mouse wheel events.'''
         """
         # return true by default so the action gets saved even if it doesn't do anything
         return True
-    
+
+    def icon_valid(self):
+        """returns true if the action is valid"""
+        if not self._keys or len(self._keys) == 0:
+            return False
+        return True
+
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
         from gremlin.reporting import ReportTable
@@ -1300,7 +1342,7 @@ Can also send mouse buttons, mouse wheel events.'''
         table = ReportTable(cellpadding=4)
 
         key_stub = ""
-        for key in self.keys:
+        for key in self._keys:
             name = gremlin.keyboard.KeyMap.get_name(key)
             if key_stub:
                 key_stub += " "
@@ -1317,7 +1359,7 @@ Can also send mouse buttons, mouse wheel events.'''
                 table.addField("Repeat Delay", f"{self._autorepeat_delay} ms")
 
 
-        return table.to_html()    
+        return table.to_html()
 
 
 

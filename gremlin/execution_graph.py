@@ -37,6 +37,7 @@ import gremlin.joystick_handling
 import gremlin.plugin_manager
 import gremlin.input_item
 import gremlin.shared_state
+from gremlin.types import ActivationRule
 import anytree
 from enum import Enum, auto
 
@@ -226,7 +227,7 @@ class BaseExecutionConditionNode(ExecutionGraphNode):
         assert isinstance(node_type, ExecutionGraphNodeType)
         super().__init__(node_type)
         self.conditions = []
-        self.rule = gremlin.actions.ActivationRule.All  # rule set that applies to the condition node
+        self.rule = ActivationRule.All  # rule set that applies to the condition node
         self.container = None  # owning container for the condition
         if condition:
             self.addCondition(condition)
@@ -242,11 +243,11 @@ class BaseExecutionConditionNode(ExecutionGraphNode):
             for functor in self.functors:
                 result = functor.process_event(event, action_value, extra_data)
                 match self.rule:
-                    case gremlin.actions.ActivationRule.Any:
+                    case ActivationRule.Any:
                         if result:
                             # succeed if any condition passes
                             return True
-                    case gremlin.actions.ActivationRule.All:
+                    case ActivationRule.All:
                         if not result:
                             # any one condition failed failes the whole stack
                             break
@@ -1079,7 +1080,7 @@ class ExecutionContext:
         rule = owner.activation_condition.rule
 
         match rule:
-            case gremlin.actions.ActivationRule.Any:
+            case ActivationRule.Any:
                 # create a condition nexus node for the ANY rule (any condition that passes means the action is good to go)
                 condition_nexus = ExecutionGraphActivationConditionNexusNode()
                 condition_nexus.parent = condition_node
@@ -1093,7 +1094,7 @@ class ExecutionContext:
                     condition_nexus.addCondition(condition)
                     condition_nexus.description += f"[{index + 1}] {str(condition)} "
 
-            case gremlin.actions.ActivationRule.All:
+            case ActivationRule.All:
                 # no nexus created for the all condition - conditions in ALL mode are nested so they are all evaluated
                 node = root_node  #
 
@@ -1554,6 +1555,8 @@ class ExecutionContext:
         for input_item in input_items.values():
             # Only add callbacks for input items that actually
             # contain actions
+            if not input_item:
+                continue
 
             input_node = ExecutionGraphInputNode()
             input_node.parent = parent_node
@@ -1718,7 +1721,8 @@ class ExecutionContext:
                     mode_node.mode = mode_name
                     mode_node.parent = device_node
                     for input_items in mode.config.values():
-                        self._build_input(device_node, input_items, mode_node, mode_name)
+                        if input_items:
+                            self._build_input(device_node, input_items, mode_node, mode_name)
 
         if not self._build_error:
             # tell parent nodes if they have an action down each branch so only nodes with mappings get executed
@@ -1901,14 +1905,14 @@ class ExecutionContext:
                             elif isinstance(functor, gremlin.actions.AbstractCondition):
                                 syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                         if not hasattr(node, "rule"):
-                            node.rule = gremlin.actions.ActivationRule.All
+                            node.rule = ActivationRule.All
 
                         match node.rule:
-                            case gremlin.actions.ActivationRule.Any:
+                            case ActivationRule.Any:
                                 if result:
                                     # one condition succeeded
                                     break
-                            case gremlin.actions.ActivationRule.All:
+                            case ActivationRule.All:
                                 if not result:
                                     # any one condition failed failes the whole stack
                                     return result
@@ -1944,12 +1948,12 @@ class ExecutionContext:
                         elif isinstance(functor, gremlin.actions.AbstractCondition):
                             syslog.info(f"{logTabs}>Executed latched condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                     match node.rule:
-                        case gremlin.actions.ActivationRule.Any:
+                        case ActivationRule.Any:
                             if result:
                                 # one condition succeeded
                                 break
 
-                        case gremlin.actions.ActivationRule.All:
+                        case ActivationRule.All:
                             if not result:
                                 # any one condition failed failes the whole stack
                                 return result
@@ -1983,11 +1987,11 @@ class ExecutionContext:
                         elif isinstance(functor, gremlin.actions.AbstractCondition):
                             syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
                     match node.rule:
-                        case gremlin.actions.ActivationRule.Any:
+                        case ActivationRule.Any:
                             if result:
                                 # one condition succeeded
                                 break
-                        case gremlin.actions.ActivationRule.All:
+                        case ActivationRule.All:
                             if not result:
                                 # any one condition failed failes the whole stack
                                 return result
@@ -2059,11 +2063,11 @@ class ExecutionContext:
                 elif isinstance(functor, gremlin.actions.AbstractCondition):
                     syslog.info(f"{logTabs}>Executed condition {condition_name} result: {'PASS' if result else 'FAIL'}")
             match node.rule:
-                case gremlin.actions.ActivationRule.Any:
+                case ActivationRule.Any:
                     if result:
                         # one condition succeeded
                         break
-                case gremlin.actions.ActivationRule.All:
+                case ActivationRule.All:
                     if not result:
                         # any one condition failed failes the whole stack
                         return result
@@ -2115,7 +2119,7 @@ class ContainerCallback:
     and chained actions.
     """
 
-    def __init__(self, container, parent = None):
+    def __init__(self, container, parent=None):
         """Creates a new instance based according to the given input item.
 
         :param container the container instance for which to build th
@@ -2126,9 +2130,7 @@ class ContainerCallback:
             ec = ExecutionContext()
             parent = ec.graph
         assert isinstance(container, gremlin.input_item.AbstractContainer)
-        assert isinstance(parent, gremlin.execution_graph.ExecutionGraphNode),"invalid parent: parent must be graph node"
-
-
+        assert isinstance(parent, gremlin.execution_graph.ExecutionGraphNode), "invalid parent: parent must be graph node"
 
         self.container = container
         self.container_node = None  # node for this container
@@ -2427,7 +2429,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
         verbose = gremlin.config.Configuration().verbose_mode_details
         if __debug__:
             if parent is not None:
-                assert isinstance(parent, ExecutionGraphNode),"invalid parent type: parent must be a graph node"
+                assert isinstance(parent, ExecutionGraphNode), "invalid parent type: parent must be a graph node"
 
         sequence = []
 
@@ -2566,7 +2568,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                 condition = gremlin.input_item.BaseInputActionCondition()
                 condition.comparison = ActionSetExecutionGraph.comparison_map[action.default_button_activation]
 
-                activation_condition = gremlin.input_item.BaseActivationCondition([condition], gremlin.actions.ActivationRule.All)
+                activation_condition = gremlin.input_item.BaseActivationCondition([condition], ActivationRule.All)
                 functor = self._create_activation_condition(activation_condition, action)
                 self.functors.append(functor)
                 sequence.append("Condition")

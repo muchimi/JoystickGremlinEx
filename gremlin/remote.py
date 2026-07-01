@@ -46,7 +46,8 @@ from psygnal import Signal
 
 import gremlin.sendinput
 
-import socketserver, msgpack
+import socketserver
+import msgpack
 import enum
 
 import gremlin.singleton_decorator
@@ -808,7 +809,8 @@ class RemoteClient:
 
             case "key":
                 # keyboard output
-                import win32gui, win32con
+                import win32gui
+                import win32con
 
                 key_data = KeyData().fromPayload(data["data"])
                 virtual_code = key_data.virtual_code
@@ -1741,7 +1743,7 @@ class PacketData:
         self.data = data
         self.response = None
         self.sent = time.time()
-        self.received = None1
+        self.received = None
         self.client_id = client_id  # who to send the request to
         self.server_id = server_id  # who to send the request response to
         self.client_name = None  # optional name

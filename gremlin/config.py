@@ -889,7 +889,7 @@ class Configuration(QtCore.QObject):
     @property
     def highlight_autoswitch(self):
         """true if in design mode and tab switching is allowed on input detect change"""
-        return self._get_data("highlight_switch", False)
+        return self._get_data("highlight_switch", True)
 
     @highlight_autoswitch.setter
     def highlight_autoswitch(self, value):
@@ -959,7 +959,7 @@ class Configuration(QtCore.QObject):
 
         :return True if the feature is enabled, False otherwise
         """
-        return self._get_data("highlight_device", False)
+        return self._get_data("highlight_device", True)
 
     @highlight_enabled.setter
     def highlight_enabled(self, value) -> bool:
@@ -2695,6 +2695,17 @@ class Configuration(QtCore.QObject):
             self._data["filter_axis_threshold"] = value
             self.save()
             self.changed.emit("filter_axis_threshold", value)
+
+    @property
+    def filter_auto_unhide(self) -> bool:
+        """true if auto unhide is enabled for filtered axis events"""
+        return self._get_data("filter_auto_unhide", True) # defaults to enabled
+    @filter_auto_unhide.setter
+    def filter_auto_unhide(self, value: bool):
+        if self.filter_auto_unhide != value:
+            self._data["filter_auto_unhide"] = value
+            self.save()
+            self.changed.emit("filter_auto_unhide", value)
 
     @property
     def input_viewer_button_size(self) -> int:

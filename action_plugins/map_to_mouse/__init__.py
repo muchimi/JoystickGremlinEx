@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -91,7 +91,7 @@ class MapToMouseWidget(gremlin.input_item.AbstractActionWidget):
         warning_color = gremlin.ui.ui_common.Color.warningColor()
         warning_widget = gremlin.ui.ui_common.QIconLabel("ph.shield-warning-fill",use_qta=True,icon_color=QtGui.QColor(warning_color),text="Legacy mapper - consider using <i>Map to Mouse Ex</i> for additional functionality", use_wrap=False)
         self.main_layout.addWidget(self.container_widget)
-        self.main_layout.addWidget(warning_widget)            
+        self.main_layout.addWidget(warning_widget)
 
     def _create_axis_ui(self):
         """Creates the UI for axis setups."""
@@ -380,7 +380,7 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
                 if is_local:
                     gremlin.sendinput.mouse_h_wheel(direction)
                 if is_remote:
-                    gremlin.remote.remote_client.send_mouse_h_wheel(direction)                      
+                    gremlin.remote.remote_client.send_mouse_h_wheel(direction)
         else:
             if value.current:
                 if is_local:
@@ -424,7 +424,7 @@ class MapToMouseFunctor(gremlin.base_profile.AbstractFunctor):
                 )
             if is_remote:
                 gremlin.remote.remote_client.send_mouse_acceleration(self.config.direction, self.config.min_speed, self.config.max_speed, self.config.time_to_max_speed)
-     
+
         else:
             if is_local:
                 self.mouse_controller.set_absolute_motion(0, 0)
@@ -479,7 +479,7 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
     #     InputType.JoystickHat,
     #     InputType.Keyboard
     # ]
-    
+
     input_types = [
          InputType.JoystickButton,
          InputType.JoystickHat,
@@ -511,10 +511,10 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
     def display_name(self):
         ''' returns a display string for the current configuration '''
         if self.motion_input:
-            return f"Map to Mouse: (motion) angle: [{self.direction}] speed: [{self.min_speed}] [{self.max_speed}] TTMS: [{self.time_to_max_speed:0.3f}]"    
+            return f"Map to Mouse: (motion) angle: [{self.direction}] speed: [{self.min_speed}] [{self.max_speed}] TTMS: [{self.time_to_max_speed:0.3f}]"
         else:
             return f"Map to Mouse: (button) [{self.button_id.name}]"
-    
+
     def icon(self):
         """Returns the icon to use for this action.
 
@@ -575,11 +575,11 @@ class MapToMouse(gremlin.base_profile.AbstractAction):
         :return True if the action is configured correctly, False otherwise
         """
         return True
-  
+
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
         from gremlin.reporting import ReportTable
-        table = ReportTable(cellpadding=4)    
+        table = ReportTable(cellpadding=4)
 
         if self.motion_input:
             # motion

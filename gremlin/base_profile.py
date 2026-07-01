@@ -101,7 +101,7 @@ class ProfileDeviceNode:
         self.label = ""
         self._device: dinput.DeviceSummary = None
         self._modes = TriggerDict()  # map of ProfileMode objects keyed by mode name (case sensitive)
-        self._modes.addCallback(self._handle_mode_node_changed)
+        # self._modes.addCallback(self._handle_mode_node_changed)
         self._name: str = None
         self.type = None  # device type
         self.connected = False  # true if the device was found in the detected hardware list
@@ -288,6 +288,7 @@ class ProfileDeviceNode:
 
     def __str__(self):
         return f"Profile Device: [{self.device_id}] name: [{self.name}] type: [{self.device_type.name}] virtual: [{self.virtual}]"
+
 
 
 class AbstractFunctor(QtCore.QObject):
@@ -1524,7 +1525,7 @@ class Settings:
         if emit:
             el = gremlin.event_handler.EventListener()
             el.input_filtered_change.emit(device_id)  # tell the widget the input list has changed
-            
+
 
     def setDefaultInputVisible(
         self,
@@ -2762,10 +2763,10 @@ class Profile:
                 device_list.append(self.devices[id])
         return device_list
 
-    def ensure_mode_exists(self, mode_name):
+    def ensure_mode_exists(self, mode_name : str, is_system=False):
         """ensures a mode exists in the profile"""
         for device_guid in self.devices:
-            mode_node = self.getModeNode(device_guid, mode_name, autocreate=True)
+            _ = self.getModeNode(device_guid, mode = mode_name, is_system=is_system, autocreate=True)
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.
@@ -3568,7 +3569,7 @@ class Profile:
 
         return self.devices[device_guid]
 
-    def getModeNode(self, device_guid, mode: str, system: bool = False, autocreate=False):
+    def getModeNode(self, device_guid, mode: str, is_system: bool = False, autocreate=False):
         """gets a mode node
         :param device_guid: id of the device containing the mode node
         :param mode: the mode name (case sensitive)
@@ -3576,14 +3577,14 @@ class Profile:
         """
         device_node = self.getDeviceNode(device_guid, autocreate)
         if device_node:
-            return device_node.getModeNode(mode, system, autocreate)
+            return device_node.getModeNode(mode, is_system, autocreate)
         return None
 
     def getModeNodeConfig(self, device_guid, mode: str, input_type: InputType, input_id, autocreate=False):
         """gets the configuration for the given mode"""
         device_node = self.getDeviceNode(device_guid, autocreate)
         if device_node:
-            mode_node = device_node.getModeNode(mode, autocreate)
+            mode_node = device_node.getModeNode(mode, is_system=False, autocreate=autocreate)
             if mode_node:
                 mode_config = mode_node.getConfig(input_type)
                 if mode_config is not None:
@@ -4439,6 +4440,7 @@ class Profile:
     def save(self, save_as_name=None, backup=True):
         """saves the profile"""
 
+        verbose = gremlin.config.Configuration().verbose
         if save_as_name is None:
             if self._profile_fname is None:
                 gremlin.ui.ui_common.MessageBox(prompt="File is not set, please save the profile first")
@@ -4532,7 +4534,7 @@ class Profile:
             try:
                 verbose = gremlin.config.Configuration().verbose
                 if verbose:
-                    syslog.info(f"READ: profile configuration: {gremlin.util.toUrl(fname)}")
+                    syslog.info(f"Profile: read profile configuration: {gremlin.util.toUrl(fname)}")
 
                 with open(fname, "r", encoding="utf-8") as hdl:
                     decoder = json.JSONDecoder()

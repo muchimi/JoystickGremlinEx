@@ -296,6 +296,8 @@ class CodeRunner:
                         for input_item in input_map.values():
                             # Only add callbacks for input items that actually
                             # contain actions
+                            if not input_item:
+                                continue
 
                             if len(input_item.containers) == 0:
                                 # no containers = no actions = skip

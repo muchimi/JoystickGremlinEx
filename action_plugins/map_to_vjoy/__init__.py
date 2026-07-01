@@ -6264,7 +6264,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         state = gremlin.joystick_handling.VirtualDeviceUsageState()
         state.registerAction(self.id)
 
-        syslog.info(f"VJOY REMAP: create action [{self.id}]")
+        # syslog.info(f"VJOY REMAP: create action [{self.id}]")
 
         self.virtual_device_map = (
             None  # list of all virtual devices that can be used as output   [device_type:DeviceType][index:int] -> device : dinput.DeviceSummary
@@ -6404,7 +6404,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     def _on_id_changed(self, old_id: str, new_id: str):
         """called when the id changes"""
-        syslog.info(f"VJOY REMAP: action id changed from [{old_id}] to [{new_id}]")
+        # syslog.info(f"VJOY REMAP: action id changed from [{old_id}] to [{new_id}]")
         state = gremlin.joystick_handling.VirtualDeviceUsageState()
         state.unregisterAction(old_id)
         state.registerAction(new_id)
@@ -6901,24 +6901,24 @@ Supports axis merging, curved output, command, hat and button mappings.
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoyAxisToButton,
         ):
-            return f"VJoy #{self._vjoy_id} Mode: {self.action_mode.name} Axis: {self.vjoy_axis_id}"
+            return f"VJoy #{self.virtual_id} Mode: {self.action_mode.name} Axis: {self.vjoy_axis_id}"
         elif self.action_mode in (
             VjoyAction.VJoyButtonPress,
             VjoyAction.VJoyButton,
             VjoyAction.VJoyToggle,
             VjoyAction.VJoyButtonRelease,
         ):
-            return f"VJoy #{self._vjoy_id} Mode: {self.action_mode.name} Button: {self.vjoy_button_id}"
+            return f"VJoy #{self.virtual_id} Mode: {self.action_mode.name} Button: {self.vjoy_button_id}"
         elif self.action_mode in (VjoyAction.VJoyHat, VjoyAction.VJoyHatToButton):
-            return f"VJoy #{self._vjoy_id} Mode: {self.action_mode.name} Hat: {self.vjoy_hat_id}"
+            return f"VJoy #{self.virtual_id} Mode: {self.action_mode.name} Hat: {self.vjoy_hat_id}"
         elif self.action_mode == VjoyAction.VJoyMergeAxis:
             stub = ""
             for index, data in enumerate(self._merge_data):
                 device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(data.device_id)
                 stub += f", merge[{index}] = device: {device.name} axis: {data.input_id}/{device.get_axis_name(data.input_id)} invert: [{data.invert}] operation: [{data.operation.name}]"
-            return f"VJoy #{self._vjoy_id} Mode: {self.action_mode.name} Axis: {self.vjoy_axis_id} {stub} "
+            return f"VJoy #{self.virtual_id} Mode: {self.action_mode.name} Axis: {self.vjoy_axis_id} {stub} "
         else:
-            return f"VJoy #{self._vjoy_id} Mode: {self.action_mode.name}"
+            return f"VJoy #{self.virtual_id} Mode: {self.action_mode.name}"
 
     @property
     def paired(self):
@@ -7174,29 +7174,42 @@ Supports axis merging, curved output, command, hat and button mappings.
         else:
             return True
 
-    def set_input_id(self, index):
+    def set_input_id(self, index : int, action_mode: VjoyAction = None ):
 
-        el = gremlin.event_handler.EventListener()
-        if self.action_mode in (
+        if action_mode is None:
+            action_mode = self.action_mode
+            assert action_mode is not None, "action_mode must be provided if self.action_mode is None"
+
+        if action_mode in (
             VjoyAction.VJoyAxis,
             VjoyAction.VJoyInvertAxis,
             VjoyAction.VJoySetAxis,
+            VjoyAction.VJoyMergeAxis,
+            VjoyAction.VJoySetAxisStepped,
         ):
             if self.vjoy_axis_id != index:
                 self.vjoy_axis_id = index
-        elif self.action_mode in (
+        elif action_mode in (
             VjoyAction.VJoyHat,
             VjoyAction.VJoyHatPress,
             VjoyAction.VJoyHatPulse,
         ):
             if self.vjoy_hat_id != index:
                 self.vjoy_hat_id = index
-        else:
+        elif action_mode in (
+            VjoyAction.VJoyButtonPress,
+            VjoyAction.VJoyButtonRelease,
+            VjoyAction.VJoyButton,
+            VjoyAction.VJoyPulse,
+            VjoyAction.VJoyHatToButton,
+            VjoyAction.VJoyAxisToButton,
+        ):
             # button
             if self.vjoy_button_id != index:
                 self.vjoy_button_id = index
 
-        self.vjoy_input_id = index
+        else:
+            self.vjoy_input_id = index
 
     def get_input_id(self):
         """returns input id based on the action mode"""
@@ -7256,10 +7269,12 @@ Supports axis merging, curved output, command, hat and button mappings.
 
             else:
                 vjoy_id = safe_read(node, "vjoy", int, 1)
+
                 if vjoy_id not in self.virtual_device_map[DeviceType.VJoy]:
                     self.refresh_virtual_inputs()  # ensure we have the latest device list
 
-                if vjoy_id not in self.virtual_device_map:
+
+                if vjoy_id not in self.virtual_device_map[DeviceType.VJoy]:
                     syslog.error(f"Profile load: vjoy device {vjoy_id} was not found in the list of valid VJOY devices")
                     self.vjoy_axis_id = 1
                     self.vjoy_button_id = 1
@@ -7293,7 +7308,19 @@ Supports axis merging, curved output, command, hat and button mappings.
                 if "return-position" in node.attrib:
                     self.vjoy_hat_return_position = vjoy.vjoy.Hat.getDirection(node.get("return-position"))
 
-            if "input" in node.attrib:
+            if "axis" in node.attrib:
+                # legacy support for axis attribute
+                index = safe_read(node, "axis", int, 1)
+                self.set_input_id(index)
+            elif "button" in node.attrib:
+                # legacy support for button attribute
+                index = safe_read(node, "button", int, 1)
+                self.set_input_id(index)
+            elif "hat" in node.attrib:
+                # legacy support for hat attribute
+                index = safe_read(node, "hat", int, 1)
+                self.set_input_id(index)
+            elif "input" in node.attrib:
                 index = safe_read(node, "input", int, 1)
                 self.set_input_id(index)
 

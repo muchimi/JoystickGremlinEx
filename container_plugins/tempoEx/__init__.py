@@ -46,23 +46,24 @@ syslog = logging.getLogger("system")
 class TempoExContainerWidget(AbstractContainerWidget):
     """Container with two actions, triggered based on activation duration."""
 
-    def __init__(self, profile_data: TempoExContainer, parent=None):
+    def __init__(self, container: TempoExContainer, parent=None):
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
-        :param parent the parent of this widget
+        :param container: the container represented by this widget
+        :param parent: the parent of this widget
         """
-        super().__init__(profile_data, parent)
+        super().__init__(container, parent)
 
         el = gremlin.event_handler.EventListener()
         el.action_delete.connect(self._delete_action)
+        self.container = container
 
     def _create_action_ui(self):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
         self._redraw_lock = False
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.create_or_delete_virtual_button()
         self.short_widget, self.short_layout = gremlin.ui.ui_common.getVContainer()
         self.short_widget.setContentsMargins(8, 0, 0, 0)
 
@@ -78,18 +79,18 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.longpress_delay_widget.setToolTip(
             "Delay to detect long press, should be greater than double tap delay.\nIf the input is released before this value, a short press is executed.\nIf the input is released on or after this value, a long press is executed."
         )
-        self.longpress_delay_widget.setValue(self.profile_data.delay * 1000)
+        self.longpress_delay_widget.setValue(self.container.delay * 1000)
         self.longpress_delay_widget.valueChanged.connect(self._delay_changed_cb)
 
         self.dtap_delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Double-Tap Delay (ms):")
         self.dtap_delay_widget.setToolTip("Delay to detect double tap.  If the input is pressed twice within this timeframe, a double-tap will be executed.")
-        self.dtap_delay_widget.setValue(self.profile_data.doubletap_delay * 1000)
+        self.dtap_delay_widget.setValue(self.container.doubletap_delay * 1000)
         self.dtap_delay_widget.valueChanged.connect(self._dtap_delay_changed_cb)
 
         self.autorelease_delay_widget = gremlin.ui.ui_common.QDelayWidget(
             label="Autorelease Delay (ms):", tooltip="Time between a press and release trigger.  Set to 0 to disable autoreleases."
         )
-        self.autorelease_delay_widget.setValue(self.profile_data.autorelease_delay * 1000)
+        self.autorelease_delay_widget.setValue(self.container.autorelease_delay * 1000)
         self.autorelease_delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
 
         self.warning_widget = gremlin.ui.ui_common.QWarningWidget(text="")
@@ -115,7 +116,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         self.options_layout.addWidget(widget)
 
-        if self.profile_data.activate_on == "press":
+        if self.container.activate_on == "press":
             self.activate_press.setChecked(True)
         else:
             self.activate_release.setChecked(True)
@@ -125,15 +126,15 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         # chain options
         self.chain_short_widget = QtWidgets.QCheckBox("short actions")
-        self.chain_short_widget.setChecked(self.profile_data.chain_short)
+        self.chain_short_widget.setChecked(self.container.chain_short)
         self.chain_short_widget.clicked.connect(self._chain_short_changed_cb)
 
         self.chain_long_widget = QtWidgets.QCheckBox("long actions")
-        self.chain_long_widget.setChecked(self.profile_data.chain_long)
+        self.chain_long_widget.setChecked(self.container.chain_long)
         self.chain_long_widget.clicked.connect(self._chain_long_changed_cb)
 
         self.chain_double_widget = QtWidgets.QCheckBox("double tap actions")
-        self.chain_double_widget.setChecked(self.profile_data.chain_double)
+        self.chain_double_widget.setChecked(self.container.chain_double)
         self.chain_double_widget.clicked.connect(self._chain_double_changed_cb)
 
         widgets = [
@@ -148,7 +149,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.timeout_input.setRange(0.0, 3600.0)
         self.timeout_input.setSingleStep(0.5)
         self.timeout_input.setValue(0)
-        self.timeout_input.setValue(self.profile_data.timeout)
+        self.timeout_input.setValue(self.container.timeout)
         self.timeout_input.valueChanged.connect(self._timeout_changed_cb)
 
         widgets = [
@@ -173,23 +174,23 @@ class TempoExContainerWidget(AbstractContainerWidget):
         self.content_widget, self.content_layout = gremlin.ui.ui_common.getVContainer(widgets)
 
         self.short_action_selector = ActionSelector(
-            # self.profile_data.get_input_type(),
+            # self.container.get_input_type(),
             InputType.JoystickButton,
-            self.profile_data.input_item,
+            self.container.input_item,
         )
         self.short_action_selector.action_label.setText("Short Press Action(s)")
 
         self.long_action_selector = ActionSelector(
-            # self.profile_data.get_input_type(),
+            # self.container.get_input_type(),
             InputType.JoystickButton,
-            self.profile_data.input_item,
+            self.container.input_item,
         )
         self.long_action_selector.action_label.setText("Long Press Action(s)")
 
         self.double_action_selector = ActionSelector(
-            # self.profile_data.get_input_type(),
+            # self.container.get_input_type(),
             InputType.JoystickButton,
-            self.profile_data.input_item,
+            self.container.input_item,
         )
         self.double_action_selector.action_label.setText("Double Tap Action(s)")
 
@@ -211,7 +212,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         # create short press container actions
 
-        action_sets = [action_set for action_set in self.profile_data.short_action_sets if action_set]
+        action_sets = [action_set for action_set in self.container.short_action_sets if action_set]
         for i, action_set in enumerate(action_sets):
             widget = self._create_action_set_widget(action_set if action_set is not None else [], f"Chain Short Action {i + 1:d}", ContainerViewTypes.Action)
             self.short_layout.addWidget(widget)
@@ -220,7 +221,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
             widget.model.data_changed.connect(self.container_modified.emit)
 
         # create long press container actions
-        action_sets = [action_set for action_set in self.profile_data.long_action_sets if action_set]
+        action_sets = [action_set for action_set in self.container.long_action_sets if action_set]
         for i, action_set in enumerate(action_sets):
             if action_set is not None:
                 widget = self._create_action_set_widget(action_set, f"Chain Long Action {i + 1:d}", ContainerViewTypes.Action)
@@ -231,7 +232,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
             widget.model.data_changed.connect(self.container_modified.emit)
 
         # create double tap  container actions
-        action_sets = [action_set for action_set in self.profile_data.double_action_sets if action_set]
+        action_sets = [action_set for action_set in self.container.double_action_sets if action_set]
         for i, action_set in enumerate(action_sets):
             if action_set is not None:
                 widget = self._create_action_set_widget(action_set, f"Chain DoubleTap Action {i + 1:d}", ContainerViewTypes.Action)
@@ -251,9 +252,9 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         """
         gremlin.util.clear_layout(self.activation_condition_layout)
-        short_actions = self.profile_data.short_action_sets
-        long_actions = self.profile_data.long_action_sets
-        double_actions = self.profile_data.double_action_sets
+        short_actions = self.container.short_action_sets
+        long_actions = self.container.long_action_sets
+        double_actions = self.container.double_action_sets
         if short_actions:
             for action_set in short_actions:
                 if action_set:
@@ -302,28 +303,28 @@ class TempoExContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        action_item = plugin_manager.get_class(action_name)(self.container)
         action_item.data = "short"
-        self.profile_data.short_action_sets.append([action_item])
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.short_action_sets.append([action_item])
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        action_sets = [action_set for action_set in self.profile_data.short_action_sets if action_set]
+        action_sets = [action_set for action_set in self.container.short_action_sets if action_set]
         self._create_widgets(action_sets, "Chain Short Action", self.short_layout, self.short_layout_widget_list)
 
     def _paste_short_action(self, action, container):
         """called when a paste occurs"""
         syslog.info("Paste short action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
+        action_item = plugin_manager.duplicate(action, self.container)
         action_item.data = "short"
-        self.profile_data.short_action_sets.append([action_item])
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.short_action_sets.append([action_item])
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        action_sets = [action_set for action_set in self.profile_data.short_action_sets if action_set]
+        action_sets = [action_set for action_set in self.container.short_action_sets if action_set]
         self._create_widgets(action_sets, "Chain Short Action", self.short_layout, self.short_layout_widget_list)
 
     def _add_long_action(self, action_name):
@@ -332,28 +333,28 @@ class TempoExContainerWidget(AbstractContainerWidget):
         :param action_name the name of the action to add
         """
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        action_item = plugin_manager.get_class(action_name)(self.container)
         action_item.data = "long"
-        self.profile_data.long_action_sets.append([action_item])
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.long_action_sets.append([action_item])
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        action_sets = [action_set for action_set in self.profile_data.long_action_sets if action_set]
+        action_sets = [action_set for action_set in self.container.long_action_sets if action_set]
         self._create_widgets(action_sets, "Chain Long Action", self.long_layout, self.long_layout_widget_list)
 
     def _paste_long_action(self, action, container):
         """called when a paste occurs"""
         syslog.info("Paste long action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
+        action_item = plugin_manager.duplicate(action, self.container)
         action_item.data = "long"
-        self.profile_data.long_action_sets.append([action_item])
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.long_action_sets.append([action_item])
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        action_sets = [action_set for action_set in self.profile_data.long_action_sets if action_set]
+        action_sets = [action_set for action_set in self.container.long_action_sets if action_set]
         self._create_widgets(action_sets, "Chain Long Action", self.long_layout, self.long_layout_widget_list)
 
     def _add_double_action(self, action_name):
@@ -362,24 +363,24 @@ class TempoExContainerWidget(AbstractContainerWidget):
         :param action_name the name of the action to add
         """
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
+        action_item = plugin_manager.get_class(action_name)(self.container)
         action_item.data = "double"
-        self.profile_data.double_action_sets.append([action_item])
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.double_action_sets.append([action_item])
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        action_sets = [action_set for action_set in self.profile_data.double_action_sets if action_set]
+        action_sets = [action_set for action_set in self.container.double_action_sets if action_set]
         self._create_widgets(action_sets, "Chain Double Action", self.double_layout, self.double_layout_widget_list)
 
     def _paste_double_action(self, action, container):
         """called when a paste occurs"""
         syslog.info("Paste double action")
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
+        action_item = plugin_manager.duplicate(action, self.container)
         action_item.data = "double"
-        self.profile_data.double_action_sets.append([action_item])
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.double_action_sets.append([action_item])
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
         for widget in self.double_layout_widget_list:
@@ -392,16 +393,16 @@ class TempoExContainerWidget(AbstractContainerWidget):
         :param value the value after which the long press action activates
         """
         # value = value/1000
-        # dtap_value = self.profile_data.doubletap_delay
+        # dtap_value = self.container.doubletap_delay
         # if value <= dtap_value:
-        self.profile_data.delay = value / 1000  # to seconds
+        self.container.delay = value / 1000  # to seconds
         self._update_warnings()
 
     def _dtap_delay_changed_cb(self, value):
         """double tap value change
         :param value the value after which the long press action activates
         """
-        self.profile_data.doubletap_delay = value / 1000  # to seconds
+        self.container.doubletap_delay = value / 1000  # to seconds
         self._update_warnings()
 
     @QtCore.Slot()
@@ -410,20 +411,20 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         :param value the value after which the long press action activates
         """
-        self.profile_data.autorelease_delay = value / 1000
+        self.container.autorelease_delay = value / 1000
         self._update_warnings()
 
     def _update_warnings(self):
         """updates warnings based on configuration"""
         warnings = []
-        value = self.profile_data.autorelease_delay
+        value = self.container.autorelease_delay
         if value == 0:
             warnings.append("Autorelease when set to zero (0) turns off any release trigger sent to containers or actions.")
 
-        if self.profile_data.activate_on == "press":
+        if self.container.activate_on == "press":
             warnings.append("DoubleTap does not trigger when the container is in <u>activate on press mode</u>.")
 
-        if self.profile_data.delay < self.profile_data.doubletap_delay:
+        if self.container.delay < self.container.doubletap_delay:
             warnings.append("Long press delay should be greater than the double tap delay.")
 
         if warnings:
@@ -441,33 +442,33 @@ class TempoExContainerWidget(AbstractContainerWidget):
         :param value whether or not the selection was toggled - ignored
         """
         if self.activate_press.isChecked():
-            self.profile_data.activate_on = "press"
+            self.container.activate_on = "press"
         else:
-            self.profile_data.activate_on = "release"
+            self.container.activate_on = "release"
 
         self._update_warnings()
 
     @QtCore.Slot(bool)
     def _chain_short_changed_cb(self, checked: bool):
         """occurs when short chain checkbox is changed"""
-        self.profile_data.chain_short = checked
+        self.container.chain_short = checked
 
     @QtCore.Slot(bool)
     def _chain_long_changed_cb(self, checked: bool):
         """occurs when short chain checkbox is changed"""
-        self.profile_data.chain_long = checked
+        self.container.chain_long = checked
 
     @QtCore.Slot(bool)
     def _chain_double_changed_cb(self, checked: bool):
         """occurs when double chain checkbox is changed"""
-        self.profile_data.chain_double = checked
+        self.container.chain_double = checked
 
     def _timeout_changed_cb(self, value):
         """Stores changes to the timeout element.
 
         :param value the new value of the timeout field
         """
-        self.profile_data.timeout = value
+        self.container.timeout = value
 
     def _find_widget(self, widget):
         """Returns the short or long action set and its index of the provided widget as a pair (action_set, index)  or (None, -1) if not found
@@ -478,13 +479,13 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         if widget in self.short_layout_widget_list:
             data = self.short_layout_widget_list
-            action_sets = self.profile_data.short_action_sets
+            action_sets = self.container.short_action_sets
         elif widget in self.long_layout_widget_list:
             data = self.long_layout_widget_list
-            action_sets = self.profile_data.long_action_sets
+            action_sets = self.container.long_action_sets
         elif widget in self.double_layout_widget_list:
             data = self.double_layout_widget_list
-            action_sets = self.profile_data.double_action_sets
+            action_sets = self.container.double_action_sets
         else:
             return (None, -1)
 
@@ -521,8 +522,8 @@ class TempoExContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         title = "TempoEx: "
-        if self.profile_data.is_valid() and len(self.profile_data.action_sets) == 2 and None not in self.profile_data.action_sets:
-            title += f"({', '.join([a.name for a in self.profile_data.action_sets[0]])}) / ({', '.join([a.name for a in self.profile_data.action_sets[1]])})"
+        if self.container.is_valid() and len(self.container.action_sets) == 2 and None not in self.container.action_sets:
+            title += f"({', '.join([a.name for a in self.container.action_sets[0]])}) / ({', '.join([a.name for a in self.container.action_sets[1]])})"
         return title
 
 
