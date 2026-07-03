@@ -52,13 +52,13 @@ _eight_names = ["North", "North East", "East", "South East", "South", "South Wes
 class HatButtonsContainerWidget(AbstractContainerWidget):
     """Basic container which holds a single action."""
 
-    def __init__(self, action_data, parent=None):
+    def __init__(self, container, parent=None):
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(action_data, parent)
+        super().__init__(container, parent)
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -72,7 +72,7 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
 
         self.four_way = QtWidgets.QRadioButton("4 Way")
         self.eight_way = QtWidgets.QRadioButton("8 Way")
-        if self.profile_data.button_count == 4:
+        if self.container.button_count == 4:
             self.four_way.setChecked(True)
             self.eight_way.setChecked(False)
         else:
@@ -85,14 +85,14 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         self.sticky_widget.setToolTip(
             "When on, a release event does not occur unless the hat is returned to the center position.\nWhen off, any hat change results in a release of the prior position."
         )
-        self.sticky_widget.setChecked(self.profile_data.sticky)
+        self.sticky_widget.setChecked(self.container.sticky)
         self.sticky_widget.clicked.connect(self._change_sticky)
 
         widgets = ["<b>Button mode</b>", self.four_way, self.eight_way, self.sticky_widget]
 
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.action_layout.addWidget(widget)
-        action_sets = self.profile_data.getActionSets()
+        action_sets = self.container.getActionSets()
         for action_set in action_sets:
             self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
             self._create_action_widget(action_set, self.action_layout, ContainerViewTypes.Action)
@@ -101,7 +101,7 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         self.action_layout.addStretch()
 
     def _ensureActionSet(self, position):
-        return self.profile_data.getActionSet(position)
+        return self.container.getActionSet(position)
 
     # def _add_action_selector(self, add_action_cb, label, paste_action_cb = None):
     #     """Adds an action selection UI widget.
@@ -124,7 +124,7 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
     #     self.action_layout.addWidget(group_box)
 
     def _create_condition_ui(self):
-        action_sets = self.profile_data.getActionSets()
+        action_sets = self.container.getActionSets()
         if not action_sets:
             return
 
@@ -163,15 +163,15 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         if isinstance(action, str):
             action_name = action
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+            action_item = plugin_manager.get_class(action_name)(self.container)
         elif isinstance(action, Clipboard):
             # paste operation
             if action.is_action:
                 # verify the action in the clipboard is appropriate for this input
 
-                action_item = plugin_manager.duplicate(action.data, self.profile_data)
+                action_item = plugin_manager.duplicate(action.data, self.container)
 
-        self.profile_data.add_action(action_item, index)
+        self.container.add_action(action_item, index)
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -179,10 +179,10 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         """paste action"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        action_set = self.profile_data.getActionSet(direction)
+        action_item = plugin_manager.duplicate(action, self.container)
+        action_set = self.container.getActionSet(direction)
         action_set.append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.create_or_delete_virtual_button()
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -198,8 +198,8 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         title = "Hat Buttons: "
-        if len(self.profile_data.action_sets) > 0:
-            title += ", ".join(a.name for a in self.profile_data.action_sets[0])
+        if len(self.container.action_sets) > 0:
+            title += ", ".join(a.name for a in self.container.action_sets[0])
         return title
 
     def _change_button_type(self, state):
@@ -208,23 +208,23 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         :param state radio button state - not used
         """
         button_count = 4 if self.four_way.isChecked() else 8
-        if button_count != self.profile_data.button_count:
-            self.profile_data.button_count = button_count
-            if button_count == 4 and len(self.profile_data.action_sets) == 8:
-                del self.profile_data.action_sets[7]
-                del self.profile_data.action_sets[5]
-                del self.profile_data.action_sets[3]
-                del self.profile_data.action_sets[1]
-            elif button_count == 8 and len(self.profile_data.action_sets) == 4:
-                self.profile_data.action_sets.insert(1, [])
-                self.profile_data.action_sets.insert(3, [])
-                self.profile_data.action_sets.insert(5, [])
-                self.profile_data.action_sets.insert(7, [])
+        if button_count != self.container.button_count:
+            self.container.button_count = button_count
+            if button_count == 4 and len(self.container.action_sets) == 8:
+                del self.container.action_sets[7]
+                del self.container.action_sets[5]
+                del self.container.action_sets[3]
+                del self.container.action_sets[1]
+            elif button_count == 8 and len(self.container.action_sets) == 4:
+                self.container.action_sets.insert(1, [])
+                self.container.action_sets.insert(3, [])
+                self.container.action_sets.insert(5, [])
+                self.container.action_sets.insert(7, [])
             self._create_action_ui()
 
     @QtCore.Slot(bool)
     def _change_sticky(self, checked: bool):
-        self.profile_data.sticky = checked
+        self.container.sticky = checked
 
 
 class HatButtonsContainerFunctor(AbstractTriggerFunctor):
@@ -256,7 +256,7 @@ class HatButtonsContainerFunctor(AbstractTriggerFunctor):
         self.button_count = self.container.button_count
 
         self.action_nodes.clear()  # list of nodes arranged by button index
-        action_sets = self.container.getActionSets()  # define action sets
+        action_sets = self.container.action_sets  # define action sets
 
         group_node = self.container_node.children[0]  # group node is the only child of the container node
         self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]

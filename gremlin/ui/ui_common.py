@@ -28,6 +28,7 @@ from PySide6.QtGui import QPixmap, QPainter, QIcon
 import collections
 from typing import Callable
 
+
 import gremlin.config
 import gremlin.error
 import qtawesome as qta
@@ -411,7 +412,13 @@ class Color:
         return Color.hoverBackgroundColor()
 
 
+    @staticmethod
+    def headerBarBackgroundColor():
+        return "#2C3D2B" if gremlin.shared_state.is_dark_theme else "#9B9B9B"
 
+    @staticmethod
+    def headerBarBorderColor():
+        return "#1F5C1C" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
 
 
     @staticmethod
@@ -1123,6 +1130,22 @@ class Icons:
         return Icons._icon("mdi.sort-descending", qta_color)
 
     @staticmethod
+    def moveUpIcon(qta_color=None) -> QtGui.QIcon:
+        return Icons._icon("mdi.arrow-up", qta_color)
+
+    @staticmethod
+    def moveDownIcon(qta_color=None) -> QtGui.QIcon:
+        return Icons._icon("mdi.arrow-down", qta_color)
+
+    @staticmethod
+    def moveTopIcon(qta_color=None) -> QtGui.QIcon:
+        return Icons._icon("mdi.arrow-collapse-up", qta_color)
+
+    @staticmethod
+    def moveBottomIcon(qta_color=None) -> QtGui.QIcon:
+        return Icons._icon("mdi.arrow-collapse-down", qta_color)
+
+    @staticmethod
     def questionIcon(qta_color=None) -> QtGui.QIcon:
         if not qta_color:
             qta_color = Color.blueColor()
@@ -1341,9 +1364,10 @@ class Buttons:
     def _template(
         label="",
         icon_source: str = "",
-        tooltip=None,
-        callback=None,
-        no_keyboard=True,
+        tooltip: str = None,
+        callback : Callable=None,
+        callbackEx: Callable=None,
+        no_keyboard: bool = True,
         data=None,
         width: int = None,
         height: int = None,
@@ -1370,14 +1394,18 @@ class Buttons:
         widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         if tooltip:
             widget.setToolTip(tooltip)
-        if callback:
-            widget.clicked.connect(callback)
+
+        # hook callbacks
+        widget.setCallback(callback)
+        widget.setCallbackEx(callbackEx)
+
         widget.setMaximumHeight(Buttons.maxHeight)
         if width is not None:
             widget.setMaximumWidth(width)
         if height is not None:
             widget.setMaximumHeight(height)
         return widget
+
 
     @staticmethod
     def getDeleteWidget(label=None, tooltip="Delete", callback=None, no_keyboard=True, data=None):
@@ -1579,12 +1607,28 @@ class Buttons:
         return Buttons._template(None, Icons.collapseAllIcon(), tooltip, callback, width=width, height=height)
 
     @staticmethod
-    def getExpandAllWidget(tooltip="Collapse All", callback=None, width=24, height=24):
+    def getExpandAllWidget(tooltip="Expland All", callback=None, width=24, height=24):
         return Buttons._template(None, Icons.expandAllIcon(), tooltip, callback, width=width, height=height)
 
     @staticmethod
     def getRecordWidget(tooltip="Record", callback=None, width=24, height=24):
         return Buttons._template(None, Icons.recordIcon(), tooltip, callback, width=width, height=height)
+
+    @staticmethod
+    def getMoveUpWidget(tooltip="Move Up", callback=None, width=24, height=24, data=None):
+        return Buttons._template(None, Icons.moveUpIcon(), tooltip, callback, width=width, height=height, data=data)
+
+    @staticmethod
+    def getMoveDownWidget(tooltip="Move Down", callback=None, width=24, height=24, data=None):
+        return Buttons._template(None, Icons.moveDownIcon(), tooltip, callback, width=width, height=height, data=data)
+
+    @staticmethod
+    def getMoveTopWidget(tooltip="Move Top", callback=None, width=24, height=24, data=None):
+        return Buttons._template(None, Icons.moveTopIcon(), tooltip, callback, width=width, height=height, data=data)
+
+    @staticmethod
+    def getMoveBottomWidget(tooltip="Move Bottom", callback=None, width=24, height=24, data=None):
+        return Buttons._template(None, Icons.moveBottomIcon(), tooltip, callback, width=width, height=height, data=data)
 
 
 class WidgetTracker:
@@ -4467,7 +4511,9 @@ class QDataPushButton(QtWidgets.QPushButton):
         self._clicked.connect(self._handle_callback)
         self.clickedEx.connect(self._handle_callback_ex)
 
-        self._callback = callback
+        self.setCallback(callback)
+
+
         self._callback_ex = callbackEx
         self._enhanced = enhanced or callbackEx is not None
 
@@ -4500,9 +4546,8 @@ class QDataPushButton(QtWidgets.QPushButton):
 
     def _handle_callback(self):
         if self._callback:
-            sig = inspect.signature(self._callback)
-            takes_parameters = len(sig.parameters) > 0
-            if takes_parameters:
+            # Determine if the callback expects parameters and call accordingly
+            if self._callback_param:
                 self._callback(self)
             else:
                 self._callback()
@@ -4513,9 +4558,16 @@ class QDataPushButton(QtWidgets.QPushButton):
 
     def setCallback(self, callback):
         self._callback = callback
+        if self._callback:
+            sig = inspect.signature(self._callback)
+            takes_parameters = len(sig.parameters) > 0
+            self._callback_param = takes_parameters
+        else:
+            self._callback_param = False
 
     def setCallbackEx(self, callback):
         self._callback_ex = callback
+
 
     def on_press(self):
         pass
@@ -10457,7 +10509,7 @@ def getHContainer(
         if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
                 if item is None:
-                    continue  # skip blanks
+                    continue  # skip blanks or empty widgets
                 if isinstance(item, str):
                     if item == "|":
                         # separator
@@ -10510,13 +10562,35 @@ def getVContainer(
     alignment=None,
     font=None,
     parent=None,
+    left_margin: int = 0,
+    right_margin: int = 0,
+    top_margin: int = 0,
+    bottom_margin: int = 0,
     no_stretch=False,
     bottom_stretch=False,
     top_stretch=False,
-    left_margin=0,
     widget_only=False,
+    spacing = 0
 ):
-    """gets a qt H container widget"""
+    """gets a vertical container widget
+
+    Args:
+        widget_or_list: The widget or list of widgets to add to the container.
+        label: Optional label to add at the top of the container.
+        alignment: Alignment for the container.
+        font: Font to apply to the label or widgets.
+        parent: Parent widget.
+        left_margin: Left margin for the layout.
+        right_margin: Right margin for the layout.
+        top_margin: Top margin for the layout.
+        bottom_margin: Bottom margin for the layout.
+        no_stretch: If True, disables adding stretch at the bottom.
+        bottom_stretch: If True, adds stretch at the bottom.
+        top_stretch: If True, adds stretch at the top.
+        widget_only: If True, returns only the widget, not the layout.
+        spacing: Spacing between items in the layout.
+    """
+
     widget = QtWidgets.QWidget(parent=parent)
     layout = QtWidgets.QVBoxLayout(widget)
     widget.setContentsMargins(0, 0, 0, 0)

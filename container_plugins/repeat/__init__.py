@@ -40,23 +40,23 @@ syslog = logging.getLogger("system")
 class RepeatContainerWidget(AbstractContainerWidget):
     """Repeat container optionally repeats the actions provided"""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, container, parent=None):
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
+        :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(profile_data, parent)
+        super().__init__(container, parent)
 
-    def _create(self, action_data):
+    def _create(self):
         """called before create action ui - initialize here"""
-        self.action_data: RepeatContainer = action_data
+        self.action_data: RepeatContainer = self.container
 
     def _create_action_ui(self):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.create_or_delete_virtual_button()
 
         self.action_layout.addWidget(QtWidgets.QLabel("Repeat Options:"))
 

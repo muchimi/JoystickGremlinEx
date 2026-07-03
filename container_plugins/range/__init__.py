@@ -40,13 +40,13 @@ syslog = logging.getLogger("system")
 class RangeContainerWidget(AbstractContainerWidget):
     """Range container for a ranged action"""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, container, parent=None):
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
+        :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(profile_data, parent)
+        super().__init__(container, parent)
 
     def _create_action_ui(self):
         """creates the UI for the container"""
@@ -73,13 +73,13 @@ class RangeContainerWidget(AbstractContainerWidget):
 
         # self.profile_data.create_or_delete_virtual_button()
         self.action_selector = ActionSelector(
-            self.profile_data.get_input_type(),
-            self.profile_data.input_item,
+            self.container.get_input_type(),
+            self.container.input_item,
         )
 
-        self.action_selector.inputItem = self.profile_data.input_item
+        self.action_selector.inputItem = self.container.input_item
         action_data: RangeContainer
-        action_data = self.profile_data
+        action_data = self.container
 
         # attach this UI widget to the container data
         action_data._widget = self

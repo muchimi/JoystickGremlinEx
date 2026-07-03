@@ -38,19 +38,19 @@ syslog = logging.getLogger("system")
 class SmartToggleContainerWidget(AbstractContainerWidget):
     """SmartToggle container which holds or toggles a single action."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, container, parent=None):
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
+        :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(profile_data, parent)
+        super().__init__(container, parent)
 
     def _create_action_ui(self):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.create_or_delete_virtual_button()
 
         self.options_layout = QtWidgets.QHBoxLayout()
 
@@ -59,11 +59,11 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
 
         self.delay_widget = gremlin.ui.ui_common.QDelayWidget()
         self.delay_widget.setToolTip("Delay in milliseconds")
-        self.delay_widget.setValue(self.profile_data.delay * 1000)
+        self.delay_widget.setValue(self.container.delay * 1000)
         self.delay_widget.valueChanged.connect(self._delay_changed_cb)
 
         self.short_widget = QtWidgets.QCheckBox("Toggle on short press")
-        self.short_widget.setChecked(self.profile_data.shortPressMode)
+        self.short_widget.setChecked(self.container.shortPressMode)
         self.short_widget.clicked.connect(self._short_press_mode_changed)
 
         self.options_layout.addWidget(self.delay_widget)
@@ -72,30 +72,30 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addLayout(self.options_layout)
 
-        if len(self.profile_data.action_sets) > 0:
-            assert len(self.profile_data.action_sets) == 1
+        if len(self.container.action_sets) > 0:
+            assert len(self.container.action_sets) == 1
 
-            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "Smart Toggle", ContainerViewTypes.Action)
+            widget = self._create_action_set_widget(self.container.action_sets[0], "Smart Toggle", ContainerViewTypes.Action)
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
         else:
             action_selector = ActionSelector(
-                self.profile_data.get_input_type(),
-                self.profile_data,
+                self.container.get_input_type(),
+                self.container,
             )
-            action_selector.inputItem = self.profile_data
+            action_selector.inputItem = self.container
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
             self.action_layout.addWidget(action_selector)
 
     @QtCore.Slot(bool)
     def _short_press_mode_changed(self, checked: bool):
-        self.profile_data.shortPressMode = checked
+        self.container.shortPressMode = checked
 
     def _create_condition_ui(self):
-        if self.profile_data.action_sets:
-            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "Smart Toggle", ContainerViewTypes.Conditions)
+        if self.container.action_sets:
+            widget = self._create_action_set_widget(self.container.action_sets[0], "Smart Toggle", ContainerViewTypes.Conditions)
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
@@ -107,11 +107,11 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        if self.profile_data.action_sets[0] is None:
-            self.profile_data.action_sets[0] = []
-        self.profile_data.action_sets[0].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
+        action_item = plugin_manager.get_class(action_name)(self.container)
+        if self.container.action_sets[0] is None:
+            self.container.action_sets[0] = []
+        self.container.action_sets[0].append(action_item)
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -122,16 +122,16 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        if self.profile_data.action_sets[0] is None:
-            self.profile_data.action_sets[0] = []
-        self.profile_data.action_sets[0].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
+        action_item = plugin_manager.duplicate(action, self.container)
+        if self.container.action_sets[0] is None:
+            self.container.action_sets[0] = []
+        self.container.action_sets[0].append(action_item)
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
     def _delay_changed_cb(self, value):
-        self.profile_data.delay = value / 1000  # in seconds
+        self.container.delay = value / 1000  # in seconds
 
     def _activation_changed_cb(self, value):
         """Updates the activation condition state.
@@ -139,9 +139,9 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         :param value whether or not the selection was toggled - ignored
         """
         if self.activate_press.isChecked():
-            self.profile_data.activate_on = "press"
+            self.container.activate_on = "press"
         else:
-            self.profile_data.activate_on = "release"
+            self.container.activate_on = "release"
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -157,21 +157,21 @@ class SmartToggleContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         title = "Smart Toggle: "
-        if len(self.profile_data.action_sets) > 0:
-            title += ", ".join(a.name for a in self.profile_data.action_sets[0])
+        if len(self.container.action_sets) > 0:
+            title += ", ".join(a.name for a in self.container.action_sets[0])
         return title
 
 
 class SmartToggleContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
     """Executes the contents of the associated SmartToggle container."""
 
-    def __init__(self, action_data: SmartToggleContainer, parent=None):  # noqa: F821
-        super().__init__(action_data, parent)
+    def __init__(self, container: SmartToggleContainer, parent=None):  # noqa: F821
+        super().__init__(container, parent)
         # self.action_set = gremlin.execution_graph.ActionSetExecutionGraph(
-        #     action_data.action_sets[0], parent
+        #     container.action_sets[0], parent
         # )
-        self.delay = action_data.delay
-        self.shortPressMode = action_data.shortPressMode
+        self.delay = container.delay
+        self.shortPressMode = container.shortPressMode
         self.release_value = None
         self.release_event = None
         self.mode = None
@@ -179,9 +179,9 @@ class SmartToggleContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFuncto
         self.is_pressed = False  # assume output is not pressed
 
     def profile_start(self):
-        action_data = self.action_data
-        self.delay = action_data.delay
-        self.shortPressMode = action_data.shortPressMode
+        container = self.container
+        self.delay = container.delay
+        self.shortPressMode = container.shortPressMode
         self.release_value = None
         self.release_event = None
         self.mode = None

@@ -21,6 +21,7 @@ from PySide6 import QtWidgets
 
 import logging
 import time
+
 from lxml import etree as ElementTree
 import threading
 import random
@@ -32,10 +33,10 @@ import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, AbstractAction, ActionSet, delete_widget
 from gremlin.input_types import InputType
 from PySide6 import QtCore
-from gremlin.util import safe_format, safe_read
+from gremlin.util import safe_format, safe_read, InvokeUiMethod, clear_layout, get_guid
 from shiboken6 import Shiboken
 from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import SyncMode
@@ -327,16 +328,16 @@ class StepOptionsWidget(QtWidgets.QWidget):
 class SequenceContainerWidget(AbstractContainerWidget):
     """Container which holds a sequence of actions."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, container, parent=None):
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
-        :param parent the parent of this widget
+        :param container:  the container represented by this widget
+        :param parent:   the parent of this widget
         """
-        super().__init__(profile_data, parent)
+        super().__init__(container, parent)
 
-    def _create(self, action_data):
-        self.action_data: SequenceContainer = action_data
+    def _create(self, container):
+        self.container: SequenceContainer = container
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -352,18 +353,22 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         self._warning_widget = gremlin.ui.ui_common.QWarningWidget()
 
-        self.action_data.create_or_delete_virtual_button()
-        self.action_selector = ActionSelector(self.action_data.get_input_type(), self.action_data.input_item)
-        self.action_selector.inputItem = self.action_data.input_item
-        self.action_selector.action_added.connect(self._add_action)
+        self.container.create_or_delete_virtual_button()
+        self.action_selector = ActionSelector(self.container.get_input_type(), self.container.input_item)
+        self.action_selector.inputItem = self.container.input_item
+        self.action_selector.action_added.connect(self._add_step)
         self.action_selector.add_button.setText("Add Step")
         self.action_selector.action_paste.connect(self._paste_action)
+
+
+
+
 
         self.widget_layout.addWidget(self.action_selector)
 
         self._trigger_widget = gremlin.ui.ui_common.QExecuteWidget(
-            self.action_data.exec_on_press,
-            self.action_data.exec_on_release,
+            self.container.exec_on_press,
+            self.container.exec_on_release,
             press_callback=self._execute_on_press_changed,
             release_callback=self._execute_on_release_changed,
         )
@@ -377,13 +382,13 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         widgets = []
         for mode, data in modes:
-            rb = gremlin.ui.ui_common.QDataRadioButton(label=mode, data=data, value=self.action_data.mode == data, callbackEx=self._handle_mode_changed)
+            rb = gremlin.ui.ui_common.QDataRadioButton(label=mode, data=data, value=self.container.mode == data, callbackEx=self._handle_mode_changed)
             widgets.append(rb)
 
         self._wiggle_count_enabled_widget = gremlin.ui.ui_common.QDataCheckbox(
             "Random Step Count",
             callback=self._handle_wiggle_count_enabled_change,
-            value=self.action_data.wiggle_count_enabled,
+            value=self.container.wiggle_count_enabled,
             tooltip="Enable the wiggle count mode to randomize how many steps execute per sequence trigger.",
         )
 
@@ -393,11 +398,11 @@ class SequenceContainerWidget(AbstractContainerWidget):
         # normal mode delay options
 
         self._normal_step_delay_widget = gremlin.ui.ui_common.QDelayWidget(
-            value=self.action_data.normal_exec_delay, callback=self._handle_normal_step_delay_change
+            value=self.container.normal_exec_delay, callback=self._handle_normal_step_delay_change
         )
 
         self._normal_step_autorelease_delay = gremlin.ui.ui_common.QDelayWidget(
-            value=self.action_data.normal_autorelease_delay, callback=self._handle_autorelease_delay_change
+            value=self.container.normal_autorelease_delay, callback=self._handle_autorelease_delay_change
         )
 
         g1 = gremlin.ui.ui_common.getGridContainer(
@@ -426,7 +431,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         grids = []
 
         self._wiggle_step_delay_widget = gremlin.ui.ui_common.QDelayWidget(
-            value=self.action_data.wiggle_step_delay, callback=self._handle_wiggle_step_delay_change
+            value=self.container.wiggle_step_delay, callback=self._handle_wiggle_step_delay_change
         )
 
         grids.append(
@@ -439,7 +444,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         )
 
         self._wiggle_exec_delay_widget = gremlin.ui.ui_common.QDelayWidget(
-            value=self.action_data.wiggle_exec_delay, callback=self._handle_wiggle_exec_delay_change
+            value=self.container.wiggle_exec_delay, callback=self._handle_wiggle_exec_delay_change
         )
 
         grids.append(
@@ -456,7 +461,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
             max_range=1000,
             tooltip="Minimum number of steps to execute in wiggle mode. 0 to disable.<br>If set to 5, up to 5 wiggle steps will run and wiggle will stop after 5.",
             callback=self._handle_wiggle_count_min_change,
-            value=self.action_data.wiggle_count_min,
+            value=self.container.wiggle_count_min,
         )
 
         self._wiggle_count_max_widget = gremlin.ui.ui_common.QIntLineEdit(
@@ -464,7 +469,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
             max_range=1000,
             tooltip="Max number of steps to execute in wiggle mode. 0 to disable.<br>If set to 5, up to 5 wiggle steps will run and wiggle will stop after 5.",
             callback=self._handle_wiggle_count_max_change,
-            value=self.action_data.wiggle_count_max,
+            value=self.container.wiggle_count_max,
         )
 
         self._wiggle_min_delay_widget = gremlin.ui.ui_common.QDelayWidget(
@@ -494,17 +499,17 @@ class SequenceContainerWidget(AbstractContainerWidget):
         )
 
         # set value separately to avoid trigger of validation callback
-        self._wiggle_min_delay_widget.setValue(self.action_data.wiggle_min_delay, False)
-        self._wiggle_max_delay_widget.setValue(self.action_data.wiggle_max_delay, False)
+        self._wiggle_min_delay_widget.setValue(self.container.wiggle_min_delay, False)
+        self._wiggle_max_delay_widget.setValue(self.container.wiggle_max_delay, False)
 
         self._wiggle_random_widget = QtWidgets.QCheckBox("Random Delay")
         self._wiggle_random_widget.setToolTip("When enabled, the delay between steps will be randomized betweeen min and max delays")
-        self._wiggle_random_widget.setChecked(self.action_data.wiggle_random)
+        self._wiggle_random_widget.setChecked(self.container.wiggle_random)
         self._wiggle_random_widget.clicked.connect(self._handle_wiggle_random_change)
 
         self._wiggle_steps_widget = QtWidgets.QCheckBox("Randomize Steps")
         self._wiggle_steps_widget.setToolTip("When enabled, steps will execute randomly like a pick list when in wiggle mode")
-        self._wiggle_steps_widget.setChecked(self.action_data.wiggle_randomize_steps)
+        self._wiggle_steps_widget.setChecked(self.container.wiggle_randomize_steps)
         self._wiggle_steps_widget.clicked.connect(self._handle_wiggle_random_steps_changed)
 
         self.container_wiggle_count_max_widget = gremlin.ui.ui_common.getHContainer(self._wiggle_count_max_widget, "Max", widget_only=True)
@@ -536,7 +541,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         self.resume_widget = gremlin.ui.ui_common.QDataCheckbox(
             "Resume at last step",
-            value=self.action_data.resume_mode,
+            value=self.container.resume_mode,
             tooltip="If enabled, the sequence will resume at the last step it stopped at.",
             callback=self._handle_resume_mode_change,
         )
@@ -549,7 +554,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         # sync option
         sync_modes = [SyncMode.Ignore, SyncMode.Input]
         sync_widget = gremlin.ui.ui_common.QSyncModeWidget(
-            mode=self.action_data.sync_mode, label="State on profile start:", callback=self._handle_sync_changed, sync_modes=sync_modes
+            mode=self.container.sync_mode, label="State on profile start:", callback=self._handle_sync_changed, sync_modes=sync_modes
         )
 
         self.action_layout.addWidget(sync_widget)
@@ -563,12 +568,20 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.step_container, self.step_layout = gremlin.ui.ui_common.getVContainer()
         self.action_layout.addWidget(self.step_container)
 
+        # hook UI updates when models change
+        self.container.action_sets.addCallback(self._handle_steps_changed)
+
+
         self._update_steps()
         self._update_widgets()
 
+    def _handle_steps_changed(self, data):
+        InvokeUiMethod(self._update_steps)
+        self.container_modified.emit()
+
     def _update_steps(self):
-        """redraws action steps in the sequence"""
-        import gremlin.util
+        """redraws action steps in the sequence - each step is an action set"""
+
 
         # cleanup action widgets
         for widget in self.action_widgets:
@@ -581,7 +594,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         # cleanup step widgets
         for widget in self.step_widgets:
-            gremlin.util.clear_layout(widget)
+            clear_layout(widget)
             widget.hide()
             widget.setParent(None)
             widget.deleteLater()
@@ -589,65 +602,136 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.step_widgets.clear()
 
         # Insert action widgets
-        for index, action in enumerate(self.action_data.action_sets):
+        for index, action_set in enumerate(self.container.action_sets):
             # options widget
 
             options: StepOptions = self.container.getOptions(index)
-            options_widget = StepOptionsWidget(self.action_data, options)
+            options_widget = StepOptionsWidget(self.container, options)
             step_widget = gremlin.ui.ui_common.QFrameBox(f"<b>Step {index + 1}</b>")
             step_container = gremlin.ui.ui_common.getVContainer([step_widget, QtWidgets.QLabel(" ")], widget_only=True)
+
+            remove_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._handle_delete_step,
+                                                                                tooltip = f"Delete Step [{index + 1}]",
+                                                                                data = action_set)
+            remove_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
+
+
+
+
+            step_up_widget = gremlin.ui.ui_common.Buttons.getMoveUpWidget(callback=self._handle_move_step_up,
+                                                                              data = action_set) if index > 0 else None
+
+
+            step_down_widget = gremlin.ui.ui_common.Buttons.getMoveDownWidget(callback=self._handle_move_step_down,
+                                                                              data = action_set) if index < len(self.container.action_sets) - 1 else None
+
+            step_top_widget = gremlin.ui.ui_common.Buttons.getMoveTopWidget(callback=self._handle_move_step_top,
+                                                                          data = action_set) if index > 0 else None
+
+            step_bottom_widget = gremlin.ui.ui_common.Buttons.getMoveBottomWidget(callback=self._handle_move_step_bottom,
+                                                                              data = action_set) if index < len(self.container.action_sets) - 1 else None
+
+
+            move_container = gremlin.ui.ui_common.getHContainer([step_up_widget, step_down_widget, step_top_widget, step_bottom_widget, remove_widget], widget_only=True)
+            move_container.setStyleSheet("background-color: transparent;")
+
+
             widgets = [
                 step_container,
                 options_widget,
+                "||",
+                move_container
             ]
 
-            options_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, alignment=QtCore.Qt.AlignmentFlag.AlignTop)
 
-            widgets = [
-                gremlin.ui.ui_common.QHorizontalLine(),
-                options_container,
-            ]
+            container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+            header_widget = gremlin.ui.ui_common.QHorizontalLine(color = gremlin.ui.ui_common.Color.headerBarBorderColor(), size = 4)
 
-            container_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+            self.step_layout.addWidget(header_widget)
             self.step_layout.addWidget(container_widget)
 
-            widget = self._create_action_set_widget(self.action_data.action_sets[index], "Step", ContainerViewTypes.Action)
+            widget = self._create_action_set_widget(self.container.action_sets[index], "Step", ContainerViewTypes.Action)
             self.step_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
 
             self.step_widgets.append(container_widget)
 
+    def _handle_delete_step(self, widget ):
+        action_set : ActionSet= widget.data # action set is stored in the button data
+        ui = gremlin.shared_state.ui
+        result = gremlin.ui.ui_common.ConfirmBox(prompt=f"Delete step [{action_set.index}]?", parent=ui)
+        if result:
+            self.container.action_sets.remove(action_set)
+
+    def _handle_move_step_up(self, widget):
+        # moves an action set up
+        action_set : ActionSet= widget.data # action set is stored in the button data
+        index = self.container.action_sets.indexOf(action_set)
+        if index > 0:
+            self.container.action_sets.pushSuspend()
+            self.container.action_sets[index], self.container.action_sets[index-1] = self.container.action_sets[index-1], self.container.action_sets[index]
+            self.container.action_sets.popSuspend()
+
+    def _handle_move_step_down(self, widget):
+        # moves an action set down
+        action_set : ActionSet= widget.data # action set is stored in the button data
+        index = self.container.action_sets.indexOf(action_set)
+        if index < len(self.container.action_sets) - 1:
+            self.container.action_sets.pushSuspend()
+            self.container.action_sets[index], self.container.action_sets[index+1] = self.container.action_sets[index+1], self.container.action_sets[index]
+            self.container.action_sets.popSuspend()
+
+    def _handle_move_step_top(self, widget):
+        # moves an action set to the top
+        action_set : ActionSet= widget.data # action set is stored in the button data
+        index = self.container.action_sets.indexOf(action_set)
+        if index > 0:
+            self.container.action_sets.pushSuspend()
+            self.container.action_sets.insert(0, self.container.action_sets.pop(index))
+            self.container.action_sets.popSuspend()
+
+    def _handle_move_step_bottom(self, widget):
+        # moves an action set to the bottom
+        action_set : ActionSet= widget.data # action set is stored in the button data
+        index = self.container.action_sets.indexOf(action_set)
+        if index < len(self.container.action_sets) - 1:
+            self.container.action_sets.pushSuspend()
+            self.container.action_sets.append(self.container.action_sets.pop(index))
+            self.container.action_sets.popSuspend()
+
+
+
     def _handle_sync_changed(self, mode):
-        self.action_data.sync_mode = mode
+        self.container.sync_mode = mode
 
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked: bool):
-        self.action_data.exec_on_press = checked
+        self.container.exec_on_press = checked
 
     @QtCore.Slot(bool)
     def _execute_on_release_changed(self, checked: bool):
-        self.action_data.exec_on_release = checked
+        self.container.exec_on_release = checked
 
     @QtCore.Slot(bool)
     def _handle_wiggle_mode_change(self, checked: bool):
-        self.action_data.wiggle_mode = checked
+        self.container.wiggle_mode = checked
         self._update_widgets()
 
     @QtCore.Slot(bool)
     def _handle_wiggle_random_change(self, checked: bool):
-        self.action_data.wiggle_random = checked
+        self.container.wiggle_random = checked
         self._update_widgets()
 
     @QtCore.Slot(bool)
     def _handle_wiggle_random_steps_changed(self, checked: bool):
-        self.action_data.wiggle_randomize_steps = checked
+        self.container.wiggle_randomize_steps = checked
 
     def _handle_min_validation(self, value) -> bool:
         if value < 0:
             self.setWarning("Delay must be positive")
             return False
-        if self.action_data.wiggle_random and value > self.action_data.wiggle_max_delay:
+        if self.container.wiggle_random and value > self.container.wiggle_max_delay:
             self.setWarning("Minimnum delay must be less or equal to the maximum delay.")
             return False
 
@@ -657,7 +741,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         if value < 0:
             self.setWarning("Delay must be positive")
             return False
-        if self.action_data.wiggle_random and value < self.action_data.wiggle_min_delay:
+        if self.container.wiggle_random and value < self.container.wiggle_min_delay:
             self.setWarning("Maximum delay must be greater or equal to the minimum delay.")
             return False
 
@@ -666,28 +750,28 @@ class SequenceContainerWidget(AbstractContainerWidget):
     @QtCore.Slot(bool)
     def _handle_mode_changed(self, widget, checked):
         mode = widget.data
-        self.action_data.mode = mode
+        self.container.mode = mode
         self._update_widgets()
 
     @QtCore.Slot(bool)
     def wiggle_count_enabled(self, checked: bool):
-        self.action_data.wiggle_count_enabled = checked
+        self.container.wiggle_count_enabled = checked
         self._update_widgets()
 
     @QtCore.Slot(int)
     def _handle_min_delay_change(self, value):
         # avoid re-entrant callbacks
-        self.action_data.wiggle_min_delay = value
+        self.container.wiggle_min_delay = value
         self.setWarning()
 
     @QtCore.Slot(int)
     def _handle_max_delay_change(self, value):
-        self.action_data.wiggle_max_delay = value
+        self.container.wiggle_max_delay = value
         self.setWarning()
 
     @QtCore.Slot(bool)
     def _handle_resume_mode_change(self, value):
-        self.action_data.resume_mode = value
+        self.container.resume_mode = value
         self.setWarning()
 
     @QtCore.Slot()
@@ -700,52 +784,52 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
     @QtCore.Slot(bool)
     def _handle_wiggle_count_enabled_change(self, checked: bool):
-        self.action_data.wiggle_count_enabled = checked
+        self.container.wiggle_count_enabled = checked
         self._update_widgets()
 
     @QtCore.Slot(int)
     def _handle_wiggle_exec_delay_change(self, value):
-        self.action_data.wiggle_exec_delay = value
+        self.container.wiggle_exec_delay = value
 
     @QtCore.Slot(int)
     def _handle_normal_step_delay_change(self, value):
-        self.action_data.normal_exec_delay = value
+        self.container.normal_exec_delay = value
 
     @QtCore.Slot(int)
     def _handle_wiggle_step_delay_change(self, value):
-        self.action_data.wiggle_step_delay = value
+        self.container.wiggle_step_delay = value
 
     @QtCore.Slot(int)
     def _handle_normal_exec_delay_change(self, value):
-        self.action_data.normal_exec_delay = value
+        self.container.normal_exec_delay = value
 
     @QtCore.Slot(int)
     def _handle_autorelease_delay_change(self, value):
-        self.action_data.normal_autorelease_delay = value
+        self.container.normal_autorelease_delay = value
 
     @QtCore.Slot(int)
     def _handle_wiggle_count_min_change(self, value):
-        max_value = self.action_data.wiggle_count_max
+        max_value = self.container.wiggle_count_max
         min_value = self._wiggle_count_max_widget.minimum()
 
         if value > max_value:
             # bump max
             self._update_count_widget(self._wiggle_count_max_widget, min_value=value, value=value)
-            self.action_data.wiggle_count_max = value
+            self.container.wiggle_count_max = value
 
         elif min_value > value:
             self._update_count_widget(self._wiggle_count_max_widget, min_value=value)
 
-        self.action_data.wiggle_count_min = value
+        self.container.wiggle_count_min = value
         self._update_widgets()
 
     @QtCore.Slot(int)
     def _handle_wiggle_count_max_change(self, value):
-        min_value = self.action_data.wiggle_count_min
+        min_value = self.container.wiggle_count_min
         if value < min_value:
             value = min_value
             self._update_count_widget(self._wiggle_count_max_widget, min_value=value, value=value)
-        self.action_data.wiggle_count_max = value
+        self.container.wiggle_count_max = value
 
     def _update_count_widget(self, widget, value=None, min_value=None, max_value=None):
         if Shiboken.is_valid(widget):
@@ -758,7 +842,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
                     widget.setValue(value)
 
     def _update_widgets(self):
-        mode = self.action_data.mode
+        mode = self.container.mode
         wiggle_enabled = mode == "wiggle"
         normal_enabled = not wiggle_enabled
         resume_enabled = mode != "normal"
@@ -770,14 +854,14 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         self.container_wiggle_options.setVisible(wiggle_enabled)
 
-        max_enabled = wiggle_enabled and self.action_data.wiggle_random
+        max_enabled = wiggle_enabled and self.container.wiggle_random
         self._wiggle_max_delay_widget.setVisible(max_enabled)
 
         if wiggle_enabled:
             self._wiggle_random_widget.setVisible(wiggle_enabled)
             self._wiggle_steps_widget.setVisible(wiggle_enabled)
             self._wiggle_exec_delay_widget.setVisible(wiggle_enabled)
-            count_enabled = self.action_data.wiggle_count_enabled
+            count_enabled = self.container.wiggle_count_enabled
             self.container_wiggle_count_widget.setVisible(count_enabled)
             self.container_wiggle_count_max_widget.setVisible(count_enabled)
 
@@ -787,7 +871,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self._warning_widget.setVisible(visible)
 
         # info box based on modes
-        match self.action_data.mode:
+        match self.container.mode:
             case "wiggle":
                 msg = """The sequence will randomly loop while the input is triggered.
 <br>In wiggle mode, the timing between steps, how long each step runs and the order of the steps can be randomly generated based on the options selected."""
@@ -798,7 +882,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
             case "normal":
                 msg = "The sequence will run once when the input is triggered.  If the sequence is triggered while it's still running, the trigger is ignored."
 
-        if resume_enabled and self.action_data.resume_mode:
+        if resume_enabled and self.container.resume_mode:
             if msg:
                 msg += "<br>"
             msg += "Resume mode is enabled: the next sequence activation will continue at the step where it last stopped."
@@ -812,39 +896,76 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self._warning_widget.setVisible(visible)
 
     def _create_condition_ui(self):
-        if self.action_data.action_sets:
-            for i, action in enumerate(self.action_data.action_sets):
-                widget = self._create_action_set_widget(self.action_data.action_sets[i], f"Step {i:d}", ContainerViewTypes.Conditions)
+        if self.container.action_sets:
+            for i, action in enumerate(self.container.action_sets):
+                widget = self._create_action_set_widget(self.container.action_sets[i], f"Step {i:d}", ContainerViewTypes.Conditions)
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
                 widget.model.data_changed.connect(self.container_modified.emit)
 
-    def _add_action(self, action_name):
+    def _add_step(self, action_name : str = None):
+        """Adds a new step to the sequence container. A step is an action set.
+
+        :param action_name: the name of the action to add to the new step, if any
+        """
+        assert isinstance(action_name, str),"Action name must be a string and provided"
+        action_set = gremlin.input_item.ActionSet()
+        self.container.action_sets.pushSuspend()
+        self.container.add_action_set(action_set)
+        if action_name:
+            self._add_action(action_name, action_set)
+        self.container.action_sets.popSuspend()
+
+    def _remove_step(self, index: int):
+        """Removes a step from the sequence container.
+
+        :param index: the index of the step to remove
+        """
+        assert isinstance(index, int) and index >= 0, "Index must be an integer greater than or equal to 0"
+        if self.container.action_sets.itemAt(index) is None:
+            raise IndexError(f"No action set found at index {index}")
+        self.container.remove_action_set(index)
+
+
+    def _add_action(self, action_name : str, action_set : gremlin.input_item.ActionSet):
         """Adds a new action to the container.
 
-        :param action_name the name of the action to add
+        :param action_name: the name of the action to add
+        :param action_set: the action set to which the action should be added
         """
-
+        assert isinstance(action_name, str), "Action name must be a string"
+        assert isinstance(action_set, gremlin.input_item.ActionSet), "Invalid action set"
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.action_data)
-        self.action_data.add_action(action_item)
-        if Shiboken.isValid(self):
-            self.container_modified.emit()
+        action_item = plugin_manager.get_class(action_name)(self.container)
+        action_set.add_action(action_item)
 
-    def _paste_action(self, action):
+    def _remove_action(self, action : AbstractAction, delete=True):
+        """Removes an action from the specified action set.
+
+        :param action: the action to remove
+        :param delete: if true, deletes the action from the profile
+        """
+        assert isinstance(action, AbstractAction), "Invalid action"
+        action_set = action.parent
+        if action_set is None:
+            raise ValueError("Action item does not belong to any action set")
+        action_set.remove_action(action, delete=delete)
+
+
+    def _paste_action(self, action : AbstractAction):
         """pastes an action"""
 
+        assert isinstance(action, AbstractAction), "Invalid action"
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.action_data)
-        self.action_data.add_action(action_item)
-        if Shiboken.isValid(self):
-            self.container_modified.emit()
+        action_item = plugin_manager.duplicate(action, self.container)
+        self.container.add_action(action_item)
+        self.container_modified.emit()
 
-    def _handle_interaction(self, widget, action):
+    def _handle_interaction(self, widget, action : AbstractAction):
         """Handles interaction icons being pressed on the individual actions.
 
-        :param widget the action widget on which an action was invoked
-        :param action the type of action being invoked
+        :param widget: the action widget on which an action was invoked
+        :param action: the action being invoked
         """
         # Find the index of the widget that gets modified
         index = self._get_widget_index(widget)
@@ -857,18 +978,18 @@ class SequenceContainerWidget(AbstractContainerWidget):
         match action:
             case Interactions.Up:
                 if index > 0:
-                    self.action_data.action_sets[index], self.action_data.action_sets[index - 1] = (
-                        self.action_data.action_sets[index - 1],
-                        self.action_data.action_sets[index],
+                    self.container.action_sets[index], self.container.action_sets[index - 1] = (
+                        self.container.action_sets[index - 1],
+                        self.container.action_sets[index],
                     )
             case Interactions.Down:
-                if index < len(self.action_data.action_sets) - 1:
-                    self.action_data.action_sets[index], self.action_data.action_sets[index + 1] = (
-                        self.action_data.action_sets[index + 1],
-                        self.action_data.action_sets[index],
+                if index < len(self.container.action_sets) - 1:
+                    self.container.action_sets[index], self.container.action_sets[index + 1] = (
+                        self.container.action_sets[index + 1],
+                        self.container.action_sets[index],
                     )
             case Interactions.Delete:
-                del self.action_data.action_sets[index]
+                del self.container.action_sets[index]
             case _:
                 return
         if Shiboken.isValid(self):
@@ -880,7 +1001,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
-        return f"Sequence: {' -> '.join([', '.join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
+        return f"Sequence: {' -> '.join([', '.join([a.name for a in actions]) for actions in self.container.action_sets])}"
 
 
 class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
@@ -1526,12 +1647,6 @@ Unlike a macro, any action suitable for the input can be used."""
                 o_node = option.to_xml()
                 node.append(o_node)
 
-        # for action_set in self.action_sets:
-        #     as_node = ElementTree.Element("action-set")
-        #     as_node.set("id", write_guid(action_set.id))
-        #     for action in action_set:
-        #         as_node.append(action.to_xml())
-        #     node.append(as_node)
 
         return node
 

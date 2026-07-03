@@ -54,19 +54,19 @@ class TempoContainerWidget(AbstractContainerWidget):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
             return
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.create_or_delete_virtual_button()
 
         self.options_layout = QtWidgets.QHBoxLayout()
         self.options2_layout = QtWidgets.QHBoxLayout()
 
         self.longpress_delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Long Press Delay (ms):")
-        self.longpress_delay_widget.setValue(self.profile_data.delay * 1000)
+        self.longpress_delay_widget.setValue(self.container.delay * 1000)
         self.longpress_delay_widget.valueChanged.connect(self._delay_changed_cb)
         self.options_layout.addWidget(self.longpress_delay_widget)
         self.options_layout.addStretch()
 
         self.autorelease_delay_widget = gremlin.ui.ui_common.QDelayWidget(label="Autorelease Delay (ms):")
-        self.autorelease_delay_widget.setValue(self.profile_data.autorelease_delay * 1000)
+        self.autorelease_delay_widget.setValue(self.container.autorelease_delay * 1000)
         self.autorelease_delay_widget.valueChanged.connect(self._autorelease_delay_changed_cb)
         self.options2_layout.addWidget(self.autorelease_delay_widget)
         self.options2_layout.addStretch()
@@ -75,7 +75,7 @@ class TempoContainerWidget(AbstractContainerWidget):
         self.options_layout.addWidget(QtWidgets.QLabel("<b>Activate on: </b>"))
         self.activate_press = QtWidgets.QRadioButton("on press")
         self.activate_release = QtWidgets.QRadioButton("on release")
-        if self.profile_data.activate_on == "press":
+        if self.container.activate_on == "press":
             self.activate_press.setChecked(True)
         else:
             self.activate_release.setChecked(True)
@@ -91,7 +91,7 @@ class TempoContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Short Press Action Sets</b>", icon=icon))
 
-        if self.profile_data.action_sets[0] is None:
+        if self.container.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),
                 None,
@@ -102,7 +102,7 @@ class TempoContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addWidget(gremlin.ui.ui_common.QHeaderLabel("<b>Long Press Action Sets</b>", icon=icon))
 
-        if self.profile_data.action_sets[1] is None:
+        if self.container.action_sets[1] is None:
             self._add_action_selector(
                 lambda x: self._add_action(1, x),
                 None,
@@ -112,11 +112,11 @@ class TempoContainerWidget(AbstractContainerWidget):
             self._create_action_widget(1, None, self.action_layout, ContainerViewTypes.Action)
 
     def _create_condition_ui(self):
-        if self.profile_data.action_sets:
-            if self.profile_data.action_sets[0] is not None:
+        if self.container.action_sets:
+            if self.container.action_sets[0] is not None:
                 self._create_action_widget(0, "Short Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
-            if self.profile_data.action_sets[1] is not None:
+            if self.container.action_sets[1] is not None:
                 self._create_action_widget(1, "Long Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
@@ -125,12 +125,12 @@ class TempoContainerWidget(AbstractContainerWidget):
         :param add_action_cb function to call when an action is added
         :param label the description of the action selector
         """
-        input_item = self.profile_data.input_item
+        input_item = self.container.input_item
         action_selector = ActionSelector(
-            self.profile_data.get_input_type(),
+            self.container.get_input_type(),
             input_item,
         )
-        action_selector.inputItem = self.profile_data
+        action_selector.inputItem = self.container
         action_selector.action_added.connect(add_action_cb)
         action_selector.action_paste.connect(paste_action_cb)
 
@@ -148,7 +148,7 @@ class TempoContainerWidget(AbstractContainerWidget):
         :param index the index at which to store the created action
         :param label the name of the action to create
         """
-        widget = self._create_action_set_widget(self.profile_data.action_sets[index], label, view_type)
+        widget = self._create_action_set_widget(self.container.action_sets[index], label, view_type)
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self.container_modified.emit)
@@ -161,11 +161,11 @@ class TempoContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        if self.profile_data.action_sets[index] is None:
-            self.profile_data.action_sets[index] = []
-        self.profile_data.action_sets[index].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
+        action_item = plugin_manager.get_class(action_name)(self.container)
+        if self.container.action_sets[index] is None:
+            self.container.action_sets[index] = []
+        self.container.action_sets[index].append(action_item)
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -173,11 +173,11 @@ class TempoContainerWidget(AbstractContainerWidget):
         """paste action into the container"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        if self.profile_data.action_sets[index] is None:
-            self.profile_data.action_sets[index] = []
-        self.profile_data.action_sets[index].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
+        action_item = plugin_manager.duplicate(action, self.container)
+        if self.container.action_sets[index] is None:
+            self.container.action_sets[index] = []
+        self.container.action_sets[index].append(action_item)
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -187,7 +187,7 @@ class TempoContainerWidget(AbstractContainerWidget):
 
         :param value the value after which the long press action activates
         """
-        self.profile_data.delay = value / 1000
+        self.container.delay = value / 1000
 
     @QtCore.Slot(int)
     def _autorelease_delay_changed_cb(self, value):
@@ -195,7 +195,7 @@ class TempoContainerWidget(AbstractContainerWidget):
 
         :param value the value after which the long press action activates
         """
-        self.profile_data.autorelease_delay = value / 1000
+        self.container.autorelease_delay = value / 1000
 
     @QtCore.Slot()
     def _activation_changed_cb(self, value):
@@ -204,9 +204,9 @@ class TempoContainerWidget(AbstractContainerWidget):
         :param value whether or not the selection was toggled - ignored
         """
         if self.activate_press.isChecked():
-            self.profile_data.activate_on = "press"
+            self.container.activate_on = "press"
         else:
-            self.profile_data.activate_on = "release"
+            self.container.activate_on = "release"
 
     def _handle_interaction(self, widget, action: Interactions):
         """Handles interaction icons being pressed on the individual actions.
@@ -217,9 +217,9 @@ class TempoContainerWidget(AbstractContainerWidget):
         if action == Interactions.Delete:
             index = self._get_widget_index(widget)
             if index != -1:
-                if index == 0 and self.profile_data.action_sets[0] is None:
+                if index == 0 and self.container.action_sets[0] is None:
                     index = 1
-                self.profile_data.action_sets[index] = None
+                self.container.action_sets[index] = None
                 if Shiboken.isValid(self):
                     self.container_modified.emit()
 
@@ -229,8 +229,8 @@ class TempoContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         title = "Tempo (legacy):"
-        if self.profile_data.is_valid() and len(self.profile_data.action_sets) == 2 and None not in self.profile_data.action_sets:
-            title += f"({', '.join([a.name for a in self.profile_data.action_sets[0]])}) / ({', '.join([a.name for a in self.profile_data.action_sets[1]])})"
+        if self.container.is_valid() and len(self.container.action_sets) == 2 and None not in self.container.action_sets:
+            title += f"({', '.join([a.name for a in self.container.action_sets[0]])}) / ({', '.join([a.name for a in self.container.action_sets[1]])})"
         return title
 
 

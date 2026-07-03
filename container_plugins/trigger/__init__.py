@@ -40,17 +40,17 @@ syslog = logging.getLogger("system")
 class TriggerContainerWidget(AbstractContainerWidget):
     """Trigger container which holds a single action."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, container, parent=None):
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
+        :param container the container represented by this widget
         :param parent the parent of this widget
         """
+        self.container: TriggerContainer = container
+        super().__init__(container, parent)
 
-        super().__init__(profile_data, parent)
-
-    def _create(self, action_data):
-        self.action_data: TriggerContainer = action_data
+    def _create(self, container):
+        self.container: TriggerContainer = container
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -60,10 +60,10 @@ class TriggerContainerWidget(AbstractContainerWidget):
         # trigger delay
 
         delay_widget = gremlin.ui.ui_common.QFloatLineEdit(
-            value=self.action_data.trigger_delay, callback=self._handle_delay_changed, tooltip="Delay trigger in seconds.  Set to 0 to disable."
+            value=self.container.trigger_delay, callback=self._handle_delay_changed, tooltip="Delay trigger in seconds.  Set to 0 to disable."
         )
 
-        execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
+        execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.container.exec_on_press, self.container.exec_on_release)
         execute_widget.pressChanged.connect(self._execute_on_press_changed)
         execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
@@ -99,24 +99,24 @@ If the timer is set to 0, the actions get executed immediately if the condition 
         if verbose_ui:
             syslog.info("TriggerContainerWidget: create action UI start")
         has_actions = False
-        for action_set in self.profile_data.action_sets:
+        for action_set in self.container.action_sets:
             if action_set:
                 has_actions = True
                 break
 
         if has_actions:
-            action_sets = [action_set for action_set in self.profile_data.action_sets if action_set]
+            action_sets = [action_set for action_set in self.container.action_sets if action_set]
             assert len(action_sets) == 1, "invalid action set count - expected a single action set"
 
-            self.profile_data.create_or_delete_virtual_button()
+            self.container.create_or_delete_virtual_button()
             widget = self._create_action_set_widget(action_sets[0], "Trigger", ContainerViewTypes.Action)
 
             self.action_tab_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
         else:
-            input_item = self.profile_data.input_item
-            if self.profile_data.get_device_type() == gremlin.types.DeviceType.VJoy:
+            input_item = self.container.input_item
+            if self.container.get_device_type() == gremlin.types.DeviceType.VJoy:
                 action_selector = ActionSelector(
                     gremlin.types.DeviceType.VJoy,
                     input_item,
@@ -128,14 +128,14 @@ If the timer is set to 0, the actions get executed immediately if the condition 
                 )
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
-            action_selector.inputItem = self.profile_data
+            action_selector.inputItem = self.container
 
             self.action_tab_layout.addWidget(action_selector)
             self.action_tab_layout.addStretch()
 
         # create the condition tab data
 
-        widget = ActivationConditionWidget(self.action_data.condition_data)
+        widget = ActivationConditionWidget(self.container.condition_data)
         self.condition_tab_layout.addWidget(widget)
         self.condition_tab_layout.addStretch()
 
@@ -143,8 +143,8 @@ If the timer is set to 0, the actions get executed immediately if the condition 
             syslog.info("TriggerContainerWidget: create action UI completed")
 
     def _create_condition_ui(self):
-        if self.profile_data.action_sets:
-            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "Trigger", ContainerViewTypes.Conditions)
+        if self.container.action_sets:
+            widget = self._create_action_set_widget(self.container.action_sets[0], "Trigger", ContainerViewTypes.Conditions)
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
@@ -164,15 +164,15 @@ If the timer is set to 0, the actions get executed immediately if the condition 
         if isinstance(action_data, str):
             action_name = action_data
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+            action_item = plugin_manager.get_class(action_name)(self.container)
         elif isinstance(action_data, Clipboard):
             # paste operation
             if action_data.is_action:
                 # verify the action in the clipboard is appropriate for this input
 
-                action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
+                action_item = plugin_manager.duplicate(action_data.data, self.container)
 
-        self.profile_data.add_action(action_item)
+        self.container.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -180,8 +180,8 @@ If the timer is set to 0, the actions get executed immediately if the condition 
         """paste action"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        self.profile_data.add_action(action_item)
+        action_item = plugin_manager.duplicate(action, self.container)
+        self.container.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -199,23 +199,23 @@ If the timer is set to 0, the actions get executed immediately if the condition 
         :return title to use for the container
         """
         title = "Trigger: "
-        if len(self.profile_data.action_sets) > 0:
-            stub = ", ".join(a.name for a in self.profile_data.action_sets[0])
+        if len(self.container.action_sets) > 0:
+            stub = ", ".join(a.name for a in self.container.action_sets[0])
             title += stub
 
         return title
 
     @QtCore.Slot(float)
     def _handle_delay_changed(self, value):
-        self.action_data.trigger_delay = value
+        self.container.trigger_delay = value
 
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked: bool):
-        self.action_data.exec_on_press = checked
+        self.container.exec_on_press = checked
 
     @QtCore.Slot(bool)
     def _execute_on_release_changed(self, checked: bool):
-        self.action_data.exec_on_release = checked
+        self.container.exec_on_release = checked
 
 
 class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
@@ -231,7 +231,7 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
         # preprocessd conditions to check
 
-        ac = self.action_data.getActivationCondition()
+        ac = self.container.getActivationCondition()
         self.rule = ac.rule
         ec = gremlin.execution_graph.ExecutionContext()
 
@@ -250,7 +250,7 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         """
 
         is_pressed = event.is_pressed
-        trigger = (is_pressed and self.action_data.exec_on_press) or (not is_pressed and self.action_data.exec_on_release)
+        trigger = (is_pressed and self.container.exec_on_press) or (not is_pressed and self.container.exec_on_release)
 
         if trigger:
             if self._timer:
@@ -259,7 +259,7 @@ class TriggerContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
             if self.verbose:
                 syslog.info("TRIGGER CONTAINER: scheduling trigger")
-            self._timer = threading.Timer(self.action_data.trigger_delay, self._handle_trigger)
+            self._timer = threading.Timer(self.container.trigger_delay, self._handle_trigger)
             self._timer.start()
         return False  # do not do further processing
 

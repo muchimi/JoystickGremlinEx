@@ -38,13 +38,13 @@ syslog = logging.getLogger("system")
 class ChainContainerWidget(AbstractContainerWidget):
     """Container which holds a sequence of actions."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, container, parent=None):
         """Creates a new instance.
 
         :param profile_data the profile data represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(profile_data, parent)
+        super().__init__(container, parent)
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -53,11 +53,11 @@ class ChainContainerWidget(AbstractContainerWidget):
 
         self.widget_layout = QtWidgets.QHBoxLayout()
 
-        self.profile_data.create_or_delete_virtual_button()
+        self.container.create_or_delete_virtual_button()
 
-        input_item = self.profile_data.input_item
+        input_item = self.container.input_item
         self.action_selector = ActionSelector(
-            self.profile_data.get_input_type(),
+            self.container.get_input_type(),
             input_item,
         )
         self.action_selector.inputItem = input_item
@@ -74,14 +74,14 @@ class ChainContainerWidget(AbstractContainerWidget):
         self.timeout_input.setRange(0.0, 3600.0)
         self.timeout_input.setSingleStep(0.5)
         self.timeout_input.setValue(0)
-        self.timeout_input.setValue(self.profile_data.timeout)
+        self.timeout_input.setValue(self.container.timeout)
         self.timeout_input.valueChanged.connect(self._timeout_changed_cb)
         self.widget_layout.addWidget(self.timeout_input)
 
         self.action_layout.addLayout(self.widget_layout)
 
         # Insert action widgets
-        action_sets = [action_set for action_set in self.profile_data.action_sets if action_set]
+        action_sets = [action_set for action_set in self.container.action_sets if action_set]
         for i, action_set in enumerate(action_sets):
             widget = self._create_action_set_widget(action_set, f"Action {i + 1:d}", ContainerViewTypes.Action)
             self.action_layout.addWidget(widget)
@@ -90,8 +90,8 @@ class ChainContainerWidget(AbstractContainerWidget):
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
-            for i, action in enumerate(self.profile_data.action_sets):
-                widget = self._create_action_set_widget(self.profile_data.action_sets[i], f"Action {i:d}", ContainerViewTypes.Conditions)
+            for i, action in enumerate(self.container.action_sets):
+                widget = self._create_action_set_widget(self.container.action_sets[i], f"Action {i:d}", ContainerViewTypes.Conditions)
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
                 widget.model.data_changed.connect(self.container_modified.emit)
@@ -103,8 +103,8 @@ class ChainContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        self.profile_data.add_action(action_item)
+        action_item = plugin_manager.get_class(action_name)(self.container)
+        self.container.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -112,8 +112,8 @@ class ChainContainerWidget(AbstractContainerWidget):
         """pastes an action"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        self.profile_data.add_action(action_item)
+        action_item = plugin_manager.duplicate(action, self.container)
+        self.container.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -122,7 +122,7 @@ class ChainContainerWidget(AbstractContainerWidget):
 
         :param value the new value of the timeout field
         """
-        self.profile_data.timeout = value
+        self.container.timeout = value
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -140,18 +140,18 @@ class ChainContainerWidget(AbstractContainerWidget):
         # Perform action
         if action == Interactions.Up:
             if index > 0:
-                self.profile_data.action_sets[index], self.profile_data.action_sets[index - 1] = (
-                    self.profile_data.action_sets[index - 1],
-                    self.profile_data.action_sets[index],
+                self.container.action_sets[index], self.container.action_sets[index - 1] = (
+                    self.container.action_sets[index - 1],
+                    self.container.action_sets[index],
                 )
         if action == Interactions.Down:
-            if index < len(self.profile_data.action_sets) - 1:
-                self.profile_data.action_sets[index], self.profile_data.action_sets[index + 1] = (
-                    self.profile_data.action_sets[index + 1],
-                    self.profile_data.action_sets[index],
+            if index < len(self.container.action_sets) - 1:
+                self.container.action_sets[index], self.container.action_sets[index + 1] = (
+                    self.container.action_sets[index + 1],
+                    self.container.action_sets[index],
                 )
         if action == Interactions.Delete:
-            del self.profile_data.action_sets[index]
+            del self.container.action_sets[index]
 
         if Shiboken.isValid(self):
             self.container_modified.emit()
@@ -161,7 +161,7 @@ class ChainContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
-        return f"Chain: {' -> '.join([', '.join([a.name for a in actions]) for actions in self.profile_data.action_sets])}"
+        return f"Chain: {' -> '.join([', '.join([a.name for a in actions]) for actions in self.container.action_sets])}"
 
 
 class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
@@ -187,7 +187,7 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         if event.event_type == InputType.JoystickHat:
             is_pressed = value.current != (0, 0)
         elif not isinstance(value.current, bool):
-            syslog.warning(f"Invalid data type received in Chain container: {type(event.value)}")
+            syslog.warning(f"Invalid data type received in Chain container: {type(value.current)}")
             return False
         else:
             is_pressed = value.current
@@ -201,10 +201,10 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         if verbose:
             syslog.info(f"Chain: index {self.index}")
         self._trigger(self.index, event, value, extra_data)
-        # result = self._action_sets[self.index].process_event(event, value)
+        # result = self.container.action_sets[self.index].process_event(event, value)
 
         if (self.switch_on_press and is_pressed) or not is_pressed:
-            self.index = (self.index + 1) % len(self.action_set_nodes)
+            self.index = (self.index + 1) % len(self.container.action_sets)
 
         return False  # stop execution as the logic is internal to trigger the other nodes
 

@@ -2836,6 +2836,7 @@ class TriggerDict(collections.UserDict):
 
     @staticmethod
     def copyFrom(source : dict):
+        assert isinstance(source, (dict, TriggerDict)), "Source must be a dictionary"
         target = TriggerDict()
         for key, item in source.items():
             target[key] = item

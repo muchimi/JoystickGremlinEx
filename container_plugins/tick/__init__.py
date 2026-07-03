@@ -64,7 +64,7 @@ class TickContainerWidget(AbstractContainerWidget):
         el = gremlin.event_handler.EventListener()
         el.joystick_event.connect(self._joystick_event_handler)
 
-        self.action_data: TickContainer = self.profile_data
+        self.action_data: TickContainer = self.container
         self.action_data.create_or_delete_virtual_button()
 
         self.interval_widget = gremlin.ui.ui_common.QFloatLineEdit()
@@ -99,7 +99,7 @@ class TickContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(self.header_container)
         self.action_layout.addLayout(self.options_layout)
 
-        if self.profile_data.action_sets[0] is None:
+        if self.container.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),
                 "Tick Up",
@@ -108,7 +108,7 @@ class TickContainerWidget(AbstractContainerWidget):
         else:
             self._create_action_widget(0, "Tick Up", self.action_layout, ContainerViewTypes.Action)
 
-        if self.profile_data.action_sets[1] is None:
+        if self.container.action_sets[1] is None:
             self._add_action_selector(
                 lambda x: self._add_action(1, x),
                 "Tick Down",
@@ -167,11 +167,11 @@ class TickContainerWidget(AbstractContainerWidget):
         self.update()
 
     def _create_condition_ui(self):
-        if self.profile_data.action_sets:
-            if self.profile_data.action_sets[0] is not None:
+        if self.container.action_sets:
+            if self.container.action_sets[0] is not None:
                 self._create_action_widget(0, "Axis Increase", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
-            if self.profile_data.action_sets[1] is not None:
+            if self.container.action_sets[1] is not None:
                 self._create_action_widget(1, "Axis Decrease", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
     def _add_action_selector(self, add_action_cb, label, paste_action_cb):
@@ -181,8 +181,8 @@ class TickContainerWidget(AbstractContainerWidget):
         :param label the description of the action selector
         """
         action_selector = ActionSelector(
-            self.profile_data.get_input_type(),
-            self.profile_data,
+            self.container.get_input_type(),
+            self.container,
         )
         action_selector.action_added.connect(add_action_cb)
         action_selector.action_paste.connect(paste_action_cb)
@@ -201,7 +201,7 @@ class TickContainerWidget(AbstractContainerWidget):
         :param index the index at which to store the created action
         :param label the name of the action to create
         """
-        widget = self._create_action_set_widget(self.profile_data.action_sets[index], label, view_type)
+        widget = self._create_action_set_widget(self.container.action_sets[index], label, view_type)
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self.container_modified.emit)
@@ -213,11 +213,11 @@ class TickContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.profile_data)
-        if self.profile_data.action_sets[index] is None:
-            self.profile_data.action_sets[index] = []
-        self.profile_data.action_sets[index].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
+        action_item = plugin_manager.get_class(action_name)(self.container)
+        if self.container.action_sets[index] is None:
+            self.container.action_sets[index] = []
+        self.container.action_sets[index].append(action_item)
+        self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -225,11 +225,11 @@ class TickContainerWidget(AbstractContainerWidget):
         """paste action"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        if self.profile_data.action_sets[index] is None:
-            self.profile_data.action_sets[index] = []
-        self.profile_data.action_sets[index].append(action_item)
-        self.profile_data.create_or_delete_virtual_button()
+        action_item = plugin_manager.duplicate(action, self.container)
+        if self.container.action_sets[index] is None:
+            self.container.action_sets[index] = []
+        self.container.action_sets[index].append(action_item)
+        self.container.create_or_delete_virtual_button()
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.
@@ -239,9 +239,9 @@ class TickContainerWidget(AbstractContainerWidget):
         """
         index = self._get_widget_index(widget)
         if index != -1:
-            if index == 0 and self.profile_data.action_sets[0] is None:
+            if index == 0 and self.container.action_sets[0] is None:
                 index = 1
-            self.profile_data.action_sets[index] = None
+            self.container.action_sets[index] = None
             if Shiboken.isValid(self):
                 self.container_modified.emit()
 
@@ -251,8 +251,8 @@ class TickContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         title = "Tick:"
-        if self.profile_data.is_valid():
-            title += f"({', '.join([a.name for a in self.profile_data.action_sets[0]])}) / ({', '.join([a.name for a in self.profile_data.action_sets[1]])})"
+        if self.container.is_valid():
+            title += f"({', '.join([a.name for a in self.container.action_sets[0]])}) / ({', '.join([a.name for a in self.container.action_sets[1]])})"
         return title
 
 

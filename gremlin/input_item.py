@@ -1699,9 +1699,11 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         # title bar
         self._title_bar_widget, self._title_bar_layout = gremlin.ui.ui_common.getVContainer()
         self._title_container_widget, self._title_container_layout = gremlin.ui.ui_common.getGridContainer()
-        self._title_bar_widget.setContentsMargins(4, 2, 4, 2)  # title bar
+
+        self._title_bar_widget.setContentsMargins(4, 0, 4, 0)  # title bar
         self._title_bar_layout.addWidget(self._title_container_widget)
         self._title_bar_widget.setObjectName("title_bar")
+        self._title_bar_widget.setFixedHeight(32)
 
 
         # title bar left side
@@ -4381,6 +4383,12 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     def description(self, value: str):
         self._description = value
 
+    def add_action_set(self, action_set: "ActionSet") -> int:
+        """Adds an action set to this container."""
+        index = self.action_sets.add(action_set)
+        self._fireChangeCallbacks()
+        return index
+
     def add_action(self, action, index: int = None, create=True) -> int:
         """Adds an action to this container.
 
@@ -4606,7 +4614,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
                 node.set("set-description", html.escape(action_sets.description))
             node.set("set-guid", write_guid(action_sets.id))
 
-        parent_node.append(node)
+            parent_node.append(node)
 
     def _parse_xml(self, node: lxml.etree.Element, data=None, extra_data=None):
         """this should be implemented by derived containers to read custom data - default is do nothing"""
@@ -5225,15 +5233,31 @@ class ActionSet(AbstractCallbackModel):
 
         super().clear()
 
-    def removeAction(self, action: AbstractAction, delete=True):
+    def add_action(self, action : AbstractAction):
+        """adds the given action to the set"""
+        self.add(action)
+
+    def remove_action(self, action : AbstractAction, delete=True):
         """removes the given action from the set
-        :param item: the action
+        :param action: the action
         :param delete: if true, deletes the action from the profile
         """
-        if action in self:
-            self.remove(action)
-            if hasattr(action, "actionDeleted"):
-                action.actionDeleted()
+        if action not in self:
+            return
+        self.remove(action)
+        if delete and hasattr(action, "actionDeleted"):
+            action.actionDeleted()
+
+    def removeAction(self, action: AbstractAction, delete=True):
+        """removes the given action from the set
+        :param action: the action
+        :param delete: if true, deletes the action from the profile
+        """
+        if action not in self:
+            return
+        self.remove(action)
+        if delete and hasattr(action, "actionDeleted"):
+            action.actionDeleted()
 
     def to_xml(self):
         """writes the actions in the action set out"""
@@ -7065,7 +7089,12 @@ class ActionSelector(QtWidgets.QWidget):
     action_added = QtCore.Signal(str)  # add button pressed
     action_paste = QtCore.Signal(object, object)  # paste button pressed ()
 
-    def __init__(self, input_type, input_item, data=None, callback: Callable = None, parent=None):
+
+    def __init__(self, input_type : InputType,
+                  input_item : InputItem,
+                  data=None, callback: Callable = None,
+                  callback_paste: Callable = None,
+                  parent=None):
         """Creates a new selector instance.
 
         :param input_type the input type for which the action selector is being created
@@ -7085,6 +7114,7 @@ class ActionSelector(QtWidgets.QWidget):
         self._input_item.lockedChanged.connect(self._handle_lock_changed)
         # self._input_type = input_type if input_type else self._input_item.getInputType()
         self._input_type = self._input_item.getInputType()
+        self._callback_pasted = callback_paste
 
         self._callbacks = []  # holds callbacks when an action is selected (action_name : str, mode = ("add","paste"), data)
         if callback is not None:
@@ -7094,12 +7124,12 @@ class ActionSelector(QtWidgets.QWidget):
         self.action_dropdown.currentIndexChanged.connect(self._action_changed)
         self.refresh()
 
-        self.add_button = gremlin.ui.ui_common.Buttons.getAddWidget(callback=self._add_action, tooltip="Adds the selected action")
+        self.add_button = gremlin.ui.ui_common.Buttons.getAddWidget(callback=self._handle_add_action, tooltip="Adds the selected action")
 
         # self.help_widget = Buttons.getHelpWidget(callback = self._handle_help)
 
         # clipboard
-        self.paste_button = gremlin.ui.ui_common.Buttons.getPasteWidget(callback=self._paste_action)
+        self.paste_button = gremlin.ui.ui_common.Buttons.getPasteWidget(callback=self._handle_paste_action)
         self.paste_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         self.paste_button.setToolTip("Paste Action")
 
@@ -7114,6 +7144,7 @@ class ActionSelector(QtWidgets.QWidget):
                 self.add_button,
                 # self.help_widget,
                 self.paste_button,
+
             ]
         )
 
@@ -7257,7 +7288,7 @@ class ActionSelector(QtWidgets.QWidget):
                 is_warning=False,
             )
 
-    def _add_action(self, clicked=False):
+    def _handle_add_action(self, clicked=False):
         """Handles selecting of an action to be added.
 
         :param clicked flag indicating whether or not the action resulted from
@@ -7267,7 +7298,9 @@ class ActionSelector(QtWidgets.QWidget):
         self._fireCallbacks(action_name, "add")
         self.action_added.emit(action_name)
 
-    def _paste_action(self):
+
+
+    def _handle_paste_action(self):
         """handle paste action"""
         import gremlin.plugin_manager
 
@@ -8011,7 +8044,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.container.unregisterChangeCallback(self._handle_container_changed)
 
     def _create_action_tab(self):
-        # Create root widget of the dock element
+        """ create the widget for the container's action tab """
         self._action_tab_container_widget = QtWidgets.QWidget()
         self._action_tab_container_layout = QtWidgets.QVBoxLayout(self._action_tab_container_widget)
 
@@ -8172,8 +8205,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         icon=None,
         icon_size=24,
     ):
-        """Adds an action widget to the container widget.
-
+        """Adds an action widget to the action set (each step in the sequence is its own action set)
         :param action_set_data: data of the actions which form the action set
         :param label the label:  to show in the title
         :param view_type visualization type
@@ -8207,8 +8239,6 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # Store the view widget so we can use it for interactions later on
         self.action_widgets.append(action_set_view)
-
-        # self._action_widget_map[action_set_data] = action_set_view
 
         return action_set_view
 
@@ -8250,16 +8280,16 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         """
         raise gremlin.error.MissingImplementationError("AbstractContainerWidget._handle_interaction not implemented in subclass")
 
-    def _create(self, action_data=None):
+    def _create(self, container=None):
         # optional override by subclasses - called before _create_action_ui
         pass
 
-    def _create_action_ui(self):
+    def _create_action_ui(self, container=None):
         """Creates the UI elements for the widget."""
         if not self._use_view:
-            raise gremlin.error.MissingImplementationError("AbstractContainerWidget._create_basic_ui not implemented in subclass")
+            raise gremlin.error.MissingImplementationError("AbstractContainerWidget._create_action_ui not implemented in subclass")
 
-    def _create_condition_ui(self):
+    def _create_condition_ui(self, container=None):
         """Creates the UI elements for the widget."""
         if not self._use_view:
             raise gremlin.error.MissingImplementationError("AbstractContainerWidget._create_condition_ui not implemented in subclass")

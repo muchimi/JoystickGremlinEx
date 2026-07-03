@@ -43,13 +43,13 @@ class StateContainerWidget(AbstractContainerWidget):
 
     """
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, container, parent=None):
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
+        :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(profile_data, parent)
+        super().__init__(container, parent)
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -106,24 +106,24 @@ class StateContainerWidget(AbstractContainerWidget):
         w3 = widget
 
         has_actions = False
-        for action_set in self.profile_data.action_sets:
+        for action_set in self.container.action_sets:
             if action_set:
                 has_actions = True
                 break
 
         if has_actions:
-            action_sets = [action_set for action_set in self.profile_data.action_sets if action_set]
+            action_sets = [action_set for action_set in self.container.action_sets if action_set]
             assert len(action_sets) == 1, "invalid action set count - expected a single action set"
 
-            self.profile_data.create_or_delete_virtual_button()
+            self.container.create_or_delete_virtual_button()
             widget = self._create_action_set_widget(action_sets[0], "State", ContainerViewTypes.Action)
 
             self.action_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
         else:
-            input_item = self.profile_data.input_item
-            if self.profile_data.get_device_type() == gremlin.types.DeviceType.VJoy:
+            input_item = self.container.input_item
+            if self.container.get_device_type() == gremlin.types.DeviceType.VJoy:
                 action_selector = ActionSelector(
                     gremlin.types.DeviceType.VJoy,
                     input_item,
@@ -135,7 +135,7 @@ class StateContainerWidget(AbstractContainerWidget):
                 )
             action_selector.action_added.connect(self._add_action)
             action_selector.action_paste.connect(self._paste_action)
-            action_selector.inputItem = self.profile_data
+            action_selector.inputItem = self.container
 
             self.action_layout.addWidget(action_selector)
 
@@ -189,8 +189,8 @@ class StateContainerWidget(AbstractContainerWidget):
                 self.setDescription(description)
 
     def _create_condition_ui(self):
-        if self.profile_data.action_sets:
-            widget = self._create_action_set_widget(self.profile_data.action_sets[0], "State", ContainerViewTypes.Conditions)
+        if self.container.action_sets:
+            widget = self._create_action_set_widget(self.container.action_sets[0], "State", ContainerViewTypes.Conditions)
             self.activation_condition_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
@@ -210,15 +210,15 @@ class StateContainerWidget(AbstractContainerWidget):
         if isinstance(action_data, str):
             action_name = action_data
             plugin_manager = gremlin.plugin_manager.ActionPlugins()
-            action_item = plugin_manager.get_class(action_name)(self.profile_data)
+            action_item = plugin_manager.get_class(action_name)(self.container)
         elif isinstance(action_data, Clipboard):
             # paste operation
             if action_data.is_action:
                 # verify the action in the clipboard is appropriate for this input
 
-                action_item = plugin_manager.duplicate(action_data.data, self.profile_data)
+                action_item = plugin_manager.duplicate(action_data.data, self.container)
 
-        self.profile_data.add_action(action_item)
+        self.container.add_action(action_item)
         # blows up in QT 6.11
         if Shiboken.isValid(self):
             self.container_modified.emit()
@@ -227,8 +227,8 @@ class StateContainerWidget(AbstractContainerWidget):
         """paste action"""
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.duplicate(action, self.profile_data)
-        self.profile_data.add_action(action_item)
+        action_item = plugin_manager.duplicate(action, self.container)
+        self.container.add_action(action_item)
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
@@ -246,8 +246,8 @@ class StateContainerWidget(AbstractContainerWidget):
         :return title to use for the container
         """
         title = "State: "
-        if len(self.profile_data.action_sets) > 0:
-            stub = ", ".join(a.name for a in self.profile_data.action_sets[0])
+        if len(self.container.action_sets) > 0:
+            stub = ", ".join(a.name for a in self.container.action_sets[0])
             title += stub
 
         return title

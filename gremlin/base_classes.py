@@ -1,5 +1,5 @@
-# -*- coding: utf-8; -*-
 
+# -*- coding: utf-8; -*-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
@@ -943,11 +943,11 @@ class AbstractCallbackModel(AbstractModel):
         self._filtered_enabled: bool = None
         self._sort_enabled: bool = None
 
-        assert isinstance(change_callback, callable) if change_callback is not None else True, "Invalid change callback"
+        assert isinstance(change_callback, Callable) if change_callback is not None else True, "Invalid change callback"
         assert isinstance(allowed_types, tuple) if allowed_types is not None else True, "allowed types must be a tuple"
 
-        assert isinstance(added_callback, callable) if added_callback is not None else True, "Invalid add callback"
-        assert isinstance(removed_callback, callable) if removed_callback is not None else True, "Invalid remove callback"
+        assert isinstance(added_callback, Callable) if added_callback is not None else True, "Invalid add callback"
+        assert isinstance(removed_callback, Callable) if removed_callback is not None else True, "Invalid remove callback"
 
         self._add_callback = added_callback
         self._remove_callback = removed_callback
@@ -970,8 +970,9 @@ class AbstractCallbackModel(AbstractModel):
     def setItemAt(self, index: int, item):
         """sets the item for the specific index"""
         # ensure the item is hashable
-        assert isinstance(item, _collections_abc.Hashable)
-        assert isinstance(index, _collections_abc.Hashable)
+        assert isinstance(item, _collections_abc.Hashable),"item must be hashable"
+        assert isinstance(index, int),"Index must be an integer"
+
         old_item = self._index_map[index] if index in self._index_map else None
 
         self._index_map[index] = item
@@ -1180,6 +1181,23 @@ class AbstractCallbackModel(AbstractModel):
         if item in self._filtered_item_map:
             return self._filtered_item_map[item]
         return -1
+
+    def pop(self, index : int):
+        """removes and returns the item at the given index, None if not found"""
+        if index in self._index_map:
+            item = self._index_map[index]
+            self.removeAt(index)
+            return item
+        return None
+
+    def push(self, item):
+        """adds the item to the model and returns its index"""
+        index = len(self._index_map)
+        self._index_map[index] = item
+        self._item_map[item] = index
+        self._filtered_index_map[index] = item
+        self._filtered_item_map[item] = index
+        return index
 
     def unfilteredIndexOf(self, item) -> int:
         """returns the index of the item (unfiltered model), -1 if not found"""
