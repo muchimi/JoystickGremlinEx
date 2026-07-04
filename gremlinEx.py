@@ -738,7 +738,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # no tab selected yet
             return True
 
-        device_guid = gremlin.util.to_guid(device_guid) # compare dinput.GUID objects
+        device_guid = gremlin.util.to_guid(device_guid)  # compare dinput.GUID objects
         assert isinstance(tab_device_guid, dinput.GUID) and isinstance(device_guid, dinput.GUID), "device id comparison mismatch data types"
 
         return tab_device_guid != device_guid
@@ -747,13 +747,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """updates the current tab tracking variables"""
         tab_device_guid = gremlin.shared_state.current_tab_device_guid
         if tab_device_guid is None:
-            tab_device_guid =  self._tab_index_map.get(self.ui.devices_tab_header_widget.currentIndex())
+            tab_device_guid = self._tab_index_map.get(self.ui.devices_tab_header_widget.currentIndex())
             gremlin.shared_state.current_tab_device_guid = tab_device_guid
             gremlin.shared_state.current_tab_device_id = gremlin.util.normalize_guid(tab_device_guid)
         assert isinstance(tab_device_guid, dinput.GUID), "current tab device guid is not a dinput.GUID"
         return tab_device_guid
 
-    def _inputswitch_needed(self, device_guid : dinput.GUID, input_id) -> bool:
+    def _inputswitch_needed(self, device_guid: dinput.GUID, input_id) -> bool:
         """checks to see if an input switch is needed"""
 
         tab_device_guid = self.getCurrentTabDeviceGuid()
@@ -930,8 +930,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             },
         )
 
-
-
         # wait for the tab selection to complete
         while not self._tab_selection_completed:
             QThread.sleep(0)
@@ -940,7 +938,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         assert isinstance(device_guid, dinput.GUID), "invalid device guid format"
         assert gremlin.shared_state.current_tab_device_guid == device_guid
         assert gremlin.shared_state.current_tab_device_id == gremlin.util.normalize_guid(device_guid)
-
 
         if verbose:
             syslog.info("tab selection worker complete")
@@ -1623,7 +1620,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 dialog.close()
 
         else:
-            dialog = gremlin.ui.input_viewer.InputViewerUi()
+            dialog = gremlin.ui.input_viewer.InputViewerDialog()
             self.modal_windows["input_viewer"] = dialog
 
             if not dialog.hasConfig():
@@ -3351,8 +3348,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         force_switch=True,
                     )
 
-
-
             except Exception as err:
                 syslog.error(f"CREATE DEVICE TABS (step 2): failed: {err}")
                 tb_msg = traceback.format_exc()
@@ -3378,7 +3373,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             device_guid = self._tab_index_map.get(self.ui.devices_tab_header_widget.currentIndex())
             gremlin.shared_state.current_tab_device_guid = device_guid
             gremlin.shared_state.current_tab_device_id = gremlin.util.normalize_guid(device_guid)
-
 
             if verbose_detailed:
                 syslog.info("CREATE TABS: complete")
@@ -3524,7 +3518,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _get_input_item(self, device_guid: str | dinput.GUID, index: int) -> gremlin.input_item.InputItem:
         """get the input item at the specified index in the device - index is 0 based"""
-        assert index >= 0,f"invalid index {index}"
+        assert index >= 0, f"invalid index {index}"
         widget: gremlin.input_item.BaseDeviceTabWidget = self._get_tab_widget_guid(device_guid)
         if widget is None or not hasattr(widget, "inputItemListModel") or not widget.isLoaded():
             return None
@@ -3774,8 +3768,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         with QtCore.QSignalBlocker(self.ui.devices_tab_header_widget):
                             self.ui.devices_tab_header_widget.setCurrentIndex(index)
 
-
-
                         if verbose:
                             syslog.info(f"Tab change complete: device {gremlin.util.normalize_guid(device_guid)}")
                         switch_tabs = True  # we are switching tabs
@@ -3887,7 +3879,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                         or gremlin.util.compare_guid(current_device_guid, device_guid)
                                     )
 
-
                                 index = widget.indexOf(input_item)
                                 if index == -1:
                                     device = gremlin.joystick_handling.getDevice(device_guid)
@@ -3897,7 +3888,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                         index = widget.indexOf(input_item)
                                         if verbose:
                                             syslog.info(f"SELECT INPUT: input {input_item.display_name} made visible at index {index}")
-
 
                                 # widget.input_item_list_view.redraw_index(index)
                                 widget.selectInputItemIndex(index)
@@ -3951,7 +3941,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     # ensure content is visible
                     self.selectTabWidget(device_guid)
         finally:
-
             # update tracking
             gremlin.shared_state.current_tab_device_guid = gremlin.util.to_guid(device_guid)
             gremlin.shared_state.current_tab_device_id = gremlin.util.normalize_guid(device_guid)
@@ -3959,8 +3948,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if completion_callback:
                 # fire the callback on completion
                 completion_callback(device_guid, input_type, input_id)
-
-
 
     def ensureTabLoaded(self):
         """ensures a tab device UI is loaded/refreshed"""

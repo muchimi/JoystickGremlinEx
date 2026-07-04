@@ -42,8 +42,46 @@ from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.types import SyncMode
 import gremlin.joystick_handling
 from gremlin.types import ContainerViewTypes, Interactions
+from enum import IntEnum
 
 syslog = logging.getLogger("system")
+
+
+class SequenceMode (IntEnum):
+    """ sequence run mode"""
+    Normal = 1
+    Toggle = 2
+    Step = 4
+    Loop = 5
+    Wiggle = 6
+
+    @staticmethod
+    def toString(mode: SequenceMode) -> str:
+        return mode.name.casefold()
+
+    @staticmethod
+    def fromString(mode_str: str) -> SequenceMode:
+        for mode in SequenceMode:
+            if mode.name.casefold() == mode_str.casefold():
+                return mode
+        raise ValueError(f"Invalid sequence mode string: {mode_str}")
+
+class SequenceRepeatMode (IntEnum):
+    """sequence repeat mode"""
+    Normal = 1
+    Random = 2
+    Loop = 3
+
+    @staticmethod
+    def toString(mode: SequenceRepeatMode) -> str:
+        return mode.name.casefold()
+
+    @staticmethod
+    def fromString(mode_str: str) -> SequenceRepeatMode:
+        for mode in SequenceRepeatMode:
+            if mode.name.casefold() == mode_str.casefold():
+                return mode
+        raise ValueError(f"Invalid sequence repeat mode string: {mode_str}")
 
 
 @SingletonDecorator
@@ -85,7 +123,7 @@ class StepOptions:
     def __init__(self):
         self.index = -1  # step index
         self.repeat_count = 2  # number of times the step should repeat
-        self.mode = "normal"  # repeate mode
+        self.mode = SequenceRepeatMode.Normal  # repeate mode
         self.repeat_min_delay = 250  # delay between repeat steps in ms
         self.repeat_max_delay = 250  # delay between repeat steps in ms
         self.autorelease_max_delay = 250  # delay for autorelease of each pulse in ms
@@ -95,15 +133,15 @@ class StepOptions:
 
     def getCount(self) -> int:
         """gets the repeat count"""
-        if self.mode == "random":
+        if self.mode == SequenceRepeatMode.Random:
             return random.randint(0, self.repeat_count)
-        elif self.mode == "normal":
+        elif self.mode == SequenceRepeatMode.Normal:
             return 1
         return self.repeat_count
 
     def getDelay(self, default_delay_ms: int = 0) -> float:
         """gets the autorelease delay in seconds"""
-        if self.mode == "normal":
+        if self.mode == SequenceRepeatMode.Normal:
             return default_delay_ms / 1000
 
         if self.randomize_delay:
@@ -112,7 +150,7 @@ class StepOptions:
 
     def getAutoreleaseDelay(self, default_delay_ms: int = 0) -> float:
         """gets the autorelease delay in seconds"""
-        if self.mode == "normal":
+        if self.mode == SequenceRepeatMode.Normal:
             return default_delay_ms / 1000
 
         if self.randomize_autorelease_delay:
@@ -124,7 +162,7 @@ class StepOptions:
         node = ElementTree.Element("step-option")
         node.set("index", safe_format(self.index, int))
         node.set("repeat-count", safe_format(self.repeat_count, int))
-        node.set("mode", self.mode)
+        node.set("mode", SequenceRepeatMode.toString(self.mode))
         node.set("repeat-min", safe_format(self.repeat_min_delay, int))
         node.set("repeat-max", safe_format(self.repeat_max_delay, int))
         node.set("autorelease-min", safe_format(self.autorelease_min_delay, int))
@@ -139,10 +177,10 @@ class StepOptions:
         if node.tag == "step-option":
             self.index = safe_read(node, "index", int, -1)
             self.repeat_count = safe_read(node, "repeat-count", int, 1)
-            self.mode = safe_read(node, "mode", str, "normal")
+            self.mode = SequenceRepeatMode.fromString(safe_read(node, "mode", str, "normal"))
             self.repeat_min_delay = safe_read(node, "repeat-min", int, 250)
-            self.repeat_max_delay = safe_read(node, "repeat-min", int, 250)
-            self.autorelease_max_delay = safe_read(node, "autorelease-min", int, 250)
+            self.repeat_max_delay = safe_read(node, "repeat-max", int, 250)
+            self.autorelease_min_delay = safe_read(node, "autorelease-min", int, 250)
             self.autorelease_max_delay = safe_read(node, "autorelease-max", int, 250)
             self.randomize_delay = safe_read(node, "randomize-delay", bool, False)
             self.randomize_autorelease_delay = safe_read(node, "randomize-autorelease", bool, False)
@@ -160,9 +198,9 @@ class StepOptionsWidget(QtWidgets.QWidget):
         self.action_data = action_data
 
         modes = [
-            ("No Repeat", "normal"),  # no repeat (default)
-            ("Repeat (fixed)", "repeat"),  # repeat fixed count
-            ("Repeat (random)", "random"),  # random repeat
+            ("No Repeat", SequenceRepeatMode.Normal),  # no repeat (default)
+            ("Repeat (fixed)", SequenceRepeatMode.Loop),  # repeat fixed count
+            ("Repeat (random)", SequenceRepeatMode.Random),  # random repeat
         ]
 
         margin = 0
@@ -187,7 +225,7 @@ class StepOptionsWidget(QtWidgets.QWidget):
             tooltip="Minimum time between repetitions in milliseconds",
         )
         self.repeat_delay_max_widget = gremlin.ui.ui_common.QDelayWidget(
-            value=options.repeat_min_delay,
+            value=options.repeat_max_delay,
             callback=self._handle_repeat_delay_max_changed,
             show_shortcuts=False,
             label="Max:",
@@ -374,10 +412,11 @@ class SequenceContainerWidget(AbstractContainerWidget):
         )
 
         modes = [
-            ("Run Once", "normal"),  # normal execution
-            ("Toggle", "toggle"),  # toggle execution
-            ("Loop (while pressed)", "loop"),  # loop mode - runs while the input is triggered
-            ("Wiggle", "wiggle"),  # wiggle execution
+            ("Normal (run once)", SequenceMode.Normal),  # normal execution
+            ("Toggle", SequenceMode.Toggle),  # toggle execution
+            ("Loop (while pressed)", SequenceMode.Loop),  # loop mode - runs while the input is triggered
+            ("Wiggle (random)", SequenceMode.Wiggle),  # wiggle execution
+            ("Step", SequenceMode.Step), # execute one step at a time on each trigger
         ]
 
         widgets = []
@@ -426,6 +465,21 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addWidget(self.container_normal_options)
 
+
+        # stepped mode options
+        widgets = []
+
+        self._stepped_exec_reset_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Reset step execution on profile start",
+            callback=self._handle_step_reset_change,
+            value=self.container.stepped_exec_reset,
+            tooltip="If enabled, stepped execution will reset to the first step when the profile starts. Otherwise, it will continue from the last step and loop around.",
+        )
+
+        widgets.append(self._stepped_exec_reset_widget)
+        self.container_stepped_options = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        self.action_layout.addWidget(self.container_stepped_options)
+
         # wiggle mode options
 
         grids = []
@@ -455,6 +509,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
                 widget_only=True,
             )
         )
+
 
         self._wiggle_count_min_widget = gremlin.ui.ui_common.QIntLineEdit(
             min_range=1,
@@ -610,13 +665,10 @@ class SequenceContainerWidget(AbstractContainerWidget):
             options_widget = StepOptionsWidget(self.container, options)
             step_widget = gremlin.ui.ui_common.QFrameBox(f"<b>Step {index + 1}</b>")
 
-            # step_container = gremlin.ui.ui_common.getVContainer([step_widget, QtWidgets.QLabel(" ")], widget_only=True)
-
             remove_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._handle_delete_step,
                                                                                 tooltip = f"Delete Step [{index + 1}]",
                                                                                 data = action_set)
             remove_widget.setFixedSize(size, size)
-            #remove_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
 
 
 
@@ -657,9 +709,14 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
 
             container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
-            #header_widget = gremlin.ui.ui_common.QHorizontalLine(color = gremlin.ui.ui_common.Color.headerBarBorderColor(), size = 4)
-            #container_widget.setStyleSheet(f".QWidget {{ background-color: {gremlin.ui.ui_common.Color.headerBarBackgroundColor()}; border-top: 4px solid {gremlin.ui.ui_common.Color.headerBarBorderColor()}; }}")
-            container_widget.setStyleSheet(f".QWidget {{ background-color: {gremlin.ui.ui_common.Color.headerBarBackgroundColor()}; }}")
+            css = f"""
+                .QWidget {{
+                    background-color: {gremlin.ui.ui_common.Color.headerBarBackgroundColor()};
+                    border-radius: 8px;
+                  }}
+
+            """
+            container_widget.setStyleSheet(css)
             container_widget.setContentsMargins(4, 4, 4, 4)
 
             #self.step_layout.addWidget(header_widget)
@@ -814,6 +871,10 @@ class SequenceContainerWidget(AbstractContainerWidget):
     def _handle_wiggle_step_delay_change(self, value):
         self.container.wiggle_step_delay = value
 
+    @QtCore.Slot(bool)
+    def _handle_step_reset_change(self, checked : bool):
+        self.container.stepped_exec_reset = checked
+
     @QtCore.Slot(int)
     def _handle_normal_exec_delay_change(self, value):
         self.container.normal_exec_delay = value
@@ -858,13 +919,16 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
     def _update_widgets(self):
         mode = self.container.mode
-        wiggle_enabled = mode == "wiggle"
-        normal_enabled = not wiggle_enabled
-        resume_enabled = mode != "normal"
+        wiggle_enabled = mode == SequenceMode.Wiggle
+        stepped_enabled = mode == SequenceMode.Step
+        normal_enabled = mode == SequenceMode.Normal
+        resume_enabled = mode != SequenceMode.Normal and mode != SequenceMode.Step
         self._wiggle_min_delay_widget.setVisible(wiggle_enabled)
 
         self.container_normal_options.setVisible(normal_enabled)
+
         self.container_wiggle_options.setVisible(wiggle_enabled)
+
         self.container_wiggle_options_widget.setVisible(wiggle_enabled)
 
         self.container_wiggle_options.setVisible(wiggle_enabled)
@@ -881,21 +945,24 @@ class SequenceContainerWidget(AbstractContainerWidget):
             self.container_wiggle_count_max_widget.setVisible(count_enabled)
 
         self.resume_widget.setVisible(resume_enabled)  # resume can only be used in a loop mode - so wiggle or toggle
+        self.container_stepped_options.setVisible(stepped_enabled)
 
         visible = bool(self._warning_widget.text())
         self._warning_widget.setVisible(visible)
 
         # info box based on modes
         match self.container.mode:
-            case "wiggle":
+            case SequenceMode.Wiggle:
                 msg = """The sequence will randomly loop while the input is triggered.
 <br>In wiggle mode, the timing between steps, how long each step runs and the order of the steps can be randomly generated based on the options selected."""
-            case "toggle":
+            case SequenceMode.Toggle:
                 msg = "The sequence will loop.  The first trigger with enable the sequence.  It will run continuously in a loop until the second trigger is received."
-            case "loop":
+            case SequenceMode.Loop:
                 msg = "The sequence will loop while the input is triggered."
-            case "normal":
-                msg = "The sequence will run once when the input is triggered.  If the sequence is triggered while it's still running, the trigger is ignored."
+            case SequenceMode.Normal:
+                msg = "The sequence will run once when the input is triggered.<br>If the sequence is triggered while it's still running, the trigger is ignored."
+            case SequenceMode.Step:
+                msg = "The sequence will execute one step at a time on each trigger."
 
         if resume_enabled and self.container.resume_mode:
             if msg:
@@ -1043,6 +1110,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self.action_data._is_running = False
         self._started = False
 
+        self._current_step = None # tracks the next step to execute
+
     def profile_start(self):
         self.action_data._is_running = False
 
@@ -1051,6 +1120,12 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self._verbose_extra = self._verbose and config.verbose_mode_extra
         gs = GlobalSequence()
         gs.sequence_count = 0
+
+        # stepped mode current step
+        if self.container.stepped_exec_reset:
+            self._current_step = None
+
+
 
         config = gremlin.config.Configuration()
         if not config.mode_change_aborts_sequence:
@@ -1159,7 +1234,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             gs.popSequence()
 
     def start_normal(self):
-        """starts the wiggle process"""
+        """starts the normal process"""
         gs = GlobalSequence()
         if gs.canExecute():
             if not self.action_data._is_running:
@@ -1174,8 +1249,40 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         else:
             syslog.error("SEQUENCE: exceeded concurrent sequence limit")
 
+
+
     def stop_normal(self):
-        """stops the wiggle process"""
+        """stops the normal process"""
+        if self.action_data._is_running:
+            if self._verbose:
+                syslog.info("SEQUENCE: stop sequence runner")
+            self.action_data._is_running = False
+            if self.action_data._thread.is_alive():
+                self.action_data._thread.join()
+            # reduce concurrency count
+            gs = GlobalSequence()
+            gs.popSequence()
+            self.action_data._thread = None
+
+    def start_stepped(self):
+        """starts the stepped process"""
+        gs = GlobalSequence()
+        if gs.canExecute():
+            if not self.action_data._is_running:
+                self.action_data._is_running = True
+                self.action_data._thread = threading.Thread(target=self._stepped_runner)
+                self.action_data._thread.name = "sequence runner"
+                # increase concurrency count
+                gs.pushSequence()
+                self.action_data._thread.start()
+                if self._verbose:
+                    syslog.info(f"SEQUENCE: start sequence runner: concurrency: [{gs.sequence_count}]")
+        else:
+            syslog.error("SEQUENCE: exceeded concurrent sequence limit")
+
+
+    def stop_stepped(self):
+        """stops the stepped process"""
         if self.action_data._is_running:
             if self._verbose:
                 syslog.info("SEQUENCE: stop sequence runner")
@@ -1191,14 +1298,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         if not self.valid:
             return False
 
-        # if event.event_type == InputType.JoystickHat:
-        #     is_pressed = value.current != (0,0)
-        # elif isinstance(value, bool):
-        #     is_pressed = value
-        # elif not isinstance(value.current, bool):
-        #     syslog.warning(f"Invalid data type received in Sequence container: {type(event.value)}")
-        #     return False
-        # else:
+
 
         is_pressed = event.is_pressed
         mode = self.action_data.mode
@@ -1216,7 +1316,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         is_running = self.action_data._is_running
 
         match mode:
-            case "wiggle":
+            case SequenceMode.Wiggle:
                 # wiggle mode runner
                 if is_pressed and not is_running:
                     # run sequence in wiggle mode
@@ -1229,7 +1329,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     if verbose:
                         syslog.info(f"SEQUENCE EVENT: wiggle mode: stop - profile mode: {profile_mode}")
                     self.stop_wiggle()
-            case "toggle":
+            case SequenceMode.Toggle:
                 # toggle mode acts as a switch on the input trigger - first press = turn on, second press = turn off
                 if is_pressed:
                     if is_running:
@@ -1242,7 +1342,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                         if verbose:
                             syslog.info(f"SEQUENCE EVENT: toggle mode: start - profile mode: {profile_mode}")
                         self.start_normal()
-            case "loop":
+            case SequenceMode.Loop:
                 # loop mode is on while the input is pressed, off when released
                 if is_pressed and not is_running:
                     # run sequence in wiggle mode
@@ -1256,7 +1356,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                         syslog.info(f"SEQUENCE EVENT: loop mode: stop - profile mode: {profile_mode}")
                     self.stop_normal()
 
-            case "normal":
+            case SequenceMode.Normal:
                 # regular mode - run while pressed
                 if is_pressed:
                     if not is_running:
@@ -1267,6 +1367,20 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     else:
                         if verbose:
                             syslog.info(f"SEQUENCE EVENT: normal mode: start ignored because prior sequence is still running  - profile mode: {profile_mode}")
+                else:
+                    if verbose:
+                        syslog.info(f"SEQUENCE EVENT: normal mode: stop - profile mode: {profile_mode}")
+                    self.stop_normal()
+
+            case SequenceMode.Step:
+                # step mode executes one step per trigger
+                if is_pressed:
+                    if verbose:
+                        syslog.info(f"SEQUENCE EVENT: step mode: next step - profile mode: {profile_mode}")
+                    self.start_stepped()
+                else:
+                    self.stop_stepped()
+
 
         return True
 
@@ -1364,6 +1478,93 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         if verbose:
             syslog.info(f"SEQUENCE NORMAL STOP: {self.id}")
         self.action_data._is_running = False
+
+    def _stepped_runner(self):
+        """step mode runner thread"""
+        event_press = gremlin.event_handler.Event(InputType.JoystickButton, 1, device_guid=gremlin.shared_state.fake_tab_guid, is_pressed=True)
+
+        event_release = event_press.fake_button(False, True)
+
+        nodes = [node for node in self.action_set_nodes]
+        verbose = self._verbose
+        verbose_extra = self._verbose_extra
+
+        # no resume mode if running once
+        resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
+
+        if verbose:
+            syslog.info(f"SEQUENCE STEPPED: [{self.id}] {self.action_data.mode} mode - runner start - resume mode: {resume}")
+
+        if not nodes:
+            # nothing to run
+            if verbose:
+                syslog.info("SEQUENCE STEPPED: Trigger Functor: nothing to run")
+            return
+
+        index = self._current_step
+        if resume:
+            if verbose:
+                syslog.info(f"Resume at step: {self.action_data.last_step}")
+            index = self.action_data.last_step
+
+        if index is None:
+            # start at the top
+            index = 0
+        count = len(nodes)
+        if index >= count:
+            # loop back to first step
+            index = 0
+
+
+        exec_delay_ms = self.container.normal_exec_delay
+        autorelease_delay_ms = self.container.normal_autorelease_delay
+
+        node = nodes[index]
+        options: StepOptions = self.action_data.getOptions(index)  # execution options for the step
+
+        repeat_count = options.getCount()  # number of times to repeat
+        if verbose:
+            syslog.info(f"\tstep [{index}] exec start - repeat count: {repeat_count}")
+
+        for repeat_index in range(repeat_count):
+            if verbose:
+                syslog.info(f"\t\tTrigger press {index}/{repeat_index}")
+            self._ec.execute_node(node, event_press, True, None)  # issue press
+            # autorelease delay computation
+            delay = options.getAutoreleaseDelay(autorelease_delay_ms)
+            if delay > 0:
+                if verbose:
+                    syslog.info(f"\t\tstep autorelease delay: {delay:03f}")
+                self._wait(delay)
+
+            if verbose:
+                syslog.info(f"\t\tTrigger release {index}/{repeat_index}")
+            self._ec.execute_node(node, event_release, False, None)  # issue release
+
+            if not self.action_data._is_running:
+                break
+
+            if repeat_index < repeat_count - 1:
+                # interval between repeat delay computation
+                delay = options.getDelay(exec_delay_ms)
+                if delay > 0:
+                    if verbose:
+                        syslog.info(f"\t\tstep repeat interval delay: {delay:03f}")
+                    self._wait(delay)
+                    if not self.action_data._is_running:
+                        break
+
+        # next node to run
+        index += 1
+
+        self.action_data.last_step = index
+        self._current_step = index
+
+
+        if verbose:
+            syslog.info(f"SEQUENCE STEPPED STOP: {self.id}")
+
+
 
     def _wiggle_runner(self):
         """wiggle mode runner thread"""
@@ -1560,12 +1761,13 @@ Unlike a macro, any action suitable for the input can be used."""
         self.normal_exec_delay = 0  # wait time between steps when running normally
         self.normal_autorelease_delay = 250  # wait time between autoreleases of each step when running normally
         self.step_options = {}  # map of step options indexed by step number
+        self.stepped_exec_reset = True  # true if the stepped execution should reset on profile start, or continue from the last step otherwise
         self.wiggle_count_min = 1  # min number of wiggle steps to take.
         self.wiggle_count_max = 1  # max number of wiggle steps to take.
         self.wiggle_count_enabled = False  # true if wiggle mode count is enabled
         self.sync_mode = SyncMode.Ignore  # default sync mode on profile start
 
-        self.mode = "normal"  # run mode
+        self.mode = SequenceMode.Normal  # run mode
 
     def getOptions(self, index):
         """gets the option object for the particular step index"""
@@ -1612,13 +1814,15 @@ Unlike a macro, any action suitable for the input can be used."""
             if "wiggle-mode" in node.attrib:
                 wiggle_mode = safe_read(node, "wiggle-mode", bool, False)
                 if wiggle_mode:
-                    self.mode = "wiggle"
+                    self.mode = SequenceMode.Wiggle
             if "toggle-mode" in node.attrib:
                 toggle_mode = safe_read(node, "toggle-mode", bool, False)
                 if toggle_mode:
-                    self.mode = "toggle"
+                    self.mode = SequenceMode.Toggle
         else:
-            self.mode = safe_read(node, "mode", str, "normal")
+            self.mode = SequenceMode.fromString(safe_read(node, "mode", str, "normal"))
+
+        self.stepped_exec_reset = safe_read(node, "stepped-exec-reset", bool, False)
 
         # load step options
         self.step_options.clear()
@@ -1654,7 +1858,8 @@ Unlike a macro, any action suitable for the input can be used."""
         node.set("normal-exec", safe_format(self.normal_exec_delay, int))
         node.set("autorelease-exec", safe_format(self.normal_autorelease_delay, int))
         node.set("sync-mode", safe_format(self.sync_mode, int))
-        node.set("mode", self.mode)
+        node.set("mode", SequenceMode.toString(self.mode))
+        node.set("stepped-exec-reset", safe_format(self.stepped_exec_reset, bool))
 
         # save step options
         if self.step_options:

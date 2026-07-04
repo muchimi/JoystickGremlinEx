@@ -540,6 +540,10 @@ class Color:
         return "#2b2b2b" if gremlin.shared_state.is_dark_theme else "#DDDDDD"
 
     @staticmethod
+    def headerBackgroundColor():
+        return "#353535" if gremlin.shared_state.is_dark_theme else "#DDDDDD"
+
+    @staticmethod
     def getHoverColor(base_color: QColor, percent: float = 1.15) -> QColor:
         """Calculates a hover color by scaling the base color's lightness.
         percent > 1.0 lightens, percent < 1.0 darkens.
@@ -624,34 +628,18 @@ class Color:
 
 
 
-    @staticmethod
-    def cssFrameBox():
-        border_color = Color.borderColor()
-        background_color = Color.frameColor()
-        css = f"""
-            .QFrame {{
-                border: 2px solid;
-                border-color: {border_color};
-                border-radius: 6px;
-                background: {background_color};
-                margin: 4px;
-            }}
-            .QLabel {{
-                border: none;
-            }}
-            """
-        return css
+
 
     @staticmethod
     def cssNormalBox():
         border_color = Color.borderColor()
         background_color = Color.backgroundColor()
         css = f"""
-            QFrame {{
+            .QFrame {{
                 border: 1px solid {border_color};
                 background: {background_color};
             }}
-            QLabel {{
+            .QLabel {{
                 border: none;
             }}
             """
@@ -781,6 +769,8 @@ class Color:
         radio_unchecked = f"{prefix}radiobox_blank.png"
         radio_checked = f"{prefix}radiobox_marked.png"
 
+        header_background_color = Color.headerBackgroundColor()
+
         css = f"""
             QCheckBox::indicator {{
                 width: 18px;
@@ -877,6 +867,19 @@ class Color:
                 background-color: {Color.selectedBackgroundColor()};
             }}
 
+            QWidget[cssClass="title_frame"]  {{
+                        border: 4px solid orange;
+                        border-radius: 8px;
+                        background: green;
+                        padding: 4px;
+                        margin: 4px;
+                    }}
+
+            QWidget[cssClass="collapsible_title"]  {{
+                        border: 4px solid {border_color};
+                        border-radius: 8px;
+                        background-color: {header_background_color};
+                    }}
 
             """
 
@@ -1365,16 +1368,28 @@ class Buttons:
 
     @staticmethod
     def _template(
-        label="",
+        label : str ="",
         icon_source: str = "",
-        tooltip: str = None,
-        callback : Callable=None,
-        callbackEx: Callable=None,
+        tooltip : str = None,
+        callback : Callable = None,
+        callbackEx: Callable = None,
         no_keyboard: bool = True,
-        data=None,
-        width: int = None,
-        height: int = None,
+        data : object = None,
+        width : int = None,
+        height : int = None,
+        size : int = 16,
     ):
+
+        assert isinstance(label, (type(None), str)),"invalid label"
+        assert isinstance(icon_source, (type(None), str, QtGui.QIcon)),"invalid icon_source"
+        assert isinstance(tooltip, (type(None), str)),"invalid tooltip"
+        assert isinstance(callback, (type(None), Callable)),"invalid callback"
+        assert isinstance(callbackEx, (type(None), Callable)),"invalid callbackEx"
+        assert isinstance(no_keyboard, bool),"invalid no_keyboard"
+        assert isinstance(data, (type(None), object)),"invalid data"
+        assert isinstance(width, (type(None), int)),"invalid width"
+        assert isinstance(height, (type(None), int)),"invalid height"
+        assert isinstance(size, int),"invalid size"
 
         if no_keyboard:
             widget = NoKeyboardPushButton()
@@ -1394,6 +1409,7 @@ class Buttons:
                 icon = None
             if icon:
                 widget.setIcon(icon)
+                widget.setIconSize(QtCore.QSize(size, size))
         widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
         if tooltip:
             widget.setToolTip(tooltip)
@@ -1411,228 +1427,230 @@ class Buttons:
 
 
     @staticmethod
-    def getDeleteWidget(label=None, tooltip="Delete", callback=None, no_keyboard=True, data=None):
-        button = Buttons._template(label, "mdi6.delete", tooltip, callback, no_keyboard, data)
+    def getDeleteWidget(label : str =None, tooltip : str ="Delete", callback : Callable =None, no_keyboard : bool =True, data : object =None, size : int = 24, icon_size : int = 16):
+        button = Buttons._template(label = label, icon_source = "mdi6.delete", tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data, size=icon_size)
+        if size is not None:
+            button.setFixedSize(size, size)
         return button
 
     @staticmethod
-    def getAddWidget(label="Add", tooltip="Add", callback=None, no_keyboard=True, data=None):
-        button = Buttons._template(label, "ri.add-line", tooltip, callback, no_keyboard, data)
+    def getAddWidget(label : str ="Add", tooltip : str ="Add", callback : Callable =None, no_keyboard : bool =True, data : object =None):
+        button = Buttons._template(label = label, icon_source = "ri.add-line", tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
         # button.setMinimumHeight(24)
         # button.setFixedWidth(get_text_width(label)*1.3)
         # button.setStyleSheet(f" QPushButton {{margin-left: none;}}")
         return button
 
     @staticmethod
-    def getRemoveWidget(label="Remove", tooltip="Remove", callback=None, no_keyboard=True, data=None):
-        return Buttons._template(label, "mdi.close-box-outline", tooltip, callback, no_keyboard, data)
+    def getRemoveWidget(label : str ="Remove", tooltip : str ="Remove", callback : Callable =None, no_keyboard : bool =True, data : object =None):
+        return Buttons._template(label = label, icon_source = "mdi.close-box-outline", tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getEditWidget(label=None, tooltip="Edit", callback=None, no_keyboard=True, data=None):
-        return Buttons._template(label, "msc.edit", tooltip, callback, no_keyboard, data)
+    def getEditWidget(label : str =None, tooltip : str ="Edit", callback : Callable =None, no_keyboard : bool =True, data : object =None):
+        return Buttons._template(label = label, icon_source = "msc.edit", tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getSearchWidget(label=None, tooltip="Search", callback=None, no_keyboard=True, data=None):
+    def getSearchWidget(label : str =None, tooltip : str ="Search", callback : Callable =None, no_keyboard : bool =True, data : object =None):
         icon = Icons.findIcon()
-        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
+        return Buttons._template(label = label, icon_source = icon, tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getKeyboardWidget(label=None, tooltip="Select Keys", callback=None, no_keyboard=True, data=None):
-        return Buttons._template(label, "fa5.keyboard", tooltip, callback, no_keyboard, data)
+    def getKeyboardWidget(label : str =None, tooltip : str ="Select Keys", callback : Callable =None, no_keyboard : bool =True, data : object =None):
+        return Buttons._template(label = label, icon_source = "fa5.keyboard", tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getHelpWidget(label=None, tooltip="Help", callback=None, no_keyboard=True, data=None):
-        return Buttons._template(label, "mdi.help", tooltip, callback, no_keyboard, data)
+    def getHelpWidget(label : str =None, tooltip : str ="Help", callback : Callable =None, no_keyboard : bool =True, data : object =None):
+        return Buttons._template(label = label, icon_source = "mdi.help", tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
     def getGrabWidget(
-        label=None,
-        tooltip="Grab Value",
-        callback=None,
-        no_keyboard=True,
+        label : str = None,
+        tooltip : str ="Grab Value",
+        callback : Callable =None,
+        no_keyboard : bool = True,
         data=None,
-        width=24,
-    ):
-        return Buttons._template(label, Icons.recordIcon(), tooltip, callback, no_keyboard, data, width=width)
+        width : int =24,
+    )  :
+        return Buttons._template(label = label, icon_source= Icons.recordIcon(), tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data, width=width)
 
     @staticmethod
     def getListenWidget(
-        label="Listen",
-        tooltip="Listen for input",
-        callback=None,
-        no_keyboard=True,
-        data=None,
-        width=None,
+        label : str ="Listen",
+        tooltip : str ="Listen for input",
+        callback : Callable =None,
+        no_keyboard : bool =True,
+        data : object =None,
+        width : int =None,
     ):
-        return Buttons._template(label, Icons.listenIcon(), tooltip, callback, no_keyboard, data, width=width)
+        return Buttons._template(label = label, icon_source = Icons.listenIcon(), tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data, width=width)
 
     @staticmethod
-    def getClearWidget(label="Clear", tooltip="Clear", callback=None, no_keyboard=True, data=None):
-        return Buttons._template(label, Icons.trashIcon(), tooltip, callback, no_keyboard, data)
+    def getClearWidget(label : str = "Clear", tooltip : str = "Clear", callback : Callable = None, no_keyboard : bool = True, data : object = None, width : int = None, height : int = 24):
+        return Buttons._template(label = label, icon_source = Icons.trashIcon(), tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data, width=width, height=height)
 
     @staticmethod
     def getEraserWidget(
-        label=None,
-        tooltip="Clear",
-        callback=None,
-        no_keyboard=True,
-        data=None,
-        width=24,
-        height=24,
+        label : str = None,
+        tooltip : str ="Clear",
+        callback : Callable = None,
+        no_keyboard : bool = True,
+        data : object = None,
+        width : int = 24,
+        height : int = 24,
     ):
         return Buttons._template(
-            label,
-            Icons.eraserIcon(),
-            tooltip,
-            callback,
-            no_keyboard,
-            data,
+            label = label,
+            icon_source = Icons.eraserIcon(),
+            tooltip = tooltip,
+            callback = callback,
+            no_keyboard = no_keyboard,
+            data = data,
             width=width,
             height=height,
         )
 
     @staticmethod
     def getFolderWidget(
-        label=None,
-        tooltip=None,
-        callback=None,
-        no_keyboard=True,
-        data=None,
-        width=24,
-        height=24,
+        label : str = None,
+        tooltip : str = None,
+        callback : Callable = None,
+        no_keyboard : bool = True,
+        data : object = None,
+        width : int = 24,
+        height : int = 24,
     ):
         return Buttons._template(
-            label,
-            Icons.folderIcon(),
-            tooltip,
-            callback,
-            no_keyboard,
-            data,
+            label = label,
+            icon_source = Icons.folderIcon(),
+            tooltip = tooltip,
+            callback = callback,
+            no_keyboard = no_keyboard,
+            data = data,
             width=width,
             height=height,
         )
 
     @staticmethod
     def getTabFilterWidget(
-        label=None,
-        tooltip=None,
-        callback=None,
-        no_keyboard=True,
-        data=None,
-        width=24,
-        height=24,
+        label : str = None,
+        tooltip : str = None,
+        callback : Callable = None,
+        no_keyboard : bool = True,
+        data : object = None,
+        width : int = 24,
+        height : int = 24,
     ):
         return Buttons._template(
-            label,
-            Icons.tabIcon(),
-            tooltip,
-            callback,
-            no_keyboard,
-            data,
+            label = label,
+            icon_source = Icons.tabIcon(),
+            tooltip = tooltip,
+            callback = callback,
+            no_keyboard = no_keyboard,
+            data = data,
             width=width,
             height=height,
         )
 
     @staticmethod
     def getSaveWidget(
-        label=None,
-        tooltip=None,
-        callback=None,
-        no_keyboard=True,
-        data=None,
-        width=24,
-        height=24,
+        label : str = None,
+        tooltip : str = None,
+        callback : Callable = None,
+        no_keyboard : bool = True,
+        data : object = None,
+        width : int = 24,
+        height : int = 24,
     ):
         return Buttons._template(
-            label,
-            Icons.saveIcon(),
-            tooltip,
-            callback,
-            no_keyboard,
-            data,
+            label = label,
+            icon_source = Icons.saveIcon(),
+            tooltip = tooltip,
+            callback = callback,
+            no_keyboard = no_keyboard,
+            data = data,
             width=width,
             height=height,
         )
 
     @staticmethod
-    def getOkWidget(label="Ok", tooltip="Accept", callback=None, no_keyboard=True, data=None):
-        return Buttons._template(label, None, tooltip, callback, no_keyboard, data)
+    def getOkWidget(label : str = "Ok", tooltip : str = "Accept", callback : Callable = None, no_keyboard : bool = True, data : object = None):
+        return Buttons._template(label = label, icon_source = None, tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getCancelWidget(label="Cancel", tooltip="Cancel", callback=None, no_keyboard=True, data=None):
-        return Buttons._template(label, None, tooltip, callback, no_keyboard, data)
+    def getCancelWidget(label : str = "Cancel", tooltip : str = "Cancel", callback : Callable = None, no_keyboard : bool = True, data : object = None):
+        return Buttons._template(label = label, icon_source = None, tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getSortUpWidget(label=None, tooltip="Sort up", callback=None, no_keyboard=True, data=None):
+    def getSortUpWidget(label : str = None, tooltip : str = "Sort up", callback : Callable = None, no_keyboard : bool = True, data : object = None):
         icon = Icons.sortUpIcon()
-        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
+        return Buttons._template(label = label, icon_source = icon, tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getSortDownWidget(label=None, tooltip="Sort Down", callback=None, no_keyboard=True, data=None):
+    def getSortDownWidget(label : str = None, tooltip : str = "Sort Down", callback : Callable = None, no_keyboard : bool = True, data : object = None):
         icon = Icons.sortDownIcon()
-        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
+        return Buttons._template(label = label, icon_source = icon, tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getRefreshWidget(label=None, tooltip="Refresh", callback=None, no_keyboard=True, data=None):
+    def getRefreshWidget(label : str = None, tooltip : str = "Refresh", callback : Callable = None, no_keyboard : bool = True, data : object = None):
         icon = Icons.refreshIcon(Color.greenColor())
-        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
+        return Buttons._template(label = label, icon_source = icon, tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getResizeWidget(label=None, tooltip="AutoSize", callback=None, no_keyboard=True, data=None):
+    def getResizeWidget(label : str = None, tooltip : str = "AutoSize", callback : Callable = None, no_keyboard : bool = True, data : object = None):
         icon = Icons.resizeIcon()
-        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
+        return Buttons._template(label = label, icon_source = icon, tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getListSyncWidget(label=None, tooltip="Find In List", callback=None, no_keyboard=True, data=None):
+    def getListSyncWidget(label : str = None, tooltip : str = "Find In List", callback : Callable = None, no_keyboard : bool = True, data : object = None):
         icon = Icons.syncIcon()
-        return Buttons._template(label, icon, tooltip, callback, no_keyboard, data)
+        return Buttons._template(label = label, icon_source = icon, tooltip = tooltip, callback = callback, no_keyboard = no_keyboard, data = data)
 
     @staticmethod
-    def getPasteWidget(tooltip="Paste", callback=None):
+    def getPasteWidget(tooltip : str = "Paste", callback : Callable = None):
         """creates a paste widget
 
         :param tooltip: the tooltip to show
         :callback : optional the callback on click
         """
-        return Buttons._template(None, Icons.pasteIcon(), tooltip, callback)
+        return Buttons._template(label = None, icon_source = Icons.pasteIcon(), tooltip = tooltip, callback = callback, no_keyboard = True, data = None)
 
     @staticmethod
-    def getCopyWidget(tooltip="Copy", callback=None):
+    def getCopyWidget(tooltip : str = "Copy", callback : Callable = None):
         """creates a copy widget
 
         :param tooltip: the tooltip to show
         :callback : optional the callback on click
 
         """
-        return Buttons._template(None, Icons.copyIcon(), tooltip, callback)
+        return Buttons._template(label = None, icon_source = Icons.copyIcon(), tooltip = tooltip, callback = callback, no_keyboard = True, data = None)
 
     @staticmethod
-    def getCollapseAllWidget(tooltip="Collapse All", callback=None, width=24, height=24):
-        return Buttons._template(None, Icons.collapseAllIcon(), tooltip, callback, width=width, height=height)
+    def getCollapseAllWidget(tooltip : str = "Collapse All", callback : Callable = None, width : int = 24, height : int = 24):
+        return Buttons._template(label=None, icon_source=Icons.collapseAllIcon(), tooltip=tooltip, callback=callback, width=width, height=height)
 
     @staticmethod
-    def getExpandAllWidget(tooltip="Expland All", callback=None, width=24, height=24):
-        return Buttons._template(None, Icons.expandAllIcon(), tooltip, callback, width=width, height=height)
+    def getExpandAllWidget(tooltip : str = "Expland All", callback : Callable = None, width : int = 24, height : int = 24):
+        return Buttons._template(label=None, icon_source=Icons.expandAllIcon(), tooltip=tooltip, callback=callback, width=width, height=height)
 
     @staticmethod
-    def getRecordWidget(tooltip="Record", callback=None, width=24, height=24):
-        return Buttons._template(None, Icons.recordIcon(), tooltip, callback, width=width, height=height)
+    def getRecordWidget(tooltip : str = "Record", callback : Callable = None, width : int = 24, height : int = 24):
+        return Buttons._template(label=None, icon_source=Icons.recordIcon(), tooltip=tooltip, callback=callback, width=width, height=height)
 
     @staticmethod
-    def getMoveUpWidget(tooltip="Move Up", callback=None, width=24, height=24, data=None):
-        return Buttons._template(None, Icons.moveUpIcon(), tooltip, callback, width=width, height=height, data=data)
+    def getMoveUpWidget(tooltip : str = "Move Up", callback : Callable = None, width : int = 24, height : int = 24, data : object = None):
+        return Buttons._template(label=None, icon_source=Icons.moveUpIcon(), tooltip=tooltip, callback=callback, width=width, height=height, data=data)
 
     @staticmethod
-    def getMoveDownWidget(tooltip="Move Down", callback=None, width=24, height=24, data=None):
-        return Buttons._template(None, Icons.moveDownIcon(), tooltip, callback, width=width, height=height, data=data)
+    def getMoveDownWidget(tooltip : str = "Move Down", callback : Callable = None, width : int = 24, height : int = 24, data : object = None):
+        return Buttons._template(label=None, icon_source=Icons.moveDownIcon(), tooltip=tooltip, callback=callback, width=width, height=height, data=data)
 
     @staticmethod
-    def getMoveTopWidget(tooltip="Move Top", callback=None, width=24, height=24, data=None):
-        return Buttons._template(None, Icons.moveTopIcon(), tooltip, callback, width=width, height=height, data=data)
+    def getMoveTopWidget(tooltip : str = "Move Top", callback : Callable = None, width : int = 24, height : int = 24, data : object = None):
+        return Buttons._template(label=None, icon_source=Icons.moveTopIcon(), tooltip=tooltip, callback=callback, width=width, height=height, data=data)
 
     @staticmethod
-    def getMoveBottomWidget(tooltip="Move Bottom", callback=None, width=24, height=24, data=None):
-        return Buttons._template(None, Icons.moveBottomIcon(), tooltip, callback, width=width, height=height, data=data)
+    def getMoveBottomWidget(tooltip : str = "Move Bottom", callback : Callable = None, width : int = 24, height : int = 24, data : object = None):
+        return Buttons._template(label=None, icon_source=Icons.moveBottomIcon(), tooltip=tooltip, callback=callback, width=width, height=height, data=data)
 
 
 class WidgetTracker:
@@ -4482,7 +4500,7 @@ class QDataPushButton(QtWidgets.QPushButton):
         callback : Callable=None,
         callbackEx : Callable=None,
         clicked : Callable=None,
-        enabled:bool=None,
+        enabled : bool=None,
         enhanced : bool =False,
         css : str= None,
         icon : QtGui.QIcon = None,
@@ -4502,11 +4520,7 @@ class QDataPushButton(QtWidgets.QPushButton):
 
 
         """
-        # if callback_ex:
-        #     import inspect
-        #     sig = inspect.signature(callback_ex)
-        #     if len(sig.parameters) != 5:
-        #         pass
+
         super().__init__(text, parent)
         self._data = data
         if tooltip:
@@ -4514,6 +4528,16 @@ class QDataPushButton(QtWidgets.QPushButton):
 
         self._clicked.connect(self._handle_callback)
         self.clickedEx.connect(self._handle_callback_ex)
+
+        assert isinstance(text, (type(None), str)),"invalid text"
+        assert isinstance(callback, (type(None), Callable)),"invalid callback"
+        assert isinstance(callbackEx, (type(None), Callable)),"invalid callbackEx"
+        assert isinstance(clicked, (type(None), Callable)),"invalid clicked"
+        assert isinstance(enabled, (type(None), bool)),"invalid enabled"
+        assert isinstance(enhanced, (type(None), bool)),"invalid enhanced"
+        assert isinstance(css, (type(None), str)),"invalid css"
+        assert isinstance(icon, (type(None), (QtGui.QIcon, str))),"invalid icon"
+        assert isinstance(size, (type(None), int, QtCore.QSize)),"invalid size"
 
         self.setCallback(callback)
 
@@ -4561,6 +4585,7 @@ class QDataPushButton(QtWidgets.QPushButton):
             self._callback_ex(widget, is_ctrl, is_shft, is_alt, is_right)
 
     def setCallback(self, callback):
+        assert isinstance(callback, (type(None), Callable)),"invalid callback"
         self._callback = callback
         if self._callback:
             sig = inspect.signature(self._callback)
@@ -4570,6 +4595,7 @@ class QDataPushButton(QtWidgets.QPushButton):
             self._callback_param = False
 
     def setCallbackEx(self, callback):
+        assert isinstance(callback, (type(None), Callable)),"invalid callbackEx"
         self._callback_ex = callback
 
 
@@ -10512,6 +10538,7 @@ def getHContainer(
     if widget_or_list:
         if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
             for item in widget_or_list:
+                stretch_factor = None
                 if item is None:
                     continue  # skip blanks or empty widgets
                 if isinstance(item, str):
@@ -10525,13 +10552,23 @@ def getHContainer(
                         item = QtWidgets.QLabel(item)
                         if font:
                             item.setFont(font)
+                elif isinstance(item, tuple):
+                    # data is a (widget, stretch) tuple
+                    item, stretch_factor = item
+
                 if use_vcontainers:
                     item, _ = getVContainer(item)
 
                 if alignment:
-                    layout.addWidget(item, alignment=alignment)
+                    if stretch_factor is not None:
+                        layout.addWidget(item, stretch=stretch_factor, alignment=alignment)
+                    else:
+                        layout.addWidget(item, alignment=alignment)
                 else:
-                    layout.addWidget(item)
+                    if stretch_factor is not None:
+                        layout.addWidget(item, stretch=stretch_factor)
+                    else:
+                        layout.addWidget(item)
         else:
             if isinstance(widget_or_list, str):
                 widget_or_list = QtWidgets.QLabel(widget_or_list)
@@ -12374,7 +12411,17 @@ class QFrameBox(QtWidgets.QFrame):
         layout.addStretch()
 
         if not css:
-            css = Color.cssFrameBox()
+            border_color = Color.borderColor()
+            background_color = Color.frameColor()
+            css = f"""
+            .QFrameBox {{
+                border: 2px solid {border_color};
+                border-radius: 6px;
+                background-color: {background_color};
+            }}
+            .QLabel {{ border: none; background-color: transparent; }}
+            """
+
         self.setStyleSheet(css)
 
         # size to the text
@@ -13021,14 +13068,35 @@ class QCollapsible(QFrame):
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # title layout
+        title_container_widget = QWidget()  # placeholder for title widget if needed
+        title_container_widget.setProperty("cssClass", "collapsible_title")
+        title_container_layout = QVBoxLayout(title_container_widget)
+        if title_widget:
+            height = title_widget.sizeHint().height()
+        else:
+            height = 32
+
+        title_container_widget.setMaximumHeight(height+8)
+
+
+
+        title_content_widget = QWidget()
+        title_content_widget.setStyleSheet("") # reset for children
+        title_content_layout = QVBoxLayout(title_content_widget)
+        title_content_layout.setContentsMargins(0, 0, 0, 0)
+
+        title_container_layout.addWidget(title_content_widget)
+
+
+        layout.addWidget(title_container_widget)
 
         if title_widget:
             h_layout = QHBoxLayout()
             h_layout.addWidget(self._toggle_btn)
             h_layout.addWidget(title_widget, stretch=2)
-            layout.addLayout(h_layout)
+            title_content_layout.addLayout(h_layout)
         else:
-            layout.addWidget(self._toggle_btn)
+            title_content_layout.addWidget(self._toggle_btn)
 
         self.content_widget, self.content_layout = getVContainer()
         layout.addWidget(self.content_widget)
@@ -13930,16 +13998,13 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
         return self._selected_data
 
 
-class QBorderWidget(QtWidgets.QFrame):
+class QBorderWidget(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
-        _is_dark = gremlin.shared_state.is_dark_theme
         border_color = Color.borderColor()
 
-        css = f"# frame {{border: 1px solid {border_color};}}')"
-        self.setStyleSheet(css)
-        self.setFrameShape(QtWidgets.QFrame.Box)
+        #self.setFrameShape(QtWidgets.QFrame.Box)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 

@@ -309,7 +309,11 @@ class OctaviInterface:
     def _run(self):
         """data poll"""
         while self._running:
-            data = list(self._device.read(8))  # returns an array of 8 bytes
+            try:
+                data = list(self._device.read(8))  # returns an array of 8 bytes
+            except Exception as e:
+                pass
+                continue
 
             if data:
                 changed_data = {}

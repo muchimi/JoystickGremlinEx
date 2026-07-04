@@ -478,8 +478,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._selected = False  # true if the item is selected
         self._is_action = False  # true if the object is a sub-item for a sub-action (GateHandler for example)
 
-
-
         self._is_axis = False  # true if the item is an axis input
         self._is_button = False  # true if the item is a button input
         self._calibration = None  # calibration data if the item is an input axis
@@ -1450,6 +1448,7 @@ class InputItemMessage(InputItem):
 
         pass
 
+
 # class InputItemLayoutItem(QtWidgets.QLayoutItem):
 #     def __init__(self, size: int):
 #         super().__init__()
@@ -1472,11 +1471,13 @@ class InputItemMessage(InputItem):
 #     def maximumSize(self) -> QtCore.QSize:
 #         return QtCore.QSize(self._size, self._size)
 
+
 #     def isEmpty(self) -> bool:
 #         return False
 class InputItemContentLayout(QtWidgets.QLayout):
     """custom layout for input item widgets"""
-    def __init__(self, widgets : dict = None, parent=None):
+
+    def __init__(self, widgets: dict = None, parent=None):
         super().__init__(parent)
         self._description_widget = None
         self._repeater_widget = None
@@ -1491,11 +1492,11 @@ class InputItemContentLayout(QtWidgets.QLayout):
         if widgets:
             self.addWidgets(widgets)
 
-    def addWidget(self, widget, key : str = None):
+    def addWidget(self, widget, key: str = None):
         widget._layout_key = key
         super().addWidget(widget)
 
-    def addItem(self, item : QtWidgets.QLayoutItem):
+    def addItem(self, item: QtWidgets.QLayoutItem):
         key = item.widget()._layout_key if hasattr(item.widget(), "_layout_key") else None
         if key is None:
             key = str(len(self._items))
@@ -1503,7 +1504,6 @@ class InputItemContentLayout(QtWidgets.QLayout):
         self._items[key] = index
         self._index_map[index] = item
         self._next_index += 1
-
 
     def addWidgets(self, widgets: dict):
         for key, item in widgets.items():
@@ -1518,8 +1518,7 @@ class InputItemContentLayout(QtWidgets.QLayout):
     def takeAt(self, index):
         return self._index_map.pop(index, None)
 
-
-    def setGeometry(self, rect : QtCore.QRect):
+    def setGeometry(self, rect: QtCore.QRect):
         super().setGeometry(rect)
 
         spacing = self.spacing()
@@ -1551,15 +1550,12 @@ class InputItemContentLayout(QtWidgets.QLayout):
     def sizeHint(self) -> QtCore.QSize:
         """Computes the ideal bounding footprint of the layout."""
         width = 230
-        height =  self._computed_height
+        height = self._computed_height
         return QtCore.QSize(width, height)
 
     def minimumSize(self) -> QtCore.QSize:
         """Prevents layout from crushing down to zero space."""
         return self.sizeHint()
-
-
-
 
 
 class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
@@ -1670,7 +1666,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.setObjectName("main_layout")
 
         # main container
-        self._container_widget  = QtWidgets.QWidget()
+        self._container_widget = QtWidgets.QWidget()
         self._container_layout = QtWidgets.QVBoxLayout(self._container_widget)
         self._container_layout.setContentsMargins(0, 0, 0, 0)
         self._container_layout.setSpacing(0)
@@ -1705,7 +1701,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._title_bar_widget.setObjectName("title_bar")
         self._title_bar_widget.setFixedHeight(32)
 
-
         # title bar left side
 
         self._title_text_widget = gremlin.ui.ui_common.QIconLabel()
@@ -1726,9 +1721,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._title_container_layout.setColumnStretch(1, 1)
 
         self._container_layout.addWidget(self._title_bar_widget)
-
-
-
 
         # icon setup
         size = self._getIconSize()  # icon size
@@ -1762,7 +1754,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         # clear input curve button
         self.clear_curve_widget = None
 
-
         self._toolbar_buttons = []
 
         if self.is_axis:
@@ -1772,58 +1763,57 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
             self._curve_container_layout.addStretch()
 
-
             css = gremlin.ui.ui_common.Color.cssInputHeaderButton()
 
-            self._curve_button_widget = gremlin.ui.ui_common.QDataPushButton(icon=self._curve_icon_inactive, size=size,callback=self._curve_button_cb, tooltip="Input Curve", css=css)
+            self._curve_button_widget = gremlin.ui.ui_common.QDataPushButton(
+                icon=self._curve_icon_inactive, size=size, callback=self._curve_button_cb, tooltip="Input Curve", css=css
+            )
 
             self._curve_container_layout.addWidget(self._curve_button_widget)
             self._toolbar_buttons.append(self._curve_button_widget)
 
-            self._calibration_button_widget = gremlin.ui.ui_common.QDataPushButton(icon=self._calibration_icon_active, size=size,callback=self._calibration_button_cb, tooltip="Device calibration options", css=css)
+            self._calibration_button_widget = gremlin.ui.ui_common.QDataPushButton(
+                icon=self._calibration_icon_active, size=size, callback=self._calibration_button_cb, tooltip="Device calibration options", css=css
+            )
             self._curve_container_layout.addWidget(self._calibration_button_widget)
             self._toolbar_buttons.append(self._calibration_button_widget)
 
-            self.clear_curve_widget = gremlin.ui.ui_common.QDataPushButton(icon=load_icon("mdi.delete"), size=size, callback=self._clear_curve_cb, tooltip="Clear Curve", css=css)
+            self.clear_curve_widget = gremlin.ui.ui_common.QDataPushButton(
+                icon=load_icon("mdi.delete"), size=size, callback=self._clear_curve_cb, tooltip="Clear Curve", css=css
+            )
             self._curve_container_layout.addWidget(self.clear_curve_widget)
             self._toolbar_buttons.append(self.clear_curve_widget)
 
-
-
         # description row
-        self._description_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(style="font-style: italic;", data = "description")
+        self._description_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(style="font-style: italic;", data="description")
         self._description_icon = None
 
-
         # action icons
-        self._action_icon_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data = "action icons")
-
+        self._action_icon_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data="action icons")
 
         # input description row
-        self._input_description_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(data = "input description")
+        self._input_description_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(data="input description")
         self._input_description_icon = None
 
         # custom widget row (used by some inputs to display custom UI elements like keyboard )
-        self._custom_container_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data = "custom content")
+        self._custom_container_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data="custom content")
 
         # repeater
-        self.axis_repeater_widget = None # axis repeater
-        self.button_repeater_widget = None # button repeater
-        self._repeater_container_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data = "repeater")
-
+        self.axis_repeater_widget = None  # axis repeater
+        self.button_repeater_widget = None  # button repeater
+        self._repeater_container_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data="repeater")
 
         # comment row
-        self._comment_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(data = "comment")
+        self._comment_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(data="comment")
 
         # status row
-        self._status_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(data = "status"  )
+        self._status_widget = gremlin.ui.ui_common.AutoHideIconTextWidget(data="status")
 
         # container ID row
         self._container_id_widget = gremlin.ui.ui_common.AutoHideStackedWidget()
 
-
         # item content setup below the title bar
-        #self._content_widget = gremlin.ui.ui_common.AutohideContainer()
+        # self._content_widget = gremlin.ui.ui_common.AutohideContainer()
         self._content_widget = QtWidgets.QWidget()
         self._content_layout = QtWidgets.QVBoxLayout(self._content_widget)
         self._content_layout.setContentsMargins(4, 4, 4, 4)
@@ -1834,7 +1824,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             # "t1": QtWidgets.QLabel("t1"),
             # "t2": QtWidgets.QLabel("t2"),
             # "t3": QtWidgets.QLabel("t3"),
-
             "repeater": self._repeater_container_widget,
             "action_icons": self._action_icon_widget,
             "description": self._description_widget,
@@ -1850,8 +1839,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         for key, widget in items.items():
             self._content_layout.addWidget(widget)
 
-
-        #InputItemContentLayout(widgets = items, parent = self._content_widget)
+        # InputItemContentLayout(widgets = items, parent = self._content_widget)
 
         self._container_layout.addWidget(self._content_widget)
 
@@ -1880,14 +1868,13 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.ensureStyle()
 
         self._autohide_widgets = gremlin.util.get_widget_references(self, gremlin.ui.ui_common.AutoHideStackedWidget)
-        self.widget_height= self.sizeHint().height()
+        self.widget_height = self.sizeHint().height()
 
     def resizeEvent(self, event):
         # update the size record when the widget is resized
         super().resizeEvent(event)
         size = self.size()
         self.widget_height = size.height()
-
 
     def setInputItem(self, input_item: InputItem):
         """sets the input item for this widget"""
@@ -1953,8 +1940,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
     def trigger(self):
         """triggers the widget to send the selection state again"""
         self._fireSelectionChangeCallbacks()
-
-
 
     @property
     def input_item(self) -> "InputItem":
@@ -2063,8 +2048,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             # selected state
             self._container_id_widget.layout().addWidget(QtWidgets.QLabel(f"Selected: {self.selected}"))
         else:
-            self._container_id_widget.setWidget(None) #hide
-
+            self._container_id_widget.setWidget(None)  # hide
 
     def _connect_events(self):
         el = gremlin.event_handler.EventListener()
@@ -2109,7 +2093,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         gremlin.util.clear_widget_references(self)
 
         gremlin.util.clear_layout(self.main_layout)
-
 
     @property
     def content_layout(self):
@@ -2161,7 +2144,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         widget = None  # widget created for the repeater
 
         if config.show_input_axis:
-
             input_item = self.input_item
             if (input_item.is_axis or input_item.is_button or input_item.is_hat) or input_type in (
                 InputType.JoystickAxis,
@@ -2211,7 +2193,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                         )
                         self.button_repeater_widget = widget
                         self._repeater_container_widget.setWidget(widget)
-
 
     def _message_key_changed(self, old_message_key, new_message_key):
         state_tracker = gremlin.ui.ui_common.StateTracker()
@@ -2377,7 +2358,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         for widget in widgets:
             layout.addWidget(widget)
 
-
     def setInputDescription(self, description: str | None):
         """sets the input description for an input widget (optional)"""
         if description:
@@ -2397,15 +2377,13 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         """sets the status"""
         self._status_widget.setText(status, icon)
 
-
     def setDescription(self, description: str | None):
         """sets the description of the input widget"""
         self._description_widget.setText(description)
 
-    def setComment(self, value : str | None, icon=None):
+    def setComment(self, value: str | None, icon=None):
         """sets the comment field of the input widget"""
         self._comment_widget.setText(value, icon)
-
 
     def setToolTip(self, tooltip):
         """sets the tooltip for the widget"""
@@ -2414,7 +2392,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
     def setIcon(self, icon_path, use_qta=True):
         """sets the widget's icon"""
         self._title_text_widget.setIcon(icon_path, use_qta)
-
 
     def update_display(self):
         gremlin.util.InvokeUiMethod(self._update_display_ui)
@@ -2521,14 +2498,16 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         if self._selected:
             # css = gremlin.ui.ui_common.Color.cssItemSelected()
             css = f"background-color: {gremlin.ui.ui_common.Color.selectColor()};"
-            self._container_widget.setStyleSheet(css)
+            if self._container_widget:
+                self._container_widget.setStyleSheet(css)
             # css_bar = gremlin.ui.ui_common.Color.cssSelectedInputHeader()
             bar_color = gremlin.ui.ui_common.Color.getHoverColor(gremlin.ui.ui_common.Color.selectColor(), 1.05).name()
             css_bar = f"background-color: {bar_color}; border:none; padding: 0px; margin: 0px; border-radius: 0px;"
 
         else:
             css = f"background-color: {gremlin.ui.ui_common.Color.unselectedBackgroundColor()};"
-            self._container_widget.setStyleSheet(css)
+            if self._container_widget:
+                self._container_widget.setStyleSheet(css)
 
             self._default_style()
             # css_bar = gremlin.ui.ui_common.Color.cssUnselectedInputHeader()
@@ -2536,7 +2515,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             css_bar = f"background-color: {bar_color}; border:none;"
 
         # update style for title bar
-        self._title_bar_widget.setStyleSheet(css_bar)
+
+        if self._title_bar_widget:
+            self._title_bar_widget.setStyleSheet(css_bar)
 
         # update the style for the buttons
         for widget in self._toolbar_buttons:
@@ -2633,7 +2614,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         widget, layout = gremlin.ui.ui_common.getGridContainer()
         layout.addWidget(QtWidgets.QWidget(), 0, 0)
-        layout.setColumnStretch(0, 1) # right align the icons
+        layout.setColumnStretch(0, 1)  # right align the icons
         self._action_icon_widget.setWidget(widget)
 
         if input_item.containers:
@@ -2666,7 +2647,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             label.setFont(font)
             label.setToolTip("No mappings found")
             layout.addWidget(label, 0, 1)
-            #self._setWidgetHeight(self._action_container_widget, rh)
+            # self._setWidgetHeight(self._action_container_widget, rh)
 
     def clear_action_icon(self, input_item, action_to_remove):
         """delete an action icon"""
@@ -2702,14 +2683,14 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                                     col = 1
                                     row += 1
 
-            #self._setWidgetHeight(self._action_container_widget, rh * (row + 1))
+            # self._setWidgetHeight(self._action_container_widget, rh * (row + 1))
         else:
             layout.addWidget(
                 QtWidgets.QLabel("∅", alignment=QtCore.Qt.AlignmentFlag.AlignRight),
                 0,
                 1,
             )
-            #self._setWidgetHeight(self._action_container_widget, rh)
+            # self._setWidgetHeight(self._action_container_widget, rh)
 
     def findAction(self, action):
         """true if the action is found in our containers"""
@@ -3968,9 +3949,7 @@ class InputItemListView(AbstractView):
             self._last_selected_widget = widget
             self._fireSelectionChangeCallbacks(last_widget, widget)  # trigger updates on selection change if any
 
-
             self.ensureVisible(widget)  # ensure the selected widget is visible in the scroll area
-
 
         return widget
 
@@ -3999,12 +3978,11 @@ class InputItemListView(AbstractView):
 
     def ensureVisible(self, widget):
         """makes the widget visible in the scroll area, if it is not already visible"""
-        #gremlin.util.singleShot(self._create_scroll_callback(widget))
+        # gremlin.util.singleShot(self._create_scroll_callback(widget))
         if gremlin.util.is_ui_thread():
             self._scroll_to_item_ui(widget)
         else:
             gremlin.util.InvokeUiMethod(self._scroll_to_item_ui, widget)
-
 
     def ensureVisibleIndex(self, index):
         """makes the widget at the given index visible in the scroll area, if it is not already visible"""
@@ -5233,11 +5211,11 @@ class ActionSet(AbstractCallbackModel):
 
         super().clear()
 
-    def add_action(self, action : AbstractAction):
+    def add_action(self, action: AbstractAction):
         """adds the given action to the set"""
         self.add(action)
 
-    def remove_action(self, action : AbstractAction, delete=True):
+    def remove_action(self, action: AbstractAction, delete=True):
         """removes the given action from the set
         :param action: the action
         :param delete: if true, deletes the action from the profile
@@ -7089,12 +7067,7 @@ class ActionSelector(QtWidgets.QWidget):
     action_added = QtCore.Signal(str)  # add button pressed
     action_paste = QtCore.Signal(object, object)  # paste button pressed ()
 
-
-    def __init__(self, input_type : InputType,
-                  input_item : InputItem,
-                  data=None, callback: Callable = None,
-                  callback_paste: Callable = None,
-                  parent=None):
+    def __init__(self, input_type: InputType, input_item: InputItem, data=None, callback: Callable = None, callback_paste: Callable = None, parent=None):
         """Creates a new selector instance.
 
         :param input_type the input type for which the action selector is being created
@@ -7144,7 +7117,6 @@ class ActionSelector(QtWidgets.QWidget):
                 self.add_button,
                 # self.help_widget,
                 self.paste_button,
-
             ]
         )
 
@@ -7297,8 +7269,6 @@ class ActionSelector(QtWidgets.QWidget):
         action_name = self.action_dropdown.currentText()
         self._fireCallbacks(action_name, "add")
         self.action_added.emit(action_name)
-
-
 
     def _handle_paste_action(self):
         """handle paste action"""
@@ -7789,14 +7759,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             data=container,
         )
 
-        self.title_frame_widget = gremlin.ui.ui_common.QBorderWidget()
-        self.title_frame_widget.addWidget(self._title_bar_widget)
-
-        # self.title_frame_widget.setMaximumWidth(600)
-        self.title_frame_widget.setMinimumWidth(200)
-
-        self.title_frame_widget.setBackgroundColor(gremlin.ui.ui_common.Color.containerBackgroundColor())
-        self.collapsible_widget = gremlin.ui.ui_common.QCollapsible(title_widget=self.title_frame_widget)
+        self.collapsible_widget = gremlin.ui.ui_common.QCollapsible(title_widget=self._title_bar_widget)
         self.collapsible_widget.toggled.connect(self._handle_toggled)
 
         # self.setTitleBarWidget(self._title_bar_widget)
@@ -8044,7 +8007,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.container.unregisterChangeCallback(self._handle_container_changed)
 
     def _create_action_tab(self):
-        """ create the widget for the container's action tab """
+        """create the widget for the container's action tab"""
         self._action_tab_container_widget = QtWidgets.QWidget()
         self._action_tab_container_layout = QtWidgets.QVBoxLayout(self._action_tab_container_widget)
 
@@ -8525,6 +8488,8 @@ class TitleBar(QtWidgets.QWidget):
 
         super().__init__(parent)
 
+        self.setContentsMargins(0, 0, 0, 0)
+
         el = gremlin.event_handler.EventListener()
         el.show_container_id_changed.connect(self._show_container_id_changed)
 
@@ -8637,23 +8602,6 @@ class TitleBar(QtWidgets.QWidget):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.addWidget(widget)
-
-        # self.main_layout.setContentsMargins(5, 0, 5, 0)
-
-        # self.main_layout.addWidget(self.label)
-        # self.main_layout.addWidget(self.id_widget)
-        # if self.priority_container:
-        #     self.main_layout.addWidget(self.priority_container)
-        # self.main_layout.addWidget(QtWidgets.QLabel("Notes:"))
-        # self.main_layout.addWidget(self.comment_widget)
-        # self.main_layout.addStretch()
-        # self.main_layout.addWidget(self.extra_widget)
-
-        # if clipboard_cb:
-        #     self.main_layout.addWidget(self.copy_button)
-
-        # self.main_layout.addWidget(self.help_button)
-        # self.main_layout.addWidget(self.close_button)
 
         self._show_container_id_changed_ui()
 
@@ -8893,7 +8841,6 @@ class ContainerView(AbstractView):
         self._main_layout = QtWidgets.QVBoxLayout(self)
         self._main_layout.setContentsMargins(0, 0, 0, 0)
         self._redraw_lock = False
-
 
         if verbose:
             self._main_layout.addWidget(QtWidgets.QLabel(f"ContainerView: [{input_item.display_name}]"))
@@ -9177,7 +9124,6 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self._spacer_height = spacer_height
 
         self._container_view = None
-
 
         self._drawn_once = False
 
@@ -12058,7 +12004,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 syslog.info(f"DeviceTabWidget: select input index [{index}]")
             self._input_item_list_view.selectItemAt(index, force=force, emit=emit)
             self._input_item_list_view.ensureVisibleIndex(index)
-
 
         else:
             if verbose:
