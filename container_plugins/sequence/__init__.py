@@ -604,40 +604,52 @@ class SequenceContainerWidget(AbstractContainerWidget):
         # Insert action widgets
         for index, action_set in enumerate(self.container.action_sets):
             # options widget
+            size = 24
 
             options: StepOptions = self.container.getOptions(index)
             options_widget = StepOptionsWidget(self.container, options)
             step_widget = gremlin.ui.ui_common.QFrameBox(f"<b>Step {index + 1}</b>")
-            step_container = gremlin.ui.ui_common.getVContainer([step_widget, QtWidgets.QLabel(" ")], widget_only=True)
+
+            # step_container = gremlin.ui.ui_common.getVContainer([step_widget, QtWidgets.QLabel(" ")], widget_only=True)
 
             remove_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._handle_delete_step,
                                                                                 tooltip = f"Delete Step [{index + 1}]",
                                                                                 data = action_set)
-            remove_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
+            remove_widget.setFixedSize(size, size)
+            #remove_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Minimum)
 
 
 
 
             step_up_widget = gremlin.ui.ui_common.Buttons.getMoveUpWidget(callback=self._handle_move_step_up,
                                                                               data = action_set) if index > 0 else None
+            if step_up_widget:
+                step_up_widget.setFixedSize(size, size)
 
 
             step_down_widget = gremlin.ui.ui_common.Buttons.getMoveDownWidget(callback=self._handle_move_step_down,
                                                                               data = action_set) if index < len(self.container.action_sets) - 1 else None
+            if step_down_widget:
+                step_down_widget.setFixedSize(size, size)
 
             step_top_widget = gremlin.ui.ui_common.Buttons.getMoveTopWidget(callback=self._handle_move_step_top,
                                                                           data = action_set) if index > 0 else None
+            if step_top_widget:
+                step_top_widget.setFixedSize(size, size)
 
             step_bottom_widget = gremlin.ui.ui_common.Buttons.getMoveBottomWidget(callback=self._handle_move_step_bottom,
                                                                               data = action_set) if index < len(self.container.action_sets) - 1 else None
+            if step_bottom_widget:
+                step_bottom_widget.setFixedSize(size, size)
 
 
             move_container = gremlin.ui.ui_common.getHContainer([step_up_widget, step_down_widget, step_top_widget, step_bottom_widget, remove_widget], widget_only=True)
-            move_container.setStyleSheet("background-color: transparent;")
+
 
 
             widgets = [
-                step_container,
+                step_widget,
+                # step_container,
                 options_widget,
                 "||",
                 move_container
@@ -645,9 +657,12 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
 
             container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
-            header_widget = gremlin.ui.ui_common.QHorizontalLine(color = gremlin.ui.ui_common.Color.headerBarBorderColor(), size = 4)
+            #header_widget = gremlin.ui.ui_common.QHorizontalLine(color = gremlin.ui.ui_common.Color.headerBarBorderColor(), size = 4)
+            #container_widget.setStyleSheet(f".QWidget {{ background-color: {gremlin.ui.ui_common.Color.headerBarBackgroundColor()}; border-top: 4px solid {gremlin.ui.ui_common.Color.headerBarBorderColor()}; }}")
+            container_widget.setStyleSheet(f".QWidget {{ background-color: {gremlin.ui.ui_common.Color.headerBarBackgroundColor()}; }}")
+            container_widget.setContentsMargins(4, 4, 4, 4)
 
-            self.step_layout.addWidget(header_widget)
+            #self.step_layout.addWidget(header_widget)
             self.step_layout.addWidget(container_widget)
 
             widget = self._create_action_set_widget(self.container.action_sets[index], "Step", ContainerViewTypes.Action)

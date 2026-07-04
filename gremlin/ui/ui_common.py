@@ -414,7 +414,7 @@ class Color:
 
     @staticmethod
     def headerBarBackgroundColor():
-        return "#2C3D2B" if gremlin.shared_state.is_dark_theme else "#9B9B9B"
+        return "#333333" if gremlin.shared_state.is_dark_theme else "#C5C5C5"
 
     @staticmethod
     def headerBarBorderColor():
@@ -629,11 +629,14 @@ class Color:
         border_color = Color.borderColor()
         background_color = Color.frameColor()
         css = f"""
-            QFrame {{
-                border: 2px solid {border_color};
+            .QFrame {{
+                border: 2px solid;
+                border-color: {border_color};
+                border-radius: 6px;
                 background: {background_color};
+                margin: 4px;
             }}
-            QLabel {{
+            .QLabel {{
                 border: none;
             }}
             """
@@ -1409,12 +1412,13 @@ class Buttons:
 
     @staticmethod
     def getDeleteWidget(label=None, tooltip="Delete", callback=None, no_keyboard=True, data=None):
-        return Buttons._template(label, "mdi6.delete", tooltip, callback, no_keyboard, data)
+        button = Buttons._template(label, "mdi6.delete", tooltip, callback, no_keyboard, data)
+        return button
 
     @staticmethod
     def getAddWidget(label="Add", tooltip="Add", callback=None, no_keyboard=True, data=None):
         button = Buttons._template(label, "ri.add-line", tooltip, callback, no_keyboard, data)
-        button.setMinimumHeight(24)
+        # button.setMinimumHeight(24)
         # button.setFixedWidth(get_text_width(label)*1.3)
         # button.setStyleSheet(f" QPushButton {{margin-left: none;}}")
         return button

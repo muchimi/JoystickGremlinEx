@@ -2244,7 +2244,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         grids.append(self.container_mode_selector_widget)
 
         self.virtual_device_label_widget = QtWidgets.QLabel("Device:")
-        self.virtual_device_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.virtual_device_selector_widget = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_virtual_device_input_changed)
         self.virtual_device_selector_widget.setFixedWidth(width)
 
         self.container_device_selector_widget = gremlin.ui.ui_common.getGridContainer(
@@ -2255,7 +2255,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         grids.append(self.container_device_selector_widget)
 
         self.virtual_output_label_widget = QtWidgets.QLabel("Output:")
-        self.virtual_output_selector_widget = gremlin.ui.ui_common.QDataComboBox()
+        self.virtual_output_selector_widget = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_virtual_output_changed)
         self.virtual_output_selector_widget.setFixedWidth(width)
 
         self._next_unused_widget = gremlin.ui.ui_common.QDataPushButton(
@@ -2363,7 +2363,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         # selector hooks
         self.virtual_device_selector_widget.currentIndexChanged.connect(self._handle_virtual_device_input_changed)
-        self.virtual_output_selector_widget.currentIndexChanged.connect(self._handle_virtual_output_changed)
+        # self.virtual_output_selector_widget.currentIndexChanged.connect(self._handle_virtual_output_changed)
 
         # set axis range widget
         self.axis_range_container_widget = QtWidgets.QWidget()
@@ -3249,6 +3249,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
                 # self._populate_grid(self.action_data.vjoy_id, input_id)
                 self.notify_device_changed()
+
+
 
     def _handle_hat_selector_changed(self, index):
         """occurs when hat is changed"""
@@ -6274,7 +6276,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         self._vjoy_input_id: int = 1
         self._vjoy_axis_id = 1
-        self._vjoy_button_id = 1
+        self._virtual_button_id = 1
         self.vjoy_hat_id = 1
         self.vjoy_hat_position = (0, 0)  # hat position as a tuple
         self.vjoy_hat_return_position = (
@@ -6474,21 +6476,22 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     @property
     def vjoy_button_id(self) -> int:
-        return self._vjoy_button_id
+        return self.virtual_input_id
+
 
     @vjoy_button_id.setter
     def vjoy_button_id(self, value: int):
-        self._vjoy_button_id = value
+        self.virtual_input_id = value
 
     @property
     def virtual_input_id(self) -> int:
         """returns the virtual input id for this action"""
-        return self.vjoy_input_id
+        return self._virtual_button_id
 
     @virtual_input_id.setter
     def virtual_input_id(self, value: int):
         """sets the virtual input id for this action"""
-        self._vjoy_button_id = value
+        self._virtual_button_id = value
 
 
     @property
@@ -7205,11 +7208,12 @@ Supports axis merging, curved output, command, hat and button mappings.
             VjoyAction.VJoyAxisToButton,
         ):
             # button
-            if self.vjoy_button_id != index:
-                self.vjoy_button_id = index
+            self.vjoy_button_id = index
+            self.virtual_input_id = index
 
         else:
             self.vjoy_input_id = index
+            self.virtual_input_id = index
 
     def get_input_id(self):
         """returns input id based on the action mode"""
@@ -7729,6 +7733,10 @@ Supports axis merging, curved output, command, hat and button mappings.
                 node.set("repeat", safe_format(self.pulse_repeat, bool))
                 node.set("repeat-delay", safe_format(self.pulse_repeat_delay, int))
 
+
+        if VjoyAction.is_button_action(self.action_mode):
+            node.set("button", safe_format(self.virtual_input_id, int))
+
         if self.curve_data is not None:
             curve_node = self.curve_data._generate_xml()
             node.append(curve_node)
@@ -7743,7 +7751,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         node.set("grid_visible", safe_format(self.grid_visible, bool))
 
         if write_node_input:
-            node.set("input", safe_format(self.vjoy_input_id, int))
+            node.set("input", safe_format(self.virtual_input_id, int))
 
         return node
 
@@ -7753,7 +7761,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         :return True if the action is configured correctly, False otherwise
         """
 
-        if self.virtual_id is None or self.vjoy_input_id is None:
+        if self.virtual_id is None or self.virtual_input_id is None:
             return False
         return True
 
