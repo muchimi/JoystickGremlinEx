@@ -1318,7 +1318,6 @@ There should only be one GremlinEx master server on the subnet.
         )
         widgets.append(widget)
 
-
         for widget in widgets:
             box1.addWidget(widget)
 
@@ -1374,8 +1373,6 @@ There should only be one GremlinEx master server on the subnet.
         )
         widgets.append(widget)
 
-
-
         widget = gremlin.ui.ui_common.getFlowContainer(widgets, widget_only=True)
         page_layout.addWidget(widget)
 
@@ -1383,7 +1380,7 @@ There should only be one GremlinEx master server on the subnet.
         self.tab_container.addTab(content_widget, "Filter")
 
     @QtCore.Slot()
-    def _handle_checkbox_filter(self, widget, checked : bool):
+    def _handle_checkbox_filter(self, widget, checked: bool):
         if widget.data == "unhide_on_highlight":
             self.config.filter_auto_unhide = checked
 
@@ -3408,7 +3405,7 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
         return False  # don't close
 
 
-class ModeManagerUi(ui_common.BaseDialogUi):
+class ModeManagerDialog(ui_common.BaseDialogUi):
     """Enables the creation of modes and configuring their inheritance."""
 
     def __init__(self, profile, mode=None, parent=None):
@@ -3596,14 +3593,14 @@ The setting can be overriden by the global mode reload option set in Options for
             self.mode_dropdowns[mode].setCurrentText(inherit)
 
             # Rename mode button
-            self.mode_rename[mode] = gremlin.ui.ui_common.QDataPushButton(load_icon("ei.edit"), "")
+            self.mode_rename[mode] = gremlin.ui.ui_common.QDataPushButton(icon=load_icon("ei.edit"))
             self.mode_rename[mode].setMaximumWidth(20)
             self.mode_layout.addWidget(self.mode_rename[mode], row, 2)
             self.mode_rename[mode].clicked.connect(self._create_rename_mode_cb(mode))
             self.mode_rename[mode].setToolTip("Edit")
 
             # Delete mode button
-            self.mode_delete[mode] = gremlin.ui.ui_common.QDataPushButton(load_icon("mdi.delete"), "")
+            self.mode_delete[mode] = gremlin.ui.ui_common.QDataPushButton(icon=load_icon("mdi.delete"))
             self.mode_delete[mode].setMaximumWidth(20)
             self.mode_delete[mode].setToolTip("Delete")
             self.mode_layout.addWidget(self.mode_delete[mode], row, 3)

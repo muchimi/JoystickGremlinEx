@@ -2709,7 +2709,7 @@ class SimconnectOptionsUi(gremlin.ui.ui_common.QRememberDialog):
             default_mode = profile.get_default_mode()
             profile.add_mode(item.sim_name, default_mode)
             # display the UI box
-            dialog = gremlin.ui.dialogs.ModeManagerUi(profile)
+            dialog = gremlin.ui.dialogs.ModeManagerDialog(profile)
             dialog.setWindowModality(QtCore.Qt.ApplicationModal)
             dialog.show()
         else:

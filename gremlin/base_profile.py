@@ -3632,7 +3632,7 @@ class Profile:
                 mode = dev.modes[mode_name]
                 for input_type in mode.config:
                     for input_item in mode.config[input_type].values():
-                        if input_item.input_id == input_id:
+                        if input_item and input_item.input_id == input_id:
                             return input_item
 
         return None

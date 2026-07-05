@@ -3913,8 +3913,9 @@ class InputItemListView(AbstractView):
             if verbose:
                 syslog.info(f"\tindex [{index}] is already selected")
             widget: InputItemWidget = self.widget(index)
-            widget.trigger()
-            return  # nothing to do if the current index is the same as the new index
+            if widget:
+                widget.trigger()
+                return  # nothing to do if the current index is the same as the new index
 
         if index == -1:
             # get the first selected widget - if any
@@ -6068,17 +6069,21 @@ class ConditionModel(AbstractCallbackModel):
     def __init__(
         self,
         action_data: AbstractContainer | AbstractAction | ConditionContainer,
-        condition_data: BaseActivationCondition = None,  # noqa: F405
+        # condition_data: BaseActivationCondition = None,  # noqa: F405
     ):
         """Creates a new model to store condition data.
 
-        :param action_data the condition data to represent (container, action or condition container)
-        :param parent the parent of this object
+        :param action_data the action data to represent (container, action or condition container)
+        :param condition_data the condition data to represent
         """
 
+        assert isinstance(action_data, (AbstractContainer, AbstractAction, ConditionContainer)), "invalid action_data"
+        # assert condition_data is None or isinstance(condition_data, BaseActivationCondition), "invalid condition_data"
+
         super().__init__(allowed_types=(BaseAbstractCondition,), model_description="ConditionModel")
-        self.condition_data = condition_data
+        # self.condition_data = condition_data
         # self.action_data = action_data
+
         self.container = None
         if isinstance(action_data, AbstractContainer):
             self.container = action_data
@@ -6095,75 +6100,69 @@ class ConditionModel(AbstractCallbackModel):
         """input item the condition applies to"""
         return self.container.input_item
 
-    def rows(self):
-        """Returns the number of rows in the model.
-        :return number of rows
-        """
-        return len(self.condition_data.conditions)
+    # def add_condition(self, condition):
+    #     """Adds a condition to to the model.
 
-    def data(self, index):
-        """Returns the data stored at the given index.
+    #     :param condition_data the condition data to add
+    #     """
 
-        :param index the index for which to return the data
-        :return the data stored at the provided index
-        """
-        return self.condition_data.conditions[index]
+    #     self.add(condition)
 
-    def add_condition(self, condition):
-        """Adds a condition to to the model.
+    #     # condition.setOwner(self.condition_data)
 
-        :param condition_data the condition data to add
-        """
+    #     tracker = ConditionTracker()
+    #     mode = gremlin.shared_state.current_mode
+    #     container = self.container
+    #     input_item = self.input_item
+    #     if input_item:
+    #         data = ConditionTrackerData(mode, input_item, container, condition, rule=ActivationRule.All)
+    #         tracker.registerCondition(data)
+    #     el = gremlin.event_handler.EventListener()
+    #     el.condition_state_changed.emit(container)
 
-        self.condition_data.conditions.append(condition)
-        condition.setOwner(self.condition_data)
-        tracker = ConditionTracker()
-        mode = gremlin.shared_state.current_mode
-        container = self.container
-        input_item = self.input_item
-        if input_item:
-            data = ConditionTrackerData(mode, input_item, container, condition, rule=ActivationRule.All)
-            tracker.registerCondition(data)
-        self.data_changed.emit()
-        el = gremlin.event_handler.EventListener()
-        el.condition_state_changed.emit(container)
+    # def delete_condition(self, condition):
+    #     """Deletes a condition from the model.
 
-    def delete_condition(self, condition):
-        """Deletes a condition from the model.
+    #     Attempts to locate the provided condition and deletes it, if it is
+    #     present.
 
-        Attempts to locate the provided condition and deletes it, if it is
-        present.
+    #     :param condition the condition to remove.
+    #     """
 
-        :param condition the condition to remove.
-        """
-        if condition in self.condition_data.conditions:
-            self.condition_data.conditions.remove(condition)
+    #     # if condition in self.condition_data.conditions:
+    #     #     self.condition_data.conditions.remove(condition)
 
-        if self.input_item:
-            tracker = ConditionTracker()
-            tracker.unregisterCondition(condition)
+    #     if self.input_item:
+    #         tracker = ConditionTracker()
+    #         tracker.unregisterCondition(condition)
 
-        container = self.container
+    #     container = self.container
 
-        el = gremlin.event_handler.EventListener()
-        el.condition_state_changed.emit(container)
-        self.data_changed.emit()
+    #     self.remove(condition)
 
-    @property
-    def rule(self):
-        """Returns the current application rule for the conditions.
+    #     el = gremlin.event_handler.EventListener()
+    #     el.condition_state_changed.emit(container)
+    #     # self.data_changed.emit()
 
-        :return current application rule of conditions
-        """
-        return self.condition_data._rule
+    # @property
+    # def rule(self) -> None | ActivationRule:
+    #     """Returns the current application rule for the conditions.
 
-    @rule.setter
-    def rule(self, rule):
-        """Sets the application rule of the conditions.
+    #     :return current application rule of conditions
+    #     """
+    #     if self.condition_data is None:
+    #         return None
+    #     return self.condition_data.rule
 
-        :param rule the new application type
-        """
-        self.condition_data._rule = rule
+    # @rule.setter
+    # def rule(self, rule : ActivationRule):
+    #     """Sets the application rule of the conditions.
+
+    #     :param rule the new application type
+    #     """
+    #     assert self.condition_data is not None, "condition data is not set"
+    #     assert isinstance(rule, ActivationRule), "invalid rule type"
+    #     self.condition_data.rule = rule
 
 
 class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
@@ -6189,11 +6188,10 @@ class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
         "mode": BaseModeCondition,
     }
 
-    def __init__(self, conditions: AbstractCallbackModel, rule):
+    def __init__(self, conditions: AbstractCallbackModel, rule: ActivationRule):
         """Creates a new instance."""
         super().__init__()
-        import gremlin.input_item
-
+        assert rule in (ActivationRule.All, ActivationRule.Any), "invalid rule"
         assert isinstance(conditions, AbstractCallbackModel), "invalid condition model"
 
         self._rule = rule
@@ -6241,6 +6239,7 @@ class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
         if "condition_id" in node.attrib:
             self._id = node.get("condition_id")
 
+        self.conditions.clear()
         rule = BaseActivationCondition.rule_lookup[safe_read(node, "rule", str, "")]
         tracker = ConditionTracker()
         mode_node = node
@@ -6261,7 +6260,7 @@ class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
             condition_type = safe_read(cond_node, "condition-type", str, "")
             condition = BaseActivationCondition.condition_lookup[condition_type]()
             condition.from_xml(cond_node, data)
-            self.conditions.append(condition)
+            self.conditions.add(condition)
             condition.setOwner(self)
             if input_item:
                 item = ConditionTrackerData(mode, input_item, container, condition, rule)
@@ -8741,7 +8740,8 @@ class ConditionActionWrapperWidget(AbstractActionWrapper):
             container.activation_condition = BaseActivationCondition(ConditionModel(container), ActivationRule.All)
             container.activation_condition.setContainer(container)
 
-        self.condition_model = ConditionModel(container, container.activation_condition)
+        #self.condition_model = ConditionModel(container, container.activation_condition)
+        self.condition_model = ConditionModel(container)
         self.condition_view = ConditionView(self.condition_model)
         container.condition_view = self.condition_view
         self.condition_view.setContainer(container)
@@ -11364,9 +11364,9 @@ class ConditionView(AbstractView):
 
         if not condition:
             data_type = ConditionView.condition_map[self.condition_selector.currentText().split()[0]][0]
-            self.model.add_condition(data_type())
+            self.model.add(data_type())
         else:
-            self.model.add_condition(condition)
+            self.model.add(condition)
 
     def _rule_changed_cb(self, text):
         """Updates the rule of the model.
@@ -11438,7 +11438,8 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         self.activation_count_widget = QtWidgets.QLabel()
         self.container_condition_frame_layout.addWidget(self.activation_count_widget)
-        self.container_condition_model = ConditionModel(self.container, self.container.activation_condition)
+        # self.container_condition_model = ConditionModel(self.container, self.container.activation_condition)
+        self.container_condition_model = ConditionModel(self.container)
 
         self.container_condition_view = ConditionView(self.container_condition_model)
         self.container_condition_view.setContainer(self.container)

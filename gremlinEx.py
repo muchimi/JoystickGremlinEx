@@ -1281,7 +1281,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def manage_modes(self):
         """Opens the mode management window."""
-        dialog = gremlin.ui.dialogs.ModeManagerUi(self.profile)
+        dialog = gremlin.ui.dialogs.ModeManagerDialog(self.profile)
         self.modal_windows["mode_manager"] = dialog
         dialog.setWindowModality(QtCore.Qt.ApplicationModal)
         dialog.closed.connect(self._handle_mode_manager_closed)
@@ -4995,6 +4995,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # file does not exist
             return
 
+
+
         wm = WorkManager()
         wm.submit(
             callback=self._do_load_profile_internal_worker,
@@ -5028,6 +5030,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info("Profile: worker: start loading")
+
+        syslog.info(f"Profile: worker: loading profile {gremlin.util.toUrl(source_xml)}")
 
         # trap recursive call
         if self._profile_load_stack:
@@ -5888,7 +5892,8 @@ if __name__ == "__main__":
             app = QtWidgets.QApplication(sys.argv)
 
     # application style and css
-    app.setStyle("Fusion")
+    #app.setStyle("Fusion")
+    app.setStyle(gremlin.ui.ui_common.GexAppStyle())
     app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
 
     config = gremlin.config.Configuration()

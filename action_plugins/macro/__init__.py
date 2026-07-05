@@ -1990,7 +1990,7 @@ To send complex sequences, please look at the sequence container."""
                 action_list.append(action_node)
             elif isinstance(entry, gremlin.macro.StateAction):
                 state_node = ElementTree.Element("state")
-                state_node.set("id", entry._state_id)
+                state_node.set("id", write_guid(entry._state_id))
                 state_node.set("key", entry.key)
                 state_node.set("action", entry.action)
                 action_list.append(state_node)

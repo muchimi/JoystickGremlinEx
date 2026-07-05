@@ -22,7 +22,7 @@ import anytree
 import os
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
-from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QProxyStyle, QStyle, QStyleFactory
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QEvent, QSize
 from PySide6.QtGui import QPixmap, QPainter, QIcon
 import collections
@@ -447,7 +447,8 @@ class Color:
 
     @staticmethod
     def infoBackgroundColor():  # color used for information boxes
-        return "#92882b" if gremlin.shared_state.is_dark_theme else "#dbd496"
+        return Color.selectedBackgroundColor()
+        #return "#92882b" if gremlin.shared_state.is_dark_theme else "#dbd496"
 
     def infoColor():  # color used for information boxes
         return "#f1f1f1" if gremlin.shared_state.is_dark_theme else "#3d3d3d"
@@ -770,6 +771,8 @@ class Color:
         radio_checked = f"{prefix}radiobox_marked.png"
 
         header_background_color = Color.headerBackgroundColor()
+        button_background_color = Color.buttonBackgroundColor()
+        button_hover_color = Color.buttonHoverBackgroundColor()
 
         css = f"""
             QCheckBox::indicator {{
@@ -865,6 +868,27 @@ class Color:
 
             QMenu::item:selected {{
                 background-color: {Color.selectedBackgroundColor()};
+            }}
+
+            QToolButton {{
+
+                border-radius: 8px;
+
+                background-color: {button_background_color};
+                height: 24px;
+                width: 24px;
+                padding: 4px;
+                margin-left: 2px;
+                margin-right: 2px;
+            }}
+
+            QToolButton:hover {{
+                border: none;
+                background-color: {button_hover_color};
+            }}
+            QToolButton:pressed {{
+                border: none;
+                background-color: {button_hover_color};
             }}
 
             QWidget[cssClass="title_frame"]  {{
@@ -3432,29 +3456,30 @@ class ModeWidget(QtWidgets.QWidget):
         min_min_sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         exp_min_sp = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
 
-        self.profile_options_button_widget = QIconPushButton(icon=Icons.gearIcon(), tooltip="Profile Options", callback=self._handle_profile_options_cb)
+        self.profile_options_button_widget = QIconPushButton(icon=Icons.gearIcon(), tooltip="Profile Options", callback=self._handle_profile_options_cb, height = 24, width = 24, icon_size=18)
 
         # Create mode selector and related widgets
         self.edit_label = QtWidgets.QLabel(self._label)
         self.edit_label.setSizePolicy(min_min_sp)
-        self.edit_mode_selector = QDataComboBox()
-        self.edit_mode_selector.setSizePolicy(exp_min_sp)
+        self.edit_mode_selector = QDataComboBox(tooltip=self._tooltip, callback=self._edit_mode_changed_cb)
+        self.edit_mode_selector.setMaximumHeight(24)
         self.edit_mode_selector.setMinimumContentsLength(20)
-        self.edit_mode_selector.setToolTip(self._tooltip)
+
 
         # add the mode change button
-        self.mode_change = QtWidgets.QPushButton()
-        is_dark = gremlin.shared_state.is_dark_theme
-        manage_modes_icon = "dark_manage_modes.svg" if is_dark else "manage_modes.svg"
-        self.mode_change.setIcon(load_icon(manage_modes_icon))
-        self.mode_change.setToolTip("Manage Profile Modes")
-        self.mode_change.clicked.connect(self._manage_modes_cb)
+        #is_dark = gremlin.shared_state.is_dark_theme
+        manage_modes_icon = load_icon("mdi6.file-tree-outline") #("dark_manage_modes.svg") if is_dark else load_icon("manage_modes.svg")
 
-        # Connect signal
-        self.edit_mode_selector.currentIndexChanged.connect(self._edit_mode_changed_cb)
+        self.mode_change = QIconPushButton(icon=manage_modes_icon,
+                                           tooltip="Manage Profile Modes",
+                                           callback=self._manage_modes_cb,
+                                           height = 24,
+                                           width = 24,
+                                           icon_size=18,
+                                           )
 
         # Add widgets to the layout
-        self.main_layout.addStretch(10)
+        #self.main_layout.addStretch(10)
 
         self.main_layout.addWidget(self.edit_label)
         self.main_layout.addWidget(self.edit_mode_selector)
@@ -4505,6 +4530,9 @@ class QDataPushButton(QtWidgets.QPushButton):
         css : str= None,
         icon : QtGui.QIcon = None,
         size : int | QtCore.QSize = None,
+        height : int = None,
+        width : int = None,
+        icon_size : int =None
     ):
         """custom push button
 
@@ -4538,6 +4566,9 @@ class QDataPushButton(QtWidgets.QPushButton):
         assert isinstance(css, (type(None), str)),"invalid css"
         assert isinstance(icon, (type(None), (QtGui.QIcon, str))),"invalid icon"
         assert isinstance(size, (type(None), int, QtCore.QSize)),"invalid size"
+        assert isinstance(height, (type(None), int)),"invalid height"
+        assert isinstance(width, (type(None), int)),"invalid width"
+        assert isinstance(icon_size, (type(None), int)),"invalid icon_size"
 
         self.setCallback(callback)
 
@@ -4559,12 +4590,20 @@ class QDataPushButton(QtWidgets.QPushButton):
                 self.setFixedSize(QtCore.QSize(size, size))
             elif isinstance(size, QtCore.QSize):
                 self.setFixedSize(size)
-
+        else:
+            if height and width:
+                self.setFixedSize(QtCore.QSize(width, height))
+            elif height:
+                self.setFixedHeight(height)
+            elif width:
+                self.setFixedWidth(width)
         if icon:
             if isinstance(icon, str):
                 icon = gremlin.util.load_icon(icon)
             if isinstance(icon, QtGui.QIcon):
                 self.setIcon(icon)
+                if icon_size:
+                    self.setIconSize(QtCore.QSize(icon_size, icon_size))
 
 
         if css:
@@ -4673,6 +4712,8 @@ class QIconPushButton(QDataPushButton):
         enabled : bool =None,
         enhanced : bool =False,
         icon_size : int  = 24,
+        height : int =None,
+        width : int =None,
     ):
         """custom push button
 
@@ -4695,7 +4736,7 @@ class QIconPushButton(QDataPushButton):
         #     if len(sig.parameters) != 5:
         #         pass
         super().__init__(
-            text=text, data=data, parent=parent, tooltip=tooltip, callback=callback, callbackEx=callbackEx, clicked=clicked, enabled=enabled, enhanced=enhanced
+            text=text, data=data, parent=parent, tooltip=tooltip, callback=callback, callbackEx=callbackEx, clicked=clicked, enabled=enabled, enhanced=enhanced, height=height, width=width
         )
         self.icon_pressed = None
         self.icon_default = None
@@ -15385,3 +15426,24 @@ class QScrollLayout(QtWidgets.QLayout):
             width = max(width, hint.width())
             height += hint.height()
         return QSize(width, height)
+
+
+class GexAppStyle(QProxyStyle):
+    def __init__(self):
+        # Force the proxy base to use the "Fusion" style layout
+        fusion_base = QStyleFactory.create("fusion")
+        super().__init__(fusion_base)
+
+    def drawComplexControl(self, control, option, painter, widget=None):
+        # Target only toolbar buttons (QToolButton)
+        if control == QStyle.ComplexControl.CC_ToolButton:
+            # Check if the button is currently being pressed down
+            if option.state & QStyle.StateFlag.State_Sunken:
+                painter.save()
+                painter.translate(1, 1)  # offset button on press
+                super().drawComplexControl(control, option, painter, widget)
+                painter.restore()
+                return
+
+        # default style
+        super().drawComplexControl(control, option, painter, widget)
