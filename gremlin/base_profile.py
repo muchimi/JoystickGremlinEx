@@ -24,6 +24,7 @@ import copy
 import logging
 import traceback
 import json
+import time
 # import gremlin.base_classes
 
 from typing import Callable
@@ -2326,12 +2327,20 @@ class Profile:
         self.override_start_mode = None  # override mode for profile startup if any (not persisted)
         el = gremlin.event_handler.EventListener()
         el.edit_mode_changed.connect(self._edit_mode_changed_cb)
+        el.shutdown.connect(self._shutdown_handler)
+
         self._profile_registry = ProfileRegistry(self)
         self._joystick_inputs_loaded = {}  # map of [device_guid] to flag to indicate if all base inputs were loaded for this joystick device
 
         self.initialize_regular_devices()  # non joystick devices
         gremlin.ui.mode_device.ensureMasterInputItems(self)
         gremlin.ui.mode_device.ensureModeInputItems(self, "Default")
+
+    def _shutdown_handler(self):
+        """handles shutdown events"""
+        # ensure the profile config data is persisted
+        config = gremlin.config.Configuration()
+        config.save_profile()
 
     def _handle_device_node_changed(self, data_map, key, old_value: ProfileDeviceNode, new_value: ProfileDeviceNode):
         # def stub(node: ProfileDeviceNode) -> str:
@@ -4524,10 +4533,33 @@ class Profile:
             self._dirty = False
 
     def _readConfig(self) -> dict:
+        """reads the profile config, ensuring it is done on the UI thread"""
+        completed = False
+        def nonlocal_set(var, value):
+            nonlocal completed
+            var = value
+            completed = True
+
+        if gremlin.util.is_ui_thread():
+            return self._readConfig_ui()
+        else:
+            result = None
+            time_max = time.time() + 2.0  # maximum wait time of 5 seconds
+            gremlin.util.InvokeUiMethod(lambda: nonlocal_set(result, self._readConfig_ui()))
+            while not completed and time.time() < time_max:
+                time.sleep(0.01)
+            if not completed:
+                syslog.warning("Profile config read timed out")
+            return result
+
+
+    def _readConfig_ui(self) -> dict:
         """reads the profile config"""
         fname = self._profile_config_fname
         if self._config_data_read:
             return self._config_data
+
+        assert gremlin.util.is_ui_thread(), "Profile config read must be done on the UI thread"
 
         data = {}
         if fname and os.path.isfile(fname):
@@ -4636,6 +4668,8 @@ class Profile:
     def getLastInput(self, device_guid=None) -> tuple:
         """gets the last input for this profile (device_guid, input_type, input_id)"""
         data = self._readConfig()  # get the profile config
+        if data is None:
+            return (None, None, None)
 
         input_id = None
         input_type = None
@@ -4763,7 +4797,7 @@ class Profile:
             if dev.device_type == gremlin.types.DeviceType.State:
                 # state device (modeless) - special handling of state input items
                 state_data = gremlin.shared_state.current_profile.state
-                input_items = [state_data[key].input_item for key in state_data]
+                input_items = [state_data[key] for key in state_data]
                 for item in input_items:
                     result = self._filter_actions_input_item(item, tag_or_list, callback, extra_data)
                     if not result:
@@ -4829,7 +4863,7 @@ class Profile:
             if dev.device_type == gremlin.types.DeviceType.State:
                 # state device (modeless) - special handling of state input items
                 state_data = gremlin.shared_state.current_profile.state
-                input_items = [state_data[key].input_item for key in state_data]
+                input_items = [state_data[key] for key in state_data]
                 for item in input_items:
                     result = self._filter_conditions_input_item(item, callback, extra_data)
                     if not result:

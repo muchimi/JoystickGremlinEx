@@ -48,13 +48,12 @@ class Configuration(QtCore.QObject):
 
     def get_config(self) -> str:
         """local config file (version based)"""
+        config_file = os.path.join(self.data_path(), "config.json")
         if __debug__:
             dev_config_file = os.path.join(self.data_path(), "dev_config.json")
-            config_file = os.path.join(self.data_path(), "config.json")
             if os.path.isfile(config_file) and not os.path.isfile(dev_config_file):
                 shutil.copy(config_file, dev_config_file)
 
-        config_file = dev_config_file if __debug__ else config_file
         return config_file
 
     def get_backup_config(self) -> str:
@@ -378,21 +377,22 @@ class Configuration(QtCore.QObject):
         self._last_profile_reload = time.time()
         self.save_profile()
 
-    def save(self, fname: str = None):
+    def save(self, fname: str = None, save_profile: bool = False):
         import gremlin.util
         import gremlin.event_handler
 
         if QtWidgets.QApplication.instance():
-            gremlin.util.InvokeUiMethod(self._save_ui, fname)  # ensure on UI thread
+            gremlin.util.InvokeUiMethod(self._save_ui, fname, save_profile)  # ensure on UI thread
         else:
-            self._save_ui(fname)
+            self._save_ui(fname, save_profile)
+
 
         # tell UI of config changes
 
         el = gremlin.event_handler.EventListener()
         el.config_option_changed.emit()
 
-    def _save_ui(self, fname: str = None):
+    def _save_ui(self, fname: str = None, save_profile: bool = False):
         """Writes the version specific configuration file to disk."""
         if self._lock:
             # ignore concurrent save requests (technically not necessary due to UI thread placement)
@@ -426,11 +426,18 @@ class Configuration(QtCore.QObject):
 
             self._lock = False
 
+        if save_profile:
+            self._save_profile_ui()
+
     def save_profile(self):
+        """Saves the profile specific configuration file."""
         import gremlin.util
 
         if QtWidgets.QApplication.instance():
-            gremlin.util.InvokeUiMethod(self._save_profile_ui)  # ensure on UI thread
+            if gremlin.util.is_ui_thread():
+                self._save_profile_ui()
+            else:
+                gremlin.util.InvokeUiMethod(self._save_profile_ui)  # ensure on UI thread
         else:
             self._save_profile_ui()
 
@@ -443,9 +450,14 @@ class Configuration(QtCore.QObject):
             self._lock = True
             fname = self._profile_config_fname
             if fname:
-                with open(fname, "w", encoding="utf-8") as hdl:
+                tmp = gremlin.util.getTemporaryFile(".json")
+                with open(tmp, "w", encoding="utf-8") as hdl:
                     encoder = json.JSONEncoder(sort_keys=True, indent=4)
                     hdl.write(encoder.encode(self._profile_data))
+                if os.path.isfile(fname):
+                    os.unlink(fname)
+                shutil.copy(tmp, fname)
+                os.unlink(tmp)
         except Exception as ex:
             syslog.error(f"CONFIG: unable to save profile: {fname}")
             syslog.error(ex)

@@ -638,10 +638,10 @@ class Color:
         css = f"""
             .QFrame {{
                 border: 1px solid {border_color};
-                background: {background_color};
+                background-color: {background_color};
             }}
             .QLabel {{
-                border: none;
+                border: none; background-color: transparent;
             }}
             """
         return css
@@ -4379,9 +4379,26 @@ class QDataWidget(QtWidgets.QWidget):
 class QDataLabel(QtWidgets.QLabel):
     """data enabled label widget"""
 
-    def __init__(self, data=None, parent=None):
+    def __init__(self,  label : str = None, label_width : int = None, min_width : int = 100, data : object =None, parent=None):
         super().__init__(parent)
         self._data = data
+        self._text = None
+        if label:
+            self.setText(label, label_width=label_width, min_width=min_width)
+
+    def setText(self, text : str =None, label_width : int = None, min_width : int = 100):
+        self._text = text
+        if text and label_width is not None:
+            width = get_text_width(text)
+            if label_width is not None and width > label_width:
+                fm = QtGui.QFontMetrics(QtGui.QFont())
+                text = fm.elidedText(text, QtCore.Qt.ElideRight, label_width)
+            super().setText(text)
+            return
+        super().setText(self._text)
+
+    def getText(self):
+        return self._text
 
     @property
     def data(self):
@@ -12441,13 +12458,14 @@ class QAutoResizingTextEdit(QtWidgets.QTextEdit):
         return widget_margins.top() + document_margin + max(num_lines, 1) * font_metrics.height() + self.document().documentMargin() + widget_margins.bottom()
 
 
-class QFrameBox(QtWidgets.QFrame):
+class QFrameBox(QtWidgets.QWidget):
     """widget for information text"""
 
     def __init__(self, text=None, css: str = None, wrap=False, parent=None):
         super().__init__(parent=parent)
         self._label_widget = QtWidgets.QLabel(text)
         layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(4,4,4,4)
         layout.addWidget(self._label_widget)
         layout.addStretch()
 
@@ -12455,20 +12473,18 @@ class QFrameBox(QtWidgets.QFrame):
             border_color = Color.borderColor()
             background_color = Color.frameColor()
             css = f"""
-            .QFrameBox {{
+            QWidget {{
                 border: 2px solid {border_color};
-                border-radius: 6px;
+                border-radius: 0px;
                 background-color: {background_color};
+                margin: 4px;
+                padding: 4px;
             }}
             .QLabel {{ border: none; background-color: transparent; }}
             """
 
         self.setStyleSheet(css)
 
-        # size to the text
-        # width = get_text_width(text)
-        # margins = 8
-        # self.setFixedWidth(width + margins * 2)
 
     def setText(self, text):
         if not Shiboken.isValid(self):
@@ -12988,16 +13004,22 @@ class QInputLockWidget(QtWidgets.QWidget):
         main_layout = QtWidgets.QVBoxLayout(self)
         self._filter = filter
 
+        size = 16
+
         lock_widget = QIconPushButton(
             icon=Icons.lockIcon(),
             tooltip="Lock all inputs",
             callback=self._handle_lock,
+            icon_size = size,
+
+
         )
 
         unlock_widget = QIconPushButton(
             icon=Icons.unlockIcon(),
             tooltip="Unlock all inputs",
             callback=self._handle_unlock,
+            icon_size = size,
         )
 
         widgets = [lock_widget, unlock_widget]
@@ -13082,7 +13104,9 @@ class QCollapsible(QFrame):
     def __init__(
         self,
         title: str = "",  # title bar label
-        title_widget: QWidget | None = None,  # title bar widget if any
+        titlebar_widget: QWidget | None = None,  # title bar widget if any
+        titlecontent_widget : QWidget | None = None, # title content widget if any
+        content_widget: QWidget | None = None, # content widget if any
         collapsed=False,  # initial state
         parent: QWidget | None = None,
         expandedIcon: QIcon | str | None = "▼",
@@ -13093,54 +13117,66 @@ class QCollapsible(QFrame):
         self._is_animating = False
         self._text = title
 
-        self._toggle_btn = QPushButton(title)
-        self._toggle_btn.setCheckable(True)
+        # main widget - this widget has two parts - a header title part and a collapsible content part.
+        # the header has two rows - a top header bar holding the toggle switch and header components, and a bottom row for additional content if needed.
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+
+
+        self._toggle_widget = QPushButton()
+        self._toggle_widget.setCheckable(True)
+        # self._toggle_widget.setMaximumHeight(32)
 
         self.setCollapsedIcon(icon=collapsedIcon)
         self.setExpandedIcon(icon=expandedIcon)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
 
-        self._toggle_btn.setStyleSheet("text-align: left; border: none; outline: none;")
-        self._toggle_btn.toggled.connect(self._toggle)
-
-        # frame layout
-
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-
-        # title layout
-        title_container_widget = QWidget()  # placeholder for title widget if needed
-        title_container_widget.setProperty("cssClass", "collapsible_title")
-        title_container_layout = QVBoxLayout(title_container_widget)
-        if title_widget:
-            height = title_widget.sizeHint().height()
-        else:
-            height = 32
-
-        title_container_widget.setMaximumHeight(height+8)
+        self._toggle_widget.setStyleSheet("text-align: left; border: none; outline: none;")
+        self._toggle_widget.toggled.connect(self._toggle)
 
 
 
-        title_content_widget = QWidget()
-        title_content_widget.setStyleSheet("") # reset for children
-        title_content_layout = QVBoxLayout(title_content_widget)
-        title_content_layout.setContentsMargins(0, 0, 0, 0)
+        # title section
+        self._title_widget = QWidget()  # placeholder for title widget if needed
+        self._title_widget.setProperty("cssClass", "collapsible_title")
+        self._title_layout = QVBoxLayout(self._title_widget)
 
-        title_container_layout.addWidget(title_content_widget)
+        # holds the collapse button
+        title_button_widget = gremlin.ui.ui_common.getVContainer(self._toggle_widget, widget_only=True)
+
+        # holds the bar next to the collapse button
+        self._top_bar_widget = AutohideContainer(name="top_bar_widget")
+        self._top_bar_widget.setContentsMargins(0, 0, 0, 0)
 
 
-        layout.addWidget(title_container_widget)
+        # row 1 of the title widget has the button and the optional main content
+        title_label_widget = QLabel(title) if title else None
+        widgets = [title_button_widget, title_label_widget,  "||", self._top_bar_widget]
+        self._row_1_widget = getHContainer(widgets, widget_only=True)
 
-        if title_widget:
-            h_layout = QHBoxLayout()
-            h_layout.addWidget(self._toggle_btn)
-            h_layout.addWidget(title_widget, stretch=2)
-            title_content_layout.addLayout(h_layout)
-        else:
-            title_content_layout.addWidget(self._toggle_btn)
+        height = 40 # row 1 height
+        self._top_bar_widget.setFixedHeight(height)
+        title_button_widget.setFixedHeight(height)
 
+        # row 2 of the title widget - optional content
+        self._row_2_widget = AutohideContainer(name="row_2_widget")
+
+        self._title_layout.addWidget(self._row_1_widget)
+        self._title_layout.addWidget(self._row_2_widget)
+
+        if titlebar_widget:
+            self._top_bar_widget.setWidget(titlebar_widget)
+
+        if titlecontent_widget:
+            self._row_2_widget.setWidget(titlecontent_widget)
+
+        layout.addWidget(self._title_widget)
+
+        # content section
         self.content_widget, self.content_layout = getVContainer()
         layout.addWidget(self.content_widget)
+        self._content = content_widget # content for the collapsible section
 
         self._content_height = 0  # height of the content
 
@@ -13153,13 +13189,39 @@ class QCollapsible(QFrame):
         self.setDuration(300)
         self.setEasingCurve(QEasingCurve.Type.InOutCubic)
 
-        # default content widget
-        self._content = None
-
         if collapsed:
             self.collapse(False)
         else:
             self.expand(False)
+
+    def _cleanup_ui(self):
+        """Cleans up the UI by clearing the layout."""
+        gremlin.util.clear_widget_references(self)
+        # el = gremlin.event_handler.EventListener()
+        # el.config_changed.disconnect(self._update_title_height)
+
+    def setTitleBarWidget(self, widget: QWidget) -> None:
+        """Set the title bar widget."""
+        self._top_bar_widget.setWidget(widget)
+
+
+    def setTitleContentWidget(self, widget : QWidget) -> None:
+        """Set the title content widget."""
+        self._row_2_widget.setWidget(widget)
+
+
+    def _update_title_height(self):
+        """Update the height of the title container based on the title widget."""
+        config = gremlin.config.Configuration()
+        if not config.show_container_id:
+            if self._title_widget:
+                height = self._title_widget.sizeHint().height()
+            else:
+                height = 32
+            self._row_1_widget.setMaximumHeight(height + 8)
+        else:
+            # clear max height limit
+            self._row_1_widget.setMaximumHeight(16777215)
 
     def _getContentHeight(self) -> int:
         return self._content_height
@@ -13177,22 +13239,29 @@ class QCollapsible(QFrame):
 
     def toggleButton(self) -> QPushButton:
         """Return the toggle button."""
-        return self._toggle_btn
+        return self._toggle_widget
 
     def setText(self, text: str) -> None:
         """Set the text of the toggle button."""
-        self._toggle_btn.setText(text)
+        self._toggle_widget.setText(text)
 
     def text(self) -> str:
         """Return the text of the toggle button."""
-        return self._toggle_btn.text()
+        return self._toggle_widget.text()
 
-    def setContent(self, content: QWidget, own=True) -> None:
+    def getTitleWidget(self):
+        """Return the title widget."""
+        return self._top_bar_widget.widget()
+
+    def setContentWidget(self, content: QWidget, own=True) -> None:
         """Replace central widget (the widget that gets expanded/collapsed)."""
+        if self._content:
+            widget = self._content
+            gremlin.util.delete_widget(widget)
+
         self._content = content
 
         if own:
-            gremlin.util.clear_layout(self.content_layout)
             self.content_layout.addWidget(self._content)
 
     def content(self) -> QWidget:
@@ -13201,11 +13270,11 @@ class QCollapsible(QFrame):
 
     def _convert_string_to_icon(self, symbol: str) -> QIcon:
         """Create a QIcon from a string."""
-        size = self._toggle_btn.font().pointSize()
+        size = self._toggle_widget.font().pointSize()
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.GlobalColor.transparent)
         painter = QPainter(pixmap)
-        color = self._toggle_btn.palette().color(QPalette.ColorRole.WindowText)
+        color = self._toggle_widget.palette().color(QPalette.ColorRole.WindowText)
         painter.setPen(color)
         painter.drawText(QRect(0, 0, size, size), Qt.AlignmentFlag.AlignCenter, symbol)
         painter.end()
@@ -13223,7 +13292,7 @@ class QCollapsible(QFrame):
             self._expanded_icon = self._convert_string_to_icon(icon)
 
         if self.isExpanded():
-            self._toggle_btn.setIcon(self._expanded_icon)
+            self._toggle_widget.setIcon(self._expanded_icon)
 
     def collapsedIcon(self) -> QIcon:
         """Returns the icon used when the widget is collapsed."""
@@ -13237,7 +13306,7 @@ class QCollapsible(QFrame):
             self._collapsed_icon = self._convert_string_to_icon(icon)
 
         if not self.isExpanded():
-            self._toggle_btn.setIcon(self._collapsed_icon)
+            self._toggle_widget.setIcon(self._collapsed_icon)
 
     def setDuration(self, msecs: int) -> None:
         """Set duration of the collapse/expand animation."""
@@ -13267,18 +13336,18 @@ class QCollapsible(QFrame):
 
     def isExpanded(self) -> bool:
         """Return whether the collapsible section is visible (expanded)"""
-        return self._toggle_btn.isChecked()
+        return self._toggle_widget.isChecked()
 
     def isCollapsed(self) -> bool:
         """true if the collapsible section is collapsed (not visible)"""
-        return not self._toggle_btn.isChecked()
+        return not self._toggle_widget.isChecked()
 
     def setLocked(self, locked: bool = True) -> None:
         """Set whether collapse/expand is disabled."""
         if not Shiboken.isValid(self):
             return
         self._locked = locked
-        self._toggle_btn.setCheckable(not locked)
+        self._toggle_widget.setCheckable(not locked)
 
     def locked(self) -> bool:
         """Return True if collapse/expand is disabled."""
@@ -13304,8 +13373,8 @@ class QCollapsible(QFrame):
 
         forward = direction == QPropertyAnimation.Direction.Forward
         icon = self._expanded_icon if forward else self._collapsed_icon
-        self._toggle_btn.setIcon(icon)
-        self._toggle_btn.setChecked(forward)
+        self._toggle_widget.setIcon(icon)
+        self._toggle_widget.setChecked(forward)
 
         if self._content:
             _content_height = self._content.sizeHint().height() + 10
@@ -15148,10 +15217,14 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
 
     widgetChanged = QtCore.Signal()
     sizeChanged = QtCore.Signal()
-    def __init__(self, widget : QtWidgets.QWidget = None, data = None, parent=None):
+    def __init__(self, widget : QtWidgets.QWidget = None, data = None, name : str = None, parent=None):
         super().__init__(parent=parent)
         self._widget = widget
         self.data = data
+        self._name = name
+        if name:
+            self.setObjectName(name)
+
         if widget is not None:
             self.addWidget(widget)
         # prevent style sheet propagation
@@ -15206,6 +15279,9 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
             return QSize(0, 0)
         return super().minimumSizeHint()
 
+class AutohideContainer(AutoHideStackedWidget):
+    """autohide container widget - shows its content if set, otherwise hides the widget"""
+    pass
 
 class AutoHideIconTextWidget(AutoHideStackedWidget):
     """autohide label widget - shows a label if text is set, otherwise hides the widget"""
@@ -15275,68 +15351,138 @@ class AutoHideIconTextWidget(AutoHideStackedWidget):
             self._widget.setPixmap(self._icon.pixmap(self._size, self._size))
 
 
-class AutohideContainer(QtWidgets.QWidget):
-    """container that automatically hides itself if no widget is set"""
-    sizeChanged = QtCore.Signal()
-    def __init__(self, data = None, parent=None):
+# class AutohideContainer(QtWidgets.QStackedWidget):
+#     """container that automatically hides itself if no widget is set"""
+#     sizeChanged = QtCore.Signal()
+#     def __init__(self, data = None, name : str = None, parent=None):
+#         super().__init__(parent=parent)
+#         self.setContentsMargins(0, 0, 0, 0)
+#         self.setSpacing(0)
+#         self.setStyleSheet("")
+#         self._widget_map = {}
+#         self._key_map = {}
+#         self._computed_height = 0
+#         self._name = name
+#         if name:
+#             self.setObjectName(name)
+
+#     def setWidget(self, widget : QtWidgets.QWidget):
+#         if widget is not None:
+#             self.addWidget("default", widget)
+#             self.setCurrentWidget(widget)
+#         else:
+#             self.removeWidget(self.getWidget())
+
+#     def getWidget(self):
+#         return self._widget_map.get("default", None)
+
+#     def addWidget(self, key, widget : QtWidgets.QWidget ):
+#         layout = self.layout()
+#         if layout is None:
+#             layout = QtWidgets.QVBoxLayout(self)
+#         layout.addWidget(widget)
+#         if key in self._widget_map:
+#             self.removeWidget(self._widget_map[key])
+#         self._widget_map[key] = widget
+#         self._key_map[widget] = key
+#         if isinstance(widget, AutoHideStackedWidget):
+#             widget.sizeChanged.connect(self._update_height)
+#         self._update_height()
+
+
+#     def removeWidget(self, widget : QtWidgets.QWidget):
+
+#         if widget in self._key_map:
+#             key = self._key_map[widget]
+#             widget = self._widget_map[key]
+#             layout = self.layout()
+#             if layout is not None:
+#                 layout.removeWidget(widget)
+#                 if isinstance(widget, AutoHideStackedWidget):
+#                     widget.sizeChanged.disconnect(self._update_height)
+#                 widget.setParent(None)
+#             del self._key_map[widget]
+#             del self._widget_map[key]
+#             self._update_height()
+
+#     def addWidgets(self, widget_map : dict):
+#         for key, widget in widget_map.items():
+#             self.addWidget(key, widget)
+
+#     def _update_height(self):
+#         """updates the height of the widget based on the content"""
+#         h = 0
+#         for widget in self._widget_map.values():
+#             h += widget.sizeHint().height()
+#         self._computed_height = h
+#         syslog.info(f"AutohideContainer: {self._name if self._name else 'unnamed'} computed height: {h}")
+
+#         self.sizeChanged.emit()
+#         self.updateGeometry()
+
+
+#     def sizeHint(self):
+#         hint = super().sizeHint()
+#         hint.setHeight(self._computed_height)
+#         return hint
+
+#     def minimumSizeHint(self):
+#         hint = super().minimumSizeHint()
+#         hint.setHeight(self._computed_height)
+#         return hint
+
+
+class AutohideContainerIdWidget(QtWidgets.QStackedWidget):
+    """A widget that automatically shows or hides contained widget if the config setting for showing container IDs is changed """
+    def __init__(self, widget : QtWidgets.QWidget = None, data = None, parent=None):
         super().__init__(parent=parent)
-        self._widget_map = {}
-        self._key_map = {}
-        self._computed_height = 0
+        self._widget = widget
+        self.data = data
+        if widget is not None:
+            self.addWidget(widget)
 
+        # prevent style sheet propagation
+        self.setStyleSheet("QWidget { background: transparent; }")
 
-    def addWidget(self, key, widget : QtWidgets.QWidget ):
-        layout = self.layout()
-        if layout is None:
-            layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(widget)
-        if key in self._widget_map:
-            self.removeWidget(self._widget_map[key])
-        self._widget_map[key] = widget
-        self._key_map[widget] = key
-        if isinstance(widget, AutoHideStackedWidget):
-            widget.sizeChanged.connect(self._update_height)
-        self._update_height()
+        config = gremlin.config.Configuration()
+        self._show_id = config.show_container_id
 
-    def removeWidget(self, widget : QtWidgets.QWidget):
+        # listen for configuration changes
+        el = gremlin.event_handler.EventListener()
+        el.config_changed.connect(self._on_config_changed)
 
-        if widget in self._key_map:
-            key = self._key_map[widget]
-            widget = self._widget_map[key]
-            layout = self.layout()
-            if layout is not None:
-                layout.removeWidget(widget)
-                if isinstance(widget, AutoHideStackedWidget):
-                    widget.sizeChanged.disconnect(self._update_height)
-                widget.setParent(None)
-            del self._key_map[widget]
-            del self._widget_map[key]
-            self._update_height()
+    def _on_config_changed(self):
+        """handle configuration changes"""
+        # update visibility based on configuration or data
+        config = gremlin.config.Configuration()
+        show_id = config.show_container_id
+        if self._show_id != show_id:
+            self._show_id = show_id
+            self.updateGeometry()
 
-    def addWidgets(self, widget_map : dict):
-        for key, widget in widget_map.items():
-            self.addWidget(key, widget)
-
-    def _update_height(self):
-        """updates the height of the widget based on the content"""
-        h = 0
-        for widget in self._widget_map.values():
-            h += widget.sizeHint().height()
-        self._computed_height = h
-        self.setFixedHeight(h)
-        # syslog.info(f"AutohideContainer: computed height: {h}")
-        self.sizeChanged.emit()
+    def setWidget(self, widget : QtWidgets.QWidget):
+        """sets the widget to be displayed"""
+        if self._widget is not None:
+            self.removeWidget(self._widget)
+        self._widget = widget
+        if widget is not None:
+            self.addWidget(widget)
+        self.updateGeometry()
 
 
     def sizeHint(self):
-        hint = super().sizeHint()
-        hint.setHeight(self._computed_height)
-        return hint
+        if self._widget and self._show_id:
+            return super().sizeHint()
+        # hide if no content
+        return QSize(0, 0)
+
 
     def minimumSizeHint(self):
-        hint = super().minimumSizeHint()
-        hint.setHeight(self._computed_height)
-        return hint
+        if self._widget and self._show_id:
+            return super().minimumSizeHint()
+        # hide if no content
+        return QSize(0, 0)
+
 
 
 

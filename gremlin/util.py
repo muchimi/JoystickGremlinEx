@@ -1198,22 +1198,23 @@ def load_image(*paths):
     return None
 
 
-def get_generic_icon():
+def  get_generic_icon():
     """gets a generic icon"""
-    import gremlin.shared_state
+    #import gremlin.shared_state
 
-    root_path = gremlin.shared_state.root_path
-    generic_icon = os.path.join(root_path, "generic.png")
-    if generic_icon and os.path.isfile(generic_icon):
-        pixmap = QtGui.QPixmap(generic_icon)
-        if pixmap.isNull():
-            syslog.warning(f"load_icon(): generic pixmap failed: {generic_icon}")
-            return None
-        icon = QtGui.QIcon()
-        icon.addPixmap(pixmap, QtGui.QIcon.Normal)
-        return icon
-    syslog.warning(f"load_icon(): generic icon file not found: {generic_icon}")
-    return None
+    #root_path = gremlin.shared_state.root_path
+    return load_icon("fa5.question-circle")
+    # generic_icon = os.path.join(root_path, "generic.png")
+    # if generic_icon and os.path.isfile(generic_icon):
+    #     pixmap = QtGui.QPixmap(generic_icon)
+    #     if pixmap.isNull():
+    #         syslog.warning(f"load_icon(): generic pixmap failed: {generic_icon}")
+    #         return None
+    #     icon = QtGui.QIcon()
+    #     icon.addPixmap(pixmap, QtGui.QIcon.Normal)
+    #     return icon
+    # syslog.warning(f"load_icon(): generic icon file not found: {generic_icon}")
+    # return None
 
 
 def write_guid(guid):

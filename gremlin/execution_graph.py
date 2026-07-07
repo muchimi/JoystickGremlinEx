@@ -2353,13 +2353,13 @@ class AbstractExecutionGraph(QtCore.QObject):
 
         assert False, f"Invalid base condition to convert: {type(condition).__name__}"
 
-    def _create_activation_condition(self, activation_condition, target, is_container_condition=False):
+    def _create_activation_condition(self, activation_condition, target : gremlin.input_item.AbstractContainer | gremlin.base_profile.AbstractAction):
         """Creates activation condition objects base on the given data.
 
         :param activation_condition data about activation condition to be
             used in order to generate executable nodes
         """
-        conditions = []
+        conditions = gremlin.input_item.ConditionModel(target)
         for condition in activation_condition.conditions:
             if isinstance(condition, gremlin.input_item.BaseActivationCondition):
                 for sub_condition in condition.conditions:
@@ -2367,7 +2367,9 @@ class AbstractExecutionGraph(QtCore.QObject):
             else:
                 conditions.append(self._convert_condition(condition))
 
-        return gremlin.input_item.BaseActivationCondition(conditions, activation_condition.rule, target, is_container_condition=is_container_condition)
+
+
+        return gremlin.input_item.BaseActivationCondition(conditions, activation_condition.rule)
 
     def _contains_input_action_condition(self, activation_condition):
         """Returns whether or not an input action condition is present.
@@ -2445,7 +2447,7 @@ class ContainerExecutionGraph(AbstractExecutionGraph):
 
         _condition_functor = None
         if container.has_conditions:
-            functor = self._create_activation_condition(container.activation_condition, container, is_container_condition=True)
+            functor = self._create_activation_condition(container.activation_condition, container)
             self.functors.append(functor)
             node.functors.append(functor)
             container_plugins.register_functor(functor)

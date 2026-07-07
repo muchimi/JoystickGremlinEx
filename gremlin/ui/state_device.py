@@ -2727,6 +2727,7 @@ class StateInputItemModel(gremlin.input_item.InputItemListModel):
         )
 
 
+
 class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     """Widget used to configure state change actions"""
 

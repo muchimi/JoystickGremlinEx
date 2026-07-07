@@ -1033,7 +1033,10 @@ class EventListener(QtCore.QObject):
         """terminate threads"""
         import gremlin.windows_event_hook
 
-        verbose = gremlin.config.Configuration().verbose_mode_inputs
+        config = gremlin.config.Configuration()
+
+
+        verbose = config.verbose_mode_inputs
         if self._keep_alive_thread:
             self._keep_alive_event.set()
             self._keep_alive_thread.join()

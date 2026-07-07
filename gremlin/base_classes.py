@@ -628,12 +628,6 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         self._id = gremlin.util.get_guid(no_brackets=True)
         self._input_item: gremlin.input_item.InputItem = gremlin.input_item._get_input_item(parent)
 
-        generic_icon = os.path.join(os.path.dirname(__file__), "generic.png")
-        if os.path.isfile(generic_icon):
-            self._generic_icon = generic_icon
-        else:
-            self._generic_icon = None
-
         # reported device type to actions so they can configure themselves to a different hardware input type if needed
         if isinstance(parent, BaseProfileData):
             self.override_input_type = parent.override_input_type
@@ -1109,6 +1103,8 @@ class AbstractCallbackModel(AbstractModel):
 
 
 
+
+
     def remove(self, item, emit=True):
         """Removes the given entry from the model."""
         if item in self._item_map:
@@ -1138,6 +1134,10 @@ class AbstractCallbackModel(AbstractModel):
             if emit:
                 self._fireChanged()
             self.onItemChanged(self, index, None, item, "removeAt")
+
+    def removeRow(self, index: int, emit=True):
+        """removes the entry at the given model index"""
+        self.removeAt(index, emit=emit)
 
 
     def clear(self, emit=True):

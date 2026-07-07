@@ -37,7 +37,7 @@ for root, _, files in os.walk("icons"):
 added_files = [
     ("about", "about"),
     ("doc", "doc"),
-    ("gfx", "gfx"),
+    ("icons","icons")
 ]
 
 added_files.extend(action_plugins_files)
@@ -123,7 +123,7 @@ exe = EXE(
     strip=None,
     upx=True,
     console=False,
-    icon="gfx\\icon.ico"
+    icon="icons\\icon.ico"
 )
 
 coll = COLLECT(

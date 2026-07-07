@@ -244,6 +244,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.request_ui_refresh.connect(self.refresh)
         el.shutdown.connect(self.handle_shutdown)
         el.feature_changed.connect(self._handle_feature_changed)  # handle feature changes
+        el.input_selection_changed.connect(self._handle_item_selected)
 
         # highlighing options
         self._icon_on = gremlin.util.load_icon(
@@ -3369,10 +3370,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     stub = "[SELECTED]" if device_guid == selected_device_guid else ""
                     syslog.info(f"\t[{index}] {self.ui.devices_tab_header_widget.tabText(index)} {device_name}  {device_guid} {stub}")
 
-            # update current tab tracking on refresh
+            # update tracking
             device_guid = self._tab_index_map.get(self.ui.devices_tab_header_widget.currentIndex())
-            gremlin.shared_state.current_tab_device_guid = device_guid
-            gremlin.shared_state.current_tab_device_id = gremlin.util.normalize_guid(device_guid)
+            self.setCurrentTabTracking(device_guid)
 
             if verbose_detailed:
                 syslog.info("CREATE TABS: complete")
@@ -3928,6 +3928,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     self._last_selected_input_type = input_type
                     self._last_selected_input_id = input_id
 
+
                 except Exception as err:
                     # something went south with the selection
                     syslog.error("TabIndex generic unhandled error occured in _select_input_handler_ui():")
@@ -3942,12 +3943,29 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     self.selectTabWidget(device_guid)
         finally:
             # update tracking
-            gremlin.shared_state.current_tab_device_guid = gremlin.util.to_guid(device_guid)
-            gremlin.shared_state.current_tab_device_id = gremlin.util.normalize_guid(device_guid)
+            self.setCurrentTabTracking(device_guid)
+
+            self._last_selected_device_guid = device_guid
+            self._last_selected_input_type = input_type
+            self._last_selected_input_id = input_id
+            config.set_last_input(device_guid, input_type, input_id)
 
             if completion_callback:
                 # fire the callback on completion
                 completion_callback(device_guid, input_type, input_id)
+
+    def _handle_item_selected(self, device_guid, input_type, input_id):
+        """Handles item selection events from the list view"""
+        config = gremlin.config.Configuration()
+        config.set_last_input(device_guid, input_type, input_id)
+        self._last_selected_device_guid = device_guid
+        self._last_selected_input_type = input_type
+        self._last_selected_input_id = input_id
+
+    def setCurrentTabTracking(self, device_guid: str):
+        """sets the tracking tab to the given device guid"""
+        gremlin.shared_state.current_tab_device_guid = gremlin.util.to_guid(device_guid)
+        gremlin.shared_state.current_tab_device_id = gremlin.util.normalize_guid(device_guid)
 
     def ensureTabLoaded(self):
         """ensures a tab device UI is loaded/refreshed"""
@@ -5232,15 +5250,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             last_device_guid, last_input_type, last_input_id = new_profile.getLastInput()  # self.config.get_last_input()
 
+
             # enable saving the configuration
             new_profile.saveConfigEnabled = True
-            self._select_input(
-                last_device_guid,
-                last_input_type,
-                last_input_id,
-                force_switch=True,
-                force_update=True,
-            )
+            if last_device_guid is not None:
+                self._select_input(
+                    last_device_guid,
+                    last_input_type,
+                    last_input_id,
+                    force_switch=True,
+                    force_update=True,
+                )
 
         finally:
             gremlin.shared_state.pop_redraw()

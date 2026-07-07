@@ -1486,8 +1486,10 @@ class VirtualDeviceUsageState:
         self.reset()
 
     def registerAction(self, key):
-        assert key not in self._action_map, "action already registered"
-        self._action_map[key] = {}
+        # assert key not in self._action_map, "action already registered"
+        if key not in self._action_map:
+            # key could already be registered in a paste situation
+            self._action_map[key] = {}
         # syslog.info(f"Button State: register action [{key}]")
 
     def getRegisteredActions(self):
