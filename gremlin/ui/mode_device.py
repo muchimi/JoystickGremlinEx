@@ -36,6 +36,7 @@ import html
 import logging
 import dinput
 from gremlin.ui.ui_common import Ansi
+
 syslog = logging.getLogger("system")
 
 
@@ -177,11 +178,7 @@ class ModeInputItem(gremlin.input_item.InputItem):
         #     pass
 
         # syslog.info(f"InputItem: CREATE MODE INPUT ITEM: input item id: {Ansi.YELLOW}[{self._id}]{Ansi.RESET} input id: {Ansi.GREEN}[{input_id.name}/{input_id}]{Ansi.RESET} mode name: [{mode_node.name}] mode node id: [{mode_node.id}] device node id: [{mode_node.parent.id}] profile id: [{mode_node.profile.id}]")
-        #pass
-
-
-
-
+        # pass
 
     def from_xml(self, node, data=None, extra_data: dict = None):
         # mode data
@@ -190,8 +187,6 @@ class ModeInputItem(gremlin.input_item.InputItem):
         #         self.parse_xml(child, data, extra_data)
         if node.tag in ("modecontrol", "mode-control"):
             self.parse_xml(node, data, extra_data)
-
-
 
         # read containers
         super().from_xml(node, data, extra_data, skip_root=True)
@@ -240,29 +235,31 @@ class ModeInputItem(gremlin.input_item.InputItem):
         super().to_xml(node)
         return node
 
-def ensureMasterInputItems(profile : gremlin.base_profile.Profile):
-    ''' initializes the profile master inputs - initialized on a new profile '''
+
+def ensureMasterInputItems(profile: gremlin.base_profile.Profile):
+    """initializes the profile master inputs - initialized on a new profile"""
 
     device_guid = ModeDeviceTabWidget.device_guid
     device_node = profile.getDeviceNode(device_guid, autocreate=True)
     mode_node = device_node.getModeNode(gremlin.shared_state.master_mode, True, autocreate=True)
     if not mode_node.getInputItem(InputType.ModeControl, ModeInputModeType.ModeProfileStart):
-        input_item = ModeInputItem(mode_node, input_id = ModeInputModeType.ModeProfileStart)
-        mode_node.setInputItem(input_item)
+        input_item = ModeInputItem(mode_node, input_id=ModeInputModeType.ModeProfileStart)
+        mode_node.addInputItem(input_item)
     if not mode_node.getInputItem(InputType.ModeControl, ModeInputModeType.ModeProfileStop):
-        input_item = ModeInputItem(mode_node, input_id = ModeInputModeType.ModeProfileStop)
-        mode_node.setInputItem(input_item)
+        input_item = ModeInputItem(mode_node, input_id=ModeInputModeType.ModeProfileStop)
+        mode_node.addInputItem(input_item)
 
-def ensureModeInputItems(profile : gremlin.base_profile.Profile, mode : str):
+
+def ensureModeInputItems(profile: gremlin.base_profile.Profile, mode: str):
     device_guid = ModeDeviceTabWidget.device_guid
     device_node = profile.getDeviceNode(device_guid, autocreate=True)
     mode_node = device_node.getModeNode(mode, autocreate=True)
     if not mode_node.getInputItem(InputType.ModeControl, ModeInputModeType.ModeEnter):
-        input_item = ModeInputItem(mode_node, input_id = ModeInputModeType.ModeEnter)
-        mode_node.setInputItem(input_item)
+        input_item = ModeInputItem(mode_node, input_id=ModeInputModeType.ModeEnter)
+        mode_node.addInputItem(input_item)
     if not mode_node.getInputItem(InputType.ModeControl, ModeInputModeType.ModeExit):
-        input_item = ModeInputItem(mode_node, input_id = ModeInputModeType.ModeExit)
-        mode_node.setInputItem(input_item)
+        input_item = ModeInputItem(mode_node, input_id=ModeInputModeType.ModeExit)
+        mode_node.addInputItem(input_item)
 
 
 class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
@@ -295,7 +292,6 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.current_mode = mode
         self.widget_storage = {}
 
-
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.connect(self._handle_new_profile)
         el.edit_mode_changed.connect(self._handle_profile_mode_changed)
@@ -308,7 +304,6 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             custom_remove_handler=self._remove_handler,
             custom_filter_handler=self._filter_data,
         )
-
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
@@ -346,7 +341,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _handle_new_profile(self):
         """new profile"""
-        self.profile : gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        self.profile: gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         self._handle_profile_mode_changed(gremlin.shared_state.edit_mode)
 
     def _handle_profile_mode_changed(self, new_mode: str):
@@ -368,7 +363,6 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         mode = self.current_mode
         master_mode = gremlin.shared_state.master_mode
         registry = self.profile.registry
-
 
         ensureMasterInputItems(self.profile)
         ensureModeInputItems(self.profile, mode)
@@ -393,9 +387,9 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         model.pushSuspend()  # suspend triggers
         input_item: InputItem
         for index, input_item in enumerate(input_items):
-            assert input_item is not None,"invalid input item - should be defined here"
+            assert input_item is not None, "invalid input item - should be defined here"
             assert input_item.input_id is not None, "invalid input id for input item"
-            model.setItemAt(index,input_item)
+            model.setItemAt(index, input_item)
             # syslog.info(f"Mode model: index [{index}] contains input item id {Ansi.YELLOW}[{input_item.id}]{Ansi.RESET} [{input_item.display_name}] container count: [{input_item.containers.count()}]")
 
         model.popSuspend()
@@ -519,13 +513,10 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         input_item = self.profile.getInputItem(device_guid, mode_name, input_type, input_id)
         if input_item is None:
-            input_item =  ModeInputItem(mode_node, input_id=input_id, description=description, description_readonly=description_readonly, tooltip=tooltip)
-
-
+            input_item = ModeInputItem(mode_node, input_id=input_id, description=description, description_readonly=description_readonly, tooltip=tooltip)
 
         # update the model
         return input_item
-
 
     def refreshInputItems(self):
         """refreshes input list"""

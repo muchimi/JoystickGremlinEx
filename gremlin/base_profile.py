@@ -291,7 +291,6 @@ class ProfileDeviceNode:
         return f"Profile Device: [{self.device_id}] name: [{self.name}] type: [{self.device_type.name}] virtual: [{self.virtual}]"
 
 
-
 class AbstractFunctor(QtCore.QObject):
     """Abstract base class defining the interface for functor like classes.
 
@@ -1526,7 +1525,6 @@ class Settings:
         if emit:
             el = gremlin.event_handler.EventListener()
             el.input_filtered_change.emit(device_id)  # tell the widget the input list has changed
-
 
     def setDefaultInputVisible(
         self,
@@ -2772,10 +2770,10 @@ class Profile:
                 device_list.append(self.devices[id])
         return device_list
 
-    def ensure_mode_exists(self, mode_name : str, is_system=False):
+    def ensure_mode_exists(self, mode_name: str, is_system=False):
         """ensures a mode exists in the profile"""
         for device_guid in self.devices:
-            _ = self.getModeNode(device_guid, mode = mode_name, is_system=is_system, autocreate=True)
+            _ = self.getModeNode(device_guid, mode=mode_name, is_system=is_system, autocreate=True)
 
     def initialize_joystick_device(self, device, modes):
         """Ensures a joystick is properly initialized in the profile.
@@ -4535,6 +4533,7 @@ class Profile:
     def _readConfig(self) -> dict:
         """reads the profile config, ensuring it is done on the UI thread"""
         completed = False
+
         def nonlocal_set(var, value):
             nonlocal completed
             var = value
@@ -4551,7 +4550,6 @@ class Profile:
             if not completed:
                 syslog.warning("Profile config read timed out")
             return result
-
 
     def _readConfig_ui(self) -> dict:
         """reads the profile config"""
@@ -5029,7 +5027,7 @@ class ProfileModeNode:
                     return True
         return False
 
-    def setInputItem(self, input_item: InputItem):
+    def addInputItem(self, input_item: InputItem):
         """stores the input item in this mode node"""
         assert input_item is not None, "invalid input item"
         input_type = input_item.input_type
@@ -5204,7 +5202,7 @@ class ProfileModeNode:
 
                 if input_item is None:
                     input_item = item
-                    self.setInputItem(item)
+                    self.addInputItem(item)
 
                 if __debug__:
                     test = self.profile.registry.getInputItem(device_guid=self.device_guid, mode_name=self.name, input_type=input_type, input_id=item.input_id)

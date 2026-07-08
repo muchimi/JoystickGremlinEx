@@ -442,6 +442,10 @@ class Color:
         return "#ffffff"  # if gremlin.shared_state.is_dark_theme else "#5a5a5a"
 
     @staticmethod
+    def entryBackgroundColor():
+        return "#5D6B52" if gremlin.shared_state.is_dark_theme else "#C5C5C5"
+
+    @staticmethod
     def listenColor():  # color used for listen type buttons
         return Color.blueColor()
 
@@ -557,6 +561,21 @@ class Color:
 
         hover_color = QColor.fromHsl(hsl.hue(), hsl.saturation(), lightness)
         return hover_color
+
+    @staticmethod
+    def cssEntry() -> str:
+        background_color = gremlin.ui.ui_common.Color.keyBackgroundColor()
+        border_color = gremlin.ui.ui_common.Color.keyBorderColor()
+        css = f"""
+            QLabel {{
+                background-color: {background_color};
+                padding: 4px;
+                border-radius: 8px;
+                border: 2px solid {border_color};
+                margin: 4px;
+                }}
+        """
+        return css
 
     @staticmethod
     def cssSelectedInputHeader():
@@ -889,6 +908,8 @@ class Color:
             QToolButton:pressed {{
                 border: none;
                 background-color: {button_hover_color};
+                padding-right: 2px;
+                padding-bottom: 2px;
             }}
 
             QWidget[cssClass="title_frame"]  {{
@@ -4922,8 +4943,9 @@ class QDataLineEdit(QtWidgets.QLineEdit):
     enterPressed = QtCore.Signal()  # indicates the enter key was pressed
     escPressed = QtCore.Signal()  # indicates the esc key was pressed
 
-    def __init__(self, text=None, data=None, parent=None, width=200, callbackEx=None):
+    def __init__(self, text : str =None, data=None, parent=None, width : int =200, callbackEx : Callable =None, tooltip: str = None):
         super().__init__(parent=parent)
+        assert callbackEx is None or isinstance(callbackEx, Callable), "callbackEx must be callable"
         self.setText(text)
         self._data = data
         self._text_changed = True
@@ -4934,6 +4956,9 @@ class QDataLineEdit(QtWidgets.QLineEdit):
         self._trigger_on_focus_loss = True
 
         self.callback_ex = callbackEx
+
+        if tooltip:
+            self.setToolTip(tooltip)
 
         self.installEventFilter(self)
 

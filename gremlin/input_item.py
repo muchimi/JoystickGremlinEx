@@ -1833,7 +1833,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             "action_icons": self._action_icon_widget,
             "description": self._description_widget,
             "status": self._status_widget,
-            "input_description": self._input_description_widget,
+            "input_description": gremlin.ui.ui_common.getHContainer([self._input_description_widget, "||","||"], widget_only=True, left_margin=4, top_margin=4,bottom_margin=4, right_margin=4),
             "custom_content": self._custom_container_widget,
             "comment": self._comment_widget,
             "container_id": self._container_id_widget,
@@ -2374,6 +2374,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         else:
             self._input_description_icon = load_icon(icon_path, use_qta) if icon_path else None
         self._input_description_widget.setIcon(self._input_description_icon)
+
+    def setInputDescriptionStyle(self, style: str):
+        """sets the style for the input description line"""
+        self._input_description_widget.setStyleSheet(style)
 
     def setStatus(self, status: str, icon=None):
         """sets the status"""
@@ -3878,10 +3882,7 @@ class InputItemListView(AbstractView):
         """selects the input"""
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_inputs or config.verbose_mode_ui
-        filtered_index, index = self.getInputItemIndices(input_item)
-        if filtered_index == -1:
-            # auto-flip to index if it exists
-            filtered_index = index
+        index = self.indexOf(input_item)
         if index != -1:  # found
             if verbose:
                 syslog.info(f"InputItemListView: select input [{input_item.display_name}] index [{index}]")
@@ -11866,6 +11867,11 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def getInputItemMappingWidget(self, input_item: InputItem) -> InputItemMappingWidget:
         """gets the mapping widget associated with the input item - the widget is created if needed"""
         if input_item:
+            index = self._input_item_list_model.indexOf(input_item)
+            if index == -1:
+                # input item is not in the input list
+                return None
+            
             key = self.getInputItemWidgetKey(input_item)
             widget = self.getRegisteredWidget(key)
             if widget is None:

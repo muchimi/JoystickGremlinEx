@@ -380,14 +380,9 @@ class Key:
 
     def __hash__(self):
         # computes the hash value for this key combination
-        # if self._latched_keys:
-        data = (self._scan_code, self._is_extended)
-        for key in self.latched_keys:
-            data.add(key._scan_code, key._is_extended)
-
-        # data = f"{self._scan_code:x}{1 if self._is_extended else 0}"
-        # for key in self._latched_keys:
-        #     data += f"|{key._scan_code:x}{1 if key._is_extended else 0}"
+        data = [(self._scan_code, self._is_extended)]
+        data.extend([(key._scan_code, key._is_extended) for key in self.latched_keys])
+        data = tuple(data)
         return hash(data)
 
         # if self._is_extended:

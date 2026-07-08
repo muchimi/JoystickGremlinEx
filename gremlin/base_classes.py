@@ -1166,6 +1166,10 @@ class AbstractCallbackModel(AbstractModel):
         """gets the filtered item at the given index if it exists"""
         return self.data(index)
 
+    def items(self):
+        """returns all items in the filtered model"""
+        return self._filtered_index_map.items()
+
     def filteredItemAt(self, index: int):
         """gets the filtered item at the given index if it exists"""
         return self.data(index)
@@ -1175,6 +1179,10 @@ class AbstractCallbackModel(AbstractModel):
         if index in self._index_map:
             return self._index_map[index]
         return None
+
+    def unfilteredItems(self):
+        """returns all items in the unfiltered model"""
+        return self._index_map.items()
 
     def indexOf(self, item) -> int:
         """returns the index of the item (filtered model), -1 if not found"""

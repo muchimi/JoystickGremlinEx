@@ -1734,7 +1734,6 @@ class OscClient:
 
 
 class OscServer:
-
     def __init__(self):
         # syslog.info("OSC: server init")
         self._server = None
@@ -1822,7 +1821,7 @@ class OscServer:
         self._server_thread.join()
         self._server_thread = None
         self._running = False
-        time.sleep(0.1) # allow time for the server thread to fully terminate
+        time.sleep(0.1)  # allow time for the server thread to fully terminate
         syslog.info("OSC: server stopped")
 
     def _server_thread_loop(self):
@@ -1839,9 +1838,7 @@ class OscServer:
         except Exception as e:
             syslog.error(f"OSC: server error: {e}")
 
-
         self._server = None
-
 
 
 """  OscInterface ================================================================================================== """
@@ -2249,7 +2246,6 @@ class OscInputItem(gremlin.input_item.InputItemMessage):
         """input id is self for OSC"""
         return self  # whole input
 
-
     def to_html(self) -> str:
         """returns reporting graphviz data for this action"""
         from gremlin.reporting import ReportTable
@@ -2347,7 +2343,6 @@ class OscInputItem(gremlin.input_item.InputItemMessage):
     @autorelease_delay.setter
     def autorelease_delay(self, value: int):
         self._autorelease_delay = value
-
 
     @property
     def mode(self) -> OscInputItem.InputMode:
@@ -2540,7 +2535,6 @@ class OscInputItem(gremlin.input_item.InputItemMessage):
         self._message_key = new_key
         client.registerInput(self)
 
-
     @staticmethod
     def data_to_string(data):
         """returns a string representation of the data"""
@@ -2719,21 +2713,21 @@ class OscInputItemWidget(gremlin.input_item.InputItemWidget):
         confirm_delete_callback=None,
         config_external=False,
         data=None,
-        parent = None
+        parent=None,
     ):
         # store the get_state_callback to be used by child widgets
         get_state_callback = self._handle_get_state
         super().__init__(
-            input_item = input_item,
-            populate_ui_callback = populate_ui_callback,
-            populate_name_callback = populate_name_callback,
-            selection_changed_callback = selection_changed_callback,
-            update_callback = update_callback,
-            confirm_delete_callback = confirm_delete_callback,
-            get_state_callback = get_state_callback,
-            config_external = config_external,
-            data = data,
-            parent = parent
+            input_item=input_item,
+            populate_ui_callback=populate_ui_callback,
+            populate_name_callback=populate_name_callback,
+            selection_changed_callback=selection_changed_callback,
+            update_callback=update_callback,
+            confirm_delete_callback=confirm_delete_callback,
+            get_state_callback=get_state_callback,
+            config_external=config_external,
+            data=data,
+            parent=parent,
         )
 
     def _handle_get_state(self, *args, **kwargs):
@@ -3465,8 +3459,9 @@ class OscFilterWidget(QtWidgets.QWidget):
     changed = Signal(str)  # fires when the filter is changed (passes the filter)
     select = Signal(object)  # request to select an item
 
-    def __init__(self, model, parent=None):
+    def __init__(self, model : OscInputItemModel, parent=None):
         super().__init__(parent)
+        assert isinstance(model, OscInputItemModel), "model must be an instance of OscInputItemModel"
 
         self._config = gremlin.config.Configuration()
 
@@ -3477,7 +3472,9 @@ class OscFilterWidget(QtWidgets.QWidget):
 
         current_filter = self._config.osc_filter
 
-        self._filter_widget = gremlin.ui.ui_common.QDataLineEdit(text=current_filter)
+        self._filter_widget = gremlin.ui.ui_common.QDataLineEdit(text=current_filter, tooltip="Enter filter text")
+        self._filter_widget.enterPressed.connect(self._apply_filter) # apply the filter
+
         self._find_widget = gremlin.ui.ui_common.Buttons.getSearchWidget(callback=self._find_entry, tooltip="Search (F3)")
 
         self._apply_widget = QtWidgets.QPushButton("Apply")
@@ -3540,7 +3537,7 @@ class OscFilterWidget(QtWidgets.QWidget):
             config.osc_last_search_term = search_term
             input_item: OscInputItem
             decorated_search_term = gremlin.util.decorate_filter(search_term)
-            data = self._model.dataModel()
+            data = self._model
             matches = [
                 (index, item)
                 for index, item in data.items()
@@ -3980,12 +3977,11 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
     def find_item_by_message(self, mode: str, msg: str) -> tuple[int, OscInputItem]:
         """looks for OSC input messages to see if there's a match"""
         msg = msg.strip().casefold()
-        model = self.inputItemListModel.dataModel()
+        model = self.inputItemListModel
 
-        for index, input_item in model.items():
-            osc: OscInputItem = input_item.input_id
-            if osc.mode_string == mode and osc.message == msg:
-                return (index, osc)
+        for index, input_item in enumerate(model):
+            if input_item.mode_string == mode and input_item.message == msg:
+                return (index, input_item)
 
         return (-1, None)
 
@@ -4025,7 +4021,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         input_item = OscInputItem(mode_node)
         input_item.input_type_changed.connect(self._refresh_mappings)
 
-        mode_node.setInputItem(input_item)
+        mode_node.addInputItem(input_item)
 
         self.inputItemListModel.refresh()
         index = self.inputItemListModel.indexOf(input_item)
@@ -4076,13 +4072,13 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
         if new_messages:
             profile = gremlin.shared_state.current_profile
-            profile.sync()
-            device_modes = profile.get_device_modes(self._device_guid, DeviceType.to_string(DeviceType.Osc))
             mode = gremlin.shared_state.current_mode
-            mode_object = device_modes.ensure_mode_exists(mode)
-            input_type = InputType.OpenSoundControl
-
             imported_list = []
+
+            device_node = profile.getDeviceNode(self._device_guid)
+            mode_node = device_node.getModeNode(gremlin.shared_state.current_mode)
+
+            self.inputItemListModel.pushSuspend()
 
             for msg, msg_mode in new_messages.items():
                 _, osc = self.find_item_by_message(mode, msg)
@@ -4091,8 +4087,8 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
                     syslog.info(f"OSC: bulk load skip: [{msg}] is already defined for mode [{mode}]")
                     continue
 
-                input_id = OscInputItem(mode_object)
-                input_id.message = msg
+                input_item = OscInputItem(mode_node)
+                input_item.message = msg
                 mode = OscInputItem.InputMode.Button
                 auto_release = False
                 match msg_mode:
@@ -4119,14 +4115,19 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
                         syslog.info(f"OSC: bulk load skip: [{msg}] unknown option: [{mode}]")
 
                 # add the new input item
-                input_id.setMode(mode)
-                input_id.autoRelease = auto_release
-                self.device_profile.modes[self.current_mode].get_data(input_type, input_id)
-                imported_list.append(input_id)
+
+                input_item.setMode(mode)
+                input_item.autoRelease = auto_release
+                mode_node.addInputItem(input_item)
+                imported_list.append(input_item)
+                input_item.input_type_changed.connect(self._refresh_mappings)
+
+            self.inputItemListModel.popSuspend()
 
             if imported_list:
-                # reload list
-                self.inputItemListModel.refresh()
+                # # reload list
+                # self.inputItemListModel.refresh()
+                self.inputItemListView.selectInputItem(imported_list[0])
 
             # show results
             gremlin.ui.ui_common.MessageBox(prompt=f"Imported {len(imported_list):,} entries.", is_warning=False)
@@ -4291,8 +4292,22 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         """called when the widget has to update itself on a data change"""
         input_item: OscInputItem = input_widget.input_item
         input_item._update_display_name()
+        # background_color = gremlin.ui.ui_common.Color.entryBackgroundColor()
+        # border_color = gremlin.ui.ui_common.Color.keyBorderColor()
+
+        # css = f"""
+        #     QLabel {{
+        #         background-color: {background_color};
+        #         padding: 4px;
+        #         border-radius: 8px;
+        #         border: solid {background_color};
+        #         margin: 4px;
+        #         }}
+        # """
+        css = gremlin.ui.ui_common.Color.cssEntry()
         input_widget.setTitle(input_item.title_name)
         input_widget.setInputDescription(input_item.display_name)
+        input_widget.setInputDescriptionStyle(css)
         input_widget.setToolTip(input_item.display_tooltip)
 
         status_text = ""
@@ -4309,7 +4324,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
         input_widget.setStatus(status_text, icon)
 
-    def _populate_input_widget_ui(self, input_widget, container_widget, data = None):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data=None):
         """called when a button is created for custom content"""
         layout = QtWidgets.QVBoxLayout(container_widget)
         status_widget = gremlin.ui.ui_common.QIconLabel()

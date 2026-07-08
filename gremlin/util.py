@@ -2836,13 +2836,12 @@ class TriggerDict(collections.UserDict):
         self._name = name if name else "TriggerDict"
 
     @staticmethod
-    def copyFrom(source : dict):
+    def copyFrom(source : dict, deep = False):
+        import copy
         assert isinstance(source, (dict, TriggerDict)), "Source must be a dictionary"
-        target = TriggerDict()
-        for key, item in source.items():
-            target[key] = item
-        return target
-
+        if deep:
+            return copy.deepcopy(source)
+        return copy.copy(source)
     @property
     def name(self) -> str:
         return self._name

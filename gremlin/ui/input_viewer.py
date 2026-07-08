@@ -17,7 +17,7 @@
 
 import threading
 from PySide6 import QtCore, QtWidgets
-
+from typing import Callable
 import dinput
 import traceback
 from shiboken6 import Shiboken
@@ -255,7 +255,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                 key = (device_id, VisualizationType.AxisTemporal)
                 at_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Temporal", data=key)
                 at_cb.setIgnoreKeyboard(True)
-                callback = self._create_callback(device, VisualizationType.AxisTemporal, at_cb)
+                callback = self._create_callback(device_id, VisualizationType.AxisTemporal, at_cb)
                 at_cb.clicked.connect(callback)
                 self._selector_callbacks[key] = callback
                 layout.addWidget(at_cb)
@@ -266,7 +266,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                 key = (device_id, VisualizationType.AxisCurrent)
                 ac_cb = gremlin.ui.ui_common.QDataCheckbox("Axes - Current", data=key )
                 ac_cb.setIgnoreKeyboard(True)
-                callback = self._create_callback(device, VisualizationType.AxisCurrent, ac_cb)
+                callback = self._create_callback(device_id, VisualizationType.AxisCurrent, ac_cb)
                 ac_cb.clicked.connect(callback)
                 self._selector_callbacks[key] = callback
                 layout.addWidget(ac_cb)
@@ -292,7 +292,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                     key = (device_id, VisualizationType.ButtonHat)
                     bh_cb = gremlin.ui.ui_common.QDataCheckbox(stub, data=key)
                     bh_cb.setIgnoreKeyboard(True)
-                    callback = self._create_callback(device, VisualizationType.ButtonHat, bh_cb)
+                    callback = self._create_callback(device_id, VisualizationType.ButtonHat, bh_cb)
                     bh_cb.clicked.connect(callback)
                     self._selector_callbacks[key] = callback
                     layout.addWidget(bh_cb)
@@ -305,7 +305,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                     key = (device_id, VisualizationType.Button)
                     bo_cb = gremlin.ui.ui_common.QDataCheckbox("Buttons", data=key)
                     bo_cb.setIgnoreKeyboard(True)
-                    callback = self._create_callback(device, VisualizationType.Button, bo_cb)
+                    callback = self._create_callback(device_id, VisualizationType.Button, bo_cb)
                     bo_cb.clicked.connect(callback)
                     self._selector_callbacks[key] = callback
                     layout.addWidget(bo_cb)
@@ -318,7 +318,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                     key = (device_id, VisualizationType.Hat)
                     ho_cb = gremlin.ui.ui_common.QDataCheckbox("Hats", data=key)
                     ho_cb.setIgnoreKeyboard(True)
-                    callback = self._create_callback(device, VisualizationType.Hat, ho_cb)
+                    callback = self._create_callback(device_id, VisualizationType.Hat, ho_cb)
                     ho_cb.clicked.connect(callback)
                     self._selector_callbacks[key] = callback
                     layout.addWidget(ho_cb)
@@ -331,16 +331,16 @@ class VisualizationSelector(QtWidgets.QWidget):
             self.main_layout.addWidget(box)
 
             # update based on settings
-            device_id = device.device_guid
+            device_id = device.device_id
             checked = config.getValue(device_id, VisualizationType.AxisTemporal, False)
             at_cb.setChecked(checked)
             if checked:
-                change_callback(device, VisualizationType.AxisTemporal, True)
+                change_callback(device_id, VisualizationType.AxisTemporal, True)
 
             checked = config.getValue(device_id, VisualizationType.AxisCurrent, False)
             ac_cb.setChecked(checked)
             if checked:
-                change_callback(device, VisualizationType.AxisCurrent, True)
+                change_callback(device_id, VisualizationType.AxisCurrent, True)
 
             if combine_button_hats:
                 # combined button/hat
@@ -348,7 +348,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                 if bh_cb:
                     bh_cb.setChecked(checked)
                 if checked:
-                    change_callback(device, VisualizationType.ButtonHat, True)
+                    change_callback(device_id, VisualizationType.ButtonHat, True)
             else:
                 # button only
                 if has_buttons:
@@ -356,7 +356,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                     if bo_cb:
                         bo_cb.setChecked(checked)
                     if checked:
-                        change_callback(device, VisualizationType.ButtonHat, True)
+                        change_callback(device_id, VisualizationType.Button, True)
 
                 # hat only
                 if has_hats:
@@ -364,7 +364,7 @@ class VisualizationSelector(QtWidgets.QWidget):
                     if ho_cb:
                         ho_cb.setChecked(checked)
                     if checked:
-                        change_callback(device, VisualizationType.Hat, True)
+                        change_callback(device_id, VisualizationType.Hat, True)
 
         # fire all the callbacks to update
         for device, vis in self._callbacks:
@@ -393,7 +393,8 @@ class VisualizationSelector(QtWidgets.QWidget):
         for widget in self._selector_widgets:
             if not Shiboken.isValid(widget):
                 continue
-            visualization, dev = widget.data
+            device_id, visualization = widget.data # key (device_id, visualization)
+            dev = gremlin.joystick_handling.getDevice(device_id)
             if visualization != VisualizationType.AxisTemporal and not dev.is_virtual:
                 with QtCore.QSignalBlocker(widget):
                     widget.setChecked(True)
@@ -411,11 +412,12 @@ class VisualizationSelector(QtWidgets.QWidget):
         widgets = [w for w in self._selector_widgets]
         for widget in widgets:
             if Shiboken.isValid(widget):
-                visualization, dev = widget.data
+                device_id, visualization = widget.data # key (device_id, visualization)
+                dev = gremlin.joystick_handling.getDevice(device_id)
                 if visualization != VisualizationType.AxisTemporal and dev.is_virtual and dev.vjoy_id == id:
                     with QtCore.QSignalBlocker(widget):
                         widget.setChecked(True)
-                    self._create_callback(dev, visualization, widget)()
+                    self._create_callback(device_id, visualization, widget)()
             else:
                 self._selector_widgets.remove(widget)
 
@@ -428,28 +430,35 @@ class VisualizationSelector(QtWidgets.QWidget):
             if Shiboken.isValid(widget):
                 with QtCore.QSignalBlocker(widget):
                     widget.setChecked(True)
-                visualisation, dev = widget.data
-                self._create_callback(dev, visualisation, widget)()
+                device_id, visualization = widget.data # key (device_id, visualization)
+                self._create_callback(device_id, visualization, widget)()
             else:
                 self._selector_widgets.remove(widget)
 
-    def _create_callback(self, device, vis_type, cb):
+    def _create_callback(self, device_id : str, visualization : VisualizationType, widget : QtWidgets.QWidget) -> Callable:
         """Creates the callback to trigger visualization updates.
 
-        :param device the device being updated
-        :param vis_type visualization type being updated
+        :param device_id the device ID being updated
+        :param visualization visualization type being updated
         """
-        key = (device, vis_type)
+        assert isinstance(device_id, str),"invalid device id"
+        assert isinstance(visualization, VisualizationType),"invalid visualization type"
+        assert isinstance(widget, QtWidgets.QWidget),"invalid widget"
+
+        key = (device_id, visualization)
         if key not in self._callbacks:
             self._callbacks.append(key)
-        return lambda: self._callback(device, vis_type, cb)
+        return lambda: self._callback(device_id, visualization, widget)
 
-    def _callback(self, device, vis_type, cb):
+    def _callback(self, device_id : str, visualization : VisualizationType, widget : QtWidgets.QWidget):
 
-        checked = cb.isChecked()
+        assert isinstance(device_id, str),"invalid device id"
+        assert isinstance(visualization, VisualizationType),"invalid visualization type"
+        assert isinstance(widget, QtWidgets.QWidget),"invalid widget"
+        checked = widget.isChecked()
         config = VisualizationConfig()
-        config.setValue(device.device_id, vis_type, checked)
-        self.changed.emit(device, vis_type, checked)
+        config.setValue(device_id, visualization, checked)
+        self.changed.emit(device_id, visualization, checked)
 
 
 class InputViewerWidget(QtWidgets.QWidget):
@@ -893,7 +902,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         return None
 
     @QtCore.Slot(dinput.DeviceSummary, VisualizationType, bool)
-    def _add_remove_visualization_widget(self, device, visualization: VisualizationType, enabled: bool | None):
+    def _add_remove_visualization_widget(self, device_id : str, visualization: VisualizationType, enabled: bool | None):
         """Adds or removes a visualization widget.
 
         :param device: the device which is being updated (DeviceSummary)
@@ -904,7 +913,10 @@ States can be toggled by clicking on the state button.  Expression states will u
         if not Shiboken.isValid(self):
             return
 
-        key = (device.device_id, visualization)
+        assert isinstance(device_id, str), "invalid device id"
+        key = (device_id, visualization)
+        device = gremlin.joystick_handling.getDevice(device_id)
+        assert device is not None, "invalid device"
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui
         # verbose = True
@@ -921,7 +933,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         if enabled is None:
             # use the existing value
             vconfig = VisualizationConfig()
-            enabled = vconfig.getValue(device.device_id, visualization)
+            enabled = vconfig.getValue(device_id, visualization)
         if enabled:
             assert self._widget_map[key] is not None, f"widget map for {key} does not exist - did you call load_viewer_widgets() first?"
 
@@ -1009,16 +1021,10 @@ States can be toggled by clicking on the state button.  Expression states will u
                 if is_filter and not self._filter_data(state):
                     continue
 
-                # btn = gremlin.ui.ui_common.QDataPushButton(key)
-                # btn.data = state # store the state with the button
                 btn = gremlin.ui.ui_common.StateRepeaterButton(state, callback=self._state_toggle)
 
-                # btn.setCheckable(True)
-
-                # btn.setChecked(state.value)
                 if verbose:
                     syslog.info(f"viewer state: {key}  value: {state.value}")
-                # btn.clicked.connect(self._state_toggle)
 
                 layout.addWidget(btn)
 
