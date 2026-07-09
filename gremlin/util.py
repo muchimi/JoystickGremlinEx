@@ -799,11 +799,13 @@ def find_icon(icon_file):
 
     root_folder = get_root_folder()
     # usual locations for images
-    folder_list = ["icons", "gfx"]
+    folder_list = ["icons"]
     for folder in folder_list:
-        new_icon_file = os.path.join(root_folder, folder, icon_file)
-        if os.path.isfile(new_icon_file):
-            return new_icon_file
+        full_folder = os.path.join(root_folder, folder)
+        if os.path.isdir(full_folder):
+            new_icon_file = os.path.join(full_folder, icon_file)
+            if os.path.isfile(new_icon_file):
+                return new_icon_file
 
     return None
 
@@ -942,10 +944,10 @@ def get_icon_path(path):
             gremlin.shared_state._icon_path_cache[the_path] = icon_file
             return icon_file
 
-    if "gfx" in the_path.casefold():
+    if "icons" in the_path.casefold():
         search_path = [the_path]
     else:
-        search_path = [the_path, os.path.normpath(os.path.join("gfx", the_path))]
+        search_path = [the_path, os.path.normpath(os.path.join("icons", the_path))]
     for stub_path in search_path:
         # syslog.info(f"icon path: {the_path}  root: {root_path}")
         icon_file = os.path.join(root_path, stub_path)
@@ -2837,9 +2839,9 @@ def getWidgetPositionInHierarchy(widget: QtWidgets.QWidget, relative_to: QtWidge
             break
         current = current.parentWidget()
 
-    syslog.info(f"Position in hierarchy for widget: {widget.__class__.__name__}")
-    for widget, pos in pos_map:
-        syslog.info(f"Widget: {widget.__class__.__name__}, Position: ({pos.x()}, {pos.y()})")
+    # syslog.info(f"Position in hierarchy for widget: {widget.__class__.__name__}")
+    # for widget, pos in pos_map:
+    #     syslog.info(f"Widget: {widget.__class__.__name__}, Position: ({pos.x()}, {pos.y()})")
     if relative_to is None or found:
         return pos_map
 

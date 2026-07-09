@@ -1248,6 +1248,7 @@ class AbstractCallbackModel(AbstractModel):
         :param sort: true to sort the data after filtering (only has effect if a sorting callback was provided)
         :param emit: true to emit a data changed signal after filtering
         """
+
         if not self._can_filter():
             # model is not filtered
             self._filtered_index_map = TriggerDict.copyFrom(self._index_map)
@@ -1269,6 +1270,7 @@ class AbstractCallbackModel(AbstractModel):
             syslog.info(f"MODEL INPUT FILTER: for [{device.name}]")
 
         # filtering enabled
+        force = False
 
         new_index_map = TriggerDict()
         new_item_map = TriggerDict()
@@ -1282,6 +1284,7 @@ class AbstractCallbackModel(AbstractModel):
                 new_index_map[new_index] = item
                 new_item_map[item] = new_index
                 new_index += 1
+                force = True
         if verbose and new_index == 0:
             syslog.info("\tall inputs are filtered for this device")
 
@@ -1290,16 +1293,20 @@ class AbstractCallbackModel(AbstractModel):
             self._filtered_index_map = new_index_map
             self._filtered_index_map.addCallback(self._handle_data_changed)
             self._filtered_item_map = new_item_map
-
+            force = True
         else:
             self._filtered_index_map = TriggerDict.copyFrom(self._index_map)
             self._filtered_item_map = TriggerDict.copyFrom(self._item_map)
+            force = True
 
         # resort the data
         self.applySort(False)
 
-        if is_included and emit:
-            self._fireChanged()
+        if force and emit:
+            self._fireChanged(force)
+
+
+
 
     def setItemFiltered(self, item: object, value: bool, emit=True) -> int:
         """sets an item filtered or not filtered (no effect if the model is not filtered)

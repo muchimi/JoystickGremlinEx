@@ -122,7 +122,7 @@ class Event:
         extra_data: dict = None,  # extra data to pass on (dict)
         is_remote: bool = False,  # true if remote
         client_list=None,  # list of remote clients if remote
-        source: EventSourceType = EventSourceType.dInput,  # source of the event
+        source: EventSourceType = EventSourceType.Any,  # source of the event
     ):
         """Creates a new Event object.
 
@@ -4364,7 +4364,7 @@ class JoystickEventProcessor:
         return gremlin.input_item.getInputIdKey(input_id)
 
     def registerListenerUICallback(
-        self, device_guid: str | dinput.GUID, input_type: InputType, input_id: int, callback: Callable = None, mode=CallbackMode.Edit, source = EventSourceType.dInput
+        self, device_guid: str | dinput.GUID, input_type: InputType, input_id: int, callback: Callable = None, mode=CallbackMode.Edit, source = EventSourceType.Any
     ):
         """register a joystick listener
 
@@ -4440,7 +4440,7 @@ class JoystickEventProcessor:
         input_type: InputType = None,
         input_id: int = None,
         callback: Callable = None,
-        source: EventSourceType = EventSourceType.dInput,
+        source: EventSourceType = EventSourceType.Any,
     ):
         """removes a registered callback - if input data is provided only looks for that one - if not provided, removes all inputs associated with the callback
         :param device_guid: the id of the device
@@ -4454,13 +4454,14 @@ class JoystickEventProcessor:
         if __debug__:
             if input_type is not None:
                 assert isinstance(input_type, InputType), "invalid input type"
-                match input_type:
-                    case InputType.Midi:
-                        assert isinstance(input_id, gremlin.ui.midi_device.MidiInputItem), "invalid midi input item"
-                    case InputType.OpenSoundControl:
-                        assert isinstance(input_id, gremlin.ui.osc_device.OscInputItem), "invalid osc input item"
-                    case _:
-                        assert isinstance(input_id, int), "invalid input id"
+                # assert is
+                # match input_type:
+                #     case InputType.Midi:
+                #         assert isinstance(input_id, gremlin.ui.midi_device.MidiInputItem), "invalid midi input item"
+                #     case InputType.OpenSoundControl:
+                #         assert isinstance(input_id, gremlin.ui.osc_device.OscInputItem), "invalid osc input item"
+                #     case _:
+                #         assert isinstance(input_id, int), "invalid input id"
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
 
@@ -4474,7 +4475,7 @@ class JoystickEventProcessor:
 
         if callback in self._callback_map and self._callback_map[callback]:
             for l_source in self._listener_callbacks:
-                if l_source != source:
+                if l_source != source and l_source != EventSourceType.Any:
                     continue
                 for l_mode in self._listener_callbacks[source]:
                     for l_device_guid in self._listener_callbacks[source][l_mode]:

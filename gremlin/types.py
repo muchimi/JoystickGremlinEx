@@ -1538,3 +1538,4 @@ class EventSourceType(enum.Enum):
     Virtual = 2
     Midi = 3
     OSC = 4
+    Any = 5 # any source

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ import gremlin.config
 from gremlin.input_types import InputType
 from gremlin.remote import VjoyAction
 import gremlin.types
+import gremlin.input_item
 
 
 syslog = logging.getLogger("system")
@@ -37,10 +38,10 @@ class MacroListModel(QtCore.QAbstractListModel):
 
     gfx_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
-        "gfx"
+        "icons"
     )
     icon_lookup = {}
-    
+
 
     value_format = {
         InputType.JoystickAxis:
@@ -114,7 +115,7 @@ class MacroListModel(QtCore.QAbstractListModel):
             return ""
 
         action = self._data[idx]
-        
+
         if role == QtCore.Qt.SizeHintRole:
             # size hint
             return QtCore.QSize(200, 26)
@@ -167,7 +168,7 @@ class MacroListModel(QtCore.QAbstractListModel):
             elif isinstance(action, gremlin.macro.StateAction):
                 if action.state:
                     if gremlin.config.Configuration().show_container_id:
-                        display = f"Set state [{action.state.key}] state ID: [{action.state.id}] action: [{action.action}] action ID: [{action.id}]"    
+                        display = f"Set state [{action.state.key}] state ID: [{action.state.id}] action: [{action.action}] action ID: [{action.id}]"
                     else:
                         display = f"Set state [{action.state.key}] action: [{action.action}]"
                 else:
@@ -177,8 +178,8 @@ class MacroListModel(QtCore.QAbstractListModel):
             else:
 
                 raise gremlin.error.GremlinError("Unknown macro action")
-            
-            
+
+
             #syslog.debug(display)
             return display
         elif role == QtCore.Qt.FontRole:
@@ -191,7 +192,7 @@ class MacroListModel(QtCore.QAbstractListModel):
 
 
         return None
-    
+
 
     def mimeTypes(self):
         """Returns the MIME types supported by this model for drag & drop.
@@ -318,7 +319,7 @@ class MacroListModel(QtCore.QAbstractListModel):
             self.beginRemoveRows(self.index(0, 0), index, index)
             del self._data[index]
             self.endRemoveRows()
-    
+
     def add_entry(self, index, entry):
         """Adds the given entry at the provided index.
 

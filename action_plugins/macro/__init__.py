@@ -1190,7 +1190,7 @@ class MacroWidget(gremlin.input_item.AbstractActionWidget):
     locked = False
 
     # Path to graphics
-    gfx_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "gfx")
+    gfx_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "icons")
 
     def __init__(self, action_data, parent=None):
         """Creates a new UI widget.

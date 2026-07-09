@@ -177,17 +177,21 @@ def filtered_input_devices(input_type_list=[InputType.JoystickAxis, InputType.Jo
     """gets a list of devices filtered by axis, button or hat"""
 
     def filter_func(dev: dinput.DeviceSummary):
+        # returns TRUE if device can be used
+        syslog.info(f"Filtering device: {dev.name}:  {str(dev)}")
+        if dev.disabled:
+            return False
         if virtual_only and not dev.is_virtual:
             return False
-        for input_type in input_type_list:
-            match input_type:
-                case InputType.JoystickAxis:
-                    return dev.axis_count > 0
-                case InputType.JoystickButton:
-                    return dev.button_count > 0
-                case InputType.JoystickHat:
-                    return dev.hat_count > 0
-            return False
+        if dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
+            for input_type in input_type_list:
+                match input_type:
+                    case InputType.JoystickAxis | InputType.JoystickHat | InputType.JoystickButton:
+                        return dev.axis_count > 0 or dev.button_count > 0 or dev.hat_count > 0
+        return False
+
+
+
 
     devices = [dev for dev in _joystick_devices if filter_func(dev)]
     return devices

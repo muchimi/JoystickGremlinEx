@@ -447,23 +447,35 @@ class Key:
         if not lookup_name:
             return -1
 
+        # modifiers - before anything else
+        start_index = 0
         if lookup_name in KeyMap._keyboard_modifiers:
-            return self.modifier_order()
+            return start_index + self.modifier_order()
 
-        # bump to next index
-        start_index = 100
+        # mouse keys - before other keys but after modifiers
+        start_index = 1000
+        mouse_keys = KeyMap._keyboard_mouse
+        if lookup_name in mouse_keys:
+            value = mouse_keys.index(lookup_name)
+            return start_index + value
+
+        # special keys - after mouse keys
+        start_index = 3000
+        # special keys
+        special_keys = KeyMap._keyboard_special
+        if lookup_name in special_keys:
+            value = special_keys.index(lookup_name)
+            return start_index + value
+
+        # other keys
+        start_index = 2000
 
         if len(lookup_name) == 1:
             # single keys - use the ascii sequence
             value = ord(lookup_name)
             return start_index + value
 
-        start_index = 1000
-        # special keys
-        special = KeyMap._keyboard_special
-        if lookup_name in special:
-            value = special.index(lookup_name)
-            return start_index + value
+
 
         # no clue
         return -1
@@ -1129,7 +1141,7 @@ class KeyMap:
 
         key = KeyMap.find(scan_code, is_extended)
         if key is None:
-            syslog.error(f"KEY: Don't know how to message_key: 0x{scan_code:02X} ({scan_code}) extended: {extended}")
+            syslog.error(f"KEY: Don't know how to message_key: 0x{scan_code:02X} ({scan_code}) extended: {is_extended}")
         return key
 
     @staticmethod
@@ -1289,7 +1301,7 @@ class KeyMap:
         """derives a single latched key from a set of keys"""
 
         modifier_map = {}
-        modifiers = KeyMap._keyboard_modifiers  # ["leftshift","leftcontrol","leftalt","rightshift","rightcontrol","rightalt","leftwin","rightwin"]
+        modifiers = KeyMap._keyboard_modifiers
         for key_name in modifiers:
             modifier_map[key_name] = []
 
@@ -1581,6 +1593,9 @@ class KeyMap:
 
     _keyboard_special = list(_g_name_map.keys())
     _keyboard_modifiers = ["leftshift", "leftcontrol", "leftalt", "rightshift", "rightshift2", "rightcontrol", "rightalt", "rightalt2", "leftwin", "rightwin"]
+
+    # list of mouse keys
+    _keyboard_mouse = ["mouse_1", "mouse_2", "mouse_3", "mouse_d_1", "mouse_d_2", "mouse_d_3", "mouse_4", "mouse_5", "wheel_up", "wheel_down", "wheel_left", "wheel_right"]
 
 
 # populate special mouse keys

@@ -40,7 +40,7 @@ import gremlin.base_profile
 import gremlin.util
 from gremlin.ui.ui_common import QBoxFrame
 from psygnal import Signal
-from gremlin.types import DeviceType
+from gremlin.types import DeviceType, EventSourceType
 from gremlin.input_item import InputItem, InputIdentifier, InputItemWidget, InputItemListView, BaseDeviceTabWidget
 from shiboken6 import Shiboken
 
@@ -2470,6 +2470,7 @@ class MidiClient(QtCore.QObject):
                         raw_value=raw_value,
                         is_axis=is_axis,
                         extra_data={"input_item": input_item},
+                        source = EventSourceType.MIDI
                     )
                 )
 
@@ -2491,6 +2492,7 @@ class MidiClient(QtCore.QObject):
                         is_axis=True,
                         override_input_type=InputType.JoystickAxis,
                         extra_data={"input_item": input_item},
+                        source = EventSourceType.MIDI
                     )
 
                     self._event_listener.joystick_event.emit(event)

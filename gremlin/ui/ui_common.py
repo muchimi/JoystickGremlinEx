@@ -5943,7 +5943,7 @@ class QJoystickListener:
         input_item=None,
         callback: Callable = None,
         description: str = "JoystickListener",
-        source : EventSourceType = EventSourceType.notSet,
+        source : EventSourceType = EventSourceType.Any,
         **kwargs,
     ):
         """creates a joystick axis visual repeater
@@ -6016,6 +6016,15 @@ class QJoystickListener:
         self._description = description or f"repeater (button): [{input_item.display_name}]"
         self.setInputItem(input_item)
 
+    def hookDevice(self, hook_id, device_guid : dinput.GUID, input_type: InputType, input_id, description : str =None):
+        """hooks a device input"""
+        self._description = description or f"repeater (button): [{hook_id}]"
+        self.setInput(device_guid=device_guid, input_type=input_type, input_id=input_id, description=description)
+
+    def unhookDevice(self):
+        """unhooks a device input"""
+        self._disconnect()
+
     def unhook(self):
         self._disconnect()
 
@@ -6056,7 +6065,7 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
         callback: Callable = None,
         state_change_callback: Callable = None,
         description: str = "AxisRepeater",
-        source: EventSourceType = EventSourceType.notSet,
+        source: EventSourceType = EventSourceType.Any,
     ):
         """creates a joystick axis visual repeater
         :param device_guid: optional, device GUID of the joystick
@@ -7224,64 +7233,73 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
         vis_type = self.vis_type
         # el = gremlin.event_handler.EventListener()
         jep = gremlin.event_handler.JoystickEventProcessor()
-        match vis_type:
-            case gremlin.types.VisualizationType.AxisCurrent:
-                # for input_id in self._device.getAxisInputIdList():
-                #     jep.unregisterListenerUICallback(
-                #         device_guid = self.device_guid,
-                #         input_type = InputType.JoystickAxis,
-                #         input_id = -1, # all inputs of that type
-                #         callback = self._current_axis_update_ui) # event is processed on the UI thread
 
-                # el.removeUIJoystickEventCallback(self._current_axis_update)
-                # el.vjoy_output_event.disconnect(self._vjoy_current_axis_update)
-                pass
-
-            case gremlin.types.VisualizationType.Button:
-                # self._unhook_buttons()
-                # jep.unregisterListenerUICallback(
-                #     device_guid = self.device_guid,
-                #     input_type = InputType.JoystickButton,
-                #     input_id = -1, # all inputs of that type
-                #     callback = self._button_update_ui) # event is processed on the UI thread
-
-                # el.removeUIJoystickEventCallback(self._button_update)
-                # el.vjoy_output_event.disconnect(self._vjoy_button_update)
-                pass
-
-            case gremlin.types.VisualizationType.ButtonHat:
-                # self._unhook_buttons()
-                # jep.unregisterListenerUICallback(
-                #     device_guid = self.device_guid,
-                #     input_type = InputType.JoystickButton,
-                #     input_id = -1, # all inputs of that type
-                #     callback = self._button_update_ui) # event is processed on the UI thread
-                # jep.unregisterListenerUICallback(
-                #     device_guid = self.device_guid,
-                #     input_type = InputType.JoystickHat,
-                #     input_id = -1, # all inputs of that type
-                #     callback = self._hat_update_ui) # event is processed on the UI thread
-                pass
-
-            case gremlin.types.VisualizationType.AxisTemporal:
-                pass
-                # jep = gremlin.event_handler.JoystickEventProcessor()
-                # jep.unregisterCallback(self.hook_id) # this unregisters ALL hooks to this callback
-
-            case gremlin.types.VisualizationType.Hat:
-                self._unhook_buttons()
-                jep.unregisterListenerUICallback(
+        if vis_type == gremlin.types.VisualizationType.Hat:
+           jep.unregisterListenerUICallback(
                     device_guid=self.device_guid,
                     input_type=InputType.JoystickHat,
                     input_id=-1,  # all inputs of that type
                     callback=self._hat_update_ui,
-                )  # event is processed on the UI thread
+            )  # event is processed on the UI thread
 
-                # el.removeUIJoystickEventCallback(self._button_hat_update)
-                # # el.vjoy_event.connect(self._vjoy_button_hat_update)
-                # el.vjoy_output_event.disconnect(self._vjoy_button_hat_update)
-                # if self._device.is_virtual:
-                #     el.unregisterVjoyCallback(self._vjoy_button_hat_update)
+        # match vis_type:
+        #     case gremlin.types.VisualizationType.AxisCurrent:
+        #         # for input_id in self._device.getAxisInputIdList():
+        #         #     jep.unregisterListenerUICallback(
+        #         #         device_guid = self.device_guid,
+        #         #         input_type = InputType.JoystickAxis,
+        #         #         input_id = -1, # all inputs of that type
+        #         #         callback = self._current_axis_update_ui) # event is processed on the UI thread
+
+        #         # el.removeUIJoystickEventCallback(self._current_axis_update)
+        #         # el.vjoy_output_event.disconnect(self._vjoy_current_axis_update)
+        #         pass
+
+        #     case gremlin.types.VisualizationType.Button:
+        #         # self._unhook_buttons()
+        #         # jep.unregisterListenerUICallback(
+        #         #     device_guid = self.device_guid,
+        #         #     input_type = InputType.JoystickButton,
+        #         #     input_id = -1, # all inputs of that type
+        #         #     callback = self._button_update_ui) # event is processed on the UI thread
+
+        #         # el.removeUIJoystickEventCallback(self._button_update)
+        #         # el.vjoy_output_event.disconnect(self._vjoy_button_update)
+        #         pass
+
+        #     case gremlin.types.VisualizationType.ButtonHat:
+        #         # self._unhook_buttons()
+        #         # jep.unregisterListenerUICallback(
+        #         #     device_guid = self.device_guid,
+        #         #     input_type = InputType.JoystickButton,
+        #         #     input_id = -1, # all inputs of that type
+        #         #     callback = self._button_update_ui) # event is processed on the UI thread
+        #         # jep.unregisterListenerUICallback(
+        #         #     device_guid = self.device_guid,
+        #         #     input_type = InputType.JoystickHat,
+        #         #     input_id = -1, # all inputs of that type
+        #         #     callback = self._hat_update_ui) # event is processed on the UI thread
+        #         pass
+
+        #     case gremlin.types.VisualizationType.AxisTemporal:
+        #         pass
+        #         # jep = gremlin.event_handler.JoystickEventProcessor()
+        #         # jep.unregisterCallback(self.hook_id) # this unregisters ALL hooks to this callback
+
+        #     case gremlin.types.VisualizationType.Hat:
+        #         self._unhook_buttons()
+        #         jep.unregisterListenerUICallback(
+        #             device_guid=self.device_guid,
+        #             input_type=InputType.JoystickHat,
+        #             input_id=-1,  # all inputs of that type
+        #             callback=self._hat_update_ui,
+        #         )  # event is processed on the UI thread
+
+        #         # el.removeUIJoystickEventCallback(self._button_hat_update)
+        #         # # el.vjoy_event.connect(self._vjoy_button_hat_update)
+        #         # el.vjoy_output_event.disconnect(self._vjoy_button_hat_update)
+        #         # if self._device.is_virtual:
+        #         #     el.unregisterVjoyCallback(self._vjoy_button_hat_update)
         self._hooked = False
 
     def _cleanup_ui(self):
@@ -7590,7 +7608,7 @@ class QUsedPushButton(QDataPushButton):
         self._is_interactive = value
         self.update()
 
-    def hook(self, device_guid: dinput.GUID, input_type: InputType, input_id: int):
+    def hook(self, device_guid: dinput.GUID, input_type: InputType, input_id: int, source : EventSourceType = EventSourceType.Any):
         """hooks the button highlight to a button input"""
         jep = gremlin.event_handler.JoystickEventProcessor()
         assert isinstance(device_guid, dinput.GUID), "invalid device guid"
@@ -7600,7 +7618,7 @@ class QUsedPushButton(QDataPushButton):
         self._input_type = input_type
         self._input_id = input_id
 
-        jep.registerListenerUICallback(device_guid, input_type, input_id, self._handle_input_ui, mode=CallbackMode.Edit)
+        jep.registerListenerUICallback(device_guid, input_type, input_id, self._handle_input_ui, mode=CallbackMode.Edit, source=source)
 
     def enterEvent(self, event):
         self._is_hovered = True
@@ -13791,6 +13809,9 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
             key=lambda x: x.name,
         )
 
+        for dev in self._devices:
+            syslog.info(f"Found device: {dev.name}")
+
         container_selector_widget = QtWidgets.QWidget()
         main_layout.addWidget(container_selector_widget)
         grid = QtWidgets.QGridLayout(container_selector_widget)
@@ -13862,6 +13883,7 @@ class QJoystickSelectorWidget(QtWidgets.QWidget):
         """updates the device list"""
         with QtCore.QSignalBlocker(self.device_selector_widget):
             self.device_selector_widget.clear()
+            dev : dinput.DeviceSummary
             for dev in self._devices:
                 self.device_selector_widget.addItem(dev.name, dev)
 
@@ -14040,10 +14062,10 @@ class QJoystickSelectorDialog(QShowAtCursorDialog):
         self.setLayout(main_layout)
 
         self.selector_widget = QJoystickSelectorWidget(
-            input_types,
-            default_device,
-            default_input_type,
-            default_input_id,
+            input_types = input_types,
+            default_device = default_device,
+            default_input_type = default_input_type,
+            default_input_id = default_input_id,
             virtual_only=virtual_only,
         )
         self.selector_widget.selectionChanged.connect(self._handle_selection_changed)

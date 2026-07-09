@@ -3594,13 +3594,15 @@ class OscFilterWidget(QtWidgets.QWidget):
             # if there is a filter, clear it
             with QtCore.QSignalBlocker(self._filter_widget):
                 self._filter_widget.setText(None)
-            self._apply_filter()
+            self._config.osc_filter = ""
+            self.changed.emit("")
 
     def _apply_filter(self):
         """applies the filter"""
         value = self._filter_widget.text()
         self._config.osc_filter = value
         self.changed.emit(value)
+
 
     def clearFilter(self):
         """clears the filter"""
@@ -3739,7 +3741,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             mode=mode,
             custom_load_handler=self._load_handler,
             custom_remove_handler=self._remove_handler,
-            custom_filter_handler=self._filter_data,
+            custom_filter_handler=self._handle_filter_data,
         )
 
         self.setInputItemListModel(model)
@@ -3826,6 +3828,9 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         el.unlock_inputs.connect(self._handle_unlock_inputs)
         el.find_next.connect(self._handle_find_next)
 
+        # re-apply filters after config is loaded
+        self.inputItemListModel.applyFilter()
+
     def _load_handler(self, model: OscInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
 
@@ -3854,22 +3859,23 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
             model._update_filter()
 
-    def _filter_data(self, input_item) -> bool:
+    def _handle_filter_data(self, input_item) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
         import fnmatch
 
         if not self._filter:
             return True  # ok
         item: OscInputItem = input_item.input_id
-        key = item.key
+        key = item.message
         if not key:
             # no key = match
             return True
 
-        key = item.key.casefold().strip()
-        if self._filter in key:
-            return True
-        return fnmatch.fnmatch(key, self._filter)
+        key = item.message.casefold().strip()
+
+        include = fnmatch.fnmatch(key, self._filter)
+        syslog.info(f"Filter check: key='{key}', filter='{self._filter}', result={include}")
+        return include
 
     def onInputListViewCreated(self):
         """called when input item list view is created"""
@@ -3926,37 +3932,20 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             if term:
                 gremlin.util.InvokeUiMethod(self._filter_widget.find_next, term)
 
-    def _filter_data(self, input_item) -> bool:
-        """custom filter handler - true if the data is included in the filter, false otherwise"""
-        import fnmatch
 
-        if not self._filter:
-            return True  # ok
-        item: OscInputItem = input_item.input_id
-        message = item.message
-        if not message:
-            # no message = match
-            return True
-
-        message = item.message.casefold().strip()
-        return fnmatch.fnmatch(message, self._filter)
-        # return self._filter in message
 
     def _filter_changed(self, filter):
         """called when the filter changes"""
         self._filter = gremlin.util.decorate_filter(filter)
+
         self.inputItemListModel.applyFilter()
         self._filter_widget.updateCounts()
 
-    def find_item(self, device_guid, input_type, input_id):
+    def find_item(self, device_guid, input_type, input_id) -> OscInputItem:
         """locates the input item, returns none if not found"""
-        osc: OscInputItem
-        _selected_index = None
-        _item = None
-        model = self.inputItemListModel.dataModel()
-        for index, osc in model.items():
-            if osc.message == input_id:
-                return osc
+        for input_item in self.inputItemListModel:
+            if input_item.device_guid == device_guid and input_item.input_type == input_type and input_item.input_id == input_id:
+                return input_item
         return None  # not found
 
     def find_item_by_message(self, mode: str, msg: str) -> tuple[int, OscInputItem]:
@@ -4649,6 +4638,7 @@ class InputOscClient(QtCore.QObject):
                         data=index,  # source index
                         is_virtual=True,  # indicate we are not a hardware input
                         is_axis=True,
+                        extra_data={"input_item": input_item},
                         source = EventSourceType.OSC,
                     )
 
@@ -4714,6 +4704,7 @@ class InputOscClient(QtCore.QObject):
                         data=index,  # source index
                         is_virtual=True,  # indicate we are not a hardware input
                         is_axis=is_axis,
+                        extra_data={"input_item": input_item},
                         source=EventSourceType.OSC,
                     )
 

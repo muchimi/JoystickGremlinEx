@@ -203,6 +203,7 @@ class VirtualAxisButtonWidget(AbstractVirtualButtonWidget):
         """Populates the UI elements with data."""
         self.lower_limit_widget.setValue(self.condition_data.lower_limit)
         self.upper_limit_widget.setValue(self.condition_data.upper_limit)
+
         self.axis_repeater_widget.hookDevice(self.condition_data.hook_id,
                                              self.condition_data.device_guid,
                                              self.condition_data.input_type,

@@ -26,7 +26,7 @@ import time
 import lxml.etree
 import traceback
 import collections
-from typing import Callable
+from typing import Callable, Self
 import html
 import gremlin
 import gremlin.config
@@ -1586,6 +1586,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
     # signal input value changed
     input_value_changed = Signal(InputIdentifier, float)
 
+
     def __init__(
         self,
         input_item: InputItem,
@@ -2162,7 +2163,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             case InputType.OpenSoundControl:
                 source = EventSourceType.OSC
             case _:
-                source = EventSourceType.dInput
+                source = EventSourceType.Any
 
 
 
@@ -2518,6 +2519,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def setSelected(self, value: bool, emit=True):
         """marks the item as selected"""
+        if not Shiboken.isValid(self):
+            return
         if value != self._selected:
             verbose = gremlin.config.Configuration().verbose_mode_ui
             if verbose:
@@ -2960,6 +2963,7 @@ class InputItemListModel(AbstractCallbackModel):
 
         if device:
             self.refresh(False)
+
 
     def _handle_sort(self, items) -> tuple:
         """returns a sort list for the items if a custom handler was not provided"""
@@ -4137,7 +4141,7 @@ class InputItemListView(AbstractView):
                 y = pos.y()
                 bar = self._scroll_area.verticalScrollBar()
                 bar.setValue(y)
-                syslog.info(f"Scrolled to widget at y-position: [{y}]")
+                # syslog.info(f"Scrolled to widget at y-position: [{y}]")
 
 
 
@@ -9225,6 +9229,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
     description_clear = Signal()  # clear the description field
     expired = Signal(object, QtWidgets.QWidget)  # (key, widget) fires when the input mapping expires to notify the owner
 
+
     def __init__(
         self,
         input_item: InputItem,
@@ -9440,7 +9445,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         # reference the widget so we can update it
         self._container_view = container_view_widget
 
-        syslog.info(f"created container view for input item [{input_item.display_name}] - mapping widget id: {self.id}")
+        # syslog.info(f"created container view for input item [{input_item.display_name}] - mapping widget id: {self.id}")
 
     def getContainerView(self) -> ContainerView:
         """gets the container view"""

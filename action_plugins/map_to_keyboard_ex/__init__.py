@@ -25,7 +25,7 @@ from gremlin.input_types import InputType
 from gremlin.input_devices import CallbackActions
 
 from gremlin.profile import safe_format, safe_read
-from gremlin.keyboard import Key
+from gremlin.keyboard import Key, sort_keys
 from gremlin.ui.virtual_keyboard import InputKeyboardDialog
 import gremlin.config
 import logging
@@ -313,7 +313,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
                 assert True, f"Don't know how to handle: {code}"
             data.append(key)
 
-        self.action_data.setKeys(gremlin.keyboard.sort_keys(data))
+        self.action_data.setKeys(sort_keys(data))
         gremlin.util.InvokeUiMethod(self._populate_ui)  # reload new keys
 
         self.action_modified.emit()
@@ -485,20 +485,26 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
             self.autorepeat_delay = 0
 
         # order the keys so
+        # key: Key
+        # key_list = [(key, key.weight) for key in action.keys]
+        # if key_list:
+        #     key_list.sort(key=lambda x: x[1])
+        #     key_list.reverse()
+
 
         # build the macro that will play when the action is called
         key: Key
-        key_list = [(key, key.weight) for key in action.keys]
-        if key_list:
-            key_list.sort(key=lambda x: x[1])
-            key_list.reverse()
+        key_list = sort_keys(action.keys)
+        # if key_list:
+        #     key_list.sort(key=lambda x: x[1])
+        #     key_list.reverse()
 
-        if self.verbose_extra:
-            stub = "".join([f"{key.name} vk: [0x{key.virtual_code:x}] weight: [{w}],  " for key, w in key_list])
-            syslog.info(f"Key order: {stub}")
+        # if self.verbose_extra:
+        #     stub = "".join([f"{key.name} vk: [0x{key.virtual_code:x}] weight: [{w}],  " for key, w in key_list])
+        #     syslog.info(f"Key order: {stub}")
 
         # remove the weight
-        key_list = [key[0] for key in key_list]
+        #key_list = [key[0] for key in key_list]
 
         self._press_keys = key_list
         self._release_keys = key_list.copy()
@@ -1134,7 +1140,7 @@ Can also send mouse buttons, mouse wheel events."""
         """
         # return "fa6s.keyboard"
         return "mdi6.keyboard-outline"
-        
+
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.
