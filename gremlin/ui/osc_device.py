@@ -21,7 +21,6 @@ import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 import threading
 
-
 import gremlin.config
 import gremlin.event_handler
 
@@ -29,7 +28,7 @@ import gremlin.input_devices
 import gremlin.joystick_handling
 import gremlin.ui.ui_common as ui_common
 import gremlin.shared_state
-from gremlin.types import DeviceType
+from gremlin.types import DeviceType, EventSourceType
 from gremlin.input_types import InputType
 from gremlin.input_item import InputItem, InputIdentifier, InputItemWidget, InputItemListView, BaseDeviceTabWidget
 from gremlin.util import read_guid, safe_read, safe_format, list_to_csv, csv_to_list
@@ -3559,7 +3558,7 @@ class OscFilterWidget(QtWidgets.QWidget):
                 # syslog.info(f"search index: {last_index}")
                 index = index_list[last_index]
                 input_item = data[index]
-                # self.select.emit(input_item)
+
 
                 self._last_search_term = search_term
                 self._last_search_index = last_index + 1  # next search index
@@ -3610,20 +3609,6 @@ class OscFilterWidget(QtWidgets.QWidget):
     @property
     def filter(self) -> str:
         return self._filter_widget.text()
-
-    # @QtCore.Slot()
-    # def _find_input_cb(self):
-    #     ''' finds a state '''
-    #     name, ok = QtWidgets.QInputDialog.getText(self, "OSC Lookup", "Search for:")
-    #     if ok:
-    #         # sc = StateData()
-    #         # if sc.exists(name):
-    #         #     data = sc.getState(name)
-    #         #     index = self._index_for_key(data)
-    #         #     self.inputItemListView.select_item(index,True)
-    #         # else:
-    #         #     gremlin.ui.ui_common.MessageBox(prompt=f"State [{name}] not found.")
-    #         pass
 
 
 class OscBulkLoadDialog(gremlin.ui.ui_common.QRememberDialog):
@@ -4543,7 +4528,7 @@ class InputOscClient(QtCore.QObject):
             return
         self._interface = OscInterface()
         self._interface.start()  # ensure started
-        self._interface.osc_message.connect(self._osc_message_cb)
+        self._interface.osc_message.connect(self._handle_osc_message_received)
 
         self._verbose = gremlin.config.Configuration().verbose_mode_osc
         self._started = True
@@ -4563,7 +4548,7 @@ class InputOscClient(QtCore.QObject):
     def stop(self):
         """stops the client"""
         if self._started:
-            self._interface.osc_message.disconnect(self._osc_message_cb)
+            self._interface.osc_message.disconnect(self._handle_osc_message_received)
             self._interface.stop()
             self._interface = None
         self._started = False
@@ -4583,7 +4568,7 @@ class InputOscClient(QtCore.QObject):
         if self._started:
             self._interface.send(address, v1, v2)
 
-    def _osc_message_cb(self, message, args):
+    def _handle_osc_message_received(self, message, args):
         """called when an OSC message is received"""
         from gremlin.ui.osc_device import OscInputItem, OscDeviceTabWidget
         from gremlin.input_types import InputType
@@ -4664,14 +4649,15 @@ class InputOscClient(QtCore.QObject):
                         data=index,  # source index
                         is_virtual=True,  # indicate we are not a hardware input
                         is_axis=True,
+                        source = EventSourceType.OSC,
                     )
 
                     self._state_data[input_item.message_key] = normalized_args  # this can have multiple axis values returned
 
-                    self._event_listener.joystick_event.emit(event)
+                    self._event_listener.osc_event.emit(event)
 
                     if not is_running:
-                        self._event_listener.joystick_event_ui.emit(event)
+                        self._event_listener.vjoy_output_event_ui.emit(event)
                         continue
 
                 elif input_item.mode == OscInputItem.InputMode.OnChange:
@@ -4728,13 +4714,15 @@ class InputOscClient(QtCore.QObject):
                         data=index,  # source index
                         is_virtual=True,  # indicate we are not a hardware input
                         is_axis=is_axis,
+                        source=EventSourceType.OSC,
                     )
 
                     self._event_listener.osc_event.emit(event)
+                    self._event_listener.joystick_event_ui.emit(event)
 
                     if not gremlin.shared_state.is_running:
                         # fire UI event to update the button
-                        self._event_listener.joystick_event_ui.emit(event)
+                        self._event_listener.vjoy_output_event_ui.emit(event)
 
                     if autorelease:
                         # schedule an autorelease event
@@ -4782,7 +4770,7 @@ class InputOscClient(QtCore.QObject):
         """execute autorelease for an input"""
         self._event_listener.osc_event.emit(event)
         if not gremlin.shared_state.is_running:
-            self._event_listener.button_state_change.emit(event)
+            self._event_listener.joystick_event_ui.emit(event)
 
 
 # listen to OSC input

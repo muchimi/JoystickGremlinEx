@@ -339,7 +339,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(switch_widget)
         self._widget_map[data.index] = switch_widget
         self.action_widget = switch_widget.action_widget
-        self.action_widgets.append(switch_widget.action_widget)
+        self._widget_map = {}.append(switch_widget.action_widget)
 
     def _create_condition_ui(self):
         if self.profile_data.action_sets:
@@ -383,7 +383,7 @@ class SwitchContainerWidget(AbstractContainerWidget):
 
     def _reload_ui(self):
         # reload the UI
-        self.action_widgets.clear()
+        self._widget_map = {}.clear()
         syslog.info("reload")
 
         # re-create the layout and place it inside the dock widget

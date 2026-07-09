@@ -38,7 +38,7 @@ class InputType(enum.IntEnum):
 
 
     @staticmethod
-    def to_string(value):
+    def to_string(value) -> str:
         if value is None:
             value = InputType.NotSet
         try:
@@ -50,7 +50,11 @@ class InputType(enum.IntEnum):
         return int(self)
 
     @staticmethod
-    def to_enum(value):
+    def from_string(value) -> "InputType":
+        return InputType.to_enum(value)
+
+    @staticmethod
+    def to_enum(value) -> "InputType":
         try:
             if value is None:
                 return InputType.NotSet
@@ -62,7 +66,7 @@ class InputType(enum.IntEnum):
             raise ValueError("Invalid type in lookup")
 
     @staticmethod
-    def to_name(value):
+    def to_name(value) -> str:
         match value:
             case InputType.NotSet:
                 return "n/a"

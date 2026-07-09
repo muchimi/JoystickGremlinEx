@@ -4776,8 +4776,9 @@ class QIconPushButton(QDataPushButton):
         super().__init__(
             text=text, data=data, parent=parent, tooltip=tooltip, callback=callback, callbackEx=callbackEx, clicked=clicked, enabled=enabled, enhanced=enhanced, height=height, width=width
         )
-        self.icon_pressed = None
-        self.icon_default = None
+        self._icon_pressed = None
+        self._icon_default = None
+
         if icon_size is not None:
             self.setIconSize(QtCore.QSize(icon_size, icon_size))
 
@@ -4790,7 +4791,6 @@ class QIconPushButton(QDataPushButton):
         icon: QIcon = gremlin.util.load_icon(icon)
         super().setIcon(icon)
 
-        # build the "press" icon
         self.icon = icon
         icon_size = self.iconSize()
         base_pixmap = icon.pixmap(icon_size)
@@ -4798,34 +4798,28 @@ class QIconPushButton(QDataPushButton):
         offset_pixmap = QPixmap(base_pixmap.size() + QSize(offset.x(), offset.y()))
         offset_pixmap.fill(Qt.transparent)  # Ensure background is clear
 
-        # 3. Draw the shifted image using QPainter
         painter = QPainter(offset_pixmap)
         painter.drawPixmap(offset, base_pixmap)
         painter.end()
+        self._icon_pressed = QIcon(offset_pixmap)
 
-        # 4. Create the final icon and set it
-        self.icon_pressed = QIcon(offset_pixmap)
-        self.icon_default = icon
-
-    # def enterEvent(self, event):
-    #     self.setIcon(self.icon_pressed)
-    #     return super().enterEvent(event)
-
-    # def leaveEvent(self, event):
-    #     self.setIcon(self.icon_default)
-    #     return super().leaveEvent(event)
+        self._icon_default = icon
 
     def on_press(self):
         """override when mouse is pressed"""
-        if self.icon_pressed:
-            self.setIcon(self.icon_pressed)
+        super().on_press()
+        if self._icon_pressed:
+            super().setIcon(self._icon_pressed)
             self.repaint()  # force immediate repaint
+
 
     def on_release(self):
         """override when mouse is released"""
-        if self.icon_default:
-            self.setIcon(self.icon_default)
+        super().on_release()
+        if self._icon_default:
+            super().setIcon(self._icon_default)
             self.repaint()  # force immediate repaint
+
 
 
 class NoKeyboardPushButton(QIconPushButton):
@@ -5949,6 +5943,7 @@ class QJoystickListener:
         input_item=None,
         callback: Callable = None,
         description: str = "JoystickListener",
+        source : EventSourceType = EventSourceType.notSet,
         **kwargs,
     ):
         """creates a joystick axis visual repeater
@@ -5970,6 +5965,7 @@ class QJoystickListener:
         self._callback: Callable = callback
         self._description = description
         self._connected = False  # tracks connectivity to the event
+        self._event_source = source
 
         if input_item is not None:
             self.setInputItem(input_item, description)
@@ -5996,9 +5992,10 @@ class QJoystickListener:
         if self._input_item != input_item:
             assert isinstance(input_item, gremlin.input_item.InputItem) if input_item is not None else True, "invalid input item"
             self._disconnect()  # disconnect old input
-            self.setInput(device_guid=input_item.device_guid, input_type=input_item.input_type, input_id=input_item.input_id, description=description)
+            input_type = input_item.getOverrideInputType()
+            self.setInput(device_guid=input_item.device_guid, input_type=input_type, input_id=input_item.input_id, description=description)
 
-    def setInput(self, device_guid: dinput.GUID, input_type: InputType, input_id, description: str = "JoystickListener"):
+    def setInput(self, device_guid: dinput.GUID, input_type: InputType, input_id, description: str = "JoystickListener" ):
         """sets hook data based on specific input"""
         if device_guid != self._device_guid or input_type != self._input_type or self._input_id != self._input_id:
             self._disconnect()
@@ -6011,6 +6008,7 @@ class QJoystickListener:
             self._input_id = input_id
             self._input_type = input_type
             self._description = description
+            self._input_source = None
             self._connect()
 
     def hook(self, input_item, description=None):
@@ -6026,7 +6024,7 @@ class QJoystickListener:
         if not self._connected and self._device_guid is not None and self._input_id is not None and self._input_type is not None:
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
             jp = gremlin.event_handler.JoystickEventProcessor()
-            jp.registerListenerUICallback(self._device_guid, self._input_type, self._input_id, self._callback, CallbackMode.Edit)
+            jp.registerListenerUICallback(self._device_guid, self._input_type, self._input_id, self._callback, CallbackMode.Edit, source = self._event_source)
             # direct to UI thread as these updates are on the UI thread
             self._connected = True
             device = gremlin.joystick_handling.getDevice(self._device_guid)
@@ -6056,7 +6054,9 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
         input_item=None,
         values: float | list[float] = None,
         callback: Callable = None,
+        state_change_callback: Callable = None,
         description: str = "AxisRepeater",
+        source: EventSourceType = EventSourceType.notSet,
     ):
         """creates a joystick axis visual repeater
         :param device_guid: optional, device GUID of the joystick
@@ -6069,8 +6069,12 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
             orientation=Qt.Orientation.Horizontal,
             input_item=input_item,
             callback=self._handle_update_ui,
+
             description=description,
+            source=source,
         )
+
+        self._state_change_callback = state_change_callback
 
         self._get_values_callback = callback
         if values is not None:
@@ -6112,6 +6116,9 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
                     # has a curve applied
                     values.curved = event.curve_value
 
+        if self._state_change_callback:
+            self._state_change_callback(values)
+
         self._set_value_ui(values)
 
     def triggerUpdate(self):
@@ -6136,25 +6143,28 @@ class QAxisRepeaterProgressbar(QProgressBar, QJoystickListener):
         if not self.isVisible():
             self.setVisible(True)
 
+
     def _cleanup_ui(self):
         """widget is being deleted"""
         self._disconnect()  # disconnect handler
 
 
 class QButtonStateWidget(QJoystickListener, QtWidgets.QWidget):
-    """visualizes the state of a button"""
+    """visualizes the state of a button - button repeater """
 
-    def __init__(self, input_item, description: str = None, callback: Callable = None, parent=None):
+    def __init__(self, input_item, description: str = None, callback: Callable = None, state_change_callback : Callable = None, source: EventSourceType = EventSourceType.notSet, parent=None):
         """Initializes the QButtonStateWidget.
         :param input_item: The input item associated with this widget (InputItem)
         :param description: Optional description for the widget
         :param callback: Optional callback function to get the current button state for non joystick items
         :param parent: Optional parent widget
         """
-        super().__init__(input_item=input_item, callback=self._handle_update_ui, description=description, parent=parent)
+        super().__init__(input_item=input_item, callback=self._handle_update_ui, description=description, source=source, parent=parent)
 
         input_type = input_item.getOverrideInputType()
         assert input_type in (InputType.JoystickButton, InputType.JoystickHat), "invalid input type - must be button or hat"
+        assert isinstance(callback, Callable) or callback is None, "invalid callback"
+        assert isinstance(state_change_callback, Callable) or state_change_callback is None, "invalid state change callback"
 
         self.setContentsMargins(0, 0, 0, 0)
         self.main_layout = QtWidgets.QHBoxLayout(self)
@@ -6173,6 +6183,7 @@ class QButtonStateWidget(QJoystickListener, QtWidgets.QWidget):
         self._hat_icons = {}  # icon hats, keyed by position
         self.main_layout.addWidget(self._button_widget)
         self._get_state_callback = callback  # store the callback
+        self._state_change_callback = state_change_callback
 
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
@@ -6188,6 +6199,7 @@ class QButtonStateWidget(QJoystickListener, QtWidgets.QWidget):
     def process_event_ui(self, event: gremlin.event_handler.Event):
         assert gremlin.util.is_ui_thread()
         self._update_value_ui(event.is_pressed)
+
 
     def desiredHeight(self):
         return self.sizeHint().height()
@@ -6210,6 +6222,9 @@ class QButtonStateWidget(QJoystickListener, QtWidgets.QWidget):
                 self._update_value_ui(event.is_pressed)
             case InputType.JoystickHat:
                 self._update_hat_ui(event.value)
+        if self._state_change_callback:
+            self._state_change_callback(event.is_pressed)
+
 
     def _update_value_ui(self, is_pressed: bool):
         gremlin.util.assert_ui_thread()
@@ -6502,13 +6517,19 @@ class JoystickDeviceAxisStateWidget(QtWidgets.QGroupBox):
         assert event.device_guid == self.device.device_guid, "handler should not be called if the event is not for this device"
         astate = gremlin.event_handler.AxisState()
         input_id = event.identifier
-        values = astate.getAxisValues(event.device_guid, input_id, event.value)
-
-        if values is not None:
+        if event.source == EventSourceType.Virtual:
+            value = event.value
             if input_id in self.axis_widgets:
-                self.axis_widgets[input_id].setValue(values)
+                self.axis_widgets[input_id].setValue(value)
             if input_id in self.value_label_widgets:
-                self.value_label_widgets[input_id].setValue(values.actual)
+                self.value_label_widgets[input_id].setValue(value)
+        else:
+            values = astate.getAxisValues(event.device_guid, input_id, event.value)
+            if values is not None:
+                if input_id in self.axis_widgets:
+                    self.axis_widgets[input_id].setValue(values)
+                if input_id in self.value_label_widgets:
+                    self.value_label_widgets[input_id].setValue(values.actual)
 
     def _handle_axis_value_changed(self, device_guid, input_type, input_id, values):
         """called by axis handler when axis value changes"""
@@ -7875,25 +7896,6 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
             widget.hide()
             self.main_layout.removeWidget(widget)
             gremlin.util.delete_widget(widget)
-
-    # def process_event(self, event):
-    #     """Updates state visualization based on the given event.
-
-    #     :param event the event with which to update the state display
-    #     """
-    #     if not Shiboken.isValid(self):
-    #         return
-    #     if self._device.device_guid != event.device_guid:
-    #         # not ours
-    #         return
-    #     input_type = event.getInputType()
-    #     if input_type == InputType.JoystickButton:
-    #         # is_pressed = event.is_pressed if event.is_pressed is not None else event.current
-    #         state = event.is_pressed if event.is_pressed is not None else False
-    #         btn = self.buttons[event.identifier]
-    #         btn.setHighlight(state)
-    #         # btn.setChecked(state)
-    #         self._event_times[event.identifier] = time.time()
 
     def process_event_ui(self, event):
         """Updates state visualization based on the given event.
@@ -9288,7 +9290,7 @@ class ActionLabel(QtWidgets.QLabel):
         """updates the icon"""
         icon = self._action.icon()
         if self._action:
-            is_valid = self._action.icon_valid()
+            is_valid = self._action.hasOutput()
             self.setToolTip(self._action.display_name())
 
         if icon is None:

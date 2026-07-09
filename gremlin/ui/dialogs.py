@@ -435,7 +435,7 @@ class HostIpDialog(ui_common.BaseDialogUi):
 #         self.close()
 
 
-class OptionsUi(ui_common.BaseDialogUi):
+class OptionsDialog(ui_common.BaseDialogUi):
     """UI allowing the configuration of a variety of options."""
 
     queue_refresh = Signal()  # refresh request
@@ -3758,18 +3758,19 @@ The setting can be overriden by the global mode reload option set in Options for
         gremlin.shared_state.current_profile.set_start_mode(mode)
 
 
-class DeviceInformationUi(ui_common.BaseDialogUi):
+class DeviceInformationDialog(ui_common.BaseDialogUi):
     """Widget which displays information about all connected joystick
     devices."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, profile : gremlin.base_profile.Profile, parent=None):
         """Creates a new instance.
 
         :param parent the parent widget
         """
         super().__init__(self.__class__.__name__, parent)
+        assert isinstance(profile, gremlin.base_profile.Profile)
 
-        self.profile = profile_data
+        self.profile = profile
 
         self.setWindowTitle("Device Information")
 

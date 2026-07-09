@@ -363,15 +363,18 @@ class Configuration(QtCore.QObject):
 
         # Attempt to load the configuration file if this fails set
         # default empty values.
+        data = None
         if os.path.isfile(fname) and os.path.getsize(fname):
             with open(fname,"r", encoding="utf-8") as hdl:
                 try:
                     # decoder = json.JSONDecoder()
                     # self._profile_data = decoder.decode(hdl.read())
-                    self._profile_data = json.load(hdl)
-                    _load_successful = True
+                    data = json.load(hdl)
                 except ValueError:
                     pass
+
+        if data:
+            self._profile_data = data
 
         # Save all data
         self._last_profile_reload = time.time()
@@ -2013,11 +2016,15 @@ class Configuration(QtCore.QObject):
         if input_type is not None:
             data[device_guid] = (input_type, input_id)
 
+            input_type_string = InputType.to_string(input_type)
             self._profile_data["last_input"] = data
-            self._profile_data["last_device_guid"] = device_guid
+            self._profile_data["last_input_device_guid"] = device_guid
+            self._profile_data["last_input_id"] = input_id
+            self._profile_data["last_input_type"] = input_type_string
+            self._profile_data["last_input_mode"] = mode
 
             self._data["last_device_guid"] = device_guid
-            self._data["last_input_type"] = InputType.to_string(input_type)
+            self._data["last_input_type"] = input_type_string
             self._data["last_input_id"] = input_id
             self._data["last_input_mode"] = mode
 
@@ -2026,7 +2033,7 @@ class Configuration(QtCore.QObject):
                     device_guid
                 )
                 syslog.info(
-                    f"CONFIG: SetLastInput(): {device_name} {InputType.to_string(input_type)} {input_id}"
+                    f"CONFIG: SetLastInput(): {device_name} {input_type_string} {input_id}"
                 )
 
             self.save_profile()
@@ -2154,14 +2161,39 @@ class Configuration(QtCore.QObject):
         # syslog = logging.getLogger("system")
         verbose = self.verbose_mode_details
 
+        # get the profile data
+        if self._profile_data:
+
+            data = self._profile_data.get("last_input", {})
+            device_guid = self._profile_data.get("last_input_device_guid", None)
+            input_id = self._profile_data.get("last_input_id", None)
+            if not device_guid:
+                device_guid = self._profile_data.get("last_device_guid", None)
+            input_type_string = self._profile_data.get("last_input_type", None)
+            if input_type_string:
+                input_type = InputType.from_string(input_type_string)
+                if data and device_guid and input_id:
+                    if return_mode:
+                        mode = self._profile_data.get("last_input_mode", None)
+                        return (device_guid, input_type, input_id, mode)
+                    return (device_guid, input_type, input_id)
+
+
+
         if device_guid is None:
             # get the last profile device guid saved to config
 
-            device_guid = self._get_data("last_device_guid", None)
-            input_type = self._get_data("last_input_type", None)
-            if input_type:
-                input_type = InputType.to_enum(input_type)
+            device_guid = self._get_data("last_input_device_guid", None)
+
+
+            input_type_string = self._data.get("last_input_type", None)
+            if input_type_string:
+                input_type = InputType.from_string(input_type_string)
+
+            mode = self._data.get("last_input_mode", None)
+
             input_id = self._get_data("last_input_id", None)
+
 
             if (
                 device_guid is not None

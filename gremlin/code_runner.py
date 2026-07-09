@@ -321,10 +321,12 @@ class CodeRunner:
                             # on the input item's content
                             callbacks = []
                             for container in input_item.containers:
-                                if not container.is_valid():
-                                    # test = container.is_valid()
-                                    syslog.warning(f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: Incomplete container ignored")
+                                if not container.hasOutput():
+                                    syslog.warning(f"CALLBACK: device: {device_name}: input: {input_item.display_name}: warning: zero output container ignored")
                                     continue
+                                if not container.is_valid():
+                                    continue
+
                                 callbacks.extend(container.generate_callbacks(graph_mode_node))
 
                             for cb_data in callbacks:

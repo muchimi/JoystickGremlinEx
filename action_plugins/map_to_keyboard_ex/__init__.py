@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+
 from lxml import etree as ElementTree
 from lxml import etree
 
@@ -1121,15 +1122,19 @@ Can also send mouse buttons, mouse wheel events."""
             case KeyboardOutputMode.Pulse:
                 stub = f" (pulse) delay (ms): [{self._delay}] repeat (ms): [{self._autorepeat_delay}]"
 
-        return f"KeyboardEx:  {self._get_display_keys()}{stub}"
+        key_stub = self._get_display_keys()
+        if not key_stub:
+            key_stub = "N/A"
+        return f"KeyboardEx: {key_stub}{stub}"
 
     def icon(self):
         """Returns the icon to use for this action.
 
         :return icon representing this action
         """
-        return "fa6s.keyboard"
-        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return "fa6s.keyboard"
+        return "mdi6.keyboard-outline"
+        
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.
@@ -1277,11 +1282,12 @@ Can also send mouse buttons, mouse wheel events."""
         # return true by default so the action gets saved even if it doesn't do anything
         return True
 
-    def icon_valid(self):
-        """returns true if the action is valid"""
+    def hasOutput(self):
+        """true if the action generates an output, false otherwise"""
         if not self._keys or len(self._keys) == 0:
             return False
         return True
+
 
     def to_html(self) -> str:
         """returns reporting graphviz data for this action"""

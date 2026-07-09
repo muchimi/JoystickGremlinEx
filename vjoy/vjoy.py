@@ -499,14 +499,15 @@ class Hat:
         (-1, 1): "mdi.arrow-top-left-thin-circle-outline",  # "North-west"
     }
 
-    def __init__(self, vjoy_dev, hat_id, hat_type):
+    def __init__(self, vjoy_dev , hat_id, hat_type):
         """Creates a new object.
 
         :param vjoy_dev the vJoy device this hat belongs to
         :param hat_id the id of the hat this object controls
         :param hat_type the type of hat being used, discrete or continuous
         """
-        self.vjoy_dev = vjoy_dev
+        import vjoy.vjoy
+        self.vjoy_dev : vjoy.vjoy.Vjoy = vjoy_dev
         self.vjoy_id = vjoy_dev.vjoy_id
         self.hat_id = hat_id
         self.device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self.vjoy_id)
@@ -668,10 +669,6 @@ class VJoy:
         if self.vjoy_id is None:
             return False
 
-        # # new T140 - check to see if we alreayd own the vjoy device
-        # status : VJoyState = VJoyInterface.GetVJDStatus(self.vjoy_id)
-        # if status == VJoyState.Owned:
-        #     return True
 
         if self.pid != VJoyInterface.GetOwnerPid(self.vjoy_id):
             retry_count = 5
@@ -683,7 +680,7 @@ class VJoy:
                 time.sleep(0.01)
 
             syslog.error(f"VJOY API: Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
-            # raise VJoyError(f"Failed to re-acquire the vJoy device - vid: {self.vjoy_id}")
+
             return False
 
     def ensure_released(self):
@@ -699,9 +696,8 @@ class VJoy:
         if self.vjoy_id is None:
             return
 
-        if self._keep_alive_timer:
+        if self._keep_alive_timer is not None:
             self._keep_alive_timer.cancel()
-            self._keep_alive_timer.join()
             self._keep_alive_timer = None
         if VJoyInterface.vJoyEnabled():
             VJoyInterface.RelinquishVJD(vjoy_id)
@@ -865,7 +861,7 @@ class VJoy:
             if status == VJoyState.Owned:
                 return
             elif status == VJoyState.Free:
-                awake = self._ensure_ownership_ui()
+                awake = self.ensure_ownership()
                 if awake:
                     return
 

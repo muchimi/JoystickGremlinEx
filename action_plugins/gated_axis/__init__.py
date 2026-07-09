@@ -167,6 +167,8 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         background_color = gremlin.ui.ui_common.Color.sliderBackgroundColor()
         self.slider_frame_widget.setStyleSheet(f".QFrame{{background-color: {background_color}; border-radius: 10px;}}")
         self._slider_widget = gremlin.ui.qsliderwidget.QSliderWidget(parent=self.slider_frame_widget, object_name=f"Slider for {self.objectName()} [{self.id}]")
+        
+
 
         # self._slider.setOrientation(QtCore.Qt.Horizontal)
         self._slider_widget.setRange(-1, 1)

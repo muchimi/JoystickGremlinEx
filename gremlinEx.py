@@ -44,7 +44,7 @@ import dinput
 from dinput import DeviceSummary
 import PySide6
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtCore import QThread
+from PySide6.QtCore import QThread, QTimer
 from gremlin.types import TabDeviceType, DeviceType, DeviceCategory
 from shiboken6 import Shiboken
 import gremlin.tabstate
@@ -141,6 +141,7 @@ from gremlin.singleton_decorator import SingletonDecorator
 from gremlin.tabstate import TabData
 
 from logging.handlers import RotatingFileHandler
+
 syslog = logging.getLogger("system")
 
 
@@ -939,8 +940,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         while not self._tab_selection_completed:
             QThread.sleep(0)
 
-
-
         if verbose:
             syslog.info("tab selection worker complete")
 
@@ -950,8 +949,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def add_custom_tools_menu(self, menuTools):
         """adds custom tools to the menu"""
-        self._actionTabSort = QtGui.QAction("Sort Devices", self, triggered=self._tab_sort_cb)
-        self._actionTabSort.setToolTip("Sorts input hardware devices in alphabetical order")
+        # self._actionTabSort = QtGui.QAction("Sort Devices", self, triggered=self._tab_sort_cb)
+        # self._actionTabSort.setToolTip("Sorts input hardware devices in alphabetical order")
+
+        self._actionTabDisplayDevice = QtGui.QAction("Device List...", self, triggered=self._tab_display_device_cb)
+        self._actionTabDisplayDevice.setToolTip("Displays the selected device in the profile")
 
         self._ationTabCopyAssignments = QtGui.QAction("Copy to device...", self, triggered=self._tab_copy_cb)
         self._ationTabCopyAssignments.setToolTip("Copies assignments to specified target device")
@@ -968,7 +970,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # self._actionTabImport.setToolTip("Import profile data into the current device")
 
         menuTools.addSeparator()
-        menuTools.addAction(self._actionTabSort)
+        # menuTools.addAction(self._actionTabSort)
+        menuTools.addAction(self._actionTabDisplayDevice)
         menuTools.addAction(self._ationTabCopyAssignments)
         # menuTools.addAction(self._actionTabSubstitute)
 
@@ -989,7 +992,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         #     and os.path.isfile(self.profile.profile_file)
         # self._actionTabSubstitute.setEnabled(is_enabled)
         menu = QtWidgets.QMenu(self)
-        menu.addAction(self._actionTabSort)
+        # menu.addAction(self._actionTabSort)
+        menu.addAction(self.ui.actionReorderDevices)
+        menu.addAction(self.ui.actionDeviceInformation)
         menu.addAction(self._ationTabCopyAssignments)
         # menu.addAction(self._actionTabSubstitute)
         # menu.addAction(self._actionTabImport)
@@ -1028,7 +1033,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             action = QtGui.QAction(name, self, triggered=self._create_tab_change_trigger_callback(index))
             switch_menu.addAction(action)
 
-        menu.addAction(self.ui.actionReorderDevices)
+
         menu.exec_(QtGui.QCursor.pos())
 
     def _crate_copy_device_id_callback(self, device_guid, is_xml=False):
@@ -1117,6 +1122,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._dialog_substitute.rejected.connect(self._handle_substitute_rejected)
         gremlin.util.centerDialog(self._dialog_substitute)
         self._dialog_substitute.show()
+
+    def _tab_display_device_cb(self):
+        """displays the device dialog"""
+        profile = gremlin.shared_state.current_profile
+        if profile:
+            dialog = gremlin.ui.dialogs.DeviceInformationDialog(profile=profile, parent=self)
+            dialog.exec()
 
     def _tab_copy_cb(self, pos):
         if self._context_menu_tab_index is None:
@@ -1252,7 +1264,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def device_information(self):
         """Opens the device information window."""
-        self.modal_windows["device_information"] = gremlin.ui.dialogs.DeviceInformationUi(self.profile)
+        self.modal_windows["device_information"] = gremlin.ui.dialogs.DeviceInformationDialog(self.profile)
         geom = self.geometry()
         w = 600
         h = 400
@@ -1311,7 +1323,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def options_dialog(self):
         """Opens the options dialog."""
-        dialog = gremlin.ui.dialogs.OptionsUi()
+        dialog = gremlin.ui.dialogs.OptionsDialog()
         self.modal_windows["options"] = dialog
         dialog.setWindowModality(QtCore.Qt.ApplicationModal)
         dialog.ensurePolished()
@@ -3350,6 +3362,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         force_switch=True,
                     )
 
+                    # ensure the input is visible
+                    QTimer.singleShot(100, lambda: widget.ensureSelectedVisible())
+
+
             except Exception as err:
                 syslog.error(f"CREATE DEVICE TABS (step 2): failed: {err}")
                 tb_msg = traceback.format_exc()
@@ -3929,7 +3945,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     self._last_selected_input_type = input_type
                     self._last_selected_input_id = input_id
 
-
                 except Exception as err:
                     # something went south with the selection
                     syslog.error("TabIndex generic unhandled error occured in _select_input_handler_ui():")
@@ -4361,8 +4376,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # update new order
         tab_map = self._get_tab_map()
         save_map = {}
-        for index, (device_guid, device_name, device_class, tab_index) in tab_map.items():
-            save_map[index] = (gremlin.util.normalize_guid(device_guid), True)
+        for index, tab_data in tab_map.items():
+            device_id = tab_data.device_id
+            save_map[index] = (device_id, True)
         self.config.tab_list = save_map
 
         index = self.ui.devices_tab_header_widget.currentIndex()
@@ -5014,8 +5030,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # file does not exist
             return
 
-
-
         wm = WorkManager()
         wm.submit(
             callback=self._do_load_profile_internal_worker,
@@ -5250,7 +5264,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # mode to restore post-load if possible
 
             last_device_guid, last_input_type, last_input_id = new_profile.getLastInput()  # self.config.get_last_input()
-
 
             # enable saving the configuration
             new_profile.saveConfigEnabled = True
@@ -5757,7 +5770,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.setWindowTitle(the_title)
 
 
-def configure_logger(config : dict):
+def configure_logger(config: dict):
     """Creates a new logger instance.
 
     :param config configuration information for the new logger
@@ -5797,9 +5810,6 @@ def configure_logger(config : dict):
         fault_handler.setFormatter(formatter)
         logger.addHandler(fault_handler)
 
-
-
-
     # logger.debug("-" * 80)
     # logger.debug(time.strftime("%Y-%m-%d %H:%M"))
     # logger.debug(f"Starting {gremlin.version.APPLICATION_NAME} {gremlin.version.APPLICATION_VERSION}")
@@ -5807,7 +5817,6 @@ def configure_logger(config : dict):
 
     console = logging.StreamHandler()
     logger.addHandler(console)
-
 
 
 def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
@@ -5834,16 +5843,13 @@ if __name__ == "__main__":
 
     # ensure only one instance is running at a time
     try:
-
         app_path = gremlin.shared_state.data_path
         LOCK_FILE_PATH = os.path.join(app_path, "gremlinex.lock")
 
         # Set a timeout of 0 to fail instantly if the script is already running
         lock = filelock.FileLock(LOCK_FILE_PATH, timeout=0)
         with lock:
-
             # log file configuration
-
 
             # faster context switching (default is 5ms)
             sys.setswitchinterval(0.001)
@@ -5852,8 +5858,6 @@ if __name__ == "__main__":
             user_log_path = os.path.join(app_path, "user.log")
             fault_log_path = os.path.join(app_path, "fault.log")
             fl = None
-
-
 
             gremlin.shared_state.app_path = app_path
             gremlin.shared_state.system_log = system_log_path
@@ -5871,7 +5875,6 @@ if __name__ == "__main__":
                     "faultfile": fault_log_path,
                     "faultbackupCount": 2,
                     "faultmegabytes": 1,
-
                 }
             )
 
@@ -5883,8 +5886,6 @@ if __name__ == "__main__":
                     "logfile": user_log_path,
                 }
             )
-
-
 
             # Path mangling to ensure Gremlin starts independent of the CWD
             sys.path.insert(0, app_path)
@@ -5946,7 +5947,7 @@ if __name__ == "__main__":
                     app = QtWidgets.QApplication(sys.argv)
 
             # application style and css
-            #app.setStyle("Fusion")
+            # app.setStyle("Fusion")
             app.setStyle(gremlin.ui.ui_common.GexAppStyle())
             app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
 
@@ -6136,4 +6137,3 @@ if __name__ == "__main__":
     except filelock.Timeout:
         syslog.error(f"Error: Another instance of {gremlin.version.APPLICATION_NAME} is already running.")
         sys.exit(1)
-

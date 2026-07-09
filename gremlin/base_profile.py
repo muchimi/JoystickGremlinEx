@@ -4551,6 +4551,9 @@ class Profile:
                 syslog.warning("Profile config read timed out")
             return result
 
+
+
+
     def _readConfig_ui(self) -> dict:
         """reads the profile config"""
         fname = self._profile_config_fname

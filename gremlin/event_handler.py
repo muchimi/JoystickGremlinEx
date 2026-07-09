@@ -564,8 +564,7 @@ class EventListener(QtCore.QObject):
     joystick_event = Signal(Event)  # Signal(Event)
 
     # ui joystick event = event fired at edit time to edit UI based on the joystick event - use QT for this to the event is on the UI thread
-    joystick_event_ui = QtCore.Signal(Event)  # ui thread joystick input event
-    vjoy_output_event_ui = QtCore.Signal(VjoyEvent)  # ui thread vjoy output event
+
 
     # custom joystick event - this is a code based joystick event that mapping items can listen to when inside other containers
     custom_joystick_event = Signal(Event)
@@ -574,6 +573,9 @@ class EventListener(QtCore.QObject):
 
     vjoy_event = Signal(VjoyEvent)  # Signal(VjoyEvent)
     vjoy_output_event = Signal(VjoyEvent)  # sent on button output
+
+    joystick_event_ui = QtCore.Signal(Event)  # ui thread joystick input event
+    vjoy_output_event_ui = QtCore.Signal(VjoyEvent)  # ui thread vjoy output event
 
     # Signal emitted when keyboard events are received
     keyboard_event = Signal(Event)
@@ -4387,8 +4389,6 @@ class JoystickEventProcessor:
             return
 
         assert isinstance(callback, Callable), "invalid callback"
-        if input_type == InputType.Midi:
-            pass
 
         input_id_key = gremlin.input_item.getInputIdKey(input_id)
 
@@ -4422,12 +4422,17 @@ class JoystickEventProcessor:
                 self._listener_callbacks[source][mode][device_guid][input_type][input_id_key].append(callback)
 
         if verbose:
+            device_name = gremlin.joystick_handling.getDeviceName(device_guid) if device_guid else "N/A"
+            if hasattr(input_id,"message_key"):
+                key = input_id.message_key
+            else:
+                key = input_id
             syslog.info(
-                f"JEP: add listener: source: [{source.name}] callback: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] queue size: [{len(self._listener_callbacks[source][mode][device_guid][input_type][input_id_key])}]"
+                f"JEP: add listener: device: [{device_name}] input type: [{input_type}] mode: [{mode}] input_id: [{input_id}] key: [{key}] source: [{source.name}]"
             )
-            obj = callback.__self__
-            if hasattr(obj, "_description"):
-                syslog.info(f"\t{obj._description}")
+            # obj = callback.__self__
+            # if hasattr(obj, "_description"):
+            #     syslog.info(f"\t{obj._description}")
 
     def unregisterListenerUICallback(
         self,
@@ -4458,6 +4463,7 @@ class JoystickEventProcessor:
                         assert isinstance(input_id, int), "invalid input id"
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
+
 
         input_id_key = gremlin.input_item.getInputIdKey(input_id)
 
@@ -4500,15 +4506,24 @@ class JoystickEventProcessor:
     def _fireCallbacks_ui(self, event: Event):
         """fires all the registered callbacks (ui thread)"""
         gremlin.util.assert_ui_thread()
-        # syslog.info(f"JEP: fire callbacks: event: {str(event)}")
+
         device_guid = event.device_guid
-        input_type = event.event_type
+        input_type = event.getInputType()
         input_id = event.identifier
         input_id_key = gremlin.input_item.getInputIdKey(input_id)
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_events or config.verbose_mode_ui_level(3)
         mode = CallbackMode.Run if gremlin.shared_state.is_running else CallbackMode.Edit
         source = event.source
+
+
+        if verbose:
+            if hasattr(input_id,"message_key"):
+                key = input_id.message_key
+            else:
+                key = input_id
+            syslog.info(f"JEP: fire callbacks: event: {str(event)} input_type: [{input_type}] input_id: [{input_id}] key: [{key}] source: [{source}]")
+
 
         if source in self._listener_callbacks:
             if mode in self._listener_callbacks[source]:
@@ -4534,6 +4549,9 @@ class JoystickEventProcessor:
     @QtCore.Slot(Event)
     def process_vjoy_ui(self, event: Event):
         """process received joystick event - UI thread"""
+        # if event.is_axis:
+        #     input_id = event.identifier
+        #     syslog.info(f"got vjoy axis event for input_id: {input_id} with value: {event.value:0.3f}")
         self._fireCallbacks_ui(event)
 
     def handle_config_changed(self):

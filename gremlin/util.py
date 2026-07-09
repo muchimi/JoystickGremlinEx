@@ -62,7 +62,9 @@ def debug_only(func):
         if not __debug__:
             return None
         return func(*args, **kwargs)
+
     return wrapper
+
 
 class FileWatcher(QtCore.QObject):
     """Watches files in the filesystem for changes."""
@@ -188,48 +190,34 @@ def script_path():
 
     :return path to the scripts location
     """
-    return os.path.normcase(
-        os.path.dirname(os.path.abspath(os.path.realpath(sys.argv[0])))
-    )
+    return os.path.normcase(os.path.dirname(os.path.abspath(os.path.realpath(sys.argv[0]))))
 
 
 def userprofile_path():
     """Returns the path to the user's profile folder, %userprofile%."""
 
-    path = os.path.abspath(
-        os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex")
-    )
+    path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex"))
     if not os.path.isdir(path):
         # profile folder does not exist - see if we can create it from the original profile
-        source_path = os.path.abspath(
-            os.path.join(os.getenv("userprofile"), "Joystick Gremlin")
-        )
+        source_path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin"))
         if os.path.isdir(source_path):
             try:
                 # copy from original profile
                 shutil.copytree(source_path, path)
-                syslog.info(
-                    "First run - copied Joystick Gremlin profiles to to Joystick Gremlin Ex"
-                )
+                syslog.info("First run - copied Joystick Gremlin profiles to to Joystick Gremlin Ex")
             except Exception as error:
-                syslog.error(
-                    f"Unable to copy profile from Joystick Gremlin to Joystick Gremlin Ex:\n{error}"
-                )
+                syslog.error(f"Unable to copy profile from Joystick Gremlin to Joystick Gremlin Ex:\n{error}")
         if not os.path.isdir(path):
             try:
                 # just create it
                 os.mkdir(path)
             except Exception as error:
-                syslog.error(
-                    f"Unable to create profile folder for Joystick Gremlin Ex:\n{error}"
-                )
+                syslog.error(f"Unable to create profile folder for Joystick Gremlin Ex:\n{error}")
 
         if not os.path.isdir(path):
             from gremlin.error import GremlinError
 
-            raise GremlinError(
-                f"Critical error: Unable to create profile folder: {path}"
-            )
+            raise GremlinError(f"Critical error: Unable to create profile folder: {path}")
 
     return os.path.normcase(path)
 
@@ -331,9 +319,7 @@ def format_name(name):
     :param name the name to format
     :return name formatted to be suitable as a python variable name
     """
-    return re.sub("[^A-Za-z]", "", name.lower()[0]) + re.sub(
-        "[^A-Za-z0-9]", "", name.lower()[1:]
-    )
+    return re.sub("[^A-Za-z]", "", name.lower()[0]) + re.sub("[^A-Za-z0-9]", "", name.lower()[1:])
 
 
 def valid_python_identifier(name):
@@ -473,7 +459,6 @@ def clear_layout(layout):
         _clear_layout(layout)
 
 
-
 def _clear_layout(layout):
     for index in reversed(range(layout.count())):
         item = layout.takeAt(index)
@@ -534,6 +519,7 @@ def delete_widget(widget: QtWidgets.QWidget):
         widget.setParent(None)  # removes the widget from the containing layout
         widget.deleteLater()  # tell QT to free the widget from memory
 
+
 def clear_widget_references(instance):
     """cleans up widget references in instances"""
     for name, value in list(vars(instance).items()):
@@ -584,9 +570,7 @@ def dumpWidgets(widget, title=None):
                 w_text = widget.text() if hasattr(widget, "text") else ""
                 w_value = str(widget.value()) if hasattr(widget, "value") else ""
                 w_name = widget.objectName()
-                syslog.info(
-                    f"\tWidget: [{type(widget)}] name: [{w_name}] text: [{w_text}] value: [{w_value}]"
-                )
+                syslog.info(f"\tWidget: [{type(widget)}] name: [{w_name}] text: [{w_text}] value: [{w_value}]")
         else:
             syslog.info("\tNo widgets.")
 
@@ -706,9 +690,7 @@ def get_dll_version(path, as_string=True):
         return (f_major, f_minor, p_major, p_minor)
     except Exception:
         syslog = logging.getLogger("system")
-        syslog.warning(
-            f"Unable to get file version information due to an OS error for: {path} "
-        )
+        syslog.warning(f"Unable to get file version information due to an OS error for: {path} ")
         return None
 
 
@@ -890,12 +872,7 @@ def _find_file(file_path, root_folder=None):
             extensions = [".svg", ".png"]
 
         for dirpath, _, filenames in os.walk(root_folder):
-            if any(
-                [
-                    part.startswith(".")
-                    for part in Path(dirpath).relative_to(root_folder).parts
-                ]
-            ):
+            if any([part.startswith(".") for part in Path(dirpath).relative_to(root_folder).parts]):
                 # ignore hidden folders, anywhere between the search root and the current file
                 # note: this also allows skipping non-hidden folders within hidden ones (like in .git),
                 #     : thereby saving quite a bit of room in the "circuit breaker", when running from
@@ -919,9 +896,7 @@ def _find_file(file_path, root_folder=None):
         return found_path
 
     if circuit_breaker == 0:
-        syslog.error(
-            f"Find_files() - search exceeded maximum when searching for: {file_path}"
-        )
+        syslog.error(f"Find_files() - search exceeded maximum when searching for: {file_path}")
 
     if verbose or circuit_breaker == 0:
         syslog.error(f"Find_files() failed for: {file_path}")
@@ -1062,9 +1037,7 @@ def load_pixmap(path, size=24, qta_color=None):
 
     # return a dummy pixmap so the code doesn't blow up
     syslog.error(f"load_pixmap(): invalid path: {the_path} {path}")
-    icon: QtGui.QIcon = load_icon(
-        "ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor()
-    )
+    icon: QtGui.QIcon = load_icon("ri.error-warning-line", qta_color=gremlin.ui.ui_common.Color.warningColor())
     return icon.pixmap(desired_size)
 
 
@@ -1118,9 +1091,7 @@ def load_icon(*paths, use_qta=False, qta_color=None):
         pixmap = load_pixmap(*paths)
         if not pixmap or pixmap.isNull():
             if verbose:
-                syslog.info(
-                    f"LoadIcon() using generic icon - failed to locate: {paths}"
-                )
+                syslog.info(f"LoadIcon() using generic icon - failed to locate: {paths}")
             return get_generic_icon()
 
         icon = QtGui.QIcon()
@@ -1198,11 +1169,11 @@ def load_image(*paths):
     return None
 
 
-def  get_generic_icon():
+def get_generic_icon():
     """gets a generic icon"""
-    #import gremlin.shared_state
+    # import gremlin.shared_state
 
-    #root_path = gremlin.shared_state.root_path
+    # root_path = gremlin.shared_state.root_path
     return load_icon("fa5.question-circle")
     # generic_icon = os.path.join(root_path, "generic.png")
     # if generic_icon and os.path.isfile(generic_icon):
@@ -1273,17 +1244,9 @@ def safe_read(node, key, type_cast, default_value, unescape: bool = False):
                     value = 0
                 else:
                     try:
-                        if (
-                            type_cast is int
-                            and isinstance(value, str)
-                            and isNumeric(value)
-                        ):
+                        if type_cast is int and isinstance(value, str) and isNumeric(value):
                             value = int(float(value))
-                        elif (
-                            type_cast is float
-                            and isinstance(value, str)
-                            and isNumeric(value)
-                        ):
+                        elif type_cast is float and isinstance(value, str) and isNumeric(value):
                             value = float(value)
                         elif unescape and type_cast is str and isinstance(value, str):
                             value = html.unescape(value)
@@ -1291,9 +1254,7 @@ def safe_read(node, key, type_cast, default_value, unescape: bool = False):
                         else:
                             value = type_cast(value)
                     except Exception:
-                        syslog.error(
-                            f"XML: safe read - unable to convert type: {type_cast} value: [{value}] - using default: {default_value}"
-                        )
+                        syslog.error(f"XML: safe read - unable to convert type: {type_cast} value: [{value}] - using default: {default_value}")
                         value = default_value
 
         except ValueError:
@@ -1334,9 +1295,7 @@ def safe_format(value, data_type, formatter=str, escape: bool = False):
     if isinstance(value, data_type):
         return formatter(value)
     else:
-        raise error.ProfileError(
-            f'Value "{value}" has type {type(value)} when {data_type} is expected'
-        )
+        raise error.ProfileError(f'Value "{value}" has type {type(value)} when {data_type} is expected')
 
 
 def get_xml_child(node, tag: str, multiple=False):
@@ -1452,7 +1411,6 @@ def get_xml_input_data(node, extra_data=None):
     return (device_guid, input_type, input_id, mode)
 
 
-
 def parse_guid(value) -> dinput.GUID:
     """Reads a string GUID representation into the internal data format.
 
@@ -1464,9 +1422,7 @@ def parse_guid(value) -> dinput.GUID:
     """
     import dinput
 
-
     try:
-
         if value is None or value == "None" or not value:
             value = None
         elif isinstance(value, str) and len(value) < 32:
@@ -1484,14 +1440,13 @@ def parse_guid(value) -> dinput.GUID:
                 raw_guid.Data3 = int.from_bytes(tmp.bytes[6:8], "big")
                 for i in range(8):
                     raw_guid.Data4[i] = tmp.bytes[8 + i]
-                value =  dinput.GUID(raw_guid)
+                value = dinput.GUID(raw_guid)
             except Exception:
                 syslog.error(f"Failed parsing GUID from value [{value}]")
                 raise ValueError(f"Failed parsing GUID from value [{value}]")
     finally:
-        assert value is None or isinstance(value, dinput.GUID),"conversion failed"
+        assert value is None or isinstance(value, dinput.GUID), "conversion failed"
     return value
-
 
 
 def parse_bool(value, default_value=False):
@@ -1536,7 +1491,7 @@ def read_guid(node, key, default_value=None) -> uuid.UUID:
     if key in node.attrib:
         try:
             s_guid = node.get(key)
-            #return dinput.GUID(s_guid)
+            # return dinput.GUID(s_guid)
             return uuid.UUID(s_guid)
         except Exception:
             pass
@@ -1567,9 +1522,7 @@ def byte_string_to_list(value: str) -> list:
             value = int(token, 16)  # expecting a hexadecimal number
             data.append(value)
         except Exception:
-            raise ValueError(
-                f"Unable to convert byte string to list, offending value: {token}"
-            )
+            raise ValueError(f"Unable to convert byte string to list, offending value: {token}")
 
     return data
 
@@ -1619,15 +1572,9 @@ def scale_to_range(
         value = source_max
 
     if invert:
-        result = (
-            ((source_max - value) * (target_max - target_min))
-            / (source_max - source_min)
-        ) + target_min
+        result = (((source_max - value) * (target_max - target_min)) / (source_max - source_min)) + target_min
     else:
-        result = (
-            ((value - source_min) * (target_max - target_min))
-            / (source_max - source_min)
-        ) + target_min
+        result = (((value - source_min) * (target_max - target_min)) / (source_max - source_min)) + target_min
     return result + 0
 
 
@@ -1729,10 +1676,7 @@ def getSignal(oObject: QtCore.QObject, signal_name: str):
         oMetaMethod = oMetaObj.method(i)
         if not oMetaMethod.isValid():
             continue
-        if (
-            oMetaMethod.methodType() == QtCore.QMetaMethod.Signal
-            and oMetaMethod.name() == signal_name
-        ):
+        if oMetaMethod.methodType() == QtCore.QMetaMethod.Signal and oMetaMethod.name() == signal_name:
             return oMetaMethod
     return None
 
@@ -1745,9 +1689,7 @@ def isSignalConnected(oObject: QtCore.QObject, signal_name: str):
     return mm is not None and oObject.isSignalConnected(mm)
 
 
-def centerDialog(
-    dialog: QtWidgets.QDialog, width: int = None, height: int = None, parent=None
-):
+def centerDialog(dialog: QtWidgets.QDialog, width: int = None, height: int = None, parent=None):
     """centers the dialog on top of the UI"""
     # Display the dialog centered in the middle of the UI
     import gremlin.shared_state
@@ -1787,9 +1729,7 @@ def swapext(path, ext=None, prefix="", suffix=""):
     else:
         ext = old_ext
     if dirname:
-        return os.path.normpath(
-            os.path.join(dirname, prefix + base + suffix + ext).casefold()
-        )
+        return os.path.normpath(os.path.join(dirname, prefix + base + suffix + ext).casefold())
     return os.path.normpath((prefix + base + suffix + ext).casefold())
 
 
@@ -1833,9 +1773,7 @@ def get_next_file(path: str, max_index=100, roundrobin: bool = True, delete=True
                         try:
                             os.unlink(blitz)
                         except Exception:
-                            syslog.error(
-                                f"NEXT: roundrobin: unable to delete file: {blitz}"
-                            )
+                            syslog.error(f"NEXT: roundrobin: unable to delete file: {blitz}")
                             return None
                     return blitz
 
@@ -1889,18 +1827,14 @@ def debug_pickle(instance, exception=None, string="", first_only=True):
             try:
                 dill.dumps(k)
             except BaseException as e:
-                problems.extend(
-                    debug_pickle(k, e, string + f"[key type={type(k).__name__}]")
-                )
+                problems.extend(debug_pickle(k, e, string + f"[key type={type(k).__name__}]"))
                 if first_only:
                     break
         for v in instance.values():
             try:
                 dill.dumps(v)
             except BaseException as e:
-                problems.extend(
-                    debug_pickle(v, e, string + f"[val type={type(v).__name__}]")
-                )
+                problems.extend(debug_pickle(v, e, string + f"[val type={type(v).__name__}]"))
                 if first_only:
                     break
     else:
@@ -1919,9 +1853,7 @@ def debug_pickle(instance, exception=None, string="", first_only=True):
     # empty), yet no member was a problem (problems is empty), thus instance itself
     # is the problem.
     if string != "" and not problems:
-        problems.append(
-            string + f" (Type '{type(instance).__name__}' caused: {exception})"
-        )
+        problems.append(string + f" (Type '{type(instance).__name__}' caused: {exception})")
 
     return problems
 
@@ -1938,9 +1870,7 @@ def is_close(a, b, tolerance=0.0001):
 class InvokeUiMethod(QtCore.QObject):
     """invokes a call on the UI thread as QT is not thread safe"""
 
-    _called = QtCore.Signal(
-        object, object, object, object, object, object, object, object
-    )
+    _called = QtCore.Signal(object, object, object, object, object, object, object, object)
 
     def __init__(
         self,
@@ -2033,11 +1963,8 @@ class InvokeUiMethod(QtCore.QObject):
                 method(p0, p1, p2, p3, p4, p5, p6, p7)
 
     @QtCore.Slot(object)
-    def _execute(
-        self, p0=None, p1=None, p2=None, p3=None, p4=None, p5=None, p6=None, p7=None
-    ):
+    def _execute(self, p0=None, p1=None, p2=None, p3=None, p4=None, p5=None, p6=None, p7=None):
         self._exec(self.method, p0, p1, p2, p3, p4, p5, p6, p7)
-
 
 
 def is_ui_thread():
@@ -2045,6 +1972,7 @@ def is_ui_thread():
     current_thread = QtCore.QThread.currentThread()
     ui_thread = QtWidgets.QApplication.instance().thread()  # UI thread
     return current_thread == ui_thread
+
 
 @debug_only
 def assert_ui_thread():
@@ -2409,25 +2337,14 @@ def isNumeric(input_string):
     if (input_string[0] == "-") and (input_string[1] == "."):
         return False
 
-    if (
-        (len(input_string) > 1)
-        and (
-            (
-                (input_string[0] == "0") and (input_string[1] != ".")
-            )  # eg. "05" number starts with a zero and is followed by another digit (i.e. not a period)
-            or (len(input_string) > 2)
-            and (
-                (input_string[0] == "-")
-                and (input_string[1] == "0")
-                and (input_string[2] != ".")
-            )
-        )
+    if (len(input_string) > 1) and (
+        ((input_string[0] == "0") and (input_string[1] != "."))  # eg. "05" number starts with a zero and is followed by another digit (i.e. not a period)
+        or (len(input_string) > 2)
+        and ((input_string[0] == "-") and (input_string[1] == "0") and (input_string[2] != "."))
     ):  # eg. -01 number starts with a hyphen, followed by a zero, followed by another digit (i.e. not a period)
         return False
 
-    if (input_string[0] == "-") and (
-        count_xs(is_digit, input_string) == count_xs(is_zero, input_string)
-    ):
+    if (input_string[0] == "-") and (count_xs(is_digit, input_string) == count_xs(is_zero, input_string)):
         return False
 
     return True
@@ -2481,23 +2398,15 @@ def normalize_guid(device_guid) -> str:
         if hasattr(device_guid, "toId"):
             device_guid = device_guid.toId()
         else:
-            device_guid = (
-                str(device_guid)
-                .casefold()
-                .replace("-", "")
-                .replace("{", "")
-                .replace("}", "")
-            )
+            device_guid = str(device_guid).casefold().replace("-", "").replace("{", "").replace("}", "")
     else:
         # string
-        device_guid = (
-            device_guid.casefold().replace("-", "").replace("{", "").replace("}", "")
-        )
+        device_guid = device_guid.casefold().replace("-", "").replace("{", "").replace("}", "")
     return device_guid
 
 
 def to_guid(device_guid) -> dinput.GUID:
-    ''' converts a device guid in whatever form to a dinput GUID'''
+    """converts a device guid in whatever form to a dinput GUID"""
     if device_guid is None:
         return None
     if isinstance(device_guid, dinput.GUID):
@@ -2525,7 +2434,6 @@ def compare_guid(id1, id2) -> bool:
     nid2 = normalize_guid(id2)
     nid1 = normalize_guid(id1)
     return nid2 == nid1
-
 
 
 def getTemporaryFile(ext=None):
@@ -2614,21 +2522,15 @@ def find_executable(starts_with_name, exe_name):
                 if name and name.casefold().startswith(starts_with_name):
                     software["name"] = name
                     try:
-                        software["version"] = winreg.QueryValueEx(
-                            asubkey, "DisplayVersion"
-                        )[0]
+                        software["version"] = winreg.QueryValueEx(asubkey, "DisplayVersion")[0]
                     except EnvironmentError:
                         software["version"] = "undefined"
                     try:
-                        software["publisher"] = winreg.QueryValueEx(
-                            asubkey, "Publisher"
-                        )[0]
+                        software["publisher"] = winreg.QueryValueEx(asubkey, "Publisher")[0]
                     except EnvironmentError:
                         software["publisher"] = "undefined"
                     try:
-                        software["path"] = winreg.QueryValueEx(
-                            asubkey, "InstallLocation"
-                        )[0]
+                        software["path"] = winreg.QueryValueEx(asubkey, "InstallLocation")[0]
                     except EnvironmentError:
                         software["path"] = ""
                     software_list.append(software)
@@ -2642,14 +2544,10 @@ def find_executable(starts_with_name, exe_name):
 
     starts_with_name = starts_with_name.casefold()
     # look in 64 bit stuff
-    software_list = find_hive(
-        winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY, starts_with_name
-    )
+    software_list = find_hive(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY, starts_with_name)
     if not len(software_list):
         # look in 32 bit stuff
-        software_list = find_hive(
-            winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY, starts_with_name
-        )
+        software_list = find_hive(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY, starts_with_name)
     if not len(software_list):
         software_list = find_hive(winreg.HKEY_CURRENT_USER, 0, starts_with_name)
 
@@ -2797,9 +2695,7 @@ def getMonitorOrientation(hwnd):
     info = win32api.GetMonitorInfo(hwnd)
     if info is not None:
         device_name = info["Device"]
-        settings = win32api.EnumDisplaySettings(
-            device_name, win32con.ENUM_CURRENT_SETTINGS
-        )
+        settings = win32api.EnumDisplaySettings(device_name, win32con.ENUM_CURRENT_SETTINGS)
         orientation = settings.DisplayOrientation
         orientations = {
             0: "Landscape (Normal)",
@@ -2818,16 +2714,14 @@ def timeit(callback, *args, **kwargs):
     value = callback(*args, **kwargs)
     end_time = time.perf_counter()
     elapsed = end_time - start_time
-    syslog.info(
-        f"Perf: [{callback.__module__}] [{callback.__name__}] time: [{elapsed:.6f}]"
-    )
+    syslog.info(f"Perf: [{callback.__module__}] [{callback.__name__}] time: [{elapsed:.6f}]")
     return value
 
 
 class TriggerDict(collections.UserDict):
     """hashable dict that fires callbacks when data is changed"""
 
-    def __init__(self, name : str = None, *args, **kwargs):
+    def __init__(self, name: str = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._on_change_callbacks = []
         self.id = uuid.uuid4()  # unique ID of this dict
@@ -2836,19 +2730,20 @@ class TriggerDict(collections.UserDict):
         self._name = name if name else "TriggerDict"
 
     @staticmethod
-    def copyFrom(source : dict, deep = False):
+    def copyFrom(source: dict, deep=False):
         import copy
+
         assert isinstance(source, (dict, TriggerDict)), "Source must be a dictionary"
         if deep:
             return copy.deepcopy(source)
         return copy.copy(source)
+
     @property
     def name(self) -> str:
         return self._name
 
-    def setName(self, name : str):
+    def setName(self, name: str):
         self._name = name
-
 
     def pushSuspend(self):
         """suspends callbacks on change"""
@@ -2912,14 +2807,40 @@ class jsonDictEncoder(json.JSONEncoder):
 
 def hashDict(d: dict):
     """computes a hash of a dictionary - all keys and items in the dict must be json serializable"""
-    dump = json.dumps(d, sort_keys=True).encode(
-        "utf-8"
-    )  # sort keys so they are in the same sequence between dictionaries
+    dump = json.dumps(d, sort_keys=True).encode("utf-8")  # sort keys so they are in the same sequence between dictionaries
     return hash(dump)
 
 
-def toUrl(fname : str):
-    ''' converts a file name to a URL link format '''
+def toUrl(fname: str):
+    """converts a file name to a URL link format"""
     import pathlib
+
     url = pathlib.Path(fname)
     return url.as_uri()
+
+
+def getWidgetPositionInHierarchy(widget: QtWidgets.QWidget, relative_to: QtWidgets.QWidget = None):
+    x, y = 0, 0
+    current = widget
+
+    pos_map = []  # map of widget to position in the hierarchy
+    found = False if relative_to is not None else True
+
+    # Traverse upward through the parent chain
+    while current is not None:
+        pos = current.pos()
+        x += pos.x()
+        y += pos.y()
+        pos_map.append((current, QtCore.QPoint(x, y)))
+        if current == relative_to:
+            found = True
+            break
+        current = current.parentWidget()
+
+    syslog.info(f"Position in hierarchy for widget: {widget.__class__.__name__}")
+    for widget, pos in pos_map:
+        syslog.info(f"Widget: {widget.__class__.__name__}, Position: ({pos.x()}, {pos.y()})")
+    if relative_to is None or found:
+        return pos_map
+
+    return []

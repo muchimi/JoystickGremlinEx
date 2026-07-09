@@ -46,17 +46,6 @@ class QSliderWidget(QtWidgets.QWidget):
     handleDragStart = QtCore.Signal(int)  # called when a handle is being dragged (handle index)
     handleDragStop = QtCore.Signal(int)  # called when a handle stops being dragged (handle index)
 
-    # handleClicked = Signal(int) # called when a handle is left clicked (handle index)
-    # handleRightClicked = Signal(int) # called when a handle is right clicked (handle index)
-    # handleDoubleClicked = Signal(int) # called when a handle is double clicked (handle index)
-    # handleDoubleRightClicked = Signal(int) # called when a handle is double clicked with the right mouse button (handle index)
-    # rangeClicked = Signal(float, int, int) # called when a groove is clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    # rangeRightClicked = Signal(float, int, int) # called when a range is right clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    # rangeDoubleClicked = Signal(float, int, int) # called when a range is double clicked (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    # rangeDoubleRightClicked = Signal(float, int, int) # called when a range is double clicked with the right mouse button (between handles) - sends the value of the slider where clicked - (value, left handle index, right handle index)
-    # valueChanged = Signal(int, float) # called when a gate value changes via dragging (index of handle, updated value)
-    # handleDragStart = Signal(int) # called when a handle is being dragged (handle index)
-    # handleDragStop = Signal(int) # called when a handle stops being dragged (handle index)
 
     def __init__(self, object_name=None, parent=None):
         import gremlin.ui.ui_common
@@ -138,7 +127,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
         # self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Expanding)
 
-        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        # self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
 
         self._pixmaps = []  # list of pixmap data marker definition objects
 
