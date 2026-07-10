@@ -37,6 +37,7 @@ from threading import Lock
 from typing import Callable
 from collections.abc import Iterator
 import webbrowser
+
 import filelock
 
 from objprint.executing.executing import lock
@@ -1613,9 +1614,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             el.vjoy_output_event.connect(self.repeater.process_event)
             self._update_statusbar_repeater("Waiting for input")
         else:
-            el.keyboard_event.disconnect(self.repeater.process_event)
-            el.joystick_event_ui.disconnect(self.repeater.process_event)
-            el.vjoy_event.disconnect(self.repeater.process_event)
+            el.disconnect(el.keyboard_event, self.repeater.process_event)
+            el.disconnect(el.joystick_event_ui, self.repeater.process_event)
+            el.disconnect(el.vjoy_event, self.repeater.process_event)
+            el.disconnect(el.vjoy_output_event, self.repeater.process_event)
+            # el.keyboard_event.disconnect(self.repeater.process_event)
+            # el.joystick_event_ui.disconnect(self.repeater.process_event)
+            # el.vjoy_event.disconnect(self.repeater.process_event)
             self.repeater.stop()
             self.status_bar_repeater_widget.setText("")
 
@@ -5783,9 +5788,12 @@ def configure_logger(config: dict):
     try:
         if unlink and os.path.isfile(log_file):
             os.unlink(log_file)
-    except Exception as err:
-        syslog.error(f"Unable to remove old log file [{log_file}]")
-        syslog.error(f"{err}\n{traceback.format_exc()}")
+    except IOError as err:
+        syslog.error(f"Unable to remove old log file [{log_file}] - another instance may be running")
+        # syslog.error(f"{err}\n{traceback.format_exc()}")
+        return False
+
+
 
     logger = logging.getLogger(config["name"])
     logger.setLevel(config["level"])
@@ -5817,6 +5825,8 @@ def configure_logger(config: dict):
 
     console = logging.StreamHandler()
     logger.addHandler(console)
+
+    return True
 
 
 def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
@@ -5865,7 +5875,7 @@ if __name__ == "__main__":
             gremlin.shared_state.fault_log = fault_log_path
 
             # system log
-            configure_logger(
+            result = configure_logger(
                 {
                     "name": "system",
                     "level": logging.DEBUG,
@@ -5877,6 +5887,9 @@ if __name__ == "__main__":
                     "faultmegabytes": 1,
                 }
             )
+            if not result:
+                # another instance running
+                os._exit(1)
 
             # user log
             configure_logger(

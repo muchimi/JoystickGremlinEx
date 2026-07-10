@@ -581,7 +581,7 @@ class MapToOscWidget(gremlin.input_item.AbstractActionWidget):
         is_axis = self.action_data.input_is_axis()
         if is_axis:
             el = gremlin.event_handler.EventListener()
-            el.joystick_event_ui.disconnect(self._joystick_event_handler)
+            el.disconnect(el.joystick_event_ui, self._joystick_event_handler)
 
     def _populate_ui(self):
         """Populates the UI components."""

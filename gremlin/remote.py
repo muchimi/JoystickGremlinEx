@@ -338,8 +338,12 @@ class RemoteClient:
             # notify this client is disconnecting
             self.requestDisconnect()
 
-            el = gremlin.event_handler.EventListener()
-            el.heartbeat.disconnect(self._alive_ticker)
+            try:
+                el = gremlin.event_handler.EventListener()
+                if self._alive_ticker in el.heartbeat:
+                    el.heartbeat.disconnect(self._alive_ticker)
+            except Exception as e:
+                pass
 
             if self._alive_thread:
                 syslog.info("Alive stop requested...")

@@ -1030,6 +1030,18 @@ class EventListener(QtCore.QObject):
         while not self._event_queue.empty():
             self._event_queue.get()
 
+    def disconnect(self, signal : Signal | QtCore.Signal, slot : Callable):
+        """ attempts to disconnect a slot from a signal safely """
+        try:
+            if isinstance(signal, Signal) and slot in signal:
+                signal.disconnect(slot)
+            elif isinstance(signal, QtCore.Signal):
+                signal.disconnect(slot)
+        except Exception as e:
+            pass
+
+
+
     @QtCore.Slot()
     def _shutdown_handler(self):
         """terminate threads"""

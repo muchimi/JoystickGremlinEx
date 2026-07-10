@@ -454,7 +454,7 @@ class KeyboardHook:
 
     def __init__(self):
         self._running = False
-        self._listen_thread = threading.Thread(target=self._listen, daemon=False)
+        self._listen_thread = threading.Thread(target=self._listen, daemon=True)
         self._listen_thread.name = "keyboard hook"
 
     def updateVerbose(self):
@@ -516,17 +516,17 @@ class KeyboardHook:
             user32.PostThreadMessageW(self._listen_thread.ident, WM_QUIT, 0, 0)
             self._listen_thread.join()
             # Recreate thread so we can launch it again
-            self._listen_thread = threading.Thread(target=self._listen, daemon=False)
+            self._listen_thread = threading.Thread(target=self._listen, daemon=True)
 
     def shutdown(self):
         """requests a shutdown"""
         self.stop()
 
         syslog.info("KBD: shutdown")
-        if self._listen_thread:
-            if self._listen_thread.is_alive():
-                self._listen_thread.join()
-            self._listen_thread = None
+        # if self._listen_thread:
+        #     # if self._listen_thread.is_alive():
+        #     #     self._listen_thread.join()
+        #     self._listen_thread = None
 
     def _listen(self):
         """Configures the hook and starts listening."""

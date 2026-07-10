@@ -4558,7 +4558,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     @property
     def action_count(self):
         """returns the total count of defined actions in this container (all action sets)"""
-        return self.action_sets.actionCount()
+        return len(self.action_sets)
 
     def getFlatActionSetList(self, action_sets):
         """flattens the action set list if needed"""
