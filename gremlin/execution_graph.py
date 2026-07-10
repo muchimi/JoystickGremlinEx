@@ -2084,11 +2084,11 @@ class ExecutionContext:
         result = True  # assume pass
         functor_map = self._functor_map
 
-        if extra_data and "trigger" in extra_data:
-            trigger = extra_data["trigger"]
-            if trigger.condition == gremlin.gated_handler.GateConditionType.EnterRange:
-                syslog.info(id)
-                pass
+        #if extra_data and "trigger" in extra_data:
+            #trigger = extra_data["trigger"]
+            # if trigger.condition == gremlin.gated_handler.GateConditionType.EnterRange:
+            #     syslog.info(id)
+            #     pass
 
         # if id in self._exec_map:
         #     root : ExecutionGraphNode = self._exec_map[id]

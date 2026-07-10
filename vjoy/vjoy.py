@@ -588,7 +588,7 @@ class VJoy:
     """Represents a vJoy device present in the system."""
 
     # Duration of inactivity after which the keep alive routine is run
-    keep_alive_timeout = 60
+    keep_alive_timeout = 10 if __debug__ else 60*3
 
     # Axis name mapping
     axis_equivalence = {
@@ -853,7 +853,7 @@ class VJoy:
         if self.vjoy_id is not None:
             import gremlin.config
 
-            verbose = gremlin.config.Configuration().verbose
+            verbose = gremlin.config.Configuration().verbose_mode_vjoy
             if verbose:
                 syslog.info(f"VJOY AWAKE: check vjoy [{self.vjoy_id}]")
             status = VJoyInterface.GetVJDStatus(self.vjoy_id)
@@ -866,7 +866,6 @@ class VJoy:
                     return
 
             # awake = device_available(self.vjoy_id)
-
             syslog.warning(f"VJOY AWAKE: vjoy [{self.vjoy_id}] is reporting no longer available. code: {status}")
 
     def reset(self):

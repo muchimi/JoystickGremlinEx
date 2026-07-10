@@ -38,6 +38,7 @@ from typing import Callable
 from collections.abc import Iterator
 import webbrowser
 
+
 import filelock
 
 from objprint.executing.executing import lock
@@ -369,16 +370,26 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             syslog.info("START: autoload profile disabled (ctrl key detected)")
             self.config.auto_load_disabled = True
 
-        if not self.config.auto_load_disabled and self.config.last_profile and os.path.isfile(self.config.last_profile):
-            # check if this was a profile swap that we load the profile from the current user folder
-            current_profile_folder = gremlin.shared_state.data_path.casefold()
-            last_profile = self.config.last_profile.lower()
-            if current_profile_folder not in last_profile:
-                _, base_file = os.path.split(last_profile)
-                located_profile = find_file(base_file, current_profile_folder)
-                if located_profile:
-                    self.config.last_profile = located_profile
-            self._do_load_profile(self.config.last_profile)
+        profile_to_load = None
+        if not self.config.auto_load_disabled:
+            if config.profile_to_load and os.path.isfile(config.profile_to_load):
+                profile_to_load = config.profile_to_load
+            elif self.config.last_profile and os.path.isfile(self.config.last_profile):
+                # check if this was a profile swap that we load the profile from the current user folder
+                profile_to_load = self.config.last_profile
+
+            if profile_to_load:
+                current_profile_folder = gremlin.shared_state.data_path.casefold()
+                last_profile = self.config.last_profile.lower()
+                if current_profile_folder not in last_profile:
+                    _, base_file = os.path.split(last_profile)
+                    located_profile = find_file(base_file, current_profile_folder)
+                    if located_profile:
+                        self.config.last_profile = located_profile
+            profile_to_load = self.config.last_profile
+
+        if profile_to_load:
+            self._do_load_profile(profile_to_load)
         else:
             self.new_profile()
 
@@ -411,6 +422,18 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         gremlin.shared_state.initialized = True
 
         el.ui_initialized.emit()
+
+        # handle auto start
+        if self.config.run_on_start and profile_to_load:
+            # register a startup call
+            el.profile_loaded.connect(self._handle_auto_start_on_load)
+
+
+    def _handle_auto_start_on_load(self):
+        """Handles auto start when the profile is loaded"""
+        el = gremlin.event_handler.EventListener()
+        el.profile_loaded.disconnect(self._handle_auto_start_on_load)
+        el.request_activate.emit(True)
 
     # def _handle_device_widget_index_changed(self, index):
     #     syslog.info(f"device page: index set to [{index}]")
@@ -5842,6 +5865,8 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     gremlin.util.display_error(msg)
 
 
+
+
 # general exception handling
 sys.excepthook = handle_unhandled_exception
 
@@ -5851,302 +5876,367 @@ WM_INPUT = 0x00FF
 if __name__ == "__main__":
     gremlin.shared_state.ui_ready = False
 
-    # ensure only one instance is running at a time
+    # Create user interface
+    app_id = "gremlinex"
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+
+    # disable dark mode for now while we sort icons in a future version
+
+    theme = gremlin.config.Configuration().theme
+    match theme:
+        case "auto":
+            gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
+            app = QtWidgets.QApplication(sys.argv)
+
+        case "light":
+            os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
+            gremlin.shared_state.is_dark_theme = False
+            app = QtWidgets.QApplication(sys.argv)
+            app.setStyle("Windows")
+
+        case "dark":
+            os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
+            gremlin.shared_state.is_dark_theme = True
+            app = QtWidgets.QApplication(sys.argv)
+
+    # application style and css
+    # app.setStyle("Fusion")
+    app.setStyle(gremlin.ui.ui_common.GexAppStyle())
+    app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
+
+    # set faster context switch for Python
+    sys.setswitchinterval(0.001)
+
     try:
         app_path = gremlin.shared_state.data_path
-        LOCK_FILE_PATH = os.path.join(app_path, "gremlinex.lock")
-
-        # Set a timeout of 0 to fail instantly if the script is already running
-        lock = filelock.FileLock(LOCK_FILE_PATH, timeout=0)
-        with lock:
-            # log file configuration
-
-            # faster context switching (default is 5ms)
-            sys.setswitchinterval(0.001)
-
-            system_log_path = os.path.join(app_path, "system.log")
-            user_log_path = os.path.join(app_path, "user.log")
-            fault_log_path = os.path.join(app_path, "fault.log")
-            fl = None
-
-            gremlin.shared_state.app_path = app_path
-            gremlin.shared_state.system_log = system_log_path
-            gremlin.shared_state.user_log = user_log_path
-            gremlin.shared_state.fault_log = fault_log_path
-
-            # system log
-            result = configure_logger(
-                {
-                    "name": "system",
-                    "level": logging.DEBUG,
-                    "logfile": system_log_path,
-                    "megabytes": 5,
-                    "backupCount": 1,
-                    "faultfile": fault_log_path,
-                    "faultbackupCount": 2,
-                    "faultmegabytes": 1,
-                }
-            )
-            if not result:
-                # another instance running
-                os._exit(1)
-
-            # user log
-            configure_logger(
-                {
-                    "name": "user",
-                    "level": logging.DEBUG,
-                    "logfile": user_log_path,
-                }
-            )
-
-            # Path mangling to ensure Gremlin starts independent of the CWD
-            sys.path.insert(0, app_path)
-            gremlin.config.Configuration().setup_userprofile()
-
-            # Fix some dumb Qt bugs
-            QtWidgets.QApplication.addLibraryPath(os.path.join(os.path.dirname(PySide6.__file__), "plugins"))
-
-            # syslog = logging.getLogger("system")
-
-            syslog.info(f"Joystick Gremlin Ex version {gremlin.version.Version().version}  (P{gremlin.util.getPythonVersion()})")
-
-            # Initialize the vjoy interface
-            from vjoy.vjoy_interface import VJoyInterface
-
-            VJoyInterface.initialize()
-
-            # Initialize the direct input interface class
-            from dinput import DILL
-
-            DILL.init()
-            DILL.initialize_capi()
-            syslog.info(f"Found DirectInput Interface version {DILL.version}")
-
-            # qt version
-            syslog.info(f"Found QT version {PySide6.__version__}")
-
-            # Show unhandled exceptions to the user when running a compiled version
-            # of Joystick Gremlin
-            executable_name = os.path.split(sys.executable)[-1]
-
-            # Initialize HidGuardian before we let SDL grab joystick data
-            import gremlin.hid_guardian
-
-            hg = gremlin.hid_guardian.HidGuardian()
-            hg.add_process(os.getpid())
-
-            # Create user interface
-            app_id = "gremlinex"
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
-
-            # disable dark mode for now while we sort icons in a future version
-
-            theme = gremlin.config.Configuration().theme
-            match theme:
-                case "auto":
-                    gremlin.shared_state.is_dark_theme = gremlin.ui.theme.theme() == "Dark"
-                    app = QtWidgets.QApplication(sys.argv)
-
-                case "light":
-                    os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=0"
-                    gremlin.shared_state.is_dark_theme = False
-                    app = QtWidgets.QApplication(sys.argv)
-                    app.setStyle("Windows")
-
-                case "dark":
-                    os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
-                    gremlin.shared_state.is_dark_theme = True
-                    app = QtWidgets.QApplication(sys.argv)
 
-            # application style and css
-            # app.setStyle("Fusion")
-            app.setStyle(gremlin.ui.ui_common.GexAppStyle())
-            app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
+        # check for running instances
+        ph = gremlin.process.ProcessHelper()
+        process_name = gremlin.version.APPLICATION_EXE
+        prompted = False
+
 
-            config = gremlin.config.Configuration()
 
-            # command line parser
-            parser = QtCore.QCommandLineParser()
-            parser.addOption(QtCore.QCommandLineOption(["np", "noprofile"], "Do not load a profile on start"))
-            parser.process(app.arguments())
-            config.auto_load_disabled = parser.isSet("noprofile")
+        # ensure only one instance is running at a time - this is setup to not require admin rights as long as the process is started by the user
+        while ph.processRunning(process_name):
+            # attempt to kill it
+            # run the application so we can get a message box UI
 
-            # for now force localization to use US English until we have proper localization support
-            locale = QtCore.QLocale("UnitedStates")
-            QtCore.QLocale.setDefault(locale)
+            if not prompted:
+                result = gremlin.ui.ui_common.ConfirmBox(
+                    informative_text = "Another instance of GremlinEx is already running.  If the current instance cannot be terminated, this one will exit.",
+                    prompt = "Terminate running process?")
+                prompted = True
+            else:
+                result = True
 
-            app.setWindowIcon(load_icon("icon.png"))
-            app.setApplicationDisplayName(gremlin.version.APPLICATION_NAME + " " + gremlin.version.APPLICATION_VERSION)
-            app.setApplicationVersion(gremlin.version.APPLICATION_VERSION)
-            # no longer needed in QT6
-            # app.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
+            if result:
+                result = ph.killProcess(process_name, timeout_ms=5000)
+                if not result:
+                    syslog.error(f"PROC: Failed to terminate process {process_name}")
+                    os._exit(1)
+                syslog.info(f"PROC: Successfully terminated process {process_name}")
 
-            # handle windows themes better
-            app.setStyle("Fusion")
+            else:
+                # terminate
+                os._exit(0)
 
-            # Ensure joystick devices are correctly setup
-            dinput.DILL.init()
-            time.sleep(0.25)
+        # log file configuration
 
-            # instance
-            _pixmaps = gremlin.ui.ui_common.Pixmaps()
-            # _widget_manager = gremlin.ui.ui_common.WidgetManager()
 
-            # check for gamepad availability via VIGEM
-            if gremlin.gamepad_handling.gamepadAvailable():
-                gremlin.gamepad_handling.gamepad_initialization()
+        # Path mangling to ensure Gremlin starts independent of the CWD
+        sys.path.insert(0, app_path)
+        gremlin.config.Configuration().setup_userprofile()
 
-            # update device list
-            gremlin.joystick_handling.joystick_devices_initialization()
+        system_log_path = os.path.join(app_path, "system.log")
+        user_log_path = os.path.join(app_path, "user.log")
+        fault_log_path = os.path.join(app_path, "fault.log")
+        fl = None
+
+        gremlin.shared_state.app_path = app_path
+        gremlin.shared_state.system_log = system_log_path
+        gremlin.shared_state.user_log = user_log_path
+        gremlin.shared_state.fault_log = fault_log_path
+
+        # system log
+        result = configure_logger(
+            {
+                "name": "system",
+                "level": logging.DEBUG,
+                "logfile": system_log_path,
+                "megabytes": 5,
+                "backupCount": 1,
+                "faultfile": fault_log_path,
+                "faultbackupCount": 2,
+                "faultmegabytes": 1,
+            }
+        )
+        if not result:
+            # another instance running
+            os._exit(1)
 
-            # Check if vJoy is properly setup and if not display an error
-            # and terminate GremlinEx
-            try:
-                syslog.info("Checking vJoy installation")
-                vjoy_count = len([dev for dev in gremlin.joystick_handling.all_joystick_devices() if dev.is_virtual and dev.connected])
-                vjoy_working = vjoy_count != 0
-                syslog.info(f"\tFound {vjoy_count} configured vjoy device(s)")
+        # user log
+        configure_logger(
+            {
+                "name": "user",
+                "level": logging.DEBUG,
+                "logfile": user_log_path,
+            }
+        )
 
-                gremlin.shared_state.vjoy_enabled = vjoy_working
 
-                if not vjoy_working:
-                    msg = "No configured VJOY devices were found.  VJOY output will be disabled.  This is normal if VJOY is not installed or not configured."
-                    syslog.warning(msg)
-                    # gremlin.ui.ui_common.MessageBox("Error Scanning Devices", msg)
-                    # raise gremlin.error.GremlinError(msg)
 
-            except (gremlin.error.GremlinError, dinput.DILLError) as e:
-                error_display = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, "Error", e.value, QtWidgets.QMessageBox.Ok)
-                error_display.move
-                error_display.show()
+        # Fix some dumb Qt bugs
+        QtWidgets.QApplication.addLibraryPath(os.path.join(os.path.dirname(PySide6.__file__), "plugins"))
 
-                app.exec_()
+        # syslog = logging.getLogger("system")
 
-                gremlin.joystick_handling.VJoyProxy.reset()
-                el = gremlin.event_handler.EventListener()
-                el.terminate()  # terminates and sends the relevant shutdown triggers
-                fl.close()
-                sys.exit(0)
+        syslog.info(f"Joystick Gremlin Ex version {gremlin.version.Version().version}  (P{gremlin.util.getPythonVersion()})")
 
-            gremlin.shared_state.reload_device_map()
+        # Initialize the vjoy interface
+        from vjoy.vjoy_interface import VJoyInterface
 
-            # Initialize action plugins
-            syslog.info("Initializing plugins")
-            gremlin.plugin_manager.ActionPlugins()
-            gremlin.plugin_manager.ContainerPlugins()
+        VJoyInterface.initialize()
 
-            # input map tracking instance
-            iim_tracker = gremlin.ui.ui_common.WidgetCacheTracker()
+        # Initialize the direct input interface class
+        from dinput import DILL
 
-            # Create Gremlin UI
-            ui = GremlinUi()
+        DILL.init()
+        DILL.initialize_capi()
+        syslog.info(f"Found DirectInput Interface version {DILL.version}")
 
-            # joystick state
-            sd = gremlin.event_handler.JoystickState()
-            sd.hook()
-            sd.reset()  # initial state
+        # qt version
+        syslog.info(f"Found QT version {PySide6.__version__}")
 
-            _tab_state = gremlin.tabstate.TabState()  # instance
+        # Show unhandled exceptions to the user when running a compiled version
+        # of Joystick Gremlin
+        executable_name = os.path.split(sys.executable)[-1]
+
+        # Initialize HidGuardian before we let SDL grab joystick data
+        import gremlin.hid_guardian
 
-            astate = gremlin.event_handler.AxisState()
-            astate.reset()
+        hg = gremlin.hid_guardian.HidGuardian()
+        hg.add_process(os.getpid())
 
-            # joystick processor instance
-            # event_processor = gremlin.event_handler.JoystickEventProcessor()
 
-            syslog.info("GremlinEx UI created")
 
-            # state monitoring
-            profile_state_monitor = gremlin.shared_state.ProfileStateMonitor()
+        config = gremlin.config.Configuration()
 
-            # automatic process monitoring check
+        # command line parser
+        parser = QtCore.QCommandLineParser()
+        parser.addOption(QtCore.QCommandLineOption(["noprofile","np"], "Do not load a profile on start (--r and --p will be ignored)"))
+        parser.addOption(QtCore.QCommandLineOption(["run", "r"], "Automatically run the last profile, or specified profile via --p on start"))
+        parser.addOption(QtCore.QCommandLineOption(["profile", "p"], "Profile to load, requires the profile xml to be provided.  If a path is not provided, GremlinEx will look for the profile file in the default profile folder."))
+        parser.addHelpOption()
 
-            pmgr = gremlin.process.ProcessMonitor()
-            el = gremlin.event_handler.EventListener()
-            el.process_monitor_changed.emit()
+        parser.process(app.arguments())
 
-            ec = gremlin.execution_graph.ExecutionContext()
 
-            gremlin.shared_state.char_width = gremlin.ui.ui_common.get_text_width("M")
 
-            # report ui
-            report = gremlin.reporting.ReportEngine()
+        config.auto_load_disabled = parser.isSet("noprofile")
+        if config.auto_load_disabled:
+            # start with a new profile
+            config.run_on_start = False
+            config.profile_to_load = False
+        else:
+            config.run_on_start = parser.isSet("run")
+            profile_specified = parser.isSet("profile")
+            args = parser.positionalArguments() if profile_specified else None
+            if args:
+                profile_to_load = args[0]
+                if not os.path.isfile(profile_to_load):
+                    profile_to_load = os.path.join(app_path, profile_to_load)
+                    if not os.path.isfile(profile_to_load):
+                        msg = f"Profile file not found: {args[0]}"
+                        gremlin.ui.ui_common.MessageBoxWarning(msg)
+                        syslog.error(msg)
+                        os._exit(1)
+            else:
+                if profile_specified:
+                    msg = "Missing argument: Profile file not specified"
+                    gremlin.ui.ui_common.MessageBoxWarning(msg)
+                    syslog.error(msg)
+                    os._exit(1)
 
-            # sound engine
-            sound = gremlin.sound.Sound()
+            config.profile_to_load = profile_to_load if args else None
 
-            # MIDI
-            midi_client = gremlin.ui.midi_device.MidiClient()
 
-            # event regsitry
-            event_registry = gremlin.event_handler.EventRegistry()
 
-            # RPC server if enabled in configuration
-            if config.remoteEnabled():
-                gremlin.remote.remote_server.start()
-                gremlin.remote.remote_client.start()
 
-            # HID maestro
-            maestro = gremlin.maestro.Maestro()
+        # for now force localization to use US English until we have proper localization support
+        locale = QtCore.QLocale("UnitedStates")
+        QtCore.QLocale.setDefault(locale)
 
-            # Run UI
+        app.setWindowIcon(load_icon("icon.png"))
+        app.setApplicationDisplayName(gremlin.version.APPLICATION_NAME + " " + gremlin.version.APPLICATION_VERSION)
+        app.setApplicationVersion(gremlin.version.APPLICATION_VERSION)
+        # no longer needed in QT6
+        # app.setAttribute(QtCore.Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
 
-            # for some reason QT shows the window with a white background and ignores stylesheets/background color
-            # workaround for now: show the window minimized so it doesnt' flash on the screen
-            # let it update
-            # show the window normally
-            ui.showMinimized()
-            app.processEvents()
+        # handle windows themes better
+        app.setStyle("Fusion")
 
-            gremlin.shared_state.ui_ready = True
+        # Ensure joystick devices are correctly setup
+        dinput.DILL.init()
+        time.sleep(0.25)
 
-            syslog.info("Init completed...")
-            el.ui_ready.emit()
+        # instance
+        _pixmaps = gremlin.ui.ui_common.Pixmaps()
+        # _widget_manager = gremlin.ui.ui_common.WidgetManager()
 
-            syslog.info("Apply settings...")
-            ui.apply_user_settings()
+        # check for gamepad availability via VIGEM
+        if gremlin.gamepad_handling.gamepadAvailable():
+            gremlin.gamepad_handling.gamepad_initialization()
 
-            # identify self to the network on start
-            gremlin.remote.remote_client.requestIdentify()
+        # update device list
+        gremlin.joystick_handling.joystick_devices_initialization()
 
-            if not config.start_minimized:
-                ui.showNormal()
+        # Check if vJoy is properly setup and if not display an error
+        # and terminate GremlinEx
+        try:
+            syslog.info("Checking vJoy installation")
+            vjoy_count = len([dev for dev in gremlin.joystick_handling.all_joystick_devices() if dev.is_virtual and dev.connected])
+            vjoy_working = vjoy_count != 0
+            syslog.info(f"\tFound {vjoy_count} configured vjoy device(s)")
 
-            syslog.info("GremlinEx UI launching...")
+            gremlin.shared_state.vjoy_enabled = vjoy_working
 
-            try:
-                # integrate twisted with QT framework
-                # twisted framework
-                # syslog.info("starting app exec")
-                app.exec()
-            except Exception as err:
-                syslog.error(f"{err}\n{traceback.format_exc()}")
+            if not vjoy_working:
+                msg = "No configured VJOY devices were found.  VJOY output will be disabled.  This is normal if VJOY is not installed or not configured."
+                syslog.warning(msg)
+                # gremlin.ui.ui_common.MessageBox("Error Scanning Devices", msg)
+                # raise gremlin.error.GremlinError(msg)
 
-            syslog.info("GremlinEx UI terminated")
+        except (gremlin.error.GremlinError, dinput.DILLError) as e:
+            error_display = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Critical, "Error", e.value, QtWidgets.QMessageBox.Ok)
+            error_display.move
+            error_display.show()
 
-            gremlin.shared_state.terminating = True
+            app.exec_()
 
-            # Terminate potentially running EventListener loop
             gremlin.joystick_handling.VJoyProxy.reset()
             el = gremlin.event_handler.EventListener()
             el.terminate()  # terminates and sends the relevant shutdown triggers
-
-            if vjoy_working:
-                # Properly terminate the runner instance should it be running
-                ui.runner.stop()
-
-            # Relinquish control over all VJoy devices used
-            gremlin.joystick_handling.VJoyProxy.reset()
-
-            # hg.remove_process(os.getpid())
-            if fl:
-                fl.close()
-
-            syslog.info("Terminating GremlinEx")
-            # gc.collect()
+            fl.close()
             sys.exit(0)
 
-    except filelock.Timeout:
-        syslog.error(f"Error: Another instance of {gremlin.version.APPLICATION_NAME} is already running.")
-        sys.exit(1)
+        gremlin.shared_state.reload_device_map()
+
+        # Initialize action plugins
+        syslog.info("Initializing plugins")
+        gremlin.plugin_manager.ActionPlugins()
+        gremlin.plugin_manager.ContainerPlugins()
+
+        # input map tracking instance
+        iim_tracker = gremlin.ui.ui_common.WidgetCacheTracker()
+
+        # Create Gremlin UI
+        ui = GremlinUi()
+
+        # joystick state
+        sd = gremlin.event_handler.JoystickState()
+        sd.hook()
+        sd.reset()  # initial state
+
+        _tab_state = gremlin.tabstate.TabState()  # instance
+
+        astate = gremlin.event_handler.AxisState()
+        astate.reset()
+
+        # joystick processor instance
+        # event_processor = gremlin.event_handler.JoystickEventProcessor()
+
+        syslog.info("GremlinEx UI created")
+
+        # state monitoring
+        profile_state_monitor = gremlin.shared_state.ProfileStateMonitor()
+
+        # automatic process monitoring check
+
+        pmgr = gremlin.process.ProcessMonitor()
+        el = gremlin.event_handler.EventListener()
+        el.process_monitor_changed.emit()
+
+        ec = gremlin.execution_graph.ExecutionContext()
+
+        gremlin.shared_state.char_width = gremlin.ui.ui_common.get_text_width("M")
+
+        # report ui
+        report = gremlin.reporting.ReportEngine()
+
+        # sound engine
+        sound = gremlin.sound.Sound()
+
+        # MIDI
+        midi_client = gremlin.ui.midi_device.MidiClient()
+
+        # event regsitry
+        event_registry = gremlin.event_handler.EventRegistry()
+
+        # RPC server if enabled in configuration
+        if config.remoteEnabled():
+            gremlin.remote.remote_server.start()
+            gremlin.remote.remote_client.start()
+
+        # HID maestro
+        maestro = gremlin.maestro.Maestro()
+
+        # Run UI
+
+        # for some reason QT shows the window with a white background and ignores stylesheets/background color
+        # workaround for now: show the window minimized so it doesnt' flash on the screen
+        # let it update
+        # show the window normally
+        ui.showMinimized()
+        app.processEvents()
+
+        gremlin.shared_state.ui_ready = True
+
+        syslog.info("Init completed...")
+        el.ui_ready.emit()
+
+        syslog.info("Apply settings...")
+        ui.apply_user_settings()
+
+        # identify self to the network on start
+        gremlin.remote.remote_client.requestIdentify()
+
+        if not config.start_minimized:
+            ui.showNormal()
+
+        syslog.info("GremlinEx UI launching...")
+
+        try:
+            # integrate twisted with QT framework
+            # twisted framework
+            # syslog.info("starting app exec")
+            app.exec()
+        except Exception as err:
+            syslog.error(f"{err}\n{traceback.format_exc()}")
+
+        syslog.info("GremlinEx UI terminated")
+
+        gremlin.shared_state.terminating = True
+
+        # Terminate potentially running EventListener loop
+        gremlin.joystick_handling.VJoyProxy.reset()
+        el = gremlin.event_handler.EventListener()
+        el.terminate()  # terminates and sends the relevant shutdown triggers
+
+        if vjoy_working:
+            # Properly terminate the runner instance should it be running
+            ui.runner.stop()
+
+        # Relinquish control over all VJoy devices used
+        gremlin.joystick_handling.VJoyProxy.reset()
+
+        # hg.remove_process(os.getpid())
+        if fl:
+            fl.close()
+
+        syslog.info("Terminating GremlinEx")
+        # gc.collect()
+        sys.exit(0)
+
+    except Exception as e:
+        pass

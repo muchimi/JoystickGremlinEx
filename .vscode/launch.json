@@ -16,7 +16,10 @@
             "justMyCode": true,
             "subProcess": false,
 
-            //"args": ["--np"]
+            //"args": ["--np"],
+            "args": ["--h"],
+            //"args" : ["--p","sc ex.xml","--r"]
+
         },
         // {
         //     "name": "Python: Current File with profiler",

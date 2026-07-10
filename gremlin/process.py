@@ -29,11 +29,19 @@ import logging
 import gremlin.config
 import gremlin.event_handler
 from psygnal import Signal
-import win32api, win32con
+import win32api
+import win32con
+import win32event
 import psutil
+from typing import overload
+
 
 # Definition of the flags for limited information queries
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+PROCESS_TERMINATE = 0x0001
+SYNCHRONIZE = 0x00100000
+WAIT_OBJECT_0 = 0x00000000
+MAX_PATH = 260
 
 syslog = logging.getLogger("system")
 
@@ -191,6 +199,9 @@ class ProcessMonitor(QtCore.QObject):
                 if exe.casefold() == process_name:
                     return True
         return False
+
+
+
 
 
 # main instance
@@ -481,3 +492,92 @@ class ProcessHelper:
                 pass
         else:
             syslog.error(f"OSACTION: unable to find process: [{path}]")
+
+
+
+
+    def processRunning(self, target_name: str) -> bool:
+        """ checks for a running process """
+        kernel32 = ctypes.windll.kernel32
+
+        pids = win32process.EnumProcesses()
+        target_name = target_name.casefold()
+
+        for pid in pids:
+            if pid <= 4:
+                # skip idle and system processes
+                continue
+            try:
+                hProcess = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+                if not hProcess:
+                    continue
+                try:
+                    # Prepare buffer to receive full path name
+                    size = ctypes.wintypes.DWORD(MAX_PATH)
+                    buf = ctypes.create_unicode_buffer(MAX_PATH)
+
+                    # Call Kernel32 function directly
+                    if kernel32.QueryFullProcessImageNameW(hProcess, 0, buf, ctypes.byref(size)):
+                        full_path = buf.value
+                        exe_name = full_path.split('\\')[-1]
+
+                        # 3. Check for a match
+                        if exe_name.casefold() == target_name:
+                            return True
+
+                finally:
+                    kernel32.CloseHandle(hProcess)
+            except Exception:
+                continue
+        return False
+
+    # @overload
+    def killProcess(self, target_name : str, timeout_ms : int =5000):
+        """ kills a process and confirms it's terminated before turning - fails if timeout is exceeded """
+        kernel32 = ctypes.windll.kernel32
+        target_name = target_name.casefold()
+        result = False
+        pids = win32process.EnumProcesses()
+        for pid in pids:
+            if pid <= 4:
+                continue
+            try:
+                # Prepare buffer to receive full path name
+                size = ctypes.wintypes.DWORD(MAX_PATH)
+                buf = ctypes.create_unicode_buffer(MAX_PATH)
+
+                # Call Kernel32 function directly
+                hProcess = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+                if not hProcess:
+                    continue
+                try:
+                    if kernel32.QueryFullProcessImageNameW(hProcess, 0, buf, ctypes.byref(size)):
+                        full_path = buf.value
+                        exe_name = full_path.split('\\')[-1]
+
+
+                        if exe_name.casefold() == target_name:
+                            print(f"Found {exe_name} (PID: {pid}). Requesting termination...")
+
+                            # 4. Reopen with Terminate + Sync permissions
+                            hProcessToKill = kernel32.OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, False, pid)
+                            if hProcessToKill:
+                                try:
+                                    kernel32.TerminateProcess(hProcessToKill, 0)
+                                    # Wait directly using kernel synchronization
+                                    result = kernel32.WaitForSingleObject(hProcessToKill, timeout_ms)
+                                    if result == WAIT_OBJECT_0:
+                                        return True # success
+                                    else:
+                                        return False # timeout
+                                finally:
+                                    kernel32.CloseHandle(hProcessToKill)
+                finally:
+                    kernel32.CloseHandle(hProcess)
+
+
+
+            except Exception:
+                continue
+
+        return False # process not found
