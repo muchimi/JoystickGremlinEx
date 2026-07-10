@@ -17,7 +17,7 @@
             "subProcess": false,
 
             //"args": ["--np"],
-            "args": ["--h"],
+            //"args": ["--h"],
             //"args" : ["--p","sc ex.xml","--r"]
 
         },
