@@ -29,9 +29,77 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T1A) Early test build
 
-### (m77T1)
-- New UI
+- Fix: Startup process check should exclude self.
+
+### (m77T1) Early test build
+- New: UI: General rework of the user interface (UI) to address performance, and reduce memory utilization.  This is mostly a gut/replace of the remaining legacy code and modernizes the UI logic and behavior to handle thousands of UI elements.
+- New: UI: Global option controls how many mapping input mappings should stay in memory at a time.  The larger the cache, the more memory GEX (QT) uses but the more responsive by avoiding a reload.  This can be set to unlimited (uses as much memory as needed), or no caching (recreate each time - uses the least runtime memory). The default is 20 entries.  Each input counts as a single entry when selected.  The cache operates in round robin fashion to balance memory usage with large numbers of possible inputs and mappings.
+- New: UI: Ability to change, re-order, save, load or control visibility of device tabs via a new dialog.  Note: this does not change the Windows device order (that order is OS determined and cannot be changed).  This said, this provides a more predictable list. Emphasis that if you disconnect and reconnect devices, it is a best practice to restart Windows so the OS and games are in sync.  GEX will handle this, but games may not.
+- New: UI: Improved UI messaging when inputs are filtered from the device input list (left side of the device tab).
+- New: MIDI: Ability to refresh MIDI ports without a GEX restart.
+- New: UI: Input action icons will indicate actions that have no outputs configured (red bar).  Many actions always have a default output, some, like keyboard or macro, may not.  Validity is determined by the action.  For example, MapToKeyboardEx will be valid if keys are defined.
+- New: UI: Input action icons will display information about the action without having to navigate to it.
+- New: UI: Input action icons are clickable. Clicking on the icon will bring the action into view instead of having to scroll to find it as some actions/containers can have a long scroll list (such as sequence for example).
+- New: APP: GremlinEx will check for running instances. If an existing process is found, it offers the option to either exit the new instance, or kill the old (helpful if it got hung for whatever reason).
+  Note: if the process was not started by the user, this requires gremlinex to run with administrative rights.  In normal situations, this is not needed as GEX should run without admin rights needed so long as UAC is not configured to restrict access (this could be the case on some enterprise setups or if you did not install your own operating system and systems with multiple accounts setup).
+- New: APP: startup command line parameters added as follows:
+
+ --p profile.xml  # specifies to load a specifi profile.  a full path can be provided, if not, GEX will look in the profile folder.  Ignored if --np is used.
+ --r # autorun the specified profile, or last profile if -p is not given. Ignored if --np is used.
+ --np # start GEX with a new profile
+ 
+ Example:  
+ 
+	# will tell GEX to load the profile test.xml from the default profile folder and automatically run it on start.
+	gremlinex --p test.xml --r  
+	
+	# will tell gremlinex to load a new profile
+	gremlinex --np
+	
+- New: Sequence container: step mode, executes one step per trigger and move to the next step
+- New: Sequence container: ability to re-order steps in the container.
+- Change: APP: General profile load optimizations.  Profile load time is cut by approximately 50% or better.
+- Change: APP: Internal refactor of data structures for containers, action sets and actions data structures to support new API and viewmodels.
+- Change: APP: Expansion of parameter strong typing checking and assertions in debug builds to harden the application and validate data/logic flows.  This is one part of Python that contributes to bugs compared to C++.
+- Change: UI: Consolidated all icons to icons folder to significantly reduce startup and initial load times, something profiling identified as a significant I/O bottleneck and lag in the UI.
+- Change: UI: Improved hourglass cursor behavior to workaround QT behaviors and use of background update processes to improve UI responsiveness.
+- Change: UI: Visual components refactor, updated and more consistent look/fee, and transition of all components to support viewmodels.
+- Change: UI: Minimize thread hopping for visual component updates to improve performance, especially as profiling indicated that QT struggles significantly with rapid context switching.
+- Change: UI: Window movement/resize optimization to avoid repeated updates when not necessary. 
+- Change: UI: Significant performance improvement with complex profiles and large input counts.  However this may require reloading of certain UI elements to maintain memory utilization low especially if you constantly change devices.
+- Change: UI: Automatic highlighing of inputs can now optionally unhide the input if it was filtered from view.  This can be used to automatically sync the input filter with a used axis or button.  The option is enabled by default and can be changed in the filter options.
+- Change: UI: More compact view of input UI elements.
+- Change: Package: reduced the distribution overall size.
+- Change: Vjoy Remap Action: delay load UI components for button grid and stepped axis to improve performance.
+- Change: DINPUT: Added spam filtering of axes and button/hat data. This is to deal with some devices like Wooting or Azeron that can spam DINPUT triggers by sending updates hundreds of times even if the value did not change.  This is driver dependant and cannot be controlled by GEX, and was also profiled to contribute to significant lag.
+- Change: DINPUT: Devices that do not adhere to DINPUT specifications will be automatically disabled and ignored by GEX.  This is also related to Wooting and Azeron (there are others) that create ghost devices, such as devices with 200+ axes when the spec is 8.
+- Change: MIDI: Dissociate MIDI port name from port number (will use whatever port is assigned to that port name - noting the number can change depending on the MIDI configuration with the OS).  GEX will listen to whatever port number is assigned using the port name only.
+- Change: Input Viewer: virtual axes can be changed with mouse wheel either on the display bar or the value repeater
+- Change: Input Viewer: positioning of inputs matches the selector sequence as items are added or removed.
+- Change: Sequence container: updated to use the new data models, adds delete button for steps.
+- Change: Platform: Update to Python 14.6 x64.
+- Change: LOG: new log (fault.log) will persist across runs and capture any unhandled errors in case the application log gets overwritten.  This only captures unhandled errors for diagnostics purposes.
+
+- Fix: DINPUT: disable out of specification hardware that reports in - more than 8 axes, 128 buttons or 4 hat.  These are typically ghost devices.
+- Fix: long icon load times in some situations
+- Fix: UI: update checkbox visuals not displaying properly in some situations
+- Fix: UI: main application window start position could be slightly offset from last position
+- Fix: QT: workaround for resize event throwing internal C++ errors introduced by QT 6.11
+- Fix: DINPUT: invalid derived device hash value.
+- Fix: Wooting driver: ignore ghost controllers that report no axis.
+- Fix: CONFIG: configuration file encoding failure will no longer result in the prior file being deleted and thus resetting the configuration.  Resets may still occur on critical exceptions.
+- Fix: UI: axis display for skipped axis may not reflect the correct axis number
+- Fix: XML: names are more consistently safe encoded in profile XML - this could cause some invalid XML with special characters.
+- Fix: Profile start/stop and other special runtime mode overrides not looking for the correct mappings (this could impact certain global triggers)
+- Fix: MIDI: restart MIDI listeners could fail to listen again
+- Fix: UI: Dialogs size/position may not persist depending on how the dialog is closed
+- Fix: UI: (workaround) bug in QT library ignores request to scroll to the selected input if not currently visible
+- Fix: UI: generic icon not found error leading to systematic file search for each icon.
+- Fix: CONFIG: use temporary files to avoid corrupting data on error including OS i/o errors or locks.
+- Fix: MapToKeyboardEx: corrected modifier order for mouse buttons and modifiers will be output before the mouse button.  While technically it should not matter, some game loops look for modifiers first rather than looking at all that is pressed.
+- Fix: MACRO: missing icons (rather, icons in the wrong folder) causing runtime error.
 
 ### (m76RC33):
 - New: Tested with Wooting keyboard in gamepad mode.

@@ -502,10 +502,14 @@ class ProcessHelper:
 
         pids = win32process.EnumProcesses()
         target_name = target_name.casefold()
+        current_pid = os.getpid()
 
         for pid in pids:
             if pid <= 4:
                 # skip idle and system processes
+                continue
+            if pid == current_pid:
+                # skip the current process
                 continue
             try:
                 hProcess = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
@@ -537,9 +541,13 @@ class ProcessHelper:
         kernel32 = ctypes.windll.kernel32
         target_name = target_name.casefold()
         result = False
+        current_pid = os.getpid()
         pids = win32process.EnumProcesses()
         for pid in pids:
             if pid <= 4:
+                continue
+            if pid == current_pid:
+                # skip the current process
                 continue
             try:
                 # Prepare buffer to receive full path name

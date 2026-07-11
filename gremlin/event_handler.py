@@ -857,7 +857,8 @@ class EventListener(QtCore.QObject):
         config = gremlin.config.Configuration()
         self._mouse_hook_stack = 0
         self.mouse_hook = None
-        self.enable_mouse_hook = False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
+        self.enable_mouse_hook = True #
+        False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
         self.enableMouse()
 
         # Calibration function for each axis of all devices
