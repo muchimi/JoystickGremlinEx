@@ -5424,64 +5424,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             is_changed = filecmp.cmp(tmp_path, self._comparative_file, shallow=False)
 
-            # # remove blank text and comments from the XML files
-            # parser = etree.XMLParser(remove_comments=True, remove_blank_text=True)
-            # try:
-            #     t1 = etree.parse(tmp_path, parser=parser)
-            #     t2 = etree.parse(profile_fname, parser=parser)
-            # except Exception:
-            #     # error loading file - assume no changes
-            #     return False
-
-            # # remove container IDs and action IDs from xml
-            # trees = (t1, t2)
-            # ignore_list = ("container_id","action_id")
-            # gate_ignore_list = ("id","min_id","max_id")
-
-            # for t in trees:
-            #     remove_nodes = []
-            #     for node in t.findall(".//*"):
-            #         for attrib in ignore_list:
-            #             if attrib in node.attrib:
-            #                 del node.attrib[attrib]
-            #         description = None
-            #         if "description" in node.attrib:
-            #             # clear blank description nodes
-            #             description = node.get("description")
-            #             if not description:
-            #                 del node.attrib["description"]
-            #         if node.tag in ("button","axis","hat") and not description:
-            #             children = list(node)
-            #             if not children:
-            #                 # remove blank axis, button and hat nodes from the comparison
-            #                 remove_nodes.append(node)
-            #         if node.tag in ("gate","range"):
-            #             # ignore IDs that will change
-            #             for attrib in gate_ignore_list:
-            #                 if attrib in node.attrib:
-            #                     del node.attrib[attrib]
-
-            #     # remove don't care nodes
-            #     for node in remove_nodes:
-            #         node.getparent().remove(node)
-
-            # is_changed = etree.tostring(t1) != etree.tostring(t2)
-
-            # if is_changed:
-            #     # save the files for testing
-            #     user_profile = gremlin.util.userprofile_path()
-            #     f1 = os.path.join(user_profile, "f1.xml")
-            #     f2 = os.path.join(user_profile, "f2.xml")
-            #     if os.path.isfile(f1):
-            #         os.unlink(f1)
-            #     if os.path.isfile(f2):
-            #         os.unlink(f2)
-            #     t1.write(f1, pretty_print=True,xml_declaration=True,encoding="utf-8")
-            #     t2.write(f2, pretty_print=True,xml_declaration=True,encoding="utf-8")
-            #     gremlin.util.display_file(f1)
-            #     gremlin.util.display_file(f2)
-            #     pass
-
             return is_changed
 
     def _last_runtime_mode(self):
@@ -5969,6 +5911,7 @@ if __name__ == "__main__":
                 "faultfile": fault_log_path,
                 "faultbackupCount": 2,
                 "faultmegabytes": 1,
+                "unlink" : False
             }
         )
         if not result:

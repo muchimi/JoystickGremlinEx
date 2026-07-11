@@ -1974,6 +1974,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def trigger(self):
         """triggers the widget to send the selection state again"""
+        if gremlin.shared_state.is_running:
+            return # ignore at runtime
         self._fireSelectionChangeCallbacks()
         el = gremlin.event_handler.EventListener()
         el.sync_input.emit(self._input_item)
@@ -2519,8 +2521,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def setSelected(self, value: bool, emit=True):
         """marks the item as selected"""
-        if not Shiboken.isValid(self):
+        if not Shiboken.isValid(self) or gremlin.shared_state.is_running:
             return
+
         if value != self._selected:
             verbose = gremlin.config.Configuration().verbose_mode_ui
             if verbose:
@@ -2538,7 +2541,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         if verbose:
             syslog.info(f"ItemWidget: selected [{value}]")
 
-        if emit:
+        if emit and not gremlin.shared_state.is_running:
             # self.selected_changed.emit(self)
             self._fireSelectionChangeCallbacks()
 
@@ -3758,9 +3761,10 @@ class InputItemListView(AbstractView):
                 self._drawn_once = True
                 widget_count = self.getInputItemWidgetCount()
 
-            if __debug__:
-                model_count = self.model.count()  # widgets that should be displayed
-                assert self._drawn_once and (widget_count == model_count), "InputItemListView model and UI are not synchronized (mismatched items)"
+            model_count = len(self.model)
+
+            # if __debug__:
+            #     assert self._drawn_once and (widget_count == model_count), "InputItemListView model and UI are not synchronized (mismatched items)"
 
             if self.current_index == -1 and model_count > 0:
                 self.setCurrentIndex(0)  # pick the first item if nothing is selected now
@@ -3935,6 +3939,8 @@ class InputItemListView(AbstractView):
     def _execute_widget_selection_changed(self, widget: InputItemWidget):
 
         try:
+            if gremlin.shared_state.is_running:
+                return
             assert gremlin.util.is_ui_thread(), "must run on Ui thread"
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
@@ -3987,6 +3993,9 @@ class InputItemListView(AbstractView):
         :param emit: flag indicating whether or not a signal is to be emitted when the item is being selected
         :param force: forces an update
         """
+
+        if gremlin.shared_state.is_running:
+            return
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_inputs or config.verbose_mode_ui_level(1)

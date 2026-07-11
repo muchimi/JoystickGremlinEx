@@ -15,17 +15,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+from gremlin.singleton_decorator import SingletonDecorator
 
 APPLICATION_NAME = "GremlinEx"
-APPLICATION_BASE = "m77T1A"
+APPLICATION_BASE = "m77T2"
 APPLICATION_MAIN = "1.0ex"
 APPLICATION_EXE = "gremlinex.exe"
 
 #APPLICATION_BASE = ""
 APPLICATION_VERSION = f"{APPLICATION_MAIN} ({APPLICATION_BASE})"
-
-from gremlin.singleton_decorator import SingletonDecorator
 
 @SingletonDecorator
 class Version():

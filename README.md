@@ -29,6 +29,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T2) Early test build
+- Fix: Resolved an issue with a missing property
+- Fix: log file will not reset right now on new run for troubleshooting purposes (it will rotate out if too large).
+- Known issue: chasing down an issue after some time where the application may stop communicating with vjoy.
+
 ### (m77T1A) Early test build
 
 - Fix: Startup process check should exclude self.
