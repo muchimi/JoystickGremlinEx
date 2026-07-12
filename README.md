@@ -29,16 +29,28 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m77T2) Early test build
+### (m77T3) Early test build (not for production, testing only)
+- Fix: removed references to deprecated callbacks in some containers
+- Fix: TTS library threading issue in Python 14.6 on thread exit
+- Fix: forcibly unload vjoy interface DLL on exit to prevent ghost references in Python 14.x
+- Fix: Button press/release container: adjust to use new API
+- Fix: Tempo container: adjust to use new API
+- Fix: TempoEx container: adjust to use new API
+- Fix: Chain container: adjust to use new API
+- Fix: UI - occasional visual multi selection in inputs (provisional)
+- Fix: API: profile changes detection: additional handling to check for missing files + remove temporary files.
+- Fix: UI: Filter dialog could cause an exception due to typo.
+
+### (m77T2) Early test build (not for production, testing only)
 - Fix: Resolved an issue with a missing property
 - Fix: log file will not reset right now on new run for troubleshooting purposes (it will rotate out if too large).
 - Known issue: chasing down an issue after some time where the application may stop communicating with vjoy.
 
-### (m77T1A) Early test build
+### (m77T1A) Early test build (not for production, testing only)
 
 - Fix: Startup process check should exclude self.
 
-### (m77T1) Early test build
+### (m77T1) Early test build (not for production, testing only)
 - New: UI: General rework of the user interface (UI) to address performance, and reduce memory utilization.  This is mostly a gut/replace of the remaining legacy code and modernizes the UI logic and behavior to handle thousands of UI elements.
 - New: UI: Global option controls how many mapping input mappings should stay in memory at a time.  The larger the cache, the more memory GEX (QT) uses but the more responsive by avoiding a reload.  This can be set to unlimited (uses as much memory as needed), or no caching (recreate each time - uses the least runtime memory). The default is 20 entries.  Each input counts as a single entry when selected.  The cache operates in round robin fashion to balance memory usage with large numbers of possible inputs and mappings.
 - New: UI: Ability to change, re-order, save, load or control visibility of device tabs via a new dialog.  Note: this does not change the Windows device order (that order is OS determined and cannot be changed).  This said, this provides a more predictable list. Emphasis that if you disconnect and reconnect devices, it is a best practice to restart Windows so the OS and games are in sync.  GEX will handle this, but games may not.

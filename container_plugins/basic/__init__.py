@@ -38,12 +38,14 @@ class BasicContainerWidget(AbstractContainerWidget):
     def __init__(self, input_item: InputItem, container: AbstractContainer, parent=None):
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
+        :param input_item the input item represented by this widget
+        :param container the container represented by this widget
         :param parent the parent of this widget
         """
         super().__init__(input_item, container, parent, view=True)
+        self.container = container
+        self.input_item = input_item
 
-  
 
     def _handle_interaction(self, widget, action):
         """Handles interaction icons being pressed on the individual actions.

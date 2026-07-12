@@ -34,7 +34,7 @@ import gremlin.input_devices
 
 
 # import gremlin.gated_handler
-from gremlin.profile import safe_format, safe_read
+from gremlin.util import safe_format, safe_read
 import gremlin.util
 from .SimConnectManager import (
     SimConnectManager,

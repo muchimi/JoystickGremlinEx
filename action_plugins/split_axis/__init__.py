@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ from lxml import etree as ElementTree
 
 import gremlin.base_profile
 from gremlin.input_types import InputType
-from gremlin.profile import safe_read, safe_format
+from gremlin.util import safe_read, safe_format
 from gremlin import util
 import gremlin.ui.ui_common
 import gremlin.input_item

@@ -1597,12 +1597,13 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         confirm_delete_callback: Callable = None,
         get_state_callback: Callable = None,
         config_external=False,
+        model_index: int = -1,
         data=None,
         parent=None,
     ):
         """builds the widget
         :param input_item: The input item associated with this widget
-        :param identifier: The input identifier associated with this widget
+        :param model_index: The index of the widget in the list view
         :param parent: Optional parent widget
         :param populate_ui_callback: Optional callback to populate the UI
         :param populate_name_callback: Optional callback to populate the name
@@ -1641,6 +1642,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._input_type = None
         self._device_guid = None
         self._input_id = None
+        self._index = model_index # index of the widget in the listview
         self.setInputItem(input_item)
 
         if hasattr(self._input_id, "input_mode_changed"):
@@ -2521,15 +2523,19 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def setSelected(self, value: bool, emit=True):
         """marks the item as selected"""
-        if not Shiboken.isValid(self) or gremlin.shared_state.is_running:
-            return
+        gremlin.util.InvokeUiMethod(self._set_selected_ui, value, emit)
 
+
+    def _set_selected_ui(self, value: bool, emit = True):
+        assert gremlin.util.is_ui_thread(), "Must be called from the UI thread"
+        if not Shiboken.isValid(self):
+            return
         if value != self._selected:
             verbose = gremlin.config.Configuration().verbose_mode_ui
             if verbose:
                 syslog.info(f"InputItemWidget: input item id [{self.input_item.id}] item: [{self.input_item.display_name}] set selected: [{value}]")
             self._selected = value
-            self._update_selected()  # uptate widget style
+            self._update_selected_ui()  # uptate widget style
 
             if emit:
                 # notify of selection change
@@ -3609,6 +3615,7 @@ class InputItemListView(AbstractView):
                                     parent=self._scroll_layout,
                                 )
                                 assert isinstance(widget, InputItemWidget), "custom handler returned an invalid widget "
+                                assert widget.index != -1,"custom handler should index the inputwidget"
                                 widget.addSelectionChangeCallback(self._handle_widget_selection_changed)  # hook selection changes
                                 widget.index = model_index
                                 assert widget is not None, "Custom widget handler didn't return a widget"
@@ -3617,6 +3624,7 @@ class InputItemListView(AbstractView):
                                 widget = InputItemWidget(
                                     input_item,
                                     selection_changed_callback=self._handle_widget_selection_changed,
+                                    model_index=model_index,
                                 )
                                 if input_item.input_type == InputType.JoystickAxis:
                                     prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
@@ -3706,7 +3714,7 @@ class InputItemListView(AbstractView):
                     index = self._current_index
                 if index == -1:
                     index = 0
-                self._select_item_ui(index)
+                self._select_item_ui(index, emit = False)
 
         finally:
             if selected_input_item is not None:
@@ -3772,9 +3780,10 @@ class InputItemListView(AbstractView):
             # reselect input and make visible
             widget = self.widget(self.current_index)
             if widget:
+                self._deselect_all_ui()  # deselect all first
                 if not widget.selected:
                     # ensure selected
-                    widget.setSelected(True, emit=False)
+                    widget._set_selected_ui(True, emit=False)
                 self.scrollToWidget(widget)
         finally:
             # toggle blank/content view
@@ -3782,6 +3791,13 @@ class InputItemListView(AbstractView):
                 self.showBlank()
             else:
                 self.showContent()
+
+    def _deselect_all_ui(self):
+        """Deselects all input item widgets."""
+        assert gremlin.util.is_ui_thread(), "Must be called from the UI thread"
+        for widget in self._widget_map.values():
+            if widget.selected:
+                widget._set_selected_ui(False, emit=False)
 
     def getInputItemWidgetCount(self):
         """gets the number of input widgets in the list"""
@@ -3796,6 +3812,7 @@ class InputItemListView(AbstractView):
 
         :param index the index of the entry to redraw
         """
+        assert gremlin.util.is_ui_thread(), "Must be called from the UI thread"
 
         if not Shiboken.isValid(self):
             # garbage collected
@@ -3878,12 +3895,6 @@ class InputItemListView(AbstractView):
         # self.item_closed.emit(self, index, item)  # widget, index, data
         self.removeRow(index)
 
-        # # select prior item
-        # if index > 0:
-        #     index -= 1
-        #     data = self.model.data(index)
-        #     if data:
-        #         self._select_item_ui(index)
 
     def _edit_item_cb(self, index: int):
         """emits the edit event along with the item being edited"""
@@ -4039,7 +4050,7 @@ class InputItemListView(AbstractView):
 
         if index == -1:
             # get the first selected widget - if any
-            widget = next((w for w in self.self._widget_map.values() if w.selected), None)
+            widget = next((w for w in self._widget_map.values() if w.selected), None)
             if not widget:
                 # select the first one
                 widget = self.widget(0)
@@ -4051,28 +4062,23 @@ class InputItemListView(AbstractView):
                 syslog.warning(f"\tindex [{index}] is not visible")
             return
 
+        self._deselect_all_ui() # remove any current selection
         last_widget = self._last_selected_widget
-        if self._current_index == -1 or self._current_index != index:
-            if last_widget and Shiboken.isValid(last_widget):
-                # deselect prior widget if it can be selected
-                if verbose:
-                    syslog.info(f"\tdeselect index [{self._current_index}]: {last_widget.input_item.display_name}")
-                last_widget.setSelected(False, False)
 
-            # widget to select
+        if self._current_index == -1 or self._current_index != index:
+                    # widget to select
             if not widget:
                 widget = self.widget(index)
 
             assert widget is not None, "widget not found in list"
-            widget.setSelected(True, emit=True)  # this fires the updates and callbacks via the _handle_widget_selection_changed callback
+            widget._set_selected_ui(True, emit=False)  # this fires the updates and callbacks via the _handle_widget_selection_changed callback
             self._current_index = index
             self._requested_selected_index = -1  # indicate no more request
             self._last_selected_widget = widget
             self._fireSelectionChangeCallbacks(last_widget, widget)  # trigger updates on selection change if any
+            self._ensure_visible_ui(widget)  # ensure the selected widget is visible in the scroll area
 
-            self.ensureVisible(widget)  # ensure the selected widget is visible in the scroll area
-
-        return widget
+        return widget,
 
     def getSelectedItem(self) -> InputItem:
         """gets the currently selected input item"""
@@ -4100,9 +4106,14 @@ class InputItemListView(AbstractView):
     def ensureInputVisible(self, input_item : InputItem):
         """ensures the specified input is visible in the input list view"""
         # find the input widget for this input type
+        gremlin.util.InvokeUiMethod(self._ensure_input_visible_ui, input_item)
+
+    def _ensure_input_visible_ui(self, input_item : InputItem):
+        """ensures the specified input item is visible, must be called from UI thread"""
+        assert gremlin.util.is_ui_thread(), "Must be called from the UI thread"
         widget = self._input_item_map.get(input_item, None)
         if widget:
-            self.ensureVisible(widget)
+            self._scroll_to_item_ui(widget)
 
     def ensureSelectedVisible(self):
         """ensures the currently selected widget is visible in the input list view"""
@@ -4117,6 +4128,11 @@ class InputItemListView(AbstractView):
             self._scroll_to_item_ui(widget)
         else:
             gremlin.util.InvokeUiMethod(self._scroll_to_item_ui, widget)
+
+    def _ensure_visible_ui(self, widget):
+        """ensures the widget is visible, must be called from UI thread"""
+        assert gremlin.util.is_ui_thread(), "Must be called from the UI thread"
+        self._scroll_to_item_ui(widget)
 
     def ensureVisibleIndex(self, index):
         """makes the widget at the given index visible in the scroll area, if it is not already visible"""
@@ -4209,11 +4225,19 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     # by default the container works with either axis or momentary inputs
     axis_only = False
 
-    def __init__(self, parent, node=None):
+    def __init__(self, parent : InputItem | "gremlin.profile_graph.ProfileContainerNode", node=None, custom_parse_callback : Callable =None, custom_generate_callback: Callable =None, custom_action_sets: bool = False):
         """Creates a new instance.
 
-        :parent the InputItem which is the parent to this action
+        :param parent: the InputItem or ProfileContainerNode which is the parent to this action
+        :param node: optional XML node for initialization
+        :param custom_parse_callback: optional callback to use when parsing action set if it has additional data (node), returns an action set
+        :param custom_generate_callback: optional callback to use when generating XML for the action set, returns an XML node
+        :param custom_action_sets: indicates if the container uses custom action sets
         """
+        import gremlin.profile_graph
+
+        assert isinstance(parent, (InputItem, gremlin.profile_graph.ProfileContainerNode)),"invalid parent type"
+
         super().__init__(parent)
 
         self.parent = parent
@@ -4221,7 +4245,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self._abstract_container_generating_xml = False  # true if generating
         self._action_sets = ActionSets(self)  # containers contain one or more action sets, each action sets contains a list of action set object
         self.activation_condition: BaseActivationCondition = None  # conditions
-        self.custom_action_sets = False  # true if the container uses custom action sets (need a converter to produce action_sets)
+        self.custom_action_sets = custom_action_sets  # true if the container uses custom action sets (need a converter to produce action_sets)
         self._condition_enabled = True  # condition flag
         self._virtual_button_enabled = (
             True  # determines if the callbacks can be virtualized or not - if not - the callback is "raw" to the functor - action / container set
@@ -4234,7 +4258,8 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self._description = None  # description
         self._callbacks_enabled = True  # callbacks are enabled by default for this container
         self._collapsed = False  # true if the container is collapsed
-        self.actionsetParseCallback = None  # callback to use when parsing action set if it has additional data (node), returns an action set
+        self.actionsetParseCallback = custom_parse_callback  # callback to use when parsing action set if it has additional data (node), returns an action set
+        self.actionsetGenerateCallback = custom_generate_callback  # callback to use when generating XML for the action set, returns an XML node
         self.actionsetCustomParseCallback = None  # callback for the complete action set parsing
         self.definition_mode = self.get_mode()
 
@@ -4251,6 +4276,8 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
             input_item = _get_input_item(parent)
             if not input_item:
                 input_item = _get_input_item(parent)
+        elif isinstance(parent, InputItem):
+            input_item = parent
 
         if not input_item:
             input_item = _get_input_item(parent)
@@ -4265,8 +4292,16 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.device_input_type = input_item.input_type
         self.device = gremlin.joystick_handling.getDevice(self.device_guid)
 
+
     def hasOutput(self) -> bool:
         """returns True if this container has output, meaning it contains an action that has output"""
+        if self._input_item:
+            device_guid = self._input_item.device_guid
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if "left" in device.name.casefold() and self._input_item.input_type == InputType.JoystickButton and self._input_item.input_id == 12:
+                self.dumpActionSets()
+                pass
+
         for action_set in self._action_sets:
             for action in action_set:
                 if action.hasOutput():
@@ -4304,23 +4339,28 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     def ensureActionSets(self):
         """convert to an action set if needed"""
+        if self.custom_action_sets:
+            return
         if not isinstance(self._action_sets, ActionSets):
             self._action_sets = ActionSets(self)
 
     def setActionSets(self, value: ActionSets | list):  # noqa: F405
         """sets a custom action set"""
+        if self.custom_action_sets:
+            raise RuntimeError("sets cannot be redefined when using custom action sets")
         assert value is not None, "actionsets must be provided"
         self._action_sets = value
         self.ensureActionSets()
 
     def resetActionSets(self):
         """resets actions sets - override in derived class if the action set default should be different"""
+        if self.custom_action_sets:
+            raise RuntimeError("should be implemented by derived class if using custom action sets")
+
         if self.action_sets:
-            # for action_set in self.action_sets:
-            #     action_set.clear()
             self.action_sets.clear()
 
-    def dumpActionSets(self, action_sets: list, label=None):
+    def dumpActionSets(self, action_sets: ActionSets = None, label=None):  # noqa: F405
         """dumps the container's action sets to the output"""
 
         if label:
@@ -4328,18 +4368,19 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         else:
             syslog.info("Container action sets:")
 
-        if not action_sets:
-            syslog.info("\tno action sets found")
+        if action_sets is None:
+            action_sets = self.action_sets
 
+        syslog.info(f"\tDUMP: container action set: Found: {len(action_sets)} action sets for container: [{self.display_name}]")
         for index, action_set in enumerate(action_sets):
             self.dumpActionSet(action_set, label=f"Action set [{index}]:", indent="\t")
 
-    def dumpActionSet(self, action_set: list, label=None, indent=""):
+    def dumpActionSet(self, action_set: ActionSet, label=None, indent=""):
         """dumps a single action set"""
         if label:
             syslog.info(f"{indent}{label}")
         else:
-            syslog.info(f"{indent}Action set:")
+            syslog.info(f"{indent}Action set: description: [{action_set.description if action_set.description is not None else 'N/A'}] model description: [{action_set.model_description if action_set.model_description is not None else 'N/A'}]")
 
         if not action_set:
             syslog.info(f"{indent}\tset is empty")
@@ -4494,7 +4535,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     @property
     def display_name(self) -> str:
         return (
-            f"[{self.input_display_name}] action count: [{self.action_model.count() if self.action_model is not None else 0}] description: [{self.description}]"
+            f"[{self.input_display_name}] action set count: [{self.action_sets.count()}] description: [{self.description if self.description else 'n/a'}] model description: [{self.action_sets.modelDescription if self.action_sets.modelDescription is not None else 'n/a'}]"
         )
 
     @property
@@ -4662,7 +4703,16 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         if not extra_data:
             extra_data = {}
         extra_data["container_type"] = node.get("type")
-        self._parse_action_set_xml(node, data, extra_data)
+
+
+        if self.actionsetParseCallback is not None:
+            # custom read the action sets
+            self.actionsetParseCallback(node, data, extra_data)
+        else:
+            self._parse_action_set_xml(node, data, extra_data)
+
+
+
 
         # parse virtual butotn settings for container
         self._parse_virtual_button_xml(node, data, extra_data)
@@ -4693,13 +4743,18 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
                 nodes = node.xpath("./action-set")
                 assert len(nodes) == 0, "old container is still generating action set data"
 
-            # generate the action sets
-            self._generate_action_set_xml(node)
+
 
             node.set("container_id", self.id)
 
             if self.comment:
                 node.set("comment", self.comment)
+
+            # generate the action sets
+            if self.actionsetGenerateCallback is not None:
+                self.actionsetGenerateCallback(node)
+            else:
+                self._generate_action_set_xml(node)
 
             node.set("collapsed", safe_format(self._collapsed, bool))  # collapsed state
 
@@ -4748,6 +4803,9 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         :param node the XML node to process
         """
 
+
+
+
         if self.actionsetCustomParseCallback:
             # handles the complete load via custom callback if the container implements it
             self.actionsetCustomParseCallback(node, data, extra_data)
@@ -4761,6 +4819,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
                 input_item: InputItem = extra_data["input_item"]
                 input_name = f"{input_item.device_name} {input_item.display_name}"
                 model_prefix = f"Action Set for [{input_name}] container: {container_type}"
+
 
         self.action_sets.clear()
         as_read = False
@@ -4912,6 +4971,9 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     def get_action_sets(self):
         """returns action sets - used for duplication (override if needed)"""
         return self.action_sets
+
+    def __str__(self):
+        return self.display_name
 
 
 class AbstractAction(BaseProfileData):
@@ -7791,10 +7853,14 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         assert isinstance(input_item, InputItem)
         assert isinstance(container, AbstractContainer)
+
+
+
         super().__init__(parent)
 
         self._action_widget_map = {}  # cache for action set [input_item] -> widget
         self._use_view = view
+        self._container : AbstractContainer = None
 
         background_color = gremlin.ui.ui_common.Color.containerBackgroundColor()
         css = f"background-color:{background_color}"
@@ -7822,8 +7888,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         )
 
         self._container_id_widget = None
-        self._container = None
-        self.container = container  # hook
+        self.container = container  # hook container
 
         self.input_item = input_item
         self._widget_map = {} # map of action sets to the action set view widget
@@ -7933,6 +7998,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
     @container.setter
     def container(self, value: AbstractContainer):
+        assert isinstance(value, AbstractContainer), "invalid container"
         if self._container != value:
             if self._container:
                 self._container.unregisterChangeCallback(self._handle_container_changed)
@@ -8170,10 +8236,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self._create_action_ui()  # ask to create the action UI
 
 
-        # verify the number of action sets matches the number of widgets
-        if __debug__:
-            widget_list = list(w for w in self._widget_map.values() if w)
-            assert len(widget_list) == len(self.container.action_sets),"mismatch between action sets and widgets"
+        # # verify the number of action sets matches the number of widgets
+        # if __debug__:
+        #     widget_list = list(w for w in self._widget_map.values() if w)
+        #     assert len(widget_list) == len(self.container.action_sets),"mismatch between action sets and widgets"
 
     def _create_activation_condition_tab(self):
         # Create widget to place inside the tab

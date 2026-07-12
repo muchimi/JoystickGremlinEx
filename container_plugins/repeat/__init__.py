@@ -40,17 +40,20 @@ syslog = logging.getLogger("system")
 class RepeatContainerWidget(AbstractContainerWidget):
     """Repeat container optionally repeats the actions provided"""
 
-    def __init__(self, container, parent=None):
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : RepeatContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
+        :param input_item the input item represented by this widget
         :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(container, parent)
+        super().__init__(input_item, container, parent)
+        self.container = container
+        self.input_item = input_item
 
-    def _create(self):
+    def _create(self, container):
         """called before create action ui - initialize here"""
-        self.action_data: RepeatContainer = self.container
+        self.action_data: RepeatContainer = container
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -406,7 +409,8 @@ class RepeatContainer(AbstractContainer):
         self.initial_pulse_delay = 0.75  # in seconds # initial repeat
         self.hold_delay = 0.25  # in seconds, repeat hold duration
         self.pulse_interval_delay = 0.25  # in seconds, interval between repeats
-        self.actionsetCustomParseCallback = self._parse_action_set
+
+        # self.actionsetCustomParseCallback = self._parse_action_set
         self.trigger_on_start = True  # true if the the repeat action is triggered on start.  If false, the trigger will only occur after the input has been held for the initial repeat delay.
         self.repeat_count = 0  # number of times to repeat, 0 to disable (unlimited)
 
@@ -422,7 +426,8 @@ class RepeatContainer(AbstractContainer):
         self.trigger_on_start = safe_read(node, "trigger-start", bool, True)
         self.repeat_count = safe_read(node, "repeat-count", int, 0)
 
-        self.setActionSets([])
+        self.action_sets.clear()
+        self.action_sets.add(gremlin.input_item.ActionSet())
 
         actionset_nodes = node.xpath("./action-set")
         for index, actionset_node in enumerate(actionset_nodes):

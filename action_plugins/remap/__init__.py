@@ -27,11 +27,11 @@ from PySide6 import QtWidgets, QtCore, QtGui
 from gremlin.input_types import InputType
 from gremlin import input_devices, joystick_handling, util
 from gremlin.error import ProfileError
-from gremlin.profile import safe_format, safe_read
+from gremlin.util import safe_format, safe_read
 from gremlin.ui import ui_common
 import gremlin.input_item
 import os
-from gremlin.util import get_guid, safe_format, safe_read
+
 import gremlin.event_handler
 from shiboken6 import Shiboken
 import dinput

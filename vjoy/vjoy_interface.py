@@ -20,6 +20,8 @@ import ctypes
 import enum
 import os
 import logging
+import atexit
+import ctypes.wintypes as wintypes
 
 syslog = logging.getLogger("system")
 
@@ -38,6 +40,7 @@ class VJoyInterface:
     """Allows low level interaction with VJoy devices via ctypes."""
 
     vjoy_dll = None
+    valid = False
 
     # Declare argument and return types for all the functions
     # exposed by the dll
@@ -103,6 +106,7 @@ class VJoyInterface:
         },
     }
 
+
     @classmethod
     def initialize(self):
         """Initializes the functions as class methods."""
@@ -160,3 +164,20 @@ class VJoyInterface:
             if "returns" in params:
                 dll_fn.restype = params["returns"]
             setattr(self, fn_name, dll_fn)
+
+        self.valid = True
+
+    @classmethod
+    def shutdown(self):
+        if self.vjoy_dll is not None:
+            dll_handle = self.vjoy_dll._handle
+            # use the correct kernel DLL for 64 bit
+            kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+            kernel32.FreeLibrary.argtypes = [wintypes.HMODULE]
+            kernel32.FreeLibrary(dll_handle)
+            del self.vjoy_dll
+            self.valid = False
+            self.vjoy_dll = None
+            syslog.info("VJOY: interface shutdown")
+
+

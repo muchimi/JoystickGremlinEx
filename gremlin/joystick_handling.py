@@ -1413,6 +1413,7 @@ def refresh_devices():
     joystick_devices_initialization()
 
 
+
 MAX_VJOY_DEVICE = 16  # number of devices 1..16 supported by VJOY - this includes devices that may not be configured
 MAX_VJOY_BUTTON = 128  # max number of buttons per VJOY device
 

@@ -20,10 +20,6 @@ sys.path.append(".")
 
 import pytest
 
-# import gremlin.plugin_manager
-# from gremlin.profile import Profile
-# import gremlin.types
-# import gremlin.util
 
 # import action_plugins.description as apd
 

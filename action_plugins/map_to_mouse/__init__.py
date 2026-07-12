@@ -25,8 +25,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 import gremlin.base_profile
 from gremlin.input_types import InputType
 from gremlin.types import MouseButton
-from gremlin.profile import read_bool, safe_read, safe_format
-from gremlin.util import rad2deg
+from gremlin.util import read_bool, safe_read, safe_format, rad2deg
 import gremlin.util
 import gremlin.ui.ui_common
 import gremlin.input_item

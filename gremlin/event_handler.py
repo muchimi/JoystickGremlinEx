@@ -17,6 +17,7 @@
 
 from __future__ import annotations  # deprecated with python 3.14+
 
+import atexit
 import functools
 import traceback
 import inspect
@@ -857,8 +858,7 @@ class EventListener(QtCore.QObject):
         config = gremlin.config.Configuration()
         self._mouse_hook_stack = 0
         self.mouse_hook = None
-        self.enable_mouse_hook = True #
-        False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
+        self.enable_mouse_hook = True # False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
         self.enableMouse()
 
         # Calibration function for each axis of all devices
@@ -1080,6 +1080,14 @@ class EventListener(QtCore.QObject):
         # shutdown mouse hook if enabled
         mh = gremlin.windows_event_hook.MouseHook()
         mh.shutdown()
+
+        # terminate vjoy
+        from vjoy.vjoy_interface import VJoyInterface
+        VJoyInterface.shutdown()
+
+
+        # manual atexit
+        #atexit._run_exitfuncs()
 
     @property
     def calibrationManager(self):

@@ -23,7 +23,7 @@ import gremlin.config
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
 from gremlin.util import get_guid
-from gremlin.profile import safe_format, safe_read
+from gremlin.util import safe_format, safe_read
 import gremlin.ui.ui_common
 import gremlin.input_item
 import os
@@ -40,13 +40,16 @@ syslog = logging.getLogger("system")
 class RangeContainerWidget(AbstractContainerWidget):
     """Range container for a ranged action"""
 
-    def __init__(self, container, parent=None):
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : RangeContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
+        :param input_item the input item represented by this widget
         :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(container, parent)
+        super().__init__(input_item, container, parent)
+        self.container = container
+        self.input_item = input_item
 
     def _create_action_ui(self):
         """creates the UI for the container"""

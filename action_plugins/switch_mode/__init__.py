@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ import gremlin.util
 import gremlin.shared_state
 import logging
 from shiboken6 import Shiboken
-from gremlin.profile import safe_format, safe_read
+from gremlin.util import safe_format, safe_read
 
 
 syslog = logging.getLogger("system")
@@ -82,14 +82,14 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
 
     @QtCore.Slot(bool)
     def _execute_on_release_changed(self, checked : bool):
-        self.action_data.exec_on_release = checked        
+        self.action_data.exec_on_release = checked
 
     def _update_modes(self):
         gremlin.util.InvokeUiMethod(self._update_modes_ui) # ensure on UI thread
-    
+
     def _update_modes_ui(self):
         ''' called when mode list needs to be updated '''
-        # update the list of available modes 
+        # update the list of available modes
         if not Shiboken.isValid(self.mode_selector_widget):
             return
         profile = gremlin.shared_state.current_profile
@@ -109,7 +109,7 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
                 index = self.mode_selector_widget.findData(current_mode)
                 if index != -1:
                     self.mode_selector_widget.setCurrentIndex(index)
-         
+
 
         if not self.mode_selector_widget.count():
             is_warning = True
@@ -118,23 +118,23 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
             is_warning = True
 
         self._warning_widget.setVisible(is_warning)
-   
+
     def _update_context_modes(self):
         gremlin.util.InvokeUiMethod(self._update_context_modes_ui) # ensure on UI thread
-    
+
     def _update_context_modes_ui(self):
         ''' called when mode list needs to be updated '''
-        # update the list of available modes 
+        # update the list of available modes
         if not Shiboken.isValid(self.mode_selector_widget):
             return
         with QtCore.QSignalBlocker(self.mode_selector_widget):
             current_mode = self.action_data.mode # current mode
             self.mode_selector_widget.clear()
             _edit_mode = gremlin.shared_state.edit_mode
-            
+
 
             # remove the current mode so we cannot switch to ourselves
-            
+
             modes = self.ec.getModeNames(as_tuple=True, include_current = False) # (display, mode) = exclude current mode
             if not modes:
                 # allow to select self if that's the only option (display, mode)
@@ -151,7 +151,7 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
                 else:
                     # pick the default
                     self.action_data.mode = self.mode_selector_widget.currentData()
-        
+
 
     def _mode_selected_changed(self):
         if not Shiboken.isValid(self.mode_selector_widget):
@@ -163,11 +163,11 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
         if not mode:
             syslog.error("Invalid mode selected: selected mode cannot be NULL")
             return
-        
+
         self.action_data.mode = mode
 
     def _populate_ui(self):
-        
+
         mode = self.action_data.mode
         if mode is None:
             index = 0
@@ -177,8 +177,8 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
                 index = 0
 
         self.mode_selector_widget.setCurrentIndex(index)
-            
-        
+
+
 
 
 class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
@@ -194,8 +194,8 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
 
     def process_event(self, event, value, extra_data = None):
         import gremlin.control_action
-        import gremlin.config        
-        
+        import gremlin.config
+
         trigger = (event.is_pressed and self.action_data.exec_on_press) \
             or (not event.is_pressed and self.action_data.exec_on_release)
         if trigger:
@@ -214,7 +214,7 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
                 syslog.info(f"\tAttached device: [{device_name}] input type: [{InputType.to_display_name(input_type)}] input: [{input_id}] mode: [{mode}]")
                 syslog.info(f"\tevent pressed: [{event.is_pressed}]")
                 syslog.info(f"\tcurrent profile mode: {gremlin.shared_state.runtime_mode} mode to set: {new_mode}")
-                
+
             switch = self._last_mode is None or new_mode != self._last_mode or current_mode != new_mode
             if switch:
                 if verbose:
@@ -225,7 +225,7 @@ class SwitchModeFunctor(gremlin.base_profile.AbstractFunctor):
                     syslog.info("\tno action")
 
             self._last_mode = new_mode
-                
+
         return True
 
 
@@ -248,7 +248,7 @@ To change the mode temporarily, use the temporary mode switch action.'''
     input_types = [
          InputType.JoystickButton,
          InputType.JoystickHat,
-    ]    
+    ]
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -267,12 +267,12 @@ To change the mode temporarily, use the temporary mode switch action.'''
         self.exec_on_press = True # true if the mode should execute on input press
         self.exec_on_release = False # true if the mode should execute on input release
         self._mode = mode
-        
+
 
     @property
     def mode(self) -> str:
         return self._mode
-    
+
     @mode.setter
     def mode(self, value: str):
         if value != self._mode and value is not None:
@@ -288,8 +288,8 @@ To change the mode temporarily, use the temporary mode switch action.'''
 
     def icon(self):
         return "ei.fork"
-        
-    
+
+
 
     def requires_virtual_button(self):
         return self.get_input_type() in [
@@ -306,7 +306,7 @@ To change the mode temporarily, use the temporary mode switch action.'''
             mode_node = node
             while mode_node is not None and mode_node.tag not in ("mode","state"):
                 mode_node = mode_node.getparent()
-                
+
             if mode_node is not None and mode_node.tag == "mode":
                 # validate nesting
                 parent_mode = mode_node.get("name")
@@ -314,7 +314,7 @@ To change the mode temporarily, use the temporary mode switch action.'''
                 # assert bool(mode) and self.mode != parent_mode,f"logic error: switch mode cannot be the same as the current edit mode:  - offending XML line: {node.sourceline}" # cannot be the same as edit mode
 
 
-       
+
         self.exec_on_press = safe_read(node,"exec-on-press", bool, True)
         self.exec_on_release = safe_read(node,"exec-on-release", bool, False)
 
@@ -332,11 +332,11 @@ To change the mode temporarily, use the temporary mode switch action.'''
 
     def _is_valid(self):
         return True
-  
+
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
         from gremlin.reporting import ReportTable
-        table = ReportTable(cellpadding=4)    
+        table = ReportTable(cellpadding=4)
 
         table.addField("Switch To Mode", self.mode)
 

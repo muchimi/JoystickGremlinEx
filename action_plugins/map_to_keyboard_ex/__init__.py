@@ -24,7 +24,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 from gremlin.input_types import InputType
 from gremlin.input_devices import CallbackActions
 
-from gremlin.profile import safe_format, safe_read
+from gremlin.util import safe_format, safe_read
 from gremlin.keyboard import Key, sort_keys
 from gremlin.ui.virtual_keyboard import InputKeyboardDialog
 import gremlin.config

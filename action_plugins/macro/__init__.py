@@ -24,7 +24,7 @@ from lxml import etree as ElementTree
 import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.macro
-from gremlin.profile import safe_format, safe_read, parse_guid, write_guid
+from gremlin.util import safe_format, safe_read, parse_guid, write_guid
 
 from gremlin.remote import VjoyAction
 from gremlin.keyboard import key_from_code, key_from_name

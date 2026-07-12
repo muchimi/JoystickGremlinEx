@@ -47,13 +47,16 @@ class ButtonContainerWidget(AbstractContainerWidget):
 
     """
 
-    def __init__(self, container, parent=None):
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : ButtonContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
+        :param input_item the input item represented by this widget
         :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(container, parent)
+        super().__init__(input_item, container, parent)
+        self.container = container
+        self.input_item = input_item
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -153,7 +156,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
         widget = gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
         layout.addWidget(widget)
 
-        widget = self._create_action_set_widget(action_set_data=self.container.action_sets[index], view_type=view_type)
+        widget = self._create_action_set_widget(action_set=self.container.action_sets[index], view_type=view_type)
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self._handle_container_changed)
@@ -308,31 +311,36 @@ and another action on trigger release in a single container."""
         self.activate_on = "release"
         self.autorelease = True
         self.autorelease_delay = 250  # delay for autorelease trigger if in autorelease mode
-        self.actionsetCustomParseCallback = self._parse_action_set
-        self.resetActionSets()
+        # self.actionsetCustomParseCallback = self._parse_action_xml
+        self.press_action_set = gremlin.input_item.ActionSet(model_description = "press actions")
+        self.release_action_set = gremlin.input_item.ActionSet(model_description = "release actions")
+        self.action_sets.clear()
+        self.action_sets.add(self.press_action_set) # 0
+        self.action_sets.add(self.release_action_set) # 1
+       
+
 
     def resetActionSets(self):
         """resets actions sets - override in derived class if the action set default should be different"""
-        self.setActionSets([[], []])
+        self.press_action_set.clear()
+        self.release_action_set.clear()
+
+
+
 
     def _parse_xml(self, node, data=None, extra_data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
+        self.resetActionSets()
         super()._parse_xml(node, data)
         if "autorelease" in node.attrib:
             self.autorelease = safe_read(node, "autorelease", bool, True)
         if "delay" in node.attrib:
             self.autorelease_delay = safe_read(node, "delay", int, 250)
 
-        self.setActionSets([[], []])
 
-        # actionset_nodes = node.xpath("./action-set")
-        # for index, actionset_node in enumerate(actionset_nodes):
-        #     action_set = gremlin.input_item.ActionSet()
-        #     self._parse_action_xml(actionset_node, action_set, data, extra_data)
-        #     self.action_sets[index] = action_set
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -344,20 +352,16 @@ and another action on trigger release in a single container."""
         node.set("autorelease", safe_format(self.autorelease, bool))
         node.set("delay", safe_format(self.autorelease_delay, int))
 
-        # for action_set in self.action_sets:
-        #     as_node = ElementTree.Element("action-set")
-        #     as_node.set("id", write_guid(action_set.id))
-        #     for action in action_set:
-        #         as_node.append(action.to_xml())
-        #     node.append(as_node)
-        # return node
+        return node
+
 
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.
 
         :return True if the container is configured properly, False otherwise
         """
-        return len(self.action_sets) == 2 and None not in self.action_sets
+        valid = len(self.action_sets) == 2 and None not in self.action_sets
+        return valid
 
 
 # Plugin definitions

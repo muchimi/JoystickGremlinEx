@@ -23,6 +23,7 @@ from __future__ import annotations  # deprecated with python 3.14+
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore
+from torch.nn.modules import container
 
 import gremlin
 import gremlin.event_handler
@@ -47,14 +48,17 @@ class TickContainerWidget(AbstractContainerWidget):
 
     """
 
-    def __init__(self, container: TickContainer, parent=None):  # noqa: F821
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container: TickContainer, parent=None):
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
-        :param parent the parent of this widget
-        """
+    :param input_item the input item represented by this widget
+    :param container the container represented by this widget
+    :param parent the parent of this widget
+    """
+        assert isinstance(container, TickContainer), "invalid container"
+        assert isinstance(input_item, gremlin.input_item.AbstractInputItem), "invalid input item"
         self.container: TickContainer = container
-        super().__init__(container, parent)
+        super().__init__(input_item, container)
 
     def _create_action_ui(self):
         """Creates the UI components."""

@@ -25,7 +25,7 @@ import gremlin.actions
 import gremlin.base_profile
 import gremlin.event_handler
 from gremlin.input_types import InputType
-from gremlin.profile import safe_read, safe_format
+from gremlin.util import safe_read, safe_format
 import gremlin.ui.ui_common
 import gremlin.input_item
 from shiboken6 import Shiboken

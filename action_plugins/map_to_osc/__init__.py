@@ -28,7 +28,7 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.joystick_handling
 import gremlin.shared_state
-from gremlin.profile import safe_read, safe_format
+from gremlin.util import safe_read, safe_format
 import gremlin.util
 import gremlin.ui.ui_common
 import gremlin.input_item

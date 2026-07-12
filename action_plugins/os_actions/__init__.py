@@ -33,7 +33,7 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.input_item
 from enum import IntEnum
-from gremlin.profile import safe_format, safe_read
+from gremlin.util import safe_format, safe_read
 import threading
 import gremlin.ui.ui_common
 import time

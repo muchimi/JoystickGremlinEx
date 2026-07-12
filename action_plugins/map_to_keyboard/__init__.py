@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ from gremlin.input_devices import CallbackActions
 import gremlin.ui.ui_common
 import gremlin.input_item
 import gremlin.keyboard
-from gremlin.profile import safe_format
+from gremlin.util import safe_format
 import gremlin.util
 from shiboken6 import Shiboken
 import html
@@ -87,7 +87,7 @@ class MapToKeyboardWidget(gremlin.input_item.AbstractActionWidget):
         """Prompts the user to press the desired key combination."""
 
 
-        
+
         self.button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(
             [InputType.Keyboard],
             return_kb_event=False,
@@ -132,7 +132,7 @@ class MapToKeyboardFunctor(gremlin.base_profile.AbstractFunctor):
 
             if self.needs_auto_release:
                 # print ("auto release event ")
-                event_release = event.clone()               
+                event_release = event.clone()
                 event_release.is_pressed = False
                 CallbackActions().register_callback(
                     lambda: gremlin.macro.MacroManager().queue_macro(self.release),
@@ -156,7 +156,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
     name = "Map to Keyboard"
     tag = "map-to-keyboard"
     hint = "Legacy keyboard mapper."
-    
+
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
     # override allowed input types if different from default
@@ -212,7 +212,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
                 gremlin.profile.parse_bool(child.get("extended"))
             ))
 
-    
+
 
     def _generate_xml(self):
         """Returns an XML node containing this instance's information.
@@ -238,7 +238,7 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
         :return True if the action is configured correctly, False otherwise
         """
         return len(self.keys) > 0
-    
+
     def display_name(self):
         ''' friendly display name '''
         names = []
@@ -247,11 +247,11 @@ class MapToKeyboard(gremlin.base_profile.AbstractAction):
             names.append(gremlin.keyboard.key_from_code(key[0],key[1]).name)
         text += " + ".join(names)
         return f"Keyboard (legacy): {text}"
-    
+
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
         from gremlin.reporting import ReportTable
-        table = ReportTable(cellpadding=4)    
+        table = ReportTable(cellpadding=4)
         names = []
         text = ""
         for key in self.keys:

@@ -26,9 +26,9 @@ from PySide6 import QtWidgets, QtCore
 
 import gremlin
 import gremlin.ui.ui_common
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, ActionSet, InputItem
 from gremlin.input_types import InputType
-from gremlin.util import safe_format
+from gremlin.util import safe_format, write_guid
 import gremlin.execution_graph
 import gremlin.base_profile
 from shiboken6 import Shiboken
@@ -41,14 +41,14 @@ syslog = logging.getLogger("system")
 class TempoContainerWidget(AbstractContainerWidget):
     """Container with two actions, triggered based on activation duration."""
 
-    def __init__(self, container: TempoContainer, parent=None):  # noqa: F821
+    def __init__(self, input_item : InputItem, container: TempoContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
+        :param input_item the input item represented by this widget
+        :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        self.container: TempoContainer = container
-        super().__init__(container, parent)
+        super().__init__(input_item, container, parent)
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -411,25 +411,45 @@ Look at Tempo Ex for a container that allows more than one action per short or l
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node)
+        super().__init__(parent, node, custom_action_sets=True, custom_generate_callback = self._generate_action_set_xml)
 
         self.delay = 0.5  # delay for long press
         self.autorelease_delay = 0.250  # delay between press and autorelease
         self.activate_on = "release"
-        self.short_action_sets = []
-        self.long_action_sets = []
-        self.setActionSets([self.short_action_sets, self.long_action_sets])
+        self.short_action_set = ActionSet(model_description="short actions")
+        self.long_action_set = ActionSet(model_description="long actions")
+        self.action_sets.add(self.short_action_set, 0) # index 0
+        self.action_sets.add(self.long_action_set, 1) # index 1
 
-    def _parse_xml(self, node, data=None, extra_data=None):
+    def _parse_xml(self, node, input_item : InputItem =None, extra_data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
 
-        super()._parse_xml(node, data)
+        super()._parse_xml(node, input_item)
         self.delay = float(node.get("delay", 0.5))
         self.autorelease_delay = float(node.get("autorelease-delay", 0.25))
         self.activate_on = node.get("activate-on", "release")
+
+        self.short_action_set.clear()
+        self.long_action_set.clear()
+
+        index = 0
+        for as_node in node:
+            match as_node.tag:
+                case "action-set":
+                    match index:
+                        case 0:
+                            self._parse_action_xml(as_node, self.short_action_set, input_item, extra_data, "short")
+                        case 1:
+                            self._parse_action_xml(as_node, self.long_action_set, input_item, extra_data, "long")
+                    index += 1
+
+                case "short-action-set":
+                    self._parse_action_xml(as_node, self.short_action_set, input_item, extra_data, "short")
+                case "long-action-set":
+                    self._parse_action_xml(as_node, self.long_action_set, input_item, extra_data, "long")
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -442,14 +462,26 @@ Look at Tempo Ex for a container that allows more than one action per short or l
         node.set("autorelease-delay", safe_format(self.autorelease_delay, float))
 
         node.set("activate-on", self.activate_on)
-        # for action_set in self.action_sets:
-        #     if action_set:
-        #         as_node = ElementTree.Element("action-set")
-        #         as_node.set("id", write_guid(action_set.id))
-        #         for action in action_set:
-        #             as_node.append(action.to_xml())
-        #         node.append(as_node)
         return node
+
+    def _generate_action_set_xml(self, node: ElementTree.Element):
+        """custom action set generation"""
+
+        # first action set is the short press
+        action_set = self.short_action_set
+        as_node = ElementTree.Element("action-set")
+        as_node.set("id", write_guid(action_set.id))
+        for action in action_set:
+            as_node.append(action.to_xml())
+        node.append(as_node)
+
+        # second action set is the long press
+        action_set = self.long_action_set
+        as_node = ElementTree.Element("action-set")
+        as_node.set("id", write_guid(action_set.id))
+        for action in action_set:
+            as_node.append(action.to_xml())
+        node.append(as_node)
 
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.

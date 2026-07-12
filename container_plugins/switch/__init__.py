@@ -263,14 +263,15 @@ class SwitchWidget(QtWidgets.QWidget):
 class SwitchContainerWidget(AbstractContainerWidget):
     """Container which holds a sequence of actions."""
 
-    def __init__(self, profile_data: SwitchContainer, parent=None):  # noqa: F821
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem,  container: SwitchContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
+        :param input_item the input item represented by this widget
+        :param container the profile data represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(profile_data, parent)
-        self.action_data = profile_data
+        super().__init__(input_item, container, parent)
+        self.action_data = container
 
     def _update_ui(self):
         """redraws the entire switch content"""

@@ -301,11 +301,14 @@ class TextToSpeech:
             return
         threading.current_thread().reset()
         self.engine.startLoop(False)
-        while not self._tts_thread.stopped():
-            time.sleep(0.05)
-            self.engine.iterate()
-
-        self.engine.endLoop()
+        try:
+            while not self._tts_thread.stopped():
+                time.sleep(0.1)
+                self.engine.iterate()
+        except Exception as err:
+            pass # ignore
+        finally:
+            self.engine.endLoop()
 
     def _queue_runner(self):
         """processes the speech queue"""

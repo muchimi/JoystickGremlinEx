@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ import gremlin.config
 import gremlin.event_handler
 from gremlin.input_types import InputType
 
-from gremlin.profile import safe_read
+from gremlin.util import safe_read
 import gremlin.ui.ui_common
 import gremlin.input_item
 import gremlin.gamepad_handling
@@ -59,7 +59,7 @@ class MapToGamepadWidget(gremlin.input_item.AbstractActionWidget):
 
     def _create_ui(self):
         """Creates the UI components."""
-        
+
         if not Shiboken.isValid(self):
             return
         el = gremlin.event_handler.EventListener()
@@ -67,16 +67,16 @@ class MapToGamepadWidget(gremlin.input_item.AbstractActionWidget):
 
         self.output_widget = QtWidgets.QWidget()
         self.output_layout = QtWidgets.QHBoxLayout(self.output_widget)
-        
+
         self.device_selector = gremlin.ui.ui_common.QDataComboBox()
         self.output_selector = gremlin.ui.ui_common.QDataComboBox()
-        
+
         self.output_layout.addWidget(QtWidgets.QLabel("Device:"))
         self.output_layout.addWidget(self.device_selector)
         self.output_layout.addWidget(QtWidgets.QLabel("Output:"))
         self.output_layout.addWidget(self.output_selector)
         self.output_layout.addStretch()
-        
+
         self.output_selector.currentIndexChanged.connect(self._output_mode_changed)
         self.device_selector.currentIndexChanged.connect(self._device_changed)
         #self.output_widget.setContentsMargins(0,0,0,0)
@@ -95,7 +95,7 @@ class MapToGamepadWidget(gremlin.input_item.AbstractActionWidget):
             self.device_selector.clear()
             for index, device in enumerate(devices):
                 self.device_selector.addItem(f"Controller (XBOX 360 For Windows) [{index+1}]", index)
-        
+
 
         with QtCore.QSignalBlocker(self.output_selector):
             self.output_selector.clear()
@@ -132,7 +132,7 @@ class MapToGamepadWidget(gremlin.input_item.AbstractActionWidget):
                 # pick the first entry
                 self.device_selector.setCurrentIndex(0)
                 self.action_data.device_index = 0
-            
+
 
             output_id = self.action_data.output_mode
             output_index = self.output_selector.findData(output_id)
@@ -180,7 +180,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
         if verbose:
             syslog.error(f"VIGEM: event: {str(event)}")
 
-        
+
         (is_local, is_remote) = self.action_data.sendFlags()
         if event.force_remote:
             # force remote mode on if specified in the event
@@ -194,8 +194,8 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                 if verbose:
                     syslog.error(f"VIGEM: no device found index: {self.action_data.device_index}")
                 return False
-            
-            
+
+
         output_mode = self.action_data.output_mode
         if output_mode == GamePadOutput.NotSet:
             return True # nothing to do
@@ -270,11 +270,11 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
             if button is not None:
                 is_pressed = event.is_pressed
                 if is_pressed:
-                    auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl] 
+                    auto_release = event.event_type in [InputType.Keyboard, InputType.KeyboardLatched, InputType.Midi, InputType.OpenSoundControl]
                     if auto_release:
                         if verbose:
                             syslog.info(f"VjoyRemap: autorelease enabled for {str(event)}")
-                        event_release = event.clone()               
+                        event_release = event.clone()
                         event_release.is_pressed = False
                         callback = lambda : self.process_event(event_release, value)
                         CallbackActions().register_callback(callback, event_release)
@@ -292,7 +292,7 @@ class MapToGamepadFunctor(gremlin.base_profile.AbstractFunctor):
                     gremlin.remote.remote_client.send_gamepad_button(self.action_data.device_index, button, value.is_pressed)
                     return True
 
-        
+
         vigem.update() # sends the data to the controller
 
         return True
@@ -309,7 +309,7 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
     name = "Map to GamePad"
     tag = "map-to-gamepad"
     hint = 'Sends game controller data.'
-    
+
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
     # override allowed input types if different from default
@@ -341,18 +341,18 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
     def output_mode(self, value : GamePadOutput):
         self._output_mode = value
 
- 
+
     def display_name(self):
         ''' returns a display string for the current configuration '''
         return f"Gamepad: [{GamePadOutput.to_display_name(self.output_mode)}]"
-    
+
     def icon(self):
         """Returns the icon to use for this action.
 
         :return icon representing this action
         """
         return "fa6s.gamepad"
-        
+
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.
@@ -402,7 +402,7 @@ class MapToGamepad(gremlin.base_profile.AbstractAction):
     def to_html(self) -> str:
         ''' returns reporting graphviz data for this action '''
         from gremlin.reporting import ReportTable
-        table = ReportTable(cellpadding=4)    
+        table = ReportTable(cellpadding=4)
         table.addField("Function", f"{GamePadOutput.to_display_name(self.output_mode)}")
         return table.to_html()
 

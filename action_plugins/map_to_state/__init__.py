@@ -12,7 +12,7 @@ import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
 from gremlin.types import SyncMode
-from gremlin.profile import safe_read, safe_format
+from gremlin.util import safe_read, safe_format
 import gremlin.ui.state_device
 import gremlin.ui.ui_common
 import gremlin.input_item

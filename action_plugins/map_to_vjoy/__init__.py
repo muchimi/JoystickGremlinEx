@@ -2255,7 +2255,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         grids.append(self.container_device_selector_widget)
 
         self.virtual_output_label_widget = QtWidgets.QLabel("Output:")
-        self.virtual_output_selector_widget = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_virtual_output_changed)
+        self.virtual_output_selector_widget = gremlin.ui.ui_common.QDataComboBox(callback_index=self._handle_virtual_output_changed)
         self.virtual_output_selector_widget.setFixedWidth(width)
 
         self._next_unused_widget = gremlin.ui.ui_common.QDataPushButton(
@@ -3209,8 +3209,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 else:
                     self.setWarning("Warning: Device is not currently connected.")
 
-    def _handle_virtual_output_changed(self, index):
+    def _handle_virtual_output_changed(self, index : int):
         """occurs when the vjoy output input ID is changed"""
+        if index == -1:
+            return
         if self.virtual_output_selector_widget.count():
             # ignore if there are no outputs
             with QtCore.QSignalBlocker(self.virtual_output_selector_widget):
@@ -4340,6 +4342,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action_data, parent)
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_vjoy or config.verbose_mode_joystick
+        # self.verbose = True
         self.verbose_extra = self.verbose and config.verbose_mode_extra
         self.vjoy_id = action_data.virtual_id
         self.vjoy_input_id = action_data.vjoy_input_id
@@ -6403,6 +6406,10 @@ Supports axis merging, curved output, command, hat and button mappings.
         # trim curves
         curve = gremlin.curve_handler.AxisCurveData()
         self.trim_curve = curve
+
+    def hasOutput(self) -> bool:
+        """returns whether this action has output"""
+        return True
 
     def _on_id_changed(self, old_id: str, new_id: str):
         """called when the id changes"""

@@ -26,7 +26,7 @@ import gremlin.input_item
 import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, InputItem
 from gremlin.types import ContainerViewTypes, Interactions
 
 from gremlin.input_types import InputType
@@ -38,13 +38,21 @@ syslog = logging.getLogger("system")
 class ChainContainerWidget(AbstractContainerWidget):
     """Container which holds a sequence of actions."""
 
-    def __init__(self, container, parent=None):
+    def __init__(self, input_item : InputItem, container : ChainContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
-        :param profile_data the profile data represented by this widget
+        :param input_item the input item represented by this widget
+        :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(container, parent)
+        super().__init__(input_item, container, parent)
+
+
+    def _create(self, container):
+        assert isinstance(container, ChainContainer), "invalid container"
+        assert len(container.action_sets) > 0, "container missing action sets"
+        self.container: ChainContainer = container
+        self.input_item = self.container.input_item
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -89,9 +97,9 @@ class ChainContainerWidget(AbstractContainerWidget):
             widget.model.data_changed.connect(self.container_modified.emit)
 
     def _create_condition_ui(self):
-        if self.profile_data.action_sets:
-            for i, action in enumerate(self.container.action_sets):
-                widget = self._create_action_set_widget(self.container.action_sets[i], f"Action {i:d}", ContainerViewTypes.Conditions)
+        if self.container.action_sets:
+            for i, action_set in enumerate(self.container.action_sets):
+                widget = self._create_action_set_widget(action_set, f"Action {i + 1:d}", ContainerViewTypes.Conditions)
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
                 widget.model.data_changed.connect(self.container_modified.emit)
@@ -173,6 +181,7 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self.index = 0
         self.last_execution = 0.0
         self.last_value = None
+        self.container = container
 
         # Determine if we need to switch the action index after a press or
         # release event. Only for container conditions this is necessary to
@@ -267,12 +276,6 @@ Unlike a macro or sequence container, only one step is executed for each trigger
         node = ElementTree.Element("container")
         node.set("type", ChainContainer.tag)
         node.set("timeout", str(self.timeout))
-        # for action_set in self.action_sets:
-        #     as_node = ElementTree.Element("action-set")
-        #     as_node.set("id", write_guid(action_set.id))
-        #     for action in action_set:
-        #         as_node.append(action.to_xml())
-        #     node.append(as_node)
         return node
 
     def _is_container_valid(self):

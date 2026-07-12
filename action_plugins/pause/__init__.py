@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.input_item
 from enum import IntEnum
-from gremlin.profile import safe_read
+from gremlin.util import safe_read
 import gremlin.ui.ui_common
 import time
 import logging
@@ -71,14 +71,14 @@ class PauseActionWidget(gremlin.input_item.AbstractActionWidget):
             self.mode_pause_widget.setChecked(True)
         self.mode_delay_widget.clicked.connect(self._mode_changed)
         self.mode_pause_widget.clicked.connect(self._mode_changed)
-        
+
 
         self.delay_widget = gremlin.ui.ui_common.QDelayWidget()
         self.delay_widget.setToolTip("Delay in milliseconds")
         self.delay_widget.valueChanged.connect(self._value_changed)
         self.main_layout.addWidget(self.mode_container_widget)
         self.main_layout.addWidget(self.delay_widget)
-        
+
 
     def _populate_ui(self):
         with QtCore.QSignalBlocker(self.delay_widget):
@@ -91,11 +91,11 @@ class PauseActionWidget(gremlin.input_item.AbstractActionWidget):
         mode = cb.data
         self.action_data.mode = mode
 
-        
+
     @QtCore.Slot()
     def _value_changed(self, value : int):
         ''' called when the delay value changes - the value is in milliseconds'''
-        self.action_data.delay = value 
+        self.action_data.delay = value
         gremlin.config.Configuration().pause_action_default_pause_value = value / 1000 # update options as well (convert to seconds)
 
     def _update(self):
@@ -108,10 +108,10 @@ class PauseActionFunctor(gremlin.base_profile.AbstractFunctor):
     def __init__(self, action_data, parent = None):
         super().__init__(action_data, parent)
         self.action_data = action_data
-        
+
 
     def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
-        
+
         syslog = logging.getLogger("system")
         if value.is_pressed:
             match self.action_data.mode:
@@ -126,7 +126,7 @@ class PauseActionFunctor(gremlin.base_profile.AbstractFunctor):
                         time.sleep(self.action_data.delay/1000)
                         syslog.info(f"Pause: end waiting {self.action_data.delay} ms")
                     self.functor_complete.emit()
-        
+
         return True
 
 
@@ -186,7 +186,7 @@ do not pause even if the profile is paused.'''
                     self.mode = PauseMode.PauseAction
             if "delay" in node.attrib:
                 self.delay = safe_read(node,"delay",int, 250)
-                
+
         else:
             # legacy node - use the old mode
             self.mode = PauseMode.PauseAction

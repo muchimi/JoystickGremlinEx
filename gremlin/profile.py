@@ -25,13 +25,17 @@ import uuid
 # from xml.dom import minidom
 import lxml
 from lxml import etree
+import time
+
 
 
 from PySide6 import QtCore
 
 import dinput
 import gremlin.config
-from gremlin.util import *
+from gremlin.util import safe_read, parse_bool, safe_format
+
+from PySide6 import QtWidgets
 from . import error, joystick_handling
 
 
@@ -197,10 +201,10 @@ class ProfileConverter:
             root = tree.getroot()
 
             new_root = self._convert_to_ex(root, fname)
-            tree = etree.tostring(new_root)
+            tree = etree.etree(new_root)
             tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
         except Exception:
-            gremlin.util.m
+            gremlin.util.message_box(f"Error converting profile: {fname}")
 
     def convert_profile(self, fname):
         """Converts the provided profile to the current version.
@@ -259,7 +263,7 @@ class ProfileConverter:
         if converted:
             if new_root is not None:
                 # Save converted version
-                tree = etree.ElementTree(root)
+                tree  = etree.ElementTree(new_root)
                 tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
             else:
                 raise error.ProfileError("Failed to convert profile")
@@ -561,12 +565,12 @@ class ProfileConverter:
 
         Parameters
         ----------
-        root : ElementTree
+        root : etree
             Root of the XML tree being modified
 
         Returns
         -------
-        ElementTree
+        etree
             Modified XML root element
         """
         root.attrib["version"] = "8"
@@ -661,12 +665,12 @@ class ProfileConverter:
 
         Parameters
         ----------
-        root : ElementTree
+        root : etree
             Root of the XML tree being modified
 
         Returns
         -------
-        ElementTree
+        etree
             Modified XML root element
         """
         root.attrib["version"] = "10"
@@ -958,7 +962,7 @@ class ProfileConverter:
             # state root entry does not exist - create it
             nodes = root.xpath("//profile")
             profile_root = nodes[0]
-            state_root = ElementTree.Element("states")
+            state_root = etree.Element("states")
             profile_root.append(state_root)
 
         # add missing state keys
@@ -976,7 +980,7 @@ class ProfileConverter:
 
             id = id_map[key]
             if state.id != id:
-                state.id = id
+                state.setId(uuid.UUID(id))
 
         # look for map to state entries in the profile
         # and add the ID attribute if needed
@@ -1428,7 +1432,7 @@ class ProfileConverter:
                 target_fname = gremlin.util.getTemporaryFile("xml")
             # save
             try:
-                tree = etree.ElementTree(root)
+                tree = etree.etree(root)
                 tree.write(
                     target_fname,
                     pretty_print=True,
@@ -1706,3 +1710,5 @@ def parse_guid(value):
     from gremlin.util import parse_guid
 
     return parse_guid(value)
+
+

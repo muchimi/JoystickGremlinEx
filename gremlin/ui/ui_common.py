@@ -5021,7 +5021,8 @@ class QDataComboBox(QComboBox):
     def __init__(
         self,
         data=None,
-        callback=None,
+        callback : Callable=None,
+        callback_index : Callable=None,
         parent=None,
         wheel_enabled: bool = None,
         auto_adjust: bool = False,
@@ -5031,9 +5032,9 @@ class QDataComboBox(QComboBox):
         max_items=20,
     ):
         """creates a combo box
-
         :param data: data object the widget carries
         :callback: callback handler when the index changes (optional) - callback(data) - returns the data for the selected row
+        :callback_index: callback handler when the index changes (optional) - callback_index(index) - returns the index of the selected row
         :wheel_enabled: true if mouse wheel is enabled on the combo box
         :auto_adjust: true if the combo box autosizes to contents
         :source: optional, list of tuples (display, data) to populate the combo box with
@@ -5049,6 +5050,7 @@ class QDataComboBox(QComboBox):
         # self.setStyleSheet("QComboBox { padding: 5px; margin: 10px; }")
         self.setStyleSheet("QComboBox { padding: 5px; }")
         self._callback = callback
+        self._callback_index = callback_index
 
         self.setMaxVisibleItems(max_items)
         self.setStyleSheet("QComboBox { combobox-popup: 0; }")
@@ -5066,7 +5068,7 @@ class QDataComboBox(QComboBox):
             if auto_adjust:
                 self.adjustSize()
 
-        self.changeEvent
+
 
         self.currentIndexChanged.connect(self._handle_callback)
 
@@ -5096,8 +5098,13 @@ class QDataComboBox(QComboBox):
 
     def _handle_callback(self):
         if self._callback:
+            # send the data
             with QtCore.QSignalBlocker(self):
                 self._callback(self.currentData())
+        if self._callback_index:
+            # send the index
+            with QtCore.QSignalBlocker(self):
+                self._callback_index(self.currentIndex())
 
     def setCallback(self, callback):
         self._callback = callback

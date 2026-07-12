@@ -1246,7 +1246,7 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
         """sets the filtered state internal to the dialog"""
         verbose = gremlin.config.Configuration().verbose_mode_filter
 
-        self.settings.setInputvisible(self.device_guid, input_type, input_id, visible)
+        self.settings.setInputVisible(self.device_guid, input_type, input_id, visible)
         if verbose and input_type == InputType.JoystickAxis:
             syslog.info(f"set filter: [{self.device.name}] axis: {input_id} visible: {visible}")
 

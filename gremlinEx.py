@@ -5418,11 +5418,27 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # tmp_path = os.path.join(os.getenv("temp"), gremlin.util.get_guid() + ".xml")
             tmp_path = os.path.join(os.getenv("temp"), "gremlin.xml")
 
-            self.profile.to_xml(tmp_path)
+            try:
+                self.profile.to_xml(tmp_path)
+            except Exception as e:
+                syslog.warning(f"Failed to write profile to temporary XML file: {e}")
+                return False 
+
             # compare files
             import filecmp
 
-            is_changed = filecmp.cmp(tmp_path, self._comparative_file, shallow=False)
+            if os.path.isfile(tmp_path) and os.path.isfile(self._comparative_file):
+                is_changed = filecmp.cmp(tmp_path, self._comparative_file, shallow=False)
+            else:
+                # missing file means no changes detected
+                is_changed = False
+
+            # is_changed = filecmp.cmp(tmp_path, self._comparative_file, shallow=False)
+            try:
+                if os.path.isfile(tmp_path):
+                    os.remove(tmp_path)
+            except Exception as e:
+                syslog.warning(f"Failed to remove temporary XML file: {e}")
 
             return is_changed
 

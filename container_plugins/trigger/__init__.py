@@ -40,14 +40,18 @@ syslog = logging.getLogger("system")
 class TriggerContainerWidget(AbstractContainerWidget):
     """Trigger container which holds a single action."""
 
-    def __init__(self, container, parent=None):
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : TriggerContainer, parent=None):
+
         """Creates a new instance.
 
+        :param input_item the input item represented by this widget
         :param container the container represented by this widget
         :param parent the parent of this widget
         """
+        assert isinstance(container, TriggerContainer), "invalid container"
+        assert isinstance(input_item, gremlin.input_item.AbstractInputItem), "invalid input item"
         self.container: TriggerContainer = container
-        super().__init__(container, parent)
+        super().__init__(input_item, container, parent)
 
     def _create(self, container):
         self.container: TriggerContainer = container
@@ -323,11 +327,10 @@ class TriggerContainer(AbstractContainer):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
+        :param node the XML node associated with this container
         """
         import gremlin.base_profile
-
         super().__init__(parent, node)
-
         self.trigger_delay = 0  # delay in seconds to wait for the contents to execute
         self.condition_data = gremlin.input_item.ConditionContainer()  # conditions for the trigger release
         self.condition_data.setContainer(self)

@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8; -*-
 # Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
@@ -284,7 +283,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
             assert device is not None, "device does not exist"
             self._device_type = device.device_type
         self._input_id: int | any = None  # input Id on the hardware (can be a int or a class)
-        self._input_id_readonly : bool = False # true if the input id cannot be changed
+        self._input_id_readonly: bool = False  # true if the input id cannot be changed
         self._input_type: InputType = InputType.NotSet
         self._display_name: str = None
         self._description: str = None
@@ -908,7 +907,7 @@ class AbstractCallbackModel(AbstractModel):
         removed_callback: Callable = None,
         allowed_types: tuple = None,
         model_description: str = None,
-        data = None,
+        data=None,
     ):
         """callback enabled model
         :param callback: optional initial callback
@@ -964,8 +963,8 @@ class AbstractCallbackModel(AbstractModel):
     def setItemAt(self, index: int, item):
         """sets the item for the specific index"""
         # ensure the item is hashable
-        assert isinstance(item, _collections_abc.Hashable),"item must be hashable"
-        assert isinstance(index, int),"Index must be an integer"
+        assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
+        assert isinstance(index, int), "Index must be an integer"
 
         old_item = self._index_map[index] if index in self._index_map else None
 
@@ -1048,7 +1047,7 @@ class AbstractCallbackModel(AbstractModel):
             return index
         return -1
 
-    def onItemChanged(self, model, index : int, new_item, old_item, operation):
+    def onItemChanged(self, model, index: int, new_item, old_item, operation):
         """override by derived classes as needed"""
         pass
 
@@ -1101,10 +1100,6 @@ class AbstractCallbackModel(AbstractModel):
 
         self.onItemChanged(self, index, item, old_item, "place")
 
-
-
-
-
     def remove(self, item, emit=True):
         """Removes the given entry from the model."""
         if item in self._item_map:
@@ -1120,7 +1115,6 @@ class AbstractCallbackModel(AbstractModel):
             if emit:
                 self._fireChanged()
         self.onItemChanged(self, index, None, item, "remove")
-
 
     def removeAt(self, index: int, emit=True):
         """removes the entry at the given model index"""
@@ -1139,7 +1133,6 @@ class AbstractCallbackModel(AbstractModel):
         """removes the entry at the given model index"""
         self.removeAt(index, emit=emit)
 
-
     def clear(self, emit=True):
         """Removes all the given entry from the model."""
         if self._item_map:
@@ -1152,7 +1145,6 @@ class AbstractCallbackModel(AbstractModel):
             if emit:
                 self._fireChanged()
             self.onItemChanged(self, -1, None, None, "clear")
-
 
     def data(self, index: int):
         """returns the item stored at the given index, None if not found
@@ -1190,7 +1182,7 @@ class AbstractCallbackModel(AbstractModel):
             return self._filtered_item_map[item]
         return -1
 
-    def pop(self, index : int):
+    def pop(self, index: int):
         """removes and returns the item at the given index, None if not found"""
         if index in self._index_map:
             item = self._index_map[index]
@@ -1304,9 +1296,6 @@ class AbstractCallbackModel(AbstractModel):
 
         if force and emit:
             self._fireChanged(force)
-
-
-
 
     def setItemFiltered(self, item: object, value: bool, emit=True) -> int:
         """sets an item filtered or not filtered (no effect if the model is not filtered)
@@ -1531,7 +1520,11 @@ class AbstractCallbackModel(AbstractModel):
 
     def _fireChanged(self, force=False, emit=False):
         """fires a data changed signal if the data has changed or if force is true"""
+        import gremlin.shared_state
         if self._suspend_stack and self._change_pending and not force:
+            return
+        if gremlin.shared_state.is_running:
+            # auto-suspend at runtime
             return
         new_hash = hash(self)
         if self._suspend_stack and not force:

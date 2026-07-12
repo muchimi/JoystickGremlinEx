@@ -241,9 +241,9 @@ class ProfileDeviceNode:
             assert mode_name != "", f"invalid mode name - offending line: {child.sourceline}"
             if mode_name == gremlin.shared_state.master_mode or self.device_type == DeviceType.ModeControl:
                 # special handling of master mode
-                assert self.modeExists(mode_name), "master mode should already exist"
-                mode_node = self.getModeNode(mode_name)
-                assert len(mode_node._config) > 0, "master mode should have default entries already set"
+                # assert self.modeExists(mode_name), "master mode should already exist"
+                mode_node = self.getModeNode(mode_name, autocreate=True)
+                # assert len(mode_node._config) > 0, "master mode should have default entries already set"
             else:
                 mode_node = self.getModeNode(mode_name, autocreate=True)
             assert mode_node is not None  # shuld always exist in the profile as it's created on start
@@ -3406,7 +3406,7 @@ class Profile:
                     continue  # skip the particular mode
                 if input_type in mode_object.config:
                     input_item = next(
-                        (item for item in mode_object.config[input_type].values() if input_id == item.input_id),
+                        (item for item in mode_object.config[input_type].values() if item is not None and input_id == item.input_id),
                         None,
                     )
                     if input_item and input_item.containers:

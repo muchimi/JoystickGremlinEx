@@ -12,15 +12,15 @@ import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
 from gremlin.types import HatDirection
-from gremlin.profile import safe_read, safe_format
+from gremlin.util import safe_read, safe_format
 import gremlin.ui.ui_common
 import gremlin.input_item
 
 import gremlin.joystick_handling
 from shiboken6 import Shiboken
-
+from dinput import DeviceSummary
 import gremlin.util
-from gremlin.util import *
+
 
 import gremlin.ui.ui_common
 
@@ -138,7 +138,7 @@ class MapToTriggerWidget(gremlin.input_item.AbstractActionWidget):
         gremlin.util.InvokeUiMethod(self._handle_listen_selection_ui, event)
 
     def _handle_listen_selection_ui(self, event):
-        dev: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(event.device_guid)
+        dev: DeviceSummary = gremlin.joystick_handling.getDevice(event.device_guid)
 
         self.action_data.device_id = dev.device_id
         self.action_data.input_id = event.identifier
@@ -409,7 +409,7 @@ class MapToTrigger(gremlin.base_profile.AbstractAction):
 
         table.addField("Map to Trigger", self.mode.name)
 
-        device: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(self.device_id)
+        device: DeviceSummary = gremlin.joystick_handling.getDevice(self.device_id)
         if not device:
             table.addField("Unknown device", self.device_id)
         else:

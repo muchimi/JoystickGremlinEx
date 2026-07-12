@@ -23,7 +23,6 @@ import time
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore
-
 import gremlin.input_item
 import gremlin as gremlin
 import gremlin.util
@@ -46,17 +45,20 @@ syslog = logging.getLogger("system")
 class TempoExContainerWidget(AbstractContainerWidget):
     """Container with two actions, triggered based on activation duration."""
 
-    def __init__(self, container: TempoExContainer, parent=None):
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container: TempoExContainer, parent=None):
         """Creates a new instance.
 
         :param container: the container represented by this widget
         :param parent: the parent of this widget
         """
-        super().__init__(container, parent)
+        super().__init__(input_item, container)
 
-        el = gremlin.event_handler.EventListener()
-        el.action_delete.connect(self._delete_action)
-        self.container = container
+
+    def _create(self, container):
+        assert isinstance(container, TempoExContainer), "invalid container"
+        assert len(container.action_sets) > 0, "container missing action sets"
+        self.container: TempoExContainer = container
+        self.input_item = self.container.input_item
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -212,34 +214,34 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         # create short press container actions
 
-        action_sets = [action_set for action_set in self.container.short_action_sets if action_set]
-        for i, action_set in enumerate(action_sets):
-            widget = self._create_action_set_widget(action_set if action_set is not None else [], f"Chain Short Action {i + 1:d}", ContainerViewTypes.Action)
-            self.short_layout.addWidget(widget)
-            self.short_layout_widget_list.append(widget)
-            widget.redraw()
-            widget.model.data_changed.connect(self.container_modified.emit)
+
+        action_set = self.container.short_action_set
+        syslog.info(f"short actions: {len(action_set) if action_set is not None else 0}")
+        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Chain Short Action", ContainerViewTypes.Action)
+        self.short_layout.addWidget(widget)
+        self.short_layout_widget_list.append(widget)
+        widget.redraw()
+        widget.model.data_changed.connect(self.container_modified.emit)
 
         # create long press container actions
-        action_sets = [action_set for action_set in self.container.long_action_sets if action_set]
-        for i, action_set in enumerate(action_sets):
-            if action_set is not None:
-                widget = self._create_action_set_widget(action_set, f"Chain Long Action {i + 1:d}", ContainerViewTypes.Action)
-
-            self.long_layout.addWidget(widget)
-            self.long_layout_widget_list.append(widget)
-            widget.redraw()
-            widget.model.data_changed.connect(self.container_modified.emit)
+        action_set = self.container.long_action_set
+        syslog.info(f"long actions: {len(action_set) if action_set is not None else 0}")
+        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Chain Long Action", ContainerViewTypes.Action)
+        self.long_layout.addWidget(widget)
+        self.long_layout_widget_list.append(widget)
+        widget.redraw()
+        widget.model.data_changed.connect(self.container_modified.emit)
 
         # create double tap  container actions
-        action_sets = [action_set for action_set in self.container.double_action_sets if action_set]
-        for i, action_set in enumerate(action_sets):
-            if action_set is not None:
-                widget = self._create_action_set_widget(action_set, f"Chain DoubleTap Action {i + 1:d}", ContainerViewTypes.Action)
-            self.double_layout.addWidget(widget)
-            self.double_layout_widget_list.append(widget)
-            widget.redraw()
-            widget.model.data_changed.connect(self.container_modified.emit)
+        action_set = self.container.double_action_set
+        syslog.info(f"double actions: {len(action_set) if action_set is not None else 0}")
+        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Chain DoubleTap Action", ContainerViewTypes.Action)
+        self.double_layout.addWidget(widget)
+        self.double_layout_widget_list.append(widget)
+        widget.redraw()
+        widget.model.data_changed.connect(self.container_modified.emit)
+
+
 
         self.action_layout.addWidget(self.content_widget)
 
@@ -252,23 +254,12 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         """
         gremlin.util.clear_layout(self.activation_condition_layout)
-        short_actions = self.container.short_action_sets
-        long_actions = self.container.long_action_sets
-        double_actions = self.container.double_action_sets
-        if short_actions:
-            for action_set in short_actions:
-                if action_set:
-                    self._create_action_widget(action_set, "Short Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
-
-        if long_actions:
-            for action_set in long_actions:
-                if action_set:
-                    self._create_action_widget(action_set, "Long Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
-
-        if double_actions:
-            for action_set in double_actions:
-                if action_set:
-                    self._create_action_widget(action_set, "Double Tap", self.activation_condition_layout, ContainerViewTypes.Conditions)
+        short_action_set = self.container.short_action_set
+        long_action_set = self.container.long_action_set
+        double_action_set = self.container.double_action_set
+        self._create_action_widget(short_action_set, "Short Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
+        self._create_action_widget(long_action_set, "Long Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
+        self._create_action_widget(double_action_set, "Double Tap", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
     def _create_action_widget(self, action_set, label, layout, view_type):
         """Creates a new action widget.
@@ -641,7 +632,7 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         assert container_node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.Container, "Logic error: Node is not a container node"
 
         group_node = container_node.children[0]  # group node is the only child of the container node
-        action_set_nodes = [
+        self.action_set_nodes = [
             node
             for node in group_node.children
             if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set and node.has_actions
@@ -649,16 +640,24 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.short_nodes = []
         self.long_nodes = []
         self.dtap_nodes = []
-        for node in action_set_nodes:
-            if node.has_actions:
-                for action in node.action_set:
-                    match action.data:
-                        case "short":
-                            self.short_nodes.append(node)
-                        case "long":
-                            self.long_nodes.append(node)
-                        case "double":
-                            self.dtap_nodes.append(node)
+        if self.action_set_nodes:
+            self.short_nodes.append(self.action_set_nodes[0])
+            if len(self.action_set_nodes) > 1:
+                self.long_nodes.append(self.action_set_nodes[1])
+            if len(self.action_set_nodes) > 2:
+                self.dtap_nodes.append(self.action_set_nodes[2])
+
+
+        # for node in action_set_nodes:
+        #     if node.has_actions:
+        #         for action in node.action_set:
+        #             match action.data:
+        #                 case "short":
+        #                     self.short_nodes.append(node)
+        #                 case "long":
+        #                     self.long_nodes.append(node)
+        #                 case "double":
+        #                     self.dtap_nodes.append(node)
 
         # true if double tap enabled if we have double tap nodes to execute and not running in release mode
 
@@ -1123,10 +1122,10 @@ More than one action per short press or long press can be added."""
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node)
-        self.short_action_sets = []
-        self.long_action_sets = []
-        self.double_action_sets = []
+        super().__init__(parent, node, custom_action_sets = True,  custom_generate_callback = self._generate_action_set_xml)
+        self.short_action_set = gremlin.input_item.ActionSet(model_description = "short press actions")
+        self.long_action_set = gremlin.input_item.ActionSet(model_description = "long press actions")
+        self.double_action_set = gremlin.input_item.ActionSet(model_description = "double press actions")
         self.delay = 0.5  # default long press delay in seconds
         self.doubletap_delay = 0.25  # default double tap delay in seconds
         self.autorelease_delay = 0.25  # autorelease in seconds
@@ -1135,20 +1134,20 @@ More than one action per short press or long press can be added."""
         self.chain_short = True
         self.chain_long = True
         self.chain_double = True
-        self.custom_action_sets = True  # indicate we use custom action sets
+        self.action_sets.add(self.short_action_set, 0) # 0
+        self.action_sets.add(self.long_action_set, 1) # 1
+        self.action_sets.add(self.double_action_set, 2) # 2
+        self.action_sets.addCallback(self._action_sets_changed)
 
-    @property
-    def action_sets(self):
-        """gets the action sets for this container"""
-        return self.short_action_sets + self.long_action_sets + self.double_action_sets
+    def _action_sets_changed(self, data):
+        """Callback for when the action sets change."""
+        pass
+
 
     def get_input_type(self):
         """override input type when actions check what input type they are hooked to"""
         return InputType.JoystickButton
 
-    @action_sets.setter
-    def action_sets(self, value):
-        pass
 
     def _parse_xml(self, node, input_item=None, extra_data=None):
         """Populates the container with the XML node's contents.
@@ -1157,9 +1156,9 @@ More than one action per short press or long press can be added."""
         """
         # setup a noop action set as the only action set as we have a custom set we use
 
-        self.short_action_sets = []
-        self.long_action_sets = []
-        self.double_action_sets = []
+        self.short_action_set.clear()
+        self.long_action_set.clear()
+        self.double_action_set.clear()
         super()._parse_xml(node, input_item)
         self.delay = safe_read(node, "delay", float, 0.5)
         self.doubletap_delay = safe_read(node, "tap-delay", float, 0.25)
@@ -1171,21 +1170,25 @@ More than one action per short press or long press can be added."""
         self.timeout = float(node.get("timeout", 0.0))
         # custom read of action sets
         for as_node in node:
-            if as_node.tag == "short-action-set":
-                action_set = gremlin.input_item.ActionSet("short")
-                self._parse_action_xml(as_node, action_set, input_item, extra_data, "short")
-                self.short_action_sets.append(action_set)
-                self.action_sets.append(action_set)
-            if as_node.tag == "long-action-set":
-                action_set = gremlin.input_item.ActionSet("long")
-                self._parse_action_xml(as_node, action_set, input_item, extra_data, "long")
-                self.long_action_sets.append(action_set)
-                self.action_sets.append(action_set)
-            if as_node.tag == "double-action-set":
-                action_set = gremlin.input_item.ActionSet("double")
-                self._parse_action_xml(as_node, action_set, input_item, extra_data, "double")
-                self.double_action_sets.append(action_set)
-                self.action_sets.append(action_set)
+            match as_node.tag:
+                case "short-action-set":
+                    self._parse_action_xml(as_node, self.short_action_set, input_item, extra_data, "short")
+                case "long-action-set":
+                    self._parse_action_xml(as_node, self.long_action_set, input_item, extra_data, "long")
+                case "double-action-set":
+                    self._parse_action_xml(as_node, self.double_action_set, input_item, extra_data, "double")
+
+
+        self.dumpActionSets(self.action_sets)
+
+        pass
+
+    def _parse_action_set_xml(self, node, input_item, extra_data=None):
+        """Parses the XML content for a specific action set and populates the given action set."""
+        # already read in _parse_xml
+        pass
+
+
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -1207,30 +1210,26 @@ More than one action per short press or long press can be added."""
 
     def _generate_action_set_xml(self, node: ElementTree.Element):
         """custom action set generation"""
-        for action_set in self.short_action_sets:
-            if action_set:
-                as_node = ElementTree.Element("short-action-set")
-                as_node.set("id", write_guid(action_set.id))
-                for action in action_set:
-                    as_node.append(action.to_xml())
+        action_set = self.short_action_set
+        as_node = ElementTree.Element("short-action-set")
+        as_node.set("id", write_guid(action_set.id))
+        for action in action_set:
+            as_node.append(action.to_xml())
+        node.append(as_node)
 
-                node.append(as_node)
-        for action_set in self.long_action_sets:
-            if action_set:
-                as_node = ElementTree.Element("long-action-set")
-                as_node.set("id", write_guid(action_set.id))
-                for action in action_set:
-                    as_node.append(action.to_xml())
+        action_set = self.long_action_set
+        as_node = ElementTree.Element("long-action-set")
+        as_node.set("id", write_guid(action_set.id))
+        for action in action_set:
+            as_node.append(action.to_xml())
+        node.append(as_node)
 
-                node.append(as_node)
-        for action_set in self.double_action_sets:
-            if action_set:
-                as_node = ElementTree.Element("double-action-set")
-                as_node.set("id", write_guid(action_set.id))
-                for action in action_set:
-                    as_node.append(action.to_xml())
-
-                node.append(as_node)
+        action_set = self.double_action_set
+        as_node = ElementTree.Element("double-action-set")
+        as_node.set("id", write_guid(action_set.id))
+        for action in action_set:
+            as_node.append(action.to_xml())
+        node.append(as_node)
 
     def is_valid_for_save(self):
         # indicate always valid for saving
@@ -1256,11 +1255,11 @@ More than one action per short press or long press can be added."""
 
         table = ReportTable(cellpadding=4)
 
-        count = sum(len(actions) for actions in self.short_action_sets)
+        count = sum(len(actions) for actions in self.short_action_set)
         table.addField("Short Steps", f"{count}")
-        count = sum(len(actions) for actions in self.long_action_sets)
+        count = sum(len(actions) for actions in self.long_action_set)
         table.addField("Long Steps", f"{count}")
-        count = sum(len(actions) for actions in self.double_action_sets)
+        count = sum(len(actions) for actions in self.double_action_set)
         table.addField("Double Steps", f"{count}")
 
         table.addField("Exec on", self.activate_on)

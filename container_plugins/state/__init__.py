@@ -43,14 +43,17 @@ class StateContainerWidget(AbstractContainerWidget):
 
     """
 
-    def __init__(self, container, parent=None):
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : StateContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
+        :param input_item the input item represented by this widget
         :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(container, parent)
-
+        super().__init__(input_item, container, parent)
+        self.container = container
+        self.input_item = input_item
+        
     def _create_action_ui(self):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
