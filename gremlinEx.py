@@ -46,7 +46,7 @@ import dinput
 from dinput import DeviceSummary
 import PySide6
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtCore import QThread, QTimer
+from PySide6.QtCore import QThread, QTimer, Signal
 from gremlin.types import TabDeviceType, DeviceType, DeviceCategory
 from shiboken6 import Shiboken
 import gremlin.tabstate
@@ -688,6 +688,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             data: TabData = self.ui.devices_tab_header_widget.tabData(index)
             tab_map[index] = data
         return tab_map
+
+    def _get_tab_data_at(self, index: int) -> TabData | None:
+        """gets the tab data for the given tab index"""
+        if 0 <= index < self.ui.devices_tab_header_widget.count():
+            return self.ui.devices_tab_header_widget.tabData(index)
+        return None
 
     def _get_tab_data_map(self) -> dict[dinput.GUID, TabData]:
         """returns the map of tab data objects associated with their device GUID"""
@@ -2367,13 +2373,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             del self._widget_device_index_map[device_guid]
             del self._widget_index_device_map[index]
 
-    def getCurrentRegisteredWidgetDevice(self):
+    def getCurrentRegisteredWidgetDeviceGuid(self):
         """gets the device ID for the currently selected device widget"""
         index = self.ui.device_page_widget.currentIndex()
         if index != -1:
-            device_guid = self._widget_index_device_map[index]
-            return device_guid
+            # returns None on invalid index
+            widget = self.ui.device_page_widget.widget(index)
+            if widget:
+                tab_data: gremlin.tabstate.TabData = self.ui.devices_tab_header_widget.tabData(index)
+                return tab_data.device_guid
         return None
+
 
     def clearRegisteredWidgets(self):
         """cleanup all widgets"""
@@ -2407,6 +2417,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             index = self._widget_device_index_map[device_guid]
             return self.ui.device_page_widget.widget(index)
         return None
+
+    def getCurrentRegisteredWidget(self) -> QtWidgets.QWidget:
+        """gets the widget for the currently selected device"""
+        index = self.ui.device_page_widget.currentIndex()
+        tab_data = self._get_tab_data_at(index)
+        if tab_data:
+            device_guid = tab_data.device_guid
+            return self.getRegisteredWidget(device_guid)
+        return None
+
 
     def getRegisteredWidgetIndex(self, device_guid) -> int:
         device_guid = gremlin.util.normalize_guid(device_guid)
@@ -4591,162 +4611,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 el.request_activate.emit(False)  # load new profile
 
-                # if option_reset_mode_on_process_activate:
-                #     # restore only the profile default mode
-                #     restore_mode = loaded_profile.get_default_mode()
-                #     if verbose:
-                #         syslog.info(
-                #             f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog"
-                #         )
-                # elif option_restore_mode:
-                #     # restore to the mapped profile default mode defined in mappings
-                #     restore_mode = self._get_process_mode(new_process_path)
-                #     if verbose and restore_mode:
-                #         syslog.info(
-                #             f"PROC: Selected profile default mode [{restore_mode}] from runtime memory"
-                #         )
-                #     if not restore_mode:
-                #         restore_mode = (
-                #             gremlin.shared_state.current_profile.get_restore_mode()
-                #         )  # saved JSON mode
-                #         if verbose and restore_mode:
-                #             syslog.info(
-                #                 f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog"
-                #             )
-                #     if not restore_mode:
-                #         restore_mode = (
-                #             gremlin.shared_state.current_profile.get_default_mode()
-                #         )
-                #         if verbose:
-                #             syslog.info(
-                #                 f"PROC: Selected profile default mode [{restore_mode}] from profile mode dialog as a fallback"
-                #             )
-
-                # a mapping profile was found - new profile was loaded if needed - see if we need to change the mode
-            #     if restore_mode is not None:
-            #         if restore_mode != current_mode:
-            #             if restore_mode not in loaded_profile.get_modes():
-            #                 syslog.error(
-            #                     f"PROC: Unable to find mode [{restore_mode}] in profile - defaulting to default mode dialog startup mode"
-            #                 )
-            #                 restore_mode = loaded_profile.get_default_mode()
-
-            #             if verbose:
-            #                 syslog.info(
-            #                     f"PROC: request mode change to [{restore_mode}]"
-            #                 )
-            #             self._process_autoload_start_mode = restore_mode
-            #             # eh.change_mode(restore_mode, force_update = True) # set the selected mode - note that this may fail if mode locking is enabled
-            #             mode_changed = True
-
-            #     # remember the last used mode for the profile before we change to the new - only do this if we are in runtime
-            #     if current_profile_save_mode:
-            #         if verbose:
-            #             syslog.info(
-            #                 f"\tSave last used mode: {current_profile_save_mode} for profile [{current_base_name}]"
-            #             )
-            #         self._runtime_mode_map[current_profile_path] = (
-            #             current_profile_save_mode
-            #         )
-            #         if self.current_process_path:
-            #             if verbose:
-            #                 base_process_name = os.path.basename(
-            #                     self.current_process_path
-            #                 )
-            #                 syslog.info(
-            #                     f"\tAssociate last process [{base_process_name}] with mode [{current_profile_save_mode}]"
-            #                 )
-            #             self._process_runtime_map[self.current_process_path] = (
-            #                 current_profile_save_mode
-            #             )
-            #     else:
-            #         if verbose:
-            #             syslog.info(
-            #                 f"\tSave last used mode: no active mode found for profile [{current_base_name}]"
-            #             )
-
-            #     self._active_process_path = new_process_path
-
-            #     # change profile
-            #     if verbose:
-            #         syslog.info(
-            #             f"PROC: process change: switch profile [{current_base_name}] ->  [{new_profile_base}]"
-            #         )
-
-            #     # load the new profile
-            #     self._do_load_profile(new_profile_path)
-
-            #     loaded_profile = gremlin.shared_state.current_profile
-            #     self.profile = loaded_profile
-
-            #     if start_mode:
-            #         self.profile.override_start_mode = start_mode
-            #         eh.change_mode(start_mode)
-
-            #     if verbose:
-            #         syslog.info(
-            #             f"PROC: process change: loaded profile [{new_profile_base}]"
-            #         )
-
-            #     if not is_running:
-            #         # gremlin was not running at the time of the process change - see if we should auto-activate the profile based on the auto activate option
-            #         if not option_auto_load_on_focus:
-            #             # activation is not requested - load only,  we're done
-            #             if verbose:
-            #                 syslog.info(
-            #                     "PROC: Profile loaded, activation is not requested and GremlinEx wasn't running at process change.  Process change completed."
-            #                 )
-            #             return
-
-            #     # activate the new profile
-            #     if verbose:
-            #         syslog.info(f"PROC: Activate profile [{new_profile_base}]")
-            #     el.request_activate.emit(True)
-
-            #     if verbose:
-            #         syslog.info(f"PROC: Profile [{new_profile_base}] activated")
-
-            #     # update flag if a mode should be restored
-            #     option_restore_mode = (
-            #         option_restore_mode or loaded_profile.get_restore_mode()
-            #     )
-
-            #     self._profile_auto_activated = True  # remember the profile was auto activated by virtue of a process change
-
-            #     restore_mode = loaded_profile.get_restore_mode()
-
-            #     # figure out which mode to restore mode for the new profile
-            #     if verbose:
-            #         syslog.info(
-            #             f"PROC: profile restore mode flag: [{option_restore_mode}]"
-            #         )
-
-            #     current_mode = (
-            #         gremlin.shared_state.current_mode
-            #     )  # current mode of the loaded profile
-
-            #     if verbose:
-            #         syslog.info(
-            #             f"PROC: profile load mode: {current_mode}  derived mode to restore: [{restore_mode}]"
-            #         )
-
-            #     # done
-
-            # elif option_auto_load_on_focus and not is_running:
-            #     # re-activate the profile if not activated
-            #     if verbose:
-            #         syslog.info(
-            #             f"PROC: profile auto-focus ON: profile not activated, auto-activating profile [{new_profile_base}] "
-            #         )
-            #     el.request_activate.emit(True)
-            #     self._profile_auto_activated = True
-
-            # if not mode_changed:
-            #     # if TTS is enabled and the process changed, issue a TTS message when the mode was not changed so we hear there was a change recorded in focus
-            #     eh.TTSNotify(f"Process focus mode {restore_mode}")
-
-            # # remember the last process that received focus
-            # self.current_process_path = new_process_path
         finally:
             if verbose:
                 if gremlin.shared_state.current_profile.profile_file:
@@ -5069,10 +4933,50 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             ),
         )
 
+    class delayed_runner_worker(QtCore.QObject):
+
+            finished = QtCore.Signal()
+            def __init__(self, ui):
+                super().__init__()
+                self.ui = ui
+
+            @QtCore.Slot()
+            def run(self):
+                widget = self.ui.getCurrentRegisteredWidget()
+                while widget is None: # not available yet
+                    QThread.msleep(100)
+                    widget = self.ui.getCurrentRegisteredWidget()
+                widget.refresh(force=True)
+                self.finished.emit() # indicate done
+
     def _profile_load_completed(self, *args):
+        """ called when a profile has been loaded """# force a UI update
         verbose = gremlin.config.Configuration().verbose_mode_ui
+        widget : gremlin.input_item.BaseDeviceTabWidget = self.getCurrentRegisteredWidget()
+        if widget:
+            widget.refresh(force=True)
+        else:
+            # delay refresh the current widget and we wait until it's available
+            self._delay_refresh_thread = QThread()
+            self.worker = GremlinUi.delayed_runner_worker(self)
+            # Move worker to the new thread
+            self.worker.moveToThread(self._delay_refresh_thread)
+
+            # Connect thread lifecycle signals
+            self._delay_refresh_thread.started.connect(self.worker.run)
+            self.worker.finished.connect(self._delay_refresh_completed)
+            self._delay_refresh_thread.start()
         if verbose:
             syslog.info("profile loaded")
+
+    @QtCore.Slot()
+    def _delay_refresh_completed(self):
+        """ called when the delayed refresh has completed """
+        self.worker.deleteLater()
+        self._delay_refresh_thread.quit()
+        self._delay_refresh_thread.deleteLater()
+
+
 
     def _do_load_profile_internal_worker(self, args) -> bool | tuple:
         """Load the profile with the given filename.
@@ -5422,7 +5326,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self.profile.to_xml(tmp_path)
             except Exception as e:
                 syslog.warning(f"Failed to write profile to temporary XML file: {e}")
-                return False 
+                return False
 
             # compare files
             import filecmp

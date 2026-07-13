@@ -29,6 +29,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T4) Early test build (not for production, testing only)
+- Fix: delay load refresh on a new profile loaded following a prior profile load.  The UI may not refresh the display in some situations.
+- Fix: handle the possibility of no inputs following a mode definition in XML (allow for empty modes)
+
+
 ### (m77T3) Early test build (not for production, testing only)
 - Fix: removed references to deprecated callbacks in some containers
 - Fix: TTS library threading issue in Python 14.6 on thread exit

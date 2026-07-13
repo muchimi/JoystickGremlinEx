@@ -614,11 +614,11 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
                 f"\tTimers: double tap delay (s): [{self.action_data.doubletap_delay:0.3f}  long delay: [{self.action_data.delay:0.3f}] autorelease delay: [{self.action_data.autorelease_delay:0.3f}]"
             )
 
-            self.action_data.dumpActionSets(self.action_data.short_action_sets, "Short Action Set")
-            syslog.info(f"\tLong action sets: {len(self.action_data.long_action_sets)}")
-            self.action_data.dumpActionSets(self.action_data.long_action_sets, "Long Action Set")
-            syslog.info(f"\tDtap action sets: {len(self.action_data.double_action_sets)}")
-            self.action_data.dumpActionSets(self.action_data.double_action_sets, "Dtap Action Set")
+            # self.action_data.dumpActionSets(self.action_data.short_action_sets, "Short Action Set")
+            # syslog.info(f"\tLong action sets: {len(self.action_data.long_action_sets)}")
+            # self.action_data.dumpActionSets(self.action_data.long_action_sets, "Long Action Set")
+            # syslog.info(f"\tDtap action sets: {len(self.action_data.double_action_sets)}")
+            # self.action_data.dumpActionSets(self.action_data.double_action_sets, "Dtap Action Set")
 
         if not self.valid:
             return
@@ -1179,9 +1179,8 @@ More than one action per short press or long press can be added."""
                     self._parse_action_xml(as_node, self.double_action_set, input_item, extra_data, "double")
 
 
-        self.dumpActionSets(self.action_sets)
-
-        pass
+        # self.dumpActionSets(self.action_sets)
+        # pass
 
     def _parse_action_set_xml(self, node, input_item, extra_data=None):
         """Parses the XML content for a specific action set and populates the given action set."""

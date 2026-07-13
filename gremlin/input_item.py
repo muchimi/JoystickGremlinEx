@@ -4295,12 +4295,12 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     def hasOutput(self) -> bool:
         """returns True if this container has output, meaning it contains an action that has output"""
-        if self._input_item:
-            device_guid = self._input_item.device_guid
-            device = gremlin.joystick_handling.getDevice(device_guid)
-            if "left" in device.name.casefold() and self._input_item.input_type == InputType.JoystickButton and self._input_item.input_id == 12:
-                self.dumpActionSets()
-                pass
+        #if self._input_item:
+            #device_guid = self._input_item.device_guid
+            #device = gremlin.joystick_handling.getDevice(device_guid)
+            # if "left" in device.name.casefold() and self._input_item.input_type == InputType.JoystickButton and self._input_item.input_id == 12:
+            #     self.dumpActionSets()
+            #     pass
 
         for action_set in self._action_sets:
             for action in action_set:
@@ -12171,13 +12171,13 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         return self._last_selected_widget
 
-    def refresh(self, emit=False):
-        if gremlin.shared_state.is_redraw_suspended():
+    def refresh(self, force = False, emit=False):
+        if not force and gremlin.shared_state.is_redraw_suspended():
             return
         if self._input_item_list_view is None:
             return  # not loaded yet
         if self.isInputListViewCreated():
-            gremlin.util.InvokeUiMethod(self._refresh_ui, emit)  # ensure on UI thread
+            gremlin.util.InvokeUiMethod(self._refresh_ui, force, emit)  # ensure on UI thread
 
     def _refresh_ui(self, force=False, emit=False):
         """Refreshes the current selection, ensuring proper synchronization. - ensure on UI thread"""

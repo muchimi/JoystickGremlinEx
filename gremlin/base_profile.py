@@ -5215,11 +5215,15 @@ class ProfileModeNode:
                 syslog.error(f"XML: unknown input type: [{node.tag}]")
 
             # sorting index
-            input_item.index = index
-            if verbose:
-                syslog.info(
-                    f"Profile MODE XML: load [{index}] input item id: {Ansi.YELLOW}[{input_item.id}]{Ansi.RESET} [{input_item.display_name}] input id: \x1b[1;32m[{input_item.input_id}]\033[0m containers: [{input_item.containers.count()}] mode node id: [{self.id}] mode: [{self.name}] device: [{device.name}] device id: [{self.parent.id}] input type: [{input_type.name}] input item: id [{input_item.id}] [{input_item.input_id.display_name if hasattr(input_item.input_id, 'display_name') else input_item.input_id}] profile id: [{self.profile.id}]"
-                )
+            if input_item is not None:
+                input_item.index = index
+                if verbose:
+                    syslog.info(
+                        f"Profile MODE XML: load [{index}] input item id: {Ansi.YELLOW}[{input_item.id}]{Ansi.RESET} [{input_item.display_name}] input id: \x1b[1;32m[{input_item.input_id}]\033[0m containers: [{input_item.containers.count()}] mode node id: [{self.id}] mode: [{self.name}] device: [{device.name}] device id: [{self.parent.id}] input type: [{input_type.name}] input item: id [{input_item.id}] [{input_item.input_id.display_name if hasattr(input_item.input_id, 'display_name') else input_item.input_id}] profile id: [{self.profile.id}]"
+                    )
+            # else:
+            #     syslog.error(f"Profile MODE XML: failed to load input item for index [{index}] in mode [{self.name}] for device [{device.name}]")
+            #     syslog.error(f"Offending line: [{node.sourceline}]")
             index += 1
 
     def to_xml(self):
