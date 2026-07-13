@@ -237,7 +237,7 @@ class CodeRunner:
                 for mode, events in modes.items():
                     for event, callback_list in events.items():
                         for callback in callback_list.values():
-                            self.event_handler.add_callback(dev_id, mode, event, callback[0], callback[1])
+                            self.event_handler.addCallback(dev_id, mode, event, callback[0], callback[1])
                             callback_count += 1
 
             # Add a fake keyboard action which does nothing to the callbacks
