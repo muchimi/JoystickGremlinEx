@@ -3289,7 +3289,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         profile.filter_actions(tag_list, self._handle_tag_callback, extra_data)
         input_type = self._get_input_type()
         used_list = None
-        device = gremlin.joystick_handling.getDevice(self.action_data.vjoy_device_guid)
+        device = self.action_data.virtual_device
+        if device is None:
+            syslog.error("VJOY REMAP: unable to locate VJOY device")
+            return
         match input_type:
             case InputType.JoystickAxis:
                 used_list = list(extra_data["axis"].keys())
