@@ -26,7 +26,7 @@ import time
 import lxml.etree
 import traceback
 import collections
-from typing import Callable, Self
+from typing import Callable
 import html
 import gremlin
 import gremlin.config
@@ -41,6 +41,7 @@ import gremlin.ui.axis_calibration
 import gremlin.ui.ui_common
 import gremlin.base_profile
 import gremlin.input_item
+
 import gremlin.base_buttons
 import gremlin.worker
 from dinput import DeviceSummary
@@ -6991,7 +6992,7 @@ class ActionSetView(AbstractView):
                         object_name = self.objectName()
                         device = gremlin.joystick_handling.getDevice(self.container.hardware_device_guid)
                         syslog.info(
-                            f"ActionSet: create {self.view_type.name} widget: device [{device.name}] input type: [{self.container.hardware_input_type.name}] input id: [{self.container.hardware_input_id}] start: {object_name} for action id [{data.id}]  "
+                            f"ActionSet: create {self.view_type.name} widget: device [{device.name}] input type: [{self.container.hardware_input_type.name}] input id: [{self.container.hardware_input_id}] start: {object_name} for action id [{action.id}]  "
                         )
 
                     match self.view_type:

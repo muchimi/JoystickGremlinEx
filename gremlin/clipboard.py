@@ -13,6 +13,7 @@ from psygnal import Signal
 from enum import IntEnum
 import win32clipboard
 
+
 from gremlin.singleton_decorator import SingletonDecorator
 
 syslog = logging.getLogger("system")
@@ -99,7 +100,7 @@ class Clipboard(QtCore.QObject):
 
     def _decode(self):
         # external clipboard
-        from gremlin.input_item import AbstractContainer
+        from gremlin.input_item import AbstractContainer, AbstractAction
 
         data = None
         if self._persist_to_file:

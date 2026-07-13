@@ -4487,7 +4487,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             else:
                 conditions.append(self._convert_condition(condition))
 
-        return gremlin.input_item.BaseActivationCondition(conditions, activation_condition.rule, target)
+        return gremlin.input_item.BaseActivationCondition(conditions, activation_condition.rule)
 
     def shouldExecute(self, event, value, action) -> bool:
         """determines if the given action should execute or not: returns True if the condition is satisfied"""
