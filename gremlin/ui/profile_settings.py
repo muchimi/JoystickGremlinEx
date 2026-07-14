@@ -68,16 +68,8 @@ class ProfileSettingsWidget(QDataWidget):
 
         self._create_ui()
 
-    # """ necessary for input handler and navigation """
-    # def refresh_ui(self):
-    #     pass
 
-    # def ensureLoaded(self):
-    #     # always loaded
-    #     pass
-
-    # def refresh(self, emit = True):
-    #     pass
+   
 
     def isLoaded(self) -> bool:
         return True

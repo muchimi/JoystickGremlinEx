@@ -451,7 +451,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
         row += 1
 
         for device_node in device_nodes:
-            if device_node.device_type in (DeviceType.Joystick, DeviceType.VJoy):
+            if device_node.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
                 source_device: DeviceSummary = self._source_map[device_node.device_guid]
 
                 enable_widget = ui_common.QDataCheckbox("Enable", data=device_node)
@@ -570,6 +570,14 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
 
             case DeviceType.VJoy:
                 devices = gremlin.joystick_handling.virtual_devices()
+                device: DeviceSummary
+                for index, device in enumerate(devices):
+                    widget.addItem(device.name, device)
+                    if device.device_id == device_id:
+                        selected_index = index
+
+            case DeviceType.Maestro:
+                devices = gremlin.joystick_handling.maestro_devices()
                 device: DeviceSummary
                 for index, device in enumerate(devices):
                     widget.addItem(device.name, device)
@@ -1466,7 +1474,7 @@ class ProfileGraph:
     def joystick_devices(self) -> list[DeviceSummary]:
         """gets a list of joystick devices defined in the profile"""
         device_nodes = [node for node in self._root.children if node.nodeType == ProfileNodeType.Device]
-        device_list = [node.device for node in device_nodes if node.device_type in (DeviceType.Joystick, DeviceType.VJoy) and not node.device.disabled]
+        device_list = [node.device for node in device_nodes if node.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy) and not node.device.disabled]
         return device_list
 
     def remap(self):

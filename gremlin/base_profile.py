@@ -104,12 +104,11 @@ class ProfileDeviceNode:
         self._modes = TriggerDict()  # map of ProfileMode objects keyed by mode name (case sensitive)
         # self._modes.addCallback(self._handle_mode_node_changed)
         self._name: str = None
-        self.type = None  # device type
-        self.connected = False  # true if the device was found in the detected hardware list
+        self._device_guid: dinput.GUID = None
         self.masterMode = {}  # master mode
 
     def _handle_mode_node_changed(self, data_map, key, old_value: ProfileModeNode, new_value: ProfileModeNode):
-        if self._device_type == DeviceType.ModeControl:
+        if self.device_type == DeviceType.ModeControl:
             syslog.info(f"mode change: key: [{key}] old_value: [{str(old_value)}] new value: [{str(new_value)}]")
             pass
 
@@ -126,9 +125,20 @@ class ProfileDeviceNode:
         return mode in self._modes
 
     @property
+    def device(self) -> dinput.DeviceSummary:
+        """returns the device summary object"""
+        return self._device
+
+    @device.setter
+    def device(self, value: dinput.DeviceSummary):
+        self._device = value
+
+    @property
     def device_guid(self) -> dinput.GUID:
         """device I/D as a GUID"""
-        return self._device_guid
+        if self._device:
+            return self._device.device_guid
+        return None
 
     @property
     def name(self) -> str:
@@ -152,12 +162,17 @@ class ProfileDeviceNode:
     def device_type(self) -> DeviceType:
         if self._device:
             return self._device.device_type
-        return self._device_type
+        return DeviceType.NotSet
 
     @device_type.setter
     def device_type(self, value: DeviceType):
-        assert isinstance(value, DeviceType)
-        self._device_type = value
+        assert False, "attribute is readonly - set device_guid instead"
+
+
+    @property
+    def type(self) -> DeviceType:
+        """device type"""
+        return self.device_type
 
     @device_guid.setter
     def device_guid(self, value: dinput.GUID):
@@ -167,7 +182,7 @@ class ProfileDeviceNode:
         self._device_guid = value
         device = gremlin.joystick_handling.getDevice(value)
         self._device = device
-        self._device_type = device.device_type if device else None
+
 
     @property
     def device_id(self) -> str:
@@ -218,6 +233,11 @@ class ProfileDeviceNode:
         mode_node.system = is_system
         return mode_node
 
+    def connected(self) -> bool:
+        if self._device:
+            return self._device.connected
+        return False
+
     def from_xml(self, node, data=None, extra_data=None):
         """Populates this device based on the xml data.
 
@@ -228,12 +248,28 @@ class ProfileDeviceNode:
         if "guid" in node.attrib:
             self.id = normalize_guid(node.get("guid"))  # device node ID
 
+        if "device-guid" in node.attrib:
+            device_id = normalize_guid(node.get("device-guid"))
+            device_guid = gremlin.util.to_guid(device_id)
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if device:
+                self._device = device
+            else:
+                # device not found (could bedisconnected)
+                syslog.info(f"DEVICE: Device with GUID [{device_guid}] not found for profile [{self.name}]")
+                device = dinput.DeviceSummary()
+                device.device_guid = device_guid
+                device.device_id = device_id
+                device.name = safe_read(node, "name", str, "unknown")
+                device.connected = False
+                if "type" in node.attrib:
+                    dt = safe_read(node, "type", str, "")
+                    device.device_type = DeviceType.to_enum(dt)
+                else:
+                    device.device_type = DeviceType.NotSet
+                self._device = device
+
         self.label = safe_read(node, "label", str, self.name)
-        dt = safe_read(node, "type", str, "")
-        if not dt:
-            dt = DeviceType.NotSet
-        self.type = DeviceType.to_enum(dt)
-        self.connected = gremlin.joystick_handling.is_device_connected(self.device_guid)
         nodes = node.xpath(".//mode")
         for child in nodes:
             assert child.tag == "mode", f"not a valid mode entry - offending line: {node.sourceline}"
@@ -275,7 +311,7 @@ class ProfileDeviceNode:
             node.set("device-guid", write_guid(self.device_guid))  # device GUID
             node.set("guid", write_guid(self.id))  # node ID
 
-            node.set("type", DeviceType.to_string(self.type))
+            node.set("type", DeviceType.to_string(self.device_type))
 
             mode_list = sorted(self.modes.values(), key=lambda x: x.name)
             for mode in mode_list:
@@ -817,6 +853,8 @@ class JoystickInputStats:
         device_guid = gremlin.util.normalize_guid(self.device_guid)
         for input_type in self.input_types:
             self.filtered_counts[input_type] = 0
+
+
 
         if device_guid in input_filter:
             device = gremlin.joystick_handling.getDevice(device_guid)
@@ -1700,7 +1738,7 @@ class Settings:
         for device in device_list:
             # come up with a suitable default
             assert device is not None, "invalid device"
-            assert device.device_type == DeviceType.Joystick, "not a joystick axis"
+            assert device.device_type in (DeviceType.Maestro, DeviceType.Joystick,DeviceType.VJoy), "not a joystick axis"
             if device.disabled:
                 # skip disabled devices
                 continue
@@ -1713,7 +1751,7 @@ class Settings:
         if not device:
             return
 
-        if device.device_type != DeviceType.Joystick:
+        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
             # not a joystick axis
             return
         if device.disabled:
@@ -1730,7 +1768,7 @@ class Settings:
 
             max_axis = min(cfg_max_axis, device.axis_count)
             max_button = min(cfg_max_button, device.button_count)
-            max_hat = min(cfg_max_hat, device.button_count)
+            max_hat = min(cfg_max_hat, device.hat_count)
             data = [
                 (InputType.JoystickAxis, max_axis),
                 (InputType.JoystickButton, max_button),
@@ -1751,7 +1789,7 @@ class Settings:
         assert isinstance(device_guid, dinput.GUID), "invalid device"
         device = gremlin.joystick_handling.getDevice(device_guid)
         assert device is not None, "device not found"
-        if device.device_type != DeviceType.Joystick:
+        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
             # not a joystick axis
             return
 
@@ -2438,7 +2476,7 @@ class Profile:
             # ignore joysticks that are disabled
             return
 
-        if device.device_type == DeviceType.Joystick:
+        if device.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
             # ensure all inputs are defined for joysticks
             loaded = device_guid in self._joystick_inputs_loaded and self._joystick_inputs_loaded[device_guid]
             if force or not loaded:
@@ -2799,7 +2837,6 @@ class Profile:
         new_device = ProfileDeviceNode(self)
         new_device.name = DeviceType.to_display_name(device_type)
         new_device.device_guid = device_guid
-        new_device.type = device_type
         self.devices[device_guid] = new_device
 
         # MIDI
@@ -2808,7 +2845,6 @@ class Profile:
         new_device = ProfileDeviceNode(self)
         new_device.name = DeviceType.to_display_name(device_type)
         new_device.device_guid = device_guid
-        new_device.type = device_type
         self.devices[device_guid] = new_device
 
         # OSC
@@ -2817,7 +2853,6 @@ class Profile:
         new_device = ProfileDeviceNode(self)
         new_device.name = DeviceType.to_display_name(device_type)
         new_device.device_guid = device_guid
-        new_device.type = device_type
         self.devices[device_guid] = new_device
 
         # mode control
@@ -2826,7 +2861,6 @@ class Profile:
         new_device = ProfileDeviceNode(self)
         new_device.name = DeviceType.to_display_name(device_type)
         new_device.device_guid = device_guid
-        new_device.type = device_type
         self.devices[device_guid] = new_device
 
         # state data
@@ -2836,7 +2870,6 @@ class Profile:
         new_device = ProfileDeviceNode(self)
         new_device.name = DeviceType.to_display_name(device_type)
         new_device.device_guid = device_guid
-        new_device.type = device_type
         self.devices[device_guid] = new_device
 
     def modeTree(self) -> Node:
@@ -3230,8 +3263,8 @@ class Profile:
     def remove_device(self, device: dinput.DeviceSummary):
         """removes the specified device from the profile"""
 
-        if device.device_type != DeviceType.Joystick:
-            syslog.error(f"PROFILE: cannot remove non-joystick device: {device.name}")
+        if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
+            syslog.error(f"PROFILE: cannot remove non-joystick/maestro device: {device.name}")
             return
 
         if device.device_id not in self._removed_devices:
@@ -3563,11 +3596,7 @@ class Profile:
                 device = gremlin.joystick_handling.getDevice(device_guid)
                 if device and not device.disabled:
                     device_node = ProfileDeviceNode(self)
-                    device_node.name = device.name
-                    device_node.type = device.device_type
-
-                    device_node.device_guid = device_guid
-                    device_node.device_type = device.device_type
+                    device_node.device = device
                     self.devices[device_guid] = device_node
                     if verbose:
                         syslog.info(f"Profile: CREATE device node: [{str(device_node)}] profile id: [{self.id}]")
@@ -3995,14 +4024,7 @@ class Profile:
 
                 if new_device.virtual:
                     self.vjoy_devices[dev.device_guid] = new_device
-                # if dev.is_virtual:
-                #     new_device.type = DeviceType.VJoy
-                #     new_device.device_guid = dev.device_guid
 
-                #     self.vjoy_devices[dev.device_guid] = new_device
-                # else:
-                #     new_device.type = DeviceType.Joystick
-                #     new_device.device_guid = dev.device_guid
 
         # Parse merge axis entries
         for child in root.iter("merge-axis"):
@@ -5145,7 +5167,7 @@ class ProfileModeNode:
             self.id = normalize_guid(node.get("guid"))  # mode node ID
 
         device_guid = self.device_guid
-        assert device_guid is not None, "parenting problem: mode should be parented to device before reading from XML"
+        assert device_guid is not None, "parenting problem: mode should be parented to a valid device before reading from XML"
         device = gremlin.joystick_handling.getDevice(device_guid)
 
         # parent mode, optional
@@ -5200,12 +5222,17 @@ class ProfileModeNode:
 
                 input_item = self.getInputItem(item.input_type, item.input_id)
 
+
                 if input_item is not None:
                     input_item.setContainers(item.containers)
 
                 if input_item is None:
                     input_item = item
                     self.addInputItem(item)
+                    self.profile.registry.registerInputItem(input_item = input_item,
+                                                            device_guid = self.device_guid,
+                                                            input_type = input_type,
+                                                            input_id = item.input_id)
 
                 if __debug__:
                     test = self.profile.registry.getInputItem(device_guid=self.device_guid, mode_name=self.name, input_type=input_type, input_id=item.input_id)
@@ -5262,7 +5289,7 @@ class ProfileModeNode:
                     do_include = True
                 depth = gremlin.util.xmlNodeDepth(item_node)
                 match input_item.device_type:
-                    case DeviceType.Joystick:
+                    case DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy:
                         if input_item.description or depth > 1:
                             do_include = True
                     case DeviceType.OctaviIFR1:

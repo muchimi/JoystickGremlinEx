@@ -29,11 +29,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m77T4C)
+### (m77T4D)
 - Fix: typo due to API refactor in code runner.
 - Fix: extra parameter in Condition API
 - Fix: clipboard unrecognized type due to missing import.
 - Fix: Next unused button error.
+- Fix: Vjoy as input: exception on selecting vjoy as input in settings.
+- Fix: Vjoy as input: empty input list.
 
 ### (m77T4) Early test build (not for production, testing only)
 - Fix: delay load refresh on a new profile loaded following a prior profile load.  The UI may not refresh the display in some situations.

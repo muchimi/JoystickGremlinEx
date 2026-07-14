@@ -992,9 +992,11 @@ class VJoyMonitor:
     def _handle_shutdown(self):
         """Handles shutdown events by stopping the keep alive thread"""
         self._stop_keep_alive()
-        if VJoyInterface.vJoyEnabled():
-            for vjoy_id in self._vjoy_id_list:
-                VJoyInterface.RelinquishVJD(vjoy_id)
+        # try:
+        #     for vjoy_id in self._vjoy_id_list:
+        #         VJoyInterface.RelinquishVJD(vjoy_id)
+        # except Exception as e:
+        #     pass
         syslog.info("VJOY: monitor shutdown complete")
 
     def _start_keep_alive(self) :

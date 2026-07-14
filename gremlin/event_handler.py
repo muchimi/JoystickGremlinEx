@@ -1463,7 +1463,10 @@ class EventListener(QtCore.QObject):
         self._keep_alive_thread.join()
 
         self.request_activate.emit(False)
-        self.shutdown.emit()
+        try:
+            self.shutdown.emit()
+        except Exception as e:
+            syslog.error(f"EVENT: error during shutdown: {e}")
 
     def reload_calibrations(self):
         """Reloads the calibration data from the configuration file."""

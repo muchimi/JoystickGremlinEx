@@ -693,13 +693,13 @@ def getDevices() -> list[dinput.DeviceSummary]:
 def getValidJoysticksDevices() -> list[dinput.DeviceSummary]:
     """gets a list of enabled joystick type devices"""
     global _all_joystick_devices
-    return [dev for dev in _all_joystick_devices.values() if not dev.disabled and dev.device_type == DeviceType.Joystick]
+    return [dev for dev in _all_joystick_devices.values() if not dev.disabled and dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy)]
 
 
 def getValidJoystickDevicesMap() -> dict[dinput.GUID, dinput.DeviceSummary]:
     """gets a map of valid joystick device keyed by device guid"""
     global _joystick_device_guid_map
-    return {dev.device_guid: dev for dev in _joystick_device_guid_map.values() if not dev.disabled and dev.device_type == DeviceType.Joystick}
+    return {dev.device_guid: dev for dev in _joystick_device_guid_map.values() if not dev.disabled and dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy)}
 
 
 def getPhysicalDevices() -> list[dinput.DeviceSummary]:
@@ -834,9 +834,8 @@ def virtual_device_map() -> dict[DeviceType, dict[int, dinput.DeviceSummary]]:
 
 def is_device_connected(device_guid) -> bool:
     """true if the device is connected (reported in)"""
-
-    if device_guid in _joystick_device_guid_map:
-        device: dinput.DeviceSummary = _joystick_device_guid_map[device_guid]
+    device : dinput.DeviceSummary = getDevice(device_guid)
+    if device:
         return device.connected
     return False
 

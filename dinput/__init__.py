@@ -427,7 +427,6 @@ class DeviceSummary:
         """
         import gremlin.util
         import gremlin.types
-
         self._connected = False  # true if device is connected
         self._disabled = False  # true if the device is disabled in GremlinEx
         self._hard_disabled = False  # true if the device is out of spec or otherwise excluded by GEX
@@ -521,6 +520,13 @@ class DeviceSummary:
                 syslog.warning(f"JOY: auto disabling device [{self.name}] id [{self.device_id}]: out of spec")
 
             self._connected = True  # if dinput data is provided, the device is marked as connected
+
+    @property
+    def key(self):
+        """gets a unique key for this device"""
+        if self.device_type == DeviceType.VJoy:
+            return ((self.vjoy_id, self.axis_count, self.button_count, self.hat_count)) # vjoy differentiates by input config
+        return self.device_id
 
     def setAxisCallback(self, callback):
         """sets a custom axis callback to get an axis value (parameter is the axis number)"""

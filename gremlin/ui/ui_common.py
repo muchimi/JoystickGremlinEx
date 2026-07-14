@@ -7193,6 +7193,10 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
                     widget.add_point(value, input_id)
         elif vis_type == gremlin.types.VisualizationType.ButtonHat:
             self._create_button_hat()
+        elif vis_type == gremlin.types.VisualizationType.Button:
+            self._create_button()
+        elif vis_type == gremlin.types.VisualizationType.Hat:
+            self._create_hat()
 
     def hook(self):
         """hooks events"""
@@ -7248,65 +7252,6 @@ class JoystickDeviceWidget(QtWidgets.QWidget):
                     input_id=-1,  # all inputs of that type
                     callback=self._hat_update_ui,
             )  # event is processed on the UI thread
-
-        # match vis_type:
-        #     case gremlin.types.VisualizationType.AxisCurrent:
-        #         # for input_id in self._device.getAxisInputIdList():
-        #         #     jep.unregisterListenerUICallback(
-        #         #         device_guid = self.device_guid,
-        #         #         input_type = InputType.JoystickAxis,
-        #         #         input_id = -1, # all inputs of that type
-        #         #         callback = self._current_axis_update_ui) # event is processed on the UI thread
-
-        #         # el.removeUIJoystickEventCallback(self._current_axis_update)
-        #         # el.vjoy_output_event.disconnect(self._vjoy_current_axis_update)
-        #         pass
-
-        #     case gremlin.types.VisualizationType.Button:
-        #         # self._unhook_buttons()
-        #         # jep.unregisterListenerUICallback(
-        #         #     device_guid = self.device_guid,
-        #         #     input_type = InputType.JoystickButton,
-        #         #     input_id = -1, # all inputs of that type
-        #         #     callback = self._button_update_ui) # event is processed on the UI thread
-
-        #         # el.removeUIJoystickEventCallback(self._button_update)
-        #         # el.vjoy_output_event.disconnect(self._vjoy_button_update)
-        #         pass
-
-        #     case gremlin.types.VisualizationType.ButtonHat:
-        #         # self._unhook_buttons()
-        #         # jep.unregisterListenerUICallback(
-        #         #     device_guid = self.device_guid,
-        #         #     input_type = InputType.JoystickButton,
-        #         #     input_id = -1, # all inputs of that type
-        #         #     callback = self._button_update_ui) # event is processed on the UI thread
-        #         # jep.unregisterListenerUICallback(
-        #         #     device_guid = self.device_guid,
-        #         #     input_type = InputType.JoystickHat,
-        #         #     input_id = -1, # all inputs of that type
-        #         #     callback = self._hat_update_ui) # event is processed on the UI thread
-        #         pass
-
-        #     case gremlin.types.VisualizationType.AxisTemporal:
-        #         pass
-        #         # jep = gremlin.event_handler.JoystickEventProcessor()
-        #         # jep.unregisterCallback(self.hook_id) # this unregisters ALL hooks to this callback
-
-        #     case gremlin.types.VisualizationType.Hat:
-        #         self._unhook_buttons()
-        #         jep.unregisterListenerUICallback(
-        #             device_guid=self.device_guid,
-        #             input_type=InputType.JoystickHat,
-        #             input_id=-1,  # all inputs of that type
-        #             callback=self._hat_update_ui,
-        #         )  # event is processed on the UI thread
-
-        #         # el.removeUIJoystickEventCallback(self._button_hat_update)
-        #         # # el.vjoy_event.connect(self._vjoy_button_hat_update)
-        #         # el.vjoy_output_event.disconnect(self._vjoy_button_hat_update)
-        #         # if self._device.is_virtual:
-        #         #     el.unregisterVjoyCallback(self._vjoy_button_hat_update)
         self._hooked = False
 
     def _cleanup_ui(self):

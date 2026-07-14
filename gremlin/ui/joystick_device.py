@@ -38,6 +38,7 @@ from shiboken6 import Shiboken
 from psygnal import Signal
 import gremlin.util
 from gremlin.input_item import InputItem
+import dinput
 
 
 syslog = logging.getLogger("system")
@@ -179,7 +180,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         model.addCallback(self._handle_model_changed)  # listen to model changes
 
         # Handle vJoy as input and vJoy as output devices properly
-        vjoy_as_input = self.device_profile.parent.settings.vjoy_as_input
+
+        vjoy_as_input = profile.settings.vjoy_as_input
 
         # For vJoy as output only show axes entries, for all others treat them
         # as if they were physical input devices
@@ -265,6 +267,10 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         model.pushSuspend()  # suspend triggers
         model.clear(emit=False)
+
+        device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(self.device_guid)
+        # if device.is_virtual and device.vjoy_id == 4:
+        #     pass
 
         registry = gremlin.shared_state.current_profile.registry
         mode = gremlin.shared_state.edit_mode

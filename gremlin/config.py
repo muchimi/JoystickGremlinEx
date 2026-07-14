@@ -2064,7 +2064,7 @@ class Configuration(QtCore.QObject):
 
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         match device_type:
-            case DeviceType.Joystick | DeviceType.VJoy:
+            case  DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy:
                 device_info = gremlin.joystick_handling.getDevice(dinput_device_guid)
                 if device_info:
                     if device_info.axis_count > 0:

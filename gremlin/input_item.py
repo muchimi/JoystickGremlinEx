@@ -507,7 +507,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                 # if isinstance(item, Mode):
                 #    self._profile_mode = item.name
                 if isinstance(item, gremlin.base_profile.ProfileDeviceNode):
-                    self._device_type = item.type
+                    self._device_type = item.device_type
                     self._device_name = item.name
                     self._device_guid = gremlin.util.to_guid(item.device_guid)
                     self._device_id = item.device_id
@@ -2934,7 +2934,7 @@ class InputItemListModel(AbstractCallbackModel):
         self._profile = profile
         self._device_data = profile.getDeviceNode(device_guid)
 
-        if device and device.device_type == DeviceType.Joystick:
+        if device and device.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
             # ensure all possible inputs are pre-loaded for joysticks before filtered
             profile.ensureInputItems(device_guid)
 
@@ -3425,6 +3425,7 @@ class InputItemListView(AbstractView):
             if self._widget_map:
                 key = next(iter(self._widget_map))  # first widget
                 widget = self._widget_map[key]  # gremlin.util.get_layout_widgets(self._scroll_layout)
+                target_widget = None
                 if hasattr(widget, "widget_height"):
                     # not in label mode
                     if widget.widget_height is not None:
@@ -3434,7 +3435,9 @@ class InputItemListView(AbstractView):
                             if i == index:
                                 target_widget = widget
                                 break
-                        self._scroll_area.ensureVisible(0, h)
+
+                    self._scroll_area.ensureVisible(0, h)
+                    if target_widget is not None:
                         self._scroll_area.ensureWidgetVisible(target_widget)
 
     def scrollToInput(self, input_item):
@@ -10010,8 +10013,9 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self.action_selector_layout = QtWidgets.QHBoxLayout(self.action_selector_widget)
 
         self.action_selector = ActionSelector(
-            gremlin.types.DeviceType.VJoy,
-            None,
+            input_type = gremlin.types.DeviceType.VJoy,
+            input_item = self._input_item,
+            data = None,
             parent=self.action_selector_widget,
         )
         self.action_selector.action_added.connect(self._add_action)
@@ -11786,6 +11790,12 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if self._input_item_list_model is not None:
             return self._input_item_list_model.indexOf(input_item)
         return -1
+
+
+    def ensureSelectedVisible(self):
+        """ensures the currently selected input item is visible in the input list view"""
+        if self._input_item_list_view is not None:
+            self._input_item_list_view.ensureSelectedVisible()
 
     def addLeftPanelHeaderWidget(self, widget):
         """adds a widget to the left panel header (above the input list)"""

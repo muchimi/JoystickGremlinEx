@@ -1681,7 +1681,7 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
 
                 detail_widget = None
                 width = gremlin.shared_state.char_width * 3
-                if import_item.device_type in (DeviceType.Joystick, DeviceType.VJoy):
+                if import_item.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
                     detail_widget = ui_common.QDataPushButton("...")
                     detail_widget.setToolTip("Details")
                     detail_widget.clicked.connect(self._view_details)
@@ -2553,7 +2553,7 @@ class Mapper:
 
                 device_profile = gremlin_ui.getActiveTabWidget().device_profile
                 # Don't create mappings for non joystick devices
-                if device_profile.type != DeviceType.Joystick:
+                if device_profile.type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
                     return
 
                 _container_plugins = gremlin.plugin_manager.ContainerPlugins()
@@ -2577,7 +2577,7 @@ class Mapper:
                 device: gremlin.base_profile.ProfileDeviceNode = current_profile.devices[tab_guid]
 
                 tab_map = gremlin_ui._get_tab_map()
-                if device.type != DeviceType.Joystick:
+                if device.type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
                     """ selected tab is not a joystick - pick the first joystick tab as ordered by the user """
 
                     tab_ids = [device_id for device_id, _, tab_type, _ in tab_map.values() if tab_type == TabDeviceType.Joystick]
