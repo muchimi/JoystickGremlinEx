@@ -2284,8 +2284,8 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
     def _theme_changed(self):
         theme = self.sender().data
         self.config.theme = theme
-
-        # gremlin.shared_state.ui.update_theme()
+        app = QtWidgets.QApplication.instance()
+        app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
 
     @QtCore.Slot(bool)
     def _highlight_enabled_cb(self, checked: bool):

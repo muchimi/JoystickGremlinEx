@@ -727,6 +727,14 @@ def getDeviceName(device_guid: int | str | dinput.GUID):
     return f"unknown: {str(device_guid)}"
 
 
+def getDeviceFromVjoyId(vid : int):
+    """gets the device for the given vjoy id"""
+    assert isinstance(vid, int), f"Invalid vjoy id [{vid}]"
+    dev = next((dev for dev in vjoy_devices() if dev.vjoy_id == vid), None)
+    if dev:
+        return dev
+    return None
+
 def getVjoyDeviceGuid(vid : int):
     """gets the vjoy device by the given vjoy id"""
     assert isinstance(vid, int), f"Invalid vjoy id [{vid}]"

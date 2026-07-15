@@ -1149,7 +1149,7 @@ More than one action per short press or long press can be added."""
         return InputType.JoystickButton
 
 
-    def _parse_xml(self, node, input_item=None, extra_data=None):
+    def _parse_xml(self, node, input_item : gremlin.input_item.InputItem = None, extra_data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container

@@ -52,7 +52,7 @@ _eight_names = ["North", "North East", "East", "South East", "South", "South Wes
 class HatButtonsContainerWidget(AbstractContainerWidget):
     """Basic container which holds a single action."""
 
-    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container, parent=None):  # noqa: F821
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : "HatButtonsContainer", parent=None):  # noqa: F821
         """Creates a new instance.
 
         :param input_item the input item represented by this widget
@@ -60,8 +60,14 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
         :param parent the parent of this widget
         """
         super().__init__(input_item, container, parent)
-        self.container = container
-        self.input_item = input_item
+
+
+    def _create(self, container):
+        assert isinstance(container, HatButtonsContainer), "invalid container"
+        assert len(container.action_sets) > 0, "container missing action sets"
+        self.container: HatButtonsContainer = container
+        self.input_item = self.container.input_item
+
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -70,8 +76,9 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
 
         gremlin.ui.ui_common.clear_layout(self.action_layout)
 
-        warning_widget = gremlin.ui.ui_common.QWarningWidget("Experimental container.  Not all features may function as expected.")
-        self.action_layout.addWidget(warning_widget)
+        # warning_widget = gremlin.ui.ui_common.QWarningWidget("Experimental container.  Not all features may function as expected.")
+        # self.action_layout.addWidget(warning_widget)
+        self._widget_map = {} # map of position to action widget
 
         self.four_way = QtWidgets.QRadioButton("4 Way")
         self.eight_way = QtWidgets.QRadioButton("8 Way")
@@ -95,36 +102,22 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
 
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.action_layout.addWidget(widget)
-        action_sets = self.container.getActionSets()
-        for action_set in action_sets:
+
+        for position in self.container.action_set_position_map:
             self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-            self._create_action_widget(action_set, self.action_layout, ContainerViewTypes.Action)
-            # self._add_action_selector(lambda x: self._add_action(direction, x), name, lambda x: self._paste_action(direction, x))
+            # position_name = vjoy.vjoy.Hat.getName(position)
+            # icon = vjoy.vjoy.Hat.getIcon(position)
+            # label = f"<b>{position_name}</b>"
+            # label_widget = gremlin.ui.ui_common.QIconLabel(icon_path = icon, text = label,icon_size=24)
+            # self.action_layout.addWidget(label_widget)
+            widget = self._create_action_widget(position, self.action_layout, ContainerViewTypes.Action)
+            self._widget_map[position] = widget
+
 
         self.action_layout.addStretch()
 
     def _ensureActionSet(self, position):
         return self.container.getActionSet(position)
-
-    # def _add_action_selector(self, add_action_cb, label, paste_action_cb = None):
-    #     """Adds an action selection UI widget.
-
-    #     :param add_action_cb function to call when an action is added
-    #     :param label the description of the action selector
-    #     """
-    #     input_item = self.profile_data.input_item
-    #     action_selector = ActionSelector(InputType.JoystickButton, input_item)
-    #     action_selector.action_added.connect(add_action_cb)
-    #     if paste_action_cb:
-    #         action_selector.action_paste.connect(paste_action_cb)
-
-    #     group_layout = QtWidgets.QVBoxLayout()
-    #     group_layout.addWidget(action_selector)
-    #     group_layout.addStretch(1)
-    #     group_box = QtWidgets.QGroupBox(label)
-    #     group_box.setLayout(group_layout)
-
-    #     self.action_layout.addWidget(group_box)
 
     def _create_condition_ui(self):
         action_sets = self.container.getActionSets()
@@ -138,20 +131,28 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
 
-    def _create_action_widget(self, action_set, layout, view_type):
+    def _create_action_widget(self, position, layout, view_type):
         """Creates a new action widget.
 
-        :param index the index at which to store the created action
-        :param label the name of the action to create
-        :param layout the layout widget to populate
-        :param view_type the visualization type being used
+        :param position: the position of the hat for the action set
+        :param layout: the layout widget to populate
+        :param view_type: the visualization type being used
+        :return: the created widget
         """
-        direction = action_set.data
-        icon = vjoy.vjoy.Hat.getIcon(direction)
-        widget = self._create_action_set_widget(action_set, vjoy.vjoy.Hat.getName(direction), view_type, icon, icon_size=48)
+        action_set = self.container.action_set_position_map[position]
+        # syslog.info(f"POsition {position}: actions: [{len(action_set)}]")
+        icon = vjoy.vjoy.Hat.getIcon(position)
+        widget = self._create_action_set_widget(
+            action_set = action_set,
+            label = f"{vjoy.vjoy.Hat.getName(position)} actions:",
+            view_type = view_type,
+            icon = icon,
+            icon_size = 48
+        )
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self.container_modified.emit)
+        return widget
 
     def _add_action(self, index, action):
         """Adds a new action to the container action set.
@@ -259,35 +260,16 @@ class HatButtonsContainerFunctor(AbstractTriggerFunctor):
         self.button_count = self.container.button_count
 
         self.action_nodes.clear()  # list of nodes arranged by button index
-        action_sets = self.container.action_sets  # define action sets
 
         group_node = self.container_node.children[0]  # group node is the only child of the container node
         self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
         self.action_set_lookup = {}  # lookup of action set button position to list of nodes to execute
-        for action_set in action_sets:
-            # nodes = [node for node in self.action_nodes if node.id ]
-            direction = action_set.data
-            if direction not in self.action_set_lookup:
-                self.action_set_lookup[direction] = []
+        for position, action_set in self.container.action_set_position_map.items():
+            if position not in self.action_set_lookup:
+                self.action_set_lookup[position] = []
             for action in action_set:
                 action_node = [node for node in self.action_set_nodes if node.containsActionId(action.id)]
-                self.action_set_lookup[direction].append(action_node)
-
-        # group_node = self.container_node.children[0] # group node is the only child of the container node
-        # self.action_set_nodes = [node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet]
-        # self.action_set_lookup = {}
-
-        # for index in self.lookup.values():
-        #     # index of each data set
-        #     if index in action_sets:
-        #         if not index in self.action_set_lookup:
-        #             self.action_set_lookup[index] = []
-        #         action_set = action_sets[index]
-        #         if action_set is not None:
-
-        #             for action in action_set:
-        #                 action_node = [node for node in self.action_set_nodes if node.containsActionId(action.id)]
-        #                 self.action_set_lookup[index].append(action_node)
+                self.action_set_lookup[position].append(action_node)
 
         self.release_events = []  # release events (node, event)
 
@@ -322,7 +304,7 @@ class HatButtonsContainerFunctor(AbstractTriggerFunctor):
                     self.release_events.append((node, event_release))
                     ec.execute_node(node, event_press, value, extra_data)
 
-        # self._execute(event, value, extra_data)
+
         return True
 
 
@@ -337,22 +319,37 @@ class HatButtonsContainer(AbstractContainer):
     input_types = [InputType.JoystickHat]
     interaction_types = []
 
-    def __init__(self, parent=None, node=None):
+    def __init__(self, container=None, node=None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node)
+        super().__init__(container, node, custom_action_sets=True, custom_generate_callback = self._generate_action_set_xml)
         self.button_count = 8
         self.sticky = True  # true if hat only releases in the center position
 
-        self.actionsetParseCallback = self._parse_xml_actionset  # callback when the action set node is being read
 
         # make actions think we're attached to a button
         self.override_input_id = 1
         self.override_input_type = InputType.JoystickButton
         self.action_set_position_map = {}  # used positions
         self.custom_action_sets = True  # indicate we use custom action sets
+
+        # create an action set for all hat positions
+        for position in vjoy.vjoy.Hat.getEightDirections():
+            action_set =   gremlin.input_item.ActionSet(model_description = f"position: {position}")
+            self.action_sets.add(action_set)
+            action_set.extraData = position # index in the data field
+            self.action_set_position_map[position] = action_set
+            # action_set.addCallback(self._action_set_changed)
+
+    # def _action_set_changed(self, position):
+    #     """Callback for when an action set changes."""
+
+    #     action_set = self.getActionSet(position)
+    #     syslog.info(f"Action set changed: {action_set} : action count: {len(action_set)}")
+    #     pass
+
 
     def getActionSet(self, position):
         """gets an action set for a specific position
@@ -365,9 +362,7 @@ class HatButtonsContainer(AbstractContainer):
             if not position:
                 syslog.error(f"HATBUTTONCONTAINER: invalid position: {position} found.")
                 return None
-        if position not in self.action_set_position_map:
-            self.action_set_position_map[position] = gremlin.base_classes.DataList(position)
-        return self.action_set_position_map[position]
+        return self.action_set_position_map.get(position, None)
 
     def getActionSets(self):
         """all action sets for this input hat"""
@@ -378,20 +373,12 @@ class HatButtonsContainer(AbstractContainer):
             positions = vjoy.vjoy.Hat.getEightDirections()
         return [self.getActionSet(position) for position in positions]
 
-    @property
-    def action_sets(self):
-        """override action set property"""
-        return self.getActionSets()
-
-    @action_sets.setter
-    def action_sets(self, value):
-        pass
 
     def get_input_type(self):
         """override input type for action selectors"""
         return self.override_input_type
 
-    def _parse_xml(self, node, data=None, extra_data=None):
+    def _parse_xml(self, node, input_item: gremlin.input_item.InputItem = None, extra_data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
@@ -399,15 +386,18 @@ class HatButtonsContainer(AbstractContainer):
         self.button_count = safe_read(node, "button-count", int, 8)
         self.sticky = safe_read(node, "sticky", bool, True)
 
-    def _parse_xml_actionset(self, node):
-        """special handler for custom action set parsing as the action set node has custom entries"""
-        if "position" in node.attrib:
-            name = node.get("position")
-            position = vjoy.vjoy.Hat.getDirection(name)  # convert from ID to position tuple
-            action_set = gremlin.base_classes.DataList(position)
-            self.action_set_position_map[position] = action_set
-            return action_set
-        return None
+        # read into custom action sets
+        for as_node in node.xpath(".//action-set"):
+            if "position" in as_node.attrib:
+                name = as_node.get("position")
+                position = vjoy.vjoy.Hat.getDirection(name)  # convert from ID to position tuple
+                description = f"position: {position}"
+                action_set = self.action_set_position_map[position]
+                action_set.clear()
+                self._parse_action_xml(as_node, action_set, input_item, extra_data, description)
+
+        self.dumpActionSets(self.action_sets)
+        pass
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -419,26 +409,26 @@ class HatButtonsContainer(AbstractContainer):
         node.set("button-count", str(self.button_count))
         node.set("sticky", safe_format(self.sticky, bool))
 
-        for action_set in self.action_sets:
+
+        return node
+
+    def _generate_action_set_xml(self, node: ElementTree.Element):
+        """custom writer for the action sets in this container"""
+        for position, action_set in self.action_set_position_map.items():
             if len(action_set) > 0:
                 # only save used positions
                 as_node = ElementTree.Element("action-set")
                 as_node.set("id", write_guid(action_set.id))
-                position = action_set.data
                 name = vjoy.vjoy.Hat.getName(position)
-                if name:
-                    as_node.set("position", name)
+                as_node.set("position", name)
                 for action in action_set:
                     as_node.append(action.to_xml())
                 node.append(as_node)
-        return node
+
+
 
     def _is_container_valid(self):
         return True
-
-    def get_action_sets(self):
-        """override method: returns action sets - override because we have custom sets"""
-        return self.getActionSets()
 
 
 # Plugin definitions

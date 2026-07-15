@@ -6983,6 +6983,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         ):
             input_type = self.input_type
         elif self.action_mode in (
+            VjoyAction.VJoyToggle,
             VjoyAction.VJoyButtonPress,
             VjoyAction.VJoyButtonRelease,
             VjoyAction.VJoyButton,

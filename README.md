@@ -30,15 +30,20 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T5)
+
+- Change: UI: general tweaks.
 - Fix: Input Viewer: show descriptive VJOY names
 - Fix: Input Viewer: handle devices with identical hardware IDs
 - Fix: Input Viewer: button visuals corrected height
+- Fix: Vjoy as input: updated for new API
 - Fix: Vjoy as input: exception enabling vjoy as input in profile settings
 - Fix: Vjoy as input: VJOY devices show empty input lists
 - Fix: Vjoy as input: VJOY device filtering exception on filter dialog close
 - Fix: API: missing call for EnsureSelectedVisible() on some visuals
 - Fix: API: 1:1 mapping updated to use new API
 - Fix: API: 1:1 mapping handle non linear axis ids
+- Fix: HatToButton container: updated to use new API
+- Fix: VJoy Remap action: missing icon for toggle mode
 
 ### (m77T4D)
 - Fix: typo due to API refactor in code runner.

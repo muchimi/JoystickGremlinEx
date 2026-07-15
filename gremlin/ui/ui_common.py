@@ -394,6 +394,10 @@ class Color:
 
     @staticmethod
     def buttonBackgroundColor():
+        return "#414141" if gremlin.shared_state.is_dark_theme else "#DBDBDB"
+
+    @staticmethod
+    def checkboxBackgroundColor():
         return "#414141" if gremlin.shared_state.is_dark_theme else "#9B9B9B"
 
     @staticmethod
@@ -402,7 +406,7 @@ class Color:
 
     @staticmethod
     def buttonBorderColor():
-        return "#424242" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
+        return "#424242" if gremlin.shared_state.is_dark_theme else "#CDE0CD"
 
     @staticmethod
     def buttonHoverBorderColor():
@@ -780,6 +784,7 @@ class Color:
         checkbox_unchecked_disabled = f"{prefix}checkbox_blank_outline_disabled.png"
         checkbox_checked = f"{prefix}checkbox_intermediate.png"
         checkbox_checked_disabled = f"{prefix}checkbox_intermediate_disabled.png"
+        checkbox_background_color = Color.checkboxBackgroundColor()
 
         radio_unchecked = f"{prefix}radiobox_blank.png"
         radio_checked = f"{prefix}radiobox_marked.png"
@@ -789,15 +794,26 @@ class Color:
         button_hover_color = Color.buttonHoverBackgroundColor()
 
         css = f"""
+
+            QDialog {{
+                background-color: {_background_color};
+            }}
+
             QCheckBox::indicator {{
                 width: 18px;
                 height: 18px;
+
             }}
             QCheckBox::indicator:checked {{
                 image: url({relative_path}{checkbox_checked});
+                background-color: {selected_background_color};
+                border-radius: 4px;
             }}
             QCheckBox::indicator:unchecked {{
                 image: url({relative_path}{checkbox_unchecked});
+                background-color: {checkbox_background_color};
+                border-radius: 4px;
+
             }}
             QCheckBox::indicator:disabled {{
                 image: url({relative_path}{checkbox_unchecked_disabled});
@@ -805,7 +821,6 @@ class Color:
             QCheckBox::indicator:checked:disabled {{
                 image: url({relative_path}{checkbox_checked_disabled});
             }}
-
 
             QRadioButton::indicator {{
                 width: 18px;
@@ -919,6 +934,10 @@ class Color:
                         border: 4px solid {border_color};
                         border-radius: 8px;
                         background-color: {header_background_color};
+                    }}
+
+            QWidget[cssClass="box_frame"]  {{
+                        border: 1px solid {border_color};
                     }}
 
             """

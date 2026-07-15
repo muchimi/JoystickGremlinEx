@@ -1828,11 +1828,13 @@ class OscServer:
 
         self._dispatcher = OscDispatcher()
         self._dispatcher.set_default_handler(self._callback)
+
         try:
             syslog.info("OSC: server starting")
             self._server = BlockingOSCUDPServer((self._host_ip, self._input_port), self._dispatcher)
-            # this blocks until the server is shutdown
             self._server.serve_forever()  # blocks until shutdown
+
+            # resume after exit
             syslog.info("OSC: server shutdown")
         except Exception as e:
             syslog.error(f"OSC: server error: {e}")

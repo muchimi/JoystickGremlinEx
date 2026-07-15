@@ -4809,10 +4809,11 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
 
 
-
-        if self.actionsetCustomParseCallback:
-            # handles the complete load via custom callback if the container implements it
-            self.actionsetCustomParseCallback(node, data, extra_data)
+        if self.custom_action_sets:
+            # custom load 
+            if self.actionsetCustomParseCallback:
+                # handles the complete load via custom callback if the container implements it
+                self.actionsetCustomParseCallback(node, data, extra_data)
             return
 
         model_prefix = None
@@ -4823,7 +4824,6 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
                 input_item: InputItem = extra_data["input_item"]
                 input_name = f"{input_item.device_name} {input_item.display_name}"
                 model_prefix = f"Action Set for [{input_name}] container: {container_type}"
-
 
         self.action_sets.clear()
         as_read = False
@@ -4900,7 +4900,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
             entry.from_xml(child, (input_item, self), extra_data)  # pass input item, container as a tuple
             action_set.append(entry)
             if data is not None:
-                entry.data = data
+                entry.extraData = data
         action_set.popSuspend(emit=False)  # allow notifications but don't update
 
     def _parse_virtual_button_xml(self, node, data=None, extra_data=None):

@@ -925,7 +925,7 @@ class AbstractCallbackModel(AbstractModel):
         self._index_map = TriggerDict()  # map of input_id to index
         self._index_map.addCallback(self._handle_data_changed)  # only track one of the two maps as a change in one also changes the other
         self._item_map = TriggerDict()  # map of input_id to index
-        self._data = data  # optional data to store with the model
+        self._extra_data = data  # optional data to store with the model
 
         # assume no filters
         self._filtered_index_map = TriggerDict()
@@ -1153,6 +1153,19 @@ class AbstractCallbackModel(AbstractModel):
         if index in self._index_map:
             return self._index_map[index]
         return None
+
+
+    @property
+    def extraData(self):
+        """returns the item stored at the given index, None if not found (same as data)"""
+        return self._extra_data
+
+    @extraData.setter
+    def extraData(self, value):
+        """sets the extra data for the model"""
+        self._extra_data = value
+
+
 
     def itemAt(self, index: int):
         """gets the filtered item at the given index if it exists"""
@@ -1541,7 +1554,7 @@ class AbstractCallbackModel(AbstractModel):
             self._old_hash = new_hash
 
             for callback in self._data_changed_callbacks:
-                callback(self._data)
+                callback(self._extra_data)
 
             if emit:
                 self.data_changed.emit()  # indicate the model changed
