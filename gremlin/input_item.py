@@ -11825,10 +11825,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if self._input_item_list_view is not None:
             self._input_item_list_view.ensureInputVisible(input_item)
 
-    def ensureSelectedVisible(self):
-        """ensures the currently selected input item is visible in the input list view"""
-        if self._input_item_list_view is not None:
-            self._input_item_list_view.ensureSelectedVisible()
 
     def ensureLoaded(self):
         """ensures the device has inputs loaded because the inputs are delay loaded until the tab is visible"""

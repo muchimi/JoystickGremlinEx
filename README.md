@@ -29,13 +29,23 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T5)
+- Fix: Input Viewer: show descriptive VJOY names
+- Fix: Input Viewer: handle devices with identical hardware IDs
+- Fix: Input Viewer: button visuals corrected height
+- Fix: Vjoy as input: exception enabling vjoy as input in profile settings
+- Fix: Vjoy as input: VJOY devices show empty input lists
+- Fix: Vjoy as input: VJOY device filtering exception on filter dialog close
+- Fix: API: missing call for EnsureSelectedVisible() on some visuals
+- Fix: API: 1:1 mapping updated to use new API
+- Fix: API: 1:1 mapping handle non linear axis ids
+
 ### (m77T4D)
 - Fix: typo due to API refactor in code runner.
 - Fix: extra parameter in Condition API
 - Fix: clipboard unrecognized type due to missing import.
 - Fix: Next unused button error.
-- Fix: Vjoy as input: exception on selecting vjoy as input in settings.
-- Fix: Vjoy as input: empty input list.
+
 
 ### (m77T4) Early test build (not for production, testing only)
 - Fix: delay load refresh on a new profile loaded following a prior profile load.  The UI may not refresh the display in some situations.

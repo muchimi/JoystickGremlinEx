@@ -2130,6 +2130,8 @@ class ProfileRegistry:
                     case _:
                         input_item = InputItem(
                             mode_node=mode_node,
+                            input_type = input_type,
+                            input_id = input_id,
                             device_guid=device_guid,
                             override_input_type=override_input_type,
                             custom_name_handler=custom_name_handler,
@@ -2820,9 +2822,7 @@ class Profile:
         :param modes the list of modes to be present
         """
         new_device = ProfileDeviceNode(self)
-        new_device.name = device.name
-        new_device.device_guid = device.device_guid
-        new_device.type = DeviceType.Joystick
+        new_device.device = device
         self.devices[device.device_guid] = new_device
 
         for mode in modes:
@@ -5057,8 +5057,8 @@ class ProfileModeNode:
         assert input_item is not None, "invalid input item"
         input_type = input_item.input_type
         input_id = input_item.input_id
-        if input_id == gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart:
-            pass
+        # if input_id == gremlin.ui.mode_device.ModeInputModeType.ModeProfileStart:
+        #     pass
         input_id_key = self.registry.getInputIdKey(input_id)
         assert input_id is not None, "invalid input id"
         mode_config = self.getConfig(input_type)
@@ -5069,6 +5069,7 @@ class ProfileModeNode:
 
     def getConfig(self, input_type: InputType) -> dict:
         """gets the configuration list for a given input type"""
+        assert isinstance(input_type, InputType), f"invalid input type: {input_type}"
         if input_type not in self._config:
             self._config[input_type] = {}
         return self._config[input_type]

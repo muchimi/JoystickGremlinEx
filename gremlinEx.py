@@ -2551,7 +2551,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def getActiveTabWidget(self) -> gremlin.ui.ui_common.QSplitTabWidget:
         """gets the current tab widget"""
-        return self.getRegisteredWidget(gremlin.shared_state.current_tab_device_guid)
+        return self.getCurrentRegisteredWidget()
 
     def getActiveTabIndex(self) -> int:
         """gets the current tab index"""
@@ -5895,11 +5895,14 @@ if __name__ == "__main__":
         parser.addOption(QtCore.QCommandLineOption(["noprofile","np"], "Do not load a profile on start (--r and --p will be ignored)"))
         parser.addOption(QtCore.QCommandLineOption(["run", "r"], "Automatically run the last profile, or specified profile via --p on start"))
         parser.addOption(QtCore.QCommandLineOption(["profile", "p"], "Profile to load, requires the profile xml to be provided.  If a path is not provided, GremlinEx will look for the profile file in the default profile folder."))
+        parser.addOption(QtCore.QCommandLineOption(["nomousehook","nmh"], "Disables mouse hook (prevents mouse output) - diagnostics use only"))
         parser.addHelpOption()
 
         parser.process(app.arguments())
 
 
+
+        config.mouse_hook_disabled = parser.isSet("nomousehook")
 
         config.auto_load_disabled = parser.isSet("noprofile")
         if config.auto_load_disabled:
@@ -5928,6 +5931,10 @@ if __name__ == "__main__":
 
             config.profile_to_load = profile_to_load if args else None
 
+        # event listener init (after processing command line args)
+        el = gremlin.event_handler.EventListener()
+        el.postInit()
+
 
 
 
@@ -5949,7 +5956,7 @@ if __name__ == "__main__":
         time.sleep(0.25)
 
         # instance
-        _pixmaps = gremlin.ui.ui_common.Pixmaps()
+        #_pixmaps = gremlin.ui.ui_common.Pixmaps()
         # _widget_manager = gremlin.ui.ui_common.WidgetManager()
 
         # check for gamepad availability via VIGEM
@@ -5987,6 +5994,7 @@ if __name__ == "__main__":
             el.terminate()  # terminates and sends the relevant shutdown triggers
             fl.close()
             sys.exit(0)
+
 
         gremlin.shared_state.reload_device_map()
 

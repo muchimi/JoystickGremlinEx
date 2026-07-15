@@ -845,21 +845,23 @@ class EventListener(QtCore.QObject):
     # container_modified = Signal(object) # indicates a container was modified
     # data_changed = Signal(object) # indicates a model was changed
 
-    def __init__(self):
-        """Creates a new instance."""
+    
+    def postInit(self):
+        """Post-initialization hook for the event handler"""
         import gremlin.windows_event_hook
         import gremlin.threading
 
-        super().__init__()
-
-        self.keyboard_hook = gremlin.windows_event_hook.KeyboardHook()
-        self.keyboard_hook.register(self._keyboard_handler)
 
         config = gremlin.config.Configuration()
         self._mouse_hook_stack = 0
         self.mouse_hook = None
-        self.enable_mouse_hook = True # False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
+        self.enable_mouse_hook = not config.mouse_hook_disabled # False if __debug__ else not config.is_debug  # disable mouse hooks while in debug mode
         self.enableMouse()
+
+        self.keyboard_hook = gremlin.windows_event_hook.KeyboardHook()
+        self.keyboard_hook.register(self._keyboard_handler)
+
+
 
         # Calibration function for each axis of all devices
         self._calibrations = {}

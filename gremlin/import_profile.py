@@ -2295,7 +2295,7 @@ class Mapper:
     class MapperDialog(gremlin.ui.ui_common.QRememberDialog):
         """dialog for mapping options"""
 
-        def __init__(self, device_info: dinput.DeviceSummary, parent=None):
+        def __init__(self, device: dinput.DeviceSummary, parent=None):
 
             super().__init__(self.__class__.__name__, parent=parent)
 
@@ -2308,6 +2308,7 @@ class Mapper:
             self.main_layout = QtWidgets.QVBoxLayout(self)
 
             self.button_mapper = "Vjoy Remap"
+            self.device = device
 
             devices = sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id)
             if not devices:
@@ -2324,11 +2325,11 @@ class Mapper:
             self.device_widget = QtWidgets.QWidget()
             self.device_layout = QtWidgets.QFormLayout(self.device_widget)
 
-            self.device_layout.addRow("Source:", self.getStrWidget(device_info.name))
+            self.device_layout.addRow("Source:", self.getStrWidget(device.name))
             self.device_layout.addRow("Profile Mode:", self.getStrWidget(gremlin.shared_state.edit_mode))
-            self.device_layout.addRow("Axis count:", self.getIntWidget(device_info.axis_count))
-            self.device_layout.addRow("Button count:", self.getIntWidget(device_info.button_count))
-            self.device_layout.addRow("Hat count:", self.getIntWidget(device_info.hat_count))
+            self.device_layout.addRow("Axis count:", self.getIntWidget(device.axis_count))
+            self.device_layout.addRow("Button count:", self.getIntWidget(device.button_count))
+            self.device_layout.addRow("Hat count:", self.getIntWidget(device.hat_count))
 
             self.container_info_layout.addWidget(QtWidgets.QLabel("<b>1:1 Mapping Options</b>"))
             self.container_info_layout.addWidget(self.device_widget)
@@ -2453,8 +2454,13 @@ class Mapper:
         @QtCore.Slot()
         def _execute_mapping(self):
             """executes the mapping"""
-            self.create_1to1_mapping(self.vjoy_id, self.button_mapper, self.mode)
-            self.close()
+            self.create_1to1_mapping(device = self.device,
+                                     vjoy_id = self.vjoy_id,
+                                     vjoy_mapper = self.button_mapper,
+                                     rollover =  self.mode)
+
+            self.accept()
+            # self.close()
 
         def getInputMap(self, l1, l2, rollover: MapperMode):
             """builds a mapping of device input id to vjoy input id based on relative sizes, returns list of pairs"""
@@ -2486,9 +2492,9 @@ class Mapper:
 
         def mapSingle(
             self,
+            profile: gremlin.base_profile.Profile,
             device_guid,
-            device_type,
-            mode_name: str,
+            mode : str,
             input_type: InputType,
             input_id: int,
             vjoy_id: int,
@@ -2497,31 +2503,49 @@ class Mapper:
             vjoy_mapper: str = "Vjoy Remap",
         ):
             registry = gremlin.shared_state.current_profile.registry
+
+            assert isinstance(profile, gremlin.base_profile.Profile), f"invalid profile: {profile}"
+            assert isinstance(device_guid, dinput.GUID), f"invalid device GUID: {device_guid}"
+            assert isinstance(mode, str), f"invalid mode: {mode}"
+            assert isinstance(input_type, InputType), f"invalid input type: {input_type}"
+            assert isinstance(input_id, int), f"invalid input id: {input_id}"
+            assert isinstance(vjoy_id, int), f"invalid vjoy id: {vjoy_id}"
+            assert isinstance(vjoy_input_type, InputType), f"invalid vjoy input type: {vjoy_input_type}"
+            assert isinstance(vjoy_input_id, int), f"invalid vjoy input id: {vjoy_input_id}"
+
             input_item = registry.getInputItem(
-                device_guid,
-                device_type,
-                mode_name,
-                input_type,
-                input_id,
+                device_guid=device_guid,
+                mode_name=mode,
+                input_type=input_type,
+                input_id=input_id,
                 autocreate=True,
             )
 
             container_plugins = gremlin.plugin_manager.ContainerPlugins()
             action_plugins = gremlin.plugin_manager.ActionPlugins()
 
+            mode_node : gremlin.base_profile.ModeNode = profile.getModeNode(device_guid=device_guid, mode=mode)
+
+
+            # add a basic container
             container = container_plugins.repository["basic"](input_item)
+            input_item.containers.append(container)
+
+            # add a vjoy remap action to that container
             action = action_plugins.repository[vjoy_mapper](container)
             action.input_type = input_type
             action.vjoy_input_id = vjoy_input_id
             action.vjoy_id = vjoy_id
             container.add_action(action)
 
-            input_item.containers.append(container)
+            # add the new input to the device
+            mode_node.addInputItem(input_item)
 
             return input_item
 
         def create_1to1_mapping(
             self,
+            device: dinput.DeviceSummary = None,
             vjoy_id: int = 1,
             vjoy_mapper: str = "Vjoy Remap",
             rollover: MapperMode = MapperMode.Unused,
@@ -2530,11 +2554,9 @@ class Mapper:
             vJoy device.
             """
             import gremlin.base_profile
+            import gremlin.input_item
             import gremlin.joystick_handling
-            # Don't attempt to create the mapping for the "Getting Started"
-            # widget
 
-            el = gremlin.event_handler.EventListener()
             try:
                 # syslog = logging.getLogger("system")
                 tab_device_type: TabDeviceType
@@ -2551,55 +2573,20 @@ class Mapper:
                     )
                     return
 
-                device_profile = gremlin_ui.getActiveTabWidget().device_profile
-                # Don't create mappings for non joystick devices
-                if device_profile.type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
-                    return
+                widget : gremlin.input_item.BaseDeviceTabWidget = gremlin_ui.getRegisteredWidget(device.device_guid)
+                assert widget is not None, "Failed to get the registered widget for the device"
 
-                _container_plugins = gremlin.plugin_manager.ContainerPlugins()
-                _action_plugins = gremlin.plugin_manager.ActionPlugins()
-                current_mode = gremlin.shared_state.current_mode
-                # mode = device_profile.modes[current_mode]
-                _input_types = [
-                    InputType.JoystickAxis,
-                    InputType.JoystickButton,
-                    InputType.JoystickHat,
-                ]
-                _type_name = {
-                    InputType.JoystickAxis: "axis",
-                    InputType.JoystickButton: "button",
-                    InputType.JoystickHat: "hat",
-                }
-                # current_profile = device_profile.parent
-
-                current_profile = gremlin.shared_state.current_profile
-                tab_guid = gremlin.util.parse_guid(gremlin_ui._active_tab_guid())
-                device: gremlin.base_profile.ProfileDeviceNode = current_profile.devices[tab_guid]
-
-                tab_map = gremlin_ui._get_tab_map()
-                if device.type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
-                    """ selected tab is not a joystick - pick the first joystick tab as ordered by the user """
-
-                    tab_ids = [device_id for device_id, _, tab_type, _ in tab_map.values() if tab_type == TabDeviceType.Joystick]
-
-                    if not tab_ids:
-                        syslog.warning("No joystick available to map to")
-                        mb = ui_common.MessageBox("Unable to create mapping, no suitable input hardware found.")
-                        mb.exec()
-                        return
-
-                    tab_guid = gremlin.util.parse_guid(tab_ids[0])
-                    device = current_profile.devices[tab_guid]
-
-                mode = device.modes[current_mode]
-                mode_name = mode.name
                 device_guid = device.device_guid
-                device_type = device.device_type
-                device_info: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_guid)
 
-                device_axis_list = [i for i in range(1, device_info.axis_count + 1)]
-                device_button_list = [i for i in range(1, device_info.button_count + 1)]
-                device_hat_list = [i for i in range(1, device_info.hat_count + 1)]
+                # Don't create mappings for non joystick devices
+                if device.device_type not in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
+                    return
+                mode = gremlin.shared_state.current_mode
+                profile : gremlin.base_profile.Profile= gremlin.shared_state.current_profile
+
+                device_axis_list = device.getAxisInputIdList()
+                device_button_list = [i for i in range(1, device.button_count + 1)]
+                device_hat_list = [i for i in range(1, device.hat_count + 1)]
 
                 vjoy_info: dinput.DeviceSummary = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
                 vjoy_axis_list = [i for i in range(1, vjoy_info.axis_count + 1)]
@@ -2607,7 +2594,7 @@ class Mapper:
                 vjoy_button_list = [i for i in range(1, vjoy_info.button_count + 1)]
 
                 if rollover == MapperMode.Unused:
-                    unused_entries = current_profile.list_unused_vjoy_inputs()
+                    unused_entries = profile.list_unused_vjoy_inputs()
                     # gets dict[vjoy_id][axis | button | hat] = list[unused_vjoy_ids]
                     if vjoy_id in unused_entries:
                         unused_axes = unused_entries["axis"]
@@ -2639,35 +2626,28 @@ class Mapper:
                     if input_map:
                         source.append((InputType.JoystickHat, input_map))
 
+                widget.inputItemListModel.pushSuspend()
+
                 for input_type, input_map in source:
                     for input_id, vjoy_input_id in input_map:
                         self.mapSingle(
-                            device_guid,
-                            device_type,
-                            mode_name,
-                            input_type=input_type,
-                            input_id=input_id,
-                            vjoy_id=vjoy_id,
-                            vjoy_input_type=input_type,
-                            vjoy_input_id=vjoy_input_id,
+                            profile = profile,
+                            device_guid = device_guid,
+                            mode = mode,
+                            input_type = input_type,
+                            input_id = input_id,
+                            vjoy_id = vjoy_id,
+                            vjoy_input_type = input_type,
+                            vjoy_input_id = vjoy_input_id,
                         )
 
-                # synchronize
-                registry = gremlin.shared_state.current_profile.registry
-                registry.sync(current_profile)
 
-                # refresh the input tabs
+                widget.inputItemListModel.popSuspend()
 
-                # tab_widget = gremlin_ui.getActiveTabWidget()
-                # tab_widget.refresh()
 
-                # update the selection
-                # device_guid, input_type, input_id = gremlin.config.Configuration().get_last_input()
-                # if input_type and input_id:
-                #     el.select_input.emit(device_guid, input_type, input_id, True, False, False, None)
             finally:
-                # el.update_action_icons.emit() # asks all inputs to refresh their action icons
-                el.request_ui_refresh.emit()
+                pass # el.update_action_icons.emit() # asks all inputs to refresh their action icons
+
 
     def create_1to1_mapping(self):
         """shows the dialog"""
@@ -2677,4 +2657,8 @@ class Mapper:
         if device_info is not None:
             dialog = Mapper.MapperDialog(device_info)
             gremlin.util.centerDialog(dialog, width=dialog.width(), height=dialog.height())
-            dialog.exec()
+            result = dialog.exec()
+            if result == QtWidgets.QDialog.Accepted:
+                # handle accepted result
+                el = gremlin.event_handler.EventListener()
+                el.request_ui_refresh.emit()

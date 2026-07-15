@@ -2848,3 +2848,12 @@ def getWidgetPositionInHierarchy(widget: QtWidgets.QWidget, relative_to: QtWidge
         return pos_map
 
     return []
+
+
+def isHashable(obj):
+    """checks if an object is hashable"""
+    try:
+        hash(obj)
+        return True
+    except TypeError:
+        return False

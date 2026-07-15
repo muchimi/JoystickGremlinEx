@@ -33,7 +33,7 @@ syslog = logging.getLogger("system")
 
 class VisualizationType(IntEnum):
     """Enumeration of possible visualization types."""
-
+    NotSet = 0
     AxisTemporal = 1
     AxisCurrent = 2
     ButtonHat = 3
@@ -41,6 +41,32 @@ class VisualizationType(IntEnum):
     State = 5
     Button = 6
     Hat = 7
+
+    @classmethod
+    def toString(cls, value: VisualizationType) -> str:
+        return value.name.casefold()
+    @classmethod
+    def fromString(cls, value: str) -> VisualizationType:
+        match value.casefold():
+            case "notset":
+                return cls.NotSet
+            case "axistemporal":
+                return cls.AxisTemporal
+            case "axiscurrent":
+                return cls.AxisCurrent
+            case "buttonhat":
+                return cls.ButtonHat
+            case "keyboard":
+                return cls.Keyboard
+            case "state":
+                return cls.State
+            case "button":
+                return cls.Button
+            case "hat":
+                return cls.Hat
+            case _:
+                raise ValueError(f"Unknown VisualizationType string: {value}")  
+
 
 
 class KeyboardOutputMode(Enum):  # order is that of the display order for keyboard mapper options

@@ -268,7 +268,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         model.pushSuspend()  # suspend triggers
         model.clear(emit=False)
 
-        device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(self.device_guid)
+        #device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(self.device_guid)
         # if device.is_virtual and device.vjoy_id == 4:
         #     pass
 
