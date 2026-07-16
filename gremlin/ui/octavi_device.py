@@ -769,7 +769,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         """
         current_mode = gremlin.shared_state.edit_mode
-        mode_object = self.device_node.ensure_mode_exists(profile=self.profile, mode_name=current_mode, device=self.device_guid)
+        mode_object = self.device_node.ensure_mode_exists(current_mode)
         config = mode_object._config
 
         changed = False
@@ -864,7 +864,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def set_mode(self, mode):
         """changes the mode of the tab"""
         self.current_mode = mode
-        self.device_node.ensure_mode_exists(profile=self.profile, mode_name=self.current_mode, device=self.device_guid)
+        self.device_node.ensure_mode_exists(self.current_mode)
         self.inputItemListModel.mode = mode
 
         # self.inputItemListView.select_item(-1)

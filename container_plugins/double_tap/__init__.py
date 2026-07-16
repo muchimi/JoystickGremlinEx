@@ -19,6 +19,7 @@ import copy
 import logging
 import threading
 import time
+
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets
@@ -26,7 +27,7 @@ from PySide6 import QtWidgets
 import gremlin
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, InputItem
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
 from gremlin.types import ContainerViewTypes, Interactions
@@ -37,7 +38,7 @@ syslog = logging.getLogger("system")
 class DoubleTapContainerWidget(AbstractContainerWidget):
     """DoubleTap container for actions for double or single taps."""
 
-    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : DoubleTapContainer, parent=None):  # noqa: F821
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : "DoubleTapContainer", parent=None):  # noqa: F821
         """Creates a new instance.
 
         :param input_item the input item represented by this widget
@@ -45,8 +46,10 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         :param parent the parent of this widget
         """
         super().__init__(input_item, container, parent)
+
+    def _create(self, container : "DoubleTapContainer"):
         self.container = container
-        self.input_item = input_item
+        self.input_item : InputItem = self.container.input_item
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -78,6 +81,8 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addLayout(self.options_layout)
 
+        self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self.action_layout.addWidget(gremlin.ui.ui_common.QIconLabel("mdi.gesture-tap", "<b>Single Tap</b>", icon_size=24))
         if self.container.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),
@@ -87,6 +92,8 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
         else:
             self._create_action_widget(0, "Single Tap", self.action_layout, ContainerViewTypes.Action)
 
+        self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self.action_layout.addWidget(gremlin.ui.ui_common.QIconLabel("mdi.gesture-double-tap", "<b>Double Tap</b>", icon_size=24))
         if self.container.action_sets[1] is None:
             self._add_action_selector(
                 lambda x: self._add_action(1, x),
@@ -322,14 +329,6 @@ and another action on input double-click (tap)"""
     functor = DoubleTapContainerFunctor
     widget = DoubleTapContainerWidget
 
-    # override default allowed inputs here
-    # input_types = [
-    #     InputType.JoystickAxis,
-    #     InputType.JoystickButton,
-    #     InputType.JoystickHat,
-    #     InputType.Keyboard
-    # ]
-
     input_types = [
         InputType.JoystickButton,
         InputType.JoystickHat,
@@ -346,10 +345,15 @@ and another action on input double-click (tap)"""
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node)
-        self.setActionSets([[], []])
+        super().__init__(parent, node, custom_action_sets=True)
+
         self.delay = 0.5
         self.activate_on = "exclusive"
+        self.action_sets.clear()
+        self.action_sets.add(gremlin.input_item.ActionSet(self, "Single Tap"), 0)
+        self.action_sets.add(gremlin.input_item.ActionSet(self, "Double Tap"), 1)
+
+
 
     def _parse_xml(self, node, data=None, extra_data=None):
         """Populates the container with the XML node's contents.
@@ -360,6 +364,19 @@ and another action on input double-click (tap)"""
         self.delay = gremlin.profile.safe_read(node, "delay", float, 0.5)
         self.activate_on = gremlin.profile.safe_read(node, "activate-on", str, "combined")
 
+
+        # read into custom action sets
+        index = 0
+        for as_node in node.xpath(".//action-set"):
+            action_set = self.action_sets[index]
+            action_set.clear()
+            input_item = self.input_item
+            self._parse_action_xml(as_node, action_set, input_item, extra_data)
+            index += 1
+            if index >= 2:
+                break
+
+
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
 
@@ -369,13 +386,6 @@ and another action on input double-click (tap)"""
         node.set("type", DoubleTapContainer.tag)
         node.set("delay", str(self.delay))
         node.set("activate-on", self.activate_on)
-        # for action_set in self.action_sets:
-        #     if action_set:
-        #         as_node = ElementTree.Element("action-set")
-        #         as_node.set("id", write_guid(action_set.id))
-        #         for action in action_set:
-        #             as_node.append(action.to_xml())
-        #         node.append(as_node)
         return node
 
     def _is_container_valid(self):
@@ -383,7 +393,7 @@ and another action on input double-click (tap)"""
 
         :return True if the container is configured properly, False otherwise
         """
-        return len(self.action_sets) == 2 and None not in self.action_sets
+        return True
 
 
 # Plugin definitions

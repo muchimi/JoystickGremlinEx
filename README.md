@@ -28,10 +28,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m77T6)
+- Change: DoubleTap container: additional UI icons and section separators in line with other containers.
+- Fix: automated API refactor failure (ensure_mode_exists)
+- Fix: DoubleTap container: updated to use new API
+- Fix: (proposed) equality check recursion in some situations
 
 ### (m77T5A)
 - Fix: incorrect version #
 - Fix: refactor of flow layout event signature not propagated to all dependencies
+
 
 ### (m77T5)
 

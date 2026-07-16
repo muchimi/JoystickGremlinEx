@@ -1009,7 +1009,7 @@ class AbstractCallbackModel(AbstractModel):
         """subscribtable"""
         if index in self._filtered_index_map:
             return self._filtered_index_map[index]
-        raise IndexError
+        raise IndexError("index out of range")
 
     def append(self, item) -> int:
         """

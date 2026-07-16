@@ -105,11 +105,6 @@ class HatButtonsContainerWidget(AbstractContainerWidget):
 
         for position in self.container.action_set_position_map:
             self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
-            # position_name = vjoy.vjoy.Hat.getName(position)
-            # icon = vjoy.vjoy.Hat.getIcon(position)
-            # label = f"<b>{position_name}</b>"
-            # label_widget = gremlin.ui.ui_common.QIconLabel(icon_path = icon, text = label,icon_size=24)
-            # self.action_layout.addWidget(label_widget)
             widget = self._create_action_widget(position, self.action_layout, ContainerViewTypes.Action)
             self._widget_map[position] = widget
 
@@ -333,7 +328,7 @@ class HatButtonsContainer(AbstractContainer):
         self.override_input_id = 1
         self.override_input_type = InputType.JoystickButton
         self.action_set_position_map = {}  # used positions
-        self.custom_action_sets = True  # indicate we use custom action sets
+
 
         # create an action set for all hat positions
         for position in vjoy.vjoy.Hat.getEightDirections():
@@ -341,14 +336,6 @@ class HatButtonsContainer(AbstractContainer):
             self.action_sets.add(action_set)
             action_set.extraData = position # index in the data field
             self.action_set_position_map[position] = action_set
-            # action_set.addCallback(self._action_set_changed)
-
-    # def _action_set_changed(self, position):
-    #     """Callback for when an action set changes."""
-
-    #     action_set = self.getActionSet(position)
-    #     syslog.info(f"Action set changed: {action_set} : action count: {len(action_set)}")
-    #     pass
 
 
     def getActionSet(self, position):

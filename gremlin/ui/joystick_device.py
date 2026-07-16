@@ -654,7 +654,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 f"Device tab: change mode requested: device tab: {gremlin.shared_state.get_device_name(self.device.device_guid)} current mode: [{mode}]  new mode: [{mode}] "
             )
 
-        self.device_profile.ensure_mode_exists(profile=self.profile, mode_name=mode, device=self.device.device_guid)
+        self.device_profile.ensure_mode_exists(mode)
 
         self.inputItemListModel.mode = mode
 
@@ -700,7 +700,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """
         current_mode = gremlin.shared_state.edit_mode
         device_profile = gremlin.shared_state.device_profile_map[self.device_guid]
-        self.device_profile.ensure_mode_exists(profile=self.profile, mode_name=current_mode, device=self.device_guid)
+        self.device_profile.ensure_mode_exists(current_mode)
         input_items = device_profile.modes[current_mode]
         axis_count = len(input_items.config[InputType.JoystickAxis])
         button_count = len(input_items.config[InputType.JoystickButton])

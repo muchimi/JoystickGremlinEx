@@ -2230,10 +2230,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         width = 200
 
         # behavior combo box  - lets the user select the output behavior
-        self.cb_action_list = gremlin.ui.ui_common.QDataComboBox()
+        self.cb_action_list = gremlin.ui.ui_common.QDataComboBox(callback_index=self._handle_action_mode_changed)
         self.cb_action_list.setFixedWidth(width)
 
-        self.cb_action_list.currentIndexChanged.connect(self._handle_action_mode_changed)
+        # self.cb_action_list.currentIndexChanged.connect(self._handle_action_mode_changed)
         self.action_label = QtWidgets.QLabel()
 
         self.container_mode_selector_widget = gremlin.ui.ui_common.getGridContainer(
@@ -2244,7 +2244,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         grids.append(self.container_mode_selector_widget)
 
         self.virtual_device_label_widget = QtWidgets.QLabel("Device:")
-        self.virtual_device_selector_widget = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_virtual_device_input_changed)
+        self.virtual_device_selector_widget = gremlin.ui.ui_common.QDataComboBox(callback_index=self._handle_virtual_device_input_changed)
         self.virtual_device_selector_widget.setFixedWidth(width)
 
         self.container_device_selector_widget = gremlin.ui.ui_common.getGridContainer(
@@ -2266,12 +2266,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self.lbl_hat_selector = QtWidgets.QLabel("Press Position:")
 
-        self.cb_hat_selector = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_hat_selector_changed)
+        self.cb_hat_selector = gremlin.ui.ui_common.QDataComboBox(callback_index=self._handle_hat_selector_changed)
         self.cb_hat_selector.setFixedWidth(width)
 
         self.lbl_hat_return_selector = QtWidgets.QLabel("Release position:")
 
-        self.cb_hat_return_selector = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_hat_return_selector_changed)
+        self.cb_hat_return_selector = gremlin.ui.ui_common.QDataComboBox(callback_index=self._handle_hat_return_selector_changed)
         self.cb_hat_return_selector.setFixedWidth(width)
 
         self.container_output_selector_widget = gremlin.ui.ui_common.getGridContainer(
@@ -3189,7 +3189,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             for action in actions:
                 self.cb_action_list.addItem(VjoyAction.to_name(action), action)
 
-    def _handle_virtual_device_input_changed(self, index):
+    def _handle_virtual_device_input_changed(self, index : int):
         """occurs when the vjoy output device is changed"""
         with QtCore.QSignalBlocker(self.virtual_device_selector_widget):
             device = self.virtual_device_selector_widget.itemData(index)
@@ -3254,14 +3254,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
 
 
-    def _handle_hat_selector_changed(self, index):
+    def _handle_hat_selector_changed(self, index : int):
         """occurs when hat is changed"""
-        position = index[0]
+        position = self.cb_hat_selector.itemData(index)
         self.action_data.vjoy_hat_position = position
 
-    def _handle_hat_return_selector_changed(self, index):
+    def _handle_hat_return_selector_changed(self, index : int):
         """occurs when hat is changed"""
-        position = index[0]
+        position = self.cb_hat_return_selector.itemData(index)
         self.action_data.vjoy_hat_return_position = position
 
     def _handle_tag_callback(self, action: VjoyRemap, extra_data: dict):  # noqa: F821
@@ -3763,7 +3763,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self._update_info()
 
-    def _handle_action_mode_changed(self, index):
+    def _handle_action_mode_changed(self, index : int):
         """called when the drop down value changes"""
         with QtCore.QSignalBlocker(self.cb_action_list):
             action: VjoyAction = self.cb_action_list.itemData(index)

@@ -1602,7 +1602,7 @@ class ProfileModifier:
 
         # Ensure modes present in the source device exist in the target device
         for mode_name in source_dev.modes:
-            target_dev.ensure_mode_exists(mode_name, target_hardware_device)
+            target_dev.ensure_mode_exists(mode_name)
 
         # Move container entries from source to target as long as there is a
         # matching input item available

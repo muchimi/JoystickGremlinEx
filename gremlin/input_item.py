@@ -3315,6 +3315,7 @@ class InputItemListView(AbstractView):
 
         self._drawn_once = False  # true if the list has been redrawn at least once
         self._redraw_lock = False
+        self._suspend_stack = 0
 
         self._widget_map = {}  # map of input item to input widget [model index : int] -> inputitemwidget
         self._input_item_map = {}  # map of input item to input widget [input_item] -> inputitemwidget
@@ -3345,6 +3346,7 @@ class InputItemListView(AbstractView):
 
         # load data and update
         self.popSuspended(emit=False)
+
 
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""
@@ -4810,7 +4812,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
 
         if self.custom_action_sets:
-            # custom load 
+            # custom load
             if self.actionsetCustomParseCallback:
                 # handles the complete load via custom callback if the container implements it
                 self.actionsetCustomParseCallback(node, data, extra_data)
@@ -8598,6 +8600,14 @@ class AbstractActionWrapper(QtWidgets.QDockWidget):
         # Create default layout
         self.main_layout = QtWidgets.QVBoxLayout(self.dock_widget)
 
+    @property
+    def action_data(self):
+        """Returns the action associated with this wrapper."""
+        if self.action_widget:
+            return self.action_widget.action_data
+        return None
+
+
 
 class TitleBarButton(QtWidgets.QAbstractButton):
     """Button usable in the titlebar of dock widgets."""
@@ -8850,17 +8860,19 @@ class BasicActionWrapper(AbstractActionWrapper):
         """
         super().__init__(action_widget, parent)
 
-        mode = action_widget.action_data.get_mode()
         self.action_widget = action_widget
+        action = action_widget.action_data
+        mode = action.get_mode()
 
-        action = self.action_widget.action_data
+
+
         if hasattr(action, "hint"):
             hint = action.hint
         else:
             hint = gremlin.hints.hint.get(action.tag, "")
 
         self._title_bar_widget = TitleBar(
-            f"{action_widget.action_data.name} ({mode})",
+            f"{action.name} ({mode})",
             hint,
             self._remove,
             self._clipboard_copy,
@@ -9330,8 +9342,6 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         super().__init__(parent)
 
         assert isinstance(input_item, InputItem), "invalid input type"
-        if input_item.input_id is None:
-            pass
         assert input_item.input_id is not None, "invalid input id on input item"
         assert input_item.input_type is not None, "input type cannot be derived be specified"
 
@@ -10069,12 +10079,18 @@ class InputItemMappingWidget(QtWidgets.QWidget):
     def __eq__(self, other):
         if other is None:
             return False
+        if not isinstance(other, InputItemMappingWidget):
+            return False
         if hasattr(self, "item_data"):
             if not hasattr(other, "item_data"):
                 return False
-            if self._input_item and other.item_data:
-                return self._input_item.callbackKey() == other.item_data.callbackKey()
-        return self == other
+        if self._input_item and other.item_data:
+            return self._input_item.callbackKey() == other.item_data.callbackKey()
+
+        if self._input_item and other._input_item:
+            return self._input_item == other._input_item
+        return False
+
 
 
 @SingletonDecorator
