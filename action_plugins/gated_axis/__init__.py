@@ -167,7 +167,7 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         background_color = gremlin.ui.ui_common.Color.sliderBackgroundColor()
         self.slider_frame_widget.setStyleSheet(f".QFrame{{background-color: {background_color}; border-radius: 10px;}}")
         self._slider_widget = gremlin.ui.qsliderwidget.QSliderWidget(parent=self.slider_frame_widget, object_name=f"Slider for {self.objectName()} [{self.id}]")
-        
+
 
 
         # self._slider.setOrientation(QtCore.Qt.Horizontal)
@@ -348,7 +348,7 @@ making changes that impact the order of gates or ranges."""
         self._update_filter()  # update filters based on current selection
         self._update_event_ui()
 
-    def _handle_range_line_count_changed(self, count: int):
+    def _handle_range_line_count_changed(self, widget, count: int):
         min_height = 24 * count
         self.range_flow_widget.setMinimumHeight(min_height)
 

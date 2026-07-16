@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T5A)
+- Fix: incorrect version #
+- Fix: refactor of flow layout event signature not propagated to all dependencies
+
 ### (m77T5)
 
 - Change: UI: general tweaks.

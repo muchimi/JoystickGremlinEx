@@ -7924,7 +7924,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
         return True
 
 
-    def _handle_line_count_changed(self, count):
+    def _handle_line_count_changed(self, widget, count : int):
         """called when the line count of the flow layout changes"""
         self.updateGeometry()
 
