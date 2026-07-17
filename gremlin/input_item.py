@@ -3391,11 +3391,13 @@ class InputItemListView(AbstractView):
 
     def showBlank(self):
         """displays a blank page"""
-        self._stacked_widget.setCurrentIndex(0)
+        if self._stacked_widget is not None:
+            self._stacked_widget.setCurrentIndex(0)
 
     def showContent(self):
         """displays the content page"""
-        self._stacked_widget.setCurrentIndex(1)
+        if self._stacked_widget is not None:
+            self._stacked_widget.setCurrentIndex(1)
 
     def _sync_input(self, input_item):
         gremlin.util.InvokeUiMethod(self._sync_input_ui, input_item)

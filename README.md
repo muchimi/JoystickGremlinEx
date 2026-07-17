@@ -28,7 +28,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
-### (m77T6)
+### (m77T6/A/B)
+- Change: changed keyboard and event queues to different data structures
 - Change: DoubleTap container: additional UI icons and section separators in line with other containers.
 - Fix: automated API refactor failure (ensure_mode_exists)
 - Fix: DoubleTap container: updated to use new API

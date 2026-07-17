@@ -16,9 +16,12 @@
 
 import os
 from collections.abc import MutableSequence
+import collections
+import time
+import threading
 from abc import abstractmethod, ABCMeta
 from PySide6 import QtCore
-from typing import Callable
+from typing import Callable, List, Any
 from gremlin.input_types import InputType
 from gremlin.types import DeviceType
 from psygnal import Signal
@@ -1564,3 +1567,262 @@ class AbstractCallbackModel(AbstractModel):
     def __hash__(self):
         """unique hash value of model contents"""
         return hash((self.id, frozenset(self._index_map.values())))
+
+
+
+
+
+class FastQueue:
+    """ custom fast queue for high-performance hook handling """
+
+    class Full(Exception):
+        """Exception raised by put() when queue is full."""
+        pass
+
+    class Empty(Exception):
+        """Exception raised by get() when queue is empty."""
+        pass
+
+    def __init__(self, maxsize: int = 0):
+        self.maxsize = maxsize
+        self._queue = collections.deque()
+        self._lock = threading.Lock()
+        self._condition = threading.Condition(self._lock)
+
+    @staticmethod
+    def fromList(items: list, maxsize: int = 0):
+        """Creates a FastQueue from a list of items."""
+        queue = FastQueue(maxsize)
+        for item in items:
+            queue.put(item)
+        return queue
+
+    def put(self, item, block: bool = True, timeout: float = None) -> bool:
+        """Add an item to the queue.
+
+        Returns True if successful, raises FastQueue.Full exception if space is unavailable.
+        """
+        with self._condition:
+            if self.maxsize > 0:
+                if not block:
+                    if len(self._queue) >= self.maxsize:
+                        raise FastQueue.Full("Queue is full")
+                else:
+                    # Wait until space opens up or timeout expires
+                    end_time = time.time() + timeout if timeout is not None else 0
+                    while len(self._queue) >= self.maxsize:
+                        if timeout is not None:
+                            remaining = end_time - time.time()
+                            if remaining <= 0:
+                                raise FastQueue.Full("Queue is full (timeout)")
+                            self._condition.wait(remaining)
+                        else:
+                            self._condition.wait()
+
+            self._queue.append(item)
+            self._condition.notify()  # Awaken waiting consumers
+            return True
+
+    def append(self, item : Any):
+        """Alias for put() to maintain compatibility with list-like behavior."""
+        return self.put(item)
+
+    def push(self, item : Any):
+        """Alias for put() to maintain compatibility with stack-like behavior."""
+        return self.put(item)
+
+    def pop(self, block: bool = True, timeout: float = None):
+        """Remove and return an item from the front of the queue.
+
+        Raises FastQueue.Empty exception if data is unavailable.
+        """
+        return self.get(block, timeout)
+
+    def popleft(self, block: bool = True, timeout: float = None):
+        """Remove and return an item from the front of the queue.
+
+        Raises FastQueue.Empty exception if data is unavailable.
+        """
+        return self.get(block, timeout)
+
+    def popback(self, block: bool = True, timeout: float = None):
+        """Remove and return an item from the back of the queue.
+
+        Raises FastQueue.Empty exception if data is unavailable.
+        """
+        with self._condition:
+            if not block:
+                if not self._queue:
+                    raise FastQueue.Empty("Queue is empty")
+            else:
+                # Wait until data arrives or timeout expires
+                end_time = time.time() + timeout if timeout is not None else 0
+                while not self._queue:
+                    if timeout is not None:
+                        remaining = end_time - time.time()
+                        if remaining <= 0:
+                            raise FastQueue.Empty("Queue is empty (timeout)")
+                        self._condition.wait(remaining)
+                    else:
+                        self._condition.wait()
+
+            item = self._queue.pop()
+            self._condition.notify()  # Awaken waiting producers
+            return item
+
+    def get(self, block: bool = True, timeout: float = None):
+        """Remove and return an item from the queue.
+
+        Raises FastQueue.Empty exception if data is unavailable.
+        """
+        with self._condition:
+            if not block:
+                if not self._queue:
+                    raise FastQueue.Empty("Queue is empty")
+            else:
+                # Wait until data arrives or timeout expires
+                end_time = time.time() + timeout if timeout is not None else 0
+                while not self._queue:
+                    if timeout is not None:
+                        remaining = end_time - time.time()
+                        if remaining <= 0:
+                            raise FastQueue.Empty("Queue is empty (timeout)")
+                        self._condition.wait(remaining)
+                    else:
+                        self._condition.wait()
+
+            item = self._queue.popleft()
+            self._condition.notify()  # Awaken waiting producers
+            return item
+
+    def getbatch(self, max_batch_size: int, block: bool = True, timeout: float = None) -> List[Any]:
+        """Extract up to max_batch_size items from the front of the queue in a single lock.
+
+        If block is True, it will wait until AT LEAST one item is available before
+        grabbing as many as possible up to max_batch_size.
+
+        Raises Empty exception if block is False and queue is empty, or if timeout expires.
+        """
+        if max_batch_size <= 0:
+            return []
+
+        with self._condition:
+            if not block:
+                if not self._queue:
+                    raise FastQueue.Empty("Queue is empty")
+            else:
+                # Wait until there is at least one item to harvest
+                end_time = time.time() + timeout if timeout is not None else 0
+                while not self._queue:
+                    if timeout is not None:
+                        remaining = end_time - time.time()
+                        if remaining <= 0:
+                            raise FastQueue.Empty("Queue is empty (timeout)")
+                        self._condition.wait(remaining)
+                    else:
+                        self._condition.wait()
+
+            # Determine the slice size safely within boundaries
+            batch_size = min(len(self._queue), max_batch_size)
+            batch = [self._queue.popleft() for _ in range(batch_size)]
+
+            # Since multiple slots just freed up, awaken all potentially blocked producers
+            if batch_size > 0:
+                self._condition.notify_all()
+
+            return batch
+
+    def getall(self, block: bool = True, timeout: float = None) -> List[Any]:
+        """Atomically drain, clear, and return all items currently in the queue.
+
+        If block is True, it waits until AT LEAST one item is present before clearing.
+        If block is False and the queue is empty, it raises an Empty exception.
+        """
+        with self._condition:
+            if not block:
+                if not self._queue:
+                    raise FastQueue.Empty("Queue is empty")
+            else:
+                # Wait until there is something to consume
+                end_time = time.time() + timeout if timeout is not None else 0
+                while not self._queue:
+                    if timeout is not None:
+                        remaining = end_time - time.time()
+                        if remaining <= 0:
+                            raise FastQueue.Empty("Queue is empty (timeout)")
+                        self._condition.wait(remaining)
+                    else:
+                        self._condition.wait()
+
+            # Fast O(1) transfer of data structure reference
+            items = list(self._queue)
+            self._queue.clear()
+
+            # Wake up all producers since the queue is entirely empty
+            self._condition.notify_all()
+            return items
+
+    def qsize(self) -> int:
+        """Return the approximate size of the queue."""
+        with self._lock:
+            return len(self._queue)
+
+    def remove(self, item: Any, failOnMissing: bool = False) -> bool:
+        """Remove the first occurrence of an item from the queue.
+
+        Raises ValueError if the item is not present.
+        Awakens waiting producers since space has freed up.
+
+        :returns: True if the item was removed, False if not found, or exception
+        """
+        with self._condition:
+            try:
+                # deque.remove() is optimized in C, but shifts memory under the hood
+                self._queue.remove(item)
+                result = True
+            except ValueError:
+                if failOnMissing:
+                    raise ValueError("item not in queue")
+                result = False
+
+            # Notify any blocked producers that a slot has opened up
+            self._condition.notify()
+        return result
+
+    def clear(self):
+        """Clear all items from the queue."""
+        with self._condition:
+            self._queue.clear()
+            self._condition.notify_all()  # Notify all waiting threads
+
+    @property
+    def __items__(self) -> List[Any]:
+        """Return a point-in-time snapshot list of all items currently in the queue."""
+        with self._lock:
+            return list(self._queue)
+
+    def __len__(self) -> int:
+        """Return the current size of the queue using len()."""
+        with self._lock:
+            return len(self._queue)
+
+    def __contains__(self, item: Any) -> bool:
+        """Check if an item exists in the queue using the 'in' operator."""
+        with self._lock:
+            return item in self._queue
+
+    def __iter__(self):
+        """Return a snapshot iterator over the current items without holding the lock."""
+        return iter(self.__items__)
+
+
+    def empty(self) -> bool:
+        """Return True if the queue is empty, False otherwise."""
+        with self._lock:
+            return not self._queue
+
+    def full(self) -> bool:
+        """Return True if the queue is full, False otherwise."""
+        with self._lock:
+            return self.maxsize > 0 and len(self._queue) >= self.maxsize
+

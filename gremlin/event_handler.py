@@ -31,6 +31,7 @@ from threading import Thread, Timer
 from typing import Callable
 import math
 import gremlin.base_classes
+from gremlin.base_classes import FastQueue
 import gremlin.shared_state
 import gremlin.threading
 
@@ -419,7 +420,7 @@ class JoystickEventQueue:
     """
 
     def __init__(self, name: str = None):
-        self._queue = collections.deque()  # Underlying queue for FIFO order
+        self._queue = FastQueue()  # Underlying queue for FIFO order
         self._seen = set()  # Set to track seen items for uniqueness
         self._lock = threading.RLock()
         self.name = name
@@ -431,11 +432,11 @@ class JoystickEventQueue:
                 key = event.callbackKey
                 if key in self._seen:
                     # swap with the latest axis value
-                    self._queue = collections.deque(x if x.callbackKey != key else event for x in self._queue)
+                    self._queue = FastQueue.fromList([x if x.callbackKey != key else event for x in list(self._queue)])
                     return
                 self._seen.add(key)
 
-            self._queue.append(event)
+            self._queue.put(event)
 
     def putData(self, data):
         """plain data add"""
@@ -463,30 +464,25 @@ class JoystickEventQueue:
 
     def getAll(self) -> list:
         """returns a list of all the events in the queue and empties it"""
-        with self._lock:
-            events = list(self._queue)
-            self._queue.clear()
-            return events
+        return self._queue.getall()
+
 
     def clear(self):
         """clears the queue"""
-        with self._lock:
-            self._queue.clear()
+        self._queue.clear()
 
     def empty(self):
         """Returns True if the queue is empty, False otherwise."""
-        return len(self._queue) == 0
+        return self._queue.empty()
+
 
     def qsize(self):
         """Returns the number of items in the queue."""
-        return len(self._queue)
+        return self._queue.qsize()
 
     def __len__(self):
         return self.qsize()
 
-    # def __contains__(self, event : Event):
-    # 	key = event.callbackkey
-    # 	return key in self._seen
 
 
 class DeviceChangeEvent:
@@ -845,7 +841,7 @@ class EventListener(QtCore.QObject):
     # container_modified = Signal(object) # indicates a container was modified
     # data_changed = Signal(object) # indicates a model was changed
 
-    
+
     def postInit(self):
         """Post-initialization hook for the event handler"""
         import gremlin.windows_event_hook
@@ -982,10 +978,6 @@ class EventListener(QtCore.QObject):
 
     def queueJoystickEventList(self, event_list):
         """queues a list of joystick events"""
-        # verbose = self._verbose_queue
-        # verbose = True
-        # jp = JoystickEventProcessor()
-        # jp.queueJoystickEventList(event_list)
         for event in event_list:
             self._event_queue.put(event)
 
@@ -998,11 +990,11 @@ class EventListener(QtCore.QObject):
                 time.sleep(0)
                 continue
 
-            event = self._event_queue.get()
-
-            # events
-            self.joystick_event.emit(event)
-            self.joystick_event_ui.emit(event)  # this is a QT event and will resolve to the UI thread on appropriate slots managed by JoystickProcessor
+            events = self._event_queue.getAll()
+            for event in events:
+                # events
+                self.joystick_event.emit(event)
+                self.joystick_event_ui.emit(event)  # this is a QT event and will resolve to the UI thread on appropriate slots managed by JoystickProcessor
 
             if not gremlin.shared_state.is_running:
                 # edit time UI events
@@ -1030,8 +1022,9 @@ class EventListener(QtCore.QObject):
         self._vjoy_callbacks.clear()
 
         # clear the event queue
-        while not self._event_queue.empty():
-            self._event_queue.get()
+        self._event_queue.clear()
+        # while not self._event_queue.empty():
+        #     self._event_queue.get()
 
     def disconnect(self, signal : Signal | QtCore.Signal, slot : Callable):
         """ attempts to disconnect a slot from a signal safely """
@@ -1352,11 +1345,56 @@ class EventListener(QtCore.QObject):
 
     def _process_queue(self):
         """processes an item the keyboard buffer queue"""
+        items = list(self._keyboard_queue.getall())
+        for item, is_pressed in items:
+            verbose = gremlin.config.Configuration().verbose_mode_detailed
+            is_error = False
+            if verbose:
+                syslog.info(f"process_queue: found item: {item} is pressed: {is_pressed}")
+
+            if isinstance(item, int):
+                virtual_code = item
+                key = gremlin.keyboard.KeyMap.find_virtual(virtual_code)
+                self._keyboard_buffer[virtual_code] = is_pressed
+                key_id = key.index_tuple()
+            else:
+                key_id = item
+                scan_code, is_extended = item
+                key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
+
+                if key is None:
+                    syslog.error(f"DEQUEUE KEY: don't know how to handle scancode: {scan_code:x} extended: {is_extended}")
+                    is_error = True
+                else:
+                    virtual_code = key.virtual_code
+                    self._keyboard_buffer[key_id] = is_pressed
+
+            if not is_error:
+                if verbose:
+                    syslog.info(
+                        f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} id: {key_id} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed}"
+                    )
+
+                self.keyboard_event.emit(
+                    Event(
+                        event_type=InputType.Keyboard,
+                        device_guid=dinput.GUID_Keyboard,
+                        identifier=key_id,
+                        virtual_code=virtual_code,
+                        is_pressed=is_pressed,
+                        data=self._keyboard_buffer,
+                    )
+                )
+
+            # process the events
+            time.sleep(0)  # yield to other threads
+            # QtWidgets.QApplication.processEvents()
+            # self._keyboard_queue.task_done()
         item, is_pressed = self._keyboard_queue.get()
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         is_error = False
         if verbose:
-            syslog.info(f"process_queue: found item: {item} is presseD: {is_pressed}")
+            syslog.info(f"process_queue: found item: {item} is pressed: {is_pressed}")
 
         if isinstance(item, int):
             virtual_code = item
@@ -1393,8 +1431,9 @@ class EventListener(QtCore.QObject):
             )
 
         # process the events
-        QtWidgets.QApplication.processEvents()
-        self._keyboard_queue.task_done()
+        time.sleep(0)  # yield to other threads
+        # QtWidgets.QApplication.processEvents()
+        # self._keyboard_queue.task_done()
 
     def _keyboard_processor(self):
         """runs as a thread to process inbound keyboard events using a queue"""
@@ -1419,7 +1458,7 @@ class EventListener(QtCore.QObject):
     def start_key_listener(self):
         """starts the key listener"""
         if not self._key_listener_started:
-            self._keyboard_queue = queue.Queue()
+            self._keyboard_queue = FastQueue() # queue.Queue()
 
             self._keyboard_thread = gremlin.threading.AbortableThread(target=self._keyboard_processor)
             self._keyboard_thread.start()
@@ -1430,9 +1469,9 @@ class EventListener(QtCore.QObject):
             self._keyboard_thread.stop()
             self._keyboard_thread.join()
             # clear any remaining input queue items
-            while not self._keyboard_queue.empty():
-                self._keyboard_queue.get()
-            self._keyboard_queue.join()
+            self._keyboard_queue.clear()
+            # while not self._keyboard_queue.empty():
+            #     self._keyboard_queue.get()
             self._key_listener_started = False
 
     def start(self):
