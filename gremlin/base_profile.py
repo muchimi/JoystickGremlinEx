@@ -1634,12 +1634,14 @@ class Settings:
         self,
         device_guid: dinput.GUID | str | int,
         input_type: InputType | list[InputType],
+        as_list : bool = False
     ) -> int:
         """gets the counts of filtered inputs in the device in the profile input filter settings - add multiple types by including them in the list"""
 
         input_type_list = input_type if hasattr(input_type, "__iter__") else [input_type]
         count = 0
         device_guid = gremlin.util.normalize_guid(device_guid)  # key must be a string
+        item_list = []
         if device_guid in self.input_visible_map:
             for input_type in input_type_list:
                 if input_type in self.input_visible_map[device_guid]:
@@ -1647,8 +1649,13 @@ class Settings:
                         1 if self.input_visible_map[device_guid][input_type][input_id] else 0 for input_id in self.input_visible_map[device_guid][input_type]
                     )
                     count += filtered_count
+                    if as_list:
+                        item_list.extend(
+                            (device_guid, input_type, input_id) for input_id in self.input_visible_map[device_guid][input_type] if self.input_visible_map[device_guid][input_type][input_id]
+                        )
+                        
 
-        return count
+        return item_list if as_list else count
 
     def getInputVisible(
         self,

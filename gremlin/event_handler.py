@@ -412,7 +412,7 @@ class Event:
         self.force_remote = state["force_remote"]
 
 
-class JoystickEventQueue:
+class JoystickEventQueue(FastQueue):
     """represents a unique event queue
 
     only one event type can be stored
@@ -420,68 +420,16 @@ class JoystickEventQueue:
     """
 
     def __init__(self, name: str = None):
-        self._queue = FastQueue()  # Underlying queue for FIFO order
-        self._seen = set()  # Set to track seen items for uniqueness
-        self._lock = threading.RLock()
+        super().__init__()
         self.name = name
-
-    def put(self, event: Event):
-        """Adds an item to the queue if it's not already present."""
-        with self._lock:
-            if event.is_axis:
-                key = event.callbackKey
-                if key in self._seen:
-                    # swap with the latest axis value
-                    self._queue = FastQueue.fromList([x if x.callbackKey != key else event for x in list(self._queue)])
-                    return
-                self._seen.add(key)
-
-            self._queue.put(event)
 
     def putData(self, data):
         """plain data add"""
-        with self._lock:
-            self._queue.append(data)
-
-    def get(self):
-        """Removes and returns an item from the front of the queue."""
-        if not self.empty():
-            with self._lock:
-                event: Event = self._queue.popleft()
-                if event.is_axis:
-                    key = event.callbackKey
-                    self._seen.remove(key)  # Remove from seen set when dequeued
-                return event
-        else:
-            raise IndexError("Queue is empty")
+        # with self._lock:
+        self.put(data)
 
     def getData(self):
-        if not self.empty():
-            with self._lock:
-                return self._queue.popleft()
-        else:
-            raise IndexError("Queue is empty")
-
-    def getAll(self) -> list:
-        """returns a list of all the events in the queue and empties it"""
-        return self._queue.getall()
-
-
-    def clear(self):
-        """clears the queue"""
-        self._queue.clear()
-
-    def empty(self):
-        """Returns True if the queue is empty, False otherwise."""
-        return self._queue.empty()
-
-
-    def qsize(self):
-        """Returns the number of items in the queue."""
-        return self._queue.qsize()
-
-    def __len__(self):
-        return self.qsize()
+        return self.get()
 
 
 
@@ -990,7 +938,7 @@ class EventListener(QtCore.QObject):
                 time.sleep(0)
                 continue
 
-            events = self._event_queue.getAll()
+            events = list(self._event_queue.getall())
             for event in events:
                 # events
                 self.joystick_event.emit(event)
@@ -1004,8 +952,6 @@ class EventListener(QtCore.QObject):
                     self.axis_state_change.emit(event)
                 else:
                     self.button_state_change.emit(event)  # for button repeaters
-
-            # self._event_queue.task_done()
 
     def _fireUIJoystickEventCallbacks(self, event):
         # run the UI callbacks on the UI thread

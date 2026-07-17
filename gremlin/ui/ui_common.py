@@ -806,7 +806,7 @@ class Color:
             }}
             QCheckBox::indicator:checked {{
                 image: url({relative_path}{checkbox_checked});
-                background-color: {selected_background_color};
+                background-color: {checkbox_background_color};
                 border-radius: 4px;
             }}
             QCheckBox::indicator:unchecked {{
@@ -825,12 +825,15 @@ class Color:
             QRadioButton::indicator {{
                 width: 18px;
                 height: 18px;
+                border-radius: 9px;
             }}
             QRadioButton::indicator:checked {{
                 image: url({relative_path}{radio_checked});
+                background-color: {checkbox_background_color};
             }}
             QRadioButton::indicator:unchecked {{
                 image: url({relative_path}{radio_unchecked});
+                background-color: {checkbox_background_color};
             }}
             QPlainTextEdit {{
                  border: 1px solid {border_color};

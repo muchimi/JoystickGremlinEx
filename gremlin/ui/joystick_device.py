@@ -349,10 +349,11 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # see if the profile has a default input setup saved for this input
 
         if settings.hasFilterDefinition(device_guid):
-            count = settings.getVisibleInputCounts(device_guid, [InputType.JoystickAxis, InputType.JoystickButton])
-            if count:
-                input_filter = settings.getInputVisible(device_guid)
-                return input_filter
+            item_list = settings.getVisibleInputCounts(device_guid, [InputType.JoystickAxis, InputType.JoystickButton], as_list=True)
+            if item_list:
+                for device_guid, input_type, input_id in item_list:
+                    input_filter = settings.getInputVisible(device_guid, input_type, input_id)  # example, adjust as needed
+                    return input_filter
 
         # come up with a default value
 

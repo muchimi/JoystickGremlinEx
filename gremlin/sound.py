@@ -31,7 +31,8 @@ import threading
 import logging
 
 import gremlin.singleton_decorator
-import queue
+#import queue
+from gremlin.base_classes import FastQueue
 import enum
 import time
 
@@ -214,7 +215,7 @@ class Sound:
         self.sound_volume_map = {}  # holds the sound volume for each key - if not present used the default volume
         self.sound_audio_file_map = {}  # [key] -> audio file path
         self._audio_device = None
-        self._event_queue = queue.Queue()  # sound queue - holds SoundCommand objects
+        self._event_queue = FastQueue() # queue.Queue()  # sound queue - holds SoundCommand objects
         self._thread = None  # sound thread
         self._is_running = False  # true if the queue is running
         self._is_paused = False  # true if queue processing is paused

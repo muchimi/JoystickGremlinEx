@@ -34,7 +34,8 @@ import gremlin.threading
 import gremlin.util as util
 import pyttsx3
 import gremlin.singleton_decorator
-import queue
+#import queue
+from gremlin.base_classes import FastQueue
 import gremlin.util
 
 syslog = logging.getLogger("system")
@@ -64,7 +65,7 @@ class TextToSpeech:
         self._started = False
         self._tts_thread = None
         self._queue_thread = None
-        self._queue = queue.Queue()
+        self._queue = FastQueue() # queue.Queue()
         self.valid = config.tts_enabled
         try:
             self.engine = pyttsx3.init()

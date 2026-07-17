@@ -4951,7 +4951,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 while widget is None: # not available yet
                     QThread.msleep(100)
                     widget = self.ui.getCurrentRegisteredWidget()
-                widget.refresh(force=True)
+                widget.refresh()
                 self.finished.emit() # indicate done
 
     def _profile_load_completed(self, *args):

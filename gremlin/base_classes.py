@@ -1789,6 +1789,22 @@ class FastQueue:
             self._condition.notify()
         return result
 
+    def removeCallback(self, callback: Callable[[Any], None]):
+        """ remove items based on a callback - the callback gets the item and returns true if the item should be removed """
+        result = False
+        with self._condition:
+            for item in self._queue:
+                if callback(item):
+                    # deque.remove() is optimized in C, but shifts memory under the hood
+                    self._queue.remove(item)
+                    result = True
+
+                # Notify any blocked producers that a slot has opened up
+            if result:
+                self._condition.notify()
+        return result
+
+
     def clear(self):
         """Clear all items from the queue."""
         with self._condition:
