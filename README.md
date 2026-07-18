@@ -28,13 +28,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
-### (m77T7)
+### (m77T7/A)
 
 - Change: UI tweaks
 - Change: move TTS and sound to new queue system.
 - Fix: default input list for joystick devices incorrect API call
 - Fix: swap queue content logic fix (could cause unresponsive joystick events)
 - Fix: Input Viewer: state visualizer could cause an exception.
+- Fix: TTS and sound module API updates for new queues
 
 ### (m77T6/A/B)
 - Change: changed keyboard and event queues to different data structures

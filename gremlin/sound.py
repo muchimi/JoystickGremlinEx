@@ -640,7 +640,7 @@ class Sound:
                             if data.fadeout_ms:
                                 sound.fadeout(data.fadeout_ms)
                             sound.play(data.loops, data.playback_ms, data.fadein_ms)
-                    self._event_queue.task_done()
+                    # self._event_queue.task_done()
 
                 case SoundAction.SetVolume:
                     if USE_PG:
@@ -651,7 +651,7 @@ class Sound:
                             sound: pygame.mixer.Sound = self.sound_map[key]
                             volume = event.data
                             self.sound_volume_map[key] = volume
-                    self._event_queue.task_done()
+                    # self._event_queue.task_done()
 
                 case SoundAction.ChangeDevice:
                     if USE_PG:
@@ -663,7 +663,7 @@ class Sound:
                             self.setPlaybackDevice(device_name)
                             current_device_name = device_name
                             self._playback_device_name = device_name
-                    self._event_queue.task_done()
+                    # self._event_queue.task_done()
 
                 case SoundAction.Stop:
                     # clear the queue and stop playback
@@ -674,12 +674,12 @@ class Sound:
                     elif USE_SD:
                         sd.stop()
 
-                    self._event_queue.task_done()
+                    # self._event_queue.task_done()
 
                     # clear the rest of the queue
                     while not self._event_queue.empty():
                         self._event_queue.get()
-                        self._event_queue.task_done()
+                        # self._event_queue.task_done()
 
 
 class TTSGeneratorDialog(QtWidgets.QDialog):

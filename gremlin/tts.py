@@ -175,7 +175,7 @@ class TextToSpeech:
         """clears the queue"""
         while not self._queue.empty():
             self._queue.get()
-            self._queue.task_done()
+            # self._queue.task_done()
 
     def _speak(self, text, rate=None):
         """speaks the text"""
@@ -322,7 +322,7 @@ class TextToSpeech:
                 if verbose:
                     syslog.info("TTS: POP queue")
                 gremlin.util.InvokeUiMethod(functor)
-                self._queue.task_done()
+                # self._queue.task_done()
             time.sleep(0.05)
 
         # terminate any remaining queue items
