@@ -23,7 +23,7 @@ from __future__ import annotations  # deprecated with python 3.14+
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore
-from torch.nn.modules import container
+
 
 import gremlin
 import gremlin.event_handler

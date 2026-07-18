@@ -1146,16 +1146,6 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         self.main_layout.addWidget(self._status_widget)
         self.main_layout.addStretch()
 
-        # jep = gremlin.event_handler.JoystickEventProcessor()
-        # description = f"calibration axis position device: [{gremlin.joystick_handling.getDeviceName(self.action_data.device_guid)}] input id: [{self.action_data.input_id}]"
-        # jep.registerCallback(self.hook_id,
-        #                      self._handle_joystick_event_ui,
-        #                     device_guid = self.action_data.device_guid,
-        #                     input_type = InputType.JoystickAxis,
-        #                     input_id = self.action_data.input_id,
-        #                     ui_only = True,
-        #                     description = description)
-
         el = gremlin.event_handler.EventListener()
         el.joystick_event_ui.connect(self._joystick_event_handler)
 

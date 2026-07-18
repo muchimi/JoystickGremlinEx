@@ -849,6 +849,11 @@ States can be toggled by clicking on the state button.  Expression states will u
 
     def _update_ui(self):
         """updates the UI elements"""
+        if not Shiboken.isValid(self):
+            return
+        if not Shiboken.isValid(self._stacked_widget):
+            return
+
         if self._visualizer_count():
             # display visualizers
             self._stacked_widget.setCurrentIndex(1)
@@ -859,7 +864,7 @@ States can be toggled by clicking on the state button.  Expression states will u
     def closeSystemWidget(self, key):
         """closes the widget associated with the given key"""
 
-        device_guid, visualization_type = key
+        _, visualization_type = key
         match visualization_type:
             case VisualizationType.State:
                 self.state_widget_selector.setChecked(False)

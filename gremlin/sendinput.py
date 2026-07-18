@@ -261,14 +261,21 @@ class MouseController:
         self._delta_generator = None
         self._accel_generator = None
         self._is_running = False
+        self._stop = threading.Event()
         self._thread = None
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._profile_start)
+        el.profile_stop.connect(self._profile_stop)
 
     def _profile_start(self):
         self._delta_generator = None
         self._accel_generator = None
+        self._stop = threading.Event()
 
+    def _profile_stop(self):
+        self._delta_generator = None
+        self._accel_generator = None
+        self.stop()
 
     def set_absolute_motion(self, dx=None, dy=None):
         """Configures a motion using absolute velocities.
@@ -321,7 +328,8 @@ class MouseController:
 
     def start(self):
         """Starts the thread that will send motions when required."""
-        if not self._is_running:
+        if not self._thread or not self._thread.is_alive():
+            self._stop.clear()
             self._thread = threading.Thread(target=self._control_loop, daemon=False)
             self._thread.name = "MouseController"
             self._thread.start()
@@ -330,19 +338,19 @@ class MouseController:
     @property
     def started(self) -> bool:
         ''' true if controller is running'''
-        return self._is_running
+        return self._thread is not None and self._thread.is_alive()
 
     def stop(self):
         """Stops the thread that sends motion events."""
         if self._thread and self._thread.is_alive():
-            self._is_running = False
+            self._stop.set()
             self._thread.join()
             syslog.info("MOUSE CONTROL: stop")
 
     def _control_loop(self):
         """Loop responsible for creating and sending mouse motion events."""
-        self._is_running = True
-        while self._is_running:
+
+        while not self._stop.is_set():
 
             if self._motion_type == MotionType.Fixed and self._delta_generator:
                 # fixed

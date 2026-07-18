@@ -412,24 +412,24 @@ class Event:
         self.force_remote = state["force_remote"]
 
 
-class JoystickEventQueue(FastQueue):
-    """represents a unique event queue
+# class JoystickEventQueue(FastQueue):
+#     """represents a unique event queue
 
-    only one event type can be stored
+#     only one event type can be stored
 
-    """
+#     """
 
-    def __init__(self, name: str = None):
-        super().__init__()
-        self.name = name
+#     def __init__(self, name: str = None):
+#         super().__init__()
+#         self.name = name
 
-    def putData(self, data):
-        """plain data add"""
-        # with self._lock:
-        self.put(data)
+#     def putData(self, data):
+#         """plain data add"""
+#         # with self._lock:
+#         self.put(data)
 
-    def getData(self):
-        return self.get()
+#     def getData(self):
+#         return self.get()
 
 
 
@@ -870,7 +870,7 @@ class EventListener(QtCore.QObject):
         self._ui_joystick_event_callbacks = []  # callbacks for joystick event runner
 
         # setup the event queue for joystick events
-        self._event_queue = JoystickEventQueue("event listener queue")  # queue.Queue() # holds the queue of events waiting to be processed
+        self._event_queue : FastQueue[Event] = FastQueue[Event](name ="event listener queue")  # queue.Queue() # holds the queue of events waiting to be processed
         self._valid_device_map = gremlin.joystick_handling.getValidJoystickDevicesMap()
         self._event_thread = gremlin.threading.AbortableThreadX(target=self._event_runner, eh=self)
         self._event_thread.name = "EVENTLISTENER listener"
@@ -929,29 +929,39 @@ class EventListener(QtCore.QObject):
         for event in event_list:
             self._event_queue.put(event)
 
-    @ignore_function
-    def _event_runner(self):
-        """runner for inbound joystick events"""
-        # verbose = self._verbose_inputs
-        while not self._event_thread.stopped():
-            if self._event_queue.empty():
+    # @ignore_function
+    def _event_runner(self) -> None:
+        """Process inbound joystick events."""
+
+        event_queue = self._event_queue
+        event_thread = self._event_thread
+
+        joystick_event_emit = self.joystick_event.emit
+        joystick_event_ui_emit = self.joystick_event_ui.emit
+        axis_state_change_emit = self.axis_state_change.emit
+        button_state_change_emit = self.button_state_change.emit
+
+        while not event_thread.stopped():
+            event_list = event_queue.getNowait()
+            if not event_list:
                 time.sleep(0)
                 continue
+            for event in event_list:
+                joystick_event_emit(event)
+                joystick_event_ui_emit(event)
 
-            events = list(self._event_queue.getall())
-            for event in events:
-                # events
-                self.joystick_event.emit(event)
-                self.joystick_event_ui.emit(event)  # this is a QT event and will resolve to the UI thread on appropriate slots managed by JoystickProcessor
+                if not gremlin.shared_state.is_running:
+                    if event.is_axis:
+                        axis_state_change_emit(event)
+                    else:
+                        button_state_change_emit(event)
+                time.sleep(0)
 
             if not gremlin.shared_state.is_running:
-                # edit time UI events
-
-                # ui specific events (such as, repeater updates)
                 if event.is_axis:
-                    self.axis_state_change.emit(event)
+                    axis_state_change_emit(event)
                 else:
-                    self.button_state_change.emit(event)  # for button repeaters
+                    button_state_change_emit(event)
 
     def _fireUIJoystickEventCallbacks(self, event):
         # run the UI callbacks on the UI thread
@@ -1404,7 +1414,7 @@ class EventListener(QtCore.QObject):
     def start_key_listener(self):
         """starts the key listener"""
         if not self._key_listener_started:
-            self._keyboard_queue = FastQueue() # queue.Queue()
+            self._keyboard_queue : FastQueue[Event] = FastQueue(name="keyboard_queue") # queue.Queue()
 
             self._keyboard_thread = gremlin.threading.AbortableThread(target=self._keyboard_processor)
             self._keyboard_thread.start()
@@ -4340,8 +4350,8 @@ class JoystickEventProcessor:
             False: {},
             True: {},
         }  # holds callbacks without filters,
-        self._event_queue = JoystickEventQueue("event dispatcher queue")  # holds the queue of events waiting to be processed
-        self._ui_event_queue = JoystickEventQueue("ui event dispatcher queue")
+        self._event_queue = FastQueue[Event](name="event dispatcher queue")  # holds the queue of events waiting to be processed
+        self._ui_event_queue = FastQueue[Event](name="ui event dispatcher queue")
 
         self._listener_callbacks = {}  # map of repeater callbacks [device_guid:dinput.GUID][input_type][input_id] -> callback(event)
         self._callback_map = {}  # map of callback to the registered device
