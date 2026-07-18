@@ -9524,7 +9524,6 @@ class QSplitTabWidget(QDataWidget):
 
         self.addRightPanelWidget(self._right_panel_stacked_widget)
 
-        # self._right_container_layout.addWidget(QtWidgets.QLabel("stack end"))
         self._widget_config_index_map = {}  # map of input id to widget index
         self._widget_config_device_map = {}  # map of widget index to input id
 
@@ -9780,11 +9779,13 @@ class QSplitTabWidget(QDataWidget):
             if iis.contains(key):
                 iis.removeWidget(key)
 
-            index = self._widget_config_index_map[key]
-            widget = self._right_panel_stacked_widget.widget(index)
 
-            for callback in self._unregistered_callbacks:
-                callback(key, index, widget)
+            index = self._widget_config_index_map.get(key, -1)
+            if index != -1:
+                widget = self._right_panel_stacked_widget.widget(index)
+
+                for callback in self._unregistered_callbacks:
+                    callback(key, index, widget)
 
         clearStackedWidget(self._right_panel_stacked_widget)
 

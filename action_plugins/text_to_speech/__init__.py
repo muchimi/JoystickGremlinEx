@@ -341,6 +341,8 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
+
+
     def _parse_xml(self, node, data=None, extra_data=None):
 
         voice_id = None

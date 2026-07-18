@@ -122,7 +122,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
             self.container.get_input_type(),
             input_item,
         )
-        action_selector.inputItem = self.container
+        
         action_selector.action_added.connect(add_action_cb)
         action_selector.action_paste.connect(paste_action_cb)
 

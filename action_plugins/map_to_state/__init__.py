@@ -1229,7 +1229,7 @@ class MapToState(gremlin.base_profile.AbstractAction):
             self.state = state
         else:
             # state not found - see if we can find the missing datas
-            syslog.warning(f"STATE: (map to state): [{key}] does not exist - creating state")
+            # syslog.warning(f"STATE: (map to state): [{key}] does not exist - creating state")
             state = sd._register(key)
             self.state = state
 

@@ -1653,7 +1653,7 @@ class Settings:
                         item_list.extend(
                             (device_guid, input_type, input_id) for input_id in self.input_visible_map[device_guid][input_type] if self.input_visible_map[device_guid][input_type][input_id]
                         )
-                        
+
 
         return item_list if as_list else count
 
@@ -4786,10 +4786,15 @@ class Profile:
         extra_data: dict = None,
     ) -> bool:
         """intermediate call for every input item in the profile with a mapping"""
+
+        if not input_item or not input_item.containers:
+            return False
+
         if hasattr(tag_or_list, "__iter__"):
             tag_list = tag_or_list
         else:
             tag_list = [tag_or_list]
+
 
         for container in input_item.containers:
             for action_set in container.action_sets:
@@ -5216,9 +5221,11 @@ class ProfileModeNode:
                         #     f"load mode input id: input item id: {Ansi.YELLOW}[{item.id}]{Ansi.RESET} mode name: [{self.name}] input id: {Ansi.GREEN}[{item.input_id.name}/{item.input_id}]{Ansi.RESET}"
                         # )
                         # pass
-
                     case _:
-                        assert False, f"unhandled input type - got [{input_type}] - offending line: [{child.sourceline}]"
+                        message = f"XML: Parse Mode: unhandled input type [{input_type}] - offending line: [{child.sourceline}]"
+                        syslog.error(message)
+                        syslog.error(f"\t{etree.tostring(child, encoding='unicode')}]")
+                        continue
 
                 if extra_data is None:
                     extra_data = {}
@@ -5247,7 +5254,7 @@ class ProfileModeNode:
                     assert test == input_item
 
             except Exception:
-                syslog.error(f"XML: unknown input type: [{node.tag}]")
+                syslog.error(f"XML: unknown input type: [{node.tag}] - offending line: [{node.sourceline}]")
 
             # sorting index
             if input_item is not None:

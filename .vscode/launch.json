@@ -13,6 +13,7 @@
             "program": "${workspaceFolder}/gremlinEx.py",
             "console": "integratedTerminal",
             "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"},
+            //"justMyCode": false,
             "justMyCode": true,
             "subProcess": false,
             "args": ["--nmh"],

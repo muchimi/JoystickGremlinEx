@@ -28,6 +28,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+### (m77T8)
+
+- Fix: UI: (proposed) incorrect device page data when loading a new profile (file/open or file/recent of file/new).  This could show incorrect device inputs or mapping data such as missing keyboard, MIDI, OSC and state inputs. Cause: profile load logic not  aware of the new cache system.
+- Fix: Tick container: update to use new API
+- Fix: API: spurious thread lock exception due to improper thread condition handling internal to the new FastQueue object. Symptom: could cause GEX to randomly stop processing hardware events after some time.  
+- Fix: Options: TTS apply button could result in an exception due to input filtering system.
+- Fix: more descriptive messages on profile mode data read errors including offending line number in the profile XML.
+
 ### (m77T7/A)
 
 - Change: UI tweaks

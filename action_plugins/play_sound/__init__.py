@@ -324,7 +324,9 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
     def _update_ui(self):
         if self.action_data.mode == PlayMode.CoquiAI:
             ktts = gremlin.ktts.KTTS()
+
             generate_enabled = ktts.is_available() and self.action_data.text is not None and self.action_data.text != ""
+
             wav = self.action_data.tts_file
             play_enabled = wav is not None and os.path.isfile(wav)
             ktts_visible = True

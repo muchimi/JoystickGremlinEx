@@ -397,3 +397,4 @@ class TextToSpeech:
         """
         text = text.replace("${current_mode}", gremlin.shared_state.current_mode)
         return text
+

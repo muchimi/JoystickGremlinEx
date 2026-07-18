@@ -8087,10 +8087,11 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.collapsible_widget.expand(False)
 
     def _config_visible(self):
-        if not Shiboken.isValid(self):
-            return
-        config = gremlin.config.Configuration()
-        self._title_bar_widget.setIdVisible(config.show_container_id)
+        # if not Shiboken.isValid(self):
+        #     return
+        # config = gremlin.config.Configuration()
+        # self._title_bar_widget.setIdVisible(config.show_container_id)
+        pass
 
     def _handle_lock_changed(self, input_item):
         """enable/disable based on lock state"""
@@ -8825,6 +8826,10 @@ class TitleBar(QtWidgets.QWidget):
 
     def setIdValue(self, value: str):
         self._id_value = value
+
+    # def setIdVisible(self, visible: bool):
+    #     if self.label:
+    #         self.label.setVisible(visible)
 
     @QtCore.Slot()
     def _comment_changed(self):
@@ -10086,8 +10091,8 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         if hasattr(self, "item_data"):
             if not hasattr(other, "item_data"):
                 return False
-        if self._input_item and other.item_data:
-            return self._input_item.callbackKey() == other.item_data.callbackKey()
+        if self._input_item and other._input_item:
+            return self._input_item.callbackKey() == other._input_item.callbackKey()
 
         if self._input_item and other._input_item:
             return self._input_item == other._input_item
@@ -11796,6 +11801,22 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.listview_container.addWidget(gremlin.ui.ui_common.QEmptyWidget())  # QtWidgets.QLabel("Not loaded"))  # index 0 = blank placeholder
 
         self.addLeftPanelWidget(self.listview_container)
+
+        # el = gremlin.event_handler.EventListener()
+        # el.profile_unloaded.connect(self._handle_profile_changed)
+
+        self._blank_input()
+
+    # def _handle_profile_changed(self):
+    #     gremlin.util.InvokeUiMethod(self._handle_profile_changed_ui)
+
+    # def _handle_profile_changed_ui(self):
+    #     self.unregisterAllWidgets()
+    #     self._input_item_list_model.pushSuspend()
+    #     self._input_item_list_model.clear()
+    #     self._input_item_list_model.popSuspend()
+    #     self._blank_input()
+
 
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""

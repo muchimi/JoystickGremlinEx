@@ -37,6 +37,7 @@ from lxml import etree as ElementTree
 from typing import Callable
 
 from PySide6 import QtCore, QtWidgets, QtGui
+from PySide6.QtCore import QMetaObject
 from win32api import GetFileVersionInfo, LOWORD, HIWORD
 from PySide6.QtGui import QColor
 from psygnal import Signal
@@ -2123,29 +2124,33 @@ def to_byte_string(source) -> tuple:
     return (source, source.encode("utf-8"))
 
 
-def _singleshot(callback):
-    """runs on Ui thread - waits for items to be processed"""
-    InvokeUiMethod(_singleshot_ui, callback)  # run on UI thread
+class CallbackEvent(QtCore.QEvent):
+    """Custom event designed to pass a Python function across threads."""
+    EVENT_TYPE = QtCore.QEvent.Type(QtCore.QEvent.registerEventType())
 
+    def __init__(self, callback: Callable[[], None]):
+        super().__init__(self.EVENT_TYPE)
+        self.callback = callback
 
-def _singleshot_ui(callback):
-    QtWidgets.QApplication.processEvents()
-    callback()
+class SingleShotInvoker(QtCore.QObject):
+    def event(self, event: QtCore.QEvent) -> bool:
+        if event.type() == CallbackEvent.EVENT_TYPE:
+            event.callback()  # Executes safely on the UI thread
+            return True
+        return super().event(event)
 
+# Global invoker lazily initialized to ensure QApplication exists
+_single_shot_invoker = None
 
-def _get_singleshot_callback(callback):
-    return lambda: _singleshot(callback)
+def singleShot(callback: Callable[[], None]):
+    # syslog.info("single shot util")
+    """Fires callback in the UI thread - returns immediately to caller"""
+    global _single_shot_invoker
+    if _single_shot_invoker is None:
+        _single_shot_invoker = SingleShotInvoker()
 
-
-def _create_singleshot_callback(callback):
-    return lambda: _get_singleshot_callback(callback)
-
-
-def singleShot(callback):
-    """fires callback in a thread - returns immediately to caller"""
-
-    timer = threading.Timer(0.02, _create_singleshot_callback(callback))
-    timer.start()
+    # Safely posts the event to the UI thread's event loop
+    QtCore.QCoreApplication.postEvent(_single_shot_invoker, CallbackEvent(callback))
 
 
 def cubic_progression(num_points, start, end):

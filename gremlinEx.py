@@ -308,7 +308,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # Setup profile storage
 
-        self.profile = gremlin.base_profile.Profile()
+        self.profile = gremlin.base_profile.Profile() # blank profile
         self._profile_auto_activated = False
         # Input selection storage
         self._last_input_timestamp = time.time()
@@ -2393,25 +2393,28 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         return self.unregisterAllWidgets()
 
     def _unregister_all_widgets_ui(self):
+        """removes all widgets from the devices tab widget """
         # remove python references
-        for widget in self._widget_device_index_map.values():
-            widget.hide()
-            widget.setParent(None)
-            if hasattr(widget, "_cleanup_ui"):
-                widget._cleanup_ui()
-            widget.deleteLater()
+        for index in self._widget_device_index_map.values():
+            widget = self.ui.device_page_widget.widget(index)
+            if widget:
+                widget.hide()
+                self.ui.device_page_widget.removeWidget(widget)
+                gremlin.util.delete_widget(widget)
+
+        self._widget_device_index_map.clear()
+        self._widget_index_device_map.clear()
+
 
         # manual QT cleanup
         stacked_widget = self.ui.device_page_widget
         gremlin.ui.ui_common.clearStackedWidget(stacked_widget)
 
+
     def unregisterAllWidgets(self):
         """clears all device widgets"""
-
         gremlin.util.InvokeUiMethod(self._unregister_all_widgets_ui)  # ensure on UI thread
 
-        self._widget_device_index_map.clear()
-        self._widget_index_device_map.clear()
 
     def getRegisteredWidget(self, device_guid) -> QtWidgets.QWidget:
         """gets the widget for the given device id, None if not found"""
@@ -2823,6 +2826,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         the different connected devices.
         """
 
+        assert gremlin.util.is_ui_thread(), "UI updates must be performed on the main UI thread"
+
         # record the update requirement
         if self._suspend_ui_update:
             self._ui_update_pending = True
@@ -2830,6 +2835,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         try:
             self.pushLoading()
+
+            # clear all cached widgets
+            self._unregister_all_widgets_ui()
+            self.clearWidgets()
+
             gremlin.shared_state.push_redraw()
             reset = len(self._tab_device_map) == 0
 
@@ -2992,8 +3002,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 syslog.info(f"\tcreating device widget for [{device.name}].")
                             widget = gremlin.ui.joystick_device.JoystickDeviceTabWidget(
                                 device=device,
-                                profile=self.profile,
                                 mode=self.current_mode,
+                                profile=self.profile,
                                 object_name=f"Joystick [{device_name}]",
                             )
 
@@ -3003,8 +3013,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                             widget.data = (TabDeviceType.Joystick, device_guid, index)
 
-                            # gremlin.shared_state.device_widget_map[device_profile.device_guid] = widget
-                            # widget.inputChanged.connect(self._device_input_changed_cb)
 
                             index += 1
 
@@ -3415,7 +3423,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                     if isinstance(widget, BaseDeviceTabWidget):
                         # ensure the input is visible
-                        QTimer.singleShot(100, lambda: widget.ensureSelectedVisible())
+                        gremlin.util.singleShot(lambda: widget.ensureSelectedVisible())
 
 
             except Exception as err:
@@ -4997,6 +5005,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         as_new_profile: bool
         source_xml, as_new_profile, emit = args
 
+
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info("Profile: worker: start loading")
@@ -5078,6 +5087,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         return False
 
                     gremlin.shared_state.current_profile = new_profile
+                    self.profile = new_profile
                     profile_updated = new_profile.from_xml(source_xml)
 
                     profile_folder = os.path.dirname(source_xml)
@@ -5104,6 +5114,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         syslog.info("Profile: reload due to conversion.")
                         new_profile = gremlin.base_profile.Profile()
                         gremlin.shared_state.current_profile = new_profile
+                        self.profile = new_profile
                         new_profile.from_xml(source_xml)
 
                     # next file
@@ -5235,7 +5246,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         current_device_guid = gremlin.shared_state.current_tab_device_guid
         current_input_type, current_input_id = self._get_last_input(current_device_guid)
 
-        self._create_tabs()
+        self._create_tabs_ui()
 
         current_profile = gremlin.shared_state.current_profile
         current_mode = gremlin.shared_state.current_mode

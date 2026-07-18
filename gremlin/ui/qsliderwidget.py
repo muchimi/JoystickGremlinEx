@@ -867,9 +867,6 @@ class QSliderWidget(QtWidgets.QWidget):
         if self._tooltip_timer is not None:
             self._tooltip_timer.cancel()
 
-        # update m76T122 - remove all instances of QTimer to avoid mixing and matching QT threading model from Python threading model
-        # syncing with QT is manually handled to guard against pitfalls
-
         self._tooltip_timer = threading.Timer(1, self._create_tooltip_callback(message))
         self._tooltip_timer.start()
 

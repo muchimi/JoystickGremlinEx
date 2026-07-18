@@ -31,7 +31,7 @@ import gremlin.joystick_handling
 import gremlin.ui.qsliderwidget
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSelector
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSets, ActionSelector, InputItem
 
 from gremlin.input_types import InputType
 from gremlin.util import safe_format, safe_read
@@ -40,25 +40,20 @@ from gremlin.types import ContainerViewTypes, Interactions
 
 
 class TickContainerWidget(AbstractContainerWidget):
-    """Container with two actions, one for input button is pressed, the other for when the input button is released
-
-    While this can be duplicated with conditions - this is a helper container to simplify the profile setup.
-
-    Works with buttons or hats
-
-    """
+    """ container that splits an input axis into a set of ticks - each tick crossing triggers an action. """
 
     def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container: TickContainer, parent=None):
         """Creates a new instance.
 
-    :param input_item the input item represented by this widget
-    :param container the container represented by this widget
-    :param parent the parent of this widget
-    """
-        assert isinstance(container, TickContainer), "invalid container"
-        assert isinstance(input_item, gremlin.input_item.AbstractInputItem), "invalid input item"
-        self.container: TickContainer = container
+        :param input_item the input item represented by this widget
+        :param container the container represented by this widget
+        :param parent the parent of this widget
+        """
         super().__init__(input_item, container)
+
+    def _create(self, container : "TickContainer"):
+        self.container = container
+        self.input_item : InputItem = self.container.input_item
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -85,6 +80,7 @@ class TickContainerWidget(AbstractContainerWidget):
         self.slider_widget.setRange(-1, 1)
         self.slider_widget.setReadOnly(True)
         self.slider_widget.setDrawHandles(False)
+        self.slider_widget.setMinimumWidth(400)
 
         self.slider_widget.setTickCount(self.action_data.getTickCount())
 
@@ -103,6 +99,8 @@ class TickContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(self.header_container)
         self.action_layout.addLayout(self.options_layout)
 
+
+        self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
         if self.container.action_sets[0] is None:
             self._add_action_selector(
                 lambda x: self._add_action(0, x),
@@ -112,6 +110,7 @@ class TickContainerWidget(AbstractContainerWidget):
         else:
             self._create_action_widget(0, "Tick Up", self.action_layout, ContainerViewTypes.Action)
 
+        self.action_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
         if self.container.action_sets[1] is None:
             self._add_action_selector(
                 lambda x: self._add_action(1, x),
@@ -122,8 +121,6 @@ class TickContainerWidget(AbstractContainerWidget):
             self._create_action_widget(1, "Tick Down", self.action_layout, ContainerViewTypes.Action)
 
     def unhook(self):
-        # jep = gremlin.event_handler.JoystickEventProcessor()
-        # jep.unregisterCallback(self.action_data.action_id)
         pass
 
     def _joystick_event_handler(self, event):
@@ -185,8 +182,8 @@ class TickContainerWidget(AbstractContainerWidget):
         :param label the description of the action selector
         """
         action_selector = ActionSelector(
-            self.container.get_input_type(),
-            self.container,
+            input_type = self.container.get_input_type(),
+            input_item = self.input_item
         )
         action_selector.action_added.connect(add_action_cb)
         action_selector.action_paste.connect(paste_action_cb)
@@ -254,10 +251,7 @@ class TickContainerWidget(AbstractContainerWidget):
 
         :return title to use for the container
         """
-        title = "Tick:"
-        if self.container.is_valid():
-            title += f"({', '.join([a.name for a in self.container.action_sets[0]])}) / ({', '.join([a.name for a in self.container.action_sets[1]])})"
-        return title
+        return "Tick"
 
 
 class TickContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
@@ -278,7 +272,7 @@ class TickContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self._tick_map = [-1.0 + x * interval for x in range(count)]
         self._last_value = self.container._get_value()
 
-    def process_event(self, event, value, extra_data=None):
+    def process_event(self, event : gremlin.event_handler.Event, value, extra_data=None):
 
         if not event.is_axis:
             return
@@ -301,40 +295,32 @@ class TickContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         tick = index
         trigger = trigger or last_tick != tick
 
-        if trigger:
-            # print (f"Value: {value:0.3f}  last: {last_value:0.3f} index: {tick}   last tick: {last_tick}  map: {self._tick_map}  trigger: {trigger}")
 
+
+        if trigger:
+
+            # Determine how many ticks have been crossed since the last event
             trigger_count = abs(last_tick - tick)
-            event.is_axis = False
-            event.is_button = True
-            event.is_pressed = True  # tell each tick we're pressed
+            trigger_event = event.fake_button(True, clone= True)
+
             if last_value < value:
                 # going up
-                # print (f"increase set trigger  value: {value:0.3f} tick: {tick} last tick: {last_tick} count: {trigger_count}")
                 for _ in range(trigger_count):
-                    self._trigger(0, event, value, extra_data)
-                    # self.increase_set.process_event(event, value)
+                    self._trigger(0, trigger_event, value, extra_data)
             elif last_value > value:
                 # going down
-                # print (f"decrease set trigger  value: {value:0.3f} tick: {tick} count: {trigger_count}")
                 for _ in range(trigger_count):
-                    self._trigger(1, event, value, extra_data)
-                    # self.decrease_set.process_event(event, value)
+                    self._trigger(1, trigger_event, value, extra_data)
 
             self.last_tick = tick
 
         self._last_value = value
 
-        return False  # stop execution past this container
+        return False # stop further processing
 
 
 class TickContainer(AbstractContainer):
-    """A container with two actions which are triggered based on the duration
-    of the activation.
-
-    A short press will run the fist action while a longer press will run the
-    second action.
-    """
+    """ A container that splits the axis input into discrete ticks and triggers actions at each tick position. """
 
     name = "Tick"
     tag = "tick_container"
@@ -378,12 +364,11 @@ For a more advanced way to split an axis and trigger actions at specific points,
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node)
-        action_sets = ActionSets(self)
-        # action_sets.append(ActionSet(self,"short"))
-        # action_sets.append(ActionSet(self,"long"))
 
-        self.setActionSets(action_sets)
+        # this container has two actions sets, one for the increase actions (index 0), the other for the decrease actions (index 1)
+        super().__init__(parent, node, custom_action_sets=True)
+
+
         self.delay = 0.5
         self.activate_on = "release"
         self.interval = 0.2  # interval between ticks
@@ -392,14 +377,29 @@ For a more advanced way to split an axis and trigger actions at specific points,
         self.override_input_id = 1
         self.override_input_type = InputType.JoystickButton
 
+        self.action_sets.clear()
+        self.action_sets.add(gremlin.input_item.ActionSet(self, "Increase"), 0)
+        self.action_sets.add(gremlin.input_item.ActionSet(self, "Decrease"), 1)
+
     def _parse_xml(self, node, data=None, extra_data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
-        # self.setActionSets(ActionSets(self))
         self.interval = safe_read(node, "interval", float, 0.2)
-        # super()._parse_xml(node, data)
+
+        # read into custom action sets
+        index = 0
+        for as_node in node.xpath(".//action-set"):
+            action_set = self.action_sets[index]
+            action_set.clear()
+            input_item = self.input_item
+            self._parse_action_xml(as_node, action_set, input_item, extra_data)
+            index += 1
+            if index >= 2:
+                break
+
+
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.
@@ -409,14 +409,6 @@ For a more advanced way to split an axis and trigger actions at specific points,
         node = ElementTree.Element("container")
         node.set("type", TickContainer.tag)
         node.set("interval", safe_format(self.interval, float))
-
-        # action_set : ActionSet
-        # for action_set in self.action_sets:
-        #     as_node = ElementTree.Element("action-set")
-        #     as_node.set("id", write_guid(action_set.id))
-        #     for action in action_set:
-        #         as_node.append(action.to_xml())
-        #     node.append(as_node)
         return node
 
     def _is_container_valid(self):

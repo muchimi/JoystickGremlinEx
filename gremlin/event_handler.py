@@ -2533,9 +2533,10 @@ class EventHandler(QtCore.QObject):
                 # keyboard latched event
                 identifier = event.identifier  # Key()
                 primary_key = identifier
+                if not primary_key:
+                    return
 
                 # verbose = True
-
                 # if the key can latch with multiple primary keys, build the table of all combinations
                 key_list = [primary_key]
                 if primary_key.is_latched:
