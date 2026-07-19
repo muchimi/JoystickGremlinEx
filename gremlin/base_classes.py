@@ -1869,6 +1869,7 @@ class FastQueue(Generic[T]):
         if timeout is None:
             while not self._queue:
                 self._condition.wait()
+                time.sleep(0)  # yield to other threads
             return
 
         available = self._condition.wait_for(

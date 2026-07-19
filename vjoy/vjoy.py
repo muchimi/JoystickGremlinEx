@@ -1051,6 +1051,7 @@ class VJoyMonitor:
                     self._keep_alive_running = False
                     syslog.info("VJOY: keep alive stop event trigger")
                     break # exit if abort signal is set
+            time.sleep(1)
 
         syslog.info("VJOY: keep alive thread exiting")
 

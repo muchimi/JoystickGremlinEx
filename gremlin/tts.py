@@ -304,9 +304,9 @@ class TextToSpeech:
         self.engine.startLoop(False)
         try:
             while not self._tts_thread.stopped():
-                time.sleep(0.1)
                 self.engine.iterate()
-        except Exception as err:
+                time.sleep(0)
+        except Exception:
             pass # ignore
         finally:
             self.engine.endLoop()

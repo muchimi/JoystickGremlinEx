@@ -90,6 +90,75 @@ except Exception as e:
     syslog.error(f"Failed to initialize Maestro context: {e}")
     _maestro_initialized = False
 
+# dummy class until this is implemented
+class HIDMaestro:
+    class HMContext:
+        def Dispose(self):
+            pass
+
+    class HMController:
+        pass
+
+    class HMDeviceExtractor:
+        @staticmethod
+        def ListDevices():
+            return []
+
+class HidDescriptorBuilder:
+    def __init__(self):
+        pass
+    def build(self):
+        pass
+
+class HMProfileBuilder:
+    pass
+
+class HMControllerBuilder:
+    pass
+
+class HMDeviceExtractorBuilder:
+    pass
+
+class HMGamepadState:
+    pass
+
+class HMAxis:
+    X = 0
+    Y = 1
+    Z = 2
+    Rx = 3
+    Ry = 4
+    Rz = 5
+    Slider = 6
+    Dial = 7
+
+class HMControllerState:
+    pass
+
+class HMJoystickState:
+    pass
+
+class HMDeviceState:
+    pass
+
+class HMControllerCapabilities:
+    pass
+
+class HMDeviceCapabilities:
+    pass
+
+class HMProfile:
+    pass
+
+class HMController:
+    pass
+
+class HMButton:
+    pass
+
+class Dictionary:
+    pass
+
 
 @SingletonDecorator
 class Maestro:

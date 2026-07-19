@@ -1461,6 +1461,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     syslog.info(f"\tstep interval delay: {exec_delay_s:03f}")
                 self._wait(exec_delay_s)
 
+            time.sleep(0) # free up resources for other things to run
+
         if verbose:
             syslog.info(f"SEQUENCE NORMAL STOP: {self.id}")
         self.action_data._is_running = False
@@ -1538,6 +1540,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     self._wait(delay)
                     if not self.action_data._is_running:
                         break
+
+            time.sleep(0) # free up resources for other things to run
 
         # next node to run
         index += 1
@@ -1645,6 +1649,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                             self._wait(delay)
                             if not self.action_data._is_running:
                                 break
+                time.sleep(0) # free up resources for other things to run
 
             if not self.action_data._is_running:
                 break
@@ -1681,6 +1686,8 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                         syslog.info(f"SEQUENCE RUNNER: (wiggle) max step count reached ({step_count})")
                     self.action_data._is_running = False
                     break
+
+            time.sleep(0) # free up resources for other things to run
 
         if verbose:
             syslog.info(f"SEQUENCE WIGGLE STOP: {self.id}")

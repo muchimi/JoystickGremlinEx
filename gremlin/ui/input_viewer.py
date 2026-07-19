@@ -426,10 +426,21 @@ class VisualizationSelector(QtWidgets.QWidget):
     @QtCore.Slot()
     def _select_real(self):
         """selects all hardware inputs"""
+        result = gremlin.ui.ui_common.ConfirmBox("Select all hardware inputs?", "This will select all non-temporal hardware inputs.<br>This could be extremely memory and performance intensive.<br>Are you sure you want to select all?", parent = self)
+        if not result:
+            return
         for key, widget in self._selector_widgets.items():
             if not Shiboken.isValid(widget):
                 continue
-            device, visualization = key  # key (device_id, visualization)
+            device_id, visualization = key  # key (device_id, visualization)
+            if isinstance(device_id, tuple):
+                # vjoy input device, vjoyid is in the first element of the tuple
+                device = gremlin.joystick_handling.getDeviceFromVjoyId(device_id[0])
+            else:
+                device = gremlin.joystick_handling.getDevice(device_id)
+            if not device:
+                # device not found or no longer connected
+                continue
 
             if visualization != VisualizationType.AxisTemporal and not device.is_virtual:
                 with QtCore.QSignalBlocker(widget):
@@ -444,8 +455,6 @@ class VisualizationSelector(QtWidgets.QWidget):
         if not Shiboken.isValid(widget):
             return
         id = widget.data
-        vc = VisualizationConfig()
-
         device = gremlin.joystick_handling.getDeviceFromVjoyId(id)
         if device:
             keys = [(device.key, visualization) for visualization in VisualizationType]
@@ -466,7 +475,21 @@ class VisualizationSelector(QtWidgets.QWidget):
                 with QtCore.QSignalBlocker(widget):
                     widget.setChecked(True)
                 _, visualization = key  # key (device.key, visualization)
+                # skip temporal axes as that could kill performance fast
+                if visualization == VisualizationType.AxisTemporal:
+                    continue
                 device = vc.getDevice(key)
+                if device is None:
+                    device_id = key[0]
+                    if isinstance(device_id, tuple):
+                        # vjoy device
+                        vjoy_id = device_id[0]
+                        device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+                    else:
+                        device = gremlin.joystick_handling.getDevice(device_id)
+                    if not device:
+                        continue
+                    vc.register(key, device, visualization)
                 assert device is not None, "unregistered device in widget"
                 self._create_callback(device, visualization, widget)()
 
@@ -598,35 +621,37 @@ class VisualizerWidget(QtWidgets.QWidget):
                 self._update_layout()
 
     def _update_layout(self):
-        if self._vis in (VisualizationType.Button, VisualizationType.ButtonHat):
-            if self._widget:
-                button_widget = self._widget.buttonWidget()
-                w = button_widget.width() if button_widget else self._widget.width()
-                count = self._device.button_count
-                bw = 38 + 8  # width + margin of 4
-                cols = w // bw
-                rows = (count + cols - 1) // cols
-                h = rows * bw
-                # syslog.info(f"set fixed height: h: {h}  columns: {cols} rows: {rows}")
-
-                if self._vis == VisualizationType.ButtonHat:
-                    # account for hat visual
-                    hat_height = self._widget.hatWidget().height() if self._widget.hatWidget() else 0
-                    h = max(h, hat_height)
-
-                self._widget_container.setFixedHeight(h + bw)
-                self._container.updateGeometry()
-
-                h = self._container.sizeHint().height()
-                # syslog.info(f"container desired size: {h}")
-                self.setFixedHeight(h)
-                return
-
-        # reset fixed height
         if self._widget:
-            # automatic height
-            self.setMinimumHeight(0)
-            self.setMaximumHeight(QWIDGETSIZE_MAX)
+            match self._vis:
+                case VisualizationType.Button | VisualizationType.ButtonHat:
+                    button_widget = self._widget.buttonWidget()
+                    w = button_widget.width() if button_widget else self._widget.width()
+
+                    count = self._device.button_count
+                    bw = 38 + 8  # width + margin of 4
+                    cols = w // bw
+                    rows = (count + cols - 1) // cols
+                    h = rows * bw
+
+                    if self._vis == VisualizationType.ButtonHat:
+                        # account for hat visual
+                        hat_height = self._widget.hatWidget().height() if self._widget.hatWidget() else 0
+                        h = max(h, hat_height)
+
+                    self._widget_container.setFixedHeight(h + bw)
+                    self._container.updateGeometry()
+
+                    h = self._container.sizeHint().height()
+                    self.setFixedHeight(h)
+
+                case VisualizationType.State:
+                    # handle state widget
+                    self._widget.updateLayout()
+                    gremlin.ui.ui_common.resetWidgetSize(self)
+                case _:
+                    # all others - free size
+                    gremlin.ui.ui_common.resetWidgetSize(self)
+            return
         else:
             # hide
             self.setFixedHeight(0)
@@ -670,8 +695,8 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, True)
         self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, True)
 
-        sd = gremlin.ui.state_device.StateData()
-        sd.crud.connect(self._state_crud)
+        # sd = gremlin.ui.state_device.StateData()
+        # sd.crud.connect(self._state_crud)
 
         self.devices = gremlin.joystick_handling.joystick_devices()
         self.gamepad_devices = gremlin.gamepad_handling.gamepadDevices()
@@ -758,7 +783,7 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         clear_widget.clicked.connect(self._clear_all)
 
         select_all_widget = gremlin.ui.ui_common.QDataPushButton("Select All")
-        select_all_widget.setToolTip("Selects all inputs")
+        select_all_widget.setToolTip("Selects all (non temporal) inputs")
         select_all_widget.clicked.connect(self._select_all)
 
         select_real_widget = gremlin.ui.ui_common.QDataPushButton("Select Hardware")
@@ -845,6 +870,10 @@ States can be toggled by clicking on the state button.  Expression states will u
     def _visualizer_count(self):
         """returns the number of visualizer widgets"""
         count = sum(1 for w in self._visualizer_widgets.values() if w is not None)
+        if self._state_visible:
+            count += 1
+        if self._keyboard_visible:
+            count += 1
         return count
 
     def _update_ui(self):
@@ -940,6 +969,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             return
 
         widget = VisualizerWidget(key, device=device, vis=visualization, description=description)
+        # widget.layout().addWidget(QtWidgets.QLabel(f"visualizer widget for device: [{device.name}] visualization: [{visualization.name}]"))
         widget.closed.connect(lambda key: self.closeSystemWidget(key))
         self._widget_map[key] = widget
         self._device_key_map[key] = device
@@ -958,27 +988,24 @@ States can be toggled by clicking on the state button.  Expression states will u
 
     def _select_all(self):
         # select keyboard and state
+
+        result = gremlin.ui.ui_common.ConfirmBox("Select all non-temporal inputs?", "This will select all non-temporal inputs.<br>This could be extremely memory and performance intensive.<br>Are you sure you want to select all?", parent = self)
+        if not result:
+            return
+
         self._keyboard_visible = True
         self._state_visible = True
         self.vis_selector._select_all()
 
-        config = VisualizationConfig()
+
+        vc = VisualizationConfig()
         device = gremlin.joystick_handling.getDevice(gremlin.shared_state.state_tab_guid)
-        config.setValue(device.key, device, VisualizationType.State, True)
+        vc.setValue(vc.state_key, device, VisualizationType.State, True)
         device = gremlin.joystick_handling.getDevice(gremlin.shared_state.keyboard_tab_guid)
-        config.setValue(device.key, device, VisualizationType.Keyboard, True)
+        vc.setValue(vc.keyboard_key, device, VisualizationType.Keyboard, True)
+        self.showState()
+        self.showKeyboard()
 
-    @QtCore.Slot()
-    def _font_size_cb(self):
-        widget = self.sender()
-        size = widget.data
-        config = gremlin.config.Configuration()
-        config.input_viewer_button_size = size
-
-    @QtCore.Slot(str, object)
-    def _config_changed(self, key, value):
-        if key == "input_viewer_button_size":
-            self.refreshState()
 
     def eventFilter(self, widget, event):
         # filter events for keys so the window hotkeys don't interfere with the keyboard repeater
@@ -1001,14 +1028,14 @@ States can be toggled by clicking on the state button.  Expression states will u
         gremlin.util.clear_layout(self.main_layout)
         self._state_filter_widget = None
         self._state_visualizer_widget = None
-        self._state_buttons.clear()
+        # self._state_buttons.clear()
         self._widget_map.clear()
         self._device_key_map.clear()
         self._event_data.clear()
         self._visualizer_widgets.clear()
 
-        sd = gremlin.ui.state_device.StateData()
-        sd.crud.disconnect(self._state_crud)
+        # sd = gremlin.ui.state_device.StateData()
+        # sd.crud.disconnect(self._state_crud)
 
     def _delete_widget(self, widget):
         gremlin.util.delete_widget(widget)
@@ -1023,7 +1050,7 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         self._state_filter_widget = None
         self._state_visualizer_widget = None
-        self._state_buttons.clear()
+        # self._state_buttons.clear()
 
         self._delete_widget(self.keyboard_widget)
         self.keyboard_widget = None
@@ -1170,65 +1197,65 @@ States can be toggled by clicking on the state button.  Expression states will u
             return True
         return fnmatch.fnmatch(key, filter)
 
-    def _reload_states(self):
-        gremlin.util.InvokeUiMethod(self._reload_states_ui)  # ensure on UI thread
+    # def _reload_states(self):
+    #     gremlin.util.InvokeUiMethod(self._reload_states_ui)  # ensure on UI thread
 
-    def _reload_states_ui(self):
-        """loads or reloads states"""
-        if not self._state_visualizer_widget or not Shiboken.isValid(self._state_visualizer_widget):
-            return
+    # def _reload_states_ui(self):
+    #     """loads or reloads states"""
+    #     if not self._state_visualizer_widget or not Shiboken.isValid(self._state_visualizer_widget):
+    #         return
 
-        layout = self._state_button_layout
-        config = gremlin.config.Configuration()
-        verbose = config.verbose_mode_state
-        i = 0
-        sd = gremlin.ui.state_device.StateData()
-        items = sd.getStates().items()
-        gremlin.util.clear_layout(layout)
-        cm = gremlin.ui.state_device.StateCategories()
-        default_category = cm.default()
-        category = None
+    #     layout = self._state_button_layout
+    #     config = gremlin.config.Configuration()
+    #     verbose = config.verbose_mode_state
+    #     i = 0
+    #     sd = gremlin.ui.state_device.StateData()
+    #     items = sd.getStates().items()
+    #     gremlin.util.clear_layout(layout)
+    #     cm = gremlin.ui.state_device.StateCategories()
+    #     default_category = cm.default()
+    #     category = None
 
-        sd = gremlin.ui.state_device.StateData()
+    #     sd = gremlin.ui.state_device.StateData()
 
-        is_filter = config.iv_state_filter_enabled
-        if is_filter:
-            category = self._state_filter_widget.category
-            if not category:
-                category = default_category
-        if items:
-            for key, state in items:
-                if state.value is None:
-                    syslog.warning(f"viewer state: bad state data for state: {state.name} id [{state.id}] - null value - skipping display")
-                    continue
-                if category:
-                    # apply filter
-                    item_category = state.category if state.category else default_category
-                    if item_category != category:
-                        continue  # filter out
-                if is_filter and not self._filter_data(state):
-                    continue
+    #     is_filter = config.iv_state_filter_enabled
+    #     if is_filter:
+    #         category = self._state_filter_widget.category
+    #         if not category:
+    #             category = default_category
+    #     if items:
+    #         for key, state in items:
+    #             if state.value is None:
+    #                 syslog.warning(f"viewer state: bad state data for state: {state.name} id [{state.id}] - null value - skipping display")
+    #                 continue
+    #             if category:
+    #                 # apply filter
+    #                 item_category = state.category if state.category else default_category
+    #                 if item_category != category:
+    #                     continue  # filter out
+    #             if is_filter and not self._filter_data(state):
+    #                 continue
 
-                btn = gremlin.ui.ui_common.StateRepeaterButton(state, callback=self._state_toggle)
+    #             btn = gremlin.ui.ui_common.StateRepeaterButton(state, callback=self._state_toggle)
 
-                if verbose:
-                    syslog.info(f"viewer state: {key}  value: {state.value}")
+    #             if verbose:
+    #                 syslog.info(f"viewer state: {key}  value: {state.value}")
 
-                layout.addWidget(btn)
+    #             layout.addWidget(btn)
 
-                state.changed.connect(lambda x: self._state_changed(x))
+    #             state.changed.connect(lambda x: self._state_changed(x))
 
-                if state.key in self._state_buttons:
-                    # remove the prior button reference
-                    gremlin.util.delete_widget(self._state_buttons[state.key])
+    #             if state.key in self._state_buttons:
+    #                 # remove the prior button reference
+    #                 gremlin.util.delete_widget(self._state_buttons[state.key])
 
-                self._state_buttons[state.key] = btn
-                i += 1
+    #             self._state_buttons[state.key] = btn
+    #             i += 1
 
-        else:
-            icon = gremlin.ui.ui_common.Icons.warningIcon(gremlin.ui.ui_common.Color.yellowColor())
-            widget = gremlin.ui.ui_common.QWarningWidget("No states found.", icon=icon, tooltip="There are no states to display.")
-            layout.addWidget(widget)
+    #     else:
+    #         icon = gremlin.ui.ui_common.Icons.warningIcon(gremlin.ui.ui_common.Color.yellowColor())
+    #         widget = gremlin.ui.ui_common.QWarningWidget("No states found.", icon=icon, tooltip="There are no states to display.")
+    #         layout.addWidget(widget)
 
     def showKeyboard(self):
         """keyboard device"""
@@ -1264,6 +1291,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             self.keyboard_widget_selector.setChecked(True)
 
         self._keyboard_visible = True
+        self._update_ui()
 
     def hideKeyboard(self):
         if self._keyboard_visible:
@@ -1277,6 +1305,7 @@ States can be toggled by clicking on the state button.  Expression states will u
             with QtCore.QSignalBlocker(self.keyboard_widget_selector):
                 self.keyboard_widget_selector.setChecked(False)
             self._keyboard_visible = False
+            self._update_ui()
 
     def showState(self):
         """state device"""
@@ -1294,43 +1323,48 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         if not self._state_visualizer_widget:
             # widget holding state information
-            self._state_visualizer_widget = QtWidgets.QGroupBox("States")
-            layout = QtWidgets.QVBoxLayout(self._state_visualizer_widget)
 
-            self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv=True)
-            self._state_filter_widget.apply.connect(self._reload_states)
-            self._state_filter_widget.changed.connect(self._category_filter_changed)
-            self._state_filter_widget.enabledChanged.connect(self._reload_states)
+            self._state_visualizer_widget = gremlin.ui.ui_common.StateVisualizerWidget()
 
-            filter_container = gremlin.ui.ui_common.getHContainer([self._state_filter_widget], widget_only=True)
+            # self._state_visualizer_widget = QtWidgets.QGroupBox("States")
+            # layout = QtWidgets.QVBoxLayout(self._state_visualizer_widget)
 
-            widgets = [filter_container, gremlin.ui.ui_common.QHorizontalLine()]
-            container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
-            layout.addWidget(container)
+            # self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv=True)
+            # self._state_filter_widget.apply.connect(self._reload_states)
+            # self._state_filter_widget.changed.connect(self._category_filter_changed)
+            # self._state_filter_widget.enabledChanged.connect(self._reload_states)
 
-            config = gremlin.config.Configuration()
-            config.changed.connect(self._config_changed)
-            current_size = config.input_viewer_button_size
-            font_sizes = (("small", 12), ("medium", 16), ("large", 20))
-            widgets = []
-            for label, size in font_sizes:
-                rb = gremlin.ui.ui_common.QDataRadioButton(label, size)
-                if current_size == size:
-                    rb.setChecked(True)
-                rb.clicked.connect(self._font_size_cb)
-                widgets.append(rb)
+            # filter_container = gremlin.ui.ui_common.getHContainer([self._state_filter_widget], widget_only=True)
 
-            widget = gremlin.ui.ui_common.getHContainer(widgets, "Button size:", widget_only=True)
-            layout.addWidget(widget)
+            # widgets = [filter_container, gremlin.ui.ui_common.QHorizontalLine()]
+            # container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+            # layout.addWidget(container)
 
-            self._state_button_layout = gremlin.ui.ui_common.QFlowLayout()
-            layout.addLayout(self._state_button_layout)
+            # config = gremlin.config.Configuration()
+            # config.changed.connect(self._config_changed)
+            # current_size = config.input_viewer_button_size
+            # font_sizes = (("small", 12), ("medium", 16), ("large", 20))
+            # widgets = []
+            # for label, size in font_sizes:
+            #     rb = gremlin.ui.ui_common.QDataRadioButton(label, size)
+            #     if current_size == size:
+            #         rb.setChecked(True)
+            #     rb.clicked.connect(self._font_size_cb)
+            #     widgets.append(rb)
+
+            # widget = gremlin.ui.ui_common.getHContainer(widgets, "Button size:", widget_only=True)
+            # layout.addWidget(widget)
+
+            # self._state_button_layout = gremlin.ui.ui_common.QFlowLayout()
+            # layout.addLayout(self._state_button_layout)
 
 
 
-        self.populateState()
+        #self.populateState()
         viewer_widget.setWidget(self._state_visualizer_widget)
         self._state_visible = True
+
+        self._update_ui()
 
 
     def hideState(self):
@@ -1349,48 +1383,50 @@ States can be toggled by clicking on the state button.  Expression states will u
             self._state_visible = False
             with QtCore.QSignalBlocker(self.state_widget_selector):
                 self.state_widget_selector.setChecked(False)
+            self._update_ui()
 
-    @QtCore.Slot(object)
-    def _category_filter_changed(self, category):
-        """called when the state category filter is changed"""
-        self._reload_states()
+    # @QtCore.Slot(object)
+    # def _category_filter_changed(self, category):
+    #     """called when the state category filter is changed"""
+    #     self._reload_states()
 
-    def refreshState(self):
-        if self._state_visualizer_widget and Shiboken.isValid(self._state_visualizer_widget):
-            self.populateState()
+    # def refreshState(self):
+    #     if self._state_visualizer_widget and Shiboken.isValid(self._state_visualizer_widget):
+    #         self._state_visualizer_widget.populateState()
+    #         # self.populateState()
 
-    def _state_changed(self, state):
-        # state changed received - ensure on UI thread
-        gremlin.util.InvokeUiMethod(self._state_changed_ui, state)
+    # def _state_changed(self, state):
+    #     # state changed received - ensure on UI thread
+    #     gremlin.util.InvokeUiMethod(self._state_changed_ui, state)
 
-    def _state_changed_ui(self, state):
-        """called on state changes"""
-        verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose:
-            syslog.info(f"Viewer: state {state.key} changed {state.value}")
-        if state.key in self._state_buttons:
-            widget = self._state_buttons[state.key]
-            if Shiboken.isValid(widget):
-                widget.setState(state.value)
-        else:
-            if verbose:
-                syslog.warning(f"Viewer: state {state.key} widget not found")
+    # def _state_changed_ui(self, state):
+    #     """called on state changes"""
+    #     verbose = gremlin.config.Configuration().verbose_mode_state
+    #     if verbose:
+    #         syslog.info(f"Viewer: state {state.key} changed {state.value}")
+    #     if state.key in self._state_buttons:
+    #         widget = self._state_buttons[state.key]
+    #         if Shiboken.isValid(widget):
+    #             widget.setState(state.value)
+    #     else:
+    #         if verbose:
+    #             syslog.warning(f"Viewer: state {state.key} widget not found")
 
-    @QtCore.Slot()
-    def _state_toggle(self, widget):
-        state = widget.data
-        key = state.key
-        verbose = gremlin.config.Configuration().verbose_mode_state
-        if verbose:
-            syslog.info("-" * 50)
-            syslog.info(f"Viewer: state {state.key} toggle")
-        sc = gremlin.ui.state_device.StateData()
-        sc.toggle(key)
+    # @QtCore.Slot()
+    # def _state_toggle(self, widget):
+    #     state = widget.data
+    #     key = state.key
+    #     verbose = gremlin.config.Configuration().verbose_mode_state
+    #     if verbose:
+    #         syslog.info("-" * 50)
+    #         syslog.info(f"Viewer: state {state.key} toggle")
+    #     sc = gremlin.ui.state_device.StateData()
+    #     sc.toggle(key)
 
-    @QtCore.Slot()
-    def _state_crud(self):
-        # called on state create/add/remove/edit
-        self.refreshState()
+    # @QtCore.Slot()
+    # def _state_crud(self):
+    #     # called on state create/add/remove/edit
+    #     self.refreshState()
 
     @QtCore.Slot(bool)
     def _toggle_keyboard_widget(self, checked: bool):

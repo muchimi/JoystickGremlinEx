@@ -47,7 +47,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
 
     """
 
-    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : ButtonContainer, parent=None):  # noqa: F821
+    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : "ButtonContainer", parent=None):  # noqa: F821
         """Creates a new instance.
 
         :param input_item the input item represented by this widget
@@ -317,7 +317,7 @@ and another action on trigger release in a single container."""
         self.action_sets.clear()
         self.action_sets.add(self.press_action_set) # 0
         self.action_sets.add(self.release_action_set) # 1
-       
+
 
 
     def resetActionSets(self):

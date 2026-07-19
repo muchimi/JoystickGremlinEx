@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
 from PySide6 import QtWidgets
 
 import logging
@@ -38,7 +39,7 @@ syslog = logging.getLogger("system")
 class ChainContainerWidget(AbstractContainerWidget):
     """Container which holds a sequence of actions."""
 
-    def __init__(self, input_item : InputItem, container : ChainContainer, parent=None):  # noqa: F821
+    def __init__(self, input_item : InputItem, container : "ChainContainer", parent=None):  # noqa: F821
         """Creates a new instance.
 
         :param input_item the input item represented by this widget

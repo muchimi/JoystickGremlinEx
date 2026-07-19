@@ -28,6 +28,18 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+
+### (m77T9)
+- Change: Input Viewer: add a confirmation box as the operation can result in hundreds of visualizers which could be very memory and CPU intensive), and exclude temporal inputs.
+- Fix: resolved an issue causing a delay when stopping a profile
+- Fix: input viewer: override QT layout logic for state visualizer to prevent the visual from using significant empty vertical space.
+- Fix: Maestro: create temporary stand-in classes until interface exists.
+- Fix: Input Viewer: select all could cause an exception due to API changes
+- Fix: Input Viewer: select hardware could cause an exception due to API changes
+- Fix: XML: adjust logic on profile mode parsing.
+- Fix: API: relinquish control more often on thread loops.
+
+
 ### (m77T8)
 
 - Fix: UI: (proposed) incorrect device page data when loading a new profile (file/open or file/recent of file/new).  This could show incorrect device inputs or mapping data such as missing keyboard, MIDI, OSC and state inputs. Cause: profile load logic not  aware of the new cache system.

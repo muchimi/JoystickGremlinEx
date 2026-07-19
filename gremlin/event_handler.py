@@ -957,12 +957,6 @@ class EventListener(QtCore.QObject):
                         button_state_change_emit(event)
                 time.sleep(0)
 
-            if not gremlin.shared_state.is_running:
-                if event.is_axis:
-                    axis_state_change_emit(event)
-                else:
-                    button_state_change_emit(event)
-
     def _fireUIJoystickEventCallbacks(self, event):
         # run the UI callbacks on the UI thread
         if self._ui_joystick_event_callbacks:
@@ -1137,6 +1131,10 @@ class EventListener(QtCore.QObject):
     def _handle_profile_stopping(self):
         """called when profile is stopping"""
         import gremlin.windows_event_hook
+
+        # clear the current event queue
+        syslog.info(f"EXEC: clear event queue: size: {len(self._event_queue)}")
+        self._event_queue.clear()
 
         self._profile_started = False
         device_guid = gremlin.shared_state.mode_tab_guid
@@ -1403,11 +1401,13 @@ class EventListener(QtCore.QObject):
                 time.sleep(0)
                 continue
             self._process_queue()
+            time.sleep(0)  # yield to other threads
 
         # done
         # process any straglers
         while not self._keyboard_queue.empty():
             self._process_queue()
+            time.sleep(0)  # yield to other threads
 
         syslog.info("KBD: processing stop")
 
@@ -1422,9 +1422,12 @@ class EventListener(QtCore.QObject):
     def stop_key_listener(self):
         """stops the key listener"""
         if self._key_listener_started:
+            syslog.info("KEY THREAD: stopping...")
             self._keyboard_thread.stop()
             self._keyboard_thread.join()
+            syslog.info("KEY THREAD: stopped")
             # clear any remaining input queue items
+            syslog.info(f"KEY THREAD: clearing remaining items in queue: size: {len(self._keyboard_queue)}")
             self._keyboard_queue.clear()
             # while not self._keyboard_queue.empty():
             #     self._keyboard_queue.get()
@@ -1918,6 +1921,8 @@ class EventListener(QtCore.QObject):
         if event_list:
             self.queueJoystickEventList(event_list)
 
+        time.sleep(0)  # yield to other threads
+
     def _dinput_device_change_handler(self, data, action):
         """Callback for device change events.
 
@@ -2274,7 +2279,9 @@ class EventHandler(QtCore.QObject):
             current_profile.set_last_runtime_mode(last_mode)
 
             if self._execute_thread.is_alive():
+                syslog.info("EXEC: stopping execute runner thread")
                 self._execute_thread.stop()
+                syslog.info("EXEC: execute runner thread stopped")
                 self._execute_thread.join()
                 syslog.info("EXEC: stop")
 
@@ -4452,9 +4459,7 @@ class JoystickEventProcessor:
             syslog.info(
                 f"JEP: add listener: device: [{device_name}] input type: [{input_type}] mode: [{mode}] input_id: [{input_id}] key: [{key}] source: [{source.name}]"
             )
-            # obj = callback.__self__
-            # if hasattr(obj, "_description"):
-            #     syslog.info(f"\t{obj._description}")
+
 
     def unregisterListenerUICallback(
         self,
@@ -4557,12 +4562,14 @@ class JoystickEventProcessor:
                                 if verbose:
                                     syslog.info(f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}")
                                 callback(event)
+                                time.sleep(0)
 
                         if input_id_key in self._listener_callbacks[source][mode][device_guid][input_type]:
                             for callback in self._listener_callbacks[source][mode][device_guid][input_type][input_id_key]:
                                 if verbose:
                                     syslog.info(f"\texec: [{callback.__module__}.{callback.__self__.__class__.__name__}.{callback.__name__}] event: {str(event)}")
                                 callback(event)
+                                time.sleep(0)
 
     @QtCore.Slot(Event)
     def process_event_ui(self, event: Event):

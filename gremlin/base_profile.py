@@ -5204,57 +5204,57 @@ class ProfileModeNode:
                     input_type = InputType.to_enum(parent_node.get("type"))
                 else:
                     input_type = InputType.to_enum(child.tag)
-                match input_type:
-                    case InputType.State:
-                        item = gremlin.ui.state_device.StateInputItem()
-                    case InputType.Keyboard | InputType.KeyboardLatched:
-                        item = gremlin.ui.keyboard_device.KeyboardInputItem(self)
-                    case InputType.OpenSoundControl:
-                        item = gremlin.ui.osc_device.OscInputItem(self)
-                    case InputType.Midi:
-                        item = gremlin.ui.midi_device.MidiInputItem(self)
-                    case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
-                        item = InputItem(mode_node=self, input_type=input_type)
-                    case InputType.ModeControl:
-                        item = gremlin.ui.mode_device.ModeInputItem(self)
-                        # syslog.info(
-                        #     f"load mode input id: input item id: {Ansi.YELLOW}[{item.id}]{Ansi.RESET} mode name: [{self.name}] input id: {Ansi.GREEN}[{item.input_id.name}/{item.input_id}]{Ansi.RESET}"
-                        # )
-                        # pass
-                    case _:
-                        message = f"XML: Parse Mode: unhandled input type [{input_type}] - offending line: [{child.sourceline}]"
-                        syslog.error(message)
-                        syslog.error(f"\t{etree.tostring(child, encoding='unicode')}]")
-                        continue
+                    match input_type:
+                        case InputType.State:
+                            item = gremlin.ui.state_device.StateInputItem()
+                        case InputType.Keyboard | InputType.KeyboardLatched:
+                            item = gremlin.ui.keyboard_device.KeyboardInputItem(self)
+                        case InputType.OpenSoundControl:
+                            item = gremlin.ui.osc_device.OscInputItem(self)
+                        case InputType.Midi:
+                            item = gremlin.ui.midi_device.MidiInputItem(self)
+                        case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
+                            item = InputItem(mode_node=self, input_type=input_type)
+                        case InputType.ModeControl:
+                            item = gremlin.ui.mode_device.ModeInputItem(self)
+                            # syslog.info(
+                            #     f"load mode input id: input item id: {Ansi.YELLOW}[{item.id}]{Ansi.RESET} mode name: [{self.name}] input id: {Ansi.GREEN}[{item.input_id.name}/{item.input_id}]{Ansi.RESET}"
+                            # )
+                            # pass
+                        case _:
+                            message = f"XML: Parse Mode: unhandled input type [{input_type}] - offending line: [{child.sourceline}]"
+                            syslog.error(message)
+                            syslog.error(f"\t{etree.tostring(child, encoding='unicode')}]")
+                            continue
 
-                if extra_data is None:
-                    extra_data = {}
-                extra_data["input_type"] = input_type
+                    if extra_data is None:
+                        extra_data = {}
+                    extra_data["input_type"] = input_type
 
-                item.from_xml(child, item, extra_data)  # send owner item to sub components as the data member
+                    item.from_xml(child, item, extra_data)  # send owner item to sub components as the data member
 
-                assert item.input_id is not None, "XML: invalid input id on load"
+                    assert item.input_id is not None, "XML: invalid input id on load"
 
-                input_item = self.getInputItem(item.input_type, item.input_id)
+                    input_item = self.getInputItem(item.input_type, item.input_id)
 
 
-                if input_item is not None:
-                    input_item.setContainers(item.containers)
+                    if input_item is not None:
+                        input_item.setContainers(item.containers)
 
-                if input_item is None:
-                    input_item = item
-                    self.addInputItem(item)
-                    self.profile.registry.registerInputItem(input_item = input_item,
-                                                            device_guid = self.device_guid,
-                                                            input_type = input_type,
-                                                            input_id = item.input_id)
+                    if input_item is None:
+                        input_item = item
+                        self.addInputItem(item)
+                        self.profile.registry.registerInputItem(input_item = input_item,
+                                                                device_guid = self.device_guid,
+                                                                input_type = input_type,
+                                                                input_id = item.input_id)
 
-                if __debug__:
-                    test = self.profile.registry.getInputItem(device_guid=self.device_guid, mode_name=self.name, input_type=input_type, input_id=item.input_id)
-                    assert test == input_item
+                    if __debug__:
+                        test = self.profile.registry.getInputItem(device_guid=self.device_guid, mode_name=self.name, input_type=input_type, input_id=item.input_id)
+                        assert test == input_item
 
             except Exception:
-                syslog.error(f"XML: unknown input type: [{node.tag}] - offending line: [{node.sourceline}]")
+                syslog.error(f"XML: unknown input type: [{node.tag}] - offending line: [{node.sourceline}]  contents: [{etree.tostring(node, encoding='unicode')}]")
 
             # sorting index
             if input_item is not None:
