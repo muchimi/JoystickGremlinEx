@@ -30,7 +30,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T9)
-- Change: Input Viewer: add a confirmation box as the operation can result in hundreds of visualizers which could be very memory and CPU intensive), and exclude temporal inputs.
+- Change: Input Viewer: add a confirmation box to some options as the operation can result in hundreds of visualizers which could be very memory and CPU intensive), and exclude temporal inputs.
 - Fix: resolved an issue causing a delay when stopping a profile
 - Fix: input viewer: override QT layout logic for state visualizer to prevent the visual from using significant empty vertical space.
 - Fix: Maestro: create temporary stand-in classes until interface exists.
