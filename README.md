@@ -33,7 +33,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: Profile: resolve an issue with T9 not loading certain inputs
 - Fix: UI: additional QT C++ garbage collection checks due to T8 fix for UI refresh
 - Fix: UI: exception in some cases linked to automatic item scrolling
-
+- Fix: UI: input curve editor not showing.
 
 ### (m77T9)
 - Change: Input Viewer: add a confirmation box to some options as the operation can result in hundreds of visualizers which could be very memory and CPU intensive), and exclude temporal inputs.
