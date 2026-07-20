@@ -758,6 +758,9 @@ class EventListener(QtCore.QObject):
     expand_all_containers = Signal()  # expand all containers
     curve_added = Signal(object)  # fires when a curve is added from an input item (InputItem)
     curve_deleted = Signal(object)  # fires when a curve is deleted from an input item (InputItem)
+    curve_edit = Signal(int, object)  # fires when a curve is edited from an input item (InputItem)
+    curve_delete = Signal(int,object)  # fires when a curve is deleted from an input item (InputItem)
+
     # occurs when calibration data changes
     calibration_added = Signal(object)  # fires when a calibration is added from an input item (InputItem)
     calibration_deleted = Signal(object)  # fires when a calibration is deleted from an input item (InputItem)
@@ -1389,7 +1392,7 @@ class EventListener(QtCore.QObject):
         # QtWidgets.QApplication.processEvents()
         # self._keyboard_queue.task_done()
 
-    def _keyboard_processor(self):
+    def _keyboard_runner(self):
         """runs as a thread to process inbound keyboard events using a queue"""
 
         syslog.info("KBD: processing start")
@@ -1416,7 +1419,7 @@ class EventListener(QtCore.QObject):
         if not self._key_listener_started:
             self._keyboard_queue : FastQueue[Event] = FastQueue(name="keyboard_queue") # queue.Queue()
 
-            self._keyboard_thread = gremlin.threading.AbortableThread(target=self._keyboard_processor)
+            self._keyboard_thread = gremlin.threading.AbortableThread(target=self._keyboard_runner)
             self._keyboard_thread.start()
 
     def stop_key_listener(self):

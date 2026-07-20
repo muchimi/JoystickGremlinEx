@@ -2867,7 +2867,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.edit_curve.emit(self)
 
     QtCore.Slot()
-
     def _input_button_cb(self):
         # toggle input state
         self.input_item.enabled = not self.input_item.enabled
@@ -2884,6 +2883,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _clear_curve_cb(self, widget):
         self.delete_curve.emit(self)
+        el = gremlin.event_handler.EventListener()
+        el.curve_delete.emit(widget.index,self._input_item)
 
 
 class InputItemListModel(AbstractCallbackModel):
@@ -3391,11 +3392,15 @@ class InputItemListView(AbstractView):
 
     def showBlank(self):
         """displays a blank page"""
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self._stacked_widget):
+            return
         if self._stacked_widget is not None:
             self._stacked_widget.setCurrentIndex(0)
 
     def showContent(self):
         """displays the content page"""
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self._stacked_widget):
+            return
         if self._stacked_widget is not None:
             self._stacked_widget.setCurrentIndex(1)
 
@@ -3551,7 +3556,8 @@ class InputItemListView(AbstractView):
 
     def create_ui(self):
         """creates or recreates the contents of the input list view (left side input selector)"""
-
+        if not Shiboken.isValid(self):
+            return
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui_level(1)
         if verbose:
@@ -3912,13 +3918,13 @@ class InputItemListView(AbstractView):
         input_item = self.model.data(index)
         self.item_edit_curve.emit(self, index, input_item)
         el = gremlin.event_handler.EventListener()
-        el.curve_added.emit(input_item)
+        el.curve_edit.emit(index, input_item)
 
     def _delete_curve_item_cb(self, index: int):
         input_item = self.model.data(index)
         self.item_delete_curve.emit(self, index, self.model.data(index))
         el = gremlin.event_handler.EventListener()
-        el.curve_deleted.emit(input_item)
+        el.curve_delete.emit(index, input_item)
 
     def _update_value_changed(self, index: int, value: float):
         self.item_input_value_changed.emit(self, index, self.model.data(index), value)
@@ -4153,22 +4159,13 @@ class InputItemListView(AbstractView):
 
     def _scroll_to_item_ui(self, widget):
         # runs on UI thread
-        if Shiboken.isValid(self):
+        if self._scroll_widget is None:
+            return
+        if Shiboken.isValid(self) and Shiboken.isValid(self._scroll_widget):
             # update layout just in case the widgets have changed size
             self._scroll_widget.layout().activate()
-
-
             bar = self._scroll_area.verticalScrollBar()
             if bar:
-                # compute the position of the widget
-                # y = 0
-                # count = len(self._widget_map)
-                # for i in range(count):
-                #     w = self._widget_map[i]
-                #     if w == widget:
-                #         break
-                #     y += w.widget_height
-                # bar.setValue(y)
                 pos_map = gremlin.util.getWidgetPositionInHierarchy(widget, self._scroll_area)
                 pos = pos_map[-1][1] if pos_map else QtCore.QPoint(0, 0)
                 y = pos.y()
@@ -11878,6 +11875,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _ensureLoaded_ui(self):
         """ensures the data is loaded into the widget - runs on UI thread"""
+        if not Shiboken.isValid(self):
+            return
         if self._input_item_list_view is None:
             self._create_ui()
 
@@ -12106,8 +12105,9 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             )  # hook selected callback - called whenever an input is selected
             self.listview_container.addWidget(widget)
             self.onInputListViewCreated()
-            self.inputItemListView.setModel(self.inputItemListModel)
-            self.inputItemListView._redraw_ui(force=True)
+            self._input_item_list_view.setModel(self.inputItemListModel)
+            self._input_item_list_view._redraw_ui(force=True)
+
 
     def setLastSelectedIndex(self, value: int):
         self._last_selected_index = value

@@ -39,8 +39,7 @@ class AbortableThread(threading.Thread, QtCore.QObject):
             eh = gremlin.event_handler.EventListener()
 
         eh.shutdown.connect(self.stop)
-
-        # self._stop_event = threading.Event()
+        self._stop_event = threading.Event()
         self._shutdown_requested = False
 
     def reset(self):
@@ -48,12 +47,11 @@ class AbortableThread(threading.Thread, QtCore.QObject):
         self._shutdown_requested = False
 
     def stop(self):
-        # self._stop_event.set()
+        self._stop_event.set()
         self._shutdown_requested = True
 
     def stopped(self):
-        return self._shutdown_requested
-        # return self._stop_event.is_set()
+        return self._shutdown_requested or self._stop_event.is_set()
 
 
 class AbortableThreadX(threading.Thread):

@@ -132,6 +132,7 @@ import gremlin.ui.user_plugin_management
 import gremlin.ui.profile_creator
 import gremlin.ui.profile_settings
 import gremlin.version
+from shiboken6 import Shiboken
 
 from gremlin.input_item import InputItem, InputItemWidget, BaseDeviceTabWidget
 
@@ -3859,9 +3860,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     # validate the current device widget first
                     widget: BaseDeviceTabWidget = self.getRegisteredWidget(device_guid)
                     assert widget is not None, f"error retrieving widget for device [{device.name}] id:[{device.device_id}]"
-                    widget.ensureLoaded()
+                    if Shiboken.isValid(widget):
+                        widget.ensureLoaded()
 
-                    if not widget.isLoaded():
+                        if not widget.isLoaded():
+                            return
+                    else:
                         return
 
                     input_count = widget.inputCount

@@ -21,6 +21,7 @@ import logging
 
 from PySide6 import QtWidgets, QtCore
 
+
 from dinput import DeviceSummary
 
 import gremlin.config
@@ -258,6 +259,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.edit_mode_changed.connect(self._handle_edit_mode_changed)
         # update display on config change
         el.config_changed.connect(self._config_changed_cb)
+        el.curve_edit.connect(self._edit_curve_item_cb)
+        el.curve_delete.connect(self._delete_curve_item_cb)
 
         self.updating = False
         self.last_event = None
@@ -496,8 +499,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         super()._cleanup_ui()
 
         if gremlin.util.isSignalConnected(self.inputItemListView, "_edit_curve_item_cb"):
-            self.inputItemListView.item_edit_curve.disconnect(self._edit_curve_item_cb)
-            self.inputItemListView.item_delete_curve.disconnect(self._delete_curve_item_cb)
+            # self.inputItemListView.item_edit_curve.disconnect(self._edit_curve_item_cb)
+            # self.inputItemListView.item_delete_curve.disconnect(self._delete_curve_item_cb)
 
             self.inputItemListView.setParent(None)
             self.inputItemListView.deleteLater()
@@ -511,17 +514,25 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             el.jump_to_mapped_input.disconnect(self._handle_jump_to_mapped_input)
             el.input_filtered_change.disconnect(self._handle_input_filter_changed)
 
-    def _edit_curve_item_cb(self, widget, index, data):
+    def _edit_curve_item_cb(self, index : int,  input_item : InputItem):
         """edit curve request"""
         import gremlin.curve_handler
         import gremlin.event_handler
 
-        curve_data: gremlin.curve_handler.AxisCurveData = data.curve_data
+        assert isinstance(input_item, InputItem), "Invalid input item"
+        if input_item.device_guid != self.device_guid:
+            # not ours
+            return
+
+        device_guid = input_item.device_guid
+        input_id = input_item.input_id
+
+        curve_data: gremlin.curve_handler.AxisCurveData = input_item.curve_data
         if not curve_data:
             curve_data = gremlin.curve_handler.AxisCurveData()
-            curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(data.device_guid, data.input_id)
+            curve_data.calibration = gremlin.ui.axis_calibration.CalibrationManager().getCalibration(device_guid, input_id)
             curve_data.curve_update()
-            data.curve_data = curve_data
+            input_item.curve_data = curve_data
 
         dialog = gremlin.curve_handler.AxisCurveDialog(curve_data)
         gremlin.util.centerDialog(dialog, dialog.width(), dialog.height())
@@ -530,23 +541,33 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._curve_update_handler = dialog.curve_update_handler
         self.curve_update_handler[index] = self._curve_update_handler
         # update the dialog with the current input value
-        value = gremlin.joystick_handling.get_axis(data.device_guid, data.input_id)
+        value = gremlin.joystick_handling.get_axis(device_guid, input_id)
         self._curve_update_handler(value)
 
-        el = gremlin.event_handler.EventListener()
-        el.joystick_event_ui.connect(self._handle_curve_update)
+        jep = gremlin.event_handler.JoystickEventProcessor()
+        jep.registerListenerUICallback(device_guid = device_guid, input_id = input_id, input_type = input_item.input_type, callback=self._handle_curve_update)
+
+        # el = gremlin.event_handler.EventListener()
+        # el.joystick_event_ui.connect(self._handle_curve_update)
 
         # disable highlighting
         gremlin.shared_state.push_suspend_highlighting()
+        dialog.dialog_closed.connect(self._unhook_curve)
         dialog.exec()
+
         self.curve_update_handler[index] = None
 
-        data.curve_data.curve_update()
+        input_item.curve_data.curve_update()
 
         # renable highlighting
         gremlin.shared_state.pop_suspend_highlighting()
 
-        self._update_curve_icon(index, data)
+        self._update_curve_icon(index, input_item)
+
+    def _unhook_curve(self):
+        jep = gremlin.event_handler.JoystickEventProcessor()
+        jep.unregisterListenerUICallback(device_guid = self.device_guid, input_id = None, input_type = None, callback=self._handle_curve_update)
+
 
     def _handle_curve_update(self, event: gremlin.event_handler.Event):
         if not event.is_axis:
@@ -557,12 +578,17 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             self._curve_update_handler(event.value)
 
     def unhook(self):
-        # jep = gremlin.event_handler.JoystickEventProcessor()
-        # jep.unregisterCallback(self.hook_id)
         pass
 
-    def _delete_curve_item_cb(self, widget, index, data):
+
+    def _delete_curve_item_cb(self, index : int, input_item):
         """delete curve request"""
+
+        assert isinstance(input_item, InputItem), "Invalid input item"
+        if input_item.device_guid != self.device_guid:
+            # not ours
+            return
+
         message_box = QtWidgets.QMessageBox()
         message_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
         message_box.setText("Delete this input curve?")
@@ -573,8 +599,8 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
                 syslog.info("delete curve data")
-            data.curve_data = None
-            self._update_curve_icon(index, data)
+            input_item.curve_data = None
+            self._update_curve_icon(index, input_item)
 
     def _update_input_value_changed_cb(self, index: int, value: float):
         if index in self.curve_update_handler and self.curve_update_handler[index] is not None:

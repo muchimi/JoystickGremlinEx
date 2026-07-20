@@ -1529,8 +1529,6 @@ class AxisCurveWidget(QtWidgets.QWidget):
             x = curve_value
             y = -g_scene_size * curve_fn(x / g_scene_size)
 
-            # print (f"value: {value} cv: {curve_value}  x: {x} y: {y}")
-
             # tracker only exists when input repeater mode is enabled
             if self.curve_scene.show_input_axis:
                 self.curve_scene.tracker.update(x, y)
