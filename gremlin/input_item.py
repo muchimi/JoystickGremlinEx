@@ -465,6 +465,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._device_name = device.name if device else f"Unknownd device: [{device_guid}]"
         self._device_type = device.device_type if device else DeviceType.NotSet
 
+        if self._device_id == '53540000000000000000000000000000':
+            pass
+
         self._name = None  # device name
         self._input_name = None  # input name of the hardware (axis name if an axis)
         if custom_name_handler is not None:
@@ -6343,11 +6346,11 @@ class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
         "mode": BaseModeCondition,
     }
 
-    def __init__(self, conditions: ConditionModel, rule: ActivationRule):
+    def __init__(self, conditions: list[AbstractCondition], rule: ActivationRule):
         """Creates a new instance."""
         super().__init__()
         assert rule in (ActivationRule.All, ActivationRule.Any), "invalid rule"
-        assert isinstance(conditions, ConditionModel), "invalid condition model"
+        # assert isinstance(conditions, list) and all(isinstance(c, AbstractCondition) for c in conditions), "invalid condition model"
 
         self._rule = rule
         self.conditions = conditions

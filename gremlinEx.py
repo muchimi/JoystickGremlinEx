@@ -4928,6 +4928,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _do_load_profile(self, source_xml: str, as_new_profile=False, emit=True):
         self._profile_load_stack = []
 
+        # clear list of disconnected devices from any prior profile
+        gremlin.joystick_handling.clearDisconnectedDevices()
+
         if not source_xml:
             # invalid file
             return

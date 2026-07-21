@@ -17,13 +17,12 @@
 
 from __future__ import annotations  # deprecated with python 3.14+
 
-import atexit
+
 import functools
 import traceback
 import inspect
 import logging
 import time
-import queue
 import threading
 import collections
 from typing import Optional
@@ -4007,6 +4006,8 @@ class AxisState:
 
     def registerAxisInputItem(self, input_item):
         """registers an axis input item"""
+        import gremlin.input_item
+        assert isinstance(input_item, gremlin.input_item.InputItem), "input_item must be an instance of AxisInputItem"
         if input_item.get_input_type() == InputType.JoystickAxis:
             verbose = gremlin.config.Configuration().verbose_mode_joystick
             device_id: str = gremlin.util.normalize_guid(input_item.device_guid)

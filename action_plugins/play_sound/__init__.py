@@ -600,13 +600,15 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
     """fixed for QT6 media player changes"""
 
-    def __init__(self, action, parent=None):
+    def __init__(self, action : PlaySound, parent=None):
         super().__init__(action, parent)
         self.sound_file = action.sound_file
         self.volume = action.volume
+        self.action_data : PlaySound = action
 
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_output or config.verbose_mode_exec
+
 
     def profile_start(self):
         """runs on profile start"""

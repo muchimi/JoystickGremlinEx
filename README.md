@@ -29,6 +29,24 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T10)
+- New: Input Viewer: add a new helper button to show/hide visualizers.  Clicking this button will also enabled the visualizer and attempt to make it visible.
+- Fix: API: disconnected devices would not load if defined in a profile.
+- Fix: Input Viewer: state visualizer updated for new API (button size change).
+- Fix: Input Viewer: refresh on new profile.  
+- Fix: Input Viewer: state visualizer could get the incorrect height on button resize.
+- Fix: API : conversion for GUID to C++ GUID structure and fix for 128 bit integer conversions / hash values.
+- Fix: TempoEx container: fixed more missing API changes not handled by refactor tool causing an exception in some verbose modes.
+
+
+Known issues:
+- TTS (legacy) delay in some situations especially when multiple sounds are queued.
+- Input Viewer: continuing bug in QT with ensuring scrolling visuals are visible - input viewer does not yet implement the workarounds for the other scroll lists.
+- Disconnected devices from a profile load (these are devices that do not exist when the profile is loaded but are referenced in the profile) may not show automatically if the device list is filtered.
+
+ 
+
 ### (m77T9A)
 - Fix: Profile: resolve an issue with T9 not loading certain inputs
 - Fix: UI: additional QT C++ garbage collection checks due to T8 fix for UI refresh

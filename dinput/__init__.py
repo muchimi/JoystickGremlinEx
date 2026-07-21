@@ -50,8 +50,6 @@ class DILLError(Exception):
 
 
 class _GUID(ctypes.Structure):
-    """Strcture mapping C information into a set of Python readable values."""
-
     _fields_ = [
         ("Data1", ctypes.c_ulong),
         ("Data2", ctypes.c_ushort),
@@ -59,16 +57,74 @@ class _GUID(ctypes.Structure):
         ("Data4", ctypes.c_uint8 * 8),
     ]
 
-    def toId(self):
-        """converts to short string lowercase format - no dashes or brackets"""
-        s = f"{self.Data1:08x}{self.Data2:04x}{self.Data3:04x}"
-        for b in self.Data4:
-            s += f"{b:02x}"
-        return s
+    def toId(self) -> str:
+        return (
+            f"{self.Data1:08x}"
+            f"{self.Data2:04x}"
+            f"{self.Data3:04x}"
+            f"{bytes(self.Data4).hex()}"
+        )
 
     def toInt(self) -> int:
-        guid = uuid.UUID(self.toId())
-        return guid.int
+        return (
+            (self.Data1 << 96)
+            | (self.Data2 << 80)
+            | (self.Data3 << 64)
+            | int.from_bytes(self.Data4, "big")
+        )
+
+    @classmethod
+    def from_uuid(cls, value: str) -> "_GUID":
+        """Create a _GUID from a UUID string."""
+        u = uuid.UUID(value)
+
+        g = cls()
+        g.Data1 = (u.int >> 96) & 0xFFFFFFFF
+        g.Data2 = (u.int >> 80) & 0xFFFF
+        g.Data3 = (u.int >> 64) & 0xFFFF
+
+        data4 = (u.int & ((1 << 64) - 1)).to_bytes(8, "big")
+        g.Data4[:] = data4
+
+        return g
+
+    @classmethod
+    def fromInt(cls, value: int) -> "_GUID":
+        """Create a _GUID from its 128-bit integer representation."""
+
+        if not 0 <= value < (1 << 128):
+            raise ValueError("GUID integer must be a 128-bit unsigned integer")
+
+        g = cls()
+        g.Data1 = (value >> 96) & 0xFFFFFFFF
+        g.Data2 = (value >> 80) & 0xFFFF
+        g.Data3 = (value >> 64) & 0xFFFF
+        g.Data4[:] = (value & 0xFFFFFFFFFFFFFFFF).to_bytes(8, "big")
+
+        return g
+
+    @classmethod
+    def fromUUID(cls, u: uuid.UUID) -> "_GUID":
+        """Create a _GUID from a uuid.UUID object."""
+        value = u.int
+
+        g = cls()
+        g.Data1 = (value >> 96) & 0xFFFFFFFF
+        g.Data2 = (value >> 80) & 0xFFFF
+        g.Data3 = (value >> 64) & 0xFFFF
+        g.Data4[:] = (value & 0xFFFFFFFFFFFFFFFF).to_bytes(8, "big")
+
+        return g
+
+    def __str__(self) -> str:
+        data4 = bytes(self.Data4).hex()
+        return (
+            f"{self.Data1:08x}-"
+            f"{self.Data2:04x}-"
+            f"{self.Data3:04x}-"
+            f"{data4[:4]}-"
+            f"{data4[4:]}"
+        )
 
 
 _GUID_SysKeyboard = _GUID()
@@ -160,26 +216,20 @@ class GUID:
 
         if isinstance(guid, str):
             try:
-                guid = uuid.UUID(guid)
-                guid_int = guid.int
-                guid = _GUID(guid_int)  # convert to internal _GUID
+                guid = _GUID.from_uuid(guid)
             except Exception:
                 syslog.error(f"GUID: Unable to convert ID {guid} to UUID")
                 return None
         elif isinstance(guid, GUID):
-            guid_int = guid._guid_int
+            pass
         elif isinstance(guid, uuid.UUID):
             # convert to ctypes structure using the integer value if the class is given a regular python UUID
-            guid_int = guid.int
-            guid = _GUID(guid_int)  # convert to internal _GUID
+            guid = _GUID.fromUUID(guid)
         elif isinstance(guid, int):
-            guid = _GUID(guid)
-            guid_int = guid.int
-
-
+            guid = _GUID.fromInt(guid)  # convert to internal _GUID
         else:
             assert isinstance(guid, _GUID)
-            guid_int = guid.toInt()
+
         self._ctypes_guid = copy.deepcopy(guid)
         self.guid = (
             guid.Data1,
@@ -189,7 +239,8 @@ class GUID:
             (guid.Data4[2] << 40) + (guid.Data4[3] << 32) + (guid.Data4[4] << 24) + (guid.Data4[5] << 16) + (guid.Data4[6] << 8) + guid.Data4[7],
         )
 
-        self._guid_int: int = guid_int  # for fast hash
+        self._guid_int: int = guid.toInt()
+        self._guid = guid
 
     @property
     def valid(self):
@@ -453,9 +504,10 @@ class DeviceSummary:
         self._get_axis_callback = None  # custom callback to read an axis value from this device if a special device
         self._get_hat_callback = None  # custom callback to read a hat value if this device is a special device
         self.visible = True # device is visible by default in the UI
+        self._device_guid = None
+        self._device_id = None
         if data is not None:
             self.device_guid = GUID(data.device_guid)
-            self.device_id = gremlin.util.normalize_guid(self.device_guid)
 
             self.vendor_id = data.vendor_id
             self.product_id = data.product_id
@@ -527,6 +579,31 @@ class DeviceSummary:
         if self.device_type == DeviceType.VJoy:
             return ((self.vjoy_id, self.axis_count, self.button_count, self.hat_count)) # vjoy differentiates by input config
         return self.device_id
+
+    @property
+    def device_guid(self):
+        return self._device_guid
+
+    @device_guid.setter
+    def device_guid(self, value):
+        if isinstance(value, GUID):
+            self._device_guid = value
+        else:
+            self._device_guid = GUID(value)
+        self._device_id = str(self._device_guid)
+        assert self._device_guid is not None, "device_guid must be set"
+        if self._device_id == "53540000000000000000000000000000":
+            pass
+
+    @property
+    def device_id(self):
+        return self._device_id
+
+    @device_id.setter
+    def device_id(self, value):
+        self.device_guid = value
+
+
 
     def setAxisCallback(self, callback):
         """sets a custom axis callback to get an axis value (parameter is the axis number)"""

@@ -23,6 +23,7 @@ import time
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore
+
 import gremlin.input_item
 import gremlin as gremlin
 import gremlin.util
@@ -522,9 +523,11 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
     def __init__(self, container: TempoExContainer, parent=None):
         super().__init__(container, parent)
 
+        self.container = container
         self.delay = container.delay
         self.autorelease_delay = container.autorelease_delay
         self.activate_on = container.activate_on
+
 
         self.start_time = 0
         self.long_press_timer = None
@@ -591,41 +594,41 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.valid = True
 
         ec = gremlin.execution_graph.ExecutionContext()
-        container_node = ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)
+        container_node = ec.find(self.container, gremlin.execution_graph.ExecutionGraphNodeType.Container)
         if not container_node:
             # if we get here it usually means an instance of the functor is still in memory and hooked to the execution graph which should not happen
             syslog.error(
-                f"TEMPOEX: Disabled: Unable to find the container in the execution tree: [{str(self.action_data)}] - missing container ID: [{self.action_data.id}]"
+                f"TEMPOEX: Disabled: Unable to find the container in the execution tree: [{str(self.container)}] - missing container ID: [{self.container.id}]"
             )
             self.valid = False
 
         if self.verbose or not self.valid:
             syslog.info("TEMPOEX: Configuration:")
-            syslog.info(f"\tContainer ID: {self.action_data.id}")
+            syslog.info(f"\tContainer ID: {self.container.id}")
             input_item: gremlin.input_item.InputItem = self.action_data._input_item
             syslog.info(f"\tAttached input: {input_item.display_name}")
-            syslog.info(f"\tExecution mode: activate on {self.action_data.activate_on}")
-            syslog.info(f"\tShort action sets: {len(self.action_data.short_action_sets)}")
+            syslog.info(f"\tExecution mode: activate on {self.container.activate_on}")
+            syslog.info(f"\tShort action sets: {len(self.container.short_action_set)}")
             syslog.info(
-                f"\tChain enabled: short: [{self.action_data.chain_short}] long: [{self.action_data.chain_short}] dtap: [{self.action_data.chain_short}]"
+                f"\tChain enabled: short: [{self.container.chain_short}] long: [{self.container.chain_long}] dtap: [{self.container.chain_double}]"
             )
 
             syslog.info(
-                f"\tTimers: double tap delay (s): [{self.action_data.doubletap_delay:0.3f}  long delay: [{self.action_data.delay:0.3f}] autorelease delay: [{self.action_data.autorelease_delay:0.3f}]"
+                f"\tTimers: double tap delay (s): [{self.container.doubletap_delay:0.3f}  long delay: [{self.container.delay:0.3f}] autorelease delay: [{self.container.autorelease_delay:0.3f}]"
             )
 
-            # self.action_data.dumpActionSets(self.action_data.short_action_sets, "Short Action Set")
-            # syslog.info(f"\tLong action sets: {len(self.action_data.long_action_sets)}")
-            # self.action_data.dumpActionSets(self.action_data.long_action_sets, "Long Action Set")
-            # syslog.info(f"\tDtap action sets: {len(self.action_data.double_action_sets)}")
-            # self.action_data.dumpActionSets(self.action_data.double_action_sets, "Dtap Action Set")
+            # self.action_data.dumpActionSets(self.container.short_action_set, "Short Action Set")
+            # syslog.info(f"\tLong action sets: {len(self.container.long_action_set)}")
+            # self.action_data.dumpActionSets(self.container.long_action_set, "Long Action Set")
+            # syslog.info(f"\tDtap action sets: {len(self.container.double_action_set)}")
+            # self.action_data.dumpActionSets(self.container.double_action_set, "Dtap Action Set")
 
         if not self.valid:
             return
 
         if not container_node.children:
             # this indicates a build or configuration error
-            syslog.warning(f"TEMPOEX: Disabled: The container node has no children: [{str(self.action_data)}] ")
+            syslog.warning(f"TEMPOEX: Disabled: The container node has no children: [{str(self.container)}] ")
             self.valid = False
             return
 
@@ -663,18 +666,18 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
         active_nodes = self.short_nodes + self.long_nodes + self.dtap_nodes
         if not active_nodes:
-            syslog.warning(f"TEMPOEX: warning: no action nodes found to execute for container [{self.action_data.id}].")
+            syslog.warning(f"TEMPOEX: warning: no action nodes found to execute for container [{self.container.id}].")
             self.valid = False
             return
 
         self.dtap_enabled = len(self.dtap_nodes) > 0
-        if self.dtap_enabled and self.activate_on != "release":
+        if self.dtap_enabled and self.container.activate_on != "release":
             syslog.warning("TEMPOEX: warning: double tap requires 'release' mode for TempoEx. DoubleTap function disabled.")
             self.dtap_enabled = False
 
         self.trigger_release = False  # press mode
 
-        if self.dtap_enabled and self.action_data.doubletap_delay >= self.delay:
+        if self.dtap_enabled and self.container.doubletap_delay >= self.container.delay:
             syslog.warning("TEMPOEX: warning: double tap delay exceeds long delay.  DoubleTap function disabled.")
             self.dtap_enabled = False
 
@@ -1065,7 +1068,7 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         if self.verbose:
             syslog.info("TEMPOEX: handle long press")
         self._trigger_long_press(event_p, value_p, extra_data)
-        if self.autorelease_delay and self.action_data.activate_on == "release":
+        if self.autorelease_delay and self.container.activate_on == "release":
             callback = self._create_callback(self._trigger_long_press, event_r, value_r, extra_data)
             timer = threading.Timer(self.autorelease_delay, callback)
             if self.verbose:

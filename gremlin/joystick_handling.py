@@ -57,6 +57,8 @@ _all_virtual_devices_map = {
 }  # all virtual input devices (vjoy and maestro) [device_type:DeviceType][index:int] -> device : dinput.DeviceSummary
 
 _joystick_device_guid_map = {}  # map of DeviceSummary objects keyed by dInput GUID (special devices)
+_disconnected_devices_map = {}  # map of disconnected devices dinput.GUID -> device
+_disconnected_devices = []  # list of disconnected devices
 _special_devices_map = {}  # map of special devices dinput.GUID -> device
 _special_devices = []  # list of special devices
 _config_devices_map = {}  # map of DeviceSummary objects keyed by dInput GUID (config devices)
@@ -634,6 +636,37 @@ def registerSpecialDevice(dev):
     syslog.info(f"\tid: [{dev.device_id}] type: [{dev.device_type.name}] name: [{dev.name}]")
 
 
+def registerDisconnectedDevice(dev):
+    """adds a disconnected device to the tracking list"""
+    global _disconnected_devices_map, _all_devices_map, _disconnected_devices
+    _all_devices_map[dev.device_guid] = dev
+    _disconnected_devices_map[dev.device_guid] = dev
+    _disconnected_devices.append(dev)
+
+    syslog.info(f"\t[disconnected device] id: [{dev.device_id}] type: [{dev.device_type.name}] name: [{dev.name}]")
+
+def unregisterDisconnectedDevice(dev):
+    global _joystick_devices, _disconnected_devices_map, _all_devices_map
+    device_guid = dev.device_guid
+    if dev in _joystick_devices:
+        _joystick_devices.remove(dev)
+    if device_guid in _all_devices_map:
+        del _all_devices_map[device_guid]
+
+
+
+
+def clearDisconnectedDevices():
+    """clears the list of disconnected devices"""
+    global _disconnected_devices_map, _disconnected_devices
+    for dev in _disconnected_devices:
+        unregisterDisconnectedDevice(dev)
+
+    _disconnected_devices_map.clear()
+    _disconnected_devices.clear()
+
+
+
 def registerConfigDevice(dev):
     """adds a special device to the tracking list"""
     global _config_devices_map, _all_devices_map, _config_devices
@@ -717,6 +750,8 @@ def getDevice(device_guid: int | str | dinput.GUID, show_error=False) -> dinput.
         if device_guid in _all_devices_map:
             return _all_devices_map[device_guid]
     return None
+
+
 
 
 def getDeviceName(device_guid: int | str | dinput.GUID):
@@ -905,51 +940,46 @@ def registerSpecialDevices():
     syslog.info("Special devices:")
 
     # keyboard
-    device_guid = str(gremlin.shared_state.keyboard_tab_guid)
+    
     device = dinput.DeviceSummary()
     device.name = "Keyboard"
     device.device_guid = gremlin.shared_state.keyboard_tab_guid
-    device.device_id = device_guid
     device.device_type = DeviceType.Keyboard
     device.device_category = DeviceCategory.Special
     registerSpecialDevice(device)
 
     # state
-    device_guid = str(gremlin.shared_state.state_tab_guid)
+
     device = dinput.DeviceSummary()
     device.name = "State"
     device.device_guid = gremlin.shared_state.state_tab_guid
-    device.device_id = device_guid
     device.device_type = DeviceType.State
     device.device_category = DeviceCategory.Special
     registerSpecialDevice(device)
 
     # OSC
-    device_guid = str(gremlin.shared_state.osc_tab_guid)
+
     device = dinput.DeviceSummary()
     device.name = "OSC"
     device.device_guid = gremlin.shared_state.osc_tab_guid
-    device.device_id = device_guid
     device.device_type = DeviceType.Osc
     device.device_category = DeviceCategory.Special
     registerSpecialDevice(device)
 
     # MIDI
-    device_guid = str(gremlin.shared_state.midi_tab_guid)
+
     device = dinput.DeviceSummary()
     device.name = "MIDI"
     device.device_guid = gremlin.shared_state.midi_tab_guid
-    device.device_id = device_guid
     device.device_type = DeviceType.Midi
     device.device_category = DeviceCategory.Special
     registerSpecialDevice(device)
 
     # Octavi IFR1
-    device_guid = str(gremlin.shared_state.octavi_tab_guid)
+
     device = dinput.DeviceSummary()
     device.name = "Octavi IFR1"
     device.device_guid = gremlin.shared_state.octavi_tab_guid
-    device.device_id = device_guid
     device.device_type = DeviceType.OctaviIFR1
     device.device_category = DeviceCategory.Special
     device.setAxisCallback(noOpCallback)
@@ -959,31 +989,26 @@ def registerSpecialDevices():
     registerSpecialDevice(device)
 
     # mode
-    device_guid = str(gremlin.shared_state.mode_tab_guid)
     device = dinput.DeviceSummary()
     device.name = "Mode/Profile"
     device.device_guid = gremlin.shared_state.mode_tab_guid
-    device.device_id = device_guid
     device.device_type = DeviceType.ModeControl
     device.device_category = DeviceCategory.Special
     registerSpecialDevice(device)
 
     # plugin
-    device_guid = str(gremlin.shared_state.plugins_tab_guid)
+
     device = dinput.DeviceSummary()
     device.name = "Plugins"
     device.device_guid = gremlin.shared_state.plugins_tab_guid
-    device.device_id = device_guid
     device.device_type = DeviceType.Plugins
     device.device_category = DeviceCategory.Config
     registerConfigDevice(device)
 
     # settings
-    device_guid = str(gremlin.shared_state.settings_tab_guid)
     device = dinput.DeviceSummary()
     device.name = "Settings"
     device.device_guid = gremlin.shared_state.settings_tab_guid
-    device.device_id = device_guid
     device.device_type = DeviceType.Settings
     device.device_category = DeviceCategory.Config
     registerConfigDevice(device)
@@ -1155,6 +1180,12 @@ def joystick_devices_initialization():
         _maestro_devices_map.clear()  # connected maestro devices (int) -> device
 
         _all_devices_map.clear()
+        # copy over any disconnected devices
+        for dev in _disconnected_devices:
+            _all_devices_map[dev.device_guid] = dev
+            if dev.device_type == DeviceType.Joystick:
+                _joystick_device_guid_map[dev.device_guid] = dev
+                _all_joystick_devices.append(dev)
         virtual_count = 0
         real_count = 0
         virtual_devices = {}

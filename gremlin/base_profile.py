@@ -33,7 +33,7 @@ from typing import Callable
 import gremlin.keyboard
 import gremlin.profile
 import gremlin.shared_state
-from gremlin.types import MergeAxisOperation, PluginVariableType
+from gremlin.types import MergeAxisOperation, PluginVariableType, DeviceCategory, DeviceType
 from uuid import UUID
 from PySide6 import QtCore
 from frozendict import frozendict
@@ -46,7 +46,7 @@ from gremlin.util import compare_path, read_bool, safe_format, safe_read, write_
 from gremlin.input_types import InputType
 import gremlin.types
 from lxml import etree
-from gremlin.types import DeviceType
+
 
 import gremlin.input_item
 import gremlin.joystick_handling
@@ -243,6 +243,7 @@ class ProfileDeviceNode:
 
         :param node the xml node to parse to populate this device
         """
+        assert node.tag == "device", f"XML: ProfileDeviceNode: Expected 'device' tag, got '{node.tag}'"
         self.name = node.get("name")
 
         if "guid" in node.attrib:
@@ -260,8 +261,28 @@ class ProfileDeviceNode:
                 device = dinput.DeviceSummary()
                 device.device_guid = device_guid
                 device.device_id = device_id
+                # for disconnectd devices, assume maximum axis and buttons to avoid problems
+                device.axis_count = 8
+                device.device_category = DeviceCategory.Physical # assume physical device if in a profile not under virtual sticks
+
+                # assume linear axis mapping for disconnected devices
+                for axis_id in range(1, device.axis_count+1):
+                    device.linear_id_map[axis_id] = axis_id
+                    device.axis_id_map[axis_id] = axis_id
+                    am = dinput.AxisMap()
+                    am.linear_index = axis_id
+                    am.axis_index = axis_id
+                    device.axismap_list.append(am)
+                    device.axis_names.append(am.getName())
+
+
+
+
+                device.button_count = 128
+                device.hat_count = 4
                 device.name = safe_read(node, "name", str, "unknown")
-                device.connected = False
+                device.setConnected(False)
+                gremlin.joystick_handling.registerDisconnectedDevice(device)
                 if "type" in node.attrib:
                     dt = safe_read(node, "type", str, "")
                     device.device_type = DeviceType.to_enum(dt)
@@ -3590,7 +3611,7 @@ class Profile:
 
         return True
 
-    def getDeviceNode(self, device_guid, autocreate=False) -> ProfileDeviceNode:
+    def getDeviceNode(self, device_guid, autocreate=False, disconnected=False) -> ProfileDeviceNode:
         """gets a device node for this profile
         :param device_guid: the guid of the device to get a device profile for
         :param autocreate: autocreate the entry if it does not exist in the current profile and the device exists/is connected
@@ -3608,9 +3629,30 @@ class Profile:
                     if verbose:
                         syslog.info(f"Profile: CREATE device node: [{str(device_node)}] profile id: [{self.id}]")
                     return device_node
+                elif disconnected:
+                    device_node = ProfileDeviceNode(self)
+                    device_node.device = dinput.DeviceSummary()
+                    device_node.device.connected = False
+
+                    self.devices[device_guid] = device_node
+
+                    if verbose:
+                        syslog.info(f"Profile: CREATE disconnected device node: [{str(device_node)}] profile id: [{self.id}]")
+                    return device_node
             return None
 
         return self.devices[device_guid]
+
+    def readDeviceNode(self, node : etree.Element) -> ProfileDeviceNode:
+        """gets a disconnected device node"""
+        verbose = gremlin.config.Configuration().verbose_mode_execution
+        device_node = ProfileDeviceNode(self)
+        device_node.from_xml(node)
+        if verbose:
+            syslog.info(f"Profile: CREATE disconnected device node: [{str(device_node)}] profile id: [{self.id}]")
+        return device_node
+
+
 
     def getModeNode(self, device_guid, mode: str, is_system: bool = False, autocreate=False):
         """gets a mode node
@@ -3922,10 +3964,17 @@ class Profile:
             else:
                 device_node = self.getDeviceNode(device_guid, autocreate=True)
             if device_node is None:
+                # disconnected device most likely
+                device_node = self.readDeviceNode(child)
+                self.devices[device_guid] = device_node
+
+            if device_node is None:
                 syslog.warning(f"XML: unrecognized device id [{str(device_guid)}] line : {child.sourceline} - skipping this entry")
                 continue
             extra_data["device_node"] = device_node
-            device_node.from_xml(child, data, extra_data)
+            if device_node.connected():
+                # disconnected nodes are already read
+                device_node.from_xml(child, data, extra_data)
 
             dd: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_node.device_guid)
             if not dd:
@@ -5204,7 +5253,7 @@ class ProfileModeNode:
                     input_type = InputType.to_enum(parent_node.get("type"))
                 else:
                     input_type = InputType.to_enum(child.tag)
-                    
+
                 match input_type:
                     case InputType.State:
                         item = gremlin.ui.state_device.StateInputItem()

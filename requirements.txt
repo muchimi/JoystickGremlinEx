@@ -10,8 +10,8 @@ anytree >=2.12.1
 
 # requires visual studio community edition and the c++ compiler installed to compile the required components when installing via pip
 # open a command line, change to the path of the CL compiler x64 (c:\program files\microsoft visual studio\xx\Community\VC\Tools\MSVC\xx\bin\Hostx64\x64)
-# run pip install python-rtmidi 
-python-rtmidi >= 1.5.8 
+# run pip install python-rtmidi
+python-rtmidi >= 1.5.8
 hidapi >=  0.15.0 # requires hidapi.dll
 hid >= 1.0.7 # requires hidapi
 psygnal >= 0.13.0
@@ -24,5 +24,6 @@ numpy
 scipy
 psutil
 pyrubberband
+edge-tts
 
 

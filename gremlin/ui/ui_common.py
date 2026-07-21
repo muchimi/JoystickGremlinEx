@@ -1397,6 +1397,18 @@ class Icons:
         icon_value = icon_map.get(direction, "mdi.arrow-right")
         return Icons._icon(icon_value, qta_color=qta_color)
 
+    @staticmethod
+    def focusIcon(qta_color=None):
+        return Icons._icon("msc.debug-stackframe-focused", qta_color=qta_color)
+
+    @staticmethod
+    def circleArrowLeft(qta_color=None):
+        return Icons._icon("mdi.arrow-left-circle", qta_color=qta_color)
+
+    @staticmethod
+    def circleArrowRight(qta_color=None):
+        return Icons._icon("mdi.arrow-right-circle", qta_color=qta_color)
+
     def _icon(value: str, qta_color=None):
         if qta_color and isinstance(qta_color, str):
             qta_color = QtGui.QColor(qta_color)
@@ -4493,6 +4505,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         :param value: default value (optional)
         :param tooltip: tooltip to display (optional)
         :param parent: parent widget (optional)
+
         """
 
         super().__init__(label, parent)
@@ -4507,9 +4520,6 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         self.stateChanged.connect(self._handle_clicked)
         if tooltip:
             self.setToolTip(tooltip)
-
-        # css = Color.cssCheckbox()
-        # self.setStyleSheet(css)
 
     def _handle_clicked(self):
         checked = self.isChecked()
@@ -4535,7 +4545,97 @@ class QDataCheckbox(QtWidgets.QCheckBox):
     def setIgnoreKeyboard(self, value: bool):
         self._ignore_keyboard = value
 
+class QActionCheckbox(QWidget):
+    """a checkbox that emits focus events"""
 
+    clicked = QtCore.Signal(bool)
+
+    def __init__(
+        self,
+        label: str = None,
+        data=None,
+        callback=None,
+        callbackEx=None,
+        value: bool = None,
+        tooltip=None,
+        parent=None,
+        action_callback : Callable = None,
+        action_icon = None,
+        action_deselect_icon = None,
+        action_size : int = 16,
+        action_tooltip : str = None,
+        ):
+        """
+        :param text: the label (optional, recommended)
+        :param data: the data tracked by this control (optional)
+        :param callback: the callback to call (checked)
+        :param action_callback: the callback to call for action events - this will add an icon to the checkbox (optional)
+        :param callbackEx: the extended callback to call (widget, checked)
+        :param value: default value (optional)
+        :param tooltip: tooltip to display (optional)
+        :param parent: parent widget (optional)
+        :param action_icon: the icon to display for the action button (optional)
+        :param action_size: the size of the action button (optional, default is 24)
+        """
+        super().__init__(parent)
+        self._checkbox = QDataCheckbox(label, data=data, callback=callback, callbackEx=callbackEx, value=value, tooltip=tooltip, parent=self)
+        self._checkbox.clicked.connect(self._handle_checkbox_clicked)
+
+        self._action_callback = action_callback
+        self._action_icon = action_icon or Icons.circleArrowRight()
+        self._action_deselect_icon = action_deselect_icon or Icons.circleArrowLeft()
+
+        if action_callback:
+            # create the action button with the provided icon and callback
+            icon_size = action_size - 2 if action_size > 2 else action_size
+            self._action_widget = QIconButton(icon=action_icon, callback=self._handle_action, parent=self, data = data, icon_size=icon_size)
+            self._action_widget.setFixedSize(action_size, action_size) # icon size
+            if action_tooltip:
+                self._action_widget.setToolTip(action_tooltip)
+            self._update_action_icon()
+        else:
+            self._action_widget = None
+
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._checkbox)
+        if action_callback:
+            layout.addWidget(self._action_widget, alignment=QtCore.Qt.AlignVCenter)
+            layout.addStretch()
+        self.setLayout(layout)
+
+    def _handle_checkbox_clicked(self, checked):
+        self._update_action_icon()
+        self.clicked.emit(checked)
+
+    def _handle_action(self):
+        if self._action_callback:
+            self._action_callback()
+        self._update_action_icon()
+
+    def _update_action_icon(self):
+        if self._action_widget:
+            if self._checkbox.isChecked():
+                self._action_widget.setIcon(self._action_deselect_icon)
+            else:
+                self._action_widget.setIcon(self._action_icon)
+
+    def setIgnoreKeyboard(self, value: bool):
+        self._checkbox.setIgnoreKeyboard(value)
+
+    def isChecked(self):
+        return self._checkbox.isChecked()
+
+    def setChecked(self, value: bool):
+        if self._checkbox.isChecked() != value:
+            self._checkbox.setChecked(value)
+
+    def data(self):
+        return self._checkbox.data
+
+    def setData(self, value):
+        self._checkbox.data = value
 class QDataRadioButton(QtWidgets.QRadioButton):
     """a radio button that has a data property to track an object associated with the checkbox"""
 
@@ -4883,8 +4983,8 @@ class NoKeyboardPushButton(QIconPushButton):
 
 
 class QIconButton(QIconPushButton):
-    def __init__(self, text=None, icon: str = None, icon_size=24, data=None, parent=None, tooltip=None):
-        super().__init__(text=text, icon=icon, icon_size=icon_size, data=data, parent=parent, tooltip=tooltip)
+    def __init__(self, text=None, icon: str = None, icon_size=24, data=None, parent=None, tooltip=None, callback : Callable = None, callbackEx : Callable = None):
+        super().__init__(text=text, icon=icon, icon_size=icon_size, data=data, parent=parent, tooltip=tooltip, callback=callback, callbackEx=callbackEx)
 
 
 class QReorderToolbar(QWidget):
@@ -7213,9 +7313,9 @@ class StateVisualizerWidget(QWidget):
         group_layout = QVBoxLayout(self.group_widget)
 
         self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv=True)
-        self._state_filter_widget.apply.connect(self._reload_states)
+        self._state_filter_widget.apply.connect(self.reloadStates)
         self._state_filter_widget.changed.connect(self._category_filter_changed)
-        self._state_filter_widget.enabledChanged.connect(self._reload_states)
+        self._state_filter_widget.enabledChanged.connect(self.reloadStates)
 
         filter_container = getHContainer([self._state_filter_widget], widget_only=True)
 
@@ -7232,6 +7332,7 @@ class StateVisualizerWidget(QWidget):
             rb = QDataRadioButton(label, size)
             if current_size == size:
                 rb.setChecked(True)
+                self._row_height = size + 4
             rb.clicked.connect(self._font_size_cb)
             widgets.append(rb)
 
@@ -7263,16 +7364,21 @@ class StateVisualizerWidget(QWidget):
         size = widget.data
         config = gremlin.config.Configuration()
         config.input_viewer_button_size = size
+        self._row_height = size + 4
+        self.reloadStates()
 
     def buttonWidget(self):
         return self._button_widget
 
     def populateState(self):
-        """execute on UI thread"""
+        """reloads profile state data in the UI"""
+        self.reloadStates()
+
+    def reloadStates(self):
+        """reloads profile state data in the UI"""
         gremlin.util.InvokeUiMethod(self._populateState_ui)
 
-    def _reload_states(self):
-        gremlin.util.InvokeUiMethod(self._populateState_ui)
+
 
 
     def _populateState_ui(self):
@@ -7350,34 +7456,36 @@ class StateVisualizerWidget(QWidget):
         max_width = self.width() # working width
 
         row_width = 0
-        row_height = 0
-        total_height = 0
+        row_height = self._row_height
+        row_count = 0
 
         for width, height in st:
             next_width = row_width + width + margin
 
             if row_width and next_width > max_width:
-                total_height += row_height + margin
                 row_width = width + margin
-                row_height = height
+                # row_height = height
             else:
                 row_width = next_width
-                if height > row_height:
-                    row_height = height
+                # if height > row_height:
+                #     row_height = height
 
         if row_width:
-            total_height += row_height
+            row_count += 1
+
+        # add an extra row for spacing
+        total_height = (row_height + margin) * (row_count + 1)
 
         # constrain the height to override default QT layout which adds entirely too much vertical space
         self._button_widget.setFixedHeight(total_height)
-        # syslog.info(f"state layout update: height: {total_height}")
+        # syslog.info(f"state layout update: height: {total_height}  rows: {row_count}  row_height: {row_height}")
 
 
 
     @QtCore.Slot(object)
     def _category_filter_changed(self, category):
         """called when the state category filter is changed"""
-        self._reload_states()
+        self.reloadStates()
 
     def _state_changed(self, state):
         # state changed received - ensure on UI thread
@@ -7399,7 +7507,7 @@ class StateVisualizerWidget(QWidget):
     @QtCore.Slot(str, object)
     def _config_changed(self, key, value):
         if key == "input_viewer_button_size":
-            self.refreshState()
+            self.reloadStates()
 
     @QtCore.Slot()
     def _state_toggle(self, widget):
@@ -7415,7 +7523,7 @@ class StateVisualizerWidget(QWidget):
     @QtCore.Slot()
     def _state_crud(self):
         # called on state create/add/remove/edit
-        self._reload_states()
+        self.reloadStates()
 
 
     def unhook(self):

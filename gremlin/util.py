@@ -2420,7 +2420,9 @@ def to_guid(device_guid) -> dinput.GUID:
         return None
     if isinstance(device_guid, dinput.GUID):
         return device_guid
-    return dinput.GUID(device_guid)
+    value = dinput.GUID(device_guid)
+    assert str(value) == str(device_guid),"conversion failed"
+    return value
 
 
 def to_uuid(device_guid) -> uuid.UUID:

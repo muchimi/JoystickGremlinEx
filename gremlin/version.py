@@ -18,7 +18,7 @@
 from gremlin.singleton_decorator import SingletonDecorator
 
 APPLICATION_NAME = "GremlinEx"
-APPLICATION_BASE = "m77T9A"
+APPLICATION_BASE = "m77T10"
 APPLICATION_MAIN = "1.0ex"
 APPLICATION_EXE = "gremlinex.exe"
 
