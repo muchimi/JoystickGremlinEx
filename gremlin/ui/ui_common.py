@@ -1281,6 +1281,19 @@ class Icons:
     def recordIcon(qta_color="#c7450e"):
         return Icons._icon("mdi.checkbox-blank-circle", qta_color=qta_color)
 
+
+    @staticmethod
+    def stopIcon(qta_color="#c7450e"):
+        return Icons._icon("mdi.stop", qta_color=qta_color)
+
+    @staticmethod
+    def pauseIcon(qta_color="#535353"):
+        return Icons._icon("mdi.pause", qta_color=qta_color)
+    
+    @staticmethod
+    def playIcon(qta_color="#0BA012"):
+        return Icons._icon("fa6s.play", qta_color=qta_color)
+
     @staticmethod
     def listenIcon(qta_color="#34b7eb"):
         return Icons._icon("fa6s.microphone", qta_color=qta_color)
@@ -1732,6 +1745,10 @@ class Buttons:
     @staticmethod
     def getRecordWidget(tooltip: str = "Record", callback: Callable = None, width: int = 24, height: int = 24):
         return Buttons._template(label=None, icon_source=Icons.recordIcon(), tooltip=tooltip, callback=callback, width=width, height=height)
+
+    @staticmethod
+    def getPlayWidget(tooltip: str = "Play", callback: Callable = None, width: int = 24, height: int = 24):
+        return Buttons._template(label=None, icon_source=Icons.playIcon(), tooltip=tooltip, callback=callback, width=width, height=height)
 
     @staticmethod
     def getMoveUpWidget(tooltip: str = "Move Up", callback: Callable = None, width: int = 24, height: int = 24, data: object = None):

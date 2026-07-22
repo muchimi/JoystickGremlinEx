@@ -4614,7 +4614,7 @@ class Profile:
 
         def nonlocal_set(var, value):
             nonlocal completed
-            var = value
+            var = value  # noqa: F841
             completed = True
 
         if gremlin.util.is_ui_thread():

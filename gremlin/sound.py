@@ -18,11 +18,17 @@
 from __future__ import annotations  # deprecated with python 3.14+
 import os
 from PySide6 import QtCore, QtMultimedia, QtWidgets
+
 import gremlin.util
 import gremlin.event_handler
-
-
+import asyncio
+import edge_tts
+from typing import Any, Dict, List
+import io
+import os
+import shutil
 import gremlin.config
+import importlib.util
 
 
 import gremlin.ui.ui_common
@@ -52,6 +58,8 @@ if USE_SD:
     import numpy as np  # for sound device library
     import concurrent.futures  # for thread pool of concurrent playback
     import pyrubberband as pyrb  # for sound sample rate modification
+    import pydub
+    from pydub import AudioSegment  # for audio format conversion
 
     from scipy import signal  # for audio resampling if needed
 
@@ -68,7 +76,8 @@ class PlaybackOptions:
 
     def __init__(
         self,
-        key: str,
+        key: Any,
+        sound_file: str = None,
         device: str = None,
         loops: int = 1,
         volume: float = None,
@@ -88,6 +97,7 @@ class PlaybackOptions:
         :param fadeout_ms: time in milliseconds for the time for the sound to fade out
         """
         self.key = key  # this is a GUID for PG mode, and the file name for SD mode
+        self.sound_file = sound_file # path to wave file to play
         self.device: str = device  # playback device - if not set - default playback is used
         if USE_PG:
             self.loops = loops - 1 if loops > 0 else 0  # sounds plays once, loops are extra repeats
@@ -111,7 +121,8 @@ class SoundEvent:
 
     @staticmethod
     def PlayAction(
-        key: str,
+        key: Any,
+        sound_file: str,
         device: str,
         loops: int = 1,
         volume: float = None,
@@ -121,7 +132,7 @@ class SoundEvent:
         stop_previous: bool = False,
         rate: float = 1.0,
     ):
-        data = PlaybackOptions(key, device, loops, volume, playback_ms, fadein_ms, fadeout_ms, stop_previous, rate)
+        data = PlaybackOptions(key, sound_file, device, loops, volume, playback_ms, fadein_ms, fadeout_ms, stop_previous, rate)
         return SoundEvent(action=SoundAction.Play, key=key, data=data)
 
     @staticmethod
@@ -155,6 +166,10 @@ class Sound:
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._handle_shutdown)
+
+        self._has_rubberband = False
+        spec = importlib.util.find_spec("pyrubberband")
+        self._has_rubberband = spec is not None
 
         self._playback_device_name = None
         verbose = gremlin.config.Configuration().verbose_mode_sound
@@ -211,9 +226,9 @@ class Sound:
             self.device_name_to_id_map = {id: name for id, name in self.device_map.items()}
 
         self.sound_map = {}  # holds sound objects by key (guid -> sound object)
-        self.sound_file_map = {}  # holds the sound file (file -> key)
+        self.sound_file_map = {}  # maps files to the sound key
         self.sound_volume_map = {}  # holds the sound volume for each key - if not present used the default volume
-        self.sound_audio_file_map = {}  # [key] -> audio file path
+        self.sound_audio_file_map = {}  # maps key to the sound file on disk (full path)
         self._audio_device = None
         self._event_queue = FastQueue() # queue.Queue()  # sound queue - holds SoundCommand objects
         self._thread = None  # sound thread
@@ -224,6 +239,27 @@ class Sound:
         if USE_PG:
             pygame.init()
             pygame.mixer.init()
+
+
+        self._temporary_files = [] # list of temp files created
+        self._sound_folder = os.path.join(gremlin.util.userprofile_path(), "sounds")
+        if not gremlin.util.create_folder(self._sound_folder):
+            syslog.error(f"Unable to create sound file repository :{self._sound_folder}")
+            self._sound_folder = gremlin.util.userprofile_path()
+
+        el.shutdown.connect(self._handle_shutdown)
+
+    def getSoundFolder(self, profile_specific: bool = True) -> str:
+        """ gets a profile specific sound folder tied to the profile ID """
+        if profile_specific:
+            profile = gremlin.shared_state.current_profile
+            id = profile.id
+            path = os.path.join(self._sound_folder, id)
+            if not gremlin.util.create_folder(path):
+                syslog.error(f"Unable to create profile-specific sound file repository :{path}")
+                path = self._sound_folder
+            return path
+        return self._sound_folder
 
     def start(self):
         """starts the sound queue"""
@@ -267,6 +303,15 @@ class Sound:
         self.device_name_to_id_map.clear()
         if USE_PG:
             pygame.quit()
+
+        # temporary file cleanup
+        for temp_file in self._temporary_files:
+            try:
+                if os.path.isfile(temp_file):
+                    os.remove(temp_file)
+            except Exception as ex:
+                syslog.error(f"Unable to remove temporary sound file {temp_file}: {str(ex)}")
+        self._temporary_files.clear()
 
     @property
     def audio_device(self) -> str:
@@ -558,8 +603,68 @@ class Sound:
             if USE_SD:
                 # use the filename as the key for SD playback
                 return sound_file
-
         return None
+
+    def getDynamicKey(self, text : str, sanitize = True):
+        ''' gets the key for the dynamic text '''
+        if not text:
+            return None
+        if sanitize:
+            text = self.sanitizeText(text)
+        value = hash(text)
+        return value
+
+    def getSoundFile(self, key, autocreate = True, profile_specific: bool = True, temporary: bool = False):
+        """retrieves the file name for a given key"""
+        if key in self.sound_audio_file_map:
+            return self.sound_audio_file_map[key]
+        if autocreate:
+            sound_file = self.getWavFileForKey(key, profile_specific=profile_specific, temporary=temporary)
+            if sound_file:
+                self.sound_audio_file_map[key] = sound_file
+                return sound_file
+        return None
+
+    def getPhraseMap(self, text: str):
+        """ takes a text and splits it to its components - returns a map of key -> (text, wav files) for that sequence"""
+        phrase_map = {}
+        phrases = text.split("|")
+        for text in phrases:
+            text = text.strip()
+            if text:
+                text = self.sanitizeText(text) # translate as needed
+                key = self.getDynamicKey(text) # key of translated text
+                sound_file = self.getSoundFile(key)
+                phrase_map[key] = (text, sound_file)
+        return phrase_map
+
+
+    def getWavFileForKey(self, key, profile_specific : bool = True, temporary: bool = False):
+        """returns the expected wav file path for a given key"""
+        if key is None:
+            return None
+        if temporary:
+            self._temporary_files.append(gremlin.util.getTemporaryFile(".wav"))
+            return self._temporary_files[-1]
+        str_key = f"m{abs(key)}" if key < 0 else str(key)
+        path = os.path.join(self.getSoundFolder(profile_specific=profile_specific), f"{str_key}.wav")
+        if os.path.isfile(path):
+            # bump the index until unique
+            index = 1
+            base_path = path
+            while os.path.isfile(path):
+                path = base_path.replace(".wav", f"_{index}.wav")
+                index += 1
+
+        return path
+
+
+    def setSoundFile(self, key, sound_file):
+        """stores a file name for a given key """
+        if key and sound_file and os.path.isfile(sound_file):
+            self.sound_audio_file_map[key] = sound_file
+            self.sound_file_map[sound_file.casefold()] = key
+
 
     def releaseSoundKey(self, sound_file):
         if USE_PG:
@@ -621,11 +726,12 @@ class Sound:
                 case SoundAction.Play:
                     # play item
                     key = event.key
+                    data : PlaybackOptions= event.data
+                    sound_file = data.sound_file
                     if verbose:
-                        syslog.info(f"\tplay [{key}]")
-                    data: PlaybackOptions = event.data
+                        syslog.info(f"\tplay [{key}] [{gremlin.util.toUrl(sound_file)}]")
                     if USE_SD:
-                        self.play(key, data)
+                        self.play(sound_file, data)
                     elif USE_PG:
                         if key in self.sound_map:
                             _audio_file = self.sound_audio_file_map[key]
@@ -680,6 +786,115 @@ class Sound:
                     while not self._event_queue.empty():
                         self._event_queue.get()
                         # self._event_queue.task_done()
+
+    def hasActionWav(self, action) -> bool:
+        """true if the action wave file if found"""
+        wav = action.tts_file
+        return wav and os.path.isfile(wav)
+
+    def getNewWav(self) -> str:
+        id = gremlin.util.get_guid()
+        tts_file = os.path.join(self._sound_folder, f"{id}.wav")
+        return tts_file
+
+
+    def translate_text(self, text):
+        """Returns the provided text after running text substitution on it.
+
+        :param text the text to substitute parts of
+        :return original text with parts substituted
+        """
+        text = text.replace("${current_mode}", gremlin.shared_state.current_mode)
+        return text
+
+    def sanitizeText(self, text):
+        """removes characters that are problematic in text"""
+        import re
+
+        # translation layer
+        text = self.translate_text(text)
+
+        text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+        text = re.sub(r"`.*?`", "", text, flags=re.DOTALL)
+        text = re.sub(r"\(.*?\)", "", text, flags=re.DOTALL)
+
+        # remove marks
+        text = text.replace("```", "")
+        text = text.replace("...", " ")
+        text = text.replace("(", " ")
+        text = text.replace(")", " ")
+
+        # use cp1252 encoding since it's what is used under the hood
+        encoded = text.encode("cp1252", errors="replace")
+        return encoded.decode("cp1252")
+
+    def convertMp3ToWav(self, mp3_file: str, wav_file: str) -> bool:
+        """Converts an MP3 file to WAV format."""
+        try:
+            audio = AudioSegment.from_mp3(mp3_file)
+            audio.export(wav_file, format="wav")
+            return True
+        except Exception as e:
+            syslog.error(f"Failed to convert MP3 to WAV [{mp3_file} -> {wav_file}]: {str(e)}")
+            return False
+
+    def adjust_speed(self, wav, sample_rate: int = 24000, tts_speed: float = 1.0):
+        """
+        Adjusts the playback speed of a wav file.  The file is modified in place.
+
+        :param wav: the full path to the source wave file to modify
+        :param sample_rate: the sample rate, the default for AI generated is 24KHz
+        :param tts_speed: playback factor, 1.0 = normal
+
+        """
+
+        from pydub import AudioSegment
+        import soundfile as sf
+        import pyrubberband as pyrb
+
+        if tts_speed == 1.0:
+            return True  # nothing to do
+
+        # load the audio stream
+        tmp = gremlin.util.getTemporaryFile("wav")
+        try:
+            shutil.copy(wav, tmp)
+        except Exception as e:
+            syslog.error(f"ETTS: Failed to copy file: {str(e)}")
+            return False
+
+        try:
+            audio = AudioSegment.from_wav(tmp)
+            wav_io = io.BytesIO()
+            audio.export(wav_io, format="wav")
+
+            data, samplerate = sf.read(wav_io)
+            stretched_data = pyrb.time_stretch(data, samplerate, tts_speed)
+            stretched_wav_io = io.BytesIO()
+            sf.write(stretched_wav_io, stretched_data, samplerate, format="wav")
+            stretched_wav_io.seek(0)
+
+            try:
+                os.unlink(wav)
+            except Exception as e:
+                syslog.error(f"ETTS: Failed to remove existing file: {str(e)}")
+                return False
+
+            try:
+                new_audio = AudioSegment.from_wav(stretched_wav_io)
+                new_audio.export(wav, format="wav")
+                new_audio = None
+            except Exception as e:
+                syslog.error(f"ETTS: Failed to save file: {str(e)}")
+                return False
+        finally:
+            try:
+                os.unlink(tmp)
+            except Exception as e:
+                syslog.error(f"ETTS: Failed to remove temporary file: {str(e)}")
+
+        return os.path.isfile(wav)
+
 
 
 class TTSGeneratorDialog(QtWidgets.QDialog):
@@ -929,3 +1144,190 @@ class GenerateDialog(QtWidgets.QDialog):
 
     def _handle_cancel(self, widget):
         self.reject()
+
+
+
+class EdgeTTSVoice:
+    """Represents a structured Microsoft Edge TTS Voice."""
+
+    def __init__(self, data: Dict[str, Any]):
+        self.name: str = data.get("Name", "")
+        self.short_name: str = data.get("ShortName", "")
+        self.gender: str = data.get("Gender", "")
+        self.locale: str = data.get("Locale", "")
+        self.suggested_codec: str = data.get("SuggestedCodec", "")
+        self.friendly_name: str = data.get("FriendlyName", "")
+        self.status: str = data.get("Status", "")
+
+
+
+    def __repr__(self) -> str:
+        return f"<Voice name='{self.short_name}' gender='{self.gender}' locale='{self.locale}'>"
+@gremlin.singleton_decorator.SingletonDecorator
+class EdgeTTS:
+    """ TTS generation via edge-tts """
+
+
+
+    def __init__(self):
+        self._speaker = "default"
+        self._sound = Sound()
+
+        self._voices_list = self._get_voice_list()
+
+    def _generate(self,
+                  text: str,
+                  output_wav: str,
+                  speaker: str = "en-US-AvaNeural",
+                  rate: str = "+0%",
+                  pitch: str = "+0Hz",
+                  volume: str = "+0%",
+                  ):
+        """ generates the output file (MP3) via edge tts
+        :param text: the text to convert to speech
+        :param speaker: the speaker voice to use, optional - default is ava neural US english
+        :param output_wav: the path to the output WAV file
+        :param rate: the speech rate adjustment
+        :param pitch: the speech pitch adjustment
+        :param volume: the speech volume adjustment
+        :returns: the path to the generated WAV file or None if failed
+
+        """
+        output_mp3 = gremlin.util.getTemporaryFile(".mp3")
+        try:
+            assert bool(speaker), "Speaker must be specified"
+            assert bool(output_wav), "Output WAV file must be specified"
+
+
+            try:
+                communicate = edge_tts.Communicate(
+                text=text,
+                voice=speaker,
+                rate=rate,
+                pitch=pitch,
+                volume=volume
+                )
+
+                asyncio.run(communicate.save(output_mp3))
+
+            except Exception as e:
+                syslog.error(f"ETTS: failed to generate audio file [{output_wav}]: {str(e)}")
+                return None
+
+            # convert mp3 to wav
+            if os.path.isfile(output_mp3):
+
+                # valiate the output folder
+                path = os.path.dirname(output_wav)
+                if not os.path.isdir(path):
+                    os.makedirs(path, exist_ok=True)
+                if os.path.isfile(output_wav):
+                    os.unlink(output_wav)
+                self._sound.convertMp3ToWav(output_mp3, output_wav)
+                return output_wav
+
+            return None
+        finally:
+            # cleanup temporary MP3 file
+            if os.path.isfile(output_mp3):
+                try:
+                    os.unlink(output_mp3)
+                except Exception as e:
+                    syslog.error(f"ETTS: unable to remove temporary MP3 file [{output_mp3}]: {str(e)}")
+
+    def is_available(self):
+        return True
+
+    def is_speed_available(self):
+        return True
+
+    def generateActionWav(self, action, text : str = None,  sound_file : str = None) -> str:
+        """generates a wave file for the given action
+
+        :param action: the play action
+        :returns: the file name or None
+
+        """
+        tts_file = sound_file or action.tts_file
+        speed = action.etts_speed # floating point 1.0 means normal
+        # convert to an edge tts rate
+        edge_rate = f"{int((speed - 1.0) * 100):+}%"
+        pitch = action.etts_pitch # string representing pitch adjustment, e.g., "+0Hz"
+        edge_pitch = f"{pitch:+}Hz"
+
+        return self.generateWav(tts_file=tts_file, text=text or action.text, voice=action.speaker, rate = edge_rate, pitch=edge_pitch, volume=action.volume)
+
+    def generateWav(self, tts_file: str, text : str, voice: EdgeTTSVoice | str = None, rate: str = "+0%", volume: str = "+0%", pitch: str = "+0Hz") -> bool:
+        """gets the wave file for the given options
+
+        :param tts_file: the path to create
+        :param text: the text to use
+        :param voice: the speaker voice to use, optional
+        :param rate: the speech rate adjustment
+        :param volume: the speech volume adjustment
+        :param pitch: the speech pitch adjustment
+
+        :returns: True if the WAV file was successfully generated, False otherwise
+        """
+
+        if not text:
+            syslog.warning("ETTS: sanitized text is blank, nothing to generate.")
+            return False  # no text
+
+        if not voice:
+            # grab the default voice
+            voice = self._voices_list[0] if self._voices_list else None
+        else:
+            if isinstance(voice, str):
+                speaker = voice.casefold()
+                voice = next((v for v in self._voices_list if v.short_name.casefold() == speaker), None)
+                if not voice:
+                    syslog.error(f"Sound: unable to find voice matching '{speaker}'")
+                    return False
+
+
+        # speaker to use
+        wav = tts_file
+        syslog.info(f"ETTS: generate voice using [{voice.short_name}]")
+
+        if os.path.isfile(wav):
+            try:
+                os.unlink(wav)
+            except Exception as e:
+                syslog.error(f"ETTS: unable to remove existing file: {str(e)}")
+                return False
+
+        """ generate """
+
+        speaker = voice if isinstance(voice, str) else voice.short_name
+        wav = self._generate(text=text, speaker=speaker, pitch = pitch, rate = rate, output_wav=wav)
+        if wav:
+            syslog.info(f"\tPhrase: [{text}]")
+            syslog.info(f"\tsuccess: generated  [{gremlin.util.toUrl(wav)}]")
+            return True
+        return False
+
+    def _get_voice_list(self) -> List[EdgeTTSVoice]:
+        """ gets a list of all edge tts voices"""
+        voices = asyncio.run(self._list_all_voices())
+
+        # Print the details of each voice
+        config = gremlin.config.Configuration()
+        verbose = config.verbose
+        if verbose:
+            syslog.info("ETTS: listing all available voices:")
+            for voice in voices:
+                syslog.info(f"Name: {voice.short_name} | Gender: {voice.gender} | Locale: {voice.locale}")
+
+        return voices
+
+    async def _list_all_voices(self) -> List[EdgeTTSVoice]:
+        """ gets the list of all voices via edge-tts """
+        voices = await edge_tts.list_voices()
+        voices = [EdgeTTSVoice(voice) for voice in voices]
+        return voices
+
+    def getVoiceList(self) -> List[EdgeTTSVoice]:
+        if not self._voices_list:
+            self._voices_list = self._get_voice_list()
+        return self._voices_list

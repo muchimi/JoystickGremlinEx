@@ -24,6 +24,8 @@ import shutil
 from PySide6 import QtCore, QtWidgets
 import gremlin.util
 
+from pydub import AudioSegment
+
 import logging
 import gremlin.singleton_decorator
 import time
@@ -34,7 +36,10 @@ import sys
 syslog = logging.getLogger("system")
 
 
-KTTS_DISABLED = getattr(sys, "frozen", False)  # disabled if running packaged
+KTTS_DISABLED = True # getattr(sys, "frozen", False)  # disabled if running packaged
+KTTS_ENABLED = not KTTS_DISABLED
+
+
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -53,6 +58,7 @@ class KTTS:
         self._id_file_map = {}  # map of action IDs to the wave file name
         self._lock_name = "ktts"
         self._initialized = False
+        sound = gremlin.sound.Sound()
 
         spec = importlib.util.find_spec("torch")
         if spec is None:
@@ -72,10 +78,9 @@ class KTTS:
         # By using this tool, you agree to CPML license https://coqui.ai/cpml
         os.environ["COQUI_TOS_AGREED"] = "1"
 
-        self._sound_folder = os.path.join(gremlin.util.userprofile_path(), "sounds")
-        if not gremlin.util.create_folder(self._sound_folder):
-            syslog.error(f"Unable to create sound file repository :{self._sound_folder}")
-            self._sound_folder = gremlin.util.userprofile_path()
+    def getSoundFolder(self, profile_specific: bool = True) -> str:
+        sound = gremlin.sound.Sound()
+        return sound.getSoundFolder(profile_specific=profile_specific)
 
     def ensure_tts(self) -> bool:
         if self._initialized:
@@ -207,15 +212,12 @@ class KTTS:
         wav = action.tts_file
         return wav and os.path.isfile(wav)
 
-    def getNewWav(self) -> str:
+    def getNewWav(self, profile_specific: bool = True) -> str:
         id = gremlin.util.get_guid()
-        tts_file = os.path.join(self._sound_folder, f"{id}.wav")
+        tts_file = os.path.join(self.getSoundFolder(profile_specific=profile_specific), f"{id}.wav")
         return tts_file
 
-    def getSoundFolder(self) -> str:
-        return self._sound_folder
-
-    def generateActionWav(self, action) -> str:
+    def generateActionWav(self, action, text : str = None) -> str:
         """generates a wave file for the given action
 
         :param action: the play action
@@ -227,7 +229,7 @@ class KTTS:
             tts_file = self.getNewWav()
             action.tts_file = tts_file
 
-        return self.generateWav(tts_file=tts_file, text=action.text, speaker=action.speaker, tts_speed=action.tts_speed)
+        return self.generateWav(tts_file=tts_file, text=text or action.text, speaker=action.speaker, tts_speed=action.tts_speed)
 
     def generateWav(self, tts_file: str, text, speaker: str = None, tts_speed: float = 1.0) -> str:
         """gets the wave file for the given options
@@ -311,7 +313,7 @@ class KTTS:
 
         """
 
-        from pydub import AudioSegment
+
         import soundfile as sf
         import pyrubberband as pyrb
 

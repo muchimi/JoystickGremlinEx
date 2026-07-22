@@ -309,7 +309,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # Setup profile storage
 
-        self.profile = gremlin.base_profile.Profile() # blank profile
+        self.profile = gremlin.base_profile.Profile()  # blank profile
         self._profile_auto_activated = False
         # Input selection storage
         self._last_input_timestamp = time.time()
@@ -429,7 +429,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if self.config.run_on_start and profile_to_load:
             # register a startup call
             el.profile_loaded.connect(self._handle_auto_start_on_load)
-
 
     def _handle_auto_start_on_load(self):
         """Handles auto start when the profile is loaded"""
@@ -1066,7 +1065,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             name = data.device.name
             action = QtGui.QAction(name, self, triggered=self._create_tab_change_trigger_callback(index))
             switch_menu.addAction(action)
-
 
         menu.exec_(QtGui.QCursor.pos())
 
@@ -2388,13 +2386,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 return tab_data.device_guid
         return None
 
-
     def clearRegisteredWidgets(self):
         """cleanup all widgets"""
         return self.unregisterAllWidgets()
 
     def _unregister_all_widgets_ui(self):
-        """removes all widgets from the devices tab widget """
+        """removes all widgets from the devices tab widget"""
         # remove python references
         for index in self._widget_device_index_map.values():
             widget = self.ui.device_page_widget.widget(index)
@@ -2406,16 +2403,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._widget_device_index_map.clear()
         self._widget_index_device_map.clear()
 
-
         # manual QT cleanup
         stacked_widget = self.ui.device_page_widget
         gremlin.ui.ui_common.clearStackedWidget(stacked_widget)
 
-
     def unregisterAllWidgets(self):
         """clears all device widgets"""
         gremlin.util.InvokeUiMethod(self._unregister_all_widgets_ui)  # ensure on UI thread
-
 
     def getRegisteredWidget(self, device_guid) -> QtWidgets.QWidget:
         """gets the widget for the given device id, None if not found"""
@@ -2433,7 +2427,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             device_guid = tab_data.device_guid
             return self.getRegisteredWidget(device_guid)
         return None
-
 
     def getRegisteredWidgetIndex(self, device_guid) -> int:
         device_guid = gremlin.util.normalize_guid(device_guid)
@@ -3014,7 +3007,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                             widget.data = (TabDeviceType.Joystick, device_guid, index)
 
-
                             index += 1
 
                             #  pick a default entry for each tab if one is not currently selected
@@ -3397,7 +3389,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 index = self.getTabIndexForDevice(last_device_guid)
 
                 if index is not None:
-                    widget : BaseDeviceTabWidget = self.getRegisteredWidget(last_device_guid)
+                    widget: BaseDeviceTabWidget = self.getRegisteredWidget(last_device_guid)
                     if not widget:
                         # device may not longer be visible, select the first tab
                         device_guid = self.ui.devices_tab_header_widget.tabData(0).device_guid  # pick first
@@ -3425,7 +3417,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if isinstance(widget, BaseDeviceTabWidget):
                         # ensure the input is visible
                         gremlin.util.singleShot(lambda: widget.ensureSelectedVisible())
-
 
             except Exception as err:
                 syslog.error(f"CREATE DEVICE TABS (step 2): failed: {err}")
@@ -3725,7 +3716,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         import gremlin.config
         import gremlin.event_handler
 
-
         import gremlin.util
         import gremlin.shared_state
         import gremlin.joystick_handling
@@ -3946,9 +3936,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         # select a particular input within a tab
 
                         if widget:
-                            if isinstance(
-                                widget, BaseDeviceTabWidget
-                            ):  # some tabs are not the standard widget - ignore those as they have no inputs
+                            if isinstance(widget, BaseDeviceTabWidget):  # some tabs are not the standard widget - ignore those as they have no inputs
                                 self.selectRegisteredWidget(device_guid)
                                 if verbose:
                                     syslog.info(f"SELECT INPUT: select widget {input_type} {input_id}")
@@ -4954,25 +4942,25 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         )
 
     class delayed_runner_worker(QtCore.QObject):
+        finished = QtCore.Signal()
 
-            finished = QtCore.Signal()
-            def __init__(self, ui):
-                super().__init__()
-                self.ui = ui
+        def __init__(self, ui):
+            super().__init__()
+            self.ui = ui
 
-            @QtCore.Slot()
-            def run(self):
+        @QtCore.Slot()
+        def run(self):
+            widget = self.ui.getCurrentRegisteredWidget()
+            while widget is None:  # not available yet
+                QThread.msleep(100)
                 widget = self.ui.getCurrentRegisteredWidget()
-                while widget is None: # not available yet
-                    QThread.msleep(100)
-                    widget = self.ui.getCurrentRegisteredWidget()
-                widget.refresh()
-                self.finished.emit() # indicate done
+            widget.refresh()
+            self.finished.emit()  # indicate done
 
     def _profile_load_completed(self, *args):
-        """ called when a profile has been loaded """# force a UI update
+        """called when a profile has been loaded"""  # force a UI update
         verbose = gremlin.config.Configuration().verbose_mode_ui
-        widget : BaseDeviceTabWidget = self.getCurrentRegisteredWidget()
+        widget: BaseDeviceTabWidget = self.getCurrentRegisteredWidget()
         if widget:
             widget.refresh(force=True)
         else:
@@ -4991,12 +4979,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     @QtCore.Slot()
     def _delay_refresh_completed(self):
-        """ called when the delayed refresh has completed """
+        """called when the delayed refresh has completed"""
         self.worker.deleteLater()
         self._delay_refresh_thread.quit()
         self._delay_refresh_thread.deleteLater()
-
-
 
     def _do_load_profile_internal_worker(self, args) -> bool | tuple:
         """Load the profile with the given filename.
@@ -5011,7 +4997,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         source_xml: str
         as_new_profile: bool
         source_xml, as_new_profile, emit = args
-
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
@@ -5701,8 +5686,6 @@ def configure_logger(config: dict):
         # syslog.error(f"{err}\n{traceback.format_exc()}")
         return False
 
-
-
     logger = logging.getLogger(config["name"])
     logger.setLevel(config["level"])
     mb = config.get("megabytes", 5) * 1024 * 1024
@@ -5748,8 +5731,6 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     msg += " ".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
     syslog.critical(msg)
     gremlin.util.display_error(msg)
-
-
 
 
 # general exception handling
@@ -5800,8 +5781,6 @@ if __name__ == "__main__":
         process_name = gremlin.version.APPLICATION_EXE
         prompted = False
 
-
-
         # ensure only one instance is running at a time - this is setup to not require admin rights as long as the process is started by the user
         while ph.processRunning(process_name):
             # attempt to kill it
@@ -5809,8 +5788,9 @@ if __name__ == "__main__":
 
             if not prompted:
                 result = gremlin.ui.ui_common.ConfirmBox(
-                    informative_text = "Another instance of GremlinEx is already running.  If the current instance cannot be terminated, this one will exit.",
-                    prompt = "Terminate running process?")
+                    informative_text="Another instance of GremlinEx is already running.  If the current instance cannot be terminated, this one will exit.",
+                    prompt="Terminate running process?",
+                )
                 prompted = True
             else:
                 result = True
@@ -5827,7 +5807,6 @@ if __name__ == "__main__":
                 os._exit(0)
 
         # log file configuration
-
 
         # Path mangling to ensure Gremlin starts independent of the CWD
         sys.path.insert(0, app_path)
@@ -5854,7 +5833,7 @@ if __name__ == "__main__":
                 "faultfile": fault_log_path,
                 "faultbackupCount": 2,
                 "faultmegabytes": 1,
-                "unlink" : False
+                "unlink": False,
             }
         )
         if not result:
@@ -5869,8 +5848,6 @@ if __name__ == "__main__":
                 "logfile": user_log_path,
             }
         )
-
-
 
         # Fix some dumb Qt bugs
         QtWidgets.QApplication.addLibraryPath(os.path.join(os.path.dirname(PySide6.__file__), "plugins"))
@@ -5904,21 +5881,22 @@ if __name__ == "__main__":
         hg = gremlin.hid_guardian.HidGuardian()
         hg.add_process(os.getpid())
 
-
-
         config = gremlin.config.Configuration()
 
         # command line parser
         parser = QtCore.QCommandLineParser()
-        parser.addOption(QtCore.QCommandLineOption(["noprofile","np"], "Do not load a profile on start (--r and --p will be ignored)"))
+        parser.addOption(QtCore.QCommandLineOption(["noprofile", "np"], "Do not load a profile on start (--r and --p will be ignored)"))
         parser.addOption(QtCore.QCommandLineOption(["run", "r"], "Automatically run the last profile, or specified profile via --p on start"))
-        parser.addOption(QtCore.QCommandLineOption(["profile", "p"], "Profile to load, requires the profile xml to be provided.  If a path is not provided, GremlinEx will look for the profile file in the default profile folder."))
-        parser.addOption(QtCore.QCommandLineOption(["nomousehook","nmh"], "Disables mouse hook (prevents mouse output) - diagnostics use only"))
+        parser.addOption(
+            QtCore.QCommandLineOption(
+                ["profile", "p"],
+                "Profile to load, requires the profile xml to be provided.  If a path is not provided, GremlinEx will look for the profile file in the default profile folder.",
+            )
+        )
+        parser.addOption(QtCore.QCommandLineOption(["nomousehook", "nmh"], "Disables mouse hook (prevents mouse output) - diagnostics use only"))
         parser.addHelpOption()
 
         parser.process(app.arguments())
-
-
 
         config.mouse_hook_disabled = parser.isSet("nomousehook")
 
@@ -5953,9 +5931,6 @@ if __name__ == "__main__":
         el = gremlin.event_handler.EventListener()
         el.postInit()
 
-
-
-
         # for now force localization to use US English until we have proper localization support
         locale = QtCore.QLocale("UnitedStates")
         QtCore.QLocale.setDefault(locale)
@@ -5974,7 +5949,7 @@ if __name__ == "__main__":
         time.sleep(0.25)
 
         # instance
-        #_pixmaps = gremlin.ui.ui_common.Pixmaps()
+        # _pixmaps = gremlin.ui.ui_common.Pixmaps()
         # _widget_manager = gremlin.ui.ui_common.WidgetManager()
 
         # check for gamepad availability via VIGEM
@@ -6012,7 +5987,6 @@ if __name__ == "__main__":
             el.terminate()  # terminates and sends the relevant shutdown triggers
             fl.close()
             sys.exit(0)
-
 
         gremlin.shared_state.reload_device_map()
 
@@ -6060,6 +6034,7 @@ if __name__ == "__main__":
 
         # sound engine
         sound = gremlin.sound.Sound()
+        edge_tts = gremlin.sound.EdgeTTS()
 
         # MIDI
         midi_client = gremlin.ui.midi_device.MidiClient()

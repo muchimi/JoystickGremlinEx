@@ -3192,11 +3192,30 @@ class Configuration(QtCore.QObject):
 
     @property
     def ai_tts_last_speaker(self) -> str:
+        """ pytts last speaker """
         return self._get_data("ai_tts_last_speaker", None)
 
     @ai_tts_last_speaker.setter
     def ai_tts_last_speaker(self, value: str):
         self._set_data("ai_tts_last_speaker", value)
+
+    @property
+    def ai_ktts_last_speaker(self) -> str:
+        """ ktts last speaker """
+        return self._get_data("ai_ktts_last_speaker", None)
+
+    @ai_ktts_last_speaker.setter
+    def ai_ktts_last_speaker(self, value: str):
+        self._set_data("ai_ktts_last_speaker", value)
+
+    @property
+    def ai_etts_last_speaker(self) -> str:
+        """ etts last speaker """
+        return self._get_data("ai_etts_last_speaker", None)
+
+    @ai_etts_last_speaker.setter
+    def ai_etts_last_speaker(self, value: str):
+        self._set_data("ai_etts_last_speaker", value)
 
     @property
     def ai_tts_save_on_generate(self) -> str:

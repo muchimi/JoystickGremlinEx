@@ -22,6 +22,10 @@
   "python.analysis.autoImportCompletions": false,
   "python-envs.defaultEnvManager": "ms-python.python:system",
   "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll": false,
+      "source.organizeImports": false,
+    },
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true
   },

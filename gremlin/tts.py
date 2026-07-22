@@ -398,3 +398,33 @@ class TextToSpeech:
         text = text.replace("${current_mode}", gremlin.shared_state.current_mode)
         return text
 
+    def generateActionWav(self, action, text : str = None,  sound_file : str = None) -> str:
+        """generates a wav file from the current action """
+        tts_file = sound_file or action.tts_file
+        speed = action.rate # floating point value 1.0 is normal
+        rate = gremlin.util.clamp(speed, -10, 10)
+        speaker = action.speaker
+        try:
+            # if engine loop is running, kill it
+            started =  self._started
+            if self._started:
+                self.stop()
+
+
+            self.engine.stop()
+            self.engine.setProperty("rate", rate)
+            self.engine.setProperty("voice", speaker)
+            self.engine.save_to_file(text or action.text, tts_file)  # generates wav files by itself
+            # Process the queue and write the file to your disk
+            self.engine.runAndWait()
+
+            # restart loop if needed
+            if started:
+                self.start()
+
+            return tts_file
+        except Exception as e:
+            syslog.error(f"TTS: Error generating wav for action: {e}")
+        return None
+
+

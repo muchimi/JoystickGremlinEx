@@ -30,6 +30,17 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 
+### (m77T11)
+- New: Play Action: support for Edge TTS AI
+- New: Play Action: support for internal TTS generation (this effectively replaces the functionality of the legacy TTS action)
+- New: Play Action: support for dynamic text changes (variable evaluation)
+- New: Play Action: support for | separator to indicate multiple phrases picked at random.
+- New: Tools: New menu entry to convert legacy TTS to Play Action.  This will take every TTS instance in the profile and replace it with the identical Play Action while preserving the settings.
+
+- Fix: Play Action: UI using too much vertical space.
+- Fix: Play Action: support special characters when saving to profile.
+
+
 ### (m77T10)
 - New: Input Viewer: add a new helper button to show/hide visualizers.  Clicking this button will also enabled the visualizer and attempt to make it visible.
 - Fix: API: disconnected devices would not load if defined in a profile.
