@@ -264,7 +264,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
-    def getCallabck(self, key):
+    def getCallback(self, key):
         """gets callback associated with the key"""
         return self._selector_callbacks.get(key, None)
 
@@ -546,6 +546,8 @@ class VisualizationSelector(QtWidgets.QWidget):
         key = (device.key, visualization)
         config.setValue(key, device, visualization, checked)
         self.changed.emit(device, visualization, checked)
+        if self._change_callback:
+            self._change_callback(device, visualization, checked)
 
 
 class VisualizerWidget(QtWidgets.QWidget):
@@ -706,8 +708,8 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         self.focus_icon_size = 20
         self.focus_icon = gremlin.ui.ui_common.Icons.focusIcon()
 
-        self.vis_selector = VisualizationSelector(self._add_remove_visualization_widget, viewer=self, focus_icon=self.focus_icon, focus_icon_size=self.focus_icon_size)
-        self.vis_selector.changed.connect(self._add_remove_visualization_widget)
+        self.vis_selector = VisualizationSelector(change_callback = self._add_remove_visualization_widget, viewer=self, focus_icon=self.focus_icon, focus_icon_size=self.focus_icon_size)
+        # self.vis_selector.changed.connect(self._add_remove_visualization_widget)
         self.vis_selector.clear.connect(self._clear)
         self._visualizer_widgets = {}  # created joystick visualizer widgets by key - if not in this list or None, not created - excludes state and keyboard visualizers
 
@@ -968,7 +970,7 @@ States can be toggled by clicking on the state button.  Expression states will u
                 self.keyboard_widget_selector.setChecked(False)
             case _:
                 self.vis_selector.closeWidget(key)
-                callback = self.vis_selector.getCallabck(key)
+                callback = self.vis_selector.getCallback(key)
                 callback()
 
     def load_viewer_widgets(self):

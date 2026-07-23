@@ -65,7 +65,7 @@ class VisualizationType(IntEnum):
             case "hat":
                 return cls.Hat
             case _:
-                raise ValueError(f"Unknown VisualizationType string: {value}")  
+                raise ValueError(f"Unknown VisualizationType string: {value}")
 
 
 
@@ -1565,3 +1565,48 @@ class EventSourceType(enum.Enum):
     Midi = 3
     OSC = 4
     Any = 5 # any source
+
+
+
+class PlayMode(enum.Enum):
+    Blank = 0  # blank
+    AudioFile = 1  # use standard sound files
+    CoquiAI = 2  # use KTTS
+    EdgeAI = 3  # use ETTS
+    PyTTS = 4  # use PyTTS
+
+    @staticmethod
+    def to_string(value) -> str:
+        match value:
+            case PlayMode.AudioFile:
+                return "audio"
+            case PlayMode.CoquiAI:
+                return "ktts"
+            case PlayMode.EdgeAI:
+                return "etts"
+            case PlayMode.Blank:
+                return "blank"
+            case PlayMode.PyTTS:
+                return "pytts"
+
+    @staticmethod
+    def from_string(value) -> PlayMode:  # noqa: F821
+        match value:
+            case "blank":
+                return PlayMode.Blank
+            case "ktts":
+                return PlayMode.CoquiAI
+            case "etts":
+                return PlayMode.EdgeAI
+            case "pytts":
+                return PlayMode.PyTTS
+            case _:
+                return PlayMode.AudioFile
+
+class PlaybackMode(enum.Enum):
+    """ playback mode for multi sounds """
+    RoundRobin = 1  # play sounds in a round-robin fashion
+    Random = 2  # play sounds randomly
+    TimedRandom = 3  # play sounds randomly with a cooldown period
+
+

@@ -33,7 +33,7 @@ from typing import Callable
 import gremlin.keyboard
 import gremlin.profile
 import gremlin.shared_state
-from gremlin.types import MergeAxisOperation, PluginVariableType, DeviceCategory, DeviceType
+from gremlin.types import MergeAxisOperation, PlaybackMode, PluginVariableType, DeviceCategory, DeviceType
 from uuid import UUID
 from PySide6 import QtCore
 from frozendict import frozendict
@@ -2402,6 +2402,11 @@ class Profile:
         gremlin.ui.mode_device.ensureMasterInputItems(self)
         gremlin.ui.mode_device.ensureModeInputItems(self, "Default")
 
+    def getProfileKey(self):
+        """ unique key for this profile """
+        self
+
+
     def _shutdown_handler(self):
         """handles shutdown events"""
         # ensure the profile config data is persisted
@@ -3896,9 +3901,13 @@ class Profile:
         if verbose:
             syslog.info(f"XML: parsing profile [{gremlin.util.toUrl(fname)}]")
 
-        # id
+        # profile id
         if "guid" in root.attrib:
             self.id = normalize_guid(root.get("guid"))
+        else:
+            # regenerate the profile
+            root.set("guid", self.id)
+            tree.write(fname, encoding="utf-8", xml_declaration=True) # update the file with the new profile ID if it's missing
 
         self._start_mode = None
         if "start_mode" in root.attrib:
@@ -4186,6 +4195,7 @@ class Profile:
         root.set("restore_last", str(self._restore_last_mode))
         root.set("force_numlock", str(self._force_numlock_off))
         root.set("force_numlock_on", str(self._force_numlock_on))
+        root.set("guid",self.id) # profile ID
 
         # mode list
 
@@ -5045,8 +5055,131 @@ class Profile:
 
         return count
 
-    def convertTTS(speaker: str = None, tts_speed: float = 1.0):
-        """converts profile TTS entries to playsound entries"""
+    def convertTTSToPlaySound(self):
+        """converts profile TTS entries to playsound entries - prompt the user and saves to a new profile """
+        fname = self.profile_file
+        if not os.path.isfile(fname):
+            return False
+
+        from gremlin.types import PlayMode
+        import gremlin.tts
+        import gremlin.ui.ui_common
+        from PySide6 import QtWidgets
+
+        tree = etree.parse(fname)
+        root = tree.getroot()
+
+        nodes = list(root.xpath("//text-to-speech"))
+        if not nodes:
+            gremlin.ui.ui_common.MessageBox(informative_text="No TTS entries found in the profile.")
+            return None
+
+        result = gremlin.ui.ui_common.ConfirmBox(informative_text ="Do you want to convert all TTS entries to lay sound entries?\nThis will save to a new profile.")
+        if not result:
+            return None
+
+        # get a profile to save to
+        save_fname, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Save Profile As...", gremlin.shared_state.data_path, "XML files (*.xml)")
+        if not save_fname:
+            return None
+
+
+        for node in nodes:
+
+            # read the node
+            voice_id = None
+            tts = gremlin.tts.TextToSpeech()
+            if "voice_id" in node.attrib:
+                voice_id = node.get("voice_id")
+                if voice_id.isdigit():
+                    voice_id = int(voice_id)
+                else:
+                    voice_id = 0
+
+                voices = tts.getVoices()
+                if voices and voice_id < len(voices):
+                    voice = voices[voice_id]
+                    speaker = voice.name
+            else:
+                # get a default voice
+                default_voice = next(
+                    (voice for voice in self.voices if "David Desktop" in voice.name), None
+                )
+                speaker = default_voice.name
+
+
+            if "volume" in node.attrib:
+                volume = safe_read(node, "volume", int, 50)
+            else:
+                volume = 50  # default
+
+            volume = gremlin.util.clamp(volume, 0, 100)
+            rate = safe_read(node, "rate", int, 100)
+            if rate == 0:
+                rate = 100  # default
+            rate = gremlin.util.clamp(
+                rate, tts.rate_offset_min, tts.rate_offset_max
+            )
+            if "text" in node.attrib:
+                text = node.get("text")
+            else:
+                text = None
+
+            # clearQueue = safe_read(node, "clear-queue", bool, False)
+            # _abort = safe_read(node, "abort", bool, False)
+            exec_on_press = safe_read(node, "exec_on_press", bool, True)
+            exec_on_release = safe_read(node, "exec_on_release", bool, False)
+            # override_suppress = safe_read(node, "override-suppress", bool, False)
+
+
+            # replace with new play sound node
+
+            randomize_sound_file = True
+            ptts_speed = rate
+            ptts_volume = volume
+            loops = 1
+            playback_ms = 0
+            playback_rate = 1.0
+            fadein_ms = 0
+            fadeout_ms = 0
+            stop_previous = False
+            playback_mode = PlaybackMode.RoundRobin
+            mode = PlayMode.PyTTS
+            auto_generate = True
+
+            node.attrib.clear()
+
+            node.tag = "play-sound"
+            node.set("mode", PlayMode.to_string(mode))
+            node.set("type", "playsound")
+            node.set("randomize", safe_format(randomize_sound_file, bool))
+
+
+            node.set("speaker", speaker)
+            node.set("volume", safe_format(volume, int))
+            node.set("text", html.escape(text))
+            node.set("ptts_speed", safe_format(ptts_speed, int))
+            node.set("ptts_volume", safe_format(ptts_volume, int))
+            node.set("exec_on_press", safe_format(exec_on_press, bool))
+            node.set("exec_on_release", safe_format(exec_on_release, bool))
+            node.set("loops", safe_format(loops, int))
+            node.set("playback-ms", safe_format(playback_ms, int))
+            node.set("playback-rate", safe_format(playback_rate, float))
+            node.set("fadein-ms", safe_format(fadein_ms, int))
+            node.set("fadeout-ms", safe_format(fadeout_ms, int))
+            node.set("stop-previous", safe_format(stop_previous, bool))
+            node.set("playback-mode", safe_format(playback_mode.name, str))
+            node.set("auto-generate", safe_format(auto_generate, bool))
+
+
+
+        tree.write(save_fname, encoding="utf-8", xml_declaration=True, pretty_print=True)
+        return save_fname
+
+
+
+
+
 
 
 """ END PROFILE """
@@ -6058,3 +6191,6 @@ class ProfileMap:
     @property
     def valid(self):
         return self._valid
+
+
+

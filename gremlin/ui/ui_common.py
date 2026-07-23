@@ -1289,7 +1289,7 @@ class Icons:
     @staticmethod
     def pauseIcon(qta_color="#535353"):
         return Icons._icon("mdi.pause", qta_color=qta_color)
-    
+
     @staticmethod
     def playIcon(qta_color="#0BA012"):
         return Icons._icon("fa6s.play", qta_color=qta_color)
@@ -4245,9 +4245,9 @@ def MessageBoxYesNo(
     informative_text=None,
     callback=None,
     parent=None,
-    width=200,
+    width=300,
 ):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "yesno", callback, parent)
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "yesno", callback, parent, width)
 
 
 def MessageBoxOkCancel(
@@ -4256,9 +4256,9 @@ def MessageBoxOkCancel(
     informative_text=None,
     callback=None,
     parent=None,
-    width=200,
+    width=300,
 ):
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "okcancel", callback, parent)
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, "okcancel", callback, parent, width)
 
 
 def MessageBox(
@@ -4268,10 +4268,10 @@ def MessageBox(
     is_warning=True,
     callback=None,
     parent=None,
-    width=200,
+    width=300,
 ):
     mode = "warning" if is_warning else "info"
-    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, mode, callback, parent)
+    gremlin.util.InvokeUiMethod(_message_box_ui, title, prompt, informative_text, mode, callback, parent, width)
 
 
 def _message_box_ui(
@@ -4281,6 +4281,7 @@ def _message_box_ui(
     mode: str = "info",
     callback=None,
     parent=None,
+    width=300,
 ):
     buttons = QtWidgets.QMessageBox.StandardButton.Ok
     if parent is None:
@@ -4298,6 +4299,7 @@ def _message_box_ui(
         case _:
             icon = Icons.infoIcon()
 
+
     pixmap = icon.pixmap(48)
     msgbox = QtWidgets.QMessageBox(parent=parent)
     msgbox.setWindowTitle(title)
@@ -4306,6 +4308,8 @@ def _message_box_ui(
     if informative_text:
         msgbox.setInformativeText(informative_text)
     msgbox.setStandardButtons(buttons)
+    msgbox.setMinimumWidth(width)
+    msgbox.setMinimumHeight(200)
 
     result = msgbox.exec()
     if callback:

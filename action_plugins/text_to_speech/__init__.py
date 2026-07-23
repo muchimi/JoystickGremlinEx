@@ -25,7 +25,12 @@ import gremlin.tts
 import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.config
-from gremlin.util import safe_format, safe_read
+import gremlin.sound
+import os
+from gremlin.types import PlaybackMode, PlayMode
+import random
+
+from gremlin.util import safe_format, safe_read, TimedRandomInt
 from shiboken6 import Shiboken
 import logging
 
@@ -53,6 +58,8 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
             self.action_data.voice_name = self.voice_widget.currentText()
         except Exception:
             pass
+
+        self.sound = gremlin.sound.Sound()
 
         self.voice_widget.currentIndexChanged.connect(self._voice_change_cb)
 
@@ -229,6 +236,8 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
         tts.speak_single(self.action_data.text, self.action_data.rate)
 
 
+
+
 class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
     tts = gremlin.tts.TextToSpeech()
 
@@ -301,6 +310,8 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         self.volume = config.initial_volume_tts  # default volume set in options
         self.rate = config.initial_load_rate_tts  # default wpm set in options
         self.voice_index = config.TTSDefaultVoiceIndex  # default voice index
+        self._timed_random = TimedRandomInt(0, 10, 10)
+        self._last_phrase = None # last spoken phrase
         self._voice_name = ""
         self._abort = False  # true if the action aborts any current TTS
         self.clearQueue = (
@@ -440,6 +451,8 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
 
         return table.to_html()
 
+
+   
 
 version = 1
 name = "text-to-speech"

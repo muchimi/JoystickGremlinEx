@@ -31,15 +31,22 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 ### (m77T11)
-- New: Play Action: support for Edge TTS AI
-- New: Play Action: support for internal TTS generation (this effectively replaces the functionality of the legacy TTS action)
-- New: Play Action: support for dynamic text changes (variable evaluation)
-- New: Play Action: support for | separator to indicate multiple phrases picked at random.
-- New: Tools: New menu entry to convert legacy TTS to Play Action.  This will take every TTS instance in the profile and replace it with the identical Play Action while preserving the settings.
+- New: Play Action: (early release) add support for (currently free) text to speech via online AI and adds support in the action for the legacy TTS engine as well.  The online generation adds a very significant (and much needed) multilingual quality boost for TTS generation via the Microsoft Edge TTS AI (internet connection required). GEX will automatically generate the necessary audio files and play them through the modern audio engine at profile design or runtime. The legacy TTS engine (local TTS generation via the operating system) is now supported as well, however playback will run through the new audio engine and audio quality continues to be limited to this old technology.  This should also resolve playback issues experienced due to the old engine limitations and the updated execution engine in GEX introduced in M77.  The audio engine introduced last year supports concurrent audio streams and advanced playback options via the Play Sound Action.  For Edge TTS, GEX supports all voice sets available via Edge TTS. Important: while this service is currently free and does not require an API key, it can experience the occasional service disruptions especially when being spammed by requests.  If this happens, the conversion may fail but may be attempted again.  GEX will only attempt to generate the missing parts, as the audio generation is based on the specific phrase being generated (a text entry may now contain multiple phrases, see below).  The API also supports multiple engines so other AI engines may be added later more easily.  AI is a fast moving technology so newer choices may become available, and current choice may be deprecated as well, so flexibility was needed in the design to more easily adapt to the context.
+- New: Play Action: add support for legacy internal TTS generation
+- New: Play Action: add support for dynamic text changes (variable evaluation)
+- New: Play Action: add support for | separator to indicate multiple phrases picked at random.  This enhancement removes the need for multiple entries for variety scenarios (saying the same thing different ways) which can be augmented by the random playback features.  Limitation: the randomness is currently tied to a specific voice. If you want different voices and options, multiple actions are still needed.
+- New: Play Action: improved audio caching - TTS generation will only regenerate if the phrase has changed (dynamically for example), manually regenerated, or if the files are missing.  Audio previously generated will not be re-created which greatly speeds up the profile start and runtime performance.
+- New: Tools: New menu entry to convert legacy TTS to Play Action.  This will replace legacy TTS actions and convert them to Play Sound Actions.
+- Change: Deprecated older KTTS local AI engine due to the impractical application and extreme resource needs.  This is not removed, but disabled for now. KTTS was only available if running from script due to (external) engine limitations not supporting packaging, not to mention adding about 3Gb to the size of the package and using significant memory and GPU.
+- Change: Sound: Added new sound manager to facilitate the management of generated audio files through various engines supported.  This includes a refactor of the GEX sound APIs.
 
-- Fix: Play Action: UI using too much vertical space.
+- Fix: Play Action: UI uses increased vertical space.
 - Fix: Play Action: support special characters when saving to profile.
+- Fix: OSC: Resolved incorrect refactor of device_profile. 
+- Fix: legacy TTS: Resolved a reference issue if TTS engine cannot be initialized.  Note: avoid using legacy TTS where possible in m77+
+- Fix: Input Viewer: (proposed) callback inspection error on add/remove visual.
 
+Known issues: the file caching and management is still experimental and may generate too many files or remove files when GEX closes.  This will be improved in the next few test releases but this is provided now for additional testing.
 
 ### (m77T10)
 - New: Input Viewer: add a new helper button to show/hide visualizers.  Clicking this button will also enabled the visualizer and attempt to make it visible.

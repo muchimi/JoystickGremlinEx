@@ -23,13 +23,14 @@ TTS uses PyTTSx3 which is not thread safe.
 
 
 """
-
+import os
 import logging
 import time
 import gremlin.config
 import gremlin.event_handler
 import gremlin.shared_state
 import threading
+from gremlin.sound import PhraseData
 import gremlin.threading
 import gremlin.util as util
 import pyttsx3
@@ -51,6 +52,8 @@ class TextToSpeech:
         """Creates a new instance."""
         # syslog = logging.getLogger("system")
         self.valid = False
+        self.voices = None
+        self.default_voice = None
         el = gremlin.event_handler.EventListener()
         el.tts_change.connect(self._tts_changed)
         el.shutdown.connect(self.end)
@@ -110,7 +113,7 @@ class TextToSpeech:
 
     def getVoices(self):
         """gets a list of defined voices"""
-        if self.valid:
+        if self.valid and self.voices:
             return self.voices
         return []
 
@@ -398,12 +401,12 @@ class TextToSpeech:
         text = text.replace("${current_mode}", gremlin.shared_state.current_mode)
         return text
 
-    def generateActionWav(self, action, text : str = None,  sound_file : str = None) -> str:
+    def generateActionWav(self, action, phrase : PhraseData) -> str:
         """generates a wav file from the current action """
-        tts_file = sound_file or action.tts_file
-        speed = action.rate # floating point value 1.0 is normal
-        rate = gremlin.util.clamp(speed, -10, 10)
+        tts_file = phrase.getSoundFile()
+        rate = phrase.rate # floating point value 1.0 is normal
         speaker = action.speaker
+        text = phrase.text
         try:
             # if engine loop is running, kill it
             started =  self._started
@@ -414,7 +417,7 @@ class TextToSpeech:
             self.engine.stop()
             self.engine.setProperty("rate", rate)
             self.engine.setProperty("voice", speaker)
-            self.engine.save_to_file(text or action.text, tts_file)  # generates wav files by itself
+            self.engine.save_to_file(text, tts_file)  # generates wav files by itself
             # Process the queue and write the file to your disk
             self.engine.runAndWait()
 
@@ -422,9 +425,9 @@ class TextToSpeech:
             if started:
                 self.start()
 
-            return tts_file
+            return os.path.isfile(tts_file)
         except Exception as e:
             syslog.error(f"TTS: Error generating wav for action: {e}")
-        return None
+        return False
 
 

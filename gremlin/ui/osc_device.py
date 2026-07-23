@@ -4134,7 +4134,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
     def _index_for_key(self, input_id):
         """returns the index of the selected input id"""
-        mode = self.device_profile.modes[self.current_mode]
+        mode = self.profile.modes[self.current_mode]
         sorted_keys = list(mode.config[InputType.OpenSoundControl].keys())
         return sorted_keys.index(input_id)
 
@@ -4354,7 +4354,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
     def _index_for_key(self, input_id):
         """returns the index of the selected input id"""
-        mode = self.device_profile.modes[self.current_mode]
+        mode = self.profile.modes[self.current_mode]
         sorted_keys = list(mode.config[InputType.OpenSoundControl].keys())
         return sorted_keys.index(input_id)
 
@@ -4369,7 +4369,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
     def set_mode(self, mode):
         """changes the mode of the tab"""
         self.current_mode = mode
-        self.device_profile.ensure_mode_exists(self.current_mode)
+        self.profile.ensure_mode_exists(self.current_mode)
         self.inputItemListModel.mode = mode
 
         # self.inputItemListView.select_item(-1)

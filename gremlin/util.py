@@ -35,6 +35,8 @@ import collections
 import qtawesome as qta
 from lxml import etree as ElementTree
 from typing import Callable
+import hashlib
+import random
 
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtCore import QMetaObject
@@ -2864,3 +2866,65 @@ def isHashable(obj):
         return True
     except TypeError:
         return False
+
+def hashString(text : str):
+    """ generate a unique key from a string """
+    hash_object = hashlib.sha256(text.encode('utf-8'))
+    # Return the hexadecimal representation of the hash
+    return hash_object.hexdigest()
+
+
+
+class TimedRandomInt:
+    def __init__(self, min_val: int, max_val: int, cooldown_period: float):
+        """
+        :param min_val: The minimum value for the random integer (inclusive).
+        :param max_val: The maximum value for the random integer (inclusive).
+        :param cooldown_period: The time period in seconds during which a number cannot be reused.
+        """
+        self.min_val = min_val
+        self.max_val = max_val
+        self.cooldown_period = cooldown_period
+        # Store used numbers with their timestamp: {number: timestamp}
+        self.used_numbers = {}
+
+    def setMin(self, value: int):
+        self.min_val = value
+        self.used_numbers.clear() # reset
+
+    def setMax(self, value: int):
+        self.max_val = value
+        self.used_numbers.clear() # reset
+
+    def _cleanup_used_numbers(self):
+        """Removes numbers from the used list if their cooldown period has passed."""
+        current_time = time.time()
+        # Use list() to iterate over a copy of keys, allowing modification of the dict
+        for number, timestamp in list(self.used_numbers.items()):
+            if current_time - timestamp > self.cooldown_period:
+                del self.used_numbers[number]
+
+    def getValue(self):
+        """Generates a random integer that hasn't been used in the cooldown period."""
+        self._cleanup_used_numbers()
+
+        # Determine the pool of available numbers
+        available_numbers = [
+            num
+            for num in range(self.min_val, self.max_val + 1)  # range is inclusive left, exclusive right
+            if num not in self.used_numbers
+        ]
+
+        if not available_numbers:
+            # Handle the case where all numbers are in cooldown
+            # return a random number
+            new_number = random.randint(self.min_val, self.max_val)  # randint is inclusive of both bounds
+
+        else:
+            # Select a random number from the available pool
+            new_number = random.choice(available_numbers)
+
+        # Mark the new number as used with the current timestamp
+        self.used_numbers[new_number] = time.time()
+
+        return new_number

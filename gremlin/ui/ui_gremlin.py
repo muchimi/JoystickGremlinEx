@@ -7,12 +7,7 @@
 # WARNING! All changes made in this file will be lost!
 
 from PySide6 import QtCore, QtGui, QtWidgets
-import os
-import shutil
 import logging
-
-
-import gremlin
 from gremlin.ui.ui_common import QRememberMainWindow
 
 
@@ -224,8 +219,8 @@ class Ui_Gremlin(object):
         self.actionConvertLegacy.triggered.connect(self._handle_convert_legacy)
 
         self.actionConvertTTS = QtGui.QAction(main_window)
-        self.actionConvertTTS.setText("Convert TTS to AI")
-        self.actionConvertTTS.setToolTip("Converts Map to TTS actions to Play Sound actions converting the text to a wav file if KTTS is available")
+        self.actionConvertTTS.setText("Convert Legacy TTS to Play Sound...")
+        self.actionConvertTTS.setToolTip("Converts the legacy Map to TTS actions to Play Sound actions and the updated audio engine")
         self.actionConvertTTS.triggered.connect(self._handle_convert_tts)
 
         self.actionGenerateTTS = QtGui.QAction(main_window)
@@ -233,10 +228,10 @@ class Ui_Gremlin(object):
         self.actionGenerateTTS.setToolTip("Converts bulk text to TTS audio files via KTTS if available")
         self.actionGenerateTTS.triggered.connect(self._handle_generate_tts)
 
-        ktts = gremlin.ktts.KTTS()
-        enabled = ktts.is_available()
-        self.actionConvertTTS.setEnabled(enabled)
-        self.actionGenerateTTS.setEnabled(enabled)
+        # ktts = gremlin.ktts.KTTS()
+        # enabled = ktts.is_available()
+        # self.actionConvertTTS.setEnabled(enabled)
+        self.actionGenerateTTS.setEnabled(False)
 
         self.menuRecent.addAction(self.actionEmpty)
         self.menuFile.addAction(self.actionNewProfile)
@@ -358,41 +353,47 @@ class Ui_Gremlin(object):
         import gremlin.shared_state
         import gremlin.sound
 
-        ui = gremlin.shared_state.ui
-        ktts = gremlin.ktts.KTTS()
-        if not ktts.is_available():
-            gremlin.ui.ui_common.MessageBoxWarning(prompt="AI engine not found on this system.", parent=ui)
-            return False
 
-        profile_converter = gremlin.profile.ProfileConverter()
+        # if not ktts.is_available():
+        #     gremlin.ui.ui_common.MessageBoxWarning(prompt="AI engine not found on this system.", parent=ui)
+        #     return False
+
         profile = gremlin.shared_state.current_profile
-        fname = profile.profile_file
-        if not fname or not os.path.isfile(fname):
-            gremlin.ui.ui_common.MessageBoxWarning(prompt="Invalid profile file.\nEnsure profile is saved.", parent=ui)
-            return False
-
-        dialog = gremlin.sound.GenerateDialog(parent=ui)
-        result = dialog.exec()
-        if result != QtWidgets.QDialog.DialogCode.Accepted:
-            # do not convert
-            return
-
-        # make a backup
-        backup_fname = gremlin.util.swap_ext(fname, suffix="_tts")
-        index = 1
-        while os.path.isfile(backup_fname):
-            backup_fname = gremlin.util.swap_ext(fname, suffix=f"_tts_{index}")
-            index += 1
-        try:
-            shutil.copy(fname, backup_fname)
-            syslog.info(f"CONVERT TTS: backup file saved to: {backup_fname}")
-        except Exception as e:
-            syslog.error(f"CONVERT TTS: unable to make backup file: {str(e)}")
-            return False
-
-        if profile_converter.convert_tts(fname):
+        new_file = profile.convertTTSToPlaySound()
+        if new_file:
             el = gremlin.event_handler.EventListener()
-            el.request_profile_reload.emit(fname, False)
+            el.request_profile_reload.emit(new_file, False)
+
+
+        # profile_converter = gremlin.profile.ProfileConverter()
+        # profile = gremlin.shared_state.current_profile
+        # fname = profile.profile_file
+        # if not fname or not os.path.isfile(fname):
+        #     gremlin.ui.ui_common.MessageBoxWarning(prompt="Invalid profile file.\nEnsure profile is saved.", parent=ui)
+        #     return False
+
+        # dialog = gremlin.sound.GenerateDialog(parent=ui)
+        # result = dialog.exec()
+        # if result != QtWidgets.QDialog.DialogCode.Accepted:
+        #     # do not convert
+        #     return
+
+        # # make a backup
+        # backup_fname = gremlin.util.swap_ext(fname, suffix="_tts")
+        # index = 1
+        # while os.path.isfile(backup_fname):
+        #     backup_fname = gremlin.util.swap_ext(fname, suffix=f"_tts_{index}")
+        #     index += 1
+        # try:
+        #     shutil.copy(fname, backup_fname)
+        #     syslog.info(f"CONVERT TTS: backup file saved to: {backup_fname}")
+        # except Exception as e:
+        #     syslog.error(f"CONVERT TTS: unable to make backup file: {str(e)}")
+        #     return False
+
+        # if profile_converter.convert_tts(fname):
+        #     el = gremlin.event_handler.EventListener()
+        #     el.request_profile_reload.emit(fname, False)
 
     def update_toolbar(self):
         """sets / resets the toolbar based on options"""

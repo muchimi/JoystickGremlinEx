@@ -23,8 +23,8 @@
   "python-envs.defaultEnvManager": "ms-python.python:system",
   "[python]": {
     "editor.codeActionsOnSave": {
-      "source.fixAll": false,
-      "source.organizeImports": false,
+      "source.fixAll": "never",
+      "source.organizeImports": "never"
     },
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true

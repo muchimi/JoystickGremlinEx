@@ -17,9 +17,11 @@
 
 from __future__ import annotations  # deprecated with python 3.14+
 import os
+import html
+from lxml import etree
 from PySide6 import QtCore, QtMultimedia, QtWidgets
-
 import gremlin.util
+from gremlin.util import hashString, safe_format, safe_read
 import gremlin.event_handler
 import asyncio
 import edge_tts
@@ -29,7 +31,7 @@ import os
 import shutil
 import gremlin.config
 import importlib.util
-
+import json
 
 import gremlin.ui.ui_common
 import threading
@@ -41,6 +43,8 @@ import gremlin.singleton_decorator
 from gremlin.base_classes import FastQueue
 import enum
 import time
+from psygnal import Signal
+
 
 syslog = logging.getLogger("system")
 
@@ -148,14 +152,321 @@ class SoundEvent:
         return SoundEvent(action=SoundAction.Stop)
 
 
-# class SoundData():
-#     ''' holds compiled sound data for SD mode '''
-#     def __init__(self, filename : str, device_id: int, options : PlaybackOptions, data, ):
-#         self.filename = filename
-#         self.device_id = device_id
-#         self.data = data
-#         self.id = gremlin.util.get_guid() # unique record id
-#         self.options = options
+class PhraseData:
+    """holds data for a phrase to be spoken
+    tracks single text and playback parameters and associated found files on disk. and tracks a unique key for the text that can be persisted for later re-use after generation
+    """
+
+    def __init__(self, text: str, voice: str = None, rate: float = 1.0, pitch: int = 0, volume: float = 1.0, sound_file : str = None, temporary : bool = False, generated : bool = True):
+        """ creates an instance
+        :param text: the text of the phrase
+        :param voice: the voice to use for TTS
+        :param rate: the rate of speech
+        :param pitch: the pitch of the voice
+        :param volume: the volume of the playback
+        :param sound_file: the path to the sound file
+        :param temporary: whether the phrase is temporary
+        :param generated: whether the sound is generated or static
+        """
+        self._id = gremlin.util.get_guid() # unique ID of this object
+        if text:
+            assert "|" not in text,"multitext not supported in PhraseData text"
+        self._id = gremlin.util.get_guid() # unique ID of this phrase
+        self._text = text
+        self._voice = voice
+        self._rate = rate
+        self._pitch = pitch
+        self._volume = volume
+        if sound_file:
+            assert text is None or text == "", "Static sound files should not have associated text"
+
+        self._sound_file  = sound_file # partial sound file from the sounds folder
+        self._temporary = temporary
+        self._key = None
+        self._generated = generated
+        self._update_key()
+
+    @property
+    def id(self) -> str:
+        return self._id
+
+    def setId(self, value: str):
+        self._id = value
+
+    @property
+    def generated(self) -> bool:
+        return self._generated
+    @generated.setter
+    def generated(self, value: bool):
+        self._generated = value
+
+    @property
+    def temporary(self) -> bool:
+        return self._temporary
+    @temporary.setter
+    def temporary(self, value: bool):
+        self._temporary = value
+
+    def getSoundFile(self) -> str:
+        return self._sound_file
+
+    @property
+    def sound_file(self) -> str:
+        return self._sound_file
+
+    @sound_file.setter
+    def sound_file(self, value: str):
+        # strip the profile sounds folders
+        self._sound_file = value
+
+    def sound_file_stub(self) -> str:
+        value = self._sound_file
+        if value:
+            pm = PhraseDataManager()
+            folder = pm.getSoundFolder() + "\\" # include trailing \
+            value = value.casefold()
+            if value.startswith(folder):
+                value = value[len(folder):]
+        return value
+
+    def sound_file_full_path(self, sound_file_stub: str = None) -> str:
+        value = sound_file_stub
+        if value:
+            value = value.casefold()
+            pm = PhraseDataManager()
+            folder = pm.getSoundFolder().casefold()
+            if not value.startswith(folder):
+                value = os.path.join(folder, value)
+            assert value.startswith(folder), f"Sound file [{value}] is not in the expected folder [{folder}]"
+        return value
+
+
+    def _update_key(self):
+        hash_string = f"{self._text}{self._voice}{self._rate:0.3f}{self._pitch}{self._volume:0.3f}"
+        self._key = hashString(hash_string)
+
+    @property
+    def text(self) -> str:
+        return self._text
+    @text.setter
+    def text(self, value: str):
+        self._text = value
+        self._update_key()
+
+    @property
+    def voice(self) -> str:
+        return self._voice
+    @voice.setter
+    def voice(self, value: str):
+        self._voice = value
+        self._update_key()
+
+    @property
+    def rate(self) -> float:
+        return self._rate
+    @rate.setter
+    def rate(self, value: float):
+        self._rate = value
+        self._update_key()
+
+    @property
+    def pitch(self) -> int:
+        return self._pitch
+    @pitch.setter
+    def pitch(self, value: int):
+        self._pitch = value
+        self._update_key()
+
+    @property
+    def volume(self) -> float:
+        return self._volume
+    @volume.setter
+    def volume(self, value: float):
+        self._volume = value
+        self._update_key()
+
+    @property
+    def key(self) -> str:
+        if self._key is None:
+            self._update_key()
+        return self._key
+
+
+    def to_xml(self) -> etree.Element:
+        """ stores phrase data to an XML element"""
+        node = etree.Element("phrase")
+        node.set("text", html.escape(self.text))
+        if self.voice is not None:
+            node.set("voice", self.voice)
+        node.set("rate", safe_format(self.rate, float))
+        node.set("pitch", safe_format(self.pitch, int))
+        node.set("volume", safe_format(self.volume, float))
+        node.set("guid", self.id)
+        node.set("key", self.key)
+        return node
+
+
+    def from_xml(self, node: etree.Element) -> "PhraseData":
+        """ reads phrase data from an XML element"""
+        self._text = html.unescape(node.get("text", ""))
+        self._voice = node.get("voice", None)
+        self._rate = safe_read(node, "rate", float, 1.0)
+        self._pitch = safe_read(node, "pitch", int, 0)
+        self._volume = safe_read(node, "volume", float, 1.0)
+        self._temporary = False # persisted files are, by definition, not temporary
+        if "guid" in node.attrib:
+            self._id = node.get("guid")
+        self._sound_file = None # force a reset
+        self._update_key()
+
+
+
+@gremlin.singleton_decorator.SingletonDecorator
+class PhraseDataManager:
+    """ handles persistence of phrases to disk for generated audio """
+    def __init__(self):
+        self.phrases = {}  # maps phrase keys to PhraseData objects - keyed by key
+        self._sound_map = {} # map of phrase keys to sound file paths
+        self._sound_folder = os.path.join(gremlin.util.userprofile_path(), "sounds","managed")
+        if not gremlin.util.create_folder(self._sound_folder):
+            syslog.error(f"Unable to create sound file repository :{self._sound_folder}")
+            self._sound_folder = gremlin.util.userprofile_path()
+        self._config_file = os.path.join(self._sound_folder, "phrases.xml")
+
+        el = gremlin.event_handler.EventListener()
+        el.shutdown.connect(self._handle_shutdown)
+        el.profile_loaded.connect(self._handle_profile_changed)
+
+
+    def _handle_profile_changed(self):
+        """ handle profile changed event """
+        self.readConfig() # update the config for the new profile
+
+
+    def getPhraseDataById(self, id: str) -> PhraseData:
+        for phrase in self.phrases.values():
+            if phrase.id == id:
+                return phrase
+        return None
+
+    def getSoundFolder(self) -> str:
+        """ gets a profile specific sound folder tied to the profile ID """
+        return self._sound_folder
+
+    def _handle_shutdown(self):
+        """ shutdown event - save the config """
+        self.writeConfig()
+        self.purgeData() # remove any non tracked files
+
+
+    def readConfig(self):
+        self.phrases.clear()
+        if not os.path.exists(self._config_file):
+            # no saved data
+            return
+        tree = etree.parse(self._config_file)
+        root = tree.getroot()
+        self.from_xml(root)
+
+
+    def writeConfig(self):
+        tree = etree.ElementTree(self.to_xml())
+        tree.write(self._config_file, encoding="utf-8", xml_declaration=True, pretty_print=True)
+        syslog.info(f"Phrases: save configuration [{gremlin.util.toUrl(self._config_file)}]")
+
+    def ensureSoundFile(self, phrase : PhraseData):
+        """ ensures the phrase has a sound file associated with it"""
+        if phrase:
+            if phrase.text:
+                # GUID based sound file
+                sound_file = phrase.sound_file
+                if not sound_file:
+                    # create a unique file for this phrase
+                    # file_name = f"{phrase.key}.wav"
+                    file_name = f"{phrase.id}.wav"
+                    sound_file = os.path.join(self.getSoundFolder(), file_name)
+                    syslog.info(f"Phrase: [{phrase.text}] created new sound file at [{phrase.sound_file}]")
+                    phrase.sound_file = sound_file
+                key = phrase.key
+                if key not in self._sound_map:
+                    self._sound_map[key] = sound_file
+
+            if __debug__:
+                for k, v in self._sound_map.items():
+                    if v == sound_file and k != key:
+                        conflict_phrase = self.phrases[k]
+                        assert False, f"Sound file conflict: {sound_file} is already associated with key {k} (phrase text: [{conflict_phrase.text}])"
+
+
+            return sound_file
+        return None
+
+
+
+    def purgeData(self):
+        """ remove all wav files that are not tracked by this manager - if the manager is empty, all files will be removed """
+        all_files = set(gremlin.util.find_files(self._sound_folder, source_pattern = "*.wav"))
+        managed_files = set()
+        for phrase in self.phrases.values():
+            if phrase.sound_file:
+                managed_files.add(phrase.sound_file)
+
+        for file in all_files - managed_files:
+            try:
+                os.remove(os.path.join(self._sound_folder, file))
+            except Exception as ex:
+                syslog.error(f"Unable to remove unmanaged sound file: {file} - {str(ex)}")
+
+
+
+    def add_phrase(self, phrase: PhraseData):
+        """ adds a phrase to the manager and returns it"""
+        self.phrases[phrase.key] = phrase
+        self.ensureSoundFile(phrase) # create a sound file reference if needed
+        return phrase
+
+    def getSoundFile(self, key: str) -> str:
+        """ gets the sound file associated with a phrase key, None if not found"""
+        if key in self._sound_map:
+            return self._sound_map[key]
+        if key in self.phrases:
+            phrase = self.phrases[key]
+            self.ensureSoundFile(phrase)
+            return self._sound_map[key]
+        return None
+
+    def get_phrase(self, key: str) -> PhraseData:
+        """ gets a phrase by its key, None if not found"""
+        return self.phrases.get(key, None)
+
+    def remove_phrase(self, key: str, clear_file : bool = False):
+        if key in self.phrases:
+            if clear_file:
+                phrase = self.phrases[key]
+                if phrase.sound_file and os.path.isfile(phrase.sound_file_full_path()):
+                    try:
+                        os.remove(phrase.sound_file_full_path())
+                    except Exception as ex:
+                        syslog.error(f"Unable to remove sound file: {phrase.sound_file_full_path()} - {str(ex)}")
+            del self.phrases[key]
+
+    def to_xml(self) -> etree.Element:
+        """ stores all phrase data to an XML element"""
+        node = etree.Element("phrases")
+        for phrase in self.phrases.values():
+            if phrase.temporary or not phrase.generated:
+                # exclude temporary or static files
+                continue
+            node.append(phrase.to_xml())
+        return node
+
+    def from_xml(self, node: etree.Element):
+        """ reads all phrase data from an XML element"""
+        self.phrases.clear()
+        for phrase_node in node.findall("phrase"):
+            phrase = PhraseData(text="")
+            phrase.from_xml(phrase_node)
+            self.add_phrase(phrase)
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -225,6 +536,8 @@ class Sound:
             # flip the device map
             self.device_name_to_id_map = {id: name for id, name in self.device_map.items()}
 
+        self.pm = PhraseDataManager()
+
         self.sound_map = {}  # holds sound objects by key (guid -> sound object)
         self.sound_file_map = {}  # maps files to the sound key
         self.sound_volume_map = {}  # holds the sound volume for each key - if not present used the default volume
@@ -242,24 +555,25 @@ class Sound:
 
 
         self._temporary_files = [] # list of temp files created
-        self._sound_folder = os.path.join(gremlin.util.userprofile_path(), "sounds")
-        if not gremlin.util.create_folder(self._sound_folder):
-            syslog.error(f"Unable to create sound file repository :{self._sound_folder}")
-            self._sound_folder = gremlin.util.userprofile_path()
+        self._sound_folder = self.pm.getSoundFolder()
 
+        # read the configuration
         el.shutdown.connect(self._handle_shutdown)
 
-    def getSoundFolder(self, profile_specific: bool = True) -> str:
+    @property
+    def soundFolder(self) -> str:
+        """gets the base sound folder"""
+        return self.pm.getSoundFolder()
+
+    def getSoundFolder(self) -> str:
         """ gets a profile specific sound folder tied to the profile ID """
-        if profile_specific:
-            profile = gremlin.shared_state.current_profile
-            id = profile.id
-            path = os.path.join(self._sound_folder, id)
-            if not gremlin.util.create_folder(path):
-                syslog.error(f"Unable to create profile-specific sound file repository :{path}")
-                path = self._sound_folder
-            return path
-        return self._sound_folder
+        return self.pm.getSoundFolder()
+
+    def getSoundFile(self, key: str) -> str:
+        """ gets the sound file associated with a phrase key, None if not found"""
+        return self.pm.getSoundFile(key)
+
+
 
     def start(self):
         """starts the sound queue"""
@@ -584,97 +898,76 @@ class Sound:
         except Exception as e:
             syslog.error(f"SOUND: PLAY: An error occurred: {e}")
 
-    def getSoundKey(self, sound_file) -> int:
-        """registers a sound file and returns a key"""
-        if os.path.isfile(sound_file):
-            sound_file = sound_file.casefold()
-            if USE_PG:
-                if sound_file not in self.sound_file_map:
-                    key = gremlin.util.get_guid()  # self._next_key
-                    self.sound_file_map[sound_file] = key
-                else:
-                    key = self.sound_file_map[sound_file]
 
-                self.sound_audio_file_map[key] = sound_file
+    def addPhrase(self, phrase : PhraseData):
+        """ registers a single phrase - ignored if already registered """
+        self.pm.add_phrase(phrase)
 
-                sound = pygame.mixer.Sound(sound_file)
-                self.sound_map[key] = sound
-                return self.sound_file_map[sound_file]
-            if USE_SD:
-                # use the filename as the key for SD playback
-                return sound_file
-        return None
 
-    def getDynamicKey(self, text : str, sanitize = True):
-        ''' gets the key for the dynamic text '''
-        if not text:
-            return None
-        if sanitize:
-            text = self.sanitizeText(text)
-        value = hash(text)
-        return value
 
-    def getSoundFile(self, key, autocreate = True, profile_specific: bool = True, temporary: bool = False):
-        """retrieves the file name for a given key"""
-        if key in self.sound_audio_file_map:
-            return self.sound_audio_file_map[key]
-        if autocreate:
-            sound_file = self.getWavFileForKey(key, profile_specific=profile_specific, temporary=temporary)
-            if sound_file:
-                self.sound_audio_file_map[key] = sound_file
-                return sound_file
-        return None
+    def getPhrase(self, key):
+        """retrieves a registered phrase by its key"""
+        return self.pm.get_phrase(key)
 
-    def getPhraseMap(self, text: str):
-        """ takes a text and splits it to its components - returns a map of key -> (text, wav files) for that sequence"""
+    def registerPhrase(self, text: str, voice: str = None, rate: float = 1.0, pitch: int = 0, volume: float = 1.0, sound_file : str = None, temporary : bool = False) -> dict:
+        """ returns a map of key -> PhraseData for the given text, new phrases are registered as needed """
+        return self.getPhraseMap(text, voice=voice, rate=rate, pitch=pitch, volume=volume, sound_file=sound_file, temporary=temporary)
+
+
+    def saveConfig(self):
+        """saves the current configuration of the phrase manager"""
+        self.pm.writeConfig()
+
+    def loadConfig(self):
+        """loads the current configuration of the phrase manager"""
+        self.pm.readConfig()
+
+
+
+    def getPhraseMap(self, text: str, voice: str = None, rate: float = 1.0, pitch: int = 0, volume: float = 1.0, sound_file : str = None, temporary : bool = False,  register : bool = True):
+        """ gets a map of key -> PhraseData for the given text
+        :param text: the text to generate phrases for
+        :param voice: the voice to use for TTS
+        :param rate: the speech rate
+        :param pitch: the speech pitch
+        :param volume: the playback volume
+        :param sound_file: the associated sound file
+        :param temporary: whether the phrase is temporary
+        :param register: whether to register the generated phrases immediately
+        """
         phrase_map = {}
-        phrases = text.split("|")
-        for text in phrases:
-            text = text.strip()
-            if text:
-                text = self.sanitizeText(text) # translate as needed
-                key = self.getDynamicKey(text) # key of translated text
-                sound_file = self.getSoundFile(key)
-                phrase_map[key] = (text, sound_file)
+        if text:
+            splits = text.split("|") if "|" in text else [text]
+            for text in splits:
+                text = text.strip()
+                if text:
+                    text = self.sanitizeText(text) # also translates as needed
+                    phrase = PhraseData(text=text, voice=voice, rate=rate, pitch=pitch, volume=volume, temporary=temporary)
+                    key = phrase.key
+                    ep = self.pm.get_phrase(key)
+                    if ep is None:
+                        # new phrase
+                        # register the new phrase
+                        self.addPhrase(phrase)
+                    else:
+                        # reuse existing phrase
+                        phrase = ep
+
+                    phrase_map[phrase.key] = phrase
+
+                    if __debug__:
+                        sound_file = phrase.sound_file
+                        assert sound_file is not None, "invalid sound file - phrase not registered properly"
+
         return phrase_map
 
-
-    def getWavFileForKey(self, key, profile_specific : bool = True, temporary: bool = False):
-        """returns the expected wav file path for a given key"""
-        if key is None:
-            return None
-        if temporary:
-            self._temporary_files.append(gremlin.util.getTemporaryFile(".wav"))
-            return self._temporary_files[-1]
-        str_key = f"m{abs(key)}" if key < 0 else str(key)
-        path = os.path.join(self.getSoundFolder(profile_specific=profile_specific), f"{str_key}.wav")
-        if os.path.isfile(path):
-            # bump the index until unique
-            index = 1
-            base_path = path
-            while os.path.isfile(path):
-                path = base_path.replace(".wav", f"_{index}.wav")
-                index += 1
-
-        return path
+    def playPhrase(self, phrase: PhraseData,options: PlaybackOptions):
+        """plays a registered phrase if the audio file is available """
+        if phrase and phrase.key in self.sound_audio_file_map:
+            sound_file = phrase.getSoundFile()
+            self.play(sound_file, options)
 
 
-    def setSoundFile(self, key, sound_file):
-        """stores a file name for a given key """
-        if key and sound_file and os.path.isfile(sound_file):
-            self.sound_audio_file_map[key] = sound_file
-            self.sound_file_map[sound_file.casefold()] = key
-
-
-    def releaseSoundKey(self, sound_file):
-        if USE_PG:
-            sound_file = sound_file.casefold()
-            if sound_file and sound_file in self.sound_file_map:
-                sound = self.sound_file_map[sound_file]
-                self.sound_file_map[sound_file] = None
-                pygame.mixer.stop()
-                del sound
-                del self.sound_file_map[sound_file]
 
     def queueAction(self, action: SoundEvent):
         """queues a sound action - PG mode only"""
@@ -1151,13 +1444,32 @@ class EdgeTTSVoice:
     """Represents a structured Microsoft Edge TTS Voice."""
 
     def __init__(self, data: Dict[str, Any]):
-        self.name: str = data.get("Name", "")
-        self.short_name: str = data.get("ShortName", "")
-        self.gender: str = data.get("Gender", "")
-        self.locale: str = data.get("Locale", "")
-        self.suggested_codec: str = data.get("SuggestedCodec", "")
-        self.friendly_name: str = data.get("FriendlyName", "")
-        self.status: str = data.get("Status", "")
+        self.name: str = ""
+        self.short_name: str = ""
+        self.gender: str = ""
+        self.locale: str = ""
+        self.suggested_codec: str = ""
+        self.friendly_name: str = ""
+        self.status: str = ""
+        if data:
+            if "Name" in data:
+                self.name: str = data.get("Name", "")
+                self.short_name: str = data.get("ShortName", "")
+                self.gender: str = data.get("Gender", "")
+                self.locale: str = data.get("Locale", "")
+                self.suggested_codec: str = data.get("SuggestedCodec", "")
+                self.friendly_name: str = data.get("FriendlyName", "")
+                self.status: str = data.get("Status", "")
+            elif "name" in data:
+                # read from JSON with lowercase keys
+                self.name: str = data.get("name", "")
+                self.short_name: str = data.get("short_name", "")
+                self.gender: str = data.get("gender", "")
+                self.locale: str = data.get("locale", "")
+                self.suggested_codec: str = data.get("suggested_codec", "")
+                self.friendly_name: str = data.get("friendly_name", "")
+                self.status: str = data.get("status", "")
+
 
 
 
@@ -1173,7 +1485,8 @@ class EdgeTTS:
         self._speaker = "default"
         self._sound = Sound()
 
-        self._voices_list = self._get_voice_list()
+        self._voices_list = {} # keyed by short name
+        self.getVoiceList() # load the default voices or from the web
 
     def _generate(self,
                   text: str,
@@ -1241,21 +1554,22 @@ class EdgeTTS:
     def is_speed_available(self):
         return True
 
-    def generateActionWav(self, action, text : str = None,  sound_file : str = None) -> str:
+    def generateActionWav(self, action, phrase : PhraseData) -> bool:
         """generates a wave file for the given action
 
         :param action: the play action
         :returns: the file name or None
 
         """
-        tts_file = sound_file or action.tts_file
-        speed = action.etts_speed # floating point 1.0 means normal
+        tts_file = phrase.getSoundFile()
+        speed = phrase.rate
         # convert to an edge tts rate
         edge_rate = f"{int((speed - 1.0) * 100):+}%"
-        pitch = action.etts_pitch # string representing pitch adjustment, e.g., "+0Hz"
+        pitch = phrase.pitch # string representing pitch adjustment, e.g., "+0Hz"
         edge_pitch = f"{pitch:+}Hz"
+        edge_volume = phrase.volume
 
-        return self.generateWav(tts_file=tts_file, text=text or action.text, voice=action.speaker, rate = edge_rate, pitch=edge_pitch, volume=action.volume)
+        return self.generateWav(tts_file=tts_file, text=phrase.text, voice=action.speaker, rate = edge_rate, pitch=edge_pitch, volume=edge_volume)
 
     def generateWav(self, tts_file: str, text : str, voice: EdgeTTSVoice | str = None, rate: str = "+0%", volume: str = "+0%", pitch: str = "+0Hz") -> bool:
         """gets the wave file for the given options
@@ -1276,15 +1590,19 @@ class EdgeTTS:
 
         if not voice:
             # grab the default voice
-            voice = self._voices_list[0] if self._voices_list else None
+            voice = voice = self.defaultVoice()
         else:
             if isinstance(voice, str):
                 speaker = voice.casefold()
-                voice = next((v for v in self._voices_list if v.short_name.casefold() == speaker), None)
-                if not voice:
-                    syslog.error(f"Sound: unable to find voice matching '{speaker}'")
-                    return False
 
+                voice = self._voices_list.get(speaker, None)
+
+                if not voice:
+                    syslog.warning(f"Sound: ETTS: unable to find voice matching '{speaker}', using default voice.")
+                    voice = self.defaultVoice()
+        if not voice:
+            syslog.error("Sound: unable to find a voice to use.'")
+            return False
 
         # speaker to use
         wav = tts_file
@@ -1307,7 +1625,7 @@ class EdgeTTS:
             return True
         return False
 
-    def _get_voice_list(self) -> List[EdgeTTSVoice]:
+    def _get_voice_list(self) -> dict[str, EdgeTTSVoice]:
         """ gets a list of all edge tts voices"""
         voices = asyncio.run(self._list_all_voices())
 
@@ -1319,15 +1637,83 @@ class EdgeTTS:
             for voice in voices:
                 syslog.info(f"Name: {voice.short_name} | Gender: {voice.gender} | Locale: {voice.locale}")
 
-        return voices
+        return {voice.short_name.casefold(): voice for voice in voices}
 
     async def _list_all_voices(self) -> List[EdgeTTSVoice]:
         """ gets the list of all voices via edge-tts """
+
         voices = await edge_tts.list_voices()
         voices = [EdgeTTSVoice(voice) for voice in voices]
         return voices
 
-    def getVoiceList(self) -> List[EdgeTTSVoice]:
+    def getVoiceList(self) -> dict[str, EdgeTTSVoice]:
         if not self._voices_list:
-            self._voices_list = self._get_voice_list()
+            # attempt to read the voice list from the local configuration file
+            self.readVoiceList()
+        if not self._voices_list:
+            try:
+                self._voices_list = self._get_voice_list()
+                self.saveVoiceList()
+            except Exception as e:
+                syslog.error(f"Sound: ETTS: unable to read voice list: {str(e)}")
+                # use default voices
+                self.loadDefaultVoices()
+
         return self._voices_list
+
+    def loadDefaultVoices(self):
+        """ setup default voices """
+        self._voices_list.clear()
+        self._voices_list["en-US-AriaNeural".casefold()] = EdgeTTSVoice({"short_name": "en-US-AriaNeural", "gender": "Female", "locale": "en-US"})
+        self._voices_list["en-US-GuyNeural".casefold()] = EdgeTTSVoice({"short_name": "en-US-GuyNeural", "gender": "Male", "locale": "en-US"})
+
+    def defaultVoice(self) -> EdgeTTSVoice:
+        """ returns the default voice """
+        voice = self._voices_list.get("en-US-AriaNeural".casefold(), None)
+        if not voice:
+            self.loadDefaultVoices()
+            voice = self._voices_list.get("en-US-AriaNeural".casefold(), None)
+        return voice
+
+    def saveVoiceList(self):
+        if self._voices_list:
+            try:
+                verbose = gremlin.config.Configuration().verbose
+                sound = Sound()
+                config_file = os.path.join(sound.soundFolder,"etts_voices.json")
+                if verbose:
+                    syslog.info(f"ETTS: save available voices to [{gremlin.util.toUrl(config_file)}]")
+                with open(config_file, "w", encoding="utf-8") as f:
+                    json.dump([voice.__dict__ for voice in self._voices_list.values()], f, ensure_ascii=False, indent=4)
+            except Exception as e:
+                syslog.error(f"Sound: ETTS: unable to save voice list: {str(e)}")
+
+    def readVoiceList(self):
+        try:
+            sound = Sound()
+            config_file = os.path.join(sound.soundFolder,"etts_voices.json")
+            if os.path.isfile(config_file):
+                self._voices_list.clear()
+                with open(config_file, "r", encoding="utf-8") as f:
+                    voices_data = json.load(f)
+                    for data in voices_data:
+                        voice = EdgeTTSVoice(data)
+                        self._voices_list[voice.short_name.casefold()] = voice
+        except Exception as e:
+            syslog.error(f"Sound: ETTS: unable to load voice list: {str(e)}")
+
+    def refreshVoiceList(self):
+        """ refresh the voice list from the web """
+        try:
+            self._voices_list = self._get_voice_list()
+            self.saveVoiceList()
+        except Exception as e:
+            syslog.error(f"Sound: ETTS: unable to refresh voice list: {str(e)}")
+            self.loadDefaultVoices()
+
+    def findVoice(self, speaker: str) -> EdgeTTSVoice:
+        """ finds a voice by speaker name, not case sensitive """
+        return self._voices_list.get(speaker.casefold(), None)
+
+
+

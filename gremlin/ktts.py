@@ -32,6 +32,7 @@ import time
 import json
 import importlib.util
 import sys
+from gremlin.sound import PhraseData, Sound
 
 syslog = logging.getLogger("system")
 
@@ -78,9 +79,9 @@ class KTTS:
         # By using this tool, you agree to CPML license https://coqui.ai/cpml
         os.environ["COQUI_TOS_AGREED"] = "1"
 
-    def getSoundFolder(self, profile_specific: bool = True) -> str:
+    def getSoundFolder(self) -> str:
         sound = gremlin.sound.Sound()
-        return sound.getSoundFolder(profile_specific=profile_specific)
+        return sound.getSoundFolder()
 
     def ensure_tts(self) -> bool:
         if self._initialized:
@@ -212,26 +213,24 @@ class KTTS:
         wav = action.tts_file
         return wav and os.path.isfile(wav)
 
-    def getNewWav(self, profile_specific: bool = True) -> str:
+    def getNewWav(self) -> str:
         id = gremlin.util.get_guid()
-        tts_file = os.path.join(self.getSoundFolder(profile_specific=profile_specific), f"{id}.wav")
+        tts_file = os.path.join(self.getSoundFolder(), f"{id}.wav")
         return tts_file
 
-    def generateActionWav(self, action, text : str = None) -> str:
+    def generateActionWav(self, action, phrase : PhraseData) -> bool:
         """generates a wave file for the given action
 
         :param action: the play action
         :returns: the file name or None
 
         """
-        tts_file = action.tts_file
-        if not tts_file:
-            tts_file = self.getNewWav()
-            action.tts_file = tts_file
+        return self.generateWav(tts_file=phrase.getSoundFile(),
+                                text = phrase.text,
+                                speaker = action.speaker,
+                                tts_speed=action.tts_speed)
 
-        return self.generateWav(tts_file=tts_file, text=text or action.text, speaker=action.speaker, tts_speed=action.tts_speed)
-
-    def generateWav(self, tts_file: str, text, speaker: str = None, tts_speed: float = 1.0) -> str:
+    def generateWav(self, tts_file: str, text, speaker: str = None, tts_speed: float = 1.0) -> bool:
         """gets the wave file for the given options
 
         :param tts_file: the path to create
@@ -239,19 +238,18 @@ class KTTS:
         :param speaker: the speaker voice to use, optional
         :param tts_speed: float, the playback speed factor 1.0 = normal
 
-        :returns: the file name or None
+        :returns: True if the file was generated successfully, False otherwise
         """
 
-        text = self.sanitize_text(text)
         if not text:
             syslog.warning("KTTS: sanitized text is blank, nothing to generate.")
-            return None  # no text
+            return False  # no text
 
         # pick a default speaker
         speakers = self.getSpeakers(True)
         if not speakers:
             syslog.error("KTTS: unable to get speaker list.")
-            return None
+            return False
         if not speaker or speaker not in speakers:
             speaker = speakers[0]
 
@@ -267,11 +265,11 @@ class KTTS:
                 os.unlink(wav)
             except Exception as e:
                 syslog.error(f"KTTS: unable to remove existing file: {str(e)}")
-                return wav
+                return False
 
         """ generate """
         if not self.ensure_tts():
-            return None
+            return False
 
         self._tts.tts_to_file(text, speaker, "en", file_path=wav)
         if os.path.isfile(wav):

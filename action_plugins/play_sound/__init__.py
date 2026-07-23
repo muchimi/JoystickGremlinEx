@@ -25,109 +25,23 @@ import gremlin.util
 import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
-from gremlin.util import load_icon
+from gremlin.util import load_icon, TimedRandomInt
 import gremlin.input_item
 import gremlin.ui.ui_common
 from gremlin.util import safe_format, safe_read
 import logging
 import gremlin.sound
+from gremlin.sound import Sound, PhraseData
 import enum
 import gremlin.ktts
 import gremlin.tts
 import gremlin.shared_state
 import random
 import time
+from gremlin.types import PlaybackMode, PlayMode
 
 syslog = logging.getLogger("system")
 
-
-class PlayMode(enum.Enum):
-    Blank = 0  # blank
-    AudioFile = 1  # use standard sound files
-    CoquiAI = 2  # use KTTS
-    EdgeAI = 3  # use ETTS
-    PyTTS = 4  # use PyTTS
-
-    @staticmethod
-    def to_string(value) -> str:
-        match value:
-            case PlayMode.AudioFile:
-                return "audio"
-            case PlayMode.CoquiAI:
-                return "ktts"
-            case PlayMode.EdgeAI:
-                return "etts"
-            case PlayMode.Blank:
-                return "blank"
-            case PlayMode.PyTTS:
-                return "pytts"
-
-    @staticmethod
-    def from_string(value) -> PlayMode:  # noqa: F821
-        match value:
-            case "blank":
-                return PlayMode.Blank
-            case "ktts":
-                return PlayMode.CoquiAI
-            case "etts":
-                return PlayMode.EdgeAI
-            case "pytts":
-                return PlayMode.PyTTS
-            case _:
-                return PlayMode.AudioFile
-
-
-class TimedRandomInt:
-    def __init__(self, min_val: int, max_val: int, cooldown_period: float):
-        """
-        :param min_val: The minimum value for the random integer (inclusive).
-        :param max_val: The maximum value for the random integer (inclusive).
-        :param cooldown_period: The time period in seconds during which a number cannot be reused.
-        """
-        self.min_val = min_val
-        self.max_val = max_val
-        self.cooldown_period = cooldown_period
-        # Store used numbers with their timestamp: {number: timestamp}
-        self.used_numbers = {}
-
-    def setMin(self, value: int):
-        self.min_val = value
-
-    def setMax(self, value: int):
-        self.max_val = value
-
-    def _cleanup_used_numbers(self):
-        """Removes numbers from the used list if their cooldown period has passed."""
-        current_time = time.time()
-        # Use list() to iterate over a copy of keys, allowing modification of the dict
-        for number, timestamp in list(self.used_numbers.items()):
-            if current_time - timestamp > self.cooldown_period:
-                del self.used_numbers[number]
-
-    def getValue(self):
-        """Generates a random integer that hasn't been used in the cooldown period."""
-        self._cleanup_used_numbers()
-
-        # Determine the pool of available numbers
-        available_numbers = [
-            num
-            for num in range(self.min_val, self.max_val + 1)  # range is inclusive left, exclusive right
-            if num not in self.used_numbers
-        ]
-
-        if not available_numbers:
-            # Handle the case where all numbers are in cooldown
-            # return a random number
-            new_number = random.randint(self.min_val, self.max_val)  # randint is inclusive of both bounds
-
-        else:
-            # Select a random number from the available pool
-            new_number = random.choice(available_numbers)
-
-        # Mark the new number as used with the current timestamp
-        self.used_numbers[new_number] = time.time()
-
-        return new_number
 
 
 class AiTTSWidget(QtWidgets.QWidget):
@@ -216,8 +130,20 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         # speaker selection for pytts
         self.ptts_speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip="Selected speaker for AI voice generation.")
-
         self.ptts_speaker_widget.setCallback(self._handle_ptts_speaker_changed)
+
+        tts = gremlin.tts.TextToSpeech()
+        self.ptts_speed_widget = gremlin.ui.ui_common.QIntLineEdit(
+            min_range=tts.rate_offset_min,
+            max_range=tts.rate_offset_max,
+            value=self.action_data.ptts_speed,
+            callback=self._handle_ptts_speed_changed,
+            tooltip="Words per minute (wpm) rate modifier for the generated audio.\n100 is the normal rate.",
+        )
+        self.ptts_speed_widget.doubleClick.connect(self._handle_ptts_speed_reset) # double click = reset
+
+        self.ptts_volume_widget = gremlin.ui.ui_common.QIntLineEdit(min_range = 0, max_range = 100, value=self.action_data.ptts_volume, callback=self._handle_ptts_volume_changed, tooltip="Playback volume for the generated audio as a percentage 0 to 100.")
+        self.ptts_volume_widget.doubleClick.connect(self._handle_ptts_volume_reset)
 
         # speaker selection for ktts
         if ktts_enabled:
@@ -248,7 +174,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             "Auto Generate",
             value=self.action_data.auto_generate,
             callback=self._handle_auto_generate_changed,
-            tooltip="Automatically generate the AI voice (select modes only).",
+            tooltip="Automatically generate and cache all AI voices (select modes only).",
         )
 
         self.generate_play_widget = gremlin.ui.ui_common.Buttons.getPlayWidget(tooltip="Generate & Play", callback=self._handle_play)
@@ -270,13 +196,6 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
                 tooltip="Speed rate modifier for the generated audio.\n1.0 is the normal rate.",
             )
 
-        self.ptts_speed_widget = gremlin.ui.ui_common.QFloatLineEdit(
-            min_range=0.1,
-            max_range=10.0,
-            value=self.action_data.ptts_speed,
-            callback=self._handle_ptts_speed_changed,
-            tooltip="Speed rate modifier for the generated audio.\n1.0 is the normal rate.",
-        )
 
         self.etts_pitch_widget = gremlin.ui.ui_common.QFloatLineEdit(
             min_range=-100,
@@ -286,29 +205,35 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="Pitch adjustment for the generated audio in Hz offset.\n0 means no adjustment. +/- 100 Hz range.",
         )
 
+        self.etts_volume_widget = gremlin.ui.ui_common.QFloatLineEdit(
+                    min_range=0,
+                    max_range=2,
+                    value=self.action_data.etts_volume,
+                    callback=self._handle_etts_volume_changed,
+                    tooltip="Volume adjustment for the generated audio.\n1.0 is the normal volume. Range is 0.0 to 2.0.  1.0 means normal.\nNote: this is not the same as the playback volume.  This is the generation volume.",
+                )
+
         widgets = [
             self.auto_generate_widget,
             self.generate_widget,
-            self.generate_play_widget,
+            (self.generate_play_widget, 100),
+
         ]
 
         playback_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         self.tts_text_container = gremlin.ui.ui_common.getVContainer(["Text:", self.tts_text_widget], widget_only=True)
 
-        widgets = ["TTS Options:", self.etts_speed_widget, self.etts_pitch_widget]
-        self.tts_options_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
-
-
-
-        self.tts_file_container_widget = gremlin.ui.ui_common.getHContainer(
-                        [self.tts_file_widget, self.tts_file_delete_widget, self.tts_file_rename_widget,playback_container], label="Cache file:", widget_only=True
-                    )
+        # self.tts_file_container_widget = gremlin.ui.ui_common.getHContainer(
+        #                 [self.tts_file_widget, self.tts_file_delete_widget, self.tts_file_rename_widget,playback_container], label="Cache file:", widget_only=True
+        #             )
 
         widgets = [
-            "PTTS Options:",
-            gremlin.ui.ui_common.getHContainer(["Voice:", self.ptts_speaker_widget, ptts_refresh_speaker_widget], widget_only=True),
-            gremlin.ui.ui_common.getHContainer(["Speed:", self.ptts_speed_widget], widget_only=True),
+            "PTTS Generation Options:",
+            gremlin.ui.ui_common.getHContainer(["Voice:", self.ptts_speaker_widget, ptts_refresh_speaker_widget,
+                                                "Rate (wpm):", self.ptts_speed_widget,
+                                                "Volume (gen):", self.ptts_volume_widget]
+                                                , widget_only=True),
         ]
 
         self.ptts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
@@ -316,7 +241,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         if ktts_enabled:
             widgets = [
-                "KTTS Options:",
+                "KTTS Generation Options:",
                 gremlin.ui.ui_common.getHContainer(["Voice:", self.ktts_speaker_widget, ktts_refresh_speaker_widget], widget_only=True),
                 gremlin.ui.ui_common.getHContainer(["KTTS speed:", self.ktts_speed_widget], widget_only=True),
             ]
@@ -324,22 +249,37 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             self.ktts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
         widgets = [
-            "ETTS Options:",
+            "ETTS Generation Options:",
             gremlin.ui.ui_common.getHContainer(["Voice:", self.etts_speaker_widget, etts_refresh_speaker_widget], widget_only=True),
-            gremlin.ui.ui_common.getHContainer(["TTS speed:", self.etts_speed_widget, "TTS pitch:", self.etts_pitch_widget], widget_only=True),
+            gremlin.ui.ui_common.getHContainer(["Rate (gen):", self.etts_speed_widget, "Pitch Offset (Hz):", self.etts_pitch_widget, "Volume (gen):", self.etts_volume_widget], widget_only=True),
         ]
         self.etts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
-        widgets = [
-            "PyTTS Options:",
-        ]
 
-        self.pytts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
         self.play_widget = QtWidgets.QPushButton("Play")
         self.play_widget.setIcon(load_icon("ei.play", qta_color=gremlin.ui.ui_common.Color.activeColor()))
         self.play_widget.setToolTip("Plays the audio as configured")
         self.play_widget.clicked.connect(self._handle_play)
+
+        widgets = []
+        for mode in PlaybackMode:
+            checked = mode == self.action_data.playback_mode
+            match mode:
+                case PlaybackMode.RoundRobin:
+                    label = "Round Robin"
+                    tooltip = "Plays audio in a round-robin fashion, cycling through available samples in sequence."
+                case PlaybackMode.Random:
+                    label = "Random"
+                    tooltip = "Plays a random audio sample from the available samples."
+                case PlaybackMode.TimedRandom:
+                    label = "Timed Random"
+                    tooltip = "Plays a random audio sample from the available samples at timed intervals."
+                case _:
+                    raise ValueError(f"Unsupported playback mode: {mode}")
+            widgets.append(gremlin.ui.ui_common.QDataRadioButton(label=label, tooltip=tooltip, value= checked, callbackEx = self._handle_playback_mode_changed, data = mode))
+
+        self.playback_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         self.loops_widget = gremlin.ui.ui_common.QIntLineEdit(
             min_range=1,
@@ -363,6 +303,16 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             chars=4,
             tooltip="Time in ms for the sample to fade out once it starts playing.\nUse 0 to disable (default).",
         )
+
+        self.playback_rate_widget = gremlin.ui.ui_common.QFloatLineEdit(
+            min_range=0.1,
+            max_range=10.0,
+            value=self.action_data.playback_rate,
+            callback=self._handle_playback_rate_changed,
+            tooltip="Speed rate modifier for the playback audio.\n1.0 is the normal rate.",
+        )
+
+
         self.playback_widget = gremlin.ui.ui_common.QIntLineEdit(
             min_range=0,
             value=self.action_data.playback_ms,
@@ -394,6 +344,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         )
 
         msg = """Samples played with this action will play concurrently as they are triggered.  Use the stop option to terminate prior audio streams before triggering the playback.  Playback timing options with a value of zero (0) means disabled.
+For text to speech (tts) modes, multiple samples can be provided by separating them with vertical bars (|).  If multiple samples are specified, the playback mode will determine how the samples are selected.
 """
 
         info_widget = gremlin.ui.ui_common.QInfoBox(msg, hide_key="play-sound")
@@ -413,7 +364,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         self.playback_file_container = gremlin.ui.ui_common.getHContainer(widgets, "Sound file:", widget_only=True)
 
-        widgets = ["Volume:", self.volume_widget, "Loops:", self.loops_widget, self.stop_widget, self.play_widget]
+        widgets = ["Volume:", self.volume_widget, "Loops:", self.loops_widget, self.stop_widget]
 
         playback_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
@@ -424,7 +375,8 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             self.fadein_widget,
             "Fade-out (ms)",
             self.fadeout_widget,
-            self.tts_options_container,
+            self.playback_mode_widget,
+            playback_container,
         ]
 
         options_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
@@ -433,9 +385,11 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         self._blank_widget = QtWidgets.QLabel("Select a play mode.")
 
-        widget = gremlin.ui.ui_common.getVContainer([self._blank_widget, "||", gremlin.ui.ui_common.QEmptyWidget(), "||"], widget_only=True)
-        widget.setContentsMargins(4, 4, 4, 4)
-        widget.setProperty("cssClass", "box_frame")
+        # widget = gremlin.ui.ui_common.getVContainer([self._blank_widget, "||", gremlin.ui.ui_common.QEmptyWidget(), "||"], widget_only=True)
+        widget = gremlin.ui.ui_common.getVContainer(self._blank_widget, widget_only=True)
+        # widget.setContentsMargins(4, 4, 4, 4)
+        #widget.setProperty("cssClass", "box_frame")
+        # widget.setMaximumHeight(40)
 
         self._stack_map = {}
         self._stack_map[PlayMode.Blank] = 0  # index 0 - blank
@@ -454,7 +408,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         container_widgets.append(self.playback_file_container)
 
         # holds the combined tts options - text, mode options, file options
-        widgets = [self.tts_text_container, self.stack_widget, self.tts_file_container_widget]
+        widgets = [self.tts_text_container, self.stack_widget] #, self.tts_file_container_widget]
         self.tts_container_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
         container_widgets.append(self.tts_container_widget)
@@ -478,13 +432,29 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
     def _handle_auto_generate_changed(self, checked: bool):
         self.action_data.auto_generate = checked
 
+    def _handle_playback_mode_changed(self, widget, checked):
+        if checked:
+            mode = widget.data
+            self.action_data.playback_mode = mode
+
+    def _handle_ptts_volume_reset(self):
+        self.action_data.ptts_volume = 100
+        self.ptts_volume_widget.setValue(100)
+
+    def _handle_ptts_speed_reset(self):
+        self.action_data.ptts_speed = 100
+        self.ptts_speed_widget.setValue(100)
+
+    def _handle_ptts_volume_changed(self, value: int):
+        self.action_data.ptts_volume = value
+
     def _update_ui(self):
 
         tts_visible = self.action_data.mode in [PlayMode.CoquiAI, PlayMode.EdgeAI, PlayMode.PyTTS]
         self.tts_container_widget.setVisible(tts_visible)
-        self.tts_options_container.setVisible(tts_visible)
-
         self.playback_file_container.setVisible(self.action_data.mode == PlayMode.AudioFile)
+
+
 
         match self.action_data.mode:
             case PlayMode.CoquiAI:
@@ -526,6 +496,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
                 etts = gremlin.sound.EdgeTTS()
 
                 generate_enabled = etts.is_available() and self.action_data.text is not None and self.action_data.text != ""
+
 
                 wav = self.action_data.tts_file
                 play_enabled = wav is not None and os.path.isfile(wav)
@@ -569,6 +540,9 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_etts_pitch_changed(self, value: float):
         self.action_data.etts_pitch = value
+
+    def _handle_etts_volume_changed(self, value: float):
+        self.action_data.etts_volume = value
 
     def _handle_ktts_speed_changed(self, value: float):
         self.action_data.ptts_speed = value
@@ -674,7 +648,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         with QtCore.QSignalBlocker(self.etts_speaker_widget):
             self.etts_speaker_widget.clear()
             if voices:
-                for voice in voices:
+                for voice in voices.values():
                     speaker = voice.short_name
                     self.etts_speaker_widget.addItem(speaker, speaker)
                 if self.action_data.speaker:
@@ -688,7 +662,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
                     config.ai_etts_last_speaker = speaker
                     self.action_data.speaker = self.etts_speaker_widget.currentText()
 
-            self.etts_speaker_widget.setEnabled(voices is not None)
+            self.etts_speaker_widget.setEnabled(bool(voices))
 
     def _update_ptts_speakers(self, initialize=False):
         ptts = gremlin.tts.TextToSpeech()
@@ -700,7 +674,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             self.ptts_speaker_widget.clear()
             if voices:
                 for voice in voices:
-                    self.ptts_speaker_widget.addItem(voice, voice)
+                    self.ptts_speaker_widget.addItem(voice.name, voice)
                 if self.action_data.speaker:
                     speaker = self.action_data.speaker
                 else:
@@ -718,20 +692,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_generate(self, widget):
         if self.action_data.text:
-            self.action_data.generate(all = True)
-
-        #     ui = gremlin.shared_state.ui
-        #     dialog = gremlin.sound.GenerateDialog(self.action_data, parent=ui)
-        #     result = dialog.exec()
-        #     if result == QtWidgets.QDialog.accepted:
-        #         self.action_data.generate(self.action_data.text)
-
-        #     self._update_ui()
-
-        # # update speakers if not done
-        # enabled = self.ktts_speaker_widget.isEnabled()
-        # if not enabled:
-        #     self._update_speakers()
+            self.action_data.generate(force = True) # force a regen
 
     def _handle_mode_change(self, widget, mode):
         mode = widget.data
@@ -754,6 +715,9 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_playback_changed(self, value: int):
         self.action_data.playback_ms = value
+
+    def _handle_playback_rate_changed(self, value: float):
+        self.action_data.playback_rate = value
 
     def _handle_stop_audio_changed(self, checked: bool):
         self.action_data.stop_previous = checked
@@ -953,26 +917,32 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.sound_file = None  # the sound file to play in audio mode
         self._sound_files = []  # list of sound files to pick from if in folder mode
         self._tts_file = None  # sound file for TTS
-        self.ptts_speed = 1.0  # for AI generation, speed factor, 1.0 = normal rate
+        self.ptts_speed: int = 100  # words per minute, 100 is the default
+        self.ptts_volume: int = 100 # volume, 0 to 100
         self.etts_speed = 1.0  # speed factor for PyTTS
         self.ktts_speed = 1.0  # speed factor for KTTS
 
         self.volume = 100  # default volume as a percentage 0 to 100
         self.etts_pitch = 0  # pitch adjust in hertz (edge tts only -100 to +100)
+        self.etts_volume = 1.0  # volume for Edge TTS (0.0 to 1.0)
         self.randomize_sound_file = False  # true if sound is randomized from a folder
 
         self.key = None  # sound key for the sound file
         self.loops = 1  # number of times the sample is played back
         self.playback_ms = 0  # playback milliseconds, 0 means play normally
+        self.playback_rate = 1.0 # playback speed
         self.fadein_ms = 0  # time to fade in in milliseconds, 0 disabled
         self.fadeout_ms = 0  # time to fade out in milliseconds, 0 disabled
         self.exec_on_press = True  # true if trigger should execute on input press event
         self.exec_on_release = False  # true if trigger should execute on input release event
         self.stop_previous = False  # true if the action should stop any prior sounds playing
+        self.playback_mode = PlaybackMode.RoundRobin  # default playback mode for multi sounds
 
         self._timed_random = TimedRandomInt(0, 10, 10)
+
         default_audio_device = QtMultimedia.QAudioDevice()
         self._audio_device = default_audio_device.description()
+        self._last_phrase = None # last played phrase for multiple choice phrases
 
         devices = QtMultimedia.QMediaDevices.audioOutputs()
         self.device_map = {}
@@ -1056,15 +1026,16 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
 
 
-    def generate(self):
-        """generates the sound based on options - returns a tuple of (key, sound_file)"""
-        sound = gremlin.sound.Sound()
+    def generate(self, force = False):
+        """generates the sounds based on options - returns a tuple of (key, sound_file)"""
+        sound = Sound()
+
 
         # ensure started
         if not self.sound.ensureStarted():
             syslog.error("PLAY: unable to play sound due to sound library initialization issue")
             return None
-        verbose = gremlin.config.Configuration().verbose_mode_sound
+        verbose = gremlin.config.Configuration().verbose
         if verbose:
             mode = self.get_mode()
             input_id = self.get_input_id()
@@ -1075,14 +1046,20 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             syslog.info(
                 f"\tOptions: exec on press: [{self.exec_on_press}] exec on release: [{self.exec_on_release}] volume: [{self.volume}] audio channel:[{self.audio_device}]"
             )
+            sound_path = sound.soundFolder
+            syslog.info(f"\tProfile ID: [{gremlin.shared_state.current_profile.id}] Sound path: [{gremlin.util.toUrl(sound_path)}] folder found: [{os.path.isdir(sound_path)}]")
+
+        # get the phrases for the sound
+        phrase_map = {}
 
         # get or autogenerate the sound file
         sound_file = None
         match self.mode:
             case PlayMode.AudioFile:
+                # static playback of one or more files depending if a folder or a single file
                 if self.sound_file and os.path.isfile(self.sound_file):
                     if self.randomize_sound_file:
-                        # pick a file at random
+                        # pick a file at random from a list of files in the folder
                         if not self._sound_files:
                             # update file list - there is at least one file
                             self.scanFolder()
@@ -1091,26 +1068,38 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                         sound_file = self._sound_files[index]
                     else:
                         sound_file = self.sound_file
+
+                    # build a phrase for this static wav file
+                    phrase = PhraseData(text = gremlin.util.get_guid())
+                    phrase.sound_file = sound_file
+                    phrase_map[phrase.key] = phrase
+
+                    return phrase.key, phrase.sound_file
+
                 else:
                     syslog.error(f"PLAY: unable to locate file: [{self.sound_file}]")
                     return None
 
             case PlayMode.EdgeAI:
-                """ ETTS generated """
+                # EdgeAI TTS generated
 
                 engine = gremlin.sound.EdgeTTS()
-                # see if we need to generate
+                pitch = self.etts_pitch
+                volume = self.etts_volume
+                voice = self.speaker
+                rate = self.etts_speed
+                phrase_map = sound.getPhraseMap(self.text, voice=voice, rate = rate, pitch=pitch, volume=volume)
 
-            case PlayMode.CoquiAI:
-                """ AI generated """
-                engine = gremlin.ktts.KTTS()
-                # TODO: generate KTTS
-                syslog.warning("PLAY: CoquiAI generation is not yet implemented")
-                return None
+
 
             case PlayMode.PyTTS:
                 # generate using internal TTS
                 engine = gremlin.tts.TextToSpeech()
+                pitch = 0
+                volume = 1.0
+                voice = self.speaker
+                rate = self.ptts_speed
+                phrase_map = sound.getPhraseMap(self.text, voice=voice, rate=rate, pitch=pitch, volume=volume)
 
             case _:
                 syslog.error(f"PLAY: unsupported play mode: {self.mode}")
@@ -1119,51 +1108,98 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         assert engine is not None, "invalid engine"
         assert hasattr(engine, "generateActionWav"), "invalid engine - missing generateActionWav method"
 
-        if self.auto_generate or "|" in self.text:
-            # evaluate the text if multple choices
+        generated = False
 
-            phrase_map = sound.getPhraseMap(self.text)
+
+        if verbose:
             count = len(phrase_map)
-            key_list = list(phrase_map.keys())
-            if count == 0:
-                # nothing to play
-                return
-            if count > 1:
-                # randomize phrase selection
-                key = random.choice(key_list)
-            else:
-                # only one phrase available
-                key = key_list[0]
+            syslog.info(f"PLAY: Generating [{count}] sound files...")
+        for phrase in phrase_map.values():
 
-            text, sound_file = phrase_map[key]
-            if not os.path.isfile(sound_file):
+            sound_file = sound.getSoundFile(phrase.key)
+            assert sound_file is not None, "invalid sound file - phrase not registered properly"
+            if force and os.path.isfile(sound_file):
+                os.unlink(sound_file)
+            if force or not os.path.isfile(sound_file):
                 # does not exist, create
-                result = engine.generateActionWav(action=self, text=text, sound_file=sound_file)
-                if not result:
-                    syslog.error(f"PLAY: failed to generate sound file: {sound_file}")
-                    return None
-        else:
-            # play the manually specified TTS file
-            sound_file = self.tts_file
-            key = self.sound.getSoundKey(sound_file)
-            if not sound_file:
-                # manual create
-
-                text = sound.sanitizeText(self.text)
-                key = sound.getDynamicKey(text, sanitize=False)
-                sound_file = sound.getSoundFile(key)
-                self.tts_file = sound_file
-
-            if sound_file and not os.path.isfile(sound_file):
-                # generate the file
-                result = engine.generateActionWav(action=self, sound_file=sound_file)
-                if not result:
-                    syslog.error(f"PLAY: failed to generate sound file: {sound_file}")
+                result = engine.generateActionWav(action=self, phrase=phrase)
+                if result:
+                    generated = True
+                    if verbose:
+                        syslog.info(f"PLAY: Phrase: [{phrase.text}]")
+                        syslog.info(f"\tGenerated sound file: [{gremlin.util.toUrl(sound_file)}]")
+                else:
+                    syslog.error(f"PLAY: Phrase: [{phrase.text}]")
+                    syslog.error(f"\tFailed to generate sound file: [{sound_file}]")
                     return None
 
-        return key, sound_file
+            else:
+                if verbose:
+                    syslog.info(f"PLAY: Phrase: [{phrase.text}]")
+                    syslog.info(f"PLAY: Using cache [{gremlin.util.toUrl(sound_file)}]")
+
+        if generated:
+            sound.saveConfig() # save the updated sound configuration for next time
 
 
+        # if multiple phrases, pick one at random
+        phrase = self.pickPhrase(phrase_map)
+        if phrase:
+            return phrase.key, phrase.sound_file
+
+        return None, None
+
+
+
+    def pickPhrase(self, phrase_map : dict):
+        """ picks a phrase to play based on the playback mode """
+        if not phrase_map:
+            return None
+
+        keys = list(phrase_map.keys())
+        count = len(keys)
+        match self.playback_mode:
+            case PlaybackMode.RoundRobin:
+                if count == 1:
+                    self._last_phrase = phrase_map[keys[0]]
+                    return self._last_phrase
+                if self._last_phrase:
+                    key = self._last_phrase.key
+                    if key in keys:
+                        index = keys.index(self._last_phrase.key)
+                        index = (index + 1) % len(keys)
+                        phrase = phrase_map[keys[index]]
+                    else:
+                        # first item if key is invalid
+                        phrase = phrase_map[keys[0]]
+                else:
+                    # first item
+                    phrase = phrase_map[keys[0]]
+
+            case PlaybackMode.Random:
+                key = random.choice(keys)
+                phrase = phrase_map[key]
+
+            case PlaybackMode.TimedRandom:
+                # ensure the timed randomizer gets us a correct index for the number of available sound files
+                match self.mode:
+                    case PlayMode.EdgeAI | PlayMode.PyTTS:
+                        # EdgeAI specific logic if needed
+                        if self._timed_random.max_val != count-1:
+                            self._timed_random.max_val = count-1
+                    case PlayMode.AudioFile:
+                        count_files = len(self._sound_files)-1
+                        if self._timed_random.max_val != count_files:
+                            self._timed_random.max_val = count_files
+
+                index = self._timed_random.getValue()
+                key = keys[index]
+                phrase = phrase_map[key]
+            case _:
+                phrase = next(iter(phrase_map.values()))
+
+        self._last_phrase = phrase
+        return phrase
 
 
 
@@ -1245,7 +1281,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                 fadein_ms=self.fadein_ms,
                 fadeout_ms=self.fadeout_ms,
                 stop_previous=self.stop_previous,
-                rate=self.ptts_speed,
+                rate=self.playback_rate,
             )
             actions.append(action)
 
@@ -1326,10 +1362,13 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.randomize_sound_file = safe_read(node, "randomize", bool, False)
         self._sound_files.clear()
 
-        self.ptts_speed = safe_read(node, "tts_speed", float, 1.0)
+        self.ptts_speed = safe_read(node, "ptts_speed", int, 100)
+        self.ptts_volume = safe_read(node, "ptts_volume", int, 100)
         self.etts_speed = safe_read(node, "etts_speed", float, 1.0)
+        self.etts_volume = safe_read(node, "etts_volume", float, 1.0)
         self.ktts_enabled = gremlin.ktts.KTTS_ENABLED
         self.ktts_speed = safe_read(node, "ktts_speed", float, 1.0)
+        self.playback_rate = safe_read(node, "playback-rate", float, 1.0)
         self.volume = int(node.get("volume", 50))
         self.exec_on_press = safe_read(node, "exec_on_press", bool, True)
         self.exec_on_release = safe_read(node, "exec_on_release", bool, False)
@@ -1340,6 +1379,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.fadeout_ms = safe_read(node, "fadeout-ms", int, 0)
         self.stop_previous = safe_read(node, "stop-previous", bool, False)
         self.auto_generate = safe_read(node, "auto-generate", bool, True)
+        pbm = safe_read(node, "playback-mode", str, PlaybackMode.RoundRobin.name)
+        self.playback_mode = PlaybackMode[pbm]
 
     def _generate_xml(self):
         node = ElementTree.Element("play-sound")
@@ -1360,18 +1401,22 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         node.set("volume", str(self.volume))
         if self.text:
             node.set("text", html.escape(self.text))
-        node.set("tts_speed", safe_format(self.ptts_speed, float))
+        node.set("ptts_speed", safe_format(self.ptts_speed, int))
+        node.set("ptts_volume", safe_format(self.ptts_volume, int))
         node.set("etts_speed", safe_format(self.etts_speed, float))
+        node.set("etts_volume", safe_format(self.etts_volume, float))
         node.set("ktts_speed", safe_format(self.ktts_speed, float))
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))
         node.set("loops", safe_format(self.loops, int))
         node.set("playback-ms", safe_format(self.playback_ms, int))
+        node.set("playback-rate", safe_format(self.playback_rate, float))
         node.set("fadein-ms", safe_format(self.fadein_ms, int))
         node.set("fadeout-ms", safe_format(self.fadeout_ms, int))
         node.set("stop-previous", safe_format(self.stop_previous, bool))
         if self.audio_device:
             node.set("audio-device", self.audio_device)
+        node.set("playback-mode", safe_format(self.playback_mode.name, str))
         node.set("auto-generate", safe_format(self.auto_generate, bool))
         return node
 
