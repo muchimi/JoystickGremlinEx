@@ -320,7 +320,8 @@ class PhraseData:
         if self.engine is not None:
             node.set("engine", self.engine.name)
         if self.voice is not None:
-            node.set("voice", self.voice)
+            voice_value = self.voice if isinstance(self.voice, str) else getattr(self.voice, "name", str(self.voice))
+            node.set("voice", voice_value)
         node.set("rate", safe_format(self.rate, float))
         node.set("pitch", safe_format(self.pitch, int))
         node.set("volume", safe_format(self.volume, float))

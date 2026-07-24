@@ -739,6 +739,20 @@ class ExecutionContext:
         node = next((node for node in anytree.PreOrderIter(self.graph) if node.id == id), None)
         return node
 
+    def _safe_preorder_iter(self, root):
+        """Manual pre-order traversal that skips None entries anywhere in
+        the tree, regardless of nesting depth. Works around a latent bug
+        where a None ends up stored as a child of some node, which makes
+        anytree.PreOrderIter crash internally (AttributeError: 'NoneType'
+        object has no attribute 'children') before it can yield anything."""
+        if root is None:
+            return
+        yield root
+        children = getattr(root, "children", None) or ()
+        for child in children:
+            if child is not None:
+                yield from self._safe_preorder_iter(child)
+
     def findActions(self, action_name: str):
         """find, in the execution tree,"""
         if not action_name:
@@ -746,6 +760,8 @@ class ExecutionContext:
 
         def filter(node):
             nonlocal action_name
+            if node is None:
+                return False
             if node.nodeType == ExecutionGraphNodeType.Action:
                 if isinstance(node.functors, list):
                     for functor in node.functors:
@@ -759,7 +775,7 @@ class ExecutionContext:
 
         # ExecutionGraphNodeType.Action, "nodeType"):
         root = self.graph
-        node_list = anytree.findall(root, filter_=filter)
+        node_list = [n for n in self._safe_preorder_iter(root) if filter(n)]
         return node_list
 
     def findMultimodeActions(self):
@@ -1766,11 +1782,11 @@ class ExecutionContext:
 
                         if self._verbose_exec:
                             syslog.info(f"Looking for id: {id}")
-                        node = next((n for n in anytree.PreOrderIter(self.graph) if n.nodeType == ExecutionGraphNodeType.Container and n.id == id), None)
+                        node = next((n for n in self._safe_preorder_iter(self.graph) if n is not None and n.nodeType == ExecutionGraphNodeType.Container and n.id == id), None)
                         if node:
                             self.registerNode(node)
 
-        for node in anytree.PreOrderIter(self.graph):
+        for node in self._safe_preorder_iter(self.graph):
             if node:
                 if node.id in self._functor_map:
                     continue  # already processed

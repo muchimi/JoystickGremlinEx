@@ -2678,6 +2678,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         assert isinstance(input_item, InputItem), "invalid input item"
 
+        if self._action_icon_widget is None:
+            return
+
         widget, layout = gremlin.ui.ui_common.getGridContainer()
         layout.addWidget(QtWidgets.QWidget(), 0, 0)
         layout.setColumnStretch(0, 1)  # right align the icons
