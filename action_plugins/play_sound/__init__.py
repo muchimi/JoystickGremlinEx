@@ -1177,7 +1177,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         wav = self.tts_file
         if wav and os.path.isfile(wav):
             ext = gremlin.util.get_ext(wav)
-            suggested_name = gremlin.util.textWordsToUnderscore(self.action_data.text)
+            suggested_name = gremlin.util.textWordsToUnderscore(self.text)
             dir = os.path.dirname(wav)
             suggested_file = os.path.join(dir, suggested_name)
             suggested_file = gremlin.util.swap_ext(suggested_file, ext)
@@ -1216,7 +1216,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                 rate = self.ptts_speed
 
 
-        phrase = self.sound.generate(text = self.action_data.text,
+        phrase = self.sound.generate(text = self.text,
                                      mode = self.mode,
                                      voice = self.speaker,
                                      randomize_sound_file = self.randomize_sound_file,
@@ -1253,9 +1253,9 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                     syslog.error(f"PLAY: unable to rename the file: {str(e)}")
                     gremlin.ui.ui_common.MessageBoxWarning(prompt=f"An error occured when renaming the file:\n{str(e)}", parent=ui)
                     return
-                self.action_data.tts_file = new_name
+                self.tts_file = new_name
                 self.tts_file_widget.setText(new_name)
-                if self.action_data.save_on_generate:
+                if self.save_on_generate:
                     # save the profile
                     syslog.info("PLAY: save profile on wav generation...")
                     profile = gremlin.shared_state.current_profile
