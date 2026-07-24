@@ -196,10 +196,22 @@ def script_path():
     return os.path.normcase(os.path.dirname(os.path.abspath(os.path.realpath(sys.argv[0]))))
 
 
+_user_profile_path : str = None
+
 def userprofile_path():
     """Returns the path to the user's profile folder, %userprofile%."""
 
-    path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex"))
+    global _user_profile_path
+    if _user_profile_path is not None:
+        return _user_profile_path
+
+    import gremlin.config
+    config = gremlin.config.Configuration()
+    path =  config.data_path()
+
+    _user_profile_path = path
+
+    # path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex"))
     if not os.path.isdir(path):
         # profile folder does not exist - see if we can create it from the original profile
         source_path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin"))
@@ -223,6 +235,7 @@ def userprofile_path():
             raise GremlinError(f"Critical error: Unable to create profile folder: {path}")
 
     return os.path.normcase(path)
+
 
 
 def copy_tree_if_newer(src, dst):
@@ -759,7 +772,7 @@ def find_files(root_folder, source_pattern="*") -> list:
         if lines:
             lines = lines.replace("\r", "")
             lines = lines.split("\n")
-            lines = [ln for ln in lines if ln]
+            lines = [ln.casefold() for ln in lines if ln]
             return lines
 
     return []
@@ -2876,7 +2889,7 @@ def hashString(text : str):
 
 
 class TimedRandomInt:
-    def __init__(self, min_val: int, max_val: int, cooldown_period: float):
+    def __init__(self, min_val: int = 0, max_val: int = 10, cooldown_period: float = 5.0):
         """
         :param min_val: The minimum value for the random integer (inclusive).
         :param max_val: The maximum value for the random integer (inclusive).

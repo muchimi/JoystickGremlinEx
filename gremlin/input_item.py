@@ -3447,10 +3447,10 @@ class InputItemListView(AbstractView):
                             if i == index:
                                 target_widget = widget
                                 break
-
-                    self._scroll_area.ensureVisible(0, h)
-                    if target_widget is not None:
-                        self._scroll_area.ensureWidgetVisible(target_widget)
+                    if self._scroll_area:
+                        self._scroll_area.ensureVisible(0, h)
+                        if target_widget is not None:
+                            self._scroll_area.ensureWidgetVisible(target_widget)
 
     def scrollToInput(self, input_item):
         self._sync_input(input_item)
@@ -9268,11 +9268,12 @@ class ContainerView(AbstractView):
                         syslog.info(f"\t[{container_count}] containers to display")
                     # display container widgets in the defined order
                     for model_index in range(container_count):
-                        data = self.model.data(model_index)
-                        assert data.id in self._widget_map, f"ContainerView model and UI are not synchronized: widget not found for container id [{data.id}]"
+                        container : AbstractContainer = self.model.itemAt(model_index)
+                        assert container is not None, f"Invalid data at model index [{model_index}]"
+                        assert container.id in self._widget_map, f"ContainerView model and UI are not synchronized: widget not found for container id [{container.id}]"
 
                         # widget already exist, re-order if needed
-                        widget = self._widget_map[data.id]
+                        widget = self._widget_map[container.id]
                         widget_index = self._scroll_layout.indexOf(widget)
                         if model_index != widget_index:
                             # reorder

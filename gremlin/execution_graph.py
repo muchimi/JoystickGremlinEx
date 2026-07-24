@@ -1771,10 +1771,11 @@ class ExecutionContext:
                             self.registerNode(node)
 
         for node in anytree.PreOrderIter(self.graph):
-            if node.id in self._functor_map:
-                continue  # already processed
-            if node.nodeType in (ExecutionGraphNodeType.Container, ExecutionGraphNodeType.Action):
-                self.registerNode(node)
+            if node:
+                if node.id in self._functor_map:
+                    continue  # already processed
+                if node.nodeType in (ExecutionGraphNodeType.Container, ExecutionGraphNodeType.Action):
+                    self.registerNode(node)
 
     def registerNode(self, node):
         """registers functors for a given node"""

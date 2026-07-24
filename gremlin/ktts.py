@@ -218,7 +218,7 @@ class KTTS:
         tts_file = os.path.join(self.getSoundFolder(), f"{id}.wav")
         return tts_file
 
-    def generateActionWav(self, action, phrase : PhraseData) -> bool:
+    def generateActionWav(self, phrase : PhraseData, voice: str = None, rate: float = 1.0, pitch: float = 0.0, volume: float = 1.0) -> bool:
         """generates a wave file for the given action
 
         :param action: the play action
@@ -227,8 +227,8 @@ class KTTS:
         """
         return self.generateWav(tts_file=phrase.getSoundFile(),
                                 text = phrase.text,
-                                speaker = action.speaker,
-                                tts_speed=action.tts_speed)
+                                speaker = voice,
+                                tts_speed=rate)
 
     def generateWav(self, tts_file: str, text, speaker: str = None, tts_speed: float = 1.0) -> bool:
         """gets the wave file for the given options

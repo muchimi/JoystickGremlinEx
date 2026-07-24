@@ -3218,6 +3218,24 @@ class Configuration(QtCore.QObject):
         self._set_data("ai_etts_last_speaker", value)
 
     @property
+    def ai_etts_last_locale(self) -> str:
+        """ etts last locale """
+        return self._get_data("ai_etts_last_locale", None)
+
+    @ai_etts_last_locale.setter
+    def ai_etts_last_locale(self, value: str):
+        self._set_data("ai_etts_last_locale", value)
+
+    @property
+    def ai_etts_last_gender(self) -> str:
+        """ etts last gender """
+        return self._get_data("ai_etts_last_gender", None)
+
+    @ai_etts_last_gender.setter
+    def ai_etts_last_gender(self, value: str):
+        self._set_data("ai_etts_last_gender", value)
+
+    @property
     def ai_tts_save_on_generate(self) -> str:
         return self._get_data("ai_tts_save_on_generate", None)
 

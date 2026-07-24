@@ -20,7 +20,7 @@ import os
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 from lxml import etree as ElementTree
 import html
-
+from typing import Callable
 import gremlin.util
 import gremlin.base_profile
 import gremlin.config
@@ -31,7 +31,7 @@ import gremlin.ui.ui_common
 from gremlin.util import safe_format, safe_read
 import logging
 import gremlin.sound
-from gremlin.sound import Sound, PhraseData
+from gremlin.sound import Sound, PhraseData, EdgeTTSVoice
 import enum
 import gremlin.ktts
 import gremlin.tts
@@ -39,6 +39,7 @@ import gremlin.shared_state
 import random
 import time
 from gremlin.types import PlaybackMode, PlayMode
+
 
 syslog = logging.getLogger("system")
 
@@ -67,6 +68,8 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         verbose = gremlin.config.Configuration().verbose_mode_sound
 
+        self.action_data.etts_callback = self._update_etts_ui
+
         container_widgets = []
         ktts_enabled = gremlin.ktts.KTTS_ENABLED
 
@@ -80,7 +83,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         self.volume_widget = gremlin.ui.ui_common.QIntLineEdit(
             min_range=0,
             max_range=100,
-            value=self.action_data.volume,
+            value=self.action_data.playback_volume,
             callback=self._volume_changed,
             chars=4,
             tooltip="Playback volume as a percentage 0 to 100.",
@@ -147,12 +150,20 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         # speaker selection for ktts
         if ktts_enabled:
-            self.ktts_speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip="Selected speaker for AI voice generation.")
+            self.ktts_speaker_widget = gremlin.ui.ui_common.QDataComboBox(tooltip="Selected speaker for AI voice generation.")
             self.ktts_speaker_widget.setCallback(self._handle_ktts_speaker_changed)
 
         # speaker selection for edge tts
-        self.etts_speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip="Selected speaker for AI voice generation.")
+        self.etts_speaker_widget = gremlin.ui.ui_common.QDataComboBox(tooltip="Selected speaker for AI voice generation.")
         self.etts_speaker_widget.setCallback(self._handle_etts_speaker_changed)
+
+        # locale filter for edge tts
+        self.etts_locale_widget = gremlin.ui.ui_common.QDataComboBox(tooltip="Locale filter for Edge TTS.")
+        self.etts_locale_widget.setCallback(self._handle_etts_locale_changed)
+
+        # gender filter
+        self.etts_gender_widget = gremlin.ui.ui_common.QDataComboBox(tooltip="Gender filter for Edge TTS.")
+        self.etts_gender_widget.setCallback(self._handle_etts_gender_changed)
 
         ktts_refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(
             label=None, callback=self._handle_refresh_ktts_speakers, tooltip="Refresh available AI speakers"
@@ -197,20 +208,20 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             )
 
 
-        self.etts_pitch_widget = gremlin.ui.ui_common.QFloatLineEdit(
-            min_range=-100,
-            max_range=100.0,
+        self.etts_pitch_widget = gremlin.ui.ui_common.QIntLineEdit(
+            min_range=-500,
+            max_range=500,
             value=self.action_data.etts_pitch,
             callback=self._handle_etts_pitch_changed,
             tooltip="Pitch adjustment for the generated audio in Hz offset.\n0 means no adjustment. +/- 100 Hz range.",
         )
 
-        self.etts_volume_widget = gremlin.ui.ui_common.QFloatLineEdit(
-                    min_range=0,
-                    max_range=2,
+        self.etts_volume_widget = gremlin.ui.ui_common.QIntLineEdit(
+                    min_range=-100,
+                    max_range=100,
                     value=self.action_data.etts_volume,
                     callback=self._handle_etts_volume_changed,
-                    tooltip="Volume adjustment for the generated audio.\n1.0 is the normal volume. Range is 0.0 to 2.0.  1.0 means normal.\nNote: this is not the same as the playback volume.  This is the generation volume.",
+                    tooltip="Volume adjustment for the generated audio.\n0 is the normal volume. Range is -100 to 100.  0 means normal.\nNote: this is not the same as the playback volume.  This is the generation volume.",
                 )
 
         widgets = [
@@ -250,7 +261,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         widgets = [
             "ETTS Generation Options:",
-            gremlin.ui.ui_common.getHContainer(["Voice:", self.etts_speaker_widget, etts_refresh_speaker_widget], widget_only=True),
+            gremlin.ui.ui_common.getHContainer(["Locale:", self.etts_locale_widget, "Gender:", self.etts_gender_widget, "Voice:", self.etts_speaker_widget, etts_refresh_speaker_widget,"||"], widget_only=True),
             gremlin.ui.ui_common.getHContainer(["Rate (gen):", self.etts_speed_widget, "Pitch Offset (Hz):", self.etts_pitch_widget, "Volume (gen):", self.etts_volume_widget], widget_only=True),
         ]
         self.etts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
@@ -425,6 +436,8 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
         self._update_ui()
 
+
+
     @QtCore.Slot(bool)
     def _handle_folder_play_changed(self, checked: bool):
         self.action_data.randomize_sound_file = checked
@@ -455,8 +468,21 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.playback_file_container.setVisible(self.action_data.mode == PlayMode.AudioFile)
 
 
+        mode = self.action_data.mode
+        if mode in (PlayMode.CoquiAI, PlayMode.EdgeAI, PlayMode.PyTTS):
+            playback_enabled = bool(self.action_data.text)
+            self.play_widget.setEnabled(playback_enabled)
+            self.generate_widget.setEnabled(playback_enabled)
+            self.generate_play_widget.setEnabled(playback_enabled)
+        else:
+            playback_enabled = bool(self.action_data.sound_file)
+            self.play_widget.setEnabled(playback_enabled)
 
-        match self.action_data.mode:
+        generate_visible = mode in (PlayMode.CoquiAI, PlayMode.EdgeAI, PlayMode.PyTTS)
+        self.generate_widget.setVisible(generate_visible)
+        self.auto_generate_widget.setVisible(generate_visible)
+
+        match mode:
             case PlayMode.CoquiAI:
                 if not self.action_data.ktts_enabled:
                     return
@@ -498,6 +524,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                 generate_enabled = etts.is_available() and self.action_data.text is not None and self.action_data.text != ""
 
 
+
                 wav = self.action_data.tts_file
                 play_enabled = wav is not None and os.path.isfile(wav)
                 speed_visible = True
@@ -517,6 +544,10 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                 label = "Available"
                 self.aitts_state_widget.setText(label)
                 self.aitts_state_widget.setIcon(icon)
+
+
+
+
 
             case _:
                 play_enabled = self.action_data.sound_file is not None and os.path.isfile(self.action_data.sound_file)
@@ -577,6 +608,16 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.action_data.speaker = value
         gremlin.config.Configuration().ai_etts_last_speaker = value
 
+    def _handle_etts_locale_changed(self, value):
+        self.action_data.etts_locale = value
+        gremlin.config.Configuration().ai_etts_last_locale = value
+        self._update_etts_speakers()
+
+    def _handle_etts_gender_changed(self, value):
+        self.action_data.etts_gender = value
+        gremlin.config.Configuration().ai_etts_last_gender = value
+        self._update_etts_speakers()
+
     def _handle_file_delete(self, widget):
         wav = self.action_data.tts_file
         if wav and os.path.isfile(wav):
@@ -602,12 +643,16 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
     def _handle_refresh_speakers(self):
         self._update_speakers()
 
+
+
     def _update_speakers(self):
         """updates the list of available voices / speakers for the appropriate TTS engines"""
         match self.action_data.mode:
             case PlayMode.CoquiAI:
                 self._update_ktts_speakers()
             case PlayMode.EdgeAI:
+                self._update_etts_genders()
+                self._update_etts_locales()
                 self._update_etts_speakers()
             case PlayMode.PyTTS:
                 self._update_ptts_speakers()
@@ -640,14 +685,84 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                 self.ktts_speaker_widget.addItem(speaker, speaker)
 
         self.ktts_speaker_widget.setEnabled(speakers is not None)
+        self.ktts_speaker_widget.updateGeometry()
 
-    def _update_etts_speakers(self, initialize=False):
+    def _update_etts_ui(self):
+        """called when the ETTS data change """
+        update = False
+        if self.action_data.etts_gender != self.etts_gender_widget.currentText():
+            with QtCore.QSignalBlocker(self.etts_gender_widget):
+                self.etts_gender_widget.setCurrentText(self.action_data.etts_gender)
+                update = True
+        if self.action_data.etts_locale != self.etts_locale_widget.currentText():
+            with QtCore.QSignalBlocker(self.etts_locale_widget):
+                self.etts_locale_widget.setCurrentText(self.action_data.etts_locale)
+                update = True
+        if update:
+            self._update_etts_speakers()
+        self.etts_gender_widget.updateGeometry()
+        self.etts_locale_widget.updateGeometry()
+
+
+    def _update_etts_genders(self):
+        """ updates the list of available ETTS genders for the ETTS engine """
         etts = gremlin.sound.EdgeTTS()
-        voices = etts.getVoiceList()
+        genders = etts.getGenders()
         config = gremlin.config.Configuration()
+        with QtCore.QSignalBlocker(self.etts_gender_widget):
+            self.etts_gender_widget.clear()
+            for gender in genders:
+                self.etts_gender_widget.addItem(gender, gender)
+            if config.ai_etts_last_gender:
+                index = self.etts_gender_widget.findText(config.ai_etts_last_gender)
+                if index != -1:
+                    self.etts_gender_widget.setCurrentIndex(index)
+            else:
+                if genders:
+                    config.ai_etts_last_gender = genders[0]
+                    self.etts_gender_widget.setCurrentIndex(0)
+
+    def _update_etts_locales(self):
+        """ updates the list of available ETTS locales for the ETTS engine """
+        etts = gremlin.sound.EdgeTTS()
+        locales = etts.getLocales(self.action_data.etts_gender)
+
+
+        config = gremlin.config.Configuration()
+        with QtCore.QSignalBlocker(self.etts_locale_widget):
+            self.etts_locale_widget.clear()
+            for locale in locales:
+                self.etts_locale_widget.addItem(locale, locale)
+            if config.ai_etts_last_locale:
+                index = self.etts_locale_widget.findText(config.ai_etts_last_locale)
+                if index != -1:
+                    self.etts_locale_widget.setCurrentIndex(index)
+            else:
+                if locales:
+                    config.ai_etts_last_locale = locales[0]
+                    self.etts_locale_widget.setCurrentIndex(0)
+
+    def _get_etts_filtered_voices(self) -> dict[str, EdgeTTSVoice]:
+        """  gets a list of filtered voices by locale"""
+        etts = gremlin.sound.EdgeTTS()
+        return etts.getFilteredVoices(locale=self.action_data.etts_locale, gender=self.action_data.etts_gender)
+
+    def _update_etts_speakers(self):
+        config = gremlin.config.Configuration()
+        voices : dict[str, EdgeTTSVoice] = self._get_etts_filtered_voices()
+        etts = gremlin.sound.EdgeTTS()
+        current_voice = etts.getVoice(self.etts_speaker_widget.currentText())
+        if current_voice:
+            if current_voice.gender != self.action_data.etts_gender or current_voice.locale != self.action_data.etts_locale:
+                voice = list(voices.values())[0]
+                self.action_data.etts_speaker = voice.short_name
+                self.action_data.speaker = voice.short_name
+
+
         with QtCore.QSignalBlocker(self.etts_speaker_widget):
             self.etts_speaker_widget.clear()
             if voices:
+                voice : EdgeTTSVoice
                 for voice in voices.values():
                     speaker = voice.short_name
                     self.etts_speaker_widget.addItem(speaker, speaker)
@@ -663,6 +778,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                     self.action_data.speaker = self.etts_speaker_widget.currentText()
 
             self.etts_speaker_widget.setEnabled(bool(voices))
+        self.etts_speaker_widget.updateGeometry()
 
     def _update_ptts_speakers(self, initialize=False):
         ptts = gremlin.tts.TextToSpeech()
@@ -689,6 +805,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                     self.action_data.speaker = speaker
 
         self.ptts_speaker_widget.setEnabled(voices is not None)
+        self.ptts_speaker_widget.updateGeometry()
 
     def _handle_generate(self, widget):
         if self.action_data.text:
@@ -776,11 +893,11 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
     def _populate_ui(self):
         self.file_path_widget.setText(self.action_data.sound_file)
-        self.volume_widget.setValue(self.action_data.volume)
+        self.volume_widget.setValue(self.action_data.playback_volume)
         self._file_changed()
 
     def _volume_changed(self, value):
-        self.action_data.volume = value
+        self.action_data.playback_volume = value
 
     def _file_changed(self):
         if self.action_data.mode == PlayMode.AudioFile:
@@ -849,7 +966,7 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
     def __init__(self, action: PlaySound, parent=None):
         super().__init__(action, parent)
         self.sound_file = action.sound_file
-        self.volume = action.volume
+        self.volume = action.playback_volume
         self.action_data: PlaySound = action
 
         config = gremlin.config.Configuration()
@@ -885,6 +1002,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
+
+
 
     # override default allowed input types here if not all
     # input_types = [
@@ -922,9 +1041,15 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.etts_speed = 1.0  # speed factor for PyTTS
         self.ktts_speed = 1.0  # speed factor for KTTS
 
-        self.volume = 100  # default volume as a percentage 0 to 100
-        self.etts_pitch = 0  # pitch adjust in hertz (edge tts only -100 to +100)
-        self.etts_volume = 1.0  # volume for Edge TTS (0.0 to 1.0)
+        self.playback_volume : int = 100  # default volume as a percentage 0 to 100
+        self.etts_pitch : int = 0  # pitch adjust in hertz (edge tts only -100 to +100)
+        self.etts_volume : int = 0  # volume offset as a whole percentage -100 to +100
+        self._etts_speaker : str = None # etts speaker
+        self._etts_locale = None  # selected locale for Edge TTS
+        self._etts_gender = None  # selected gender for Edge TTS
+
+        self.etts_callback : Callable = None # callback when etts data changes to update the UI
+
         self.randomize_sound_file = False  # true if sound is randomized from a folder
 
         self.key = None  # sound key for the sound file
@@ -986,6 +1111,53 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                 self.sound.queueAction(gremlin.sound.SoundEvent.ChangeDeviceAction(name))
 
     @property
+    def etts_speaker(self) -> str:
+        return self._etts_speaker
+
+    @etts_speaker.setter
+    def etts_speaker(self, value: str):
+        self._etts_speaker = value
+        self.speaker = value
+        if self.mode == PlayMode.EdgeAI:
+            etts = gremlin.sound.EdgeTTS()
+            voice = etts.getVoice(self._etts_speaker)
+            if voice:
+                self._etts_gender = voice.gender
+                self._etts_locale = voice.locale
+                if self.etts_callback:
+                    self.etts_callback()
+
+    @property
+    def etts_gender(self) -> str:
+        gender = self._etts_gender
+        if not gender and self.speaker and self.mode == PlayMode.EdgeAI:
+            etts = gremlin.sound.EdgeTTS()
+            voice = etts.getVoice(self.speaker)
+            if voice:
+                self.etts_gender = voice.gender
+                if self.etts_callback:
+                    self.etts_callback()
+        return self._etts_gender
+
+    @etts_gender.setter
+    def etts_gender(self, value: str):
+        self._etts_gender = value
+
+    @property
+    def etts_locale(self) -> str:
+        locale = self._etts_locale
+        if not locale and self.speaker and self.mode == PlayMode.EdgeAI:
+            etts = gremlin.sound.EdgeTTS()
+            voice = etts.getVoice(self.speaker)
+            if voice:
+                self.etts_locale = voice.locale
+        return self._etts_locale
+
+    @etts_locale.setter
+    def etts_locale(self, value: str):
+        self._etts_locale = value
+
+    @property
     def tts_file(self) -> str:
         return self._tts_file
 
@@ -1025,181 +1197,37 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self._timed_random.setMax(len(self._sound_files) - 1)
 
 
-
     def generate(self, force = False):
-        """generates the sounds based on options - returns a tuple of (key, sound_file)"""
-        sound = Sound()
-
-
-        # ensure started
-        if not self.sound.ensureStarted():
-            syslog.error("PLAY: unable to play sound due to sound library initialization issue")
-            return None
-        verbose = gremlin.config.Configuration().verbose
-        if verbose:
-            mode = self.get_mode()
-            input_id = self.get_input_id()
-            input_type = self.get_input_type()
-            device_name = self.get_device_name()
-            syslog.info(f"PLAY: [{self.id}] play [{self.sound_file}]")
-            syslog.info(f"\tAttached device: [{device_name}] input type: [{InputType.to_display_name(input_type)}] input: [{input_id}] mode: [{mode}]")
-            syslog.info(
-                f"\tOptions: exec on press: [{self.exec_on_press}] exec on release: [{self.exec_on_release}] volume: [{self.volume}] audio channel:[{self.audio_device}]"
-            )
-            sound_path = sound.soundFolder
-            syslog.info(f"\tProfile ID: [{gremlin.shared_state.current_profile.id}] Sound path: [{gremlin.util.toUrl(sound_path)}] folder found: [{os.path.isdir(sound_path)}]")
-
-        # get the phrases for the sound
-        phrase_map = {}
-
-        # get or autogenerate the sound file
-        sound_file = None
         match self.mode:
             case PlayMode.AudioFile:
-                # static playback of one or more files depending if a folder or a single file
-                if self.sound_file and os.path.isfile(self.sound_file):
-                    if self.randomize_sound_file:
-                        # pick a file at random from a list of files in the folder
-                        if not self._sound_files:
-                            # update file list - there is at least one file
-                            self.scanFolder()
-
-                        index = self._timed_random.getValue()
-                        sound_file = self._sound_files[index]
-                    else:
-                        sound_file = self.sound_file
-
-                    # build a phrase for this static wav file
-                    phrase = PhraseData(text = gremlin.util.get_guid())
-                    phrase.sound_file = sound_file
-                    phrase_map[phrase.key] = phrase
-
-                    return phrase.key, phrase.sound_file
-
-                else:
-                    syslog.error(f"PLAY: unable to locate file: [{self.sound_file}]")
-                    return None
+                pitch = 0
+                volume = 100
+                rate = 1.0
+                self.scanFolder()
+                self._timed_random.setMax(len(self._sound_files) - 1)
 
             case PlayMode.EdgeAI:
-                # EdgeAI TTS generated
-
-                engine = gremlin.sound.EdgeTTS()
                 pitch = self.etts_pitch
                 volume = self.etts_volume
-                voice = self.speaker
                 rate = self.etts_speed
-                phrase_map = sound.getPhraseMap(self.text, voice=voice, rate = rate, pitch=pitch, volume=volume)
-
-
-
             case PlayMode.PyTTS:
-                # generate using internal TTS
-                engine = gremlin.tts.TextToSpeech()
                 pitch = 0
-                volume = 1.0
-                voice = self.speaker
+                volume = self.ptts_volume
                 rate = self.ptts_speed
-                phrase_map = sound.getPhraseMap(self.text, voice=voice, rate=rate, pitch=pitch, volume=volume)
-
-            case _:
-                syslog.error(f"PLAY: unsupported play mode: {self.mode}")
-                return None
-
-        assert engine is not None, "invalid engine"
-        assert hasattr(engine, "generateActionWav"), "invalid engine - missing generateActionWav method"
-
-        generated = False
 
 
-        if verbose:
-            count = len(phrase_map)
-            syslog.info(f"PLAY: Generating [{count}] sound files...")
-        for phrase in phrase_map.values():
-
-            sound_file = sound.getSoundFile(phrase.key)
-            assert sound_file is not None, "invalid sound file - phrase not registered properly"
-            if force and os.path.isfile(sound_file):
-                os.unlink(sound_file)
-            if force or not os.path.isfile(sound_file):
-                # does not exist, create
-                result = engine.generateActionWav(action=self, phrase=phrase)
-                if result:
-                    generated = True
-                    if verbose:
-                        syslog.info(f"PLAY: Phrase: [{phrase.text}]")
-                        syslog.info(f"\tGenerated sound file: [{gremlin.util.toUrl(sound_file)}]")
-                else:
-                    syslog.error(f"PLAY: Phrase: [{phrase.text}]")
-                    syslog.error(f"\tFailed to generate sound file: [{sound_file}]")
-                    return None
-
-            else:
-                if verbose:
-                    syslog.info(f"PLAY: Phrase: [{phrase.text}]")
-                    syslog.info(f"PLAY: Using cache [{gremlin.util.toUrl(sound_file)}]")
-
-        if generated:
-            sound.saveConfig() # save the updated sound configuration for next time
-
-
-        # if multiple phrases, pick one at random
-        phrase = self.pickPhrase(phrase_map)
+        phrase = self.sound.generate(text = self.action_data.text,
+                                     mode = self.mode,
+                                     voice = self.speaker,
+                                     randomize_sound_file = self.randomize_sound_file,
+                                     rate = rate,
+                                     pitch = pitch,
+                                     volume = volume,
+                                     force=force,
+                                     timed_random=self._timed_random)
         if phrase:
             return phrase.key, phrase.sound_file
-
         return None, None
-
-
-
-    def pickPhrase(self, phrase_map : dict):
-        """ picks a phrase to play based on the playback mode """
-        if not phrase_map:
-            return None
-
-        keys = list(phrase_map.keys())
-        count = len(keys)
-        match self.playback_mode:
-            case PlaybackMode.RoundRobin:
-                if count == 1:
-                    self._last_phrase = phrase_map[keys[0]]
-                    return self._last_phrase
-                if self._last_phrase:
-                    key = self._last_phrase.key
-                    if key in keys:
-                        index = keys.index(self._last_phrase.key)
-                        index = (index + 1) % len(keys)
-                        phrase = phrase_map[keys[index]]
-                    else:
-                        # first item if key is invalid
-                        phrase = phrase_map[keys[0]]
-                else:
-                    # first item
-                    phrase = phrase_map[keys[0]]
-
-            case PlaybackMode.Random:
-                key = random.choice(keys)
-                phrase = phrase_map[key]
-
-            case PlaybackMode.TimedRandom:
-                # ensure the timed randomizer gets us a correct index for the number of available sound files
-                match self.mode:
-                    case PlayMode.EdgeAI | PlayMode.PyTTS:
-                        # EdgeAI specific logic if needed
-                        if self._timed_random.max_val != count-1:
-                            self._timed_random.max_val = count-1
-                    case PlayMode.AudioFile:
-                        count_files = len(self._sound_files)-1
-                        if self._timed_random.max_val != count_files:
-                            self._timed_random.max_val = count_files
-
-                index = self._timed_random.getValue()
-                key = keys[index]
-                phrase = phrase_map[key]
-            case _:
-                phrase = next(iter(phrase_map.values()))
-
-        self._last_phrase = phrase
-        return phrase
 
 
 
@@ -1236,8 +1264,39 @@ class PlaySound(gremlin.base_profile.AbstractAction):
     def play(self):
         """plays the sound"""
 
+        sound_file = None
+
+        match self.mode:
+            case PlayMode.PyTTS:
+                rate = self.ptts_speed
+                volume = self.ptts_volume
+                pitch = 0
+            case PlayMode.EdgeAI:
+                rate =self.etts_speed
+                volume = self.etts_volume
+                pitch = self.etts_pitch
+            case PlayMode.AudioFile:
+                rate = 1.0
+                volume = 1.0
+                pitch = 0
+                sound_file = self.sound_file
+            case _:
+                # default case
+                pass
+
         # generate the sound file if needed - returns the path to the audio file to play
-        key, sound_file = self.generate()
+        phrase : PhraseData = self.sound.generate(text = self.text,
+                                              mode = self.mode,
+                                              voice = self.speaker,
+                                              randomize_sound_file = self.randomize_sound_file,
+                                              rate = rate,
+                                              volume = volume,
+                                              pitch = pitch,
+                                              playback_mode = self.playback_mode,
+                                              sound_file = sound_file,
+                                              timed_random=self._timed_random,
+                                              )
+        sound_file = phrase.sound_file if phrase else None
         if not sound_file:
             syslog.error("PLAY: failed to generate sound file")
             return None
@@ -1255,7 +1314,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             syslog.info(f"PLAY: [{self.id}] play [{sound_file}]")
             syslog.info(f"\tAttached device: [{device_name}] input type: [{InputType.to_display_name(input_type)}] input: [{input_id}] mode: [{mode}]")
             syslog.info(
-                f"\tOptions: exec on press: [{self.exec_on_press}] exec on release: [{self.exec_on_release}] volume: [{self.volume}] audio channel:[{self.audio_device}]"
+                f"\tOptions: exec on press: [{self.exec_on_press}] exec on release: [{self.exec_on_release}] volume: [{self.playback_volume}] audio channel:[{self.audio_device}]"
             )
 
 
@@ -1264,9 +1323,10 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         if sound_file and os.path.isfile(sound_file):
             # verbose = gremlin.config.Configuration().verbose_mode_sound
             actions = []
+            key = phrase.key
             if gremlin.sound.USE_PG:
                 # pg needs volume to be set
-                action = gremlin.sound.SoundEvent.SetVolumeAction(key, self.volume)
+                action = gremlin.sound.SoundEvent.SetVolumeAction(key, self.playback_volume)
                 actions.append(action)
                 action = gremlin.sound.SoundEvent.ChangeDeviceAction(self.audio_device)
                 actions.append(action)
@@ -1276,7 +1336,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                 sound_file=sound_file,
                 device=self.audio_device,
                 loops=self.loops,
-                volume=self.volume,
+                volume=self.playback_volume,
                 playback_ms=self.playback_ms,
                 fadein_ms=self.fadein_ms,
                 fadeout_ms=self.fadeout_ms,
@@ -1357,6 +1417,36 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         if "speaker" in node.attrib:
             speaker = node.get("speaker")
         self.speaker = speaker  # speaker for AI
+        if self.mode == PlayMode.EdgeAI:
+            if speaker:
+                config = gremlin.config.Configuration()
+                etts = gremlin.sound.EdgeTTS()
+                voice = etts.getVoice(speaker)
+                self._etts_speaker = speaker # this will set the gender and the locale
+                if voice:
+                    self._etts_locale = voice.locale
+                    self._etts_gender = voice.gender
+                    config.ai_etts_last_speaker = speaker
+                    config.ai_etts_last_locale = self._etts_locale
+                    config.ai_etts_last_gender = self._etts_gender
+
+                else:
+                    locale = safe_read(node, "etts_locale", str, "")
+                    self._etts_locale = locale if locale else None
+                    config.ai_etts_last_locale = self._etts_locale
+                    gender = safe_read(node, "etts_gender", str, "")
+                    self._etts_gender = gender if gender else None
+                    config.ai_etts_last_gender = self._etts_gender
+            else:
+                # use defaults
+                self._etts_gender = config.ai_etts_last_gender
+                self._etts_locale = config.ai_etts_last_locale
+
+
+
+
+
+
         self.tts_file = safe_read(node, "tts_file", str, "")
         self.sound_file = node.get("file")
         self.randomize_sound_file = safe_read(node, "randomize", bool, False)
@@ -1366,10 +1456,13 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.ptts_volume = safe_read(node, "ptts_volume", int, 100)
         self.etts_speed = safe_read(node, "etts_speed", float, 1.0)
         self.etts_volume = safe_read(node, "etts_volume", float, 1.0)
+
+
+
         self.ktts_enabled = gremlin.ktts.KTTS_ENABLED
         self.ktts_speed = safe_read(node, "ktts_speed", float, 1.0)
         self.playback_rate = safe_read(node, "playback-rate", float, 1.0)
-        self.volume = int(node.get("volume", 50))
+        self.playback_volume = int(node.get("volume", 50))
         self.exec_on_press = safe_read(node, "exec_on_press", bool, True)
         self.exec_on_release = safe_read(node, "exec_on_release", bool, False)
         self.audio_device = safe_read(node, "audio-device", str, None)
@@ -1398,13 +1491,17 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
         if self.speaker:
             node.set("speaker", self.speaker)
-        node.set("volume", str(self.volume))
+        node.set("volume", str(self.playback_volume))
         if self.text:
             node.set("text", html.escape(self.text))
         node.set("ptts_speed", safe_format(self.ptts_speed, int))
         node.set("ptts_volume", safe_format(self.ptts_volume, int))
         node.set("etts_speed", safe_format(self.etts_speed, float))
         node.set("etts_volume", safe_format(self.etts_volume, float))
+        if self.etts_locale:
+            node.set("etts_locale", self.etts_locale)
+        if self.etts_gender:
+            node.set("etts_gender", self.etts_gender)
         node.set("ktts_speed", safe_format(self.ktts_speed, float))
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))
@@ -1448,7 +1545,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                     table.addField("Play (AI)", "not found")
                 table.addField("Speaker", self.speaker if self.speaker else "n/a")
 
-        table.addField("Volume", f"{self.volume}")
+        table.addField("Volume", f"{self.playback_volume}")
 
         if self.exec_on_press:
             table.addField("Exec (press)", "Yes")

@@ -229,11 +229,14 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
 
     @QtCore.Slot()
     def _play_cb(self):
-        tts = gremlin.tts.TextToSpeech()
-        voice = tts.getVoices()[self.action_data.voice_index]
-        tts.set_voice(voice)
-        tts.set_volume(self.action_data.volume)
-        tts.speak_single(self.action_data.text, self.action_data.rate)
+        sound = gremlin.sound.Sound()
+        sound.playPyTTS(self.action_data.text, voice=self.action_data.voice_name, rate=self.action_data.rate, timed_random=self.action_data._timed_random)
+
+        # tts = gremlin.tts.TextToSpeech()
+        # voice = tts.getVoices()[self.action_data.voice_index]
+        # tts.set_voice(voice)
+        # tts.set_volume(self.action_data.volume)
+        # tts.speak_single(self.action_data.text, self.action_data.rate)
 
 
 
@@ -246,26 +249,28 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
         self.action_data = action
 
     def _speak(self):
-        if self.tts is not None:
-            if self.action_data.abort:
-                self.tts.abort()
-            else:
-                voice = self.tts.getVoices()[self.action_data.voice_index]
-                self.tts.set_voice(voice)
-                self.tts.set_volume(self.action_data.volume)
-                self.tts.speak(
-                    self.action_data.text,
-                    self.action_data.rate,
-                    self.action_data.clearQueue,
-                    self.action_data.override_suppress,
-                )
+        self.action_data.play()
 
-    def profile_start(self):
-        if self.action_data.enabled:
-            self.tts.start()
+        # if self.tts is not None:
+        #     if self.action_data.abort:
+        #         self.tts.abort()
+        #     else:
+        #         voice = self.tts.getVoices()[self.action_data.voice_index]
+        #         self.tts.set_voice(voice)
+        #         self.tts.set_volume(self.action_data.volume)
+        #         self.tts.speak(
+        #             self.action_data.text,
+        #             self.action_data.rate,
+        #             self.action_data.clearQueue,
+        #             self.action_data.override_suppress,
+        #         )
 
-    def profile_stop(self):
-        self.tts.abort()
+    # def profile_start(self):
+    #     if self.action_data.enabled:
+    #         self.tts.start()
+
+    # def profile_stop(self):
+    #     self.tts.abort()
 
     def process_event(self, event, value, extra_data=None):
         if not self.action_data.enabled:
@@ -322,6 +327,10 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
             False  # true if trigger should execute on input release event
         )
         self.override_suppress = False  # override suppression flag
+
+    def play(self):
+        sound = gremlin.sound.Sound()
+        sound.playPyTTS(self.text, voice=self.voice_name, rate=self.rate, timed_random=self._timed_random)
 
     @property
     def voice_name(self):
@@ -452,7 +461,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
         return table.to_html()
 
 
-   
+
 
 version = 1
 name = "text-to-speech"

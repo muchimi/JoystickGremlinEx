@@ -5191,7 +5191,7 @@ class QDataComboBox(QComboBox):
         callback_index: Callable = None,
         parent=None,
         wheel_enabled: bool = None,
-        auto_adjust: bool = False,
+        auto_adjust: bool = True,
         source=None,
         value=None,
         tooltip: str = None,

@@ -29,6 +29,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T12)
+- New: add locale voice filter for Edge TTS mode to simplify voice selection.
+- New: add gender voice filter for Edge TTS mode to simplify voice selection.
+- Change: Text to Speech Action (TTS): legacy TTS will no longer constantly regenerate audio on action trigger. Audio will be cached and generated once, and played through the updated multi-channel playback engine.  This resolves multiple (old) issues linked to that older engine, such as extreme lag, inability to handle concurrent streams, and significant start/stop runtimes and lag.  The engine is only used to generate audio to be compatible with older profiles but will play audio through the newer audio processing engine.
+- Fix: Audio: cache considers engine type to determine cache in case the same stream is sent with different options or through different engines.
+- Fix: Audio: cache deletes all audio files aggressively on application exit forcing them to be re-created each run.
+- Fix: Play Sound action: resolved an issue in the playback mode (audio file playback) where the audio would not play.
+- Fix: UI: exception on some view refreshes.
+- Fix: API: exception in execution tree is compiled on certain node types.
 
 ### (m77T11)
 - New: Play Action: (early release) add support for (currently free) text to speech via online AI and adds support in the action for the legacy TTS engine as well.  The online generation adds a very significant (and much needed) multilingual quality boost for TTS generation via the Microsoft Edge TTS AI (internet connection required). GEX will automatically generate the necessary audio files and play them through the modern audio engine at profile design or runtime. The legacy TTS engine (local TTS generation via the operating system) is now supported as well, however playback will run through the new audio engine and audio quality continues to be limited to this old technology.  This should also resolve playback issues experienced due to the old engine limitations and the updated execution engine in GEX introduced in M77.  The audio engine introduced last year supports concurrent audio streams and advanced playback options via the Play Sound Action.  For Edge TTS, GEX supports all voice sets available via Edge TTS. Important: while this service is currently free and does not require an API key, it can experience the occasional service disruptions especially when being spammed by requests.  If this happens, the conversion may fail but may be attempted again.  GEX will only attempt to generate the missing parts, as the audio generation is based on the specific phrase being generated (a text entry may now contain multiple phrases, see below).  The API also supports multiple engines so other AI engines may be added later more easily.  AI is a fast moving technology so newer choices may become available, and current choice may be deprecated as well, so flexibility was needed in the design to more easily adapt to the context.
