@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T13)
+- Fix: Play Sound: exception on generate due to refactor.
+
 ### (m77T12)
 - New: add locale voice filter for Edge TTS mode to simplify voice selection.
 - New: add gender voice filter for Edge TTS mode to simplify voice selection.
