@@ -376,7 +376,7 @@ class TextToSpeech(gremlin.base_profile.AbstractAction):
 
             voices = tts.getVoices()
             if voices and voice_id < len(voices):
-                self.voice_name = voices[voice_id]
+                self.voice_name = voices[voice_id].name
             self.voice_index = voice_id
 
         if "volume" in node.attrib:

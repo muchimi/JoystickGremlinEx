@@ -974,9 +974,20 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
 
     def profile_start(self):
         """runs on profile start"""
+        self.action_data._last_tts_key = None  # reset duplicate-suppression state
         if self.action_data.randomize_sound_file:
             # update the file list to randomize from
             self.action_data.scanFolder()
+
+        # pre-generate the audio file now (profile activation), rather than
+        # letting the first trigger generate it inline from the input
+        # execution/hook thread, which can hang the app (pyttsx3/SAPI5 does
+        # not tolerate being called in that context well).
+        if self.action_data.mode in (PlayMode.PyTTS, PlayMode.EdgeAI):
+            try:
+                self.action_data.generate(force=False)
+            except Exception as e:
+                syslog.warning(f"PLAY SOUND: pre-generation failed for [{self.action_data.text}]: {e}")
 
     def profile_stop(self):
         """stop any active audio on profile stop"""
@@ -1068,6 +1079,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         default_audio_device = QtMultimedia.QAudioDevice()
         self._audio_device = default_audio_device.description()
         self._last_phrase = None # last played phrase for multiple choice phrases
+        self._last_tts_key = None  # (text, voice, rate) of the last spoken phrase, for duplicate suppression
 
         devices = QtMultimedia.QMediaDevices.audioOutputs()
         self.device_map = {}
@@ -1265,6 +1277,17 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         """plays the sound"""
 
         sound_file = None
+
+        if self.mode in (PlayMode.PyTTS, PlayMode.EdgeAI):
+            if gremlin.config.Configuration().tts_suppress_duplicate:
+                key = (self.text, self.speaker, self.mode)
+                now = time.time()
+                cooldown_seconds = 10.0  # allow the same phrase again after this delay
+                if self._last_tts_key is not None:
+                    last_key, last_time = self._last_tts_key
+                    if key == last_key and (now - last_time) < cooldown_seconds:
+                        return
+                self._last_tts_key = (key, now)
 
         match self.mode:
             case PlayMode.PyTTS:

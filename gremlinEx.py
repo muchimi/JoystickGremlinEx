@@ -27,6 +27,7 @@ import faulthandler
 import ctypes
 import logging
 import os
+import subprocess
 import sys
 import time
 import trace
@@ -391,6 +392,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             profile_to_load = self.config.last_profile
 
         if profile_to_load:
+            self._autostart_target_name = os.path.splitext(os.path.basename(profile_to_load))[0]
             self._do_load_profile(profile_to_load)
         else:
             self.new_profile()
@@ -1235,7 +1237,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         :param evt the closure event
         """
 
-        if self.config.close_to_tray and self.ui.tray_icon.isVisible():
+        if self.config.close_to_tray and self.ui.tray_icon is not None and not getattr(self, "_really_quitting", False):
             self.hide()
             event.ignore()
         else:
@@ -4855,6 +4857,24 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # app is terminating
                 return
 
+        # also wait for the actual profile to be fully loaded in the
+        # background worker thread - ui.initialized alone is not enough,
+        # the profile can still be a placeholder/empty one at this point,
+        # which builds an empty execution graph (0 functors) once activated
+        target_name = getattr(self, "_autostart_target_name", None)
+        if target_name:
+            max_wait = 10.0  # seconds
+            waited = 0.0
+            while waited < max_wait:
+                profile = gremlin.shared_state.current_profile
+                if profile and profile.name == target_name:
+                    break
+                syslog.info(f"autostart waiting for profile [{target_name}] to finish loading...")
+                time.sleep(0.1)
+                waited += 0.1
+                if gremlin.shared_state.terminating:
+                    return
+
         syslog.info("autostart starting")
 
         el = gremlin.event_handler.EventListener()
@@ -5254,8 +5274,20 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _force_close(self):
         """Forces the closure of the program."""
+        self._really_quitting = True
         self.ui.tray_icon.hide()
         self.close()
+        # safety net: some background threads may not release the process
+        # promptly after quit(), leaving it alive in Task Manager with no
+        # window or tray icon. External watchdog guarantees termination.
+        pid = os.getpid()
+        try:
+            subprocess.Popen(
+                ["cmd", "/c", f"timeout /t 5 /nobreak >nul & taskkill /F /PID {pid}"],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        except Exception:
+            pass
 
     def _get_device_profile(self, device):
         """Returns a profile for the given device.
@@ -5771,6 +5803,7 @@ if __name__ == "__main__":
 
     # application style and css
     # app.setStyle("Fusion")
+    app.setQuitOnLastWindowClosed(False)  # don't quit when the main window is hidden (minimize to tray)
     app.setStyle(gremlin.ui.ui_common.GexAppStyle())
     app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
 

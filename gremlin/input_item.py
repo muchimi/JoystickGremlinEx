@@ -2678,6 +2678,14 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         assert isinstance(input_item, InputItem), "invalid input item"
 
+        if self._action_icon_widget is None or not Shiboken.isValid(self._action_icon_widget):
+            # hosting widget was already torn down (e.g. its container was
+            # deleted) while this icon refresh was queued on the UI thread.
+            # It can be gone in two ways: None on the Python side, or the
+            # underlying C++ Qt object already deleted (Shiboken invalid),
+            # which raises "Internal C++ object already deleted" on setWidget.
+            return
+
         widget, layout = gremlin.ui.ui_common.getGridContainer()
         layout.addWidget(QtWidgets.QWidget(), 0, 0)
         layout.setColumnStretch(0, 1)  # right align the icons
@@ -2765,6 +2773,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def clear_action_icon(self, input_item, action_to_remove):
         """delete an action icon"""
+
+        if self._action_icon_widget is None or not Shiboken.isValid(self._action_icon_widget):
+            return
 
         widget, layout = gremlin.ui.ui_common.getGridContainer()
         layout.addWidget(QtWidgets.QWidget(), 0, 0)
@@ -12360,6 +12371,11 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         verbose = gremlin.config.Configuration().verbose_mode_ui
 
         if index != -1:
+            if self._input_item_list_view is None:
+                # the input list view was not (re)built yet - this can happen
+                # when a queued re-selection fires during a mode change before
+                # the list has been reconstructed; nothing to select yet
+                return
             if verbose:
                 syslog.info(f"DeviceTabWidget: select input index [{index}]")
             self._input_item_list_view.selectItemAt(index, force=force, emit=emit)
