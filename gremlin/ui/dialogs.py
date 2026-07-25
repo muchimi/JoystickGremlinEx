@@ -445,7 +445,9 @@ class OptionsDialog(ui_common.BaseDialogUi):
 
         :param parent the parent of this widget
         """
-        super().__init__(self.__class__.__name__, parent)
+
+        # default size is 1/3 of the screen
+        super().__init__(self.__class__.__name__, width=-1, height=-1, parent=parent)
 
         # Actual configuration object being managed
         self._reload_needed = False  # true if UI reload is needed on option changes
@@ -453,7 +455,6 @@ class OptionsDialog(ui_common.BaseDialogUi):
 
         preferred = self.preferredSize()
         self.resize(preferred)  # read default size or size hint
-        self.setMinimumWidth(400)
         self._max_content_width = 800
 
         self._custom_host_name = self.config.custom_host_name  # to detect changes
@@ -742,7 +743,7 @@ class OptionsDialog(ui_common.BaseDialogUi):
         # Default action selection
 
         self.default_action_dropdown = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
-        self.default_action_widget, self.default_action_layout = gremlin.ui.ui_common.getHContainer(self.default_action_dropdown, "Default Action:")
+        self.default_action_widget, self.default_action_layout = gremlin.ui.ui_common.getHContainer([self.default_action_dropdown,("",100)], "Default Action:")
         self._init_action_dropdown()
 
         # Macro axis polling rate

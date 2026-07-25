@@ -5661,6 +5661,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         # add client name to title bar if remote mode is enabled
         config = gremlin.config.Configuration()
+
+        if config.enable_log_version:
+            the_title = f"{the_title} [V]"
+
         if config.remoteEnabled():
             # add client name as a reference to title bar if a remote mode is enabled
             the_title = f"{the_title} [{gremlin.remote.remote_client.getClientName()}]"

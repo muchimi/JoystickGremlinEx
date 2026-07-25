@@ -82,9 +82,7 @@ class Configuration(QtCore.QObject):
         self._profile_fname = None  # current profile to use for the conig
         self._profile_config_fname = None  # config file specific to the profile
         self._app_path = None  # path where data is stored
-        self._profile_path = os.path.join(
-            os.getenv("userprofile"), "Joystick Gremlin Ex"
-        )  # default user profile
+        self._profile_path = self.data_path()
         self._visuals_hidden_map = None
 
         self._midi_enabled = None
@@ -229,6 +227,11 @@ class Configuration(QtCore.QObject):
                 gremlin.version.APPLICATION_BASE
             )  # can be blank
         return f"{app_main}_{app_base}" if app_base else app_main
+
+    def versionString(self):
+        """returns the version string for the current application"""
+        return self._clean_version()
+
 
     def data_path(self):
         """returns a path to the data folder for the current application version - this folder is located in the user profile
@@ -395,12 +398,28 @@ class Configuration(QtCore.QObject):
         el = gremlin.event_handler.EventListener()
         el.config_option_changed.emit()
 
+    def getTemporaryFile(self, ext=None):
+        """gets a temporary file - the temporary file location is in the user folder """
+        data_path = self.data_path()
+        user_profile = os.path.join(data_path, "temp")
+        os.makedirs(user_profile, exist_ok=True)
+        tmp_file = os.path.join(user_profile, gremlin.util.get_guid())
+        if ext:
+            if not ext.startswith("."):
+                tmp_file += "."
+            tmp_file += ext
+        return tmp_file
+
     def _save_ui(self, fname: str = None, save_profile: bool = False):
         """Writes the version specific configuration file to disk."""
         if self._lock:
             # ignore concurrent save requests (technically not necessary due to UI thread placement)
             return
-        tmp = gremlin.util.getTemporaryFile(".json")
+        data_path = self.data_path()
+        tmp = os.path.join(data_path, "temp")
+        os.makedirs(tmp, exist_ok=True)
+
+        tmp = self.getTemporaryFile(".json")
         is_error = False
         try:
             self._lock = True

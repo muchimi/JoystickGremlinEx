@@ -6812,6 +6812,9 @@ class ActionSetView(AbstractView):
         icon_size=24,
         interact_callback: Callable = None,
         index : int = -1,
+        title_widgets : list[QtWidgets.QWidget] = [],
+        header_widgets: list[QtWidgets.QWidget] = [],
+        tail_widgets: list[QtWidgets.QWidget] = [],
         parent=None,
     ):
         """
@@ -6829,6 +6832,9 @@ class ActionSetView(AbstractView):
         :param action_interact_callback: optional callback when the user interacts with an action sends (action: Action, interaction: Interactions)
         :param action_interact_enabled: whether interactions are enabled for actions in this view
         :param index: the index of the item being interacted with
+        :param title_widgets: list of widgets to place in the title area of the action set view
+        :param header_widgets: list of widgets to place in the header area of the action set view
+        :param tail_widgets: list of widgets to place in the tail area of the action set view
 
         """
 
@@ -6860,24 +6866,18 @@ class ActionSetView(AbstractView):
         self.view_type = view_type
         self._main_layout = QtWidgets.QVBoxLayout(self)
 
+        # header widgets
+        for widget in header_widgets:
+            self._main_layout.addWidget(widget)
+
         self.label = label
         self._selected = False  # true if the object is selected
         title_widget = None
 
         if self.label:
             title_widget = gremlin.ui.ui_common.QStepTile(self.label, icon=icon)
-            # if icon:
-            #     title = gremlin.ui.ui_common.QIconLabel(icon, icon_size=icon_size, text=f"{self.label}:")
-            # else:
-            #     title = QtWidgets.QLabel(f"{self.label}")
         elif icon:
             title_widget = gremlin.ui.ui_common.QStepTile(icon=icon)
-            #   title = gremlin.ui.ui_common.QIconLabel(icon, icon_size=icon_size)
-
-        # if title:
-        #     self._main_layout.addWidget(title)
-
-
 
         self.setObjectName(f"ActionSetView: {'n/a' if label is None else label}")
 
@@ -6889,21 +6889,30 @@ class ActionSetView(AbstractView):
         self._action_widget, self._action_layout = gremlin.ui.ui_common.getVContainer()
 
         # Only show edit controls in the basic tab
+        widgets = []
         self._main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
         if self.view_type == ContainerViewTypes.Action:
+            # built the action title bar
+            if title_widget:
+                widgets.append(title_widget) # title widget
+            for widget in title_widgets:
+                widgets.append(widget) # other passed title widgets
+
             if self._has_interactions:
-                widget =self._create_edit_controls()
+                widget =self._create_edit_controls() # move controls
                 if widget:
-                    if title_widget:
-                        title_container = gremlin.ui.ui_common.getHContainer([title_widget,("",100),widget], widget_only=True) if title_widget else None
-                        self._main_layout.addWidget(title_container)
-                    else:
-                        self._main_layout.addWidget(widget, alignment=QtCore.Qt.AlignRight)
-            else:
-                if title_widget:
-                    self._main_layout.addWidget(title_widget)
+                    widgets.append(("", 100)) # flush control widget all the way right
+                    widgets.append(widget)
+
+            if widgets:
+                title_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True, align_top=True) if widgets else None
+                self._main_layout.addWidget(title_container)
 
         self._main_layout.addWidget(self._action_widget)
+
+        # tail widgets
+        for widget in tail_widgets:
+            self._main_layout.addWidget(widget)
 
         # Only permit adding actions from the basic tab and if the tab is
         # not associated with a vJoy device
@@ -8420,6 +8429,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         interact_callback: Callable = None,
         allowed_interactions: list[Interactions] = [],
         index : int = -1,
+        title_widgets: list[QtWidgets.QWidget] = [],
+        header_widgets: list[QtWidgets.QWidget] = [],
+        tail_widgets: list[QtWidgets.QWidget] = [],
     ) -> gremlin.input_item.ActionSetView:
         """Adds an action widget to the action set (each step in the sequence is its own action set)
         :param action_set_data: data of the actions which form the action set
@@ -8428,6 +8440,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         :param interact_callback callback function for interaction events
         :param interact_enable flag to enable interaction
         :param index the index of the action set within the container
+        :param header_widgets list of widgets to place in the header of the action set view
+        :param tail_widgets list of widgets to place in the tail of the action set view
 
         :return wrapped widget
         """
@@ -8453,6 +8467,9 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             icon_size=icon_size,
             interact_callback=interact_callback,
             index = index,
+            title_widgets=title_widgets,
+            header_widgets=header_widgets,
+            tail_widgets=tail_widgets,
             parent=self,
         )
 

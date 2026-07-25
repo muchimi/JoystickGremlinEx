@@ -10605,7 +10605,16 @@ class QRememberDialog(QtWidgets.QDialog):
             size = QtCore.QSize(window_size[0], window_size[1])
             return size.expandedTo(hint_size)
 
-        return hint_size
+        if self._default_height == -1 or self._default_width == -1:
+            # size to a third of the display by default
+            screen_size = QtWidgets.QApplication.primaryScreen().availableGeometry().size()
+            if self._default_width == -1:
+                self._default_width = max(400, screen_size.width() // 3)
+            if self._default_height == -1:
+                self._default_height = max(300, screen_size.height() // 3)
+
+
+        return QtCore.QSize(self._default_width, self._default_height)
 
     def showEvent(self, event):
         """occurs when window is displayed (made visible)"""
@@ -10701,12 +10710,12 @@ class BaseDialogUi(QRememberDialog):
     # Signal emitted when the dialog is being closed
     closed = QtCore.Signal()
 
-    def __init__(self, key, parent=None):
+    def __init__(self, key, width=400, height=300, parent=None):
         """Creates a new options UI instance.
 
         :param parent the parent of this widget
         """
-        super().__init__(key, parent=parent)
+        super().__init__(key, width=width, height=height, parent=parent)
 
     def closeEvent(self, event):
         """Closes the calibration window.
@@ -15996,6 +16005,11 @@ class QInteractWidget(QtWidgets.QWidget):
         self.data = data
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.remove_widget = None
+        self.step_up_widget = None
+        self.step_down_widget = None
+        self.step_top_widget = None
+        self.step_bottom_widget = None
 
         widgets = []
 
@@ -16031,17 +16045,38 @@ class QInteractWidget(QtWidgets.QWidget):
 
         self.main_layout.addWidget(widget)
 
-    def update(self, index : int = 0, max_index : int = 0):
+        self._update_buttons() # update button state based on index
+
+
+    @property
+    def deleteEnabled(self) -> bool:
+        """Return whether the delete button is enabled."""
+        if self.remove_widget:
+            return self.remove_widget.isEnabled()
+        return False
+
+    @deleteEnabled.setter
+    def deleteEnabled(self, value: bool):
+        if self.remove_widget:
+            self.remove_widget.setEnabled(value)
+
+
+    def updateIndex(self, index : int = 0, max_index : int = 0):
         self._index = index
         self._max_index = max_index
-        self.setEnabled(self._index > 0 or self._index < self._max_index - 1)
         self._update_buttons()
 
     def _update_buttons(self) -> None:
-        self.step_up_widget.setEnabled(self._index > 0)
-        self.step_down_widget.setEnabled(self._index < self._max_index - 1)
-        self.step_top_widget.setEnabled(self._index > 0)
-        self.step_bottom_widget.setEnabled(self._index < self._max_index - 1)
+        """Update the enabled state of the move buttons based on the current index and max index."""
+        self.setEnabled(self._index > 0 or self._index < self._max_index - 1)
+        if self.step_up_widget:
+            self.step_up_widget.setEnabled(self._index > 0)
+        if self.step_down_widget:
+            self.step_down_widget.setEnabled(self._index < self._max_index - 1)
+        if self.step_top_widget:
+            self.step_top_widget.setEnabled(self._index > 0)
+        if self.step_bottom_widget:
+            self.step_bottom_widget.setEnabled(self._index < self._max_index - 1)
 
     def _handle_delete_step(self):
         self.interacted.emit(Interactions.Delete)

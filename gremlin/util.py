@@ -2463,14 +2463,9 @@ def compare_guid(id1, id2) -> bool:
 
 
 def getTemporaryFile(ext=None):
-    """gets a temporary file"""
-    tmp_file = os.path.join(userprofile_path(), get_guid())
-    if ext:
-        if not ext.startswith("."):
-            tmp_file += "."
-        tmp_file += ext
-    return tmp_file
-
+    """gets a temporary file - the temporary file location is in the user folder """
+    config = gremlin.config.Configuration()
+    return config.getTemporaryFile(ext)
 
 def compare_float_lists(l1: list, l2: list):
     """compares two lists of floats - returns True if the lists are different"""

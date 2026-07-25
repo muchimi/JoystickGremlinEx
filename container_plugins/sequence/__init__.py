@@ -196,25 +196,29 @@ class StepOptions:
 class StepOptionsWidget(QtWidgets.QWidget):
     """widget to manage step options"""
 
-    def __init__(self, action_data: SequenceContainer, options: StepOptions, parent=None):  # noqa: F821
+    def __init__(self, action_data: SequenceContainer, options: StepOptions, index : int, parent=None):  # noqa: F821
         super().__init__(parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self.options = options
+        self.options = options # data block for the execution options
         self.action_data = action_data
+        self.index = index
 
         modes = [
             ("No Repeat", SequenceRepeatMode.Normal),  # no repeat (default)
-            ("Repeat (fixed)", SequenceRepeatMode.Loop),  # repeat fixed count
+            ("Repeat (roundrobin)", SequenceRepeatMode.Loop),  # repeat fixed count
             ("Repeat (random)", SequenceRepeatMode.Random),  # random repeat
         ]
 
         margin = 0
 
-        self.repeat_mode_widget = gremlin.ui.ui_common.QDataComboBox(source=modes, value=options.mode, auto_adjust=True, callback=self._handle_mode_changed)
+        widgets = []
+        for label, mode in modes:
+            widget = gremlin.ui.ui_common.QDataRadioButton(label=label, data=mode, value = mode == options.mode, callbackEx=self._handle_mode_changed)
+            widgets.append(widget)
 
-        self.repeat_mode_widget.autoSize()
+        self.repeat_mode_widget =  gremlin.ui.ui_common.getHContainer(widgets, "Repeat Mode:", widget_only=True)
 
         self.repeat_count_widget = gremlin.ui.ui_common.QIntLineEdit(
             value=options.repeat_count,
@@ -285,7 +289,6 @@ class StepOptionsWidget(QtWidgets.QWidget):
         )
 
         widgets = [
-            "Repeat Mode:",
             self.repeat_mode_widget,
             self.container_repeat_widget,
         ]
@@ -306,12 +309,12 @@ class StepOptionsWidget(QtWidgets.QWidget):
         auto_max_visible = False
 
         match self.options.mode:
-            case "normal":
+            case SequenceRepeatMode.Normal:
                 pass
-            case "repeat":
+            case SequenceRepeatMode.Loop:
                 repeat_visible = True
                 delay_visible = True
-            case "random":
+            case SequenceRepeatMode.Random:
                 repeat_visible = True
                 delay_visible = True
 
@@ -339,9 +342,10 @@ class StepOptionsWidget(QtWidgets.QWidget):
         self.options.repeat_count = value
 
     @QtCore.Slot()
-    def _handle_mode_changed(self, data):
-        self.options.mode = data
-        self._update_widgets()
+    def _handle_mode_changed(self,widget, checked):
+        if checked:
+            self.options.mode = widget.data
+            self._update_widgets()
 
     @QtCore.Slot(float)
     def _handle_repeat_delay_min_changed(self, value):
@@ -396,7 +400,6 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self._lock = threading.Lock()
 
         # list of step widgets in the UI
-        self.option_widget_map = {}
         self._widget_map = {}
 
         self.widget_layout = QtWidgets.QHBoxLayout()
@@ -647,11 +650,6 @@ class SequenceContainerWidget(AbstractContainerWidget):
             gremlin.util.delete_widget(widget)
         self._widget_map.clear()
 
-        # cleanup options for each step
-        for widget in self.option_widget_map.values():
-            gremlin.util.delete_widget(widget)
-        self.option_widget_map.clear()
-
         gremlin.util.clear_layout(self.action_set_layout)
 
         syslog.info("Updating action sets in sequence container")
@@ -661,9 +659,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
             # options widget
 
             options: StepOptions = self.container.getOptions(index)
-            options_widget = StepOptionsWidget(self.container, options)
-            self.action_set_layout.addWidget(options_widget)
-            self.option_widget_map[index] = options_widget
+            options_widget = StepOptionsWidget(self.container, options, index)
 
             # action set actions
             widget = self._create_action_set_widget(action_set,
@@ -671,7 +667,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
                                                     ContainerViewTypes.Action,
                                                     interact_callback = self._handle_interaction,
                                                     allowed_interactions = self.container.interaction_types,
-                                                    index = index
+                                                    index = index,
+                                                    title_widgets = [options_widget]
                                                                                                                                )
             self._widget_map[action_set] = widget
             self.action_set_layout.addWidget(widget)
