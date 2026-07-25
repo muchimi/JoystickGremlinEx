@@ -29,14 +29,18 @@ import time
 
 from typing import Callable
 
+from torch.nn.modules import container
 
+
+import container_plugins
 import gremlin.keyboard
 import gremlin.profile
 import gremlin.shared_state
-from gremlin.types import MergeAxisOperation, PlaybackMode, PluginVariableType, DeviceCategory, DeviceType
+from gremlin.types import KeyboardOutputMode, MergeAxisOperation, PlaybackMode, PluginVariableType, DeviceCategory, DeviceType, MouseButton
 from uuid import UUID
 from PySide6 import QtCore
 from frozendict import frozendict
+from gremlin.input_item import ActionSet, ActionSets
 
 
 import gremlin.ui.mode_device
@@ -5175,6 +5179,112 @@ class Profile:
 
         tree.write(save_fname, encoding="utf-8", xml_declaration=True, pretty_print=True)
         return save_fname
+
+
+    def convertMacroToSequence(self):
+        """ converts macro entries to sequence container entries """
+        fname = self.profile_file
+        if not os.path.isfile(fname):
+            return False
+
+        from gremlin.types import PlayMode
+        import gremlin.tts
+        import gremlin.ui.ui_common
+        from PySide6 import QtWidgets
+
+        tree = etree.parse(fname)
+        root = tree.getroot()
+
+        nodes = list(root.xpath("//macro"))
+
+        if not nodes:
+            gremlin.ui.ui_common.MessageBox(informative_text="No Macro entries found in the profile.")
+            return None
+
+        result = gremlin.ui.ui_common.ConfirmBox(informative_text ="Do you want to convert all Macro entries to sequence containers??\nThis will save to a new profile.")
+        if not result:
+            return None
+
+        # get a profile to save to
+        save_fname, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Save Profile As...", gremlin.shared_state.data_path, "XML files (*.xml)")
+        if not save_fname:
+            return None
+
+        macro_actions = []
+        def _apply_macro(action, extra_data: dict = None) -> bool:
+            nonlocal macro_actions
+            macro_actions.append(action)
+            return True
+
+        # get all macro entries in the current profile
+        self.filter_actions("macro", _apply_macro)
+
+
+
+        plugin_manager = gremlin.plugin_manager.ActionPlugins()
+        container_plugins = gremlin.plugin_manager.ContainerPlugins()
+
+
+
+        from action_plugins.macro import Macro
+        from action_plugins.map_to_vjoy import VjoyRemap
+        from action_plugins.map_to_keyboard_ex import MapToKeyboardEx
+        from action_plugins.map_to_mouse_ex import MapToMouseEx
+        from action_plugins.map_to_state import MapToState
+        from container_plugins.sequence import SequenceContainer
+        import gremlin.macro
+
+
+        action : Macro
+        input_item_map = {}
+        for action in macro_actions:
+            input_item = action.input_item
+            if input_item not in input_item_map:
+                container : SequenceContainer = container_plugins.get_class("Sequence")(input_item=input_item)
+                input_item_map[input_item] = container
+                input_item.containers.append(container)
+            else:
+                container = input_item_map[input_item]
+
+
+            action_set = ActionSet()
+            container.add_action_set(action_set)
+            for macro_action in action.sequence:
+                if isinstance(macro_action, gremlin.macro.JoystickAction):
+                    new_action = VjoyRemap(container)
+                    new_action.vjoy_input_id = macro_action.input_id
+                    new_action.vjoy_value = macro_action.value
+                    match macro_action.input_type:
+                        case InputType.JoystickAxis:
+                            new_action.vjoy_axis = macro_action.axis
+                        case InputType.JoystickButton:
+                            new_action.vjoy_button = macro_action.button
+                    action_set.add_action(new_action)
+                elif isinstance(macro_action, gremlin.macro.KeyAction):
+                    new_action = MapToKeyboardEx(container)
+                    key = macro_action.key
+                    new_action.keys.append(key)
+                    new_action.mode = KeyboardOutputMode.Hold
+                    action_set.add_action(new_action)
+                elif isinstance(macro_action, gremlin.macro.MouseButtonAction):
+                    new_action = MapToKeyboardEx(container)
+                    button : MouseButton = macro_action.button
+                    key =  key = gremlin.keyboard.key_from_mousebutton(button.value)
+                    new_action.keys.append(key)
+                    action_set.add_action(new_action)
+                elif isinstance(macro_action, gremlin.macro.MouseMotionAction):
+                    new_action = MapToMouseEx(container)
+                    x = macro_action.x
+                    y = macro_action.y
+                    new_action.mouse_x = x
+                    new_action.mouse_y = y
+                    action_set.add_action(new_action)
+                elif isinstance(macro_action, gremlin.macro.StateAction):
+                    new_action = MapToState(container)
+                    state = macro_action.state
+                    new_action.state = state
+                    action_set.add_action(new_action)
+
 
 
 
