@@ -26,7 +26,7 @@ from PySide6.QtWidgets import QLayout, QMainWindow, QMainWindow, QVBoxLayout, QW
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QEvent, QSize
 from PySide6.QtGui import QPixmap, QPainter, QIcon, QResizeEvent
 import collections
-from typing import Callable
+from typing import Callable, Any
 
 
 import gremlin.config
@@ -40,7 +40,7 @@ import gremlin.joystick_handling
 import gremlin.keyboard
 import gremlin.shared_state
 import gremlin.types
-from gremlin.types import SyncMode, CallbackMode, EventSourceType
+from gremlin.types import SyncMode, CallbackMode, EventSourceType, Interactions
 from PySide6.QtCore import (
     Qt,
     QSize,
@@ -661,6 +661,23 @@ class Color:
             .QLabel {{
                 border: none; background-color: transparent;
             }}
+            """
+        return css
+
+    @staticmethod
+    def cssTitleBox():
+        background_color = Color.normalColor()
+        foreground_color = Color.backgroundColor()
+        css = f"""
+            .QLabel {{
+                border: 0px solid {background_color};
+                background-color: {background_color};
+                color: {foreground_color};
+                border-radius: 6px;
+                font: bold 14px;
+                padding: 4px;
+            }}
+
             """
         return css
 
@@ -10936,6 +10953,9 @@ def getHContainer(
                 stretch_factor = None
                 if item is None:
                     continue  # skip blanks or empty widgets
+                if isinstance(item, tuple):
+                    # data is a (widget, stretch) tuple
+                    item, stretch_factor = item
                 if isinstance(item, str):
                     if item == "|":
                         # separator
@@ -10947,9 +10967,7 @@ def getHContainer(
                         item = QtWidgets.QLabel(item)
                         if font:
                             item.setFont(font)
-                elif isinstance(item, tuple):
-                    # data is a (widget, stretch) tuple
-                    item, stretch_factor = item
+
 
                 if use_vcontainers:
                     item, _ = getVContainer(item)
@@ -15943,3 +15961,125 @@ class GexAppStyle(QProxyStyle):
 
         # default style
         super().drawComplexControl(control, option, painter, widget)
+
+
+class QInteractWidget(QtWidgets.QWidget):
+    """ interact widget """
+
+    interacted = QtCore.Signal(Interactions)
+
+    def __init__(self,
+                  index : int = 0,
+                  max_index : int = 0,
+                  data : Any = None,
+                  size : int = 24,
+                  allowed_interactions: list[Interactions] = None,
+                  callback : Callable[[Interactions, int, Any], None] = None,
+                  parent=None):
+        """
+        Initialize the interact widget.
+
+        :param index: the current index of the item
+        :param max_index: the maximum number of items
+        :param data: the associated data for the item
+        :param size: the size of the interaction buttons
+        :param allowed_interactions: the list of allowed interactions
+        :param callback: the callback function to handle interactions, handler parameters include the interaction clicked, the index, and whatever data was passed to the control (Interactions, index: int, data : Any)
+        :param parent: the parent widget
+        """
+        super().__init__(parent)
+
+        self._index = index # current index of the item
+        self._max_index = max_index # max number of items
+        self._interactions = allowed_interactions
+        self._interact_callback = callback
+        self.data = data
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        widgets = []
+
+        if self._interactions is None or Interactions.Delete in self._interactions:
+            self.remove_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._handle_delete_step, data=data)
+            self.remove_widget.setFixedSize(size, size)
+            widgets.append(self.remove_widget)
+
+        if self._interactions is None or Interactions.Up in self._interactions:
+            self.step_up_widget = gremlin.ui.ui_common.Buttons.getMoveUpWidget(callback=self._handle_move_step_up, data=data)
+            self.step_up_widget.setFixedSize(size, size)
+            widgets.append(self.step_up_widget)
+
+        if self._interactions is None or Interactions.Down in self._interactions:
+            self.step_down_widget = gremlin.ui.ui_common.Buttons.getMoveDownWidget(callback=self._handle_move_step_down, data=data)
+            self.step_down_widget.setFixedSize(size, size)
+            widgets.append(self.step_down_widget)
+
+        if self._interactions is None or Interactions.Top in self._interactions:
+            self.step_top_widget = gremlin.ui.ui_common.Buttons.getMoveTopWidget(callback=self._handle_move_step_top, data=data)
+            self.step_top_widget.setFixedSize(size, size)
+            widgets.append(self.step_top_widget)
+
+        if self._interactions is None or Interactions.Bottom in self._interactions:
+            self.step_bottom_widget = gremlin.ui.ui_common.Buttons.getMoveBottomWidget(callback=self._handle_move_step_bottom, data=data)
+            self.step_bottom_widget.setFixedSize(size, size)
+            widgets.append(self.step_bottom_widget)
+
+        move_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+
+        widget = gremlin.ui.ui_common.getVContainer([move_container], widget_only=True)
+        self.has_edit_controls = len(widgets) > 0
+
+        self.main_layout.addWidget(widget)
+
+    def update(self, index : int = 0, max_index : int = 0):
+        self._index = index
+        self._max_index = max_index
+        self.setEnabled(self._index > 0 or self._index < self._max_index - 1)
+        self._update_buttons()
+
+    def _update_buttons(self) -> None:
+        self.step_up_widget.setEnabled(self._index > 0)
+        self.step_down_widget.setEnabled(self._index < self._max_index - 1)
+        self.step_top_widget.setEnabled(self._index > 0)
+        self.step_bottom_widget.setEnabled(self._index < self._max_index - 1)
+
+    def _handle_delete_step(self):
+        self.interacted.emit(Interactions.Delete)
+        if self._interact_callback:
+            self._interact_callback(Interactions.Delete, self._index, self.data)
+
+    def _handle_move_step_up(self):
+        self.interacted.emit(Interactions.Up)
+        if self._interact_callback:
+            self._interact_callback(Interactions.Up, self._index, self.data)
+
+    def _handle_move_step_down(self):
+        self.interacted.emit(Interactions.Down)
+        if self._interact_callback:
+            self._interact_callback(Interactions.Down, self._index, self.data)
+
+    def _handle_move_step_top(self):
+        self.interacted.emit(Interactions.Top)
+        if self._interact_callback:
+            self._interact_callback(Interactions.Top, self._index, self.data)
+
+    def _handle_move_step_bottom(self):
+        self.interacted.emit(Interactions.Bottom)
+        if self._interact_callback:
+            self._interact_callback(Interactions.Bottom, self._index, self.data)
+
+
+
+class QStepTile(QtWidgets.QWidget):
+    """ step title widget """
+    def __init__(self, label: str = None, icon=None, parent=None):
+        super().__init__(parent)
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.setStyleSheet(Color.cssTitleBox())
+        if icon:
+            self.icon_label = gremlin.ui.ui_common.QIconLabel(icon, icon_size=16, text=label)
+            self.main_layout.addWidget(self.icon_label)
+        else:
+            if label:
+                self.label = QtWidgets.QLabel(label)
+                self.main_layout.addWidget(self.label)

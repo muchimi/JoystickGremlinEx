@@ -26,7 +26,7 @@ import time
 import lxml.etree
 import traceback
 import collections
-from typing import Callable
+from typing import Callable, Any
 import html
 import gremlin
 import gremlin.config
@@ -4233,6 +4233,8 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     # by default the container works with either axis or momentary inputs
     axis_only = False
 
+    interaction_types : list[Interactions] = [] # list of allowed interactions for derived containers, if empty, the container does not allow interactions on actions sets
+
     def __init__(self, parent : InputItem | "gremlin.profile_graph.ProfileContainerNode", node=None, custom_parse_callback : Callable =None, custom_generate_callback: Callable =None, custom_action_sets: bool = False):
         """Creates a new instance.
 
@@ -4270,6 +4272,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.actionsetGenerateCallback = custom_generate_callback  # callback to use when generating XML for the action set, returns an XML node
         self.actionsetCustomParseCallback = None  # callback for the complete action set parsing
         self.definition_mode = self.get_mode()
+
 
         self._container_changed_callbacks = []  # list of callbacks called when this container changes
 
@@ -4602,6 +4605,13 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         if self._action_sets is None:
             self._action_sets = ActionSets(self)
         return self._action_sets
+
+    @property
+    def action_set(self) -> "ActionSet":
+        """gets the first action set for this container"""
+        if self.action_sets:
+            return self.action_sets[0]
+        return None
 
     def createActionSet(self, action_list, description: str = None, data=None) -> ActionSet:  # noqa: F405
         """creates an action set from a list of actions"""
@@ -6648,11 +6658,10 @@ class ActionSetsView(AbstractView):
             view_type=view_type,
             icon=icon,
             icon_size=icon_size,
-            interaction_callback=self._interaction_callback,
+            interact_callback=self._interaction_callback,
             parent=self,
         )
 
-        # action_set_view.interacted.connect(lambda x: self._handle_interaction(action_set_view, x))
 
         return action_set_view
 
@@ -6801,7 +6810,8 @@ class ActionSetView(AbstractView):
         view_type=ContainerViewTypes.Action,
         icon=None,
         icon_size=24,
-        interaction_callback: Callable = None,
+        interact_callback: Callable = None,
+        index : int = -1,
         parent=None,
     ):
         """
@@ -6814,14 +6824,18 @@ class ActionSetView(AbstractView):
         :param view_type: the view type, defaults to Action, can be Condition or Virtual button
         :param icon : optional icon to display
         :param icon_size: optional icon size in pixels
-        :param interaction_callback: optional callback when the user interacts with the view sends (action_set: ActionSet, interaction: Interactions)
+        :param interact_callback: optional callback when the user interacts with the view sends (action_set: ActionSet, interaction: Interactions)
+        :param interact_enabled: whether interactions are enabled for this view
+        :param action_interact_callback: optional callback when the user interacts with an action sends (action: Action, interaction: Interactions)
+        :param action_interact_enabled: whether interactions are enabled for actions in this view
+        :param index: the index of the item being interacted with
 
         """
 
         assert isinstance(profile, gremlin.base_profile.Profile), "invalid profile"
         assert isinstance(container, AbstractContainer), "invalid container"
         assert isinstance(model, ActionSet), "invalid model"
-        assert isinstance(interaction_callback, Callable) if interaction_callback is not None else True, "invalid interaction callback"
+        assert isinstance(interact_callback, Callable) if interact_callback is not None else True, "invalid interaction callback"
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
@@ -6831,51 +6845,39 @@ class ActionSetView(AbstractView):
 
         self.pushSuspended()  # supend redraw
 
-        self._interaction_callback = interaction_callback
+        self._interact_callback = interact_callback
+        self._has_interactions = bool(container.interaction_types)
+
+        self._index = index # index of the action set
 
         self._redraw_lock = False
         self.profile = profile
         self.container = container  # owning container
+
         self._widget_map = {}  # holds action widgets that were created
 
         self.has_edit_controls = False  # assume no edit controls
         self.view_type = view_type
         self._main_layout = QtWidgets.QVBoxLayout(self)
 
-        # self._main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine(color=gremlin.ui.ui_common.Color.grayColor()))
-        # self._main_layout.addWidget(QtWidgets.QLabel("ActionSetView:"))
-
-        self.allowed_interactions = container.interaction_types
         self.label = label
         self._selected = False  # true if the object is selected
-        title = None
+        title_widget = None
 
         if self.label:
-            if icon:
-                title = gremlin.ui.ui_common.QIconLabel(icon, icon_size=icon_size, text=f"{self.label} action:")
-            else:
-                title = QtWidgets.QLabel(f"{self.label} action:")
+            title_widget = gremlin.ui.ui_common.QStepTile(self.label, icon=icon)
+            # if icon:
+            #     title = gremlin.ui.ui_common.QIconLabel(icon, icon_size=icon_size, text=f"{self.label}:")
+            # else:
+            #     title = QtWidgets.QLabel(f"{self.label}")
         elif icon:
-            title = gremlin.ui.ui_common.QIconLabel(icon, icon_size=icon_size)
+            title_widget = gremlin.ui.ui_common.QStepTile(icon=icon)
+            #   title = gremlin.ui.ui_common.QIconLabel(icon, icon_size=icon_size)
 
-        if title:
-            self._main_layout.addWidget(title)
+        # if title:
+        #     self._main_layout.addWidget(title)
 
-        left_panel, left_layout = gremlin.ui.ui_common.getVContainer()
-        right_panel, right_layout = gremlin.ui.ui_common.getVContainer()
-        right_panel.setMaximumWidth(0)  # use no space by default unless needed
 
-        action_container, action_layout = gremlin.ui.ui_common.getGridContainer()
-        action_layout.addWidget(left_panel, 0, 0)
-        action_layout.addWidget(right_panel, 0, 1)
-
-        add_action_container, add_action_layout = gremlin.ui.ui_common.getVContainer()
-
-        widgets = [action_container, add_action_container]
-        content_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
-
-        # self.collapsible_container.setContent(content_widget)
-        self._main_layout.addWidget(content_widget)
 
         self.setObjectName(f"ActionSetView: {'n/a' if label is None else label}")
 
@@ -6887,18 +6889,28 @@ class ActionSetView(AbstractView):
         self._action_widget, self._action_layout = gremlin.ui.ui_common.getVContainer()
 
         # Only show edit controls in the basic tab
+        self._main_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
         if self.view_type == ContainerViewTypes.Action:
-            self._create_edit_controls()
-            left_layout.addWidget(self._action_widget)
-            if self.has_edit_controls:
-                right_layout.addWidget(self.controls_widget)
-                right_panel.setMaximumWidth(34)
-                right_panel.setMinimumWidth(34)
-        else:
-            left_layout.addWidget(self._action_widget)
+            if self._has_interactions:
+                widget =self._create_edit_controls()
+                if widget:
+                    if title_widget:
+                        title_container = gremlin.ui.ui_common.getHContainer([title_widget,("",100),widget], widget_only=True) if title_widget else None
+                        self._main_layout.addWidget(title_container)
+                    else:
+                        self._main_layout.addWidget(widget, alignment=QtCore.Qt.AlignRight)
+            else:
+                if title_widget:
+                    self._main_layout.addWidget(title_widget)
+
+        self._main_layout.addWidget(self._action_widget)
 
         # Only permit adding actions from the basic tab and if the tab is
         # not associated with a vJoy device
+
+        self._widget_map = {}  # maps the model ID to the wrapper object created in the layout
+        self._stacked_widget = QtWidgets.QStackedWidget()
+        self._main_layout.addWidget(self._stacked_widget)
 
         if self.view_type == ContainerViewTypes.Action and container.get_device_type() != DeviceType.VJoy:
             input_type = None
@@ -6916,14 +6928,10 @@ class ActionSetView(AbstractView):
             self.action_selector.action_added.connect(self._add_action)
             self.action_selector.action_paste.connect(self._paste_action)
             widget = gremlin.ui.ui_common.getHContainer(self.action_selector, widget_only=True)
-            add_action_layout.addWidget(widget)
+            self._main_layout.addWidget(widget)
 
-        self._left_layout = left_layout
-        self._right_layout = right_layout
 
-        self._widget_map = {}  # maps the model ID to the wrapper object created in the layout
-        self._stacked_widget = QtWidgets.QStackedWidget()
-        self._left_layout.addWidget(self._stacked_widget)
+
 
         self._blank_widget = QtWidgets.QLabel("Please add an action to this container.")
         widget = gremlin.ui.ui_common.getVContainer(self._blank_widget, widget_only=True)
@@ -6950,8 +6958,8 @@ class ActionSetView(AbstractView):
         if value and not self._selected:
             self._selected = True
             background_color = gremlin.ui.ui_common.Color.selectedDockTabBackgroundColor()
-            self.setStyleSheet = f"background: {background_color};"
-        elif not value and not self._selected:
+            self.setStyleSheet(f"background: {background_color};")
+        elif not value and self._selected:
             self._selected = False
             self.setStyleSheet("")
 
@@ -6960,9 +6968,7 @@ class ActionSetView(AbstractView):
         if data.action_id not in self._widget_map:
             # create the action widget from the plugin
             widget = data.widget(data)
-
             widget.action_modified.connect(self.model.data_changed.emit)
-
             self._widget_map[data.action_id] = widget
         else:
             widget = self._widget_map[data.action_id]
@@ -6993,7 +6999,8 @@ class ActionSetView(AbstractView):
             self._action_widget = self._container_widget
 
             with QtCore.QSignalBlocker(self.model):  # .data_changed.blocked():
-                for action in self.model:
+                # max_index = len(self.model) - 1
+                for index, action in enumerate(self.model):
 
                     if verbose:
                         object_name = self.objectName()
@@ -7005,6 +7012,8 @@ class ActionSetView(AbstractView):
                     match self.view_type:
                         case ContainerViewTypes.Action:
                             widget = self._get_action_widget(action)
+                            # if self._action_interact_enabled:
+                            #     widget = InteractableActionWrapper(widget, self._action_interact_callback, index, max_index)
                             wrapped_widget = BasicActionWrapper(widget)
                             wrapped_widget.closed.connect(self._create_closed_cb(widget))
 
@@ -7033,8 +7042,6 @@ class ActionSetView(AbstractView):
     def hasAction(self, action : AbstractAction) -> bool:
         """Returns True if the given action has an associated widget."""
         return action.id in self._widget_map
-
-
 
 
     def _show_blank(self):
@@ -7173,46 +7180,68 @@ class ActionSetView(AbstractView):
 
         :param allowed_interactions list of allowed interactions
         """
-        palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColorConstants.Red)
         self.has_edit_controls = False
+        allowed_interactions = self.container.interaction_types
+        if allowed_interactions:
+            widget = gremlin.ui.ui_common.QInteractWidget(index = self._index,
+                                                          max_index = self.model.count() - 1,
+                                                          data = self,
+                                                          allowed_interactions= allowed_interactions,
+                                                          callback=self._handle_interaction,
+                                                          )
 
-        self.controls_widget = QtWidgets.QWidget()
-        self.controls_layout = QtWidgets.QVBoxLayout(self.controls_widget)
-        prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-        if Interactions.Up in self.allowed_interactions:
-            self.control_move_up = QtWidgets.QPushButton(load_icon(f"{prefix}button_up.png"), "")
-            self.control_move_up.clicked.connect(lambda: self._handle_interaction(Interactions.Up))
-            self.controls_layout.addWidget(self.control_move_up)
-            self.has_edit_controls = True
-        if Interactions.Down in self.allowed_interactions:
-            self.control_move_down = QtWidgets.QPushButton(load_icon(f"{prefix}button_down.png"), "")
-            self.control_move_down.clicked.connect(lambda: self._handle_interaction(Interactions.Down))
-            self.controls_layout.addWidget(self.control_move_down)
-            self.has_edit_controls = True
-        if Interactions.Delete in self.allowed_interactions:
-            self.control_delete = gremlin.ui.ui_common.Buttons.getDeleteWidget(
-                callback=lambda: self.interacted.emit(Interactions.Delete),
-                tooltip="Delete Actions",
-            )
-            self.controls_layout.addWidget(self.control_delete)
-            self.has_edit_controls = True
-        if Interactions.Edit in self.allowed_interactions:
-            self.control_edit = gremlin.ui.ui_common.Buttons.getEditWidget(callback=lambda: self._handle_interaction(Interactions.Edit))
-            self.controls_layout.addWidget(self.control_edit)
-            self.has_edit_controls = True
-        if Interactions.Copy in self.allowed_interactions:
-            self.control_copy = gremlin.ui.ui_common.Buttons.getCopyWidget(callback=lambda: self._handle_interaction(Interactions.Copy))
-            self.controls_layout.addWidget(self.control_copy)
-            self.has_edit_controls = True
+            if widget.has_edit_controls:
+                self.controls_widget = widget
+                self.has_edit_controls = True
+                return widget
 
-        self.controls_layout.addStretch(1)
+        return None
 
-    def _handle_interaction(self, interaction: Interactions):
-        """called when the user interacts with the UI"""
-        if self._interaction_callback:
-            self._interaction_callback(interaction)
-        self.interacted.emit(interaction)
+
+        # self.controls_widget = QtWidgets.QWidget()
+        # self.controls_layout = QtWidgets.QVBoxLayout(self.controls_widget)
+        # prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
+        # if Interactions.Up in self.allowed_interactions:
+        #     self.control_move_up = QtWidgets.QPushButton(load_icon(f"{prefix}button_up.png"), "")
+        #     self.control_move_up.clicked.connect(lambda: self._handle_interaction(Interactions.Up))
+        #     self.controls_layout.addWidget(self.control_move_up)
+        #     self.has_edit_controls = True
+        # if Interactions.Down in self.allowed_interactions:
+        #     self.control_move_down = QtWidgets.QPushButton(load_icon(f"{prefix}button_down.png"), "")
+        #     self.control_move_down.clicked.connect(lambda: self._handle_interaction(Interactions.Down))
+        #     self.controls_layout.addWidget(self.control_move_down)
+        #     self.has_edit_controls = True
+        # if Interactions.Delete in self.allowed_interactions:
+        #     self.control_delete = gremlin.ui.ui_common.Buttons.getDeleteWidget(
+        #         callback=lambda: self.interacted.emit(Interactions.Delete),
+        #         tooltip="Delete Actions",
+        #     )
+        #     self.controls_layout.addWidget(self.control_delete)
+        #     self.has_edit_controls = True
+        # if Interactions.Edit in self.allowed_interactions:
+        #     self.control_edit = gremlin.ui.ui_common.Buttons.getEditWidget(callback=lambda: self._handle_interaction(Interactions.Edit))
+        #     self.controls_layout.addWidget(self.control_edit)
+        #     self.has_edit_controls = True
+        # if Interactions.Copy in self.allowed_interactions:
+        #     self.control_copy = gremlin.ui.ui_common.Buttons.getCopyWidget(callback=lambda: self._handle_interaction(Interactions.Copy))
+        #     self.controls_layout.addWidget(self.control_copy)
+        #     self.has_edit_controls = True
+
+        # self.controls_layout.addStretch(1)
+
+    def _handle_interaction(self, interaction: Interactions, index : int, data = None):
+        """called when the user interacts with the UI
+
+        :param interaction the type of interaction
+        :param index the index of the item being interacted with
+        :param data optional data associated with the interaction
+        """
+        if self._interact_callback:
+            # use callback if available
+            self._interact_callback(interaction, index, data)
+        else:
+            # use event otherwise
+            self.interacted.emit(interaction, index, data)
 
 
 class ActionSelector(QtWidgets.QWidget):
@@ -7850,6 +7879,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         :param input_item: the input item to display containers for
         :param container: the specific container to display
+        :param interaction_callback: the callback function to handle interactions, handler parameters include the interaction clicked, the index, and whatever data was passed to the control (Interactions, index: int, data : Any)
         :param parent: the parent of the widget
         :param view: true if the container uses the new view model for its action sets
         """
@@ -7869,6 +7899,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self._action_widget_map = {}  # cache for action set [input_item] -> widget
         self._use_view = view
         self._container : AbstractContainer = None
+
 
         background_color = gremlin.ui.ui_common.Color.containerBackgroundColor()
         css = f"background-color:{background_color}"
@@ -7992,11 +8023,11 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.collapsible_widget.setTitleContentWidget(self._container_id_widget)  # container ID content goes on line 2
         self._update_container_ui(self.container)
 
-    def registerActionSetView(self, action_set, action_view):
+    def registerActionSetView(self, action_set : ActionSet, action_view : ActionSetView):
         self._widget_map[action_set] = action_view
 
 
-    def getActionSetView(self, action_set):
+    def getActionSetView(self, action_set : ActionSet):
         """gets the action set widget for the given action set"""
         return self._widget_map.get(action_set, None)
 
@@ -8386,12 +8417,18 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         view_type=ContainerViewTypes.Action,
         icon=None,
         icon_size=24,
-    ):
+        interact_callback: Callable = None,
+        allowed_interactions: list[Interactions] = [],
+        index : int = -1,
+    ) -> gremlin.input_item.ActionSetView:
         """Adds an action widget to the action set (each step in the sequence is its own action set)
         :param action_set_data: data of the actions which form the action set
         :param label the label:  to show in the title
         :param view_type visualization type
-        :
+        :param interact_callback callback function for interaction events
+        :param interact_enable flag to enable interaction
+        :param index the index of the action set within the container
+
         :return wrapped widget
         """
 
@@ -8414,10 +8451,11 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             view_type=view_type,
             icon=icon,
             icon_size=icon_size,
+            interact_callback=interact_callback,
+            index = index,
             parent=self,
         )
 
-        action_set_view.interacted.connect(lambda x: self._handle_interaction(action_set_view, x))
 
         # Store the view widget so we can use it for interactions later on
         self.registerActionSetView(action_set, action_set_view)
@@ -8853,6 +8891,37 @@ class TitleBar(QtWidgets.QWidget):
             self._close_callback()
 
 
+class InteractableActionWrapper(QtWidgets.QWidget):
+
+    def __init__(self, action_widget, action_interact_callback: Callable = None, index: int = 0, max_index: int = 0, parent=None):
+        super().__init__(parent)
+        self._action_interact_callback = action_interact_callback
+
+
+        self.action_widget = action_widget
+        self.action_data = action_widget.action_data
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+
+        self.interact_widget = gremlin.ui.ui_common.QInteractWidget(index, max_index, data = action_widget)
+        if self._action_interact_callback:
+            self.interact_widget.interacted.connect(self._action_interact_callback)
+
+        widgets = [
+            ("",100),
+            self.interact_widget
+        ]
+
+        container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+
+        self.main_layout.addWidget(container_widget)
+        self.main_layout.addWidget(action_widget)
+
+    def updateIndex(self, index: int, max_index: int):
+        self.interact_widget.updateIndex(index, max_index)
+
+
+
 class BasicActionWrapper(AbstractActionWrapper):
     """Wraps an action widget and displays the basic config dialog."""
 
@@ -8894,7 +8963,7 @@ class BasicActionWrapper(AbstractActionWrapper):
 
         self.main_layout.addWidget(self.action_widget)
 
-        # gremlin.util.singleShot(self._config_visible)
+
 
     def _config_visible(self):
         if not Shiboken.isValid(self):
@@ -9170,7 +9239,7 @@ class ContainerView(AbstractView):
                         syslog.info(f"\tCreate container widget: [{container.name}]")
                     widget = container.widget(self.input_item, container)
                     widget.closed.connect(self._create_closed_cb(widget))
-                    widget.container_modified.connect(self.model.data_changed.emit)
+                    # widget.container_modified.connect(self._handle_container_modified)
                     self._scroll_layout.addWidget(widget)
                     self._widget_map[container.id] = widget
 
@@ -9178,6 +9247,19 @@ class ContainerView(AbstractView):
 
             else:
                 self._show_blank()
+
+    # def _handle_container_modified(self, container_id = None):
+    #     """handles the container modified signal"""
+    #     widget = None
+    #     if not container_id:
+    #         widget = self.sender()
+    #         if widget not in self._widget_map.values():
+    #             return # not ours
+    #     else:
+    #         widget = self._widget_map.get(container_id, None)
+
+    #     if widget:
+    #         widget.redraw()
 
     def ensureActionVisible(self, action: AbstractAction):
         """ensures the given action is visible in the UI"""

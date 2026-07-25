@@ -456,8 +456,10 @@ class PhraseDataManager:
 
         remove_files = [f for f in all_files if f not in managed_files]
 
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_sound or config.verbose_mode_tts
 
-        if __debug__:
+        if verbose:
             syslog.info(f"Audio cache purge: folder [{gremlin.util.toUrl(self._sound_folder)}]")
             managed_files = sorted(managed_files)
             syslog.info(f"------------------ managed files ----------------- [{len(managed_files)}]")

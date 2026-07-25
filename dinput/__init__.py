@@ -215,6 +215,10 @@ class GUID:
         """
 
         if isinstance(guid, str):
+            # if "{" in guid:
+            #     guid = guid.replace("{", "").replace("}", "")
+            # if "-" in guid:
+            #     guid = guid.replace("-", "")
             try:
                 guid = _GUID.from_uuid(guid)
             except Exception:

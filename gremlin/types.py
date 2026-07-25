@@ -1546,6 +1546,8 @@ class Interactions(enum.Enum):
     Add = 5  # add item
     Count = 6  # count item
     Copy = 7  # copy to clipboard
+    Top = 8  # move item to top
+    Bottom = 9  # move item to bottom
 
 
 class CallbackMode(enum.IntEnum):

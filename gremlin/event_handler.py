@@ -1424,15 +1424,14 @@ class EventListener(QtCore.QObject):
     def stop_key_listener(self):
         """stops the key listener"""
         if self._key_listener_started:
+
             syslog.info("KEY THREAD: stopping...")
             self._keyboard_thread.stop()
             self._keyboard_thread.join()
-            syslog.info("KEY THREAD: stopped")
-            # clear any remaining input queue items
+            
             syslog.info(f"KEY THREAD: clearing remaining items in queue: size: {len(self._keyboard_queue)}")
             self._keyboard_queue.clear()
-            # while not self._keyboard_queue.empty():
-            #     self._keyboard_queue.get()
+            syslog.info("KEY THREAD: stopped")
             self._key_listener_started = False
 
     def start(self):

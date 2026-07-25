@@ -33,7 +33,7 @@ import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, AbstractAction, ActionSet, delete_widget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, AbstractAction, ActionSet, ActionSetView, delete_widget
 from gremlin.input_types import InputType
 from PySide6 import QtCore
 from gremlin.util import safe_format, safe_read, InvokeUiMethod, clear_layout, get_guid
@@ -75,14 +75,18 @@ class SequenceRepeatMode(IntEnum):
     Random = 2
     Loop = 3
 
+
     @staticmethod
     def toString(mode: SequenceRepeatMode) -> str:
         return mode.name.casefold()
 
     @staticmethod
     def fromString(mode_str: str) -> SequenceRepeatMode:
+        mode_str = mode_str.casefold()
+        if mode_str == "repeat":
+            mode_str = "loop"
         for mode in SequenceRepeatMode:
-            if mode.name.casefold() == mode_str.casefold():
+            if mode.name.casefold() == mode_str:
                 return mode
         raise ValueError(f"Invalid sequence repeat mode string: {mode_str}")
 
@@ -392,7 +396,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self._lock = threading.Lock()
 
         # list of step widgets in the UI
-        self.step_widgets = []
+        self.option_widget_map = {}
+        self._widget_map = {}
 
         self.widget_layout = QtWidgets.QHBoxLayout()
 
@@ -621,153 +626,59 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(self._trigger_widget)
 
         self.action_layout.addLayout(self.widget_layout)
-        self.step_container, self.step_layout = gremlin.ui.ui_common.getVContainer()
-        self.action_layout.addWidget(self.step_container)
 
-        # hook UI updates when models change
-        self.container.action_sets.addCallback(self._handle_steps_changed)
+        # holds the steps in the sequence container - one step = one action set
+        self.action_set_widget = QtWidgets.QWidget()
+        self.action_set_layout = QtWidgets.QVBoxLayout(self.action_set_widget)
+        self.action_layout.addWidget(self.action_set_widget)
 
-        self._update_steps()
+
+        self._update_action_sets()
         self._update_widgets()
 
-    def _handle_steps_changed(self, data):
-        InvokeUiMethod(self._update_steps)
-        self.container_modified.emit()
 
-    def _update_steps(self):
+    def _update_action_sets(self):
         """redraws action steps in the sequence - each step is an action set"""
 
-        # cleanup action widgets
+        # cleanup current action sets
         for widget in self._widget_map.values():
+            widget.hide()
             widget.model.data_changed.disconnect(self.container_modified.emit)
             gremlin.util.delete_widget(widget)
         self._widget_map.clear()
 
-        # cleanup step widgets
-        for widget in self.step_widgets:
-            clear_layout(widget)
-            widget.hide()
-            widget.setParent(None)
-            widget.deleteLater()
+        # cleanup options for each step
+        for widget in self.option_widget_map.values():
+            gremlin.util.delete_widget(widget)
+        self.option_widget_map.clear()
 
-        self.step_widgets.clear()
+        gremlin.util.clear_layout(self.action_set_layout)
+
+        syslog.info("Updating action sets in sequence container")
 
         # Insert action widgets
         for index, action_set in enumerate(self.container.action_sets):
             # options widget
-            size = 24
 
             options: StepOptions = self.container.getOptions(index)
             options_widget = StepOptionsWidget(self.container, options)
-            step_widget = gremlin.ui.ui_common.QFrameBox(f"<b>Step {index + 1}</b>")
+            self.action_set_layout.addWidget(options_widget)
+            self.option_widget_map[index] = options_widget
 
-            remove_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
-                callback=self._handle_delete_step, tooltip=f"Delete Step [{index + 1}]", data=action_set
-            )
-            remove_widget.setFixedSize(size, size)
+            # action set actions
+            widget = self._create_action_set_widget(action_set,
+                                                    f"Step {index+1:d}",
+                                                    ContainerViewTypes.Action,
+                                                    interact_callback = self._handle_interaction,
+                                                    allowed_interactions = self.container.interaction_types,
+                                                    index = index
+                                                                                                                               )
+            self._widget_map[action_set] = widget
+            self.action_set_layout.addWidget(widget)
+            widget.redraw()
+            widget.model.data_changed.connect(self.container_modified.emit)
 
-            step_up_widget = gremlin.ui.ui_common.Buttons.getMoveUpWidget(callback=self._handle_move_step_up, data=action_set) if index > 0 else None
-            if step_up_widget:
-                step_up_widget.setFixedSize(size, size)
 
-            step_down_widget = (
-                gremlin.ui.ui_common.Buttons.getMoveDownWidget(callback=self._handle_move_step_down, data=action_set)
-                if index < len(self.container.action_sets) - 1
-                else None
-            )
-            if step_down_widget:
-                step_down_widget.setFixedSize(size, size)
-
-            step_top_widget = gremlin.ui.ui_common.Buttons.getMoveTopWidget(callback=self._handle_move_step_top, data=action_set) if index > 0 else None
-            if step_top_widget:
-                step_top_widget.setFixedSize(size, size)
-
-            step_bottom_widget = (
-                gremlin.ui.ui_common.Buttons.getMoveBottomWidget(callback=self._handle_move_step_bottom, data=action_set)
-                if index < len(self.container.action_sets) - 1
-                else None
-            )
-            if step_bottom_widget:
-                step_bottom_widget.setFixedSize(size, size)
-
-            move_container = gremlin.ui.ui_common.getHContainer(
-                [step_up_widget, step_down_widget, step_top_widget, step_bottom_widget, remove_widget], widget_only=True
-            )
-
-            widgets = [
-                step_widget,
-                # step_container,
-                options_widget,
-                "||",
-                move_container,
-            ]
-
-            container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
-            css = f"""
-                .QWidget {{
-                    background-color: {gremlin.ui.ui_common.Color.headerBarBackgroundColor()};
-                    border-radius: 8px;
-                  }}
-
-            """
-            container_widget.setStyleSheet(css)
-            container_widget.setContentsMargins(4, 4, 4, 4)
-
-            # self.step_layout.addWidget(header_widget)
-            self.step_layout.addWidget(container_widget)
-
-            action_set = self.container.action_sets[index]
-            action_set_widget = self._create_action_set_widget(action_set, "Step", ContainerViewTypes.Action)
-            self.step_layout.addWidget(action_set_widget)
-            action_set_widget.redraw()
-            action_set_widget.model.data_changed.connect(self.container_modified.emit)
-
-            self.step_widgets.append(container_widget)
-
-            self._widget_map[action_set] = action_set_widget
-
-    def _handle_delete_step(self, widget):
-        action_set: ActionSet = widget.data  # action set is stored in the button data
-        ui = gremlin.shared_state.ui
-        result = gremlin.ui.ui_common.ConfirmBox(prompt=f"Delete step [{action_set.index}]?", parent=ui)
-        if result:
-            self.container.action_sets.remove(action_set)
-
-    def _handle_move_step_up(self, widget):
-        # moves an action set up
-        action_set: ActionSet = widget.data  # action set is stored in the button data
-        index = self.container.action_sets.indexOf(action_set)
-        if index > 0:
-            self.container.action_sets.pushSuspend()
-            self.container.action_sets[index], self.container.action_sets[index - 1] = self.container.action_sets[index - 1], self.container.action_sets[index]
-            self.container.action_sets.popSuspend()
-
-    def _handle_move_step_down(self, widget):
-        # moves an action set down
-        action_set: ActionSet = widget.data  # action set is stored in the button data
-        index = self.container.action_sets.indexOf(action_set)
-        if index < len(self.container.action_sets) - 1:
-            self.container.action_sets.pushSuspend()
-            self.container.action_sets[index], self.container.action_sets[index + 1] = self.container.action_sets[index + 1], self.container.action_sets[index]
-            self.container.action_sets.popSuspend()
-
-    def _handle_move_step_top(self, widget):
-        # moves an action set to the top
-        action_set: ActionSet = widget.data  # action set is stored in the button data
-        index = self.container.action_sets.indexOf(action_set)
-        if index > 0:
-            self.container.action_sets.pushSuspend()
-            self.container.action_sets.insert(0, self.container.action_sets.pop(index))
-            self.container.action_sets.popSuspend()
-
-    def _handle_move_step_bottom(self, widget):
-        # moves an action set to the bottom
-        action_set: ActionSet = widget.data  # action set is stored in the button data
-        index = self.container.action_sets.indexOf(action_set)
-        if index < len(self.container.action_sets) - 1:
-            self.container.action_sets.pushSuspend()
-            self.container.action_sets.append(self.container.action_sets.pop(index))
-            self.container.action_sets.popSuspend()
 
     def _handle_sync_changed(self, mode):
         self.container.sync_mode = mode
@@ -994,6 +905,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         if action_name:
             self._add_action(action_name, action_set)
         self.container.action_sets.popSuspend()
+        self._update_action_sets()
 
     def _remove_step(self, index: int):
         """Removes a step from the sequence container.
@@ -1004,6 +916,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         if self.container.action_sets.itemAt(index) is None:
             raise IndexError(f"No action set found at index {index}")
         self.container.remove_action_set(index)
+        self._update_action_sets()
 
     def _add_action(self, action_name: str, action_set: gremlin.input_item.ActionSet):
         """Adds a new action to the container.
@@ -1038,40 +951,53 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.container.add_action(action_item)
         self.container_modified.emit()
 
-    def _handle_interaction(self, widget, action: AbstractAction):
+    def _handle_interaction(self, interaction : Interactions, index : int, widget : ActionSetView):
         """Handles interaction icons being pressed on the individual actions.
 
-        :param widget: the action widget on which an action was invoked
-        :param action: the action being invoked
+        :param widget the action widget on which an action was invoked
+        :param index the index of the action widget
+        :param interaction the type of action being invoked
         """
         # Find the index of the widget that gets modified
-        index = self._get_widget_index(widget)
+        # index = self._get_widget_index(widget)
 
         if index == -1:
             syslog.warning("Unable to find widget specified for interaction, not doing anything.")
             return
 
         # Perform action
-        match action:
+        match interaction:
             case Interactions.Up:
                 if index > 0:
-                    self.container.action_sets[index], self.container.action_sets[index - 1] = (
-                        self.container.action_sets[index - 1],
-                        self.container.action_sets[index],
-                    )
+                    self.container.action_sets.swap(index, index - 1)
             case Interactions.Down:
                 if index < len(self.container.action_sets) - 1:
-                    self.container.action_sets[index], self.container.action_sets[index + 1] = (
-                        self.container.action_sets[index + 1],
-                        self.container.action_sets[index],
-                    )
+                    self.container.action_sets.swap(index, index + 1)
+            case Interactions.Top:
+                if index > 0:
+                    self.container.action_sets.swap(index, 0)
+
+            case Interactions.Bottom:
+                if index < len(self.container.action_sets) - 1:
+                    self.container.action_sets.swap(index, len(self.container.action_sets) - 1)
+
             case Interactions.Delete:
                 del self.container.action_sets[index]
-            case _:
-                return
+        if interaction == Interactions.Up:
+            if index > 0:
+                self.container.action_sets.swap(index, index - 1)
+        if interaction == Interactions.Down:
+            if index < len(self.container.action_sets) - 1:
+                self.container.action_sets.swap(index, index + 1)
+
+        if interaction == Interactions.Delete:
+            self.container.action_sets.removeAt(index)
+
         if Shiboken.isValid(self):
             self.container_modified.emit()
-        self._update_steps()
+
+        self._update_action_sets()
+
 
     def _get_window_title(self):
         """Returns the title to use for this container.
@@ -1475,7 +1401,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
         nodes = [node for node in self.action_set_nodes]
         verbose = self._verbose
-        verbose_extra = self._verbose_extra
+
 
         # no resume mode if running once
         resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
@@ -1725,6 +1651,8 @@ Unlike a macro, any action suitable for the input can be used."""
         Interactions.Up,
         Interactions.Down,
         Interactions.Delete,
+        Interactions.Top,
+        Interactions.Bottom
     ]
 
     functor = SequenceContainerFunctor

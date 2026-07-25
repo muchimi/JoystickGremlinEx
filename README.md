@@ -29,8 +29,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m77T13)
+### (m77T13A)
+- Change: Containers that support ordering have an updated look and gain top/bottom interaction buttons.
 - Fix: Play Sound: exception on generate due to refactor.
+- Fix: Chain Container: no display
+- Fix: Sequence Container: repeat mode mapped to loop mode
 
 ### (m77T12)
 - New: add locale voice filter for Edge TTS mode to simplify voice selection.

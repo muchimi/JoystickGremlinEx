@@ -27,7 +27,7 @@ import gremlin.input_item
 import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, InputItem
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, InputItem, ActionSetView, ActionSet
 from gremlin.types import ContainerViewTypes, Interactions
 
 from gremlin.input_types import InputType
@@ -46,7 +46,7 @@ class ChainContainerWidget(AbstractContainerWidget):
         :param container the container represented by this widget
         :param parent the parent of this widget
         """
-        super().__init__(input_item, container, parent)
+        super().__init__(input_item, container, parent=parent)
 
 
     def _create(self, container):
@@ -61,6 +61,7 @@ class ChainContainerWidget(AbstractContainerWidget):
             return
 
         self.widget_layout = QtWidgets.QHBoxLayout()
+        self._action_set_widgets = {}
 
         self.container.create_or_delete_virtual_button()
 
@@ -74,10 +75,6 @@ class ChainContainerWidget(AbstractContainerWidget):
         self.action_selector.add_button.setText("Add Step")
         self.action_selector.action_paste.connect(self._paste_action)
 
-        self.widget_layout.addWidget(self.action_selector)
-
-        self.widget_layout.addStretch(1)
-
         self.widget_layout.addWidget(QtWidgets.QLabel("<b>Timeout:</b> "))
         self.timeout_input = gremlin.ui.ui_common.DynamicDoubleSpinBox()
         self.timeout_input.setRange(0.0, 3600.0)
@@ -89,18 +86,42 @@ class ChainContainerWidget(AbstractContainerWidget):
 
         self.action_layout.addLayout(self.widget_layout)
 
-        # Insert action widgets
+        self.action_set_layout = QtWidgets.QVBoxLayout()
+        self.action_layout.addLayout(self.action_set_layout)
+
+        self._update_action_sets()
+        self.widget_layout.addWidget(self.action_selector)
+
+    def _update_action_sets(self):
+        """Updates the action sets in the UI."""
+        if not Shiboken.isValid(self):
+            return
+
+        # Clear existing action set widgets
+        for widget in self._action_set_widgets.values():
+            widget.hide()
+            self.action_set_layout.removeWidget(widget)
+            gremlin.util.delete_widget(widget)
+        self._action_set_widgets.clear()
+
+        # Recreate action set widgets
         action_sets = [action_set for action_set in self.container.action_sets if action_set]
         for i, action_set in enumerate(action_sets):
-            widget = self._create_action_set_widget(action_set, f"Action {i + 1:d}", ContainerViewTypes.Action)
-            self.action_layout.addWidget(widget)
+            widget = self._create_action_set_widget(action_set,
+                                                    f"Step {i + 1:d}",
+                                                    ContainerViewTypes.Action,
+                                                    interact_callback=self._handle_interaction,
+                                                    allowed_interactions=self.container.interaction_types,
+                                                    index = i)
+            self._action_set_widgets[i] = widget
+            self.action_set_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
 
     def _create_condition_ui(self):
         if self.container.action_sets:
             for i, action_set in enumerate(self.container.action_sets):
-                widget = self._create_action_set_widget(action_set, f"Action {i + 1:d}", ContainerViewTypes.Conditions)
+                widget = self._create_action_set_widget(action_set, f"Action {i + 1:d}", ContainerViewTypes.Conditions, index = i)
                 self.activation_condition_layout.addWidget(widget)
                 widget.redraw()
                 widget.model.data_changed.connect(self.container_modified.emit)
@@ -133,37 +154,53 @@ class ChainContainerWidget(AbstractContainerWidget):
         """
         self.container.timeout = value
 
-    def _handle_interaction(self, widget, action):
+    def _handle_interaction(self, interaction : Interactions, index : int, widget : ActionSetView):
         """Handles interaction icons being pressed on the individual actions.
 
         :param widget the action widget on which an action was invoked
-        :param action the type of action being invoked
+        :param index the index of the action widget
+        :param interaction the type of action being invoked
         """
         # Find the index of the widget that gets modified
-        index = self._get_widget_index(widget)
+        # index = self._get_widget_index(widget)
 
         if index == -1:
             syslog.warning("Unable to find widget specified for interaction, not doing anything.")
             return
 
         # Perform action
-        if action == Interactions.Up:
+        match interaction:
+            case Interactions.Up:
+                if index > 0:
+                    self.container.action_sets.swap(index, index - 1)
+            case Interactions.Down:
+                if index < len(self.container.action_sets) - 1:
+                    self.container.action_sets.swap(index, index + 1)
+            case Interactions.Top:
+                if index > 0:
+                    self.container.action_sets.swap(index, 0)
+
+            case Interactions.Bottom:
+                if index < len(self.container.action_sets) - 1:
+                    self.container.action_sets.swap(index, len(self.container.action_sets) - 1)
+
+            case Interactions.Delete:
+                del self.container.action_sets[index]
+        if interaction == Interactions.Up:
             if index > 0:
-                self.container.action_sets[index], self.container.action_sets[index - 1] = (
-                    self.container.action_sets[index - 1],
-                    self.container.action_sets[index],
-                )
-        if action == Interactions.Down:
+                self.container.action_sets.swap(index, index - 1)
+        if interaction == Interactions.Down:
             if index < len(self.container.action_sets) - 1:
-                self.container.action_sets[index], self.container.action_sets[index + 1] = (
-                    self.container.action_sets[index + 1],
-                    self.container.action_sets[index],
-                )
-        if action == Interactions.Delete:
-            del self.container.action_sets[index]
+                self.container.action_sets.swap(index, index + 1)
+
+        if interaction == Interactions.Delete:
+            self.container.action_sets.removeAt(index)
 
         if Shiboken.isValid(self):
             self.container_modified.emit()
+
+        self._update_action_sets()
+
 
     def _get_window_title(self):
         """Returns the title to use for this container.
@@ -248,6 +285,8 @@ Unlike a macro or sequence container, only one step is executed for each trigger
     interaction_types = [
         Interactions.Up,
         Interactions.Down,
+        Interactions.Top,
+        Interactions.Bottom,
         Interactions.Delete,
     ]
 
@@ -260,6 +299,7 @@ Unlike a macro or sequence container, only one step is executed for each trigger
         :param parent the InputItem this container is linked to
         """
         super().__init__(parent, node)
+
         self.timeout = 0.0
 
     def _parse_xml(self, node, data=None, extra_data=None):
@@ -278,6 +318,9 @@ Unlike a macro or sequence container, only one step is executed for each trigger
         node.set("type", ChainContainer.tag)
         node.set("timeout", str(self.timeout))
         return node
+
+
+
 
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.

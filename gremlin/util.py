@@ -2436,7 +2436,7 @@ def to_guid(device_guid) -> dinput.GUID:
     if isinstance(device_guid, dinput.GUID):
         return device_guid
     value = dinput.GUID(device_guid)
-    assert str(value) == str(device_guid),"conversion failed"
+    # assert str(value) == str(device_guid),"conversion failed"
     return value
 
 

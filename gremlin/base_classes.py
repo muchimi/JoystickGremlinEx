@@ -1068,7 +1068,7 @@ class AbstractCallbackModel(AbstractModel):
             # bump all the items down 1
             start_index = i
             stop_index = len(self._index_map)
-            for index in range(stop_index, start_index, step=-1):
+            for index in range(stop_index, start_index, -1):
                 data = self._index_map[index]
                 self._index_map[index + 1] = data
                 self._item_map[data] = index + 1
@@ -1220,6 +1220,18 @@ class AbstractCallbackModel(AbstractModel):
         if item in self._item_map:
             return self._item_map[item]
         return -1
+
+    def swap(self, index1: int, index2: int, emit=True):
+        """swaps the items at the given indices"""
+        if index1 == index2:
+            return
+        if index1 in self._index_map and index2 in self._index_map:
+            self._index_map[index1], self._index_map[index2] = self._index_map[index2], self._index_map[index1]
+            self._item_map[self._index_map[index1]] = index1
+            self._item_map[self._index_map[index2]] = index2
+            self.applyFilter(emit=emit)
+            if emit:
+                self._fireChanged()
 
     def rows(self) -> int:
         """returns the size of the unfiltered model"""
