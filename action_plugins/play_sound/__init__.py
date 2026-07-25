@@ -128,6 +128,26 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         self.tts_file_widget = gremlin.ui.ui_common.QLineEdit(text=self.action_data.tts_file)
         self.tts_file_widget.setReadOnly(True)
 
+        self.tts_suppress_enabled_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Suppress Duplicate Playback",
+            value=self.action_data.tts_suppress_duplicate,
+            callback=self._handle_tts_suppress_enabled_changed,
+            tooltip="Suppress duplicate playback within the cooldown period.",
+        )
+
+        self.tts_suppress_cooldown_widget = gremlin.ui.ui_common.QIntLineEdit(
+            min_range=0,
+            max_range=60,
+            value=self.action_data.tts_suppress_cooldown,
+            callback=self._handle_tts_suppress_cooldown_changed,
+            chars=4,
+            tooltip="Cooldown time in seconds to suppress duplicate TTS playback.",
+        )
+
+        cooldown_container = gremlin.ui.ui_common.getHContainer(
+            [self.tts_suppress_enabled_widget,"Cooldown (s):", self.tts_suppress_cooldown_widget], widget_only=True
+        )
+
         self.tts_file_delete_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._handle_file_delete, tooltip="Delete the audio file")
         self.tts_file_rename_widget = gremlin.ui.ui_common.QDataPushButton("Rename", callback=self._handle_file_rename, tooltip="Rename the audio file")
 
@@ -426,6 +446,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
         container_widgets.append(options_container)
         container_widgets.append(playback_widget)
+        container_widgets.append(cooldown_container)
 
         container_widgets.append(self._execute_widget)
         container_widgets.append(info_widget)
@@ -436,6 +457,13 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
         self._update_ui()
 
+
+    def _handle_tts_suppress_enabled_changed(self, checked: bool):
+        self.action_data.tts_suppress_enabled = checked
+
+
+    def _handle_tts_suppress_cooldown_changed(self, value: int):
+        self.action_data._tts_suppress_cooldown = value
 
 
     @QtCore.Slot(bool)
@@ -1033,12 +1061,16 @@ class PlaySound(gremlin.base_profile.AbstractAction):
     widget = PlaySoundWidget
     player = QtMultimedia.QMediaPlayer()  # needs to be a singleton or it blows up
 
+    last_phrase_key = None  # (key, timestamp) of the last played phrase for duplicate suppression
+
     def icon(self):
         return "ei.speaker"
         # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def __init__(self, parent):
         super().__init__(parent)
+
+        config = gremlin.config.Configuration()
         self.parent = parent
         self.mode = PlayMode.AudioFile
         self.auto_generate = True  # automatically generate AI voice when text changes (valid for some modes only)
@@ -1051,6 +1083,9 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.ptts_volume: int = 100 # volume, 0 to 100
         self.etts_speed = 1.0  # speed factor for PyTTS
         self.ktts_speed = 1.0  # speed factor for KTTS
+
+        self._tts_suppress_duplicate = config.tts_suppress_enabled  # whether to suppress duplicate TTS playback
+        self._tts_suppress_cooldown = config.tts_suppress_cooldown  # cooldown time in seconds to suppress duplicate TTS playback
 
         self.playback_volume : int = 100  # default volume as a percentage 0 to 100
         self.etts_pitch : int = 0  # pitch adjust in hertz (edge tts only -100 to +100)
@@ -1089,6 +1124,26 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.sound = gremlin.sound.Sound()
 
         self._sound = None  # holds the sound object
+
+    @property
+    def tts_suppress_duplicate(self) -> bool:
+        return self._tts_suppress_duplicate
+
+    @tts_suppress_duplicate.setter
+    def tts_suppress_duplicate(self, value: bool):
+        self._tts_suppress_duplicate = value
+        config = gremlin.config.Configuration()
+        config.tts_suppress_enabled = value
+
+    @property
+    def tts_suppress_cooldown(self) -> int:
+        return self._tts_suppress_cooldown
+
+    @tts_suppress_cooldown.setter
+    def tts_suppress_cooldown(self, value: int):
+        self._tts_suppress_cooldown = value
+        config = gremlin.config.Configuration()
+        config.tts_suppress_cooldown = value
 
     @property
     def save_on_generate(self) -> bool:
@@ -1278,17 +1333,6 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
         sound_file = None
 
-        if self.mode in (PlayMode.PyTTS, PlayMode.EdgeAI):
-            if gremlin.config.Configuration().tts_suppress_duplicate:
-                key = (self.text, self.speaker, self.mode)
-                now = time.time()
-                cooldown_seconds = 10.0  # allow the same phrase again after this delay
-                if self._last_tts_key is not None:
-                    last_key, last_time = self._last_tts_key
-                    if key == last_key and (now - last_time) < cooldown_seconds:
-                        return
-                self._last_tts_key = (key, now)
-
         match self.mode:
             case PlayMode.PyTTS:
                 rate = self.ptts_speed
@@ -1319,10 +1363,24 @@ class PlaySound(gremlin.base_profile.AbstractAction):
                                               sound_file = sound_file,
                                               timed_random=self._timed_random,
                                               )
+
         sound_file = phrase.sound_file if phrase else None
         if not sound_file:
             syslog.error("PLAY: failed to generate sound file")
             return None
+
+        if self.tts_suppress_duplicate:
+            key = phrase.key if phrase else None
+            if self.last_phrase_key:
+                last_key, last_time = self.last_phrase_key
+                if key == last_key:
+                    cooldown_seconds = self.tts_suppress_cooldown
+                    now = time.time()
+                    if (now - last_time) < cooldown_seconds:
+                        return
+            self.last_phrase_key = (key, time.time())
+
+
 
         # ensure started
         if not self.sound.ensureStarted():

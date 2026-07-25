@@ -568,6 +568,7 @@ class Sound:
             self.running_data = {}  # data for running audio streams
             self._playback_enabled = True  # enable playback
             self._sound_tasks = []  # tracks sound tasks
+            self._last_phrase = None
 
             device_list = sd.query_devices()
 
@@ -1180,7 +1181,9 @@ class Sound:
     def pickPhrase(self, phrase_map : dict, mode : PlayMode, playback_mode: PlaybackMode = PlaybackMode.RoundRobin, timed_random : TimedRandomInt = None):
         """ picks a phrase to play based on the playback mode """
         if not phrase_map:
+            self._last_phrase = None
             return None
+
 
         keys = list(phrase_map.keys())
         count = len(keys)

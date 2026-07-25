@@ -156,6 +156,7 @@ class TextToSpeech:
         clear: bool = False,
         override_suppress: bool = False,
     ):
+        #m77T13 - use the play engine to speak the text + cache
         sound = Sound()
         sound.playPyTTS(text, voice=self._current_voice.name if self._current_voice else self.default_voice.name, rate=rate, timed_random=self._timed_random)
 

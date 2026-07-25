@@ -602,6 +602,22 @@ class Configuration(QtCore.QObject):
         self._set_data("initial_load_rate_tts", value)
 
     @property
+    def tts_suppress_enabled(self) -> bool:
+        return self._get_data("tts_suppress_enabled", True)
+
+    @tts_suppress_enabled.setter
+    def tts_suppress_enabled(self, value: bool):
+        self._set_data("tts_suppress_enabled", value)
+
+    @property
+    def tts_suppress_cooldown(self) -> int:
+        return self._get_data("tts_suppress_cooldown", 5)
+
+    @tts_suppress_cooldown.setter
+    def tts_suppress_cooldown(self, value: int):
+        self._set_data("tts_suppress_cooldown", value)
+
+    @property
     def initial_volume_tts(self):
         """default TTS volume"""
         return self._get_data("initial_volume_tts", 80)

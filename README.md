@@ -30,11 +30,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T14)
-- Change: Containers that support ordering or re-ordering such as Sequence or Chain have an updated look and gain top/bottom interaction buttons.
+- Change: Containers that support ordering or re-ordering such as Sequence or Chain have an updated look for interactions and layout, and gain a top/bottom interaction.
+- Change: Added PRR from RazOrLegend (thank you!) - auto start, minimize to tray, and TTS duplicate suppression options (with some modifications, see below)
+- Change: Play Sound: added cooldown option for suppression
+- Change: Play Sound: suppression cooldown is profile wide for all TTS phrases - and supports multiple phrases - suppression is however enabled on a play action basis so some actions may opt to ignore suppression.
 
 - Fix: Chain Container: no display in some situations.
 - Fix: Sequence Container: resolves an issue with repeat mode refactor
 - Fix: API: resolved an issue when using versioning mode to store data
+
 
 ### (m77T13)
 
