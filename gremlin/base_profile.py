@@ -29,9 +29,6 @@ import time
 
 from typing import Callable
 
-from torch.nn.modules import container
-
-
 import container_plugins
 import gremlin.keyboard
 import gremlin.profile
