@@ -10586,13 +10586,29 @@ class QRememberDialog(QtWidgets.QDialog):
         config = gremlin.config.Configuration()
         window_size = config.getWindowSize(self._window_key)
         window_location = config.getWindowLocation(self._window_key)
-        if window_size:
+        if window_size and window_size[0] and window_size[1]:
             self.resize(window_size[0], window_size[1])
         else:
-            self.resize(self._default_width, self._default_height)
-        if window_location:
+            size = self.preferredSize()
+            self.resize(size.width(), size.height())
+        if window_location and window_location[0] is not None and window_location[1] is not None:
             x, y = window_location
-            pos = QtCore.QPoint(x, y)
+            on_screen = False
+            try:
+                for screen in QtWidgets.QApplication.screens():
+                    if screen.availableGeometry().contains(QtCore.QPoint(x + 20, y + 20)):
+                        on_screen = True
+                        break
+            except Exception:
+                on_screen = True
+            if on_screen:
+                pos = QtCore.QPoint(x, y)
+            else:
+                try:
+                    geo = QtWidgets.QApplication.primaryScreen().availableGeometry()
+                    pos = geo.center() - QtCore.QPoint(self.width() // 2, self.height() // 2)
+                except Exception:
+                    pos = QtCore.QPoint(100, 100)
             # syslog.info(f"recall move window {self.window_key} to {x},{y}")
             self.move(pos)
 
@@ -15615,7 +15631,7 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
         return self._widget
 
     def setWidget(self, widget: QWidget):
-        if self._widget is not None:
+        if self._widget is not None and Shiboken.isValid(self._widget):
             # delete the old widget
             self.removeWidget(self._widget)
             gremlin.util.delete_widget(self._widget)
@@ -15846,10 +15862,13 @@ class AutohideContainerIdWidget(QtWidgets.QStackedWidget):
 
     def setWidget(self, widget: QWidget):
         """sets the widget to be displayed"""
-        if self._widget is not None:
+        if not Shiboken.isValid(self):
+            # this layout's own C++ object was already deleted; nothing to do
+            return
+        if self._widget is not None and Shiboken.isValid(self._widget):
             self.removeWidget(self._widget)
         self._widget = widget
-        if widget is not None:
+        if widget is not None and Shiboken.isValid(widget):
             self.addWidget(widget)
         self.updateGeometry()
 

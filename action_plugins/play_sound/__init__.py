@@ -30,6 +30,7 @@ import gremlin.input_item
 import gremlin.ui.ui_common
 from gremlin.util import safe_format, safe_read
 import logging
+import threading
 import gremlin.sound
 from gremlin.sound import Sound, PhraseData, EdgeTTSVoice
 import enum
@@ -1007,15 +1008,19 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
             # update the file list to randomize from
             self.action_data.scanFolder()
 
-        # pre-generate the audio file now (profile activation), rather than
-        # letting the first trigger generate it inline from the input
-        # execution/hook thread, which can hang the app (pyttsx3/SAPI5 does
-        # not tolerate being called in that context well).
+        # pre-generate the audio file rather than letting the first trigger
+        # generate it inline from the input execution/hook thread (which can
+        # hang the app). Do it on a detached background thread so that profile
+        # activation itself never blocks the UI - generating many TTS phrases
+        # synchronously here freezes the app at activation until all are done.
         if self.action_data.mode in (PlayMode.PyTTS, PlayMode.EdgeAI):
-            try:
-                self.action_data.generate(force=False)
-            except Exception as e:
-                syslog.warning(f"PLAY SOUND: pre-generation failed for [{self.action_data.text}]: {e}")
+            def _bg_generate(action_data):
+                try:
+                    action_data.generate(force=False)
+                except Exception as e:
+                    syslog.warning(f"PLAY SOUND: pre-generation failed for [{action_data.text}]: {e}")
+            t = threading.Thread(target=_bg_generate, args=(self.action_data,), daemon=True)
+            t.start()
 
     def profile_stop(self):
         """stop any active audio on profile stop"""
@@ -1330,6 +1335,15 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
     def play(self):
         """plays the sound"""
+        # run the whole generate+playback off the input execution thread:
+        # if the audio file isn't pre-generated yet, self.sound.generate()
+        # would otherwise synthesize it inline here and freeze the app on the
+        # first press. A detached daemon thread keeps the input pipeline free.
+        t = threading.Thread(target=self._play_worker, daemon=True)
+        t.start()
+
+    def _play_worker(self):
+        """does the actual sound generation and playback (background thread)"""
 
         sound_file = None
 

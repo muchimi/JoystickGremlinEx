@@ -4857,23 +4857,25 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # app is terminating
                 return
 
-        # also wait for the actual profile to be fully loaded in the
-        # background worker thread - ui.initialized alone is not enough,
-        # the profile can still be a placeholder/empty one at this point,
-        # which builds an empty execution graph (0 functors) once activated
-        target_name = getattr(self, "_autostart_target_name", None)
-        if target_name:
-            max_wait = 10.0  # seconds
-            waited = 0.0
-            while waited < max_wait:
-                profile = gremlin.shared_state.current_profile
-                if profile and profile.name == target_name:
-                    break
-                syslog.info(f"autostart waiting for profile [{target_name}] to finish loading...")
-                time.sleep(0.1)
-                waited += 0.1
-                if gremlin.shared_state.terminating:
-                    return
+        # Wait for a real profile to be loaded in the background worker
+        # before activating: ui.initialized alone isn't enough, the profile
+        # can still be a placeholder/empty one at this point, which builds an
+        # empty execution graph (0 functors). We wait for any non-empty
+        # profile to be present rather than matching an exact name, which is
+        # fragile (a stale session .json can load under a different name and
+        # the exact-name wait would then spin forever, freezing the UI).
+        max_wait = 8.0  # seconds
+        waited = 0.0
+        while waited < max_wait:
+            profile = gremlin.shared_state.current_profile
+            # a usable profile has been loaded once it exists and has a name
+            if profile is not None and getattr(profile, "name", None):
+                break
+            syslog.info("autostart waiting for profile to finish loading...")
+            time.sleep(0.1)
+            waited += 0.1
+            if gremlin.shared_state.terminating:
+                return
 
         syslog.info("autostart starting")
 
