@@ -36,6 +36,7 @@ from gremlin.sound import PhraseData
 import gremlin.threading
 import gremlin.util as util
 import pyttsx3
+import pythoncom
 import gremlin.singleton_decorator
 #import queue
 from gremlin.base_classes import FastQueue
@@ -74,6 +75,7 @@ class TextToSpeech:
         self._tts_thread = None
         self._queue_thread = None
         self._queue = FastQueue() # queue.Queue()
+        self._engine_lock = threading.Lock()  # pyttsx3/SAPI5 is not thread-safe; serialize access
         self.valid = config.tts_enabled
         try:
             self.engine = pyttsx3.init()
@@ -461,21 +463,37 @@ class TextToSpeech:
         speaker = voice
         text = phrase.text
         try:
-            # if engine loop is running, kill it
-            # started =  self._started
-            # if self._started:
-            #     self.stop()
-
-            self.engine.stop()
-            self.engine.setProperty("rate", rate)
-            self.engine.setProperty("voice", speaker)
-            self.engine.save_to_file(text, tts_file)  # generates wav files by itself
-            # Process the queue and write the file to your disk
-            self.engine.runAndWait()
-
-            # restart loop if needed
-            # if started:
-            #     self.start()
+            with self._engine_lock:
+                # pyttsx3/SAPI5 uses a COM object tied to the thread that
+                # created it. Reusing a shared engine from a different thread
+                # (input execution thread on button press, or the autostart
+                # thread) can hang indefinitely. Create a fresh engine on the
+                # calling thread, and initialize COM there first (threads that
+                # never touched COM can otherwise hang on the first call).
+                com_initialized_here = False
+                try:
+                    pythoncom.CoInitialize()
+                    com_initialized_here = True
+                except Exception:
+                    pass
+                try:
+                    engine = pyttsx3.init()
+                    try:
+                        engine.setProperty("rate", rate)
+                        engine.setProperty("voice", speaker)
+                        engine.save_to_file(text, tts_file)  # generates wav files by itself
+                        engine.runAndWait()
+                    finally:
+                        try:
+                            engine.stop()
+                        except Exception:
+                            pass
+                finally:
+                    if com_initialized_here:
+                        try:
+                            pythoncom.CoUninitialize()
+                        except Exception:
+                            pass
 
             return os.path.isfile(tts_file)
         except Exception as e:
