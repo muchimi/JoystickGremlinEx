@@ -573,9 +573,12 @@ class Hat:
 
         :param direction the direction of the hat
         """
-        # a False/None value means "no direction" -> treat as centered
+        # Normalize a released/centered hat (False or None) to the neutral
+        # position (0, 0), which is a valid centered direction. Previously a
+        # False/None direction raised VJoyError instead of centering the hat.
         if direction is False or direction is None:
             direction = (0, 0)
+
         if direction not in Hat.to_discrete_direction:
             raise VJoyError(f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, self._direction)}")
 
@@ -589,9 +592,12 @@ class Hat:
 
         :param direction the angle in degree of the hat
         """
-        # a False/None value means "no direction" -> treat as centered
+        # Normalize a released/centered hat (False or None) to the neutral
+        # position (0, 0), which is a valid centered direction. Previously a
+        # False/None direction raised VJoyError instead of centering the hat.
         if direction is False or direction is None:
             direction = (0, 0)
+
         if direction not in Hat.to_continuous_direction:
             raise VJoyError(f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, direction)}")
 
@@ -633,7 +639,11 @@ class VJoy:
             self._enabled = False
             return
 
-        # default: not acquired until proven otherwise
+        # true if the device is successfully acquired by GremlinEx.
+        # This is set based on the real acquisition result below; it was
+        # previously assigned True then immediately overwritten with False,
+        # which caused the 'acquired' property to always report False even
+        # after a successful acquisition.
         self._acquired = False
 
         if VJoyInterface.GetVJDStatus(vjoy_id) != VJoyState.Free.value:
@@ -643,7 +653,6 @@ class VJoy:
             syslog.error(f"Failed to acquire the vJoy device - vid: {vjoy_id}")
 
         else:
-            # acquisition succeeded
             self._acquired = True
 
         self.vjoy_id = vjoy_id

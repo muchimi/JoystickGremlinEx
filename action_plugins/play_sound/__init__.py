@@ -303,8 +303,14 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         widgets = [
             "ETTS Generation Options:",
-            gremlin.ui.ui_common.getHContainer(["Locale:", self.etts_locale_widget, "Gender:", self.etts_gender_widget, "Voice:", self.etts_speaker_widget, etts_refresh_speaker_widget,"||"], widget_only=True),
-            gremlin.ui.ui_common.getHContainer(["Rate% (gen):", self.etts_speed_widget, "Pitch Offset (Hz):", self.etts_pitch_widget, "Volume (gen):", self.etts_volume_widget], widget_only=True),
+            gremlin.ui.ui_common.getHContainer(
+                ["Locale:", self.etts_locale_widget, "Gender:", self.etts_gender_widget, "Voice:", self.etts_speaker_widget, etts_refresh_speaker_widget, "||"],
+                widget_only=True,
+            ),
+            gremlin.ui.ui_common.getHContainer(
+                ["Rate% (gen):", self.etts_speed_widget, "Pitch Offset (Hz):", self.etts_pitch_widget, "Volume (gen):", self.etts_volume_widget],
+                widget_only=True,
+            ),
         ]
         self.etts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
@@ -626,7 +632,12 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
             # QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(file_path))
 
     def _handle_tts_suppress_enabled_changed(self, checked: bool):
-        self.action_data.tts_suppress_enabled = checked
+        # The checkbox reads action_data.tts_suppress_duplicate, and playback
+        # checks the same property. This handler previously assigned to
+        # tts_suppress_enabled, an attribute that is never read, so unchecking
+        # the box left _tts_suppress_duplicate unchanged and suppression stayed
+        # active. Write to the actual property instead.
+        self.action_data.tts_suppress_duplicate = checked
 
     def _handle_tts_suppress_cooldown_changed(self, value: int):
         self.action_data._tts_suppress_cooldown = value
@@ -954,11 +965,10 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                     self.action_data.etts_speaker = voice.short_name
                     self.action_data.speaker = voice.short_name
 
-
             with QtCore.QSignalBlocker(self.etts_speaker_widget):
                 self.etts_speaker_widget.clear()
                 if voices:
-                    voice : EdgeTTSVoice
+                    voice: EdgeTTSVoice
                     for voice in voices.values():
                         speaker = voice.short_name
                         self.etts_speaker_widget.addItem(speaker, speaker)
@@ -1265,8 +1275,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self._sound_files = []  # list of sound files to pick from if in folder mode
         self._tts_file = None  # sound file for TTS
         self.ptts_speed: int = 100  # words per minute, 100 is the default
-        self.ptts_volume: int = 100 # volume, 0 to 100
-        self.etts_speed : int = 0  # speed factor for Edge TTS as a whole percentage, e.g., 10 means +10%
+        self.ptts_volume: int = 100  # volume, 0 to 100
+        self.etts_speed: int = 0  # speed factor for Edge TTS as a whole percentage, e.g., 10 means +10%
         self.ktts_speed = 1.0  # speed factor for KTTS
 
         self._tts_suppress_duplicate = config.tts_suppress_enabled  # whether to suppress duplicate TTS playback

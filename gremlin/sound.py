@@ -1313,6 +1313,13 @@ class Sound:
                     if verbose:
                         syslog.info(f"\tplay [{key}] [{gremlin.util.toUrl(sound_file)}]")
                     if USE_SD:
+                        if data.stop_previous:
+                            # stop any sounds currently playing before starting
+                            # the new one. On the sounddevice (SD) path this was
+                            # previously ignored - stop_previous was only honored
+                            # on the pygame path below - so 'Stop previous audio'
+                            # had no effect for AI/Edge-TTS playback.
+                            self.soundStop()
                         self.play(sound_file, data)
                     elif USE_PG:
                         if key in self.sound_map:
@@ -1434,27 +1441,6 @@ class Sound:
                 # Running as a normal Python script
                 main_module = sys.modules['__main__']
                 if not hasattr(main_module, '__file__'):
-                    ffmpeg_exe = None
-                else:
-                    current_dir = os.path.dirname(os.path.abspath(main_module.__file__))
-                    ffmpeg_exe = os.path.join(current_dir, "ffmpeg", "ffmpeg.exe")
-            if ffmpeg_exe and os.path.isfile(ffmpeg_exe):
-                self._ffmpeg_exe = ffmpeg_exe
-                return True
-            # Fall back to ffmpeg on the system PATH
-            path_ffmpeg = shutil.which("ffmpeg")
-            if path_ffmpeg:
-                self._ffmpeg_exe = path_ffmpeg
-                syslog.info(f"FFmpeg found on PATH: {path_ffmpeg}")
-                return True
-            # Last resort: auto-download a static build into ./ffmpeg/
-            downloaded = self._downloadFFmpeg()
-            if downloaded and os.path.isfile(downloaded):
-                self._ffmpeg_exe = downloaded
-                syslog.info(f"FFmpeg auto-downloaded: {downloaded}")
-                return True
-            syslog.error("FFmpeg not found.")
-            return False
                     return False
                 current_dir = os.path.dirname(os.path.abspath(main_module.__file__))
                 ffmpeg_exe = os.path.join(current_dir, "ffmpeg", "ffmpeg.exe")
@@ -1469,82 +1455,6 @@ class Sound:
             syslog.error(f"Failed to ensure FFmpeg: {str(e)}")
             return False
 
-    def _downloadFFmpeg(self) -> str | None:
-        """Download a static FFmpeg build from gyan.dev into ./ffmpeg/ on first use.
-
-        Returns the path to ffmpeg.exe on success, else None.
-        """
-        import urllib.request
-        import hashlib
-        import zipfile
-        import tempfile
-
-        try:
-            # Determine target directory next to the main script
-            main_module = sys.modules['__main__']
-            if not hasattr(main_module, '__file__'):
-                return None
-            base_dir = os.path.dirname(os.path.abspath(main_module.__file__))
-            target_dir = os.path.join(base_dir, "ffmpeg")
-            os.makedirs(target_dir, exist_ok=True)
-            target_exe = os.path.join(target_dir, "ffmpeg.exe")
-
-            url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
-            sha_url = url + ".sha256"
-
-            syslog.info("FFmpeg not found locally. Downloading a static build "
-                        "(~100 MB, one-time)...")
-
-            # Fetch expected SHA-256 (best-effort)
-            expected_sha = None
-            try:
-                with urllib.request.urlopen(sha_url, timeout=30) as r:
-                    expected_sha = r.read().decode("utf-8").split()[0].strip().lower()
-            except Exception as e:
-                syslog.warning(f"FFmpeg: could not fetch checksum ({e}); "
-                               "continuing without verification.")
-
-            # Download the ZIP to a temp file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
-                tmp_zip = tmp.name
-            with urllib.request.urlopen(url, timeout=120) as resp, \
-                    open(tmp_zip, "wb") as out:
-                shutil.copyfileobj(resp, out)
-
-            # Verify integrity
-            if expected_sha:
-                h = hashlib.sha256()
-                with open(tmp_zip, "rb") as f:
-                    for chunk in iter(lambda: f.read(1 << 20), b""):
-                        h.update(chunk)
-                actual_sha = h.hexdigest().lower()
-                if actual_sha != expected_sha:
-                    syslog.error("FFmpeg: checksum mismatch, aborting download.")
-                    os.remove(tmp_zip)
-                    return None
-
-            # Extract bin/ffmpeg.exe (and ffprobe.exe) into target_dir, flattened
-            with zipfile.ZipFile(tmp_zip) as zf:
-                for name in zf.namelist():
-                    lower = name.lower()
-                    if lower.endswith("/bin/ffmpeg.exe") or lower.endswith("/bin/ffprobe.exe"):
-                        exe_name = os.path.basename(name)
-                        with zf.open(name) as src, \
-                                open(os.path.join(target_dir, exe_name), "wb") as dst:
-                            shutil.copyfileobj(src, dst)
-
-            os.remove(tmp_zip)
-
-            if os.path.isfile(target_exe):
-                syslog.info(f"FFmpeg installed to {target_exe}")
-                return target_exe
-            syslog.error("FFmpeg: ffmpeg.exe not found in downloaded archive.")
-            return None
-
-        except Exception as e:
-            syslog.error(f"FFmpeg auto-download failed: {str(e)}")
-            return None
-        
     def convertMp3ToWav(self, mp3_file: str, wav_file: str) -> bool:
         """Converts an MP3 file to WAV format."""
         try:
