@@ -27,5 +27,7 @@ pyrubberband
 edge-tts
 audioop-lts
 pydub
+pycountry
+# ffmpeg is included in the distro under ffmpeg
 
 

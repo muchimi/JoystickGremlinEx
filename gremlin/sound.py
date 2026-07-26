@@ -36,6 +36,7 @@ import json
 import random
 import gremlin.ui.ui_common
 import threading
+import pycountry
 
 import logging
 
@@ -1058,7 +1059,7 @@ class Sound:
                  mode: PlayMode = PlayMode.EdgeAI,
                  voice : str = None,
                  randomize_sound_file : bool = False,
-                 rate : float = 1.0,
+                 rate : float = 0,
                  pitch : int = 0,
                  volume : float = 1.0,
                  playback_mode : PlaybackMode = PlaybackMode.RoundRobin,
@@ -1768,6 +1769,7 @@ class EdgeTTSVoice:
         self.locale: str = ""
         self.suggested_codec: str = ""
         self.friendly_name: str = ""
+        self.friendly_locale : str = ""
         self.status: str = ""
         if data:
             if "Name" in data:
@@ -1775,6 +1777,7 @@ class EdgeTTSVoice:
                 self.short_name: str = data.get("ShortName", "")
                 self.gender: str = data.get("Gender", "")
                 self.locale: str = data.get("Locale", "")
+                self.friendly_locale: str = self.translateLocale(self.locale)
                 self.suggested_codec: str = data.get("SuggestedCodec", "")
                 self.friendly_name: str = data.get("FriendlyName", "")
                 self.status: str = data.get("Status", "")
@@ -1784,10 +1787,27 @@ class EdgeTTSVoice:
                 self.short_name: str = data.get("short_name", "")
                 self.gender: str = data.get("gender", "")
                 self.locale: str = data.get("locale", "")
+                self.friendly_locale: str = self.translateLocale(self.locale)
                 self.suggested_codec: str = data.get("suggested_codec", "")
                 self.friendly_name: str = data.get("friendly_name", "")
                 self.status: str = data.get("status", "")
 
+
+    def translateLocale(self, locale: str) -> str:
+        """Returns a descriptive string like 'English (United States)'."""
+        parts = locale.strip().split("-")
+        lang_code = parts[0].lower()
+
+        lang = pycountry.languages.get(alpha_2=lang_code) or pycountry.languages.get(alpha_3=lang_code)
+        lang_name = lang.name if lang else "Unknown Language"
+
+        if len(parts) > 1:
+            country_code = parts[1].upper()
+            country = pycountry.countries.get(alpha_2=country_code)
+            if country:
+                return f"{lang_name} ({country.name})"
+
+        return lang_name
 
 
 
@@ -1875,20 +1895,19 @@ class EdgeTTS:
     def is_speed_available(self):
         return True
 
-    def generateActionWav(self, phrase : PhraseData, voice: str = None, rate: float = 1.0, pitch: int = 0, volume: int = 0) -> bool:
+    def generateActionWav(self, phrase : PhraseData, voice: str = None, rate: int = 0, pitch: int = 0, volume: int = 0) -> bool:
         """generates a wave file for the given action
         :param phrase: the phrase data containing text, rate, pitch, and sound file
         :param voice: the speaker voice to use, optional
-        :param rate: the speech rate adjustment - generated playback rate
+        :param rate: the speech rate adjustment - generated playback rate (as a whole percentage, e.g., 10 means +10%)
         :param pitch: the speech pitch adjustment in Herz, 0 for no change
         :param volume: the speech volume adjustment positive or negative percentage, -50 means 50% quieter, 50 means 50% louder
         :returns: the file name or None
 
         """
         tts_file = phrase.getSoundFile()
-        speed = phrase.rate
         # convert to an edge tts rate
-        edge_rate = f"{int((speed - 1.0) * 100):+}%"
+        edge_rate = f"{int(rate):+}%"
         edge_pitch = f"{pitch:+}Hz"
         edge_volume = f"{int(volume * 100):+}%"
 
@@ -2029,12 +2048,12 @@ class EdgeTTS:
         except Exception as e:
             syslog.error(f"Sound: ETTS: unable to load voice list: {str(e)}")
 
-    def getLocales(self, gender : str = None) -> list[str]:
-        """ gets a list of all available locales """
+    def getLocales(self, gender : str = None) -> list[(str, str)]:
+        """ gets a list of all available locales (friendly_locale, locale)"""
         voices = self.getVoiceList()
         if gender:
             voices = {k: v for k, v in voices.items() if v.gender == gender}
-        locales = sorted(set(v.locale for v in voices.values()))
+        locales = sorted(set((v.friendly_locale, v.locale) for v in voices.values()))
         return locales
 
     def getGenders(self) -> list[str]:
@@ -2068,6 +2087,5 @@ class EdgeTTS:
     def findVoice(self, speaker: str) -> EdgeTTSVoice:
         """ finds a voice by speaker name, not case sensitive """
         return self._voices_list.get(speaker.casefold(), None)
-
 
 

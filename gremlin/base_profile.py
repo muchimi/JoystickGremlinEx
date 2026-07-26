@@ -5164,7 +5164,7 @@ class Profile:
             node.set("exec_on_press", safe_format(exec_on_press, bool))
             node.set("exec_on_release", safe_format(exec_on_release, bool))
             node.set("loops", safe_format(loops, int))
-            node.set("playback-ms", safe_format(playback_ms, int))
+            node.set("playback-ms", safe_format(playback_ms, float))
             node.set("playback-rate", safe_format(playback_rate, float))
             node.set("fadein-ms", safe_format(fadein_ms, int))
             node.set("fadeout-ms", safe_format(fadeout_ms, int))
@@ -5543,8 +5543,9 @@ class ProfileModeNode:
                     test = self.profile.registry.getInputItem(device_guid=self.device_guid, mode_name=self.name, input_type=input_type, input_id=item.input_id)
                     assert test == input_item
 
-            except Exception:
-                syslog.error(f"XML: unknown input type: [{node.tag}] - offending line: [{node.sourceline}]  contents: [{etree.tostring(node, encoding='unicode')}]")
+            except Exception as e:
+                syslog.error(f"XML: unknown input type: [{node.tag}] - offending line: [{node.sourceline}]  contents: [{etree.tostring(node, encoding='unicode')}")
+                syslog.error(f"\texception occurred: {str(e)}\n{traceback.format_exc()}")
 
             # sorting index
             if input_item is not None:

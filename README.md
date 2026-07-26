@@ -29,6 +29,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T14D):
+- Change: Play Sound: change playback cutoff from milliseconds to seconds
+- Change: Play Sound: translate edge tts locale to ISO standards.
+- Fix: Play Sound: Edge TTS play rate now as a whole percentage to match API, -50 means half-speed, 100 means 2x speed (+100).  Default is 0, normal speed.  
+- Fix: Play Sound: selecting a locale could cause a circular update resulting in recursion.
+
 ### (m77T14C)
 - Change: forcibly run audio conversion by running ffmpeg directly and report any errors to log file.
 
