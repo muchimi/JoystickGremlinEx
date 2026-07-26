@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T14B)
+- Change: include the ffmpeg dependency in the distribution package in case the system does not have it installed.
+
 ### (m77T14A)
 - Fix: QT confirmation box not on UI thread in some situations
 

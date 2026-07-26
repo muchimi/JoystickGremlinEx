@@ -18,6 +18,7 @@
 from __future__ import annotations  # deprecated with python 3.14+
 import os
 import html
+import sys
 from lxml import etree
 from PySide6 import QtCore, QtMultimedia, QtWidgets
 import gremlin.util
@@ -548,6 +549,10 @@ class Sound:
     """wrapper class to play sounds via pygame and QT multimedia"""
 
     def __init__(self):
+
+        # If running in a PyInstaller bundle, add the temporary folder to the PATH
+        if hasattr(sys, '_MEIPASS'):
+            os.environ['PATH'] = sys._MEIPASS + os.pathsep + os.environ['PATH']
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._handle_shutdown)
@@ -1801,7 +1806,10 @@ class EdgeTTS:
                     os.makedirs(path, exist_ok=True)
                 if os.path.isfile(output_wav):
                     os.unlink(output_wav)
-                self._sound.convertMp3ToWav(output_mp3, output_wav)
+                result = self._sound.convertMp3ToWav(output_mp3, output_wav)
+                if not result:
+                    syslog.error(f"ETTS: failed to convert MP3 to WAV [{output_mp3} -> {output_wav}]")
+
                 return output_wav
 
             return None

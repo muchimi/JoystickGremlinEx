@@ -50,7 +50,8 @@ added_binaries = [
     ("dill.dll", "."),
     ("vigem/ViGEmClient.dll", "."),
     ("SimConnect.dll","."),
-    ("hidapi.dll",".")
+    ("hidapi.dll","."),
+    ("ffmpeg/ffmpeg.exe",".")
 
 ]
 
@@ -75,7 +76,7 @@ a = Analysis(
     pathex=['C:/JoystickGremlin-develop'],
     binaries=added_binaries,
     datas=added_files,
-    hiddenimports=['mido.backends.rtmidi','lxml','pyttsx3','hid',"windows_event_hook","psygnal","graphviz","numpy","scipy","scipy._cyutility","sounddevice","soundfile","pyrubberband","pydub"],
+    hiddenimports=['mido.backends.rtmidi','lxml','pyttsx3','hid',"windows_event_hook","psygnal","graphviz","numpy","scipy","scipy._cyutility","sounddevice","soundfile","pyrubberband","pydub","ffmpeg"],
     hookspath=None,
     runtime_hooks=None,
     excludes=["torch",
