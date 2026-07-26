@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,13 +25,13 @@ from gremlin.input_types import InputType
 import gremlin.input_item
 from shiboken6 import Shiboken
 
-class PreviousModeWidget(gremlin.input_item.AbstractActionWidget):
 
+class PreviousModeWidget(gremlin.input_item.AbstractActionWidget):
     """Widget associated with the action of switching to the previous mode."""
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
-        assert(isinstance(action_data, PreviousMode))
+        assert isinstance(action_data, PreviousMode)
 
     def _create_ui(self):
         if not Shiboken.isValid(self):
@@ -44,18 +44,17 @@ class PreviousModeWidget(gremlin.input_item.AbstractActionWidget):
 
 
 class PreviousModeFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         import gremlin.control_action
+
         gremlin.control_action.switch_to_previous_mode()
         return True
 
 
-class PreviousMode(gremlin.base_profile.AbstractAction):
-
+class PreviousMode(gremlin.input_item.AbstractAction):
     """Action that switches to the previously active mode."""
 
     name = "Switch to previous Mode"
@@ -73,31 +72,28 @@ class PreviousMode(gremlin.base_profile.AbstractAction):
     # ]
 
     input_types = [
-         InputType.JoystickButton,
-         InputType.JoystickHat,
+        InputType.JoystickButton,
+        InputType.JoystickHat,
     ]
 
     functor = PreviousModeFunctor
     widget = PreviousModeWidget
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, extra_data: dict = None):
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
+        """returns a display string for the current configuration"""
         return "Previous Mode"
 
     def icon(self):
         return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         pass
 
     def _generate_xml(self):

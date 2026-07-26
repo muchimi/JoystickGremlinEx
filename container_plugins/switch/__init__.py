@@ -775,12 +775,12 @@ an input toggle, press or release.  Multiple inputs can be specified for latchin
     functor = SwitchContainerFunctor
     widget = SwitchContainerWidget
 
-    def __init__(self, parent=None, node=None):
+    def __init__(self, parent=None, node=None, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node)
+        super().__init__(parent, node, extra_data=extra_data)
         self.timeout = 0.0
         self.sync_mode = SyncMode.Ignore  # default sync mode on profile start
 

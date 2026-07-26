@@ -618,7 +618,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
     configuration and to easily load and store them.
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent, extra_data : dict = None):
         """Creates a new instance.
 
         :param: parent the parent item of this instance in the profile tree (type: InputItem)
@@ -628,7 +628,13 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         assert parent is not None
         self.code = None
         self._id = gremlin.util.get_guid(no_brackets=True)
-        self._input_item: gremlin.input_item.InputItem = gremlin.input_item._get_input_item(parent)
+        self._input_item: gremlin.input_item.InputItem = None
+        if extra_data:
+            if "input_item" in extra_data:
+                self._input_item = extra_data["input_item"]
+        else:
+            self._input_item = gremlin.input_item._get_input_item(parent)
+        assert self._input_item is not None, "input item not set for profile data"
 
         # reported device type to actions so they can configure themselves to a different hardware input type if needed
         if isinstance(parent, BaseProfileData):

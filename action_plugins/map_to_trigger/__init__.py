@@ -295,7 +295,7 @@ class MapToTriggerFunctor(gremlin.base_profile.AbstractFunctor):
         return True
 
 
-class MapToTrigger(gremlin.base_profile.AbstractAction):
+class MapToTrigger(gremlin.input_item.AbstractAction):
     """map to trigger action"""
 
     name = "Trigger (Joystick)"
@@ -317,8 +317,8 @@ class MapToTrigger(gremlin.base_profile.AbstractAction):
     def requires_virtual_button(self):
         return False
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, extra_data: dict = None):
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
 
         default_device = gremlin.joystick_handling.default_device()

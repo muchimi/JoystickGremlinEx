@@ -675,12 +675,12 @@ For more advanced axis splitting capability, look at the Gated Axis action.
     functor = RangeContainerFunctor
     widget = RangeContainerWidget
 
-    def __init__(self, parent, node=None):
+    def __init__(self, parent, node=None, extra_data: dict = None):
         """' creates a new instance
         :parent the InputItem which is the parent to this action
         """
 
-        super().__init__(parent, node)
+        super().__init__(parent, node, extra_data=extra_data)
         self._index = 0  # index # of this item
         self.range_min = -1.0  # lower bound of the range
         self.range_min_included = False  # true if the lower range is excluded from the range

@@ -499,8 +499,8 @@ class AbstractFunctor(QtCore.QObject):
     def _check_for_auto_release(self, action):
         """auto release check for functors"""
         activation_condition = None
-        if action.parent.activation_condition:
-            activation_condition = action.parent.activation_condition
+        if action.container.activation_condition:
+            activation_condition = action.container.activation_condition
         elif action.activation_condition:
             activation_condition = action.activation_condition
 

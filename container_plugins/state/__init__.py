@@ -53,7 +53,7 @@ class StateContainerWidget(AbstractContainerWidget):
         super().__init__(input_item, container, parent)
         self.container = container
         self.input_item = input_item
-        
+
     def _create_action_ui(self):
         """Creates the UI components."""
         if not Shiboken.isValid(self):
@@ -322,12 +322,12 @@ class StateContainer(AbstractContainer):
     functor = StateContainerFunctor
     widget = StateContainerWidget
 
-    def __init__(self, parent=None, node=None):
+    def __init__(self, parent=None, node=None, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node)
+        super().__init__(parent, node, extra_data=extra_data)
         self.state = None  # the state
         self.required_value = True  # execute on state set by default
 

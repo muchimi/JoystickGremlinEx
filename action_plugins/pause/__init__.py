@@ -34,21 +34,20 @@ from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
-class PauseMode (IntEnum):
-    Delay = 0 # delay mode
-    PauseAction = 1 # pause action mode
+class PauseMode(IntEnum):
+    Delay = 0  # delay mode
+    PauseAction = 1  # pause action mode
+
 
 class PauseActionWidget(gremlin.input_item.AbstractActionWidget):
-
     """Widget for the pause action."""
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
-        assert(isinstance(action_data, PauseAction))
-
+        assert isinstance(action_data, PauseAction)
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
+        """returns a display string for the current configuration"""
         return "Pause Action"
 
     def _create_ui(self):
@@ -72,13 +71,11 @@ class PauseActionWidget(gremlin.input_item.AbstractActionWidget):
         self.mode_delay_widget.clicked.connect(self._mode_changed)
         self.mode_pause_widget.clicked.connect(self._mode_changed)
 
-
         self.delay_widget = gremlin.ui.ui_common.QDelayWidget()
         self.delay_widget.setToolTip("Delay in milliseconds")
         self.delay_widget.valueChanged.connect(self._value_changed)
         self.main_layout.addWidget(self.mode_container_widget)
         self.main_layout.addWidget(self.delay_widget)
-
 
     def _populate_ui(self):
         with QtCore.QSignalBlocker(self.delay_widget):
@@ -91,12 +88,11 @@ class PauseActionWidget(gremlin.input_item.AbstractActionWidget):
         mode = cb.data
         self.action_data.mode = mode
 
-
     @QtCore.Slot()
-    def _value_changed(self, value : int):
-        ''' called when the delay value changes - the value is in milliseconds'''
+    def _value_changed(self, value: int):
+        """called when the delay value changes - the value is in milliseconds"""
         self.action_data.delay = value
-        gremlin.config.Configuration().pause_action_default_pause_value = value / 1000 # update options as well (convert to seconds)
+        gremlin.config.Configuration().pause_action_default_pause_value = value / 1000  # update options as well (convert to seconds)
 
     def _update(self):
         delay_visible = self.action_data.mode == PauseMode.Delay
@@ -104,13 +100,11 @@ class PauseActionWidget(gremlin.input_item.AbstractActionWidget):
 
 
 class PauseActionFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action_data, parent = None):
+    def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent)
         self.action_data = action_data
 
-
-    def process_event(self, event : gremlin.event_handler.Event, value : gremlin.actions.Value, extra_data = None):
+    def process_event(self, event: gremlin.event_handler.Event, value: gremlin.actions.Value, extra_data=None):
 
         syslog = logging.getLogger("system")
         if value.is_pressed:
@@ -123,22 +117,21 @@ class PauseActionFunctor(gremlin.base_profile.AbstractFunctor):
                         # delay
 
                         syslog.info(f"Pause: start waiting {self.action_data.delay} ms")
-                        time.sleep(self.action_data.delay/1000)
+                        time.sleep(self.action_data.delay / 1000)
                         syslog.info(f"Pause: end waiting {self.action_data.delay} ms")
                     self.functor_complete.emit()
 
         return True
 
 
-class PauseAction(gremlin.base_profile.AbstractAction):
-
+class PauseAction(gremlin.input_item.AbstractAction):
     """Action for pausing the execution of callbacks."""
 
     name = "Pause"
     tag = "pause"
-    hint = '''Pauses the profile.
+    hint = """Pauses the profile.
 Note: containers that are marked as always execute
-do not pause even if the profile is paused.'''
+do not pause even if the profile is paused."""
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
@@ -152,31 +145,27 @@ do not pause even if the profile is paused.'''
     # ]
 
     input_types = [
-         InputType.JoystickButton,
-         InputType.JoystickHat,
+        InputType.JoystickButton,
+        InputType.JoystickHat,
     ]
 
     functor = PauseActionFunctor
     widget = PauseActionWidget
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, extra_data: dict = None):
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
-        self.mode = PauseMode.Delay # delay mode is the default
-        self.delay = int(gremlin.config.Configuration().pause_action_default_pause_value * 1000) # default delay in ms
-
+        self.mode = PauseMode.Delay  # delay mode is the default
+        self.delay = int(gremlin.config.Configuration().pause_action_default_pause_value * 1000)  # default delay in ms
 
     def icon(self):
         return "fa5.pause-circle"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         if "mode" in node.attrib:
             mode = node.get("mode")
             match mode:
@@ -185,18 +174,17 @@ do not pause even if the profile is paused.'''
                 case 1:
                     self.mode = PauseMode.PauseAction
             if "delay" in node.attrib:
-                self.delay = safe_read(node,"delay",int, 250)
+                self.delay = safe_read(node, "delay", int, 250)
 
         else:
             # legacy node - use the old mode
             self.mode = PauseMode.PauseAction
 
-
     def _generate_xml(self):
         node = ElementTree.Element("pause")
-        node.set("mode",str(self.mode))
+        node.set("mode", str(self.mode))
         if self.mode == PauseMode.Delay:
-            node.set("delay",str(self.delay))
+            node.set("delay", str(self.delay))
         return node
 
     def _is_valid(self):

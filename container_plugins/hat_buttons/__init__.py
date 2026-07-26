@@ -314,12 +314,12 @@ class HatButtonsContainer(AbstractContainer):
     input_types = [InputType.JoystickHat]
     interaction_types = []
 
-    def __init__(self, container=None, node=None):
+    def __init__(self, container=None, node=None, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(container, node, custom_action_sets=True, custom_generate_callback = self._generate_action_set_xml)
+        super().__init__(container, node, extra_data=extra_data, custom_action_sets=True, custom_generate_callback = self._generate_action_set_xml)
         self.button_count = 8
         self.sticky = True  # true if hat only releases in the center position
 

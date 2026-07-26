@@ -131,7 +131,7 @@ class MapToOctaviIfr1Functor(gremlin.base_profile.AbstractFunctor):
         return True
 
 
-class MapToOctaviIfr1(gremlin.base_profile.AbstractAction):
+class MapToOctaviIfr1(gremlin.input_item.AbstractAction):
     """Action data for the map to OSC (open sound control) - allows the inputs to send an OSC command"""
 
     name = "Map to Octavi IFR1"
@@ -145,12 +145,12 @@ class MapToOctaviIfr1(gremlin.base_profile.AbstractAction):
     functor = MapToOctaviIfr1Functor
     widget = MapToOctaviIfr1Widget
 
-    def __init__(self, parent):
+    def __init__(self, parent, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the container this action is part of
         """
-        super().__init__(parent)
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
 
         self.button = OctaviButton.MODEAP  # default LED to toggle

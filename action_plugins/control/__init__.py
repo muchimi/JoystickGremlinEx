@@ -305,7 +305,7 @@ class ControlFunctor(gremlin.base_profile.AbstractFunctor):
             return True
 
 
-class Control(gremlin.base_profile.AbstractAction):
+class Control(gremlin.input_item.AbstractAction):
     """Action remapping physical joystick inputs to vJoy inputs."""
 
     name = "Control"
@@ -319,8 +319,8 @@ class Control(gremlin.base_profile.AbstractAction):
 
     input_types = [InputType.JoystickButton, InputType.JoystickHat]
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, extra_data: dict = None):
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         self.action: ControlAction = ControlAction.TTSAbort
         self.setPriority(899)  # run ahead of other actions in the same content but before mode change

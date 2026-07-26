@@ -137,7 +137,7 @@ class ResponseCurveExFunctor(gremlin.base_profile.AbstractFunctor):
         return True
 
 
-class ResponseCurveEx(gremlin.base_profile.AbstractAction):
+class ResponseCurveEx(gremlin.input_item.AbstractAction):
     """Represents axis response curve mapping."""
 
     name = "Response Curve Ex"
@@ -156,12 +156,12 @@ If applying a curve to an output axis, use VJOY Remap instead for improved perfo
     functor = ResponseCurveExFunctor
     widget = ResponseCurveExWidget
 
-    def __init__(self, parent):
+    def __init__(self, parent, extra_data: dict = None):
         """Creates a new ResponseCurve instance.
 
         :param parent the parent profile.InputItem of this instance
         """
-        super().__init__(parent)
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         self.curve_data = gremlin.curve_handler.AxisCurveData()
         # uptate m76T62 - ignore any calibration data

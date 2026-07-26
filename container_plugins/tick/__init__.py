@@ -359,14 +359,14 @@ For a more advanced way to split an axis and trigger actions at specific points,
         print(f"New count: {count}  interval: {self.interval}  {2 / self.interval:0.3f}")
         return count
 
-    def __init__(self, parent=None, node=None):
+    def __init__(self, parent=None, node=None, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
 
         # this container has two actions sets, one for the increase actions (index 0), the other for the decrease actions (index 1)
-        super().__init__(parent, node, custom_action_sets=True)
+        super().__init__(parent, node, extra_data=extra_data, custom_action_sets=True)
 
 
         self.delay = 0.5

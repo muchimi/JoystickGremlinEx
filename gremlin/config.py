@@ -3472,3 +3472,10 @@ class Configuration(QtCore.QObject):
     def maestro_dist_path(self, value: str):
         self._set_data("maestro_dist_path", value)
 
+    @property
+    def last_save_path(self) -> str:
+        """returns the last save path used for audio files"""
+        return self._get_data("last_save_path", "")
+    @last_save_path.setter
+    def last_save_path(self, value: str):
+        self._set_data("last_save_path", value)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ from lxml import etree as ElementTree
 from PySide6.QtCore import QModelIndex
 
 
-import gremlin.base_profile 
+import gremlin.base_profile
 import gremlin.event_handler
 from gremlin.input_types import InputType
 import gremlin.shared_state
@@ -33,6 +33,7 @@ import gremlin.util
 import html
 
 import logging
+
 syslog = logging.getLogger("system")
 
 
@@ -40,13 +41,13 @@ class CycleModeModel(QtCore.QAbstractItemModel):
     def __init__(self):
         super().__init__()
         self._data = {}
-        
-    def rowCount(self, parent = None):
+
+    def rowCount(self, parent=None):
         return len(self._data)
 
-    def columnCount(self, parent = None):
+    def columnCount(self, parent=None):
         return 1
-    
+
     def clear(self):
         self._data.clear()
 
@@ -56,18 +57,18 @@ class CycleModeModel(QtCore.QAbstractItemModel):
         self._data[count] = (mode, display)
         self.endInsertRows()
 
-    def data(self, index : QModelIndex, role = QtCore.Qt.DisplayRole):
+    def data(self, index: QModelIndex, role=QtCore.Qt.DisplayRole):
         if not index.isValid():
             return None
-        
+
         if role == QtCore.Qt.DisplayRole:
             row = index.row()
             if row in self._data:
                 return self._data[row][1]
         return None
-    
+
     def swap(self, index_a, index_b):
-        ''' swaps two indices '''
+        """swaps two indices"""
         data_a = self._data[index_a]
         data_b = self._data[index_b]
         self._data[index_a] = data_b
@@ -94,56 +95,51 @@ class CycleModeModel(QtCore.QAbstractItemModel):
             del self._data[index]
 
     def modes(self):
-        ''' gets the modes in the list'''
+        """gets the modes in the list"""
         return [data[0] for data in self._data.values()]
-    
+
     def index(self, row, column, parent=QModelIndex()):
         if row not in self._data:
             return QModelIndex()
 
         return self.createIndex(row, column, row)
-    
+
     def parent(self, index):
         return QModelIndex()
 
     def __len__(self):
         return len(self._data)
 
-class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
 
+class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
     """Widget allowing the configuration of a list of modes to cycle."""
 
     locked = False
 
     def __init__(self, action_data, parent=None):
         super().__init__(action_data, parent=parent)
-        assert(isinstance(action_data, CycleModes))
-
-
-
-        
+        assert isinstance(action_data, CycleModes)
 
     def _create_ui(self):
 
         if not Shiboken.isValid(self):
             return
 
-
         self.ec = gremlin.execution_graph.ExecutionContext()
         self.model = CycleModeModel()
         self.view = QtWidgets.QListView()
         self.view.setModel(self.model)
-   
+
         self.view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
         # Add widgets which allow modifying the mode list
         self.mode_list_widget = gremlin.ui.ui_common.QDataComboBox()
-        self.button_add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(callback = self._add_cb)
-        self.button_delete_widget =gremlin.ui.ui_common.Buttons.getDeleteWidget(callback = self._remove_cb)
-        
+        self.button_add_widget = gremlin.ui.ui_common.Buttons.getAddWidget(callback=self._add_cb)
+        self.button_delete_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._remove_cb)
+
         icon = gremlin.ui.ui_common.Icons.listUpIcon()
         self.up = QtWidgets.QPushButton(icon, "Up")
-        
+
         self.up.clicked.connect(self._up_cb)
         icon = gremlin.ui.ui_common.Icons.listDownIcon()
         self.down = QtWidgets.QPushButton(icon, "Down")
@@ -159,8 +155,6 @@ class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
         self.button_container_layout.addWidget(self.button_delete_widget)
         self.button_container_layout.addWidget(self.up)
         self.button_container_layout.addWidget(self.down)
-        
-
 
         self.main_layout.addWidget(self.view)
         self.main_layout.addWidget(self.button_container_widget)
@@ -168,8 +162,6 @@ class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
 
         eh = gremlin.event_handler.EventListener()
         eh.edit_mode_changed.connect(self._edit_mode_changed)
-
-
 
     def _populate_ui(self):
         self._update_mode_list()
@@ -193,35 +185,32 @@ class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
             for display, mode in mode_list:
                 if mode:
                     self.mode_list_widget.addItem(display, mode)
-                    
+
         modes = [mode for _, mode in mode_list]
         # verify the modes in the cycle are valid
         mode_list = self.action_data.mode_list
-        
+
         for mode in mode_list:
             if mode is None or mode not in modes:
                 mode_list.remove(mode)
         self.model.clear()
         for mode in mode_list:
             self.model.addItem(mode, mode)
-        
-        
+
     def _edit_mode_changed(self):
-        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui) # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui)  # ensure on UI thread
 
-    
     def _edit_mode_changed_ui(self):
-        ''' occurs when the modes are edited or changed '''
+        """occurs when the modes are edited or changed"""
         self._update_mode_list()
-
 
     @QtCore.Slot()
     def _add_cb(self):
         """Adds the currently selected mode to the list of modes."""
-        
+
         mode = self.mode_list_widget.currentData()
         display = self.mode_list_widget.currentText()
-        
+
         self.model.addItem(display, mode)
         self.save_changes()
 
@@ -248,13 +237,11 @@ class CycleModesWidget(gremlin.input_item.AbstractActionWidget):
 
 
 class CycleModesFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
-        self.action_data : CycleModes = action
-        
+        self.action_data: CycleModes = action
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         if event.is_pressed:
             mode_list = self.action_data.mode_list
             index = self.action_data.mode_index
@@ -276,25 +263,17 @@ class CycleModesFunctor(gremlin.base_profile.AbstractFunctor):
             self.action_data.mode_index = index
 
             gremlin.event_handler.EventHandler().change_mode(next_mode)
-            
-        
 
-    
-
-
-        
         return True
 
 
-class CycleModes(gremlin.base_profile.AbstractAction):
-
+class CycleModes(gremlin.input_item.AbstractAction):
     """Action allowing the switching through a list of modes."""
 
     name = "Cycle Modes"
     tag = "cycle-modes"
-    hint = '''Changes profile modes modes based
-on a round robin sequence.'''
-
+    hint = """Changes profile modes modes based
+on a round robin sequence."""
 
     default_button_activation = (True, False)
 
@@ -304,36 +283,30 @@ on a round robin sequence.'''
     #     InputType.JoystickButton,
     #     InputType.JoystickHat,
     #     InputType.Keyboard,
-        
+
     # ]
 
-    input_types = [
-        InputType.JoystickButton,
-        InputType.JoystickHat
-    ]
+    input_types = [InputType.JoystickButton, InputType.JoystickHat]
 
     functor = CycleModesFunctor
     widget = CycleModesWidget
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, extra_data: dict = None):
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         self.mode_list = []
-        self.mode_index = 0 # index of the current cycle mode
+        self.mode_index = 0  # index of the current cycle mode
         self.setPriority(999)
 
     def icon(self):
         return "ei.fork"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None, extra_data = None):
-        ''' reads action XML data '''
+    def _parse_xml(self, node, data=None, extra_data=None):
+        """reads action XML data"""
         self.mode_list.clear()
 
         # get defined profile modes in the xml
@@ -349,7 +322,7 @@ on a round robin sequence.'''
                 continue
             if mode not in mode_list:
                 syslog.error(f"CYCLE MODE: mode [{mode}] does not exist in the profile -  offending line: {child.sourceline}")
-                syslog.error(f"\tValid modes: {"".join(f"[{m}] " for m in mode_list)}")
+                syslog.error(f"\tValid modes: {''.join(f'[{m}] ' for m in mode_list)}")
                 continue
             self.mode_list.append(mode)
 
@@ -366,18 +339,18 @@ on a round robin sequence.'''
         return node
 
     def to_html(self) -> str:
-        ''' returns reporting graphviz data for this action '''
+        """returns reporting graphviz data for this action"""
         from gremlin.reporting import ReportTable
-        table = ReportTable(cellpadding=4) 
-        
+
+        table = ReportTable(cellpadding=4)
+
         for index, mode in enumerate(self.mode_list):
             if mode:
                 table.addField(f"Mode {index}", html.escape(mode))
 
         return table.to_html()
 
-   
-    
+
 version = 1
 name = "cycle-modes"
 create = CycleModes

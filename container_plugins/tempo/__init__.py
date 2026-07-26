@@ -406,12 +406,12 @@ Look at Tempo Ex for a container that allows more than one action per short or l
         Interactions.Delete,
     ]
 
-    def __init__(self, parent=None, node=None):
+    def __init__(self, parent=None, node=None, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node, custom_action_sets=True, custom_generate_callback = self._generate_action_set_xml)
+        super().__init__(parent, node, extra_data=extra_data, custom_action_sets=True, custom_generate_callback = self._generate_action_set_xml)
 
         self.delay = 0.5  # delay for long press
         self.autorelease_delay = 0.250  # delay between press and autorelease
