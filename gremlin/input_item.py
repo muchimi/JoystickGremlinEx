@@ -1873,7 +1873,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         if self.is_axis:
             # update axis input icons
-            self._update_axis_icons_ui()
+            self._update_axis_icons()
 
         self.ensureStyle()
 
@@ -2294,16 +2294,16 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
     def _update_axis_icons_ui(self):
         """update titlebar icons - UI thread"""
         is_curve = self._input_item.is_curve
-        if Shiboken.isValid(self._curve_button_widget):
+        if self._curve_button_widget is not None and Shiboken.isValid(self._curve_button_widget):
             if is_curve:
                 self._curve_button_widget.setIcon(self._curve_icon_active)
             else:
                 self._curve_button_widget.setIcon(self._curve_icon_inactive)
 
-        if Shiboken.isValid(self.clear_curve_widget):
+        if self.clear_curve_widget is not None and Shiboken.isValid(self.clear_curve_widget):
             self.clear_curve_widget.setEnabled(is_curve)
 
-        if Shiboken.isValid(self._calibration_button_widget):
+        if self._calibration_button_widget is not None and Shiboken.isValid(self._calibration_button_widget):
             has_calibration = self._input_item.hasCalibration
             if has_calibration:
                 self._calibration_button_widget.setIcon(self._calibration_icon_active)

@@ -30,7 +30,6 @@ import gremlin.input_item
 import gremlin.ui.ui_common
 from gremlin.util import safe_format, safe_read
 import logging
-import threading
 import gremlin.sound
 from gremlin.sound import Sound, PhraseData, EdgeTTSVoice
 import enum
@@ -70,6 +69,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         verbose = gremlin.config.Configuration().verbose_mode_sound
 
         self.action_data.etts_callback = self._update_etts_ui
+        self._updating_etts_speakers = False
 
         container_widgets = []
         ktts_enabled = gremlin.ktts.KTTS_ENABLED
@@ -211,12 +211,12 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         self.generate_play_widget = gremlin.ui.ui_common.Buttons.getPlayWidget(tooltip="Generate & Play", callback=self._handle_play)
 
-        self.etts_speed_widget = gremlin.ui.ui_common.QFloatLineEdit(
-            min_range=0.1,
-            max_range=10.0,
+        self.etts_speed_widget = gremlin.ui.ui_common.QIntLineEdit(
+            min_range=-100,
+            max_range=400,
             value=self.action_data.etts_speed,
             callback=self._handle_etts_speed_changed,
-            tooltip="Speed rate modifier for the generated audio.\n1.0 is the normal rate.",
+            tooltip="Speed rate modifier for the generated audio.\n0is the normal rate.  Half speed, -50, twice the speed +100",
         )
 
         if ktts_enabled:
@@ -283,7 +283,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         widgets = [
             "ETTS Generation Options:",
             gremlin.ui.ui_common.getHContainer(["Locale:", self.etts_locale_widget, "Gender:", self.etts_gender_widget, "Voice:", self.etts_speaker_widget, etts_refresh_speaker_widget,"||"], widget_only=True),
-            gremlin.ui.ui_common.getHContainer(["Rate (gen):", self.etts_speed_widget, "Pitch Offset (Hz):", self.etts_pitch_widget, "Volume (gen):", self.etts_volume_widget], widget_only=True),
+            gremlin.ui.ui_common.getHContainer(["Rate% (gen):", self.etts_speed_widget, "Pitch Offset (Hz):", self.etts_pitch_widget, "Volume (gen):", self.etts_volume_widget], widget_only=True),
         ]
         self.etts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
@@ -345,12 +345,12 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         )
 
 
-        self.playback_widget = gremlin.ui.ui_common.QIntLineEdit(
+        self.playback_widget = gremlin.ui.ui_common.QFloatLineEdit(
             min_range=0,
-            value=self.action_data.playback_ms,
+            value=self.action_data.playback_ms*1000,
             callback=self._handle_playback_changed,
-            chars=4,
-            tooltip="Maximum time in ms the sample has to play.\nThe sample will be cut short if the specified time is shorter than the normal sample play time.\nUse 0 to disable (default).",
+            decimals=2,
+            tooltip="Maximum time in seconds the sample has to play.\nThe sample will be cut short if the specified time is shorter than the normal sample play time.\nUse 0 to disable (default).",
         )
 
         self.stop_widget = gremlin.ui.ui_common.QDataCheckbox(
@@ -401,7 +401,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         playback_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         widgets = [
-            "Playback (ms):",
+            "Max playback (s):",
             self.playback_widget,
             "Fade-in (ms):",
             self.fadein_widget,
@@ -605,10 +605,10 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.action_data.etts_volume = value
 
     def _handle_ktts_speed_changed(self, value: float):
-        self.action_data.ptts_speed = value
+        self.action_data.ktts_speed = value
 
-    def _handle_etts_speed_changed(self, value: float):
-        self.action_data.ptts_speed = value
+    def _handle_etts_speed_changed(self, value: int):
+        self.action_data.etts_speed = value
 
     def _handle_ptts_speed_changed(self, value: float):
         self.action_data.ptts_speed = value
@@ -760,15 +760,15 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         config = gremlin.config.Configuration()
         with QtCore.QSignalBlocker(self.etts_locale_widget):
             self.etts_locale_widget.clear()
-            for locale in locales:
-                self.etts_locale_widget.addItem(locale, locale)
+            for friendly_locale, locale in locales:
+                self.etts_locale_widget.addItem(friendly_locale, locale)
             if config.ai_etts_last_locale:
-                index = self.etts_locale_widget.findText(config.ai_etts_last_locale)
+                index = self.etts_locale_widget.findData(config.ai_etts_last_locale)
                 if index != -1:
                     self.etts_locale_widget.setCurrentIndex(index)
             else:
                 if locales:
-                    config.ai_etts_last_locale = locales[0]
+                    config.ai_etts_last_locale = locales[0][1]
                     self.etts_locale_widget.setCurrentIndex(0)
 
     def _get_etts_filtered_voices(self) -> dict[str, EdgeTTSVoice]:
@@ -777,37 +777,44 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         return etts.getFilteredVoices(locale=self.action_data.etts_locale, gender=self.action_data.etts_gender)
 
     def _update_etts_speakers(self):
-        config = gremlin.config.Configuration()
-        voices : dict[str, EdgeTTSVoice] = self._get_etts_filtered_voices()
-        etts = gremlin.sound.EdgeTTS()
-        current_voice = etts.getVoice(self.etts_speaker_widget.currentText())
-        if current_voice:
-            if current_voice.gender != self.action_data.etts_gender or current_voice.locale != self.action_data.etts_locale:
-                voice = list(voices.values())[0]
-                self.action_data.etts_speaker = voice.short_name
-                self.action_data.speaker = voice.short_name
+        if self._updating_etts_speakers:
+            return
+        self._updating_etts_speakers = True
+        try:
+            config = gremlin.config.Configuration()
+            voices : dict[str, EdgeTTSVoice] = self._get_etts_filtered_voices()
+            etts = gremlin.sound.EdgeTTS()
+            current_voice = etts.getVoice(self.etts_speaker_widget.currentText())
+            if current_voice:
+                if current_voice.gender != self.action_data.etts_gender or current_voice.locale != self.action_data.etts_locale:
+                    voice = list(voices.values())[0]
+                    self.action_data.etts_speaker = voice.short_name
+                    self.action_data.speaker = voice.short_name
 
 
-        with QtCore.QSignalBlocker(self.etts_speaker_widget):
-            self.etts_speaker_widget.clear()
-            if voices:
-                voice : EdgeTTSVoice
-                for voice in voices.values():
-                    speaker = voice.short_name
-                    self.etts_speaker_widget.addItem(speaker, speaker)
-                if self.action_data.speaker:
-                    speaker = self.action_data.speaker
-                else:
-                    speaker = config.ai_etts_last_speaker
-                index = self.etts_speaker_widget.findText(speaker)
-                if index != -1:
-                    self.etts_speaker_widget.setCurrentIndex(index)
-                else:
-                    config.ai_etts_last_speaker = speaker
-                    self.action_data.speaker = self.etts_speaker_widget.currentText()
+            with QtCore.QSignalBlocker(self.etts_speaker_widget):
+                self.etts_speaker_widget.clear()
+                if voices:
+                    voice : EdgeTTSVoice
+                    for voice in voices.values():
+                        speaker = voice.short_name
+                        self.etts_speaker_widget.addItem(speaker, speaker)
+                    if self.action_data.speaker:
+                        speaker = self.action_data.speaker
+                    else:
+                        speaker = config.ai_etts_last_speaker
+                    index = self.etts_speaker_widget.findText(speaker)
+                    if index != -1:
+                        self.etts_speaker_widget.setCurrentIndex(index)
+                    else:
+                        config.ai_etts_last_speaker = speaker
+                        self.action_data.speaker = self.etts_speaker_widget.currentText()
 
-            self.etts_speaker_widget.setEnabled(bool(voices))
-        self.etts_speaker_widget.updateGeometry()
+                self.etts_speaker_widget.setEnabled(bool(voices))
+            self.etts_speaker_widget.updateGeometry()
+
+        finally:
+            self._updating_etts_speakers = False
 
     def _update_ptts_speakers(self, initialize=False):
         ptts = gremlin.tts.TextToSpeech()
@@ -859,8 +866,8 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
     def _handle_fadeout_changed(self, value: int):
         self.action_data.fadeout_ms = value
 
-    def _handle_playback_changed(self, value: int):
-        self.action_data.playback_ms = value
+    def _handle_playback_changed(self, value: float):
+        self.action_data.playback_ms = value/1000 # to ms
 
     def _handle_playback_rate_changed(self, value: float):
         self.action_data.playback_rate = value
@@ -1008,19 +1015,15 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
             # update the file list to randomize from
             self.action_data.scanFolder()
 
-        # pre-generate the audio file rather than letting the first trigger
-        # generate it inline from the input execution/hook thread (which can
-        # hang the app). Do it on a detached background thread so that profile
-        # activation itself never blocks the UI - generating many TTS phrases
-        # synchronously here freezes the app at activation until all are done.
+        # pre-generate the audio file now (profile activation), rather than
+        # letting the first trigger generate it inline from the input
+        # execution/hook thread, which can hang the app (pyttsx3/SAPI5 does
+        # not tolerate being called in that context well).
         if self.action_data.mode in (PlayMode.PyTTS, PlayMode.EdgeAI):
-            def _bg_generate(action_data):
-                try:
-                    action_data.generate(force=False)
-                except Exception as e:
-                    syslog.warning(f"PLAY SOUND: pre-generation failed for [{action_data.text}]: {e}")
-            t = threading.Thread(target=_bg_generate, args=(self.action_data,), daemon=True)
-            t.start()
+            try:
+                self.action_data.generate(force=False)
+            except Exception as e:
+                syslog.warning(f"PLAY SOUND: pre-generation failed for [{self.action_data.text}]: {e}")
 
     def profile_stop(self):
         """stop any active audio on profile stop"""
@@ -1086,7 +1089,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self._tts_file = None  # sound file for TTS
         self.ptts_speed: int = 100  # words per minute, 100 is the default
         self.ptts_volume: int = 100 # volume, 0 to 100
-        self.etts_speed = 1.0  # speed factor for PyTTS
+        self.etts_speed : int = 0  # speed factor for Edge TTS as a whole percentage, e.g., 10 means +10%
         self.ktts_speed = 1.0  # speed factor for KTTS
 
         self._tts_suppress_duplicate = config.tts_suppress_enabled  # whether to suppress duplicate TTS playback
@@ -1335,15 +1338,6 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
     def play(self):
         """plays the sound"""
-        # run the whole generate+playback off the input execution thread:
-        # if the audio file isn't pre-generated yet, self.sound.generate()
-        # would otherwise synthesize it inline here and freeze the app on the
-        # first press. A detached daemon thread keeps the input pipeline free.
-        t = threading.Thread(target=self._play_worker, daemon=True)
-        t.start()
-
-    def _play_worker(self):
-        """does the actual sound generation and playback (background thread)"""
 
         sound_file = None
 
@@ -1503,6 +1497,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         return os.path.isfile(wav)
 
     def _parse_xml(self, node, data=None, extra_data=None):
+        config = gremlin.config.Configuration()
         mode = safe_read(node, "mode", str, "")
         self.mode = PlayMode.from_string(mode)
         self.text = None
@@ -1514,7 +1509,6 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.speaker = speaker  # speaker for AI
         if self.mode == PlayMode.EdgeAI:
             if speaker:
-                config = gremlin.config.Configuration()
                 etts = gremlin.sound.EdgeTTS()
                 voice = etts.getVoice(speaker)
                 self._etts_speaker = speaker # this will set the gender and the locale
@@ -1549,10 +1543,8 @@ class PlaySound(gremlin.base_profile.AbstractAction):
 
         self.ptts_speed = safe_read(node, "ptts_speed", int, 100)
         self.ptts_volume = safe_read(node, "ptts_volume", int, 100)
-        self.etts_speed = safe_read(node, "etts_speed", float, 1.0)
+        self.etts_speed = safe_read(node, "etts_speed", int, 0)
         self.etts_volume = safe_read(node, "etts_volume", float, 1.0)
-
-
 
         self.ktts_enabled = gremlin.ktts.KTTS_ENABLED
         self.ktts_speed = safe_read(node, "ktts_speed", float, 1.0)
@@ -1562,7 +1554,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.exec_on_release = safe_read(node, "exec_on_release", bool, False)
         self.audio_device = safe_read(node, "audio-device", str, None)
         self.loops = safe_read(node, "loops", int, 1)
-        self.playback_ms = safe_read(node, "playback-ms", int, 0)
+        self.playback_ms = safe_read(node, "playback-ms", float, 0)
         self.fadein_ms = safe_read(node, "fadein-ms", int, 0)
         self.fadeout_ms = safe_read(node, "fadeout-ms", int, 0)
         self.stop_previous = safe_read(node, "stop-previous", bool, False)
@@ -1591,7 +1583,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
             node.set("text", html.escape(self.text))
         node.set("ptts_speed", safe_format(self.ptts_speed, int))
         node.set("ptts_volume", safe_format(self.ptts_volume, int))
-        node.set("etts_speed", safe_format(self.etts_speed, float))
+        node.set("etts_speed", safe_format(self.etts_speed, int))
         node.set("etts_volume", safe_format(self.etts_volume, float))
         if self.etts_locale:
             node.set("etts_locale", self.etts_locale)

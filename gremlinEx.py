@@ -29,6 +29,7 @@ import logging
 import os
 import subprocess
 import sys
+import filecmp
 import time
 import trace
 import uuid
@@ -5371,7 +5372,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 return False
 
             # compare files
-            import filecmp
 
             if os.path.isfile(tmp_path) and os.path.isfile(self._comparative_file):
                 is_changed = filecmp.cmp(tmp_path, self._comparative_file, shallow=False)

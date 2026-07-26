@@ -18,6 +18,7 @@
 from __future__ import annotations  # deprecated with python 3.14+
 import os
 import html
+import sys
 from lxml import etree
 from PySide6 import QtCore, QtMultimedia, QtWidgets
 import gremlin.util
@@ -35,6 +36,7 @@ import json
 import random
 import gremlin.ui.ui_common
 import threading
+import pycountry
 
 import logging
 
@@ -549,12 +551,17 @@ class Sound:
 
     def __init__(self):
 
+        # If running in a PyInstaller bundle, add the temporary folder to the PATH
+        if hasattr(sys, '_MEIPASS'):
+            os.environ['PATH'] = sys._MEIPASS + os.pathsep + os.environ['PATH']
+
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self._handle_shutdown)
 
         self._has_rubberband = False
         spec = importlib.util.find_spec("pyrubberband")
         self._has_rubberband = spec is not None
+        self._ffmpeg_exe = None
 
         self._playback_device_name = None
         config = gremlin.config.Configuration()
@@ -1052,7 +1059,7 @@ class Sound:
                  mode: PlayMode = PlayMode.EdgeAI,
                  voice : str = None,
                  randomize_sound_file : bool = False,
-                 rate : float = 1.0,
+                 rate : float = 0,
                  pitch : int = 0,
                  volume : float = 1.0,
                  playback_mode : PlaybackMode = PlaybackMode.RoundRobin,
@@ -1386,7 +1393,7 @@ class Sound:
         encoded = text.encode("cp1252", errors="replace")
         return encoded.decode("cp1252")
 
-    def convertMp3ToWav(self, mp3_file: str, wav_file: str) -> bool:
+    def convertMp3ToWav_pydub(self, mp3_file: str, wav_file: str) -> bool:
         """Converts an MP3 file to WAV format."""
         try:
             audio = AudioSegment.from_mp3(mp3_file)
@@ -1395,6 +1402,140 @@ class Sound:
         except Exception as e:
             syslog.error(f"Failed to convert MP3 to WAV [{mp3_file} -> {wav_file}]: {str(e)}")
             return False
+
+    def ensureFFmpeg(self) -> bool:
+        try:
+            if self._ffmpeg_exe:
+                return True
+
+            if getattr(sys, 'frozen', False):
+                # Running as a packaged executable
+                current_dir = os.path.dirname(sys.executable)
+                ffmpeg_exe = os.path.join(current_dir, "_internal", "ffmpeg.exe")
+
+            else:
+                # Running as a normal Python script
+                main_module = sys.modules['__main__']
+                if not hasattr(main_module, '__file__'):
+                    ffmpeg_exe = None
+                else:
+                    current_dir = os.path.dirname(os.path.abspath(main_module.__file__))
+                    ffmpeg_exe = os.path.join(current_dir, "ffmpeg", "ffmpeg.exe")
+            if ffmpeg_exe and os.path.isfile(ffmpeg_exe):
+                self._ffmpeg_exe = ffmpeg_exe
+                return True
+            # Fall back to ffmpeg on the system PATH
+            path_ffmpeg = shutil.which("ffmpeg")
+            if path_ffmpeg:
+                self._ffmpeg_exe = path_ffmpeg
+                syslog.info(f"FFmpeg found on PATH: {path_ffmpeg}")
+                return True
+            # Last resort: auto-download a static build into ./ffmpeg/
+            downloaded = self._downloadFFmpeg()
+            if downloaded and os.path.isfile(downloaded):
+                self._ffmpeg_exe = downloaded
+                syslog.info(f"FFmpeg auto-downloaded: {downloaded}")
+                return True
+            syslog.error("FFmpeg not found.")
+            return False
+        except Exception as e:
+            syslog.error(f"Failed to ensure FFmpeg: {str(e)}")
+            return False
+
+    def _downloadFFmpeg(self) -> str | None:
+        """Download a static FFmpeg build from gyan.dev into ./ffmpeg/ on first use.
+
+        Returns the path to ffmpeg.exe on success, else None.
+        """
+        import urllib.request
+        import hashlib
+        import zipfile
+        import tempfile
+
+        try:
+            # Determine target directory next to the main script
+            main_module = sys.modules['__main__']
+            if not hasattr(main_module, '__file__'):
+                return None
+            base_dir = os.path.dirname(os.path.abspath(main_module.__file__))
+            target_dir = os.path.join(base_dir, "ffmpeg")
+            os.makedirs(target_dir, exist_ok=True)
+            target_exe = os.path.join(target_dir, "ffmpeg.exe")
+
+            url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+            sha_url = url + ".sha256"
+
+            syslog.info("FFmpeg not found locally. Downloading a static build "
+                        "(~100 MB, one-time)...")
+
+            # Fetch expected SHA-256 (best-effort)
+            expected_sha = None
+            try:
+                with urllib.request.urlopen(sha_url, timeout=30) as r:
+                    expected_sha = r.read().decode("utf-8").split()[0].strip().lower()
+            except Exception as e:
+                syslog.warning(f"FFmpeg: could not fetch checksum ({e}); "
+                               "continuing without verification.")
+
+            # Download the ZIP to a temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+                tmp_zip = tmp.name
+            with urllib.request.urlopen(url, timeout=120) as resp, \
+                    open(tmp_zip, "wb") as out:
+                shutil.copyfileobj(resp, out)
+
+            # Verify integrity
+            if expected_sha:
+                h = hashlib.sha256()
+                with open(tmp_zip, "rb") as f:
+                    for chunk in iter(lambda: f.read(1 << 20), b""):
+                        h.update(chunk)
+                actual_sha = h.hexdigest().lower()
+                if actual_sha != expected_sha:
+                    syslog.error("FFmpeg: checksum mismatch, aborting download.")
+                    os.remove(tmp_zip)
+                    return None
+
+            # Extract bin/ffmpeg.exe (and ffprobe.exe) into target_dir, flattened
+            with zipfile.ZipFile(tmp_zip) as zf:
+                for name in zf.namelist():
+                    lower = name.lower()
+                    if lower.endswith("/bin/ffmpeg.exe") or lower.endswith("/bin/ffprobe.exe"):
+                        exe_name = os.path.basename(name)
+                        with zf.open(name) as src, \
+                                open(os.path.join(target_dir, exe_name), "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+
+            os.remove(tmp_zip)
+
+            if os.path.isfile(target_exe):
+                syslog.info(f"FFmpeg installed to {target_exe}")
+                return target_exe
+            syslog.error("FFmpeg: ffmpeg.exe not found in downloaded archive.")
+            return None
+
+        except Exception as e:
+            syslog.error(f"FFmpeg auto-download failed: {str(e)}")
+            return None
+        
+    def convertMp3ToWav(self, mp3_file: str, wav_file: str) -> bool:
+        """Converts an MP3 file to WAV format."""
+        try:
+            if self.ensureFFmpeg():
+                import subprocess
+                process = subprocess.run([self._ffmpeg_exe, "-i", mp3_file, wav_file], capture_output=True)
+                if process.returncode != 0:
+                    syslog.error(f"FFmpeg: conversion failed: {process.stderr.decode()}")
+                    return False
+                verbose = gremlin.config.Configuration().verbose_mode_sound
+                if verbose:
+                    syslog.info(f"FFmpeg: conversion succeeded: {mp3_file} -> {wav_file}")
+                return True
+            syslog.error("FFmpeg: conversion failed: ffmpeg not installed or not found on this system.")
+
+        except Exception as e:
+            syslog.error(f"FFmpeg: Failed to convert MP3 to WAV [{mp3_file} -> {wav_file}]: {str(e)}")
+        return False
 
     def adjust_speed(self, wav, sample_rate: int = 24000, tts_speed: float = 1.0):
         """
@@ -1715,6 +1856,7 @@ class EdgeTTSVoice:
         self.locale: str = ""
         self.suggested_codec: str = ""
         self.friendly_name: str = ""
+        self.friendly_locale : str = ""
         self.status: str = ""
         if data:
             if "Name" in data:
@@ -1722,6 +1864,7 @@ class EdgeTTSVoice:
                 self.short_name: str = data.get("ShortName", "")
                 self.gender: str = data.get("Gender", "")
                 self.locale: str = data.get("Locale", "")
+                self.friendly_locale: str = self.translateLocale(self.locale)
                 self.suggested_codec: str = data.get("SuggestedCodec", "")
                 self.friendly_name: str = data.get("FriendlyName", "")
                 self.status: str = data.get("Status", "")
@@ -1731,10 +1874,27 @@ class EdgeTTSVoice:
                 self.short_name: str = data.get("short_name", "")
                 self.gender: str = data.get("gender", "")
                 self.locale: str = data.get("locale", "")
+                self.friendly_locale: str = self.translateLocale(self.locale)
                 self.suggested_codec: str = data.get("suggested_codec", "")
                 self.friendly_name: str = data.get("friendly_name", "")
                 self.status: str = data.get("status", "")
 
+
+    def translateLocale(self, locale: str) -> str:
+        """Returns a descriptive string like 'English (United States)'."""
+        parts = locale.strip().split("-")
+        lang_code = parts[0].lower()
+
+        lang = pycountry.languages.get(alpha_2=lang_code) or pycountry.languages.get(alpha_3=lang_code)
+        lang_name = lang.name if lang else "Unknown Language"
+
+        if len(parts) > 1:
+            country_code = parts[1].upper()
+            country = pycountry.countries.get(alpha_2=country_code)
+            if country:
+                return f"{lang_name} ({country.name})"
+
+        return lang_name
 
 
 
@@ -1801,7 +1961,10 @@ class EdgeTTS:
                     os.makedirs(path, exist_ok=True)
                 if os.path.isfile(output_wav):
                     os.unlink(output_wav)
-                self._sound.convertMp3ToWav(output_mp3, output_wav)
+                result = self._sound.convertMp3ToWav(output_mp3, output_wav)
+                if not result:
+                    syslog.error(f"ETTS: failed to convert MP3 to WAV [{output_mp3} -> {output_wav}]")
+
                 return output_wav
 
             return None
@@ -1819,20 +1982,19 @@ class EdgeTTS:
     def is_speed_available(self):
         return True
 
-    def generateActionWav(self, phrase : PhraseData, voice: str = None, rate: float = 1.0, pitch: int = 0, volume: int = 0) -> bool:
+    def generateActionWav(self, phrase : PhraseData, voice: str = None, rate: int = 0, pitch: int = 0, volume: int = 0) -> bool:
         """generates a wave file for the given action
         :param phrase: the phrase data containing text, rate, pitch, and sound file
         :param voice: the speaker voice to use, optional
-        :param rate: the speech rate adjustment - generated playback rate
+        :param rate: the speech rate adjustment - generated playback rate (as a whole percentage, e.g., 10 means +10%)
         :param pitch: the speech pitch adjustment in Herz, 0 for no change
         :param volume: the speech volume adjustment positive or negative percentage, -50 means 50% quieter, 50 means 50% louder
         :returns: the file name or None
 
         """
         tts_file = phrase.getSoundFile()
-        speed = phrase.rate
         # convert to an edge tts rate
-        edge_rate = f"{int((speed - 1.0) * 100):+}%"
+        edge_rate = f"{int(rate):+}%"
         edge_pitch = f"{pitch:+}Hz"
         edge_volume = f"{int(volume * 100):+}%"
 
@@ -1973,12 +2135,12 @@ class EdgeTTS:
         except Exception as e:
             syslog.error(f"Sound: ETTS: unable to load voice list: {str(e)}")
 
-    def getLocales(self, gender : str = None) -> list[str]:
-        """ gets a list of all available locales """
+    def getLocales(self, gender : str = None) -> list[(str, str)]:
+        """ gets a list of all available locales (friendly_locale, locale)"""
         voices = self.getVoiceList()
         if gender:
             voices = {k: v for k, v in voices.items() if v.gender == gender}
-        locales = sorted(set(v.locale for v in voices.values()))
+        locales = sorted(set((v.friendly_locale, v.locale) for v in voices.values()))
         return locales
 
     def getGenders(self) -> list[str]:
@@ -2012,6 +2174,5 @@ class EdgeTTS:
     def findVoice(self, speaker: str) -> EdgeTTSVoice:
         """ finds a voice by speaker name, not case sensitive """
         return self._voices_list.get(speaker.casefold(), None)
-
 
 

@@ -15631,6 +15631,8 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
         return self._widget
 
     def setWidget(self, widget: QWidget):
+        if not Shiboken.isValid(self):
+            return
         if self._widget is not None and Shiboken.isValid(self._widget):
             # delete the old widget
             self.removeWidget(self._widget)
@@ -15638,7 +15640,7 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
 
         # set the new widget
         self._widget = widget
-        if widget is not None:
+        if widget is not None and Shiboken.isValid(widget):
             self.addWidget(widget)
             self.setCurrentWidget(widget)
         self.widgetChanged.emit()
@@ -15863,7 +15865,6 @@ class AutohideContainerIdWidget(QtWidgets.QStackedWidget):
     def setWidget(self, widget: QWidget):
         """sets the widget to be displayed"""
         if not Shiboken.isValid(self):
-            # this layout's own C++ object was already deleted; nothing to do
             return
         if self._widget is not None and Shiboken.isValid(self._widget):
             self.removeWidget(self._widget)
