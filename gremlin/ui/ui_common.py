@@ -10617,7 +10617,7 @@ class QRememberDialog(QtWidgets.QDialog):
         config = gremlin.config.Configuration()
         window_size = config.getWindowSize(self._window_key)
         hint_size = self.sizeHint()
-        if window_size:
+        if window_size and window_size[0] is not None and window_size[1] is not None:
             size = QtCore.QSize(window_size[0], window_size[1])
             return size.expandedTo(hint_size)
 

@@ -573,6 +573,9 @@ class Hat:
 
         :param direction the direction of the hat
         """
+        # a False/None value means "no direction" -> treat as centered
+        if direction is False or direction is None:
+            direction = (0, 0)
         if direction not in Hat.to_discrete_direction:
             raise VJoyError(f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, self._direction)}")
 
@@ -586,6 +589,9 @@ class Hat:
 
         :param direction the angle in degree of the hat
         """
+        # a False/None value means "no direction" -> treat as centered
+        if direction is False or direction is None:
+            direction = (0, 0)
         if direction not in Hat.to_continuous_direction:
             raise VJoyError(f"Invalid direction specified - {_error_string(self.vjoy_id, self.hat_id, direction)}")
 
@@ -627,17 +633,21 @@ class VJoy:
             self._enabled = False
             return
 
+        # default: not acquired until proven otherwise
+        self._acquired = False
+
         if VJoyInterface.GetVJDStatus(vjoy_id) != VJoyState.Free.value:
             syslog.error(f"Requested vJoy device is not available - vid: {vjoy_id}")
 
         elif not VJoyInterface.AcquireVJD(vjoy_id):
             syslog.error(f"Failed to acquire the vJoy device - vid: {vjoy_id}")
 
-        self._acquired = True
+        else:
+            # acquisition succeeded
+            self._acquired = True
 
         self.vjoy_id = vjoy_id
         self.pid = os.getpid()
-        self._acquired = False  # true if the device is acquired by GremlinEx
 
         # Initialize all controls
         self._axis_lookup = {}

@@ -2830,6 +2830,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._ui_update_pending = True
             return
 
+        # ensure verbose flags always exist, even if an early exception
+        # skips their assignment inside the try block below
+        verbose = False
+        verbose_l1 = False
+        verbose_detailed = False
+
         try:
             self.pushLoading()
 
