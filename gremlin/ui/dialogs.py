@@ -743,7 +743,9 @@ class OptionsDialog(ui_common.BaseDialogUi):
         # Default action selection
 
         self.default_action_dropdown = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True)
-        self.default_action_widget, self.default_action_layout = gremlin.ui.ui_common.getHContainer([self.default_action_dropdown,("",100)], "Default Action:")
+        self.default_action_widget, self.default_action_layout = gremlin.ui.ui_common.getHContainer(
+            [self.default_action_dropdown, ("", 100)], "Default Action:"
+        )
         self._init_action_dropdown()
 
         # Macro axis polling rate
@@ -1529,12 +1531,20 @@ There should only be one GremlinEx master server on the subnet.
             tooltip="When enabled, TTS will ignore duplicate sequential messages.",
         )
 
+        self.generate_on_load_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Generate TTS on load",
+            value=gremlin.config.Configuration().tts_generate_on_load,
+            callback=self._generate_on_load_changed,
+            tooltip="When enabled, TTS entries will be generated automatically when the profile is loaded.\nThis could significantly increase the load time when enabled depending on entries to generate.",
+        )
+
         box = gremlin.ui.ui_common.QBoxFrameLayout(title="Voice options", transparent=True)
         box.addWidget(self.tts_enabled_widget)
         box.addWidget(self.tts_mode_switch_enabled_widget)
         box.addWidget(self.enable_broadcast_speech_widget)
         box.addWidget(self.initial_load_mode_tts_widget)
         box.addWidget(self.suppress_duplicate_widget)
+        box.addWidget(self.generate_on_load_widget)
 
         tts = gremlin.tts.TextToSpeech()
 
@@ -1595,6 +1605,9 @@ There should only be one GremlinEx master server on the subnet.
 
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
         self.tab_container.addTab(content_widget, "Voice (TTS)")
+
+    def _generate_on_load_changed(self, value):
+        self.config.tts_generate_on_load = value
 
     @QtCore.Slot()
     def _voice_change_cb(self):
@@ -3763,7 +3776,7 @@ class DeviceInformationDialog(ui_common.BaseDialogUi):
     """Widget which displays information about all connected joystick
     devices."""
 
-    def __init__(self, profile : gremlin.base_profile.Profile, parent=None):
+    def __init__(self, profile: gremlin.base_profile.Profile, parent=None):
         """Creates a new instance.
 
         :param parent the parent widget

@@ -218,7 +218,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         action_set = self.container.short_action_set
         syslog.info(f"short actions: {len(action_set) if action_set is not None else 0}")
-        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Chain Short Action", ContainerViewTypes.Action)
+        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Short Action(s)", ContainerViewTypes.Action)
         self.short_layout.addWidget(widget)
         self.short_layout_widget_list.append(widget)
         widget.redraw()
@@ -227,7 +227,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         # create long press container actions
         action_set = self.container.long_action_set
         syslog.info(f"long actions: {len(action_set) if action_set is not None else 0}")
-        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Chain Long Action", ContainerViewTypes.Action)
+        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Long Action(s)", ContainerViewTypes.Action)
         self.long_layout.addWidget(widget)
         self.long_layout_widget_list.append(widget)
         widget.redraw()
@@ -236,7 +236,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         # create double tap  container actions
         action_set = self.container.double_action_set
         syslog.info(f"double actions: {len(action_set) if action_set is not None else 0}")
-        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Chain DoubleTap Action", ContainerViewTypes.Action)
+        widget = self._create_action_set_widget(action_set if action_set is not None else [], "Double Tap Action(s)", ContainerViewTypes.Action)
         self.double_layout.addWidget(widget)
         self.double_layout_widget_list.append(widget)
         widget.redraw()
@@ -303,7 +303,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
             self.container_modified.emit()
 
         action_sets = [action_set for action_set in self.container.short_action_sets if action_set]
-        self._create_widgets(action_sets, "Chain Short Action", self.short_layout, self.short_layout_widget_list)
+        self._create_widgets(action_sets, "Short Action(s)", self.short_layout, self.short_layout_widget_list)
 
     def _paste_short_action(self, action, container):
         """called when a paste occurs"""
@@ -317,7 +317,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
             self.container_modified.emit()
 
         action_sets = [action_set for action_set in self.container.short_action_sets if action_set]
-        self._create_widgets(action_sets, "Chain Short Action", self.short_layout, self.short_layout_widget_list)
+        self._create_widgets(action_sets, "Short Action(s)", self.short_layout, self.short_layout_widget_list)
 
     def _add_long_action(self, action_name):
         """Adds a new action to the long action list
@@ -333,7 +333,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
             self.container_modified.emit()
 
         action_sets = [action_set for action_set in self.container.long_action_sets if action_set]
-        self._create_widgets(action_sets, "Chain Long Action", self.long_layout, self.long_layout_widget_list)
+        self._create_widgets(action_sets, "Long Action(s)", self.long_layout, self.long_layout_widget_list)
 
     def _paste_long_action(self, action, container):
         """called when a paste occurs"""
@@ -347,7 +347,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
             self.container_modified.emit()
 
         action_sets = [action_set for action_set in self.container.long_action_sets if action_set]
-        self._create_widgets(action_sets, "Chain Long Action", self.long_layout, self.long_layout_widget_list)
+        self._create_widgets(action_sets, "Long Action(s)", self.long_layout, self.long_layout_widget_list)
 
     def _add_double_action(self, action_name):
         """Adds a new action to the double action list
@@ -363,7 +363,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
             self.container_modified.emit()
 
         action_sets = [action_set for action_set in self.container.double_action_sets if action_set]
-        self._create_widgets(action_sets, "Chain Double Action", self.double_layout, self.double_layout_widget_list)
+        self._create_widgets(action_sets, "Double Action(s)", self.double_layout, self.double_layout_widget_list)
 
     def _paste_double_action(self, action, container):
         """called when a paste occurs"""
