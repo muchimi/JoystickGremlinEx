@@ -5494,6 +5494,8 @@ class ActionSet(AbstractCallbackModel):
         node.set("guid", write_guid(self.id))
         if self.description:
             node.set("description", html.escape(self.description))
+        if self.modelDescription:
+            node.set("modelDescription", html.escape(self.modelDescription))
         for action in self:
             node.append(action.to_xml())
         return node
@@ -5512,6 +5514,8 @@ class ActionSet(AbstractCallbackModel):
                 self.id = read_guid(node, "guid")
             if "description" in node.attrib:
                 self.description = html.unescape(node.get("description"))
+            if "modelDescription" in node.attrib:
+                self.modelDescription = html.unescape(node.get("modelDescription"))
 
         config = gremlin.config.Configuration()
         self.clear()

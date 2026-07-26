@@ -3289,7 +3289,7 @@ class Configuration(QtCore.QObject):
     @property
     def tts_generate_on_load(self) -> bool:
         """ attempt to generate missing audio for TTS on profile load"""
-        return self._get_data("tts_generate_on_load", True)
+        return self._get_data("tts_generate_on_load", False)
 
     @tts_generate_on_load.setter
     def tts_generate_on_load(self, value: bool):

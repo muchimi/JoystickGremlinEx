@@ -32,10 +32,17 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 ### (m77T15):
 - New: Play Sound: status display for last operation.
 - New: Play Sound: save button in TTS mode.  This will generate either the single phrase or the multiple phrases (if the | is used).  The status display will then offer to open the folder location.
+- New: Play Sound: download ffmpeg if not included in the distribution (note: ffmpeg is currently included in the distro as of M14) (thanks for adding that RazOrLegend).
+- Change: Play Sound: changed icon to select an existing file, and added a button to clear the entry.
+- Change: API: added extra data block for custom container/action creation.
+- Change: API: action sets will save the description field to the profile for readability.
+- Change: TTS Options: add an option to generate audio on load.  When enabled, play actions will attempt to generate any missing audio files when the profile is loaded.  Warning: this may significantly increase profile load times depending on how many you have, hence why this is an option which defaults to OFF.
+- Change: TempoEx Container: update action category label.
 - Fix: API: play multiple audio files from folder exception on undefined variable.
-- Fix: Sequence Container: possible exception on add step  
+- Fix: Sequence Container: possible exception on add step 
 - Fix: Sequence Container: some steps cannot be reordered
-- Fix: UI: last input selection no longer saved.
+- Fix: Sequence Contaienr: step sequencing in normal mode was not advancing on trigger.
+- Fix: UI: last input selection no longer saved (whoops) causing default to be selected all the time.
 
 ### (m77T14D):
 - Change: Play Sound: change playback cutoff from milliseconds to seconds
