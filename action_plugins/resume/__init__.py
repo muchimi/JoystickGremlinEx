@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,8 +24,8 @@ from gremlin.input_types import InputType
 import gremlin.input_item
 from shiboken6 import Shiboken
 
-class ResumeActionWidget(gremlin.input_item.AbstractActionWidget):
 
+class ResumeActionWidget(gremlin.input_item.AbstractActionWidget):
     """Widget for the resume action."""
 
     def __init__(self, action_data, parent=None):
@@ -43,18 +43,17 @@ class ResumeActionWidget(gremlin.input_item.AbstractActionWidget):
 
 
 class ResumeActionFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         import gremlin.control_action
+
         gremlin.control_action.resume()
         return True
 
 
-class ResumeAction(gremlin.base_profile.AbstractAction):
-
+class ResumeAction(gremlin.input_item.AbstractAction):
     """Action to resume callback execution."""
 
     name = "Resume"
@@ -71,8 +70,8 @@ class ResumeAction(gremlin.base_profile.AbstractAction):
     # ]
 
     input_types = [
-         InputType.JoystickButton,
-         InputType.JoystickHat,
+        InputType.JoystickButton,
+        InputType.JoystickHat,
     ]
 
     functor = ResumeActionFunctor
@@ -80,23 +79,20 @@ class ResumeAction(gremlin.base_profile.AbstractAction):
 
     def icon(self):
         return "ei.play-circle"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, extra_data: dict = None):
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
+        """returns a display string for the current configuration"""
         return "Resume"
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         pass
 
     def _generate_xml(self):

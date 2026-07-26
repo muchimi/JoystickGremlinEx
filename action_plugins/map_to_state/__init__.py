@@ -1123,7 +1123,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         return True
 
 
-class MapToState(gremlin.base_profile.AbstractAction):
+class MapToState(gremlin.input_item.AbstractAction):
     """Action data for the map to State action.
 
     Map to State allows controlling of the State cursor using either a joystick
@@ -1142,12 +1142,12 @@ class MapToState(gremlin.base_profile.AbstractAction):
 
     input_types = [InputType.JoystickButton, InputType.JoystickHat, InputType.Keyboard, InputType.KeyboardLatched]
 
-    def __init__(self, parent):
+    def __init__(self, parent, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the container this action is part of
         """
-        super().__init__(parent)
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
 
         self.state: gremlin.ui.state_device.StateInputItem = None  # mapped state for non-hat mappings

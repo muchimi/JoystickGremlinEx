@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,6 @@ from shiboken6 import Shiboken
 
 
 class TogglePauseActionWidget(gremlin.input_item.AbstractActionWidget):
-
     """Widget for the resume action."""
 
     def __init__(self, action_data, parent=None):
@@ -44,26 +43,24 @@ class TogglePauseActionWidget(gremlin.input_item.AbstractActionWidget):
 
 
 class TogglePauseActionFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         import gremlin.control_action
+
         gremlin.control_action.toggle_pause_resume()
         return True
 
 
-class TogglePauseAction(gremlin.base_profile.AbstractAction):
-
+class TogglePauseAction(gremlin.input_item.AbstractAction):
     """Action to resume callback execution."""
 
     name = "Toggle Pause & Resume"
     tag = "toggle-pause"
-    hint = '''Toggles profile pause on/off.
+    hint = """Toggles profile pause on/off.
 Note that containers that have the always execute flag on
-continue to run even if the profile is paused.'''
-    
+continue to run even if the profile is paused."""
 
     default_button_activation = (True, False)
     # override default allowed inputs here
@@ -74,32 +71,29 @@ continue to run even if the profile is paused.'''
     #     InputType.Keyboard
     # ]
     input_types = [
-         InputType.JoystickButton,
-         InputType.JoystickHat,
+        InputType.JoystickButton,
+        InputType.JoystickHat,
     ]
 
     functor = TogglePauseActionFunctor
     widget = TogglePauseActionWidget
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, extra_data: dict = None):
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
 
     def display_name(self):
-        ''' returns a display string for the current configuration '''
+        """returns a display string for the current configuration"""
         return "Toggle Pause"
-    
+
     def icon(self):
         return "fa5.pause-circle"
-        #return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
+        # return f"{os.path.dirname(os.path.realpath(__file__))}/icon.png"
 
     def requires_virtual_button(self):
-        return self.get_input_type() in [
-            InputType.JoystickAxis,
-            InputType.JoystickHat
-        ]
+        return self.get_input_type() in [InputType.JoystickAxis, InputType.JoystickHat]
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         pass
 
     def _generate_xml(self):

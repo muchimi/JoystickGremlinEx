@@ -487,39 +487,6 @@ def _clear_layout(layout):
             _clear_layout(item.layout())
 
 
-# def clear_layout(layout: QtWidgets.QLayout):
-#     """Removes all widgets from the given layout.
-
-#     :param layout: the layout from which to remove all items
-#     """
-
-#     if not Shiboken.isValid(layout):
-#         return
-#     if layout is None:
-#         return
-#     if isinstance(layout, QtWidgets.QWidget):
-#         widget = layout
-#         layout = widget.layout()
-#     while layout.count() > 0:
-#         item = layout.takeAt(0)
-#         if item.layout():
-#             clear_layout(item.layout())
-#         if item.widget():
-#             widget = item.widget()
-#             if hasattr(widget,"unhook"):
-#                 # call unhook on destruction if defined
-#                 widget.unhook()
-#             if hasattr(widget,"_cleanup_ui"):
-#                 widget._cleanup_ui()
-#             # if Shiboken.isValid(widget):
-#             #     if hasattr(widget, "layout"):
-#             #         clear_layout(widget.layout())
-#                 # widget.hide()
-#                 widget.setParent(None)
-#                 widget.deleteLater()
-#         layout.removeItem(item)
-
-
 def delete_widget(widget: QtWidgets.QWidget):
     """removes a widget from memory"""
     if widget and Shiboken.isValid(widget):
@@ -2936,3 +2903,11 @@ class TimedRandomInt:
         self.used_numbers[new_number] = time.time()
 
         return new_number
+
+
+def getSafeFilename(s):
+    """Generates a safe filename by removing unsafe characters and truncating to 255 characters."""
+    s = s.strip()
+    s = s.replace(' ', '_')
+    s = re.sub(r'(?u)[^-\w.]', '', s)
+    return s[:255]

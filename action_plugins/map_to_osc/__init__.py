@@ -849,7 +849,7 @@ class MapToOscFunctor(gremlin.base_profile.AbstractFunctor):
         return True
 
 
-class MapToOsc(gremlin.base_profile.AbstractAction):
+class MapToOsc(gremlin.input_item.AbstractAction):
     """Action data for the map to OSC (open sound control) - allows the inputs to send an OSC command"""
 
     name = "Map to OSC"
@@ -872,12 +872,12 @@ class MapToOsc(gremlin.base_profile.AbstractAction):
     functor = MapToOscFunctor
     widget = MapToOscWidget
 
-    def __init__(self, parent):
+    def __init__(self, parent, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the container this action is part of
         """
-        super().__init__(parent)
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
 
         config = gremlin.config.Configuration()

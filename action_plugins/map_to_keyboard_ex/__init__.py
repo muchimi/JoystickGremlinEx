@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-
 from lxml import etree as ElementTree
 from lxml import etree
 
@@ -491,7 +490,6 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         #     key_list.sort(key=lambda x: x[1])
         #     key_list.reverse()
 
-
         # build the macro that will play when the action is called
         key: Key
         key_list = sort_keys(action.keys)
@@ -504,7 +502,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         #     syslog.info(f"Key order: {stub}")
 
         # remove the weight
-        #key_list = [key[0] for key in key_list]
+        # key_list = [key[0] for key in key_list]
 
         self._press_keys = key_list
         self._release_keys = key_list.copy()
@@ -989,7 +987,7 @@ class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
         macro_mgr.clear_queue()
 
 
-class MapToKeyboardEx(gremlin.base_profile.AbstractAction):
+class MapToKeyboardEx(gremlin.input_item.AbstractAction):
     """Action data for the map to keyboard action.
 
     Map to keyboard presses and releases a set of keys in sync with another
@@ -1012,12 +1010,12 @@ Can also send mouse buttons, mouse wheel events."""
     functor = MapToKeyboardExFunctor
     widget = MapToKeyboardExWidget
 
-    def __init__(self, parent):
+    def __init__(self, parent, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the container this action is part of
         """
-        super().__init__(parent)
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         self._keys = []
         self.mode = KeyboardOutputMode.Hold  # hold by default
@@ -1140,7 +1138,6 @@ Can also send mouse buttons, mouse wheel events."""
         """
         # return "fa6s.keyboard"
         return "mdi6.keyboard-outline"
-
 
     def requires_virtual_button(self):
         """Returns whether or not an activation condition is needed.
@@ -1293,7 +1290,6 @@ Can also send mouse buttons, mouse wheel events."""
         if not self._keys or len(self._keys) == 0:
             return False
         return True
-
 
     def to_html(self) -> str:
         """returns reporting graphviz data for this action"""

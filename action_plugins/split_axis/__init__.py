@@ -31,8 +31,8 @@ from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
 
-class SplitAxisWidget(gremlin.input_item.AbstractActionWidget):
 
+class SplitAxisWidget(gremlin.input_item.AbstractActionWidget):
     def __init__(self, action_data, parent=None):
         """Creates a new RemapWidget.
 
@@ -63,14 +63,8 @@ class SplitAxisWidget(gremlin.input_item.AbstractActionWidget):
 
         # Device selection
         self.split_device_layout = QtWidgets.QHBoxLayout()
-        self.vjoy_selector_1 = gremlin.ui.ui_common.VJoySelector(
-            self._create_vjoy_selector_callback(1),
-            [InputType.JoystickAxis]
-        )
-        self.vjoy_selector_2 = gremlin.ui.ui_common.VJoySelector(
-            self._create_vjoy_selector_callback(2),
-            [InputType.JoystickAxis]
-        )
+        self.vjoy_selector_1 = gremlin.ui.ui_common.VJoySelector(self._create_vjoy_selector_callback(1), [InputType.JoystickAxis])
+        self.vjoy_selector_2 = gremlin.ui.ui_common.VJoySelector(self._create_vjoy_selector_callback(2), [InputType.JoystickAxis])
         self.split_device_layout.addWidget(self.vjoy_selector_1)
         self.split_device_layout.addWidget(self.vjoy_selector_2)
 
@@ -82,32 +76,14 @@ class SplitAxisWidget(gremlin.input_item.AbstractActionWidget):
         self.split_slider.setValue(self.action_data.center_point * 1e5)
         self.split_readout.setValue(self.action_data.center_point)
         try:
-            if self.action_data.device_low_vjoy_id is None or \
-                    self.action_data.device_low_axis is None:
-                self.vjoy_selector_1.set_selection(
-                    InputType.JoystickAxis,
-                    -1,
-                    -1
-                )
+            if self.action_data.device_low_vjoy_id is None or self.action_data.device_low_axis is None:
+                self.vjoy_selector_1.set_selection(InputType.JoystickAxis, -1, -1)
             else:
-                self.vjoy_selector_1.set_selection(
-                    InputType.JoystickAxis,
-                    self.action_data.device_low_vjoy_id,
-                    self.action_data.device_low_axis
-                )
-            if self.action_data.device_high_vjoy_id is None or \
-                    self.action_data.device_high_axis is None:
-                self.vjoy_selector_2.set_selection(
-                    InputType.JoystickAxis,
-                    -1,
-                    -1
-                )
+                self.vjoy_selector_1.set_selection(InputType.JoystickAxis, self.action_data.device_low_vjoy_id, self.action_data.device_low_axis)
+            if self.action_data.device_high_vjoy_id is None or self.action_data.device_high_axis is None:
+                self.vjoy_selector_2.set_selection(InputType.JoystickAxis, -1, -1)
             else:
-                self.vjoy_selector_2.set_selection(
-                    InputType.JoystickAxis,
-                    self.action_data.device_high_vjoy_id,
-                    self.action_data.device_high_axis
-                )
+                self.vjoy_selector_2.set_selection(InputType.JoystickAxis, self.action_data.device_high_vjoy_id, self.action_data.device_high_axis)
 
             self.save_vjoy_selection(1, self.vjoy_selector_1.get_selection())
             self.save_vjoy_selection(2, self.vjoy_selector_2.get_selection())
@@ -116,9 +92,7 @@ class SplitAxisWidget(gremlin.input_item.AbstractActionWidget):
             #        vJoy selector attempting to acquire a vJoy device, this
             #        should no longer occur, check if this here is still needed
             util.display_error(
-                f"A needed vJoy device is not accessible: {e}\n\n" +
-                "Default values have been set for the input, but they are "
-                "not what has been specified."
+                f"A needed vJoy device is not accessible: {e}\n\n" + "Default values have been set for the input, but they are not what has been specified."
             )
             syslog.error(str(e))
 
@@ -168,57 +142,47 @@ class SplitAxisWidget(gremlin.input_item.AbstractActionWidget):
 
 
 class SplitAxisFunctor(gremlin.base_profile.AbstractFunctor):
-
-    def __init__(self, action, parent = None):
+    def __init__(self, action, parent=None):
         super().__init__(action, parent)
         self.action = action
         self.vjoy = gremlin.joystick_handling.VJoyProxy()
 
-    def process_event(self, event, value, extra_data = None):
+    def process_event(self, event, value, extra_data=None):
         if value.current < self.action.center_point:
             value_range = -1.0 - self.action.center_point
 
-            self.vjoy[self.action.device_low_vjoy_id].axis(
-                self.action.device_low_axis
-            ).value = ((value.current - self.action.center_point) /
-                       value_range) * 2.0 - 1.0
-            self.vjoy[self.action.device_high_vjoy_id].axis(
-                self.action.device_high_axis
-            ).value = -1.0
+            self.vjoy[self.action.device_low_vjoy_id].axis(self.action.device_low_axis).value = (
+                (value.current - self.action.center_point) / value_range
+            ) * 2.0 - 1.0
+            self.vjoy[self.action.device_high_vjoy_id].axis(self.action.device_high_axis).value = -1.0
         else:
             # Compute value range guarding against division by zero
             value_range = max(1.0 - self.action.center_point, 0.001)
 
-            self.vjoy[self.action.device_high_vjoy_id].axis(
-                self.action.device_high_axis
-            ).value = ((value.current - self.action.center_point) /
-                       value_range) * 2.0 - 1.0
-            self.vjoy[self.action.device_low_vjoy_id].axis(
-                self.action.device_low_axis
-            ).value = -1.0
+            self.vjoy[self.action.device_high_vjoy_id].axis(self.action.device_high_axis).value = (
+                (value.current - self.action.center_point) / value_range
+            ) * 2.0 - 1.0
+            self.vjoy[self.action.device_low_vjoy_id].axis(self.action.device_low_axis).value = -1.0
 
         return True
 
 
-class SplitAxis(gremlin.base_profile.AbstractAction):
-
+class SplitAxis(gremlin.input_item.AbstractAction):
     name = "Split Axis"
     tag = "split-axis"
-    hint = '''Splits an input axis into regions.
-For advanced axis splitting options, please use Gated Axis instead.'''
+    hint = """Splits an input axis into regions.
+For advanced axis splitting options, please use Gated Axis instead."""
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, True)
     # override default allowed inputs here
-    input_types = [
-        InputType.JoystickAxis
-    ]
+    input_types = [InputType.JoystickAxis]
 
     functor = SplitAxisFunctor
     widget = SplitAxisWidget
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, extra_data: dict = None):
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         self.center_point = 0.0
         self.device_low_axis = None
@@ -232,7 +196,7 @@ For advanced axis splitting options, please use Gated Axis instead.'''
     def requires_virtual_button(self):
         return False
 
-    def _parse_xml(self, node, data = None, extra_data = None):
+    def _parse_xml(self, node, data=None, extra_data=None):
         self.center_point = float(node.get("center-point"))
         self.device_low_vjoy_id = safe_read(node, "device-low-vjoy-id", int, 1)
         self.device_high_vjoy_id = safe_read(node, "device-high-vjoy-id", int, 1)

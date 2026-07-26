@@ -44,9 +44,7 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
         if not Shiboken.isValid(self):
             return
 
-        self.process_widget = gremlin.ui.ui_common.QPathLineItem(
-            "Process:", self.action_data.process, self.action_data
-        )
+        self.process_widget = gremlin.ui.ui_common.QPathLineItem("Process:", self.action_data.process, self.action_data)
         self.process_widget.pathChanged.connect(self._process_changed_cb)
         self.process_widget.open.connect(self._process_open_cb)
         self.process_widget.installEventFilter(self)
@@ -57,33 +55,23 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
         self.args_widget.installEventFilter(self)
 
         self.run_widget = QtWidgets.QPushButton("Test")
-        self.run_widget.setIcon(
-            gremlin.util.load_icon(
-                "ei.play", qta_color=gremlin.ui.ui_common.Color.activeColor()
-            )
-        )
+        self.run_widget.setIcon(gremlin.util.load_icon("ei.play", qta_color=gremlin.ui.ui_common.Color.activeColor()))
         self.run_widget.setToolTip("Runs the process")
         self.run_widget.clicked.connect(self._run_process)
 
         self.chkb_exec_on_release = QtWidgets.QCheckBox("Exec on release")
         self.chkb_exec_on_release.setChecked(self.action_data.exec_on_release)
-        self.chkb_exec_on_release.setToolTip(
-            "Execute the command on input release instead of input press"
-        )
+        self.chkb_exec_on_release.setToolTip("Execute the command on input release instead of input press")
         self.chkb_exec_on_release.clicked.connect(self._exec_on_release_changed)
 
         self.options_container_widget = QtWidgets.QWidget()
         self.options_container_widget.setContentsMargins(0, 0, 0, 0)
-        self.options_container_layout = QtWidgets.QHBoxLayout(
-            self.options_container_widget
-        )
+        self.options_container_layout = QtWidgets.QHBoxLayout(self.options_container_widget)
         self.options_container_layout.setContentsMargins(0, 0, 0, 0)
 
         self.args_by_line_widget = QtWidgets.QCheckBox("Argument per line")
         self.args_by_line_widget.setChecked(self.action_data.args_per_line)
-        self.args_by_line_widget.setToolTip(
-            "When enabled, each line in the argument list will be passed as a separate argument to the process"
-        )
+        self.args_by_line_widget.setToolTip("When enabled, each line in the argument list will be passed as a separate argument to the process")
         self.args_by_line_widget.clicked.connect(self._args_per_line_changed)
 
         self.options_container_layout.addWidget(QtWidgets.QLabel("Arguments:"))
@@ -115,9 +103,7 @@ class RunProcessWidget(gremlin.input_item.AbstractActionWidget):
         self.executable_dialog.show()
 
     def _select_executable(self, widget, fname):
-        gremlin.util.InvokeUiMethod(
-            self._select_executable_ui, widget, fname
-        )  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._select_executable_ui, widget, fname)  # ensure on UI thread
 
     def _select_executable_ui(self, widget, fname):
         """Adds the provided executable to the list of configurations.
@@ -192,7 +178,7 @@ class RunProcessFunctor(gremlin.base_profile.AbstractFunctor):
         return True
 
 
-class RunProcess(gremlin.base_profile.AbstractAction):
+class RunProcess(gremlin.input_item.AbstractAction):
     """Action representing a single TTS entry."""
 
     name = "Run Process"
@@ -216,8 +202,8 @@ class RunProcess(gremlin.base_profile.AbstractAction):
     functor = RunProcessFunctor
     widget = RunProcessWidget
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, extra_data: dict = None):
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         self.process = ""  # process to run
         self.arguments = ""  # args to send
@@ -262,9 +248,7 @@ class RunProcess(gremlin.base_profile.AbstractAction):
                 args = self.arguments
             cmd_list = [self.process]
             cmd_list.extend(arg for arg in args)
-            process = subprocess.Popen(
-                cmd_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
+            process = subprocess.Popen(cmd_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = process.communicate()
             syslog.info(f"PROC: execute process: {self.process} {args}")
             if out:

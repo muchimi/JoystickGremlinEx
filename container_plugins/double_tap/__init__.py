@@ -122,7 +122,7 @@ class DoubleTapContainerWidget(AbstractContainerWidget):
             self.container.get_input_type(),
             input_item,
         )
-        
+
         action_selector.action_added.connect(add_action_cb)
         action_selector.action_paste.connect(paste_action_cb)
 
@@ -340,12 +340,12 @@ and another action on input double-click (tap)"""
         Interactions.Delete,
     ]
 
-    def __init__(self, parent=None, node=None):
+    def __init__(self, parent=None, node=None, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node, custom_action_sets=True)
+        super().__init__(parent, node, extra_data=extra_data, custom_action_sets=True)
 
         self.delay = 0.5
         self.activate_on = "exclusive"

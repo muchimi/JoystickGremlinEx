@@ -3287,6 +3287,16 @@ class Configuration(QtCore.QObject):
         self._set_data("ai_tts_use_word_filenames", value)
 
     @property
+    def tts_generate_on_load(self) -> bool:
+        """ attempt to generate missing audio for TTS on profile load"""
+        return self._get_data("tts_generate_on_load", True)
+
+    @tts_generate_on_load.setter
+    def tts_generate_on_load(self, value: bool):
+        self._set_data("tts_generate_on_load", value)
+
+
+    @property
     def ai_tts_overwrite_filenames(self) -> str:
         return self._get_data("ai_tts_overwrite_filenames", None)
 
@@ -3472,3 +3482,10 @@ class Configuration(QtCore.QObject):
     def maestro_dist_path(self, value: str):
         self._set_data("maestro_dist_path", value)
 
+    @property
+    def last_save_path(self) -> str:
+        """returns the last save path used for audio files"""
+        return self._get_data("last_save_path", "")
+    @last_save_path.setter
+    def last_save_path(self, value: str):
+        self._set_data("last_save_path", value)

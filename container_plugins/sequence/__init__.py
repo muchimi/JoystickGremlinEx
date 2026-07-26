@@ -33,7 +33,7 @@ import gremlin.event_handler
 import gremlin.shared_state
 import gremlin.ui.ui_common
 import gremlin.input_item
-from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, AbstractAction, ActionSet, ActionSetView, delete_widget
+from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, AbstractAction, ActionSet, ActionSetView
 from gremlin.input_types import InputType
 from PySide6 import QtCore
 from gremlin.util import safe_format, safe_read, InvokeUiMethod, clear_layout, get_guid
@@ -662,7 +662,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
             options_widget = StepOptionsWidget(self.container, options, index)
 
             # action set actions
-            widget = self._create_action_set_widget(action_set,
+            widget : ActionSetView = self._create_action_set_widget(action_set,
                                                     f"Step {index+1:d}",
                                                     ContainerViewTypes.Action,
                                                     interact_callback = self._handle_interaction,
@@ -674,6 +674,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
             self.action_set_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
+
 
 
 
@@ -1038,6 +1039,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         gs = GlobalSequence()
         gs.sequence_count = 0
 
+
         # stepped mode current step
         if self.container.stepped_exec_reset:
             self._current_step = None
@@ -1303,6 +1305,9 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         verbose = self._verbose
         verbose_extra = self._verbose_extra
 
+        verbose = True
+
+
         # no resume mode if running once
         resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
 
@@ -1378,6 +1383,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 if verbose_extra:
                     syslog.info("\tlooping sequence")
 
+            # next step index
             self.action_data.last_step = index
             if exec_delay_ms > 0:
                 if verbose:
@@ -1655,12 +1661,12 @@ Unlike a macro, any action suitable for the input can be used."""
     functor = SequenceContainerFunctor
     widget = SequenceContainerWidget
 
-    def __init__(self, parent=None, node=None):
+    def __init__(self, parent=None, node=None, extra_data : dict =None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node)
+        super().__init__(parent, node, extra_data=extra_data, custom_action_sets = True, custom_parse_callback = self._parse_steps_xml)
         self.exec_on_release = False  # true if the sequence triggers on input release
         self.exec_on_press = True  # true if the sequence triggers on input press
 
@@ -1748,6 +1754,25 @@ Unlike a macro, any action suitable for the input can be used."""
 
         if "sync-mode" in node.attrib:
             self.sync_mode = SyncMode(safe_read(node, "sync-mode", int, 0))
+
+    def _parse_steps_xml(self, node, data=None, extra_data=None):
+        verbose = True
+        self.action_sets.pushSuspend()
+        self.action_sets.clear()
+        actionset_nodes = node.xpath("./action-set")
+
+        for index, child in enumerate(actionset_nodes):
+            action_set = ActionSet(self)
+            action_set.index = index
+            action_set.from_xml(child, self, input_item = self.input_item)
+            self.action_sets.append(action_set)
+            if verbose:
+                syslog.info(f"SEQUENCE: read step [{index}] with {len(action_set)} actions")
+                for action_index, action in enumerate(action_set):
+                    syslog.info(f"SEQUENCE: action [{action_index}] - {action}")
+
+
+        self.action_sets.popSuspend()
 
     def _generate_xml(self):
         """Returns an XML node representing this container's data.

@@ -103,82 +103,13 @@ class BasicContainer(AbstractContainer):
     functor = BasicContainerFunctor
     widget = BasicContainerWidget
 
-    def __init__(self, parent=None, node=None):
+    def __init__(self, parent=None, node=None, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node)
+        super().__init__(parent, node, extra_data=extra_data)
         self._basic_container_generating_xml = False
-
-    # def add_action(self, action, index=-1):
-    #     assert isinstance(action, AbstractAction)
-
-    #     # Make sure if we're dealing with axis with remap and response curve
-    #     # actions that they are arranged sensibly
-    #     if action.get_input_type() == InputType.JoystickAxis:
-    #         remap_sets = []
-    #         curve_sets = []
-    #         for container in self.parent.containers:
-    #             for action_set in container.action_sets:
-    #                 for t_action in action_set:
-    #                     if gremlin.input_item._is_curve_tag(t_action.tag):
-    #                         curve_sets.append(action_set)
-    #                     elif t_action.tag == "remap":
-    #                         remap_sets.append(action_set)
-
-    #         if action.tag == "remap" and len(curve_sets) == 1 and \
-    #                 len(remap_sets) == 0:
-    #             curve_sets[0].append(action)
-    #         elif gremlin.input_item._is_curve_tag(action.tag) and len(remap_sets) == 1 and \
-    #                 len(curve_sets) == 0:
-    #             remap_sets[0].append(action)
-    #         else:
-    #             if index == -1:
-    #                 self.action_sets.append([])
-    #                 index = len(self.action_sets) - 1
-    #             self.action_sets[index].append(action)
-    #     else:
-    #         if index == -1:
-    #             self.action_sets.append([])
-    #             index = len(self.action_sets) - 1
-    #         self.action_sets[index].append(action)
-
-    #     #self.refresh_conditions()
-
-    #     self.create_or_delete_virtual_button()
-
-    #     self.mapping_changed() # tell UI of changes
-
-    # def _parse_xml(self, node, data = None, extra_data = None):
-    #     """Populates the container with the XML node's contents.
-
-    #     :param node the XML node with which to populate the container
-    #     """
-    #     pass
-
-    # def _generate_xml(self):
-    #     """Returns an XML node representing this container's data.
-
-    #     :return XML node representing the data of this container
-    #     """
-    #     if self._basic_container_generating_xml:
-    #         syslog.error("BASIC CONTAINER XML: recursion detected")
-    #         return None
-    #     self._basic_container_generating_xml = True
-    #     try:
-
-    #         node = super().to_xml()
-    #         node.set("type", "basic")
-    #         if self.action_sets:
-    #             as_node = ElementTree.Element("action-set")
-    #             as_node.set("id", write_guid(self.action_sets[0].id))
-    #             for action in self.action_sets[0]:
-    #                 as_node.append(action.to_xml())
-    #             node.append(as_node)
-    #         return node
-    #     finally:
-    #         self._basic_container_generating_xml = False
 
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.

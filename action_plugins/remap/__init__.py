@@ -368,7 +368,7 @@ class RemapFunctor(gremlin.base_profile.AbstractFunctor):
                     self.thread_running = False
 
 
-class Remap(gremlin.base_profile.AbstractAction):
+class Remap(gremlin.input_item.AbstractAction):
     """Action remapping physical joystick inputs to vJoy inputs."""
 
     name = "Remap"
@@ -390,12 +390,12 @@ Use Vjoy Remap instead."""
     functor = RemapFunctor
     widget = RemapWidget
 
-    def __init__(self, parent):
+    def __init__(self, parent, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the container to which this action belongs
         """
-        super().__init__(parent)
+        super().__init__(parent, extra_data=extra_data)
         self.id_changed.connect(self._on_id_changed)
 
         # button tracking
@@ -406,13 +406,12 @@ Use Vjoy Remap instead."""
         # Set vjoy ids to None so we know to pick the next best one
         # automatically
         self.parent = parent
-        self._vjoy_id = 1 # vjoy device #
+        self._vjoy_id = 1  # vjoy device #
         device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(self._vjoy_id)
         self.virtual_device = gremlin.joystick_handling.getDevice(device_guid)
         self._vjoy_input_id = None
         input_type = self.get_input_type()
         self._input_type = input_type
-
 
         self.axis_mode = "absolute"
         self.axis_scaling = 1.0
@@ -437,17 +436,15 @@ Use Vjoy Remap instead."""
         state = gremlin.joystick_handling.VirtualDeviceUsageState()
         state.unregisterAction(self.id)
 
-
-
     def update_button_used(self):
         """updates the vjoy input usage for the action"""
         if self._input_type == InputType.JoystickButton and self.vjoy_input_id is not None:
-            self.set_button_used(self.vjoy_input_id, True) # mark used
+            self.set_button_used(self.vjoy_input_id, True)  # mark used
 
-    def set_button_used(self, input_id, used : bool):
+    def set_button_used(self, input_id, used: bool):
         """send a state update to the button usage tracker"""
         if input_id >= 0:
-            assert self._input_type == InputType.JoystickButton,"invalid action mode for button usage tracking"
+            assert self._input_type == InputType.JoystickButton, "invalid action mode for button usage tracking"
             state = gremlin.joystick_handling.VirtualDeviceUsageState()
             state.set_usage_state(device_guid=self.virtual_device_guid, button_id=input_id, used=used, key=self.id)
 
@@ -498,7 +495,6 @@ Use Vjoy Remap instead."""
         if value != self._vjoy_input_id:
             self._vjoy_input_id = value
             self.update_button_used()
-
 
     @property
     def virtual_input_id(self) -> int:

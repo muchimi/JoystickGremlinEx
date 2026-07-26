@@ -29,6 +29,29 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T15):
+- New: Play Sound: status display for last operation.
+- New: Play Sound: save button in TTS mode.  This will generate either the single phrase or the multiple phrases (if the | is used).  The status display will then offer to open the folder location.
+- Fix: API: play multiple audio files from folder exception on undefined variable.
+- Fix: Sequence Container: possible exception on add step  
+- Fix: Sequence Container: some steps cannot be reordered
+- Fix: UI: last input selection no longer saved.
+
+### (m77T14D):
+- Change: Play Sound: change playback cutoff from milliseconds to seconds
+- Change: Play Sound: translate edge tts locale to ISO standards.
+- Fix: Play Sound: Edge TTS play rate now as a whole percentage to match API, -50 means half-speed, 100 means 2x speed (+100).  Default is 0, normal speed.  
+- Fix: Play Sound: selecting a locale could cause a circular update resulting in recursion.
+
+### (m77T14C)
+- Change: forcibly run audio conversion by running ffmpeg directly and report any errors to log file.
+
+### (m77T14B)
+- Change: include the ffmpeg dependency in the distribution package in case the system does not have it installed.
+
+### (m77T14A)
+- Fix: QT confirmation box not on UI thread in some situations
+
 ### (m77T14)
 - Change: Containers that support ordering or re-ordering such as Sequence or Chain have an updated look for interactions and layout, and gain a top/bottom interaction.
 - Change: Added PRR from RazOrLegend (thank you!) - auto start, minimize to tray, and TTS duplicate suppression options (with some modifications, see below)

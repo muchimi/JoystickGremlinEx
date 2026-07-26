@@ -1382,10 +1382,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el = gremlin.event_handler.EventListener()
         el.options_changed.emit()
 
-    # def options_closed(self):
-    #     dialog = self.sender()
-    #     if dialog.reload_profile:
-    #         self.refresh()
 
     def profile_creator(self):
         """Opens the UI used to create a profile from an existing one."""
@@ -3025,9 +3021,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 # get the first input item of the tab
                                 input_item = self._get_input_item(device_guid, 0)
                                 if input_item:
-                                    # input_id = input_item.input_id
-                                    # input_type = input_item.input_type
-                                    # el.input_selection_changed.emit(device_guid, input_type, input_id)
                                     self.config.last_device_guid = device_guid
 
                     # add tab header for this device
@@ -3702,6 +3695,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _select_input_handler_ui(self, args):
         """Selects a specific input on the given tab.
         The tab is changed if different from the current tab.
+        selection_change handler
         """
 
         restore_device_guid: dinput.GUID
@@ -3744,6 +3738,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 return
 
             verbose = self.config.verbose_mode_select
+            # verbose = True
 
             widget = None
             _push_cursor = False
@@ -4034,11 +4029,19 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _handle_item_selected(self, device_guid, input_type, input_id):
         """Handles item selection events from the list view"""
+        self.saveInputSelection(device_guid, input_type, input_id)
+
+    def saveInputSelection(self, device_guid, input_type, input_id):
+        """Saves the current input selection to the configuration"""
         config = gremlin.config.Configuration()
         config.set_last_input(device_guid, input_type, input_id)
         self._last_selected_device_guid = device_guid
         self._last_selected_input_type = input_type
         self._last_selected_input_id = input_id
+        verbose = config.verbose_mode_select
+        if verbose:
+            device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+            syslog.info(f"SELECT INPUT: save selection device_name={device_name}, device_guid={device_guid}, input_type={input_type}, input_id={input_id}")
 
     def setCurrentTabTracking(self, device_guid: str):
         """sets the tracking tab to the given device guid"""
@@ -5316,6 +5319,23 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         return device_profile
 
     def _save_changes_request(self):
+        result = None
+
+        def setResult(value):
+            nonlocal result
+            result = value
+
+        if gremlin.util.is_ui_thread():
+            return self._save_changes_request_ui()
+        else:
+            gremlin.util.InvokeUiMethod(self._save_changes_request_ui, setResult)
+
+        # gremlin.util.InvokeUiMethod(self._save_changes_request_ui, setResult)
+        while result is None:
+            time.sleep(0.01)
+        return result
+
+    def _save_changes_request_ui(self, callback: Callable = None):
         """Asks the user what to do in case of a profile change.
 
         Presents the user with a dialog asking whether or not to save or
@@ -5323,10 +5343,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         :return True continue with the intended action, False abort
         """
+        gremlin.util.assert_ui_thread()
+
         # If the profile is empty we don't need to ask anything
         if not self.profile:
+            if callback:
+                callback(True)
             return True
         if self.profile.empty():
+            if callback:
+                callback(True)
             return True
 
         continue_process = True
@@ -5346,6 +5372,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self.save_profile()
             elif response == QtWidgets.QMessageBox.StandardButton.Cancel:
                 continue_process = False
+        if callback:
+            callback(continue_process)
         return continue_process
 
     def _has_profile_changed(self):

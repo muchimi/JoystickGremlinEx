@@ -309,7 +309,7 @@ class ActionPlugins:
 
         syslog.info(f"\tLoaded {plugin_count} action plugins")
         if error_count > 0:
-            syslog.info_error(f"{error_count} plugin(s) failed to load")
+            syslog.error(f"{error_count} plugin(s) failed to load")
 
     def duplicate(self, action, container, input_item=None, extra_data: dict = None):
         """duplicates an action and gives it a unique ID"""

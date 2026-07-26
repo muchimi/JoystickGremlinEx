@@ -1120,12 +1120,12 @@ More than one action per short press or long press can be added."""
         #     Interactions.Delete,
     ]
 
-    def __init__(self, parent=None, node=None):
+    def __init__(self, parent=None, node=None, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node, custom_action_sets = True,  custom_generate_callback = self._generate_action_set_xml)
+        super().__init__(parent, node, extra_data=extra_data, custom_action_sets = True,  custom_generate_callback = self._generate_action_set_xml)
         self.short_action_set = gremlin.input_item.ActionSet(model_description = "short press actions")
         self.long_action_set = gremlin.input_item.ActionSet(model_description = "long press actions")
         self.double_action_set = gremlin.input_item.ActionSet(model_description = "double press actions")

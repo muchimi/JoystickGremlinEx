@@ -1328,6 +1328,10 @@ class Icons:
         return Icons._icon("ph.shield-warning-fill", qta_color=qta_color)
 
     @staticmethod
+    def errorIcon(qta_color="#c7450e"):
+        return Icons._icon("fa5s.error", qta_color=qta_color)
+
+    @staticmethod
     def infoIcon(qta_color="#34b7eb"):
         return Icons._icon("fa5s.info-circle", qta_color=qta_color)
 
@@ -15868,6 +15872,9 @@ class AutohideContainerIdWidget(QtWidgets.QStackedWidget):
             return
         if self._widget is not None and Shiboken.isValid(self._widget):
             self.removeWidget(self._widget)
+        if widget is not None and not Shiboken.isValid(widget):
+            self._widget = None
+            return
         self._widget = widget
         if widget is not None and Shiboken.isValid(widget):
             self.addWidget(widget)
@@ -16004,6 +16011,7 @@ class QInteractWidget(QtWidgets.QWidget):
                   size : int = 24,
                   allowed_interactions: list[Interactions] = None,
                   callback : Callable[[Interactions, int, Any], None] = None,
+                  auto_disable: bool = False,
                   parent=None):
         """
         Initialize the interact widget.
@@ -16023,6 +16031,7 @@ class QInteractWidget(QtWidgets.QWidget):
         self._interactions = allowed_interactions
         self._interact_callback = callback
         self.data = data
+        self._auto_disable = auto_disable
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.remove_widget = None
@@ -16088,6 +16097,9 @@ class QInteractWidget(QtWidgets.QWidget):
 
     def _update_buttons(self) -> None:
         """Update the enabled state of the move buttons based on the current index and max index."""
+        if not self._auto_disable:
+            # do not manage button states automatically
+            return
         self.setEnabled(self._index > 0 or self._index < self._max_index - 1)
         if self.step_up_widget:
             self.step_up_widget.setEnabled(self._index > 0)
@@ -16123,7 +16135,13 @@ class QInteractWidget(QtWidgets.QWidget):
         if self._interact_callback:
             self._interact_callback(Interactions.Bottom, self._index, self.data)
 
-
+    # def changeEvent(self, event):
+    #     if event.type() == QtCore.QEvent.Type.EnabledChange:
+    #         if not self.isEnabled():
+    #             syslog.info("Widget was disabled!")
+    #         else:
+    #             syslog.info("Widget was enabled!")
+    #     super().changeEvent(event)
 
 class QStepTile(QtWidgets.QWidget):
     """ step title widget """

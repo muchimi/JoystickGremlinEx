@@ -399,12 +399,12 @@ class RepeatContainer(AbstractContainer):
     functor = RepeatContainerFunctor
     widget = RepeatContainerWidget
 
-    def __init__(self, parent=None, node=None):
+    def __init__(self, parent=None, node=None, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node)
+        super().__init__(parent, node, extra_data=extra_data)
         self.setActionSets([[]])
         self.initial_pulse_delay = 0.75  # in seconds # initial repeat
         self.hold_delay = 0.25  # in seconds, repeat hold duration

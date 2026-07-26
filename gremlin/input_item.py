@@ -1098,6 +1098,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._containers.pushSuspend()  # stop updates
         self._containers.clear()  # remove any prior data
         container_nodes = node.xpath("./container")
+        if extra_data is None:
+            extra_data = {}
+        extra_data["input_item"] = self
         for child in container_nodes:
             if child.tag in ("latched", "input", "keylatched") or _is_curve_tag(child.tag):
                 # ignore extra data
@@ -1114,7 +1117,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             if container_type not in container_tag_map:
                 syslog.warning(f"Unknown container type used: {container_type}")
                 continue
-            entry = container_tag_map[container_type](self)
+            entry = container_tag_map[container_type](self, extra_data = extra_data)
             mode_object = gremlin.base_profile.get_mode_object(node, extra_data)
             if extra_data is None:
                 extra_data = {}
@@ -2544,6 +2547,12 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             if emit:
                 # notify of selection change
                 self._fireSelectionChangeCallbacks()
+
+                # tell UI the selection changed
+                ui = gremlin.shared_state.ui
+                if ui:
+                    ui.saveInputSelection(self.input_item.device_guid, self.input_item.input_type, self.input_item.input_id)
+
 
     def _execute_selected(self, value: bool, emit: bool):
         # ensure the widget has the correct visual selection state
@@ -4246,7 +4255,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     interaction_types : list[Interactions] = [] # list of allowed interactions for derived containers, if empty, the container does not allow interactions on actions sets
 
-    def __init__(self, parent : InputItem | "gremlin.profile_graph.ProfileContainerNode", node=None, custom_parse_callback : Callable =None, custom_generate_callback: Callable =None, custom_action_sets: bool = False):
+    def __init__(self, parent : InputItem | "gremlin.profile_graph.ProfileContainerNode", node=None, custom_parse_callback : Callable =None, custom_generate_callback: Callable =None, custom_action_sets: bool = False, extra_data : dict =None):
         """Creates a new instance.
 
         :param parent: the InputItem or ProfileContainerNode which is the parent to this action
@@ -4259,7 +4268,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
         assert isinstance(parent, (InputItem, gremlin.profile_graph.ProfileContainerNode)),"invalid parent type"
 
-        super().__init__(parent)
+        super().__init__(parent, extra_data=extra_data)
 
         self.parent = parent
 
@@ -5018,13 +5027,21 @@ class AbstractAction(BaseProfileData):
     id_changed = Signal(str, str)  # triggers when the ID changes (old_id, new_id)
     icon_changed = Signal()  # triggers when the icon changes
 
-    def __init__(self, parent):
+    def __init__(self, parent, extra_data : dict = None):
         """Creates a new instance.
 
         :parent the container which is the parent to this action
         """
-        # assert isinstance(parent, AbstractContainer)
-        super().__init__(parent)
+        super().__init__(parent, extra_data)
+        self.container = None
+        if extra_data:
+            if "container" in extra_data:
+                self.container = extra_data["container"]
+        else:
+            if isinstance(parent, AbstractContainer):
+                self.container = parent
+
+        self.parent_container = self.container
 
         self._abstract_action_generating_xml = False  # true if generating XML
         self.activation_condition = None  # stores the conditions attached to that action
@@ -5032,7 +5049,7 @@ class AbstractAction(BaseProfileData):
         self._action_type = None
         self._enabled = False  # true if the action is enabled
         self.singleton = False  # true if the action can only appear once in the input's mapping
-        self.parent_container = parent  # holds the reference to the parent container holding this action
+
         self._is_axis = False
         self._is_hardware = None
         self.comment = None  # user comments/notes
@@ -5499,6 +5516,11 @@ class ActionSet(AbstractCallbackModel):
         config = gremlin.config.Configuration()
         self.clear()
 
+        if extra_data is None:
+            extra_data = {}
+        extra_data["input_item"] = input_item
+        extra_data["container"] = container
+
         # valid action names
         action_name_map = ActionPlugins().tag_map
         for child in node:
@@ -5516,8 +5538,10 @@ class ActionSet(AbstractCallbackModel):
                 if tag not in action_name_map:
                     # new mapper not found
                     tag = child.tag
+            else:
+                tag = child.tag
 
-            entry = action_name_map[tag](self)
+            entry = action_name_map[tag](self, extra_data = extra_data)
             entry.from_xml(child, (input_item, self), extra_data)  # pass input item, container as a tuple
             self.add(entry)
 
@@ -6329,6 +6353,7 @@ class ConditionModel(AbstractCallbackModel):
     @property
     def input_item(self) -> InputItem:
         """input item the condition applies to"""
+        assert self.container is not None, "container not set for condition model"
         return self.container.input_item
 
     def setContainer(self, container: AbstractContainer | AbstractAction | ConditionContainer):
@@ -7216,38 +7241,6 @@ class ActionSetView(AbstractView):
                 return widget
 
         return None
-
-
-        # self.controls_widget = QtWidgets.QWidget()
-        # self.controls_layout = QtWidgets.QVBoxLayout(self.controls_widget)
-        # prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
-        # if Interactions.Up in self.allowed_interactions:
-        #     self.control_move_up = QtWidgets.QPushButton(load_icon(f"{prefix}button_up.png"), "")
-        #     self.control_move_up.clicked.connect(lambda: self._handle_interaction(Interactions.Up))
-        #     self.controls_layout.addWidget(self.control_move_up)
-        #     self.has_edit_controls = True
-        # if Interactions.Down in self.allowed_interactions:
-        #     self.control_move_down = QtWidgets.QPushButton(load_icon(f"{prefix}button_down.png"), "")
-        #     self.control_move_down.clicked.connect(lambda: self._handle_interaction(Interactions.Down))
-        #     self.controls_layout.addWidget(self.control_move_down)
-        #     self.has_edit_controls = True
-        # if Interactions.Delete in self.allowed_interactions:
-        #     self.control_delete = gremlin.ui.ui_common.Buttons.getDeleteWidget(
-        #         callback=lambda: self.interacted.emit(Interactions.Delete),
-        #         tooltip="Delete Actions",
-        #     )
-        #     self.controls_layout.addWidget(self.control_delete)
-        #     self.has_edit_controls = True
-        # if Interactions.Edit in self.allowed_interactions:
-        #     self.control_edit = gremlin.ui.ui_common.Buttons.getEditWidget(callback=lambda: self._handle_interaction(Interactions.Edit))
-        #     self.controls_layout.addWidget(self.control_edit)
-        #     self.has_edit_controls = True
-        # if Interactions.Copy in self.allowed_interactions:
-        #     self.control_copy = gremlin.ui.ui_common.Buttons.getCopyWidget(callback=lambda: self._handle_interaction(Interactions.Copy))
-        #     self.controls_layout.addWidget(self.control_copy)
-        #     self.has_edit_controls = True
-
-        # self.controls_layout.addStretch(1)
 
     def _handle_interaction(self, interaction: Interactions, index : int, data = None):
         """called when the user interacts with the UI

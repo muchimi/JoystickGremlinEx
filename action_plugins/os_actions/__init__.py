@@ -342,7 +342,7 @@ class OsActionFunctor(gremlin.base_profile.AbstractFunctor):
             syslog.error(f"OSACTION: unable to find process: [{path}]")
 
 
-class OsAction(gremlin.base_profile.AbstractAction):
+class OsAction(gremlin.input_item.AbstractAction):
     """Action for pausing the execution of callbacks."""
 
     name = "OS Action"
@@ -359,8 +359,8 @@ class OsAction(gremlin.base_profile.AbstractAction):
     functor = OsActionFunctor
     widget = OsActionWidget
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, parent, extra_data: dict = None):
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         self.action = OsActionMode.SetFocus
         self.process_name: str = None  # process name

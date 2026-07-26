@@ -1723,7 +1723,7 @@ class MacroFunctor(gremlin.base_profile.AbstractFunctor):
         return True
 
 
-class Macro(gremlin.base_profile.AbstractAction):
+class Macro(gremlin.input_item.AbstractAction):
     """Represents a macro action."""
 
     name = "Macro"
@@ -1746,12 +1746,12 @@ To send complex sequences, please look at the sequence container."""
     functor = MacroFunctor
     widget = MacroWidget
 
-    def __init__(self, parent):
+    def __init__(self, parent, extra_data: dict = None):
         """Creates a new Macro instance.
 
         :param parent the parent profile.ItemAction of this macro action
         """
-        super().__init__(parent)
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         self.sequence = []
         self.exclusive = False

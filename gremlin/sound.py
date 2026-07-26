@@ -562,7 +562,7 @@ class Sound:
         spec = importlib.util.find_spec("pyrubberband")
         self._has_rubberband = spec is not None
         self._ffmpeg_exe = None
-
+        self._sound_files = [] # list of sound files for multiple audio playback
         self._playback_device_name = None
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_tts or config.verbose_mode_sound
@@ -1054,6 +1054,19 @@ class Sound:
             self.playPhrase(phrase, options)
 
 
+    def scanFolder(self):
+        """scans the file folder for valid audio files"""
+        self._sound_files.clear()
+        if self.sound_file and os.path.isfile(self.sound_file):
+            folder_path = os.path.dirname(self.sound_file)
+            entries = os.listdir(folder_path)
+            for entry in entries:
+                ext = gremlin.util.get_ext(entry)
+                if ext in (".wav", ".mp3"):
+                    self._sound_files.append(os.path.join(folder_path, entry))
+
+        self._timed_random.setMax(len(self._sound_files) - 1)
+
     def generate(self,
                  text : str,
                  mode: PlayMode = PlayMode.EdgeAI,
@@ -1065,7 +1078,8 @@ class Sound:
                  playback_mode : PlaybackMode = PlaybackMode.RoundRobin,
                  timed_random : TimedRandomInt = None,
                  sound_file : str = None,
-                 force : bool = False) -> PhraseData:
+                 as_map : bool = False,
+                 force : bool = False) -> PhraseData | dict:
         """generates the audio for a given phrase using the specified play mode"""
 
         # ensure started
@@ -1084,6 +1098,7 @@ class Sound:
         match mode:
             case PlayMode.AudioFile:
                 # static playback of one or more files depending if a folder or a single file
+                self._sound_files = []
                 if sound_file and os.path.isfile(sound_file):
                     if randomize_sound_file:
                         # pick a file at random from a list of files in the folder
@@ -1101,11 +1116,11 @@ class Sound:
                     phrase.sound_file = sound_file
                     phrase_map[phrase.key] = phrase
 
-                    return phrase
+                    return phrase if not as_map else phrase_map
 
                 else:
                     syslog.error(f"PLAY: unable to locate file: [{sound_file}]")
-                    return None
+                    return None if not as_map else {}
 
             case PlayMode.EdgeAI:
                 # EdgeAI TTS generated
@@ -1178,6 +1193,8 @@ class Sound:
             self.saveConfig() # save the updated sound configuration for next time
 
 
+        if as_map:
+            return phrase_map
 
 
         # if multiple phrases, pick one at random
@@ -1438,6 +1455,16 @@ class Sound:
                 return True
             syslog.error("FFmpeg not found.")
             return False
+                    return False
+                current_dir = os.path.dirname(os.path.abspath(main_module.__file__))
+                ffmpeg_exe = os.path.join(current_dir, "ffmpeg", "ffmpeg.exe")
+            if os.path.isfile(ffmpeg_exe):
+                self._ffmpeg_exe = ffmpeg_exe
+                return True
+            else:
+                syslog.error("FFmpeg not found.")
+                return False
+            return True
         except Exception as e:
             syslog.error(f"Failed to ensure FFmpeg: {str(e)}")
             return False

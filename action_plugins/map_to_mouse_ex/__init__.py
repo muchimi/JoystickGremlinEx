@@ -511,8 +511,7 @@ class MapToMouseExWidget(gremlin.input_item.AbstractActionWidget):
 
     def _create_mouse_button_ui(self):
         self.mouse_button_listen_widget = gremlin.ui.ui_common.NoKeyboardPushButton(
-            gremlin.types.MouseButton.to_string(self.action_data.button_id),
-            tooltip="Listen for a mouse button"
+            gremlin.types.MouseButton.to_string(self.action_data.button_id), tooltip="Listen for a mouse button"
         )
         self.mouse_button_listen_widget.clicked.connect(self._handle_button_listen)
 
@@ -1075,7 +1074,7 @@ class MapToMouseExFunctor(gremlin.base_profile.AbstractFunctor):
                 )
 
 
-class MapToMouseEx(gremlin.base_profile.AbstractAction):
+class MapToMouseEx(gremlin.input_item.AbstractAction):
     """Action data for the map to mouse action.
 
     Map to mouse allows controlling of the mouse cursor using either a joystick
@@ -1093,12 +1092,12 @@ Note: Map to Keyboard Ex can also be used to send mouse button and wheel data.""
     functor = MapToMouseExFunctor
     widget = MapToMouseExWidget
 
-    def __init__(self, parent):
+    def __init__(self, parent, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the container this action is part of
         """
-        super().__init__(parent)
+        super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         # Flag whether or not this is mouse motion or button press
         self.motion_input = False

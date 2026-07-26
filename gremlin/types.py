@@ -1605,6 +1605,22 @@ class PlayMode(enum.Enum):
             case _:
                 return PlayMode.AudioFile
 
+    @staticmethod
+    def to_description(value):
+        match value:
+            case PlayMode.Blank:
+                return "Blank mode"
+            case PlayMode.AudioFile:
+                return "Audio file Playback mode (play the selected audio file)"
+            case PlayMode.CoquiAI:
+                return "Coqui AI TTS mode - generates speech using the Coqui AI TTS engine"
+            case PlayMode.EdgeAI:
+                return "Edge AI TTS mode - generates speech using the Edge AI TTS engine"
+            case PlayMode.PyTTS:
+                return "PyTTS (internal TTS) mode - generates speech using the internal TTS engine"
+            case _:
+                return f"Unknown play mode: [{value}]"
+
 class PlaybackMode(enum.Enum):
     """ playback mode for multi sounds """
     RoundRobin = 1  # play sounds in a round-robin fashion
