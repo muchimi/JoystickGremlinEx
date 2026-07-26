@@ -560,6 +560,7 @@ class Sound:
         self._has_rubberband = False
         spec = importlib.util.find_spec("pyrubberband")
         self._has_rubberband = spec is not None
+        self._ffmpeg_exe = None
 
         self._playback_device_name = None
         config = gremlin.config.Configuration()
@@ -1391,7 +1392,7 @@ class Sound:
         encoded = text.encode("cp1252", errors="replace")
         return encoded.decode("cp1252")
 
-    def convertMp3ToWav(self, mp3_file: str, wav_file: str) -> bool:
+    def convertMp3ToWav_pydub(self, mp3_file: str, wav_file: str) -> bool:
         """Converts an MP3 file to WAV format."""
         try:
             audio = AudioSegment.from_mp3(mp3_file)
@@ -1400,6 +1401,53 @@ class Sound:
         except Exception as e:
             syslog.error(f"Failed to convert MP3 to WAV [{mp3_file} -> {wav_file}]: {str(e)}")
             return False
+
+    def ensureFFmpeg(self) -> bool:
+        try:
+            if self._ffmpeg_exe:
+                return True
+
+            if getattr(sys, 'frozen', False):
+                # Running as a packaged executable
+                current_dir = os.path.dirname(sys.executable)
+                ffmpeg_exe = os.path.join(current_dir, "_internal", "ffmpeg.exe")
+
+            else:
+                # Running as a normal Python script
+                main_module = sys.modules['__main__']
+                if not hasattr(main_module, '__file__'):
+                    return False
+                current_dir = os.path.dirname(os.path.abspath(main_module.__file__))
+                ffmpeg_exe = os.path.join(current_dir, "ffmpeg", "ffmpeg.exe")
+            if os.path.isfile(ffmpeg_exe):
+                self._ffmpeg_exe = ffmpeg_exe
+                return True
+            else:
+                syslog.error("FFmpeg not found.")
+                return False
+            return True
+        except Exception as e:
+            syslog.error(f"Failed to ensure FFmpeg: {str(e)}")
+            return False
+
+    def convertMp3ToWav(self, mp3_file: str, wav_file: str) -> bool:
+        """Converts an MP3 file to WAV format."""
+        try:
+            if self.ensureFFmpeg():
+                import subprocess
+                process = subprocess.run([self._ffmpeg_exe, "-i", mp3_file, wav_file], capture_output=True)
+                if process.returncode != 0:
+                    syslog.error(f"FFmpeg: conversion failed: {process.stderr.decode()}")
+                    return False
+                verbose = gremlin.config.Configuration().verbose_mode_sound
+                if verbose:
+                    syslog.info(f"FFmpeg: conversion succeeded: {mp3_file} -> {wav_file}")
+                return True
+            syslog.error("FFmpeg: conversion failed: ffmpeg not installed or not found on this system.")
+
+        except Exception as e:
+            syslog.error(f"FFmpeg: Failed to convert MP3 to WAV [{mp3_file} -> {wav_file}]: {str(e)}")
+        return False
 
     def adjust_speed(self, wav, sample_rate: int = 24000, tts_speed: float = 1.0):
         """

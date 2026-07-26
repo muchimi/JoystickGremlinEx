@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T14C)
+- Change: forcibly run audio conversion by running ffmpeg directly and report any errors to log file.
+
 ### (m77T14B)
 - Change: include the ffmpeg dependency in the distribution package in case the system does not have it installed.
 

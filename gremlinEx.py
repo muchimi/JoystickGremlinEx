@@ -5331,7 +5331,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         :return True continue with the intended action, False abort
         """
-        assert gremlin.util.assert_ui_thread("SaveChangesRequest: This method must be called from the UI thread.")
+        gremlin.util.assert_ui_thread()
 
         # If the profile is empty we don't need to ask anything
         if not self.profile:

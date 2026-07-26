@@ -1489,6 +1489,7 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         return os.path.isfile(wav)
 
     def _parse_xml(self, node, data=None, extra_data=None):
+        config = gremlin.config.Configuration()
         mode = safe_read(node, "mode", str, "")
         self.mode = PlayMode.from_string(mode)
         self.text = None
@@ -1500,7 +1501,6 @@ class PlaySound(gremlin.base_profile.AbstractAction):
         self.speaker = speaker  # speaker for AI
         if self.mode == PlayMode.EdgeAI:
             if speaker:
-                config = gremlin.config.Configuration()
                 etts = gremlin.sound.EdgeTTS()
                 voice = etts.getVoice(speaker)
                 self._etts_speaker = speaker # this will set the gender and the locale

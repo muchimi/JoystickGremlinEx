@@ -5059,7 +5059,7 @@ class Profile:
     def convertTTSToPlaySound(self):
         """converts profile TTS entries to playsound entries - prompt the user and saves to a new profile """
         fname = self.profile_file
-        if not os.path.isfile(fname):
+        if not fname or not os.path.isfile(fname):
             return False
 
         from gremlin.types import PlayMode
