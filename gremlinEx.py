@@ -5307,6 +5307,23 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         return device_profile
 
     def _save_changes_request(self):
+        result = None
+
+        def setResult(value):
+            nonlocal result
+            result = value
+
+        if gremlin.util.is_ui_thread():
+            return self._save_changes_request_ui()
+        else:
+            gremlin.util.InvokeUiMethod(self._save_changes_request_ui, setResult)
+
+        # gremlin.util.InvokeUiMethod(self._save_changes_request_ui, setResult)
+        while result is None:
+            time.sleep(0.01)
+        return result
+
+    def _save_changes_request_ui(self, callback: Callable = None):
         """Asks the user what to do in case of a profile change.
 
         Presents the user with a dialog asking whether or not to save or
@@ -5314,10 +5331,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         :return True continue with the intended action, False abort
         """
+        assert gremlin.util.assert_ui_thread("SaveChangesRequest: This method must be called from the UI thread.")
+
         # If the profile is empty we don't need to ask anything
         if not self.profile:
+            if callback:
+                callback(True)
             return True
         if self.profile.empty():
+            if callback:
+                callback(True)
             return True
 
         continue_process = True
@@ -5337,6 +5360,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 self.save_profile()
             elif response == QtWidgets.QMessageBox.StandardButton.Cancel:
                 continue_process = False
+        if callback:
+            callback(continue_process)
         return continue_process
 
     def _has_profile_changed(self):

@@ -29,6 +29,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T14A)
+- Fix: QT confirmation box not on UI thread in some situations
+
 ### (m77T14)
 - Change: Containers that support ordering or re-ordering such as Sequence or Chain have an updated look for interactions and layout, and gain a top/bottom interaction.
 - Change: Added PRR from RazOrLegend (thank you!) - auto start, minimize to tray, and TTS duplicate suppression options (with some modifications, see below)
