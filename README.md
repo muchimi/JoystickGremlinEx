@@ -29,6 +29,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T15A):
+- Change: keyboard handling - skip queue on profile exit (this may leave some dandling key presses - this is for testing to see if profile shutdown times improve).
+- Fix: Input Viewer: state repeater vertical sizing changes.
+
 ### (m77T15):
 - New: Play Sound: status display for last operation.
 - New: Play Sound: save button in TTS mode.  This will generate either the single phrase or the multiple phrases (if the | is used).  The status display will then offer to open the folder location.
