@@ -1407,17 +1407,17 @@ class EventListener(QtCore.QObject):
 
         # done
         # process any straglers
-        while not self._keyboard_queue.empty():
-            self._process_queue()
-            time.sleep(0)  # yield to other threads
 
-        syslog.info("KBD: processing stop")
+        # while not self._keyboard_queue.empty():
+        #     self._process_queue()
+        #     time.sleep(0)  # yield to other threads
+
+        syslog.info("KBD: stopped")
 
     def start_key_listener(self):
         """starts the key listener"""
         if not self._key_listener_started:
             self._keyboard_queue : FastQueue[Event] = FastQueue(name="keyboard_queue") # queue.Queue()
-
             self._keyboard_thread = gremlin.threading.AbortableThread(target=self._keyboard_runner)
             self._keyboard_thread.start()
 
@@ -1426,9 +1426,10 @@ class EventListener(QtCore.QObject):
         if self._key_listener_started:
 
             syslog.info("KEY THREAD: stopping...")
+            self._keyboard_thread_running = False
             self._keyboard_thread.stop()
             self._keyboard_thread.join()
-            
+
             syslog.info(f"KEY THREAD: clearing remaining items in queue: size: {len(self._keyboard_queue)}")
             self._keyboard_queue.clear()
             syslog.info("KEY THREAD: stopped")

@@ -7329,7 +7329,7 @@ def resetWidgetSize(widget):
 
 
 class StateVisualizerWidget(QWidget):
-    """state visualization widget"""
+    """state visualization widget - input viewer"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -7516,7 +7516,7 @@ class StateVisualizerWidget(QWidget):
             row_count += 1
 
         # add an extra row for spacing
-        total_height = (row_height + margin) * (row_count + 1)
+        total_height = (row_height + margin) * (row_count + 2)
 
         # constrain the height to override default QT layout which adds entirely too much vertical space
         self._button_widget.setFixedHeight(total_height)
@@ -10587,26 +10587,28 @@ class QRememberDialog(QtWidgets.QDialog):
 
     def _apply_window_settings_ui(self):
         """Restores the stored window geometry settings."""
-        config = gremlin.config.Configuration()
-        window_size = config.getWindowSize(self._window_key)
-        window_location = config.getWindowLocation(self._window_key)
-        if window_size and window_size[0] is not None and window_size[1] is not None:
-            self.resize(window_size[0], window_size[1])
-        else:
-            self.resize(self._default_width, self._default_height)
-        if window_location:
-            x, y = window_location
-            if x is not None and y is not None:
+        try:
+            config = gremlin.config.Configuration()
+            window_size = config.getWindowSize(self._window_key)
+            window_location = config.getWindowLocation(self._window_key)
+            if window_size:
+                self.resize(window_size[0], window_size[1])
+            else:
+                self.resize(self._default_width, self._default_height)
+            if window_location:
+                x, y = window_location
                 pos = QtCore.QPoint(x, y)
                 # syslog.info(f"recall move window {self.window_key} to {x},{y}")
                 self.move(pos)
+        except Exception as e:
+            pass
 
     def preferredSize(self) -> QtCore.QSize:
         """preferred window size"""
         config = gremlin.config.Configuration()
         window_size = config.getWindowSize(self._window_key)
         hint_size = self.sizeHint()
-        if window_size and window_size[0] is not None and window_size[1] is not None:
+        if window_size:
             size = QtCore.QSize(window_size[0], window_size[1])
             return size.expandedTo(hint_size)
 
