@@ -20,6 +20,25 @@ The documentation for GremlinEx has recently moved to GitHub Pages:  [Documentat
 
 Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion, tips and development information.
 
+# Support and donations
+
+GremlinEx is a work of passion and donations to support and sustain the project are welcome. It takes a significant amount of time and commitment to research and implement and evolve.  With the landscape of hardware and platforms and games constantly evolving, GremlinEx is kept up to date and modernized, and it also builds on your feedback and ideas.
+
+I strongly believe there are very few applications, if any, open source or payware, that do what GremlinEx does.  GremlinEx elegantly solves simple to extremely complex controller mapping issues across a wide selection of manufacturer devices, both physical and software based. As such, GremlinEx has wide support for games and hardware cockpits, it is manufacturer agnostic and relies on standards and published APIs to make this work. GremlinEx supports esoteric hardware, networked controller configuraitons, OSC and MIDI devices, remote control and most recently adds high quality AI voice generation.  It also builds on years of experience gaming and a shared passion.
+
+If you find GremlinEx of use to you, if you like what it does, if it helps you manage your devices and game controls, if you use it regularly or it resolved an issue for you, please consider a donation to the project.
+
+Any amount is appreciated and goes a long way to sustain and the long hours supporting this project.
+
+There are two ways you can safely and securely contribute to the project:
+
+- via GitHub's sponsorship program.
+- via a Paypal direct donation
+
+The links are the top of this project page, or on the right side under sponsorships. 
+
+Again, thank you for your shared passion and for your generosity and support. It means a lot, and sponsors make a huge difference. 
+
 # Test versions
 
 The most current test releases will contain the latest bug fixes, features and optimizations.  Not all test releases are stable which is why they are not in the release channel, and many are.  Please make a backup of your profiles and enable the versioning option to keep files separate by version just in case, but there is about a year's worth of key updates since the last official release all in the test channel including several stable versions.  
