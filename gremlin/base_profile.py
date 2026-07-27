@@ -4043,11 +4043,7 @@ class Profile:
 
                 if "inherit" in mode_node.attrib:
                     parent_mode_name = html.unescape(mode_node.get("inherit"))
-                    # Guard against the old bool-serialization bug that wrote
-                    # the parent mode name as the literal "True"/"False".
-                    # Such values are not real parent modes; skip them so the
-                    # mode is treated as a root instead of building a bogus
-                    # "True" parent that later fails validation.
+                    # Guard against the old bool-serialization bug ("True"/"False").
                     if parent_mode_name in ("True", "False"):
                         parent_mode_name = None
 
@@ -5484,13 +5480,9 @@ class ProfileModeNode:
         # parent mode, optional
         if "inherit" in node.attrib:
             inherit_value = html.unescape(node.get("inherit"))
-            # Older versions serialized inherit as a bool, corrupting the
-            # parent mode name into the literal "True"/"False" (see to_xml).
-            # A mode named exactly "True" or "False" is not a real parent
-            # here, so treat these as "no inheritance" rather than failing
-            # the "invalid inherit mode" assertion downstream. Real profiles
-            # affected by the old bug simply lose the (already broken)
-            # inheritance link and can be re-saved cleanly.
+            # Older versions serialized inherit as a bool, corrupting the parent
+            # mode name into the literal "True"/"False". Treat these as "no
+            # inheritance" rather than failing validation downstream.
             if inherit_value in ("True", "False"):
                 self.inherit = None
             else:
@@ -5590,9 +5582,9 @@ class ProfileModeNode:
             node.set("system", safe_format(True, bool))
 
         # inherit is the NAME of the parent mode (a string) or None/False for
-        # no inheritance. It defaults to the bool False in __init__, and older
-        # profiles serialized it as a bool. Only write it when it is an actual
-        # mode name string; anything else (False/True/None) means no parent.
+        # no inheritance. It defaulted to bool and was serialized as bool, which
+        # turned the parent mode name into the literal "True" and corrupted the
+        # profile. Only write it when it is an actual mode-name string.
         if isinstance(self.inherit, str):
             node.set("inherit", safe_format(self.inherit, str, escape=True))
 
