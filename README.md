@@ -22,7 +22,7 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Support and donations
 
-GremlinEx is a work of passion and donations to support and sustain the project are welcome. It takes a significant amount of time and commitment to research and implement and evolve.  With the landscape of hardware and platforms and games constantly evolving, GremlinEx is kept up to date and modernized, and it also builds on your feedback and ideas.
+GremlinEx is a work of passion and donations to support and sustain the project are welcome. It takes a significant amount of time and commitment to research and implement and deploy new features.  With the landscape of hardware and platforms and games constantly evolving, GremlinEx is kept up to date and modernized, and it also builds on your feedback and ideas.
 
 I strongly believe there are very few applications, if any, open source or payware, that do what GremlinEx does.  GremlinEx elegantly solves simple to extremely complex controller mapping issues across a wide selection of manufacturer devices, both physical and software based. As such, GremlinEx has wide support for games and hardware cockpits, it is manufacturer agnostic and relies on standards and published APIs to make this work. GremlinEx supports esoteric hardware, networked controller configuraitons, OSC and MIDI devices, remote control and most recently adds high quality AI voice generation.  It also builds on years of experience gaming and a shared passion.
 
