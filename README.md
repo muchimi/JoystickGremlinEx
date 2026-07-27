@@ -51,7 +51,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 ### (m77T16):
 - Fix: Plugin API: resolve an issue with the input selection dialog in the m77 API.
 - Fix: Plugin API: resolve an issue with error handling of bad data stored to profile.
-- 
+
 
 ### (m77T15A):
 - Change: keyboard handling - skip queue on profile exit (this may leave some dandling key presses - this is for testing to see if profile shutdown times improve).
