@@ -5875,10 +5875,12 @@ class PluginVariable:
             node.set("value", "1" if value else "0")
         elif self.type == PluginVariableType.PhysicalInput:
             if self.value is not None:
-                node.set("device-guid", write_guid(self.value["device_id"]))
-                node.set("device-name", safe_format(self.value["device_name"], str))
-                node.set("input-id", safe_format(self.value["input_id"], int))
-                node.set("input-type", InputType.to_string(self.value["input_type"]))
+                device_id = self.value.get("device_id", None)
+                if device_id:
+                    node.set("device-guid", write_guid(device_id))
+                    node.set("device-name", safe_format(self.value["device_name"], str))
+                    node.set("input-id", safe_format(self.value["input_id"], int))
+                    node.set("input-type", InputType.to_string(self.value["input_type"]))
         elif self.type == PluginVariableType.VirtualInput:
             if self.value is not None:
                 node.set("vjoy-id", safe_format(self.value["device_id"], int))

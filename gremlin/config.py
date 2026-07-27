@@ -3489,3 +3489,11 @@ class Configuration(QtCore.QObject):
     @last_save_path.setter
     def last_save_path(self, value: str):
         self._set_data("last_save_path", value)
+
+    @property
+    def virpil_led_executable(self) -> str:
+        """returns the path to the virpil LED executable"""
+        return self._get_data("virpil_led_executable", r"C:\Program Files (x86)\VPC Software Suite\tools\VPC_LED_Control.exe")
+    @virpil_led_executable.setter
+    def virpil_led_executable(self, value: str):
+        self._set_data("virpil_led_executable", value)

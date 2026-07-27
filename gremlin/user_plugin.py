@@ -32,6 +32,7 @@ import gremlin.ui.ui_common
 from gremlin.input_types import InputType
 import gremlin.types
 from psygnal import Signal
+import gremlin.event_handler
 
 syslog = logging.getLogger("system")
 
@@ -598,10 +599,12 @@ class PhysicalInputVariable(AbstractVariable):
 
         value_widget = QtWidgets.QPushButton("Press")
         if value is not None:
-            input_id = f"{value['input_id']:d}"
-            if value["input_type"] == InputType.JoystickAxis:
-                input_id = gremlin.types.AxisNames.to_string(gremlin.types.AxisNames(value["input_id"]))
-            value_widget.setText(f"{value['device_name']} {InputType.to_string(value['input_type']).capitalize()} {input_id}")
+            device_id = value.get("device_id", None)
+            if device_id:
+                input_id = f"{value['input_id']:d}"
+                if value["input_type"] == InputType.JoystickAxis:
+                    input_id = gremlin.types.AxisNames.to_string(gremlin.types.AxisNames(value["input_id"]))
+                value_widget.setText(f"{value['device_name']} {InputType.to_string(value['input_type']).capitalize()} {input_id}")
         value_widget.clicked.connect(self._record_user_input)
 
         layout.addWidget(value_widget, 0, 1)
@@ -612,17 +615,23 @@ class PhysicalInputVariable(AbstractVariable):
         return layout
 
     def _record_user_input(self):
-        widget = gremlin.ui.ui_common.InputListenerWidget(self.valid_types)
+        widget = gremlin.ui.ui_common.InputListenerWidget(self.valid_types, callback=self._update_user_input)
 
-        widget.item_selected.connect(self._user_input)
+        root = QtWidgets.QApplication.activeWindow()
+        assert root is not None, "unable to find parent window"
+        geom = root.geometry()
 
+
+        widget.setGeometry(
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
+            300,
+            150,
+        )
         # Display the dialog centered in the middle of the UI
-        geom = QtWidgets.QApplication.topLevelWindows()[0].geometry()
-        widget.setGeometry(int(geom.x() + geom.width() / 2 - 150), int(geom.y() + geom.height() / 2 - 75), 300, 150)
-
         widget.show()
 
-    def _user_input(self, event):
+    def _update_user_input(self, event : gremlin.event_handler.Event):
         self.value_changed.emit(
             {
                 "device_id": event.device_guid,
