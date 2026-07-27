@@ -827,10 +827,23 @@ class Sound:
         elif USE_SD:
             # terminate the thread pools
             self._playback_enabled = False  # stop all streams
-            # wait for all the tasks to be completed
-            while self._sound_tasks:
+            # Wait for active tasks to finish, but bound the wait so a stream
+            # that never completes (e.g. a stalled device) cannot hang the
+            # caller indefinitely. Previously this was an unbounded
+            # 'while self._sound_tasks' loop, which could freeze profile stop
+            # and 'stop previous audio' for minutes if a task got stuck.
+            deadline = time.time() + 2.0  # seconds
+            while self._sound_tasks and time.time() < deadline:
                 self._task_trim()
                 time.sleep(0.01)
+            if self._sound_tasks:
+                # give up on stragglers: try to cancel and drop them so the
+                # queue is not blocked. Tasks already running cannot be
+                # cancelled, but disabling playback above has signalled them
+                # to stop at their next callback.
+                for t in self._sound_tasks:
+                    t.cancel()
+                self._sound_tasks = []
             self._playback_enabled = True  # renable once all streams are done
 
     def _task_trim(self):

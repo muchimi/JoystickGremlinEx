@@ -29,7 +29,6 @@ import logging
 import os
 import subprocess
 import sys
-import filecmp
 import time
 import trace
 import uuid
@@ -2280,7 +2279,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             index = 0  # Hide
         if __debug__:
             device = gremlin.joystick_handling.getDevice(device_id)
-            syslog.info(f"show content page: [{device.name}] index: [{index}] id: [{device_id}] ")
+            device_name = device.name if device is not None else "<unknown>"
+            syslog.info(f"show content page: [{device_name}] index: [{index}] id: [{device_id}] ")
         self.setDeviceContentIndex(index)
 
     def setDeviceContentIndex(self, index: int):
@@ -2825,12 +2825,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if self._suspend_ui_update:
             self._ui_update_pending = True
             return
-
-        # ensure verbose flags always exist, even if an early exception
-        # skips their assignment inside the try block below
-        verbose = False
-        verbose_l1 = False
-        verbose_detailed = False
 
         try:
             self.pushLoading()
@@ -4867,25 +4861,23 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 # app is terminating
                 return
 
-        # Wait for a real profile to be loaded in the background worker
-        # before activating: ui.initialized alone isn't enough, the profile
-        # can still be a placeholder/empty one at this point, which builds an
-        # empty execution graph (0 functors). We wait for any non-empty
-        # profile to be present rather than matching an exact name, which is
-        # fragile (a stale session .json can load under a different name and
-        # the exact-name wait would then spin forever, freezing the UI).
-        max_wait = 8.0  # seconds
-        waited = 0.0
-        while waited < max_wait:
-            profile = gremlin.shared_state.current_profile
-            # a usable profile has been loaded once it exists and has a name
-            if profile is not None and getattr(profile, "name", None):
-                break
-            syslog.info("autostart waiting for profile to finish loading...")
-            time.sleep(0.1)
-            waited += 0.1
-            if gremlin.shared_state.terminating:
-                return
+        # also wait for the actual profile to be fully loaded in the
+        # background worker thread - ui.initialized alone is not enough,
+        # the profile can still be a placeholder/empty one at this point,
+        # which builds an empty execution graph (0 functors) once activated
+        target_name = getattr(self, "_autostart_target_name", None)
+        if target_name:
+            max_wait = 10.0  # seconds
+            waited = 0.0
+            while waited < max_wait:
+                profile = gremlin.shared_state.current_profile
+                if profile and profile.name == target_name:
+                    break
+                syslog.info(f"autostart waiting for profile [{target_name}] to finish loading...")
+                time.sleep(0.1)
+                waited += 0.1
+                if gremlin.shared_state.terminating:
+                    return
 
         syslog.info("autostart starting")
 
@@ -5406,6 +5398,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 return False
 
             # compare files
+            import filecmp
 
             if os.path.isfile(tmp_path) and os.path.isfile(self._comparative_file):
                 is_changed = filecmp.cmp(tmp_path, self._comparative_file, shallow=False)

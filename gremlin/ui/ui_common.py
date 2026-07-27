@@ -10590,31 +10590,16 @@ class QRememberDialog(QtWidgets.QDialog):
         config = gremlin.config.Configuration()
         window_size = config.getWindowSize(self._window_key)
         window_location = config.getWindowLocation(self._window_key)
-        if window_size and window_size[0] and window_size[1]:
+        if window_size and window_size[0] is not None and window_size[1] is not None:
             self.resize(window_size[0], window_size[1])
         else:
-            size = self.preferredSize()
-            self.resize(size.width(), size.height())
-        if window_location and window_location[0] is not None and window_location[1] is not None:
+            self.resize(self._default_width, self._default_height)
+        if window_location:
             x, y = window_location
-            on_screen = False
-            try:
-                for screen in QtWidgets.QApplication.screens():
-                    if screen.availableGeometry().contains(QtCore.QPoint(x + 20, y + 20)):
-                        on_screen = True
-                        break
-            except Exception:
-                on_screen = True
-            if on_screen:
+            if x is not None and y is not None:
                 pos = QtCore.QPoint(x, y)
-            else:
-                try:
-                    geo = QtWidgets.QApplication.primaryScreen().availableGeometry()
-                    pos = geo.center() - QtCore.QPoint(self.width() // 2, self.height() // 2)
-                except Exception:
-                    pos = QtCore.QPoint(100, 100)
-            # syslog.info(f"recall move window {self.window_key} to {x},{y}")
-            self.move(pos)
+                # syslog.info(f"recall move window {self.window_key} to {x},{y}")
+                self.move(pos)
 
     def preferredSize(self) -> QtCore.QSize:
         """preferred window size"""
@@ -15635,16 +15620,14 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
         return self._widget
 
     def setWidget(self, widget: QWidget):
-        if not Shiboken.isValid(self):
-            return
-        if self._widget is not None and Shiboken.isValid(self._widget):
+        if self._widget is not None:
             # delete the old widget
             self.removeWidget(self._widget)
             gremlin.util.delete_widget(self._widget)
 
         # set the new widget
         self._widget = widget
-        if widget is not None and Shiboken.isValid(widget):
+        if widget is not None:
             self.addWidget(widget)
             self.setCurrentWidget(widget)
         self.widgetChanged.emit()
@@ -15868,15 +15851,13 @@ class AutohideContainerIdWidget(QtWidgets.QStackedWidget):
 
     def setWidget(self, widget: QWidget):
         """sets the widget to be displayed"""
-        if not Shiboken.isValid(self):
-            return
         if self._widget is not None and Shiboken.isValid(self._widget):
             self.removeWidget(self._widget)
         if widget is not None and not Shiboken.isValid(widget):
             self._widget = None
             return
         self._widget = widget
-        if widget is not None and Shiboken.isValid(widget):
+        if widget is not None:
             self.addWidget(widget)
         self.updateGeometry()
 

@@ -4043,11 +4043,20 @@ class Profile:
 
                 if "inherit" in mode_node.attrib:
                     parent_mode_name = html.unescape(mode_node.get("inherit"))
-                    if parent_mode_name not in mode_node_map:
-                        tree_parent_mode = ModeNode(parent_mode_name)
-                        mode_tree_nodes[parent_mode_name] = tree_parent_mode
+                    # Guard against the old bool-serialization bug that wrote
+                    # the parent mode name as the literal "True"/"False".
+                    # Such values are not real parent modes; skip them so the
+                    # mode is treated as a root instead of building a bogus
+                    # "True" parent that later fails validation.
+                    if parent_mode_name in ("True", "False"):
+                        parent_mode_name = None
 
-                    mode_tree_node.parent_name = parent_mode_name
+                    if parent_mode_name is not None:
+                        if parent_mode_name not in mode_node_map:
+                            tree_parent_mode = ModeNode(parent_mode_name)
+                            mode_tree_nodes[parent_mode_name] = tree_parent_mode
+
+                        mode_tree_node.parent_name = parent_mode_name
 
         # link parent nodes in the tree
         for mode_name in mode_tree_nodes:
@@ -5474,7 +5483,18 @@ class ProfileModeNode:
 
         # parent mode, optional
         if "inherit" in node.attrib:
-            self.inherit = html.unescape(node.get("inherit"))
+            inherit_value = html.unescape(node.get("inherit"))
+            # Older versions serialized inherit as a bool, corrupting the
+            # parent mode name into the literal "True"/"False" (see to_xml).
+            # A mode named exactly "True" or "False" is not a real parent
+            # here, so treat these as "no inheritance" rather than failing
+            # the "invalid inherit mode" assertion downstream. Real profiles
+            # affected by the old bug simply lose the (already broken)
+            # inheritance link and can be re-saved cleanly.
+            if inherit_value in ("True", "False"):
+                self.inherit = None
+            else:
+                self.inherit = inherit_value
         else:
             self.inherit = None
 
@@ -5569,8 +5589,12 @@ class ProfileModeNode:
         if self.system:
             node.set("system", safe_format(True, bool))
 
-        if self.inherit is not None:
-            node.set("inherit", safe_format(self.inherit, bool))
+        # inherit is the NAME of the parent mode (a string) or None/False for
+        # no inheritance. It defaults to the bool False in __init__, and older
+        # profiles serialized it as a bool. Only write it when it is an actual
+        # mode name string; anything else (False/True/None) means no parent.
+        if isinstance(self.inherit, str):
+            node.set("inherit", safe_format(self.inherit, str, escape=True))
 
         node.set("guid", self.id)  # unique mode ID
 
