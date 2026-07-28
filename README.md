@@ -48,6 +48,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T17)
+- Change: Play Sound Action: slight refactor for non TTS mode.
+- Fix: Play Sound Action: folder scanning exception when in audio mode getting a list of sounds to play.
+- Fix: Events: keyboard handler could block on keyboard input when terminating.
+- Fix: API: loading of old profiles with keyboard entries could result in exceptions under the new API.  Resolves indexing and comparisons.
+- Fix: XML: revised load logic on input nodes.
+- Fix: Keyboard Device: inputs do not display keys.
+
 ### (m77T16A):
 - Fix: TempoEx Container: possible exception when adding an action to any of the three categories.
 - Fix: TempoEx Container: container does not reset action set on load before loading new sets.

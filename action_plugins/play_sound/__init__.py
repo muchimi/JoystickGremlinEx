@@ -17,7 +17,7 @@
 
 from __future__ import annotations  # deprecated with python 3.14+
 import os
-import subprocess
+# import subprocess
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
 
@@ -34,7 +34,7 @@ import gremlin.ui.ui_common
 from gremlin.util import safe_format, safe_read
 import logging
 import gremlin.sound
-from gremlin.sound import Sound, PhraseData, EdgeTTSVoice
+from gremlin.sound import Sound, PhraseData, EdgeTTSVoice, SoundEvent
 import enum
 import gremlin.ktts
 import gremlin.tts
@@ -1089,14 +1089,6 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.play_widget.setEnabled(value)
 
     @QtCore.Slot()
-    def _play_ai_cb(self):
-        """plays a ui"""
-        ktts = gremlin.sound.KTTS()
-        wav = ktts.getActionWav(self.action_data)
-        if wav:
-            _sound = gremlin.sound.Sound()
-
-    @QtCore.Slot()
     def _handle_select_default(self, widget, is_control: bool, is_shift: bool, is_alt: bool, is_right: bool):
         """selects the default playback device"""
 
@@ -1226,19 +1218,21 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
     def profile_start(self):
         """runs on profile start"""
         self.action_data._last_tts_key = None  # reset duplicate-suppression state
-        if self.action_data.randomize_sound_file:
-            # update the file list to randomize from
-            self.action_data.scanFolder()
+        match self.action_data.mode:
+            case PlayMode.AudioFile:
+                if self.action_data.sound_file and self.action_data.randomize_sound_file:
+                    # update the file list to randomize from
+                    self.action_data.scanFolder(self.action_data.sound_file)
 
-        # pre-generate the audio file now (profile activation), rather than
-        # letting the first trigger generate it inline from the input
-        # execution/hook thread, which can hang the app (pyttsx3/SAPI5 does
-        # not tolerate being called in that context well).
-        if self.action_data.mode in (PlayMode.PyTTS, PlayMode.EdgeAI):
-            try:
-                self.action_data.generate(force=False)
-            except Exception as e:
-                syslog.warning(f"PLAY SOUND: pre-generation failed for [{self.action_data.text}]: {e}")
+            # pre-generate the audio file now (profile activation), rather than
+            # letting the first trigger generate it inline from the input
+            # execution/hook thread, which can hang the app (pyttsx3/SAPI5 does
+            # not tolerate being called in that context well).
+            case PlayMode.PyTTS | PlayMode.EdgeAI:
+                try:
+                    self.action_data.generate(force=False)
+                except Exception as e:
+                    syslog.warning(f"PLAY SOUND: pre-generation failed for [{self.action_data.text}]: {e}")
 
     def profile_stop(self):
         """stop any active audio on profile stop"""
@@ -1289,7 +1283,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self.auto_generate = True  # automatically generate AI voice when text changes (valid for some modes only)
         self.text = None  # text to speech for AI mode
         self.speaker = None  # text to speech AI speaker
-        self.sound_file = None  # the sound file to play in audio mode
+        self._sound_file = None  # the sound file to play in audio mode
         self._sound_files = []  # list of sound files to pick from if in folder mode
         self._tts_file = None  # sound file for TTS
         self.ptts_speed: int = 100  # words per minute, 100 is the default
@@ -1334,10 +1328,20 @@ class PlaySound(gremlin.input_item.AbstractAction):
         for index, device in enumerate(devices):
             self.device_map[index] = device
 
-        self.sound = gremlin.sound.Sound()
+        self.sound = Sound()
 
-        self._sound = None  # holds the sound object
+    @property
+    def sound_file(self) -> str:
+        return self._sound_file
+    @sound_file.setter
+    def sound_file(self, value: str):
+        self._sound_file = value
 
+    def scanFolder(self, sound_file: str = None):
+        """scans the file folder for valid audio files"""
+        if sound_file and os.path.isfile(sound_file):
+            self._sound_files = self.sound.scanFolder(sound_file)
+            self._timed_random.setMax(len(self._sound_files) - 1)
 
     @property
     def tts_suppress_duplicate(self) -> bool:
@@ -1389,7 +1393,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
 
         if gremlin.sound.USE_PG:
             if init_mixer:
-                self.sound.queueAction(gremlin.sound.SoundEvent.ChangeDeviceAction(name))
+                self.sound.queueAction(SoundEvent.ChangeDeviceAction(name))
 
     @property
     def etts_speaker(self) -> str:
@@ -1468,18 +1472,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
             suggested_file = gremlin.util.swap_ext(suggested_file, ext)
             return suggested_file
 
-    def scanFolder(self):
-        """scans the file folder for valid audio files"""
-        self._sound_files.clear()
-        if self.sound_file and os.path.isfile(self.sound_file):
-            folder_path = os.path.dirname(self.sound_file)
-            entries = os.listdir(folder_path)
-            for entry in entries:
-                ext = gremlin.util.get_ext(entry)
-                if ext in (".wav", ".mp3"):
-                    self._sound_files.append(os.path.join(folder_path, entry))
 
-        self._timed_random.setMax(len(self._sound_files) - 1)
 
     def generate(self, force=False, as_map: bool = False):
         match self.mode:
@@ -1508,6 +1501,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
             pitch=pitch,
             volume=volume,
             force=force,
+            sound_file=self.sound_file,
+            sound_files=self._sound_files,
             timed_random=self._timed_random,
             as_map=as_map,
         )
@@ -1580,7 +1575,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
             volume=volume,
             pitch=pitch,
             playback_mode=self.playback_mode,
-            sound_file=sound_file,
+            sound_file=self._sound_file,
+            sound_files=self._sound_files,
             timed_random=self._timed_random,
         )
 
@@ -1623,12 +1619,12 @@ class PlaySound(gremlin.input_item.AbstractAction):
             key = phrase.key
             if gremlin.sound.USE_PG:
                 # pg needs volume to be set
-                action = gremlin.sound.SoundEvent.SetVolumeAction(key, self.playback_volume)
+                action = SoundEvent.SetVolumeAction(key, self.playback_volume)
                 actions.append(action)
-                action = gremlin.sound.SoundEvent.ChangeDeviceAction(self.audio_device)
+                action = SoundEvent.ChangeDeviceAction(self.audio_device)
                 actions.append(action)
 
-            action = gremlin.sound.SoundEvent.PlayAction(
+            action = SoundEvent.PlayAction(
                 key=key,
                 sound_file=sound_file,
                 device=self.audio_device,
@@ -1647,7 +1643,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         else:
             # if the stop is requested, allow no sound file
             if self.stop_previous:
-                action = gremlin.sound.SoundEvent.StopAction()
+                action = SoundEvent.StopAction()
                 self.sound.queueAction(action)
             else:
                 syslog.error(f"PLAY: don't know how to play: {sound_file}")

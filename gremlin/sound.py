@@ -1067,19 +1067,6 @@ class Sound:
             self.playPhrase(phrase, options)
 
 
-    def scanFolder(self):
-        """scans the file folder for valid audio files"""
-        self._sound_files.clear()
-        if self.sound_file and os.path.isfile(self.sound_file):
-            folder_path = os.path.dirname(self.sound_file)
-            entries = os.listdir(folder_path)
-            for entry in entries:
-                ext = gremlin.util.get_ext(entry)
-                if ext in (".wav", ".mp3"):
-                    self._sound_files.append(os.path.join(folder_path, entry))
-
-        self._timed_random.setMax(len(self._sound_files) - 1)
-
     def generate(self,
                  text : str,
                  mode: PlayMode = PlayMode.EdgeAI,
@@ -1090,10 +1077,27 @@ class Sound:
                  volume : float = 1.0,
                  playback_mode : PlaybackMode = PlaybackMode.RoundRobin,
                  timed_random : TimedRandomInt = None,
-                 sound_file : str = None,
+                 sound_file : str = None, # single sound file
+                 sound_files : list[str] = None, # pick list of sound files
                  as_map : bool = False,
                  force : bool = False) -> PhraseData | dict:
-        """generates the audio for a given phrase using the specified play mode"""
+        """generates the audio for a given phrase using the specified play mode
+        :param text: the text to generate audio for
+        :param mode: the play mode to use for generating the audio
+        :param voice: the voice to use for TTS
+        :param randomize_sound_file: whether to randomize the sound file selection
+        :param rate: the speech rate
+        :param pitch: the speech pitch
+        :param volume: the playback volume
+        :param playback_mode: the playback mode to use
+        :param timed_random: the timed random instance for randomization
+        :param sound_file: the single sound file to use
+        :param sound_files: the list of sound files to choose from
+        :param as_map: whether to return the result as a map of key -> PhraseData
+        :param force: whether to force regeneration of the audio
+        :return: the generated PhraseData or a map of key if in map return mode [key] -> PhraseData
+
+        """
 
         # ensure started
         if not self.ensureStarted():
@@ -1111,16 +1115,15 @@ class Sound:
         match mode:
             case PlayMode.AudioFile:
                 # static playback of one or more files depending if a folder or a single file
-                self._sound_files = []
                 if sound_file and os.path.isfile(sound_file):
                     if randomize_sound_file:
                         # pick a file at random from a list of files in the folder
-                        if not self._sound_files:
+                        if not sound_files:
                             # update file list - there is at least one file
-                            self.scanFolder()
-
+                            sound_files = self.scanFolder(sound_file)
+                            timed_random.setMax(len(sound_files) - 1)
                         index = timed_random.getValue()
-                        sound_file = self._sound_files[index]
+                        sound_file = sound_files[index]
                     else:
                         sound_file = sound_file
 
@@ -1132,7 +1135,7 @@ class Sound:
                     return phrase if not as_map else phrase_map
 
                 else:
-                    syslog.error(f"PLAY: unable to locate file: [{sound_file}]")
+                    syslog.warning(f"PLAY: unable to locate file: [{sound_file}]")
                     return None if not as_map else {}
 
             case PlayMode.EdgeAI:
@@ -1214,6 +1217,19 @@ class Sound:
         phrase = self.pickPhrase(phrase_map, mode=mode, playback_mode=playback_mode, timed_random=timed_random)
         return phrase
 
+    def scanFolder(self, sound_file: str = None):
+        """scans the file folder for valid audio files"""
+        if sound_file and os.path.isfile(sound_file):
+            sound_files = []
+            folder_path = os.path.dirname(sound_file)
+            entries = os.listdir(folder_path)
+            for entry in entries:
+                ext = gremlin.util.get_ext(entry)
+                if ext in (".wav", ".mp3"):
+                    sound_files.append(os.path.join(folder_path, entry).casefold())
+        return sound_files
+
+
 
     def pickPhrase(self, phrase_map : dict, mode : PlayMode, playback_mode: PlaybackMode = PlaybackMode.RoundRobin, timed_random : TimedRandomInt = None):
         """ picks a phrase to play based on the playback mode """
@@ -1266,9 +1282,6 @@ class Sound:
 
         self._last_phrase = phrase
         return phrase
-
-
-
 
     def queueAction(self, action: SoundEvent):
         """queues a sound action - PG mode only"""

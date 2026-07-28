@@ -526,8 +526,8 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 class SpecialInputItem(AbstractInputItem):
     """specialized input item"""
 
-    def __init__(self, name):
-        super().__init__()
+    def __init__(self, name : str, mode, device_guid):
+        super().__init__(mode, device_guid)
         self._display_name = name
         self._description = "Special Virtual Input"
 

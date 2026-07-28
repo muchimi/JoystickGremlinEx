@@ -31,7 +31,7 @@ import logging
 import threading
 import time
 from gremlin.util import log_info, load_icon
-from gremlin.base_classes import TraceableList
+# from gremlin.base_classes import TraceableList
 import gremlin.input_item
 from shiboken6 import Shiboken
 import html

@@ -61,6 +61,8 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
 
     def _handle_get_sort_key(self, input_item: KeyboardInputItem):
         """sorting key for this input item"""
+        if not self._key.name:
+            return []
         sort_list = [self._key.name.casefold()]
         sort_list.extend([key.name.casefold() for key in self.latched_keys])
         return sort_list
@@ -273,7 +275,7 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
         if self._suspend_update:
             # ignore
             return
-        if not self._key:
+        if not self._key or not self._key.latched_name:
             self._message_key = self._guid
             self._title_name = "Keyboard Input (not configured)"
             self._display_name = ""
@@ -288,6 +290,7 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
         for key in self._key._latched_keys:
             extended_key = "0x0E " if key._is_extended else ""
             message_key += f"|{extended_key}0x{key._scan_code:02X}"
+
 
         self._message_key = message_key
 
@@ -337,7 +340,10 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
     def __eq__(self, other):
         if isinstance(other, KeyboardInputItem):
             return self.message_key == other.message_key
-        return self.__hash__() == other.__hash__()
+
+        return False
+
+        #return self.__hash__() == other.__hash__()
 
     def __ne__(self, other):
         return not (self == other)
@@ -663,6 +669,8 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         gremlin.shared_state.pop_suspend_ui_keyinput()
         self._keyboard_dialog.deleteLater()
         self._keyboard_dialog = None
+        self._update_input_widget(self.getContentWidget(), self.getContentWidget().parent)
+
 
     def _dialog_ok_cb(self):
         """called when the add/edit key dialog completes"""
@@ -678,6 +686,11 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         el = gremlin.event_handler.EventListener()
         el.device_mapping_changed.emit(self._device_id)
+
+        widget = self.inputItemListView.widget(index)
+        if widget:
+            self._update_input_widget(widget, None)
+
 
     def _process_input_keys(self, keys, index, root_key=None):
         """processes input keys
@@ -803,6 +816,8 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         widget.enable_close()
         widget.enable_edit()
 
+
+
         self._update_input_widget(widget, widget.parent)
 
         return widget
@@ -814,10 +829,16 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             input_widget.setCustomContent(None)
             return
 
+
         widgets = []
         if len(values) < 8:
             key: gremlin.keyboard.Key
             for key in values:
+                # check for blank keys
+                if not key.name:
+                    input_widget.setCustomContent(None)
+                    return
+
                 widget = gremlin.ui.virtual_keyboard.QKeyWidget()
                 icon = gremlin.keyboard.KeyMap.icon(key)
                 name = gremlin.keyboard.KeyMap.get_name(key)
@@ -852,18 +873,9 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         values = input_item.getKeyList()
         self._set_custom_content(input_widget, values)
 
-        # input_widget.setInputDescription(data.display_name_scan)
-        input_widget.display_name = input_item.display_name_scan
-
-        input_widget.setToolTip(input_item.display_tooltip)
-        if input_item.has_mouse:
-            input_widget.setInputDescriptionIcon("mdi.mouse")
-        else:
-            input_widget.setInputDescriptionIcon(None)
-
         is_warning = False
         status_text = ""
-        if input_item.key is None:
+        if input_item.key is None or not input_item.key.name:
             is_warning = True
             status_text = "Not configured"
         elif gremlin.config.Configuration().show_scancodes:
@@ -871,15 +883,15 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         icon = None
         if is_warning:
-            warning_color = gremlin.ui.ui_common.Color.warningColor()
-            _icon_color = QtGui.QColor(warning_color)
-            icon = gremlin.util.load_icon(
-                "ph.shield-warning-fill",
-                use_qta=True,
-                qta_color=QtGui.QColor(warning_color),
-            )
+            input_widget.setConfigured(False)
+        else:
+            input_widget.setConfigured(True)
+            input_widget.display_name = input_item.display_name_scan
+            input_widget.setToolTip(input_item.display_tooltip)
+            if input_item.has_mouse:
+                input_widget.setInputDescriptionIcon("mdi.mouse")
 
-        input_widget.setStatus(status_text, icon)
+            input_widget.setStatus(status_text, icon)
 
     def _populate_input_widget_ui(self, input_widget, container_widget, data = None):
         """called when a button is created for custom content"""
@@ -900,6 +912,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._keyboard_dialog.closed.connect(self._dialog_close_cb)
         self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.showNormal()
+
 
     def _close_item_cb(self, widget, index, data):
         """called when the close button is clicked"""

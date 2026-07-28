@@ -1327,6 +1327,13 @@ class Icons:
     def warningIcon(qta_color=Color.warningColor()):
         return Icons._icon("ph.shield-warning-fill", qta_color=qta_color)
 
+
+    @staticmethod
+    def yellowWarningIcon(qta_color=Color.yellowColor()):
+        return Icons._icon("ph.shield-warning-fill", qta_color=qta_color)
+
+
+
     @staticmethod
     def errorIcon(qta_color="#c7450e"):
         return Icons._icon("fa5s.error", qta_color=qta_color)
@@ -15630,9 +15637,15 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
         # set the new widget
         self._widget = widget
         if widget is not None:
-            self.addWidget(widget)
+            super().addWidget(widget)
             self.setCurrentWidget(widget)
+            height = widget.sizeHint().height()
+            self.setFixedHeight(height)
+        else:
+            self.setFixedHeight(0) # hide
         self.widgetChanged.emit()
+
+
 
     def layout(self):
         if not self._widget:

@@ -1301,6 +1301,8 @@ class EventListener(QtCore.QObject):
 
     def _process_queue(self):
         """processes an item the keyboard buffer queue"""
+        if self._keyboard_queue.empty():
+            return
         items = list(self._keyboard_queue.getall())
         for item, is_pressed in items:
             verbose = gremlin.config.Configuration().verbose_mode_detailed
@@ -1344,8 +1346,7 @@ class EventListener(QtCore.QObject):
 
             # process the events
             time.sleep(0)  # yield to other threads
-            # QtWidgets.QApplication.processEvents()
-            # self._keyboard_queue.task_done()
+
         item, is_pressed = self._keyboard_queue.get()
         verbose = gremlin.config.Configuration().verbose_mode_detailed
         is_error = False
@@ -1402,15 +1403,9 @@ class EventListener(QtCore.QObject):
             if self._keyboard_queue.empty():
                 time.sleep(0)
                 continue
-            self._process_queue()
-            time.sleep(0)  # yield to other threads
-
-        # done
-        # process any straglers
-
-        # while not self._keyboard_queue.empty():
-        #     self._process_queue()
-        #     time.sleep(0)  # yield to other threads
+            else:
+                self._process_queue()
+                time.sleep(0)  # yield to other threads
 
         syslog.info("KBD: stopped")
 
@@ -1427,11 +1422,13 @@ class EventListener(QtCore.QObject):
 
             syslog.info("KEY THREAD: stopping...")
             self._keyboard_thread_running = False
+            self._keyboard_queue.clear()
             self._keyboard_thread.stop()
-            self._keyboard_thread.join()
+            self._keyboard_thread.join(timeout=1)
+
 
             syslog.info(f"KEY THREAD: clearing remaining items in queue: size: {len(self._keyboard_queue)}")
-            self._keyboard_queue.clear()
+
             syslog.info("KEY THREAD: stopped")
             self._key_listener_started = False
 
