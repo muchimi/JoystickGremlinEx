@@ -44,6 +44,13 @@ import time
 from gremlin.types import PlaybackMode, PlayMode
 import shutil
 
+# Sentinel for the "follow the Windows default output device" option shown at
+# the top of the playback device dropdown. When selected, audio_device is set
+# to DEFAULT_AUDIO_DEVICE_MARKER and resolved to the current system default at
+# playback time rather than to a fixed device.
+DEFAULT_AUDIO_DEVICE_INDEX = -1
+DEFAULT_AUDIO_DEVICE_MARKER = "__default__"
+
 
 syslog = logging.getLogger("system")
 
@@ -392,7 +399,13 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         device_index = self.action_data.getAudioDeviceIndex()
 
-        source = [(d.description(), index) for index, d in self.action_data.device_map.items()]
+        # The first entry follows the current Windows default output device at
+        # playback time (value -1 = DEFAULT_AUDIO_DEVICE sentinel). Selecting it
+        # means the sound always plays on whatever is the system default when it
+        # is triggered - e.g. speakers when a headset is off, the headset when it
+        # is on and Windows switches to it.
+        source = [("Default device", DEFAULT_AUDIO_DEVICE_INDEX)]
+        source += [(d.description(), index) for index, d in self.action_data.device_map.items()]
 
         self.audio_device_selector = gremlin.ui.ui_common.QDataComboBox(callback=self._handle_audio_change, source=source, value=device_index)
         self.default_widget = gremlin.ui.ui_common.QDataPushButton("Default", callbackEx=self._handle_select_default, tooltip="Select system default")
@@ -632,7 +645,12 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
             # QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(file_path))
 
     def _handle_tts_suppress_enabled_changed(self, checked: bool):
-        self.action_data.tts_suppress_enabled = checked
+        # The checkbox reads action_data.tts_suppress_duplicate, and playback
+        # checks the same property. This handler previously assigned to
+        # tts_suppress_enabled, an attribute that is never read, so unchecking
+        # the box left _tts_suppress_duplicate unchanged and suppression stayed
+        # active. Write to the actual property instead.
+        self.action_data.tts_suppress_duplicate = checked
 
     def _handle_tts_suppress_cooldown_changed(self, value: int):
         self.action_data._tts_suppress_cooldown = value
@@ -1028,8 +1046,13 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self._update_status_ui(f"Mode Change: {PlayMode.to_description(mode)}.", "info")
 
     def _handle_audio_change(self, value):
+        if value == DEFAULT_AUDIO_DEVICE_INDEX:
+            # follow the Windows default output device at playback time
+            self.action_data.audio_device = DEFAULT_AUDIO_DEVICE_MARKER
+            return
         device = self.action_data.findDevice(value)
-        self.action_data.audio_device = device.description()
+        if device is not None:
+            self.action_data.audio_device = device.description()
 
     def _handle_loops_changed(self, value: int):
         self.action_data.loops = value
@@ -1630,6 +1653,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 syslog.error(f"PLAY: don't know how to play: {sound_file}")
 
     def findDevice(self, index: int):
+        if index == DEFAULT_AUDIO_DEVICE_INDEX:
+            return self.getDefaultAudioDevice()
         if index in self.device_map:
             return self.device_map[index]
 
@@ -1648,6 +1673,11 @@ class PlaySound(gremlin.input_item.AbstractAction):
 
         default_audio_device = self.getDefaultAudioDevice()
 
+        # "follow default" marker -> always resolve to the current Windows
+        # default output device at the moment the sound is played.
+        if self.audio_device == DEFAULT_AUDIO_DEVICE_MARKER:
+            return default_audio_device
+
         if self.audio_device:
             device = next((d for d in self.device_map.values() if d.description() == self.audio_device), default_audio_device)
         else:
@@ -1663,6 +1693,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
 
     def getAudioDeviceIndex(self):
         """gets the index of the selected device"""
+        if self.audio_device == DEFAULT_AUDIO_DEVICE_MARKER:
+            return DEFAULT_AUDIO_DEVICE_INDEX
         if not self.audio_device:
             device = self.getDefaultAudioDevice()
             self.audio_device = device.description()

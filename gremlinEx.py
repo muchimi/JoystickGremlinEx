@@ -2279,7 +2279,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             index = 0  # Hide
         if __debug__:
             device = gremlin.joystick_handling.getDevice(device_id)
-            syslog.info(f"show content page: [{device.name}] index: [{index}] id: [{device_id}] ")
+            device_name = device.name if device is not None else "<unknown>"
+            syslog.info(f"show content page: [{device_name}] index: [{index}] id: [{device_id}] ")
         self.setDeviceContentIndex(index)
 
     def setDeviceContentIndex(self, index: int):
