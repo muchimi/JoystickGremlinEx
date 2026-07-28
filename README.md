@@ -50,6 +50,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 ### (m77T16A):
 - Fix: TempoEx Container: possible exception when adding an action to any of the three categories.
+- Fix: TempoEx Container: container does not reset action set on load before loading new sets.
+- Fix: various fixes / vjoy / default device courtesy RazOrLegend
 
 
 ### (m77T16):
