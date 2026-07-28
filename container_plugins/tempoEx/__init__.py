@@ -60,6 +60,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         assert len(container.action_sets) > 0, "container missing action sets"
         self.container: TempoExContainer = container
         self.input_item = self.container.input_item
+        self._actionset_widget_map = {}
 
     def _create_action_ui(self):
         """Creates the UI components."""
@@ -258,20 +259,24 @@ class TempoExContainerWidget(AbstractContainerWidget):
         short_action_set = self.container.short_action_set
         long_action_set = self.container.long_action_set
         double_action_set = self.container.double_action_set
-        self._create_action_widget(short_action_set, "Short Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
-        self._create_action_widget(long_action_set, "Long Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
-        self._create_action_widget(double_action_set, "Double Tap", self.activation_condition_layout, ContainerViewTypes.Conditions)
+        self._actionset_widget_map["short"] = self._create_action_widget(short_action_set, "Short Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
+        self._actionset_widget_map["long"] = self._create_action_widget(long_action_set, "Long Press", self.activation_condition_layout, ContainerViewTypes.Conditions)
+        self._actionset_widget_map["double"] = self._create_action_widget(double_action_set, "Double Tap", self.activation_condition_layout, ContainerViewTypes.Conditions)
 
     def _create_action_widget(self, action_set, label, layout, view_type):
         """Creates a new action widget.
 
-        :param index the index at which to store the created action
+        :param action_set the action set to create the widget for
         :param label the name of the action to create
+        :param layout the layout to add the widget to
+        :param view_type the type of view for the widget
+        :returns the created widget
         """
         widget = self._create_action_set_widget(action_set, label, view_type)
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self.container_modified.emit)
+        return widget
 
     def _delete_action(self, input_item, container, action):
         """removes an action"""
@@ -295,15 +300,17 @@ class TempoExContainerWidget(AbstractContainerWidget):
         """
 
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
-        action_item = plugin_manager.get_class(action_name)(self.container)
-        action_item.data = "short"
-        self.container.short_action_sets.append([action_item])
+        action = plugin_manager.get_class(action_name)(self.container)
+        action.data = "short"
+        self.container.short_action_set.append([action])
         self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        action_sets = [action_set for action_set in self.container.short_action_sets if action_set]
-        self._create_widgets(action_sets, "Short Action(s)", self.short_layout, self.short_layout_widget_list)
+
+
+        # #action_sets = [action_set for action_set in self.container.short_action_set if action_set]
+        # self._create_widgets(action_sets, "Short Action(s)", self.short_layout, self.short_layout_widget_list)
 
     def _paste_short_action(self, action, container):
         """called when a paste occurs"""
@@ -311,13 +318,15 @@ class TempoExContainerWidget(AbstractContainerWidget):
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.container)
         action_item.data = "short"
-        self.container.short_action_sets.append([action_item])
+        self.container.short_action_set.append([action_item])
         self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        action_sets = [action_set for action_set in self.container.short_action_sets if action_set]
-        self._create_widgets(action_sets, "Short Action(s)", self.short_layout, self.short_layout_widget_list)
+
+
+        # action_sets = [action_set for action_set in self.container.short_action_set if action_set]
+        # self._create_widgets(action_sets, "Short Action(s)", self.short_layout, self.short_layout_widget_list)
 
     def _add_long_action(self, action_name):
         """Adds a new action to the long action list
@@ -327,13 +336,13 @@ class TempoExContainerWidget(AbstractContainerWidget):
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.container)
         action_item.data = "long"
-        self.container.long_action_sets.append([action_item])
+        self.container.long_action_set.append([action_item])
         self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        action_sets = [action_set for action_set in self.container.long_action_sets if action_set]
-        self._create_widgets(action_sets, "Long Action(s)", self.long_layout, self.long_layout_widget_list)
+        # action_sets = [action_set for action_set in self.container.long_action_set if action_set]
+        # self._create_widgets(action_sets, "Long Action(s)", self.long_layout, self.long_layout_widget_list)
 
     def _paste_long_action(self, action, container):
         """called when a paste occurs"""
@@ -341,13 +350,13 @@ class TempoExContainerWidget(AbstractContainerWidget):
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.container)
         action_item.data = "long"
-        self.container.long_action_sets.append([action_item])
+        self.container.long_action_set.append([action_item])
         self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        action_sets = [action_set for action_set in self.container.long_action_sets if action_set]
-        self._create_widgets(action_sets, "Long Action(s)", self.long_layout, self.long_layout_widget_list)
+        # action_sets = [action_set for action_set in self.container.long_action_set if action_set]
+        # self._create_widgets(action_sets, "Long Action(s)", self.long_layout, self.long_layout_widget_list)
 
     def _add_double_action(self, action_name):
         """Adds a new action to the double action list
@@ -357,13 +366,13 @@ class TempoExContainerWidget(AbstractContainerWidget):
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.get_class(action_name)(self.container)
         action_item.data = "double"
-        self.container.double_action_sets.append([action_item])
+        self.container.double_action_set.append([action_item])
         self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
 
-        action_sets = [action_set for action_set in self.container.double_action_sets if action_set]
-        self._create_widgets(action_sets, "Double Action(s)", self.double_layout, self.double_layout_widget_list)
+        # action_sets = [action_set for action_set in self.container.double_action_set if action_set]
+        # self._create_widgets(action_sets, "Double Action(s)", self.double_layout, self.double_layout_widget_list)
 
     def _paste_double_action(self, action, container):
         """called when a paste occurs"""
@@ -371,7 +380,7 @@ class TempoExContainerWidget(AbstractContainerWidget):
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         action_item = plugin_manager.duplicate(action, self.container)
         action_item.data = "double"
-        self.container.double_action_sets.append([action_item])
+        self.container.double_action_set.append([action_item])
         self.container.create_or_delete_virtual_button()
         if Shiboken.isValid(self):
             self.container_modified.emit()
@@ -471,13 +480,13 @@ class TempoExContainerWidget(AbstractContainerWidget):
 
         if widget in self.short_layout_widget_list:
             data = self.short_layout_widget_list
-            action_sets = self.container.short_action_sets
+            action_sets = self.container.short_action_set
         elif widget in self.long_layout_widget_list:
             data = self.long_layout_widget_list
-            action_sets = self.container.long_action_sets
+            action_sets = self.container.long_action_set
         elif widget in self.double_layout_widget_list:
             data = self.double_layout_widget_list
-            action_sets = self.container.double_action_sets
+            action_sets = self.container.double_action_set
         else:
             return (None, -1)
 
@@ -527,6 +536,8 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.delay = container.delay
         self.autorelease_delay = container.autorelease_delay
         self.activate_on = container.activate_on
+
+        assert len(container.action_sets) == 3, "TempoEx container must have exactly 3 action sets: short, long, and double."
 
 
         self.start_time = 0
@@ -587,6 +598,10 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.last_short_value = None
         self.dtap_timeout = None
         self.verbose = gremlin.config.Configuration().verbose_mode_container
+
+
+        assert len(self.container.action_sets) == 3, "TempoEx container must have exactly 3 action sets: short, long, and double."
+
 
         self.last_trigger = None
         self.trigger_mode = None  # what to trigger (short or long press)
@@ -1125,7 +1140,9 @@ More than one action per short press or long press can be added."""
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node, extra_data=extra_data, custom_action_sets = True,  custom_generate_callback = self._generate_action_set_xml)
+        super().__init__(parent, node, extra_data=extra_data, custom_action_sets = True, custom_generate_callback = self._generate_action_set_xml)
+
+
         self.short_action_set = gremlin.input_item.ActionSet(model_description = "short press actions")
         self.long_action_set = gremlin.input_item.ActionSet(model_description = "long press actions")
         self.double_action_set = gremlin.input_item.ActionSet(model_description = "double press actions")
@@ -1137,12 +1154,15 @@ More than one action per short press or long press can be added."""
         self.chain_short = True
         self.chain_long = True
         self.chain_double = True
+        self.action_sets.clear()
         self.action_sets.add(self.short_action_set, 0) # 0
         self.action_sets.add(self.long_action_set, 1) # 1
         self.action_sets.add(self.double_action_set, 2) # 2
-        self.action_sets.addCallback(self._action_sets_changed)
+        self.action_sets.addCallback(self._action_set_changed)
+        assert len(self.action_sets) == 3, f"TempoEx container must have exactly 3 action sets: short, long, and double. got {len(self.action_sets)}"
+        syslog.info(f"TempoEx: action set count: {len(self.action_sets)}")
 
-    def _action_sets_changed(self, data):
+    def _action_set_changed(self, data):
         """Callback for when the action sets change."""
         pass
 
@@ -1171,7 +1191,7 @@ More than one action per short press or long press can be added."""
         self.chain_short = safe_read(node, "chain_short", bool, False)
         self.chain_double = safe_read(node, "chain_double", bool, False)
         self.timeout = float(node.get("timeout", 0.0))
-        # custom read of action sets
+
         for as_node in node:
             match as_node.tag:
                 case "short-action-set":
@@ -1184,11 +1204,6 @@ More than one action per short press or long press can be added."""
 
         # self.dumpActionSets(self.action_sets)
         # pass
-
-    def _parse_action_set_xml(self, node, input_item, extra_data=None):
-        """Parses the XML content for a specific action set and populates the given action set."""
-        # already read in _parse_xml
-        pass
 
 
 
@@ -1242,12 +1257,12 @@ More than one action per short press or long press can be added."""
 
         :return True if the container is configured properly, False otherwise
         """
-        # count = len(self.short_action_sets) + len(self.long_action_sets) + len(self.double_action_sets)
+        # count = len(self.short_action_set) + len(self.long_action_set) + len(self.double_action_set)
         # valid = count > 0
         valid = True
         return valid
 
-    def get_action_sets(self):
+    def get_action_set(self):
         """override method: returns action sets - override because we have custom sets"""
         return self.action_sets
 

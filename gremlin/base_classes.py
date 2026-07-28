@@ -1035,26 +1035,33 @@ class AbstractCallbackModel(AbstractModel):
         :param callback: optional, filtering callback, takes an item as a parameter and returns true if the item should be included in the filtered data
         :returns int: inserted position
         """
-        if self._allowed_types:
-            if not isinstance(item, self._allowed_types):
-                raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
-        assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
+        if item is None:
+            return -1
 
-        if item not in self._index_map:
-            self.markDirty()
-            if index == -1:
-                # find the next available index
-                index = 0
-                while index in self._index_map:
-                    index += 1
-            old_item = self.itemAt(index)
-            self.setItemAt(index, item)
-            self.onItemChanged(self, index, item, old_item, "add")
+        items =  item if isinstance(item, list) else [item]
+
+        for item in items:
+
+            if self._allowed_types:
+                if not isinstance(item, self._allowed_types):
+                    raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
+                assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
+
+            if item not in self._index_map:
+                self.markDirty()
+                if index == -1:
+                    # find the next available index
+                    index = 0
+                    while index in self._index_map:
+                        index += 1
+                old_item = self.itemAt(index)
+                self.setItemAt(index, item)
+                self.onItemChanged(self, index, item, old_item, "add")
+
             self.applyFilter()
             self._fireChanged()
-
             return index
-        return -1
+        return -1  # if the item was not added
 
     def onItemChanged(self, model, index: int, new_item, old_item, operation):
         """override by derived classes as needed"""

@@ -48,6 +48,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T16A):
+- Fix: TempoEx Container: possible exception when adding an action to any of the three categories.
+
+
 ### (m77T16):
 - Fix: Plugin API: resolve an issue with the input selection dialog in the m77 API.
 - Fix: Plugin API: resolve an issue with error handling of bad data stored to profile.
