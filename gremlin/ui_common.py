@@ -1327,6 +1327,13 @@ class Icons:
     def warningIcon(qta_color=Color.warningColor()):
         return Icons._icon("ph.shield-warning-fill", qta_color=qta_color)
 
+
+    @staticmethod
+    def yellowWarningIcon(qta_color=Color.yellowColor()):
+        return Icons._icon("ph.shield-warning-fill", qta_color=qta_color)
+
+
+
     @staticmethod
     def errorIcon(qta_color="#c7450e"):
         return Icons._icon("fa5s.error", qta_color=qta_color)
@@ -10092,18 +10099,19 @@ class QSplitTabWidget(QDataWidget):
 
     def _handle_expired_widget_ui(self, key, widget):
         """called by the widget cache when a widget is being removed from the cache"""
-        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
-        if key in self._widget_config_index_map:
-            # one of ours - unregister it
-            if verbose:
-                syslog.info(f" QtSplitTabWidget: Expired widget: [{key}]")
-            index = self._right_panel_stacked_widget.indexOf(widget)
-            if index != -1:
-                # one of ours
+        if Shiboken.isValid(self) and Shiboken.isValid(widget):
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+            if key in self._widget_config_index_map:
+                # one of ours - unregister it
                 if verbose:
-                    syslog.info("\tremoving widget from stacked widget")
-                widget.expired.disconnect(self._handle_expired_widget)
-                self.unregisterWidget(key)
+                    syslog.info(f" QtSplitTabWidget: Expired widget: [{key}]")
+                index = self._right_panel_stacked_widget.indexOf(widget)
+                if index != -1:
+                    # one of ours
+                    if verbose:
+                        syslog.info("\tremoving widget from stacked widget")
+                    widget.expired.disconnect(self._handle_expired_widget)
+                    self.unregisterWidget(key)
 
     def unload(self):
         """unloads UI resources used by a particular tab widget"""
@@ -10468,9 +10476,9 @@ class QRememberMainWindow(ResizableWindow):
 
         window_location = config.getWindowLocation(self._window_key)
 
-        if window_size:
+        if window_size and window_size[0] is not None and window_size[1] is not None:
             self.resize(window_size[0], window_size[1])
-        if window_location:
+        if window_location and window_location[0] is not None and window_location[1] is not None:
             self.move(window_location[0], window_location[1])
         else:
             self.active_screen = QtWidgets.QApplication.screenAt(self.pos())
@@ -10597,10 +10605,11 @@ class QRememberDialog(QtWidgets.QDialog):
                 self.resize(self._default_width, self._default_height)
             if window_location:
                 x, y = window_location
-                if x is not None and y is not None:
-                    pos = QtCore.QPoint(x, y)
-                    # syslog.info(f"recall move window {self.window_key} to {x},{y}")
-                    self.move(pos)
+                if x is None or y is None:
+                    x, y = self.x(), self.y()
+                pos = QtCore.QPoint(x, y)
+                # syslog.info(f"recall move window {self.window_key} to {x},{y}")
+                self.move(pos)
         except Exception as e:
             pass
 
@@ -15631,9 +15640,15 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
         # set the new widget
         self._widget = widget
         if widget is not None:
-            self.addWidget(widget)
+            super().addWidget(widget)
             self.setCurrentWidget(widget)
+            height = widget.sizeHint().height()
+            self.setFixedHeight(height)
+        else:
+            self.setFixedHeight(0) # hide
         self.widgetChanged.emit()
+
+
 
     def layout(self):
         if not self._widget:
