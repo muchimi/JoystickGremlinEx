@@ -2048,7 +2048,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         elif input_type == InputType.JoystickHat:
             if not action_name:
-                action_name = f"Vjoy device {vjoy_id} hat {vjoy_input_id}"
+                action_name = f"Vjoy device {vjoy_id} hat {self.action_data.vjoy_hat_id}"
             prefix = f"Hat {input_id}"
 
         else:
@@ -3454,15 +3454,31 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             elif input_type == InputType.JoystickHat:
                 count = device.hat_count
-                for id in range(1, count + 1):
-                    self.virtual_output_selector_widget.addItem(f"Hat {id}", id)
-                input_id = self.action_data.vjoy_input_id
+                with QtCore.QSignalBlocker(self.virtual_output_selector_widget):
+                    for id in range(1, count + 1):
+                        self.virtual_output_selector_widget.addItem(f"Hat {id}", id)
+                    # Preselect the configured output hat. The output hat is
+                    # stored in vjoy_hat_id (not vjoy_input_id); without this
+                    # the dropdown was never positioned and always showed Hat 1.
+                    hat_index = self.virtual_output_selector_widget.findData(self.action_data.vjoy_hat_id)
+                    if hat_index != -1:
+                        self.virtual_output_selector_widget.setCurrentIndex(hat_index)
+                input_id = self.action_data.vjoy_hat_id
                 if input_id < 1 or input_id > count:
                     self.setWarning(f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy hat # {input_id}")
                     return
 
     def _get_output_index(self):
-        index = self.virtual_output_selector_widget.findData(self.action_data.vjoy_input_id)
+        # For hat actions the output id is stored in vjoy_hat_id, not
+        # vjoy_input_id; use the right one so the dropdown resolves correctly.
+        if self.action_data.action_mode in (
+            VjoyAction.VJoyHat,
+            VjoyAction.VJoyHatPress,
+            VjoyAction.VJoyHatPulse,
+        ):
+            index = self.virtual_output_selector_widget.findData(self.action_data.vjoy_hat_id)
+        else:
+            index = self.virtual_output_selector_widget.findData(self.action_data.vjoy_input_id)
         return index or -1
 
     @QtCore.Slot(float)
@@ -4331,6 +4347,15 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.verbose_extra = self.verbose and config.verbose_mode_extra
         self.vjoy_id = action_data.virtual_id
         self.vjoy_input_id = action_data.vjoy_input_id
+        # For hat actions the output hat is stored in vjoy_hat_id; the functor
+        # drives the hat through vjoy_input_id, so copy the hat id across here.
+        # Without this, hat output always used vjoy_input_id (default 1).
+        if action_data.action_mode in (
+            VjoyAction.VJoyHat,
+            VjoyAction.VJoyHatPress,
+            VjoyAction.VJoyHatPulse,
+        ):
+            self.vjoy_input_id = action_data.vjoy_hat_id
         self.input_type = action_data.get_input_type()
         self.axis_scaling = action_data.axis_scaling
         self.action_mode = action_data.action_mode
@@ -7594,7 +7619,20 @@ Supports axis merging, curved output, command, hat and button mappings.
             if position_name:
                 node.set("return-position", position_name)
         else:
-            node.set(InputType.to_string(self.input_type), str(self.vjoy_input_id))
+            # The output id to persist depends on the action mode. For hat
+            # actions the selected output hat lives in vjoy_hat_id; saving
+            # vjoy_input_id here (as before) discarded the UI selection, so the
+            # output hat always reverted to 1 on reload. Axes/buttons keep
+            # using vjoy_input_id.
+            if self.action_mode in (
+                VjoyAction.VJoyHat,
+                VjoyAction.VJoyHatPress,
+                VjoyAction.VJoyHatPulse,
+            ):
+                output_id = self.vjoy_hat_id
+            else:
+                output_id = self.vjoy_input_id
+            node.set(InputType.to_string(self.input_type), str(output_id))
 
         node.set("mode", safe_format(VjoyAction.to_string(self.action_mode), str))
 
