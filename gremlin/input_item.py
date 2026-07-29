@@ -1063,7 +1063,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         valid = False
         parent = node.getparent()
         while parent:
-            if parent.tag in ("mode", "gate"):
+            if parent.tag in ("mode", "gate", "states"):
                 valid = True
                 break
             parent = parent.getparent()
@@ -2727,6 +2727,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         :param input_item: the InputItem instance for which to create action icons
         """
 
+
+
         if not self._icons_dirty:
             return
 
@@ -2796,14 +2798,22 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
             # self._setWidgetHeight(self._action_container_widget, rh * (row + 1))
 
+
         else:
-            label = QtWidgets.QLabel("∅", alignment=QtCore.Qt.AlignmentFlag.AlignRight)
-            font = label.font()
+            widget = QtWidgets.QLabel("∅", alignment=QtCore.Qt.AlignmentFlag.AlignRight)
+            font = widget.font()
             font.setPixelSize(24)
-            label.setFont(font)
-            label.setToolTip("No mappings found")
-            layout.addWidget(label, 0, 1)
+            widget.setFont(font)
+            widget.setToolTip("No mappings found")
+            layout.addWidget(widget, 0, 1)
             # self._setWidgetHeight(self._action_container_widget, rh)
+
+
+
+        height = int(widget.sizeHint().height()*1.1) # grow by 10%
+        self._action_icon_widget.setFixedHeight(height)
+
+
 
     def _handle_action_icon_clicked(self, widget):
         """handles clicks on action icons"""

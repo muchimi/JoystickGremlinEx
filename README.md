@@ -48,6 +48,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T17A)
+- Fix: states now loading again (inadvertent exclusion due to logic check loading input data introduced in T17)
+- Fix: UI: invisible action icons due to zero size.
+
 ### (m77T17)
 - Change: Play Sound Action: slight refactor for non TTS mode.
 - Fix: Play Sound Action: folder scanning exception when in audio mode getting a list of sounds to play.

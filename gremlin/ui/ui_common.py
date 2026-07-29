@@ -10099,18 +10099,19 @@ class QSplitTabWidget(QDataWidget):
 
     def _handle_expired_widget_ui(self, key, widget):
         """called by the widget cache when a widget is being removed from the cache"""
-        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
-        if key in self._widget_config_index_map:
-            # one of ours - unregister it
-            if verbose:
-                syslog.info(f" QtSplitTabWidget: Expired widget: [{key}]")
-            index = self._right_panel_stacked_widget.indexOf(widget)
-            if index != -1:
-                # one of ours
+        if Shiboken.isValid(self) and Shiboken.isValid(widget):
+            verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+            if key in self._widget_config_index_map:
+                # one of ours - unregister it
                 if verbose:
-                    syslog.info("\tremoving widget from stacked widget")
-                widget.expired.disconnect(self._handle_expired_widget)
-                self.unregisterWidget(key)
+                    syslog.info(f" QtSplitTabWidget: Expired widget: [{key}]")
+                index = self._right_panel_stacked_widget.indexOf(widget)
+                if index != -1:
+                    # one of ours
+                    if verbose:
+                        syslog.info("\tremoving widget from stacked widget")
+                    widget.expired.disconnect(self._handle_expired_widget)
+                    self.unregisterWidget(key)
 
     def unload(self):
         """unloads UI resources used by a particular tab widget"""
