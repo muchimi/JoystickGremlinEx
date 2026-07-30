@@ -3795,6 +3795,7 @@ class InputListenerWidget(QBoxFrame):
 
         super().__init__(parent)
         from gremlin.keyboard import key_from_name
+        import gremlin.input_devices
 
         self._event_types = event_types
         self._return_kb_event = return_kb_event
@@ -3811,6 +3812,8 @@ class InputListenerWidget(QBoxFrame):
         self._mouse_x = None  # mouse x coord for mouse move
         self._mouse_y = None  # mouse y coord for mouse move
 
+        self._significant = gremlin.input_devices.JoystickInputSignificant()
+        self._significant.reset()
         self._listen_mouse = InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types or InputType.Mouse in event_types
 
         self._close_on_key = not (InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types)
@@ -3899,16 +3902,20 @@ class InputListenerWidget(QBoxFrame):
         if self.filter_func is not None and not self.filter_func(event):
             return
 
+        # syslog.info(f"listener: got event: {event}")
+
         # Ensure the event corresponds to a significant enough change in input
         if event.is_axis:
-            process_event = True  # gremlin.input_devices.JoystickInputSignificant().should_process(event)
+            process_event = self._significant.should_process(event, deviation = 0.25) # move 1/4
+            syslog.info(f"axis move: result: {process_event}")
+
         elif event.event_type == InputType.JoystickButton:
             process_event = event.is_pressed
         elif event.event_type == InputType.JoystickHat:
             process_event = event.value != (0, 0)
 
         if process_event:
-            gremlin.input_devices.JoystickInputSignificant().reset()
+            self._significant.reset()
             gremlin.util.InvokeUiMethod(self._selected_ui, event)
 
     def _selected_ui(self, event):
@@ -5347,7 +5354,7 @@ class QDataComboBox(QComboBox):
     def data(self, value):
         self._data = value
 
-    def setWidthToContent(self):
+    def setWidthToContent(self, min_width = 50):
         """updates the width of the combo box to its contents as autosize often does not work """
         count = 0
         for i in range(self.count()):
@@ -5355,6 +5362,7 @@ class QDataComboBox(QComboBox):
             count = max(count, len(item_text))
 
         width = get_char_width(count + 4)
+        width = max(width, min_width)
         self.setMaximumWidth(width)
 
 
@@ -7484,6 +7492,7 @@ class StateVisualizerWidget(QWidget):
             if not category:
                 category = default_category
         if items:
+            filter = self._state_filter_widget.filter
             for key, state in items:
                 if state.value is None:
                     syslog.warning(f"viewer state: bad state data for state: {state.name} id [{state.id}] - null value - skipping display")
@@ -7493,7 +7502,7 @@ class StateVisualizerWidget(QWidget):
                     item_category = state.category if state.category else default_category
                     if item_category != category:
                         continue  # filter out
-                if is_filter and not self._filter_data(state):
+                if is_filter and not sd.filterData(key, filter):
                     continue
 
                 btn = StateRepeaterButton(state, callback=self._state_toggle)
@@ -13143,6 +13152,7 @@ class QModeSelector(QWidget):
 
         for mode in profile.mode_list():
             self.dropdown.addItem(mode, mode)
+        self.dropdown.setWidthToContent()
         self.dropdown.currentIndexChanged.connect(self._update_cb)
 
         if title:

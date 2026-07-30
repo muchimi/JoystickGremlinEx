@@ -48,10 +48,18 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m77T18)
-- New: Virpil LED Action: action that lets you set one or more buttons on a Virpil devie that supports them. In this implementation, GEX is not aware of which button belong to which device because the product ID is not mapped to the button set.  A color picker is provided and the action provides three modes: hold, pulse and toggle.
-- Fix: VJoy Remap action: selected output does not update in profile or on save.
+### (m77T19)
+- Change: API: pass extra data to condition objects
+- Change: Keyboard Condition: visual pass
+- Change: UI: updated GEX icon
+- Fix: Input Viewer: state visualizer refresh in filtered mode.
+- Fix: UI: condition add/delete
+- Fix: Input Listener: for axes, wait for deviation of 0.25 or more before triggering.  This is to avoid noisy inputs that could trigger a selection.
+- Fix: UI: removing a condition may not update the condition list until profile reload.
 
+### (m77T18)
+- New: Virpil LED Action: action that lets you set one or more buttons on a Virpil device that supports this feature. In this implementation, GEX is not aware of which buttons belongs to which device because the product ID is not mapped to the button set, but it can be set manually.  A color picker is provided and the action provides three modes: hold, pulse and toggle.  The action will map to supported color intensities on Virpil devices.
+- Fix: VJoy Remap action: selected output does not update in profile or on save.
 
 
 ### (m77T17A)

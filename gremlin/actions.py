@@ -118,16 +118,8 @@ class KeyboardCondition(AbstractCondition):
         :param is_extended whether or not the key code is extended
         :param comparison the comparison operation to perform when evaluated
         """
-        import gremlin.macro
-
+        assert isinstance(input_item, gremlin.ui.keyboard_device.KeyboardInputItem), "invalid input_item for keyboard condition"
         super().__init__(comparison)
-        from gremlin.ui.keyboard_device import KeyboardInputItem
-
-        if not input_item:
-            input_item = KeyboardInputItem()
-            key = gremlin.macro.key_from_code(scan_code, is_extended)
-            input_item.key = key
-
         self.input_item = input_item
 
     def __call__(self, event, value, extra_data=None):
@@ -913,3 +905,29 @@ class HatButton(VirtualButton):
 
     def __str__(self):
         return f"AxisButton: directions: {self._directions}"
+
+
+def convert_condition(condition):
+    """converts a base condition to an action condition"""
+    import gremlin.ui.keyboard_device
+    import gremlin.ui.joystick_device
+    import gremlin.ui.state_device
+    import gremlin.actions
+    import gremlin.input_item
+    if isinstance(condition, gremlin.ui.keyboard_device.BaseKeyboardCondition):
+        return gremlin.actions.KeyboardCondition(condition.scan_code, condition.is_extended, condition.comparison, input_item = condition.input_item)
+
+    elif isinstance(condition, gremlin.ui.joystick_device.BaseJoystickCondition):
+        return gremlin.actions.JoystickCondition(condition)
+
+    elif isinstance(condition, gremlin.input_item.BaseVJoyCondition):
+        return gremlin.actions.VJoyCondition(condition)
+
+    elif isinstance(condition, gremlin.input_item.BaseInputActionCondition):
+        return gremlin.actions.InputActionCondition(condition.comparison)
+    elif isinstance(condition, gremlin.ui.state_device.BaseStateCondition):
+        return gremlin.actions.StateCondition(condition)
+    elif isinstance(condition, gremlin.input_item.BaseModeCondition):
+        return gremlin.actions.ModeCondition(condition)
+
+    assert False, f"Invalid base condition to convert: {type(condition).__name__}"

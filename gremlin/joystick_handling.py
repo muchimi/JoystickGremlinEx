@@ -21,6 +21,7 @@ import threading
 
 import dinput
 import time
+import traceback
 
 
 import gremlin.config
@@ -1206,54 +1207,59 @@ def joystick_devices_initialization():
         virtual_devices = {}
         dinput_vjoy_device_map = {}  # map of vjoy devices by vjoy ID
 
-        syslog.info("DINPUT device list:")
-        for device_index in range(device_count):
-            # these are all connected devices
-            dev = dinput.DILL.get_device_information_by_index(device_index)
-            syslog.info(f"\tDevice: {dev.name} ID {dev.device_id}  Type: {dev.device_type.name}")
-            if dev.vendor_id == 0x4D8 and dev.product_id == 0xE6D6 and dev.button_count == 35:
-                # IFR1 device, disable
-                syslog.warning("\t\tOctavi IFR1 is disabled in GremlinEx as a regular joystick as it's handled at the HID level.")
-                dev.disabled = True
-            if dev.vendor_id == 0x31E3 and dev.axis_count == 0:  # handle wooting no axis/no button devices
-                dev.disabled = True
+        try:
 
-            dev.device_category = DeviceCategory.Physical
+            syslog.info("DINPUT device list:")
+            for device_index in range(device_count):
+                # these are all connected devices
+                dev = dinput.DILL.get_device_information_by_index(device_index)
+                syslog.info(f"\tDevice: {dev.name} ID {dev.device_id}  Type: {dev.device_type.name}")
+                if dev.vendor_id == 0x4D8 and dev.product_id == 0xE6D6 and dev.button_count == 35:
+                    # IFR1 device, disable
+                    syslog.warning("\t\tOctavi IFR1 is disabled in GremlinEx as a regular joystick as it's handled at the HID level.")
+                    dev.disabled = True
+                if dev.vendor_id == 0x31E3 and dev.axis_count == 0:  # handle wooting no axis/no button devices
+                    dev.disabled = True
 
-            if dev.axis_count:
-                syslog.info(f"\t\tAxis definitions: {dev.axis_count} found")
-                for i in range(dev.axis_count):
-                    linear = i + 1
-                    axis_id = dev.linear_id_map[linear]
-                    axis_name = dev.get_axis_name(axis_id)
-                    syslog.info(f"\t\t\tAxis {axis_name} A{axis_id} L{linear} {'(sequential)' if linear == axis_id else '(non-sequential)'}")
+                dev.device_category = DeviceCategory.Physical
 
-            devices.append(dev)
-            syslog.info(f"\t\tIndex: [{device_index}] {str(dev)}")
+                if dev.axis_count:
+                    syslog.info(f"\t\tAxis definitions: {dev.axis_count} found")
+                    for i in range(dev.axis_count):
+                        linear = i + 1
+                        axis_id = dev.linear_id_map[linear]
+                        axis_name = dev.get_axis_name(axis_id)
+                        syslog.info(f"\t\t\tAxis {axis_name} A{axis_id} L{linear} {'(sequential)' if linear == axis_id else '(non-sequential)'}")
 
-            if dev.device_type == DeviceType.Joystick:
-                _joystick_devices.append(dev)
-                _all_joystick_devices.append(dev)
-                _joystick_device_guid_map[dev.device_guid] = dev  # key by GUID
+                devices.append(dev)
+                syslog.info(f"\t\tIndex: [{device_index}] {str(dev)}")
 
-            _all_devices_map[dev.device_guid] = dev  # key by GUID
+                if dev.device_type == DeviceType.Joystick:
+                    _joystick_devices.append(dev)
+                    _all_joystick_devices.append(dev)
+                    _joystick_device_guid_map[dev.device_guid] = dev  # key by GUID
 
-            if dev.is_virtual:
-                virtual_count += 1
-                virtual_devices[dev.hashkey] = dev
-                dev.device_category = DeviceCategory.Virtual
-                match dev.device_type:
-                    case DeviceType.VJoy:
-                        dinput_vjoy_device_map[dev.hashkey] = dev
-                    case DeviceType.Maestro:
-                        _maestro_devices_map[dev.virtual_id] = dev
-                    case _:
-                        raise ValueError(f"Unknown virtual device with vendor ID: 0x{dev.vendor_id:X} product ID: 0x{dev.product_id:X}")
+                _all_devices_map[dev.device_guid] = dev  # key by GUID
 
-            else:
-                real_count += 1
+                if dev.is_virtual:
+                    virtual_count += 1
+                    virtual_devices[dev.hashkey] = dev
+                    dev.device_category = DeviceCategory.Virtual
+                    match dev.device_type:
+                        case DeviceType.VJoy:
+                            dinput_vjoy_device_map[dev.hashkey] = dev
+                        case DeviceType.Maestro:
+                            _maestro_devices_map[dev.virtual_id] = dev
+                        case _:
+                            syslog.warning(f"\tWarning: Unknown virtual device [{dev.name}] with vendor ID: [0x{dev.vendor_id:X}] product ID: [0x{dev.product_id:X}]")
 
-        syslog.info(f"INIT: Found {real_count} hardware devices and {virtual_count} virtual devices")
+                else:
+                    real_count += 1
+
+            syslog.info(f"INIT: Found {real_count} hardware devices and {virtual_count} virtual devices")
+        except Exception as ex:
+            syslog.error(f"INIT: Error while initializing devices: {ex}")
+            syslog.error(traceback.format_exc())
 
         vjoy_lookup = {}
         vjoy_wheel_lookup = {}
