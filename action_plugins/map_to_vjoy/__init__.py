@@ -6957,12 +6957,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     @vjoy_axis_id.setter
     def vjoy_axis_id(self, value: int):
-        if self._vjoy_axis_id != value:
-            self._vjoy_axis_id = value
-            # input_type = self._get_input_type()
-            # if input_type == InputType.JoystickAxis:
-            #     syslog.info(f"vjoy axis set to : {value}")
-            # self.data_changed.emit()
+        self._vjoy_axis_id = value
 
     def _get_input_type(self):
         """derives the vjoy input type for based on the action"""
@@ -7200,15 +7195,13 @@ Supports axis merging, curved output, command, hat and button mappings.
             VjoyAction.VJoyMergeAxis,
             VjoyAction.VJoySetAxisStepped,
         ):
-            if self.vjoy_axis_id != index:
-                self.vjoy_axis_id = index
+            self.vjoy_axis_id = index
         elif action_mode in (
             VjoyAction.VJoyHat,
             VjoyAction.VJoyHatPress,
             VjoyAction.VJoyHatPulse,
         ):
-            if self.vjoy_hat_id != index:
-                self.vjoy_hat_id = index
+            self.vjoy_hat_id = index
         elif action_mode in (
             VjoyAction.VJoyButtonPress,
             VjoyAction.VJoyButtonRelease,
@@ -7221,9 +7214,8 @@ Supports axis merging, curved output, command, hat and button mappings.
             self.vjoy_button_id = index
             self.virtual_input_id = index
 
-        else:
-            self.vjoy_input_id = index
-            self.virtual_input_id = index
+        self.vjoy_input_id = index
+        self.virtual_input_id = index
 
     def get_input_id(self):
         """returns input id based on the action mode"""

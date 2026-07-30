@@ -48,6 +48,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T18)
+- New: Virpil LED Action: action that lets you set one or more buttons on a Virpil devie that supports them. In this implementation, GEX is not aware of which button belong to which device because the product ID is not mapped to the button set.  A color picker is provided and the action provides three modes: hold, pulse and toggle.
+- Fix: VJoy Remap action: selected output does not update in profile or on save.
+
+
+
 ### (m77T17A)
 - Fix: states now loading again (inadvertent exclusion due to logic check loading input data introduced in T17)
 - Fix: UI: invisible action icons due to zero size.
