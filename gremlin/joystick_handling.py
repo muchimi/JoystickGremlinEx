@@ -94,6 +94,7 @@ _joystick_initialized = False
 
 # invalid device GUID - used when a GUID is needed but could not be derived
 _invalid_device_guid = "f765ae4c4dac40cbabefe9f6187d4689"
+_invalid_device: dinput.DeviceSummary = None
 
 syslog = logging.getLogger("system")
 
@@ -940,7 +941,7 @@ def registerSpecialDevices():
     syslog.info("Special devices:")
 
     # keyboard
-    
+
     device = dinput.DeviceSummary()
     device.name = "Keyboard"
     device.device_guid = gremlin.shared_state.keyboard_tab_guid
@@ -1084,8 +1085,22 @@ def invalidDeviceGuid():
     """invalid device guid placeholder as a dinput.GUID"""
     global _invalid_device_guid
     import gremlin.util
-
     return gremlin.util.parse_guid(_invalid_device_guid)
+
+def getInvalidDevice() -> dinput.DeviceSummary:
+    """returns the invalid device object """
+    global _invalid_device_guid, _invalid_device
+    if _invalid_device is None:
+        dev = dinput.DeviceSummary()
+        dev.device_id = _invalid_device_guid
+        dev.device_guid = gremlin.util.parse_guid(_invalid_device_guid)
+        dev.name = "No Device"
+        dev.device_type = DeviceType.NotSet
+        dev.device_category = DeviceCategory.Special
+        dev.disabled = True
+        dev.setConnected(False)
+        _invalid_device = dev
+    return _invalid_device
 
 
 def invalidDeviceId() -> str:

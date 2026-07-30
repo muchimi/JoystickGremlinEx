@@ -1130,7 +1130,7 @@ class AbstractCallbackModel(AbstractModel):
             syslog.info(f"item {item.id} removed from model {self.id} new count: {self.count()}")
             if emit:
                 self._fireChanged()
-        self.onItemChanged(self, index, None, item, "remove")
+            self.onItemChanged(self, index, None, item, "remove")
 
     def removeAt(self, index: int, emit=True):
         """removes the entry at the given model index"""

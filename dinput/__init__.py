@@ -607,6 +607,10 @@ class DeviceSummary:
     def device_id(self, value):
         self.device_guid = value
 
+    @property
+    def enabled(self) -> bool:
+        """true if the device is enabled (not manually disabled or out of spec)"""
+        return not self.disabled
 
 
     def setAxisCallback(self, callback):

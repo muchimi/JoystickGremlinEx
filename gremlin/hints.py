@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026 
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,14 +18,16 @@
 """Reads hints from a CSV file and makes them available to Gremlin for use."""
 
 import csv
-
+import os
 from gremlin.util import resource_path
 
 # Stores the hints and allows Gremlin to grab the ones it needs for display
 hint = {}
 
+res_path = resource_path("doc/hints.csv")
+if os.path.isfile(res_path):
+    with open(resource_path("doc/hints.csv")) as csv_stream:
+        reader = csv.reader(csv_stream, delimiter=",", quotechar="\"")
+        for row in reader:
+            hint[row[0]] = row[1]
 
-with open(resource_path("doc/hints.csv")) as csv_stream:
-    reader = csv.reader(csv_stream, delimiter=",", quotechar="\"")
-    for row in reader:
-        hint[row[0]] = row[1]

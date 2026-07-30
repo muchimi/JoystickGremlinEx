@@ -193,7 +193,10 @@ def script_path():
 
     :return path to the scripts location
     """
-    return os.path.normcase(os.path.dirname(os.path.abspath(os.path.realpath(sys.argv[0]))))
+    return get_root_folder()
+    
+
+
 
 
 _user_profile_path : str = None
@@ -238,7 +241,7 @@ def userprofile_path():
 
 
 
-def copy_tree_if_newer(src, dst):
+def copy_tree_if_newer(src : str, dst: str):
     """Copies a directory tree from src to dst, only if the source files
     are newer than the destination files or if the destination file does not exist.
     """
@@ -255,23 +258,16 @@ def copy_tree_if_newer(src, dst):
         shutil.copytree(src, dst)
 
 
-def resource_path(relative_path):
+def resource_path(relative_path: str):
     """Get absolute path to resource, handling development and pyinstaller
     based usage.
 
     :param relative_path the relative path to the file of interest
     :return properly normalized resource path
     """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-            base_path = sys._MEIPASS
-        else:
-            base_path = script_path()
-    except Exception:
-        base_path = script_path()
-
+    base_path = script_path()
     return os.path.normcase(os.path.join(base_path, relative_path))
+
 
 
 def display_error(msg):
