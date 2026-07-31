@@ -3457,8 +3457,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self.virtual_output_selector_widget):
                     for id in range(1, count + 1):
                         self.virtual_output_selector_widget.addItem(f"Hat {id}", id)
-                    # The output hat is stored in vjoy_hat_id; preselect it so
-                    # the dropdown is positioned correctly (was always Hat 1).
                     hat_index = self.virtual_output_selector_widget.findData(self.action_data.vjoy_hat_id)
                     if hat_index != -1:
                         self.virtual_output_selector_widget.setCurrentIndex(hat_index)
@@ -3468,7 +3466,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     return
 
     def _get_output_index(self):
-        # Hat actions store the output id in vjoy_hat_id, not vjoy_input_id.
         if self.action_data.action_mode in (
             VjoyAction.VJoyHat,
             VjoyAction.VJoyHatPress,
@@ -4345,8 +4342,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.verbose_extra = self.verbose and config.verbose_mode_extra
         self.vjoy_id = action_data.virtual_id
         self.vjoy_input_id = action_data.vjoy_input_id
-        # For hat actions the output hat is stored in vjoy_hat_id; the functor
-        # drives the hat through vjoy_input_id, so copy the hat id across here.
+        # For hat actions the output hat is stored in vjoy_hat_id.
         if action_data.action_mode in (
             VjoyAction.VJoyHat,
             VjoyAction.VJoyHatPress,
@@ -7597,8 +7593,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 node.set("return-position", position_name)
         else:
             # For hat actions the selected output hat lives in vjoy_hat_id;
-            # saving vjoy_input_id here discarded the UI selection (output hat
-            # reverted to 1 on reload). Axes/buttons keep using vjoy_input_id.
+            # saving vjoy_input_id here discarded the UI selection.
             if self.action_mode in (
                 VjoyAction.VJoyHat,
                 VjoyAction.VJoyHatPress,
