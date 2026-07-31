@@ -3457,9 +3457,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 with QtCore.QSignalBlocker(self.virtual_output_selector_widget):
                     for id in range(1, count + 1):
                         self.virtual_output_selector_widget.addItem(f"Hat {id}", id)
-                    # Preselect the configured output hat. The output hat is
-                    # stored in vjoy_hat_id (not vjoy_input_id); without this
-                    # the dropdown was never positioned and always showed Hat 1.
+                    # The output hat is stored in vjoy_hat_id; preselect it so
+                    # the dropdown is positioned correctly (was always Hat 1).
                     hat_index = self.virtual_output_selector_widget.findData(self.action_data.vjoy_hat_id)
                     if hat_index != -1:
                         self.virtual_output_selector_widget.setCurrentIndex(hat_index)
@@ -3469,8 +3468,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                     return
 
     def _get_output_index(self):
-        # For hat actions the output id is stored in vjoy_hat_id, not
-        # vjoy_input_id; use the right one so the dropdown resolves correctly.
+        # Hat actions store the output id in vjoy_hat_id, not vjoy_input_id.
         if self.action_data.action_mode in (
             VjoyAction.VJoyHat,
             VjoyAction.VJoyHatPress,
@@ -4349,7 +4347,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.vjoy_input_id = action_data.vjoy_input_id
         # For hat actions the output hat is stored in vjoy_hat_id; the functor
         # drives the hat through vjoy_input_id, so copy the hat id across here.
-        # Without this, hat output always used vjoy_input_id (default 1).
         if action_data.action_mode in (
             VjoyAction.VJoyHat,
             VjoyAction.VJoyHatPress,
@@ -7611,11 +7608,9 @@ Supports axis merging, curved output, command, hat and button mappings.
             if position_name:
                 node.set("return-position", position_name)
         else:
-            # The output id to persist depends on the action mode. For hat
-            # actions the selected output hat lives in vjoy_hat_id; saving
-            # vjoy_input_id here (as before) discarded the UI selection, so the
-            # output hat always reverted to 1 on reload. Axes/buttons keep
-            # using vjoy_input_id.
+            # For hat actions the selected output hat lives in vjoy_hat_id;
+            # saving vjoy_input_id here discarded the UI selection (output hat
+            # reverted to 1 on reload). Axes/buttons keep using vjoy_input_id.
             if self.action_mode in (
                 VjoyAction.VJoyHat,
                 VjoyAction.VJoyHatPress,
