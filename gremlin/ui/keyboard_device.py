@@ -17,7 +17,7 @@
 
 from __future__ import annotations  # deprecated with python 3.14+
 import logging
-from PySide6 import QtWidgets, QtGui
+from PySide6 import QtWidgets, QtGui, QtCore
 
 # import container_plugins.basic
 # import gremlin
@@ -28,9 +28,17 @@ import gremlin.shared_state
 import gremlin.util
 from . import ui_common
 from gremlin.keyboard import Key
-from gremlin.input_item import InputItemWidget, InputIdentifier, InputItemListView, InputItemListModel
+from gremlin.input_item import (
+    InputItem,
+    InputItemWidget,
+    InputIdentifier,
+    InputItemListView,
+    InputItemListModel,
+    BaseAbstractCondition,
+    AbstractConditionWidget,
+)
 import uuid
-from gremlin.util import read_guid, write_guid, safe_read
+from gremlin.util import read_guid, write_guid, safe_read, parse_bool
 from typing import Callable
 from lxml import etree
 import gremlin.ui.ui_common
@@ -41,7 +49,7 @@ from shiboken6 import Shiboken
 syslog = logging.getLogger("system")
 
 
-class KeyboardInputItem(gremlin.input_item.InputItem):
+class KeyboardInputItem(InputItem):
     """holds a keyboard input item"""
 
     def __init__(self, mode_object: gremlin.base_profile.ProfileModeNode):
@@ -141,6 +149,16 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
         key_list = [self._key]
         key_list.extend([key for key in self.latched_keys])
         return key_list
+
+    @property
+    def keymap(self) -> dict:
+        """returns a dictionary mapping key names to Key objects"""
+        key_map = {}
+        if self._key:
+            key_map[self._key.name] = self._key
+            for key in self.latched_keys:
+                key_map[key.name] = key
+        return key_map
 
     @property
     def message_key(self):
@@ -291,7 +309,6 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
             extended_key = "0x0E " if key._is_extended else ""
             message_key += f"|{extended_key}0x{key._scan_code:02X}"
 
-
         self._message_key = message_key
 
         is_latched = self._key.is_latched
@@ -343,7 +360,7 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
 
         return False
 
-        #return self.__hash__() == other.__hash__()
+        # return self.__hash__() == other.__hash__()
 
     def __ne__(self, other):
         return not (self == other)
@@ -358,6 +375,297 @@ class KeyboardInputItem(gremlin.input_item.InputItem):
 
     def __str__(self):
         return self.to_string()
+
+
+class BaseKeyboardCondition(BaseAbstractCondition):
+    """Keyboard state based condition.
+
+    The condition is for a single key and as such contains the key's scan
+    code as well as the extended flag.
+    """
+
+    def __init__(self, extra_data: dict = None):
+        """Creates a new instance."""
+        super().__init__(extra_data)
+        self._input_item = extra_data.get("input_item") if extra_data else None
+        self.scan_code = None
+        self.is_extended = None
+        self.comparison = "pressed"
+
+    @property
+    def input_item(self) -> InputItem:
+        return self._input_item
+
+    @input_item.setter
+    def input_item(self, value: InputItem):
+        assert value is None or isinstance(value, KeyboardInputItem), "input_item must be an instance of InputItem"
+        self._input_item = value
+
+    def from_xml(self, node, data=None, extra_data=None):
+        """Populates the object with data from an XML node.
+
+        :param node the XML node to parse for data
+        """
+
+        super().from_xml(node, data, extra_data)
+        self.comparison = safe_read(node, "comparison", str, "")
+        self.scan_code = safe_read(node, "scan-code", int, 0)
+        self.is_extended = parse_bool(safe_read(node, "extended", str, ""))
+        input_item = None
+        mode_object = gremlin.base_profile.get_mode_object(node, extra_data)
+        assert mode_object is not None, "Unable to derive mode object"
+
+        syslog.info(f"node source line: {node.sourceline} {etree.tostring(node)} ")
+        for child in node:
+            if child.tag in ("keylatched","keyboard"):
+                from gremlin.ui.keyboard_device import KeyboardInputItem
+                input_item = KeyboardInputItem(mode_object)
+                input_item.parse_xml(child, data)
+                break
+
+        self.input_item = input_item
+
+    def to_xml(self):
+        """Returns an XML node containing the objects data.
+
+        :return XML node containing the object's data
+        """
+        node = super().to_xml()  # lxml.etree.Element("condition")
+        node.set("condition-type", "keyboard")
+        node.set("input", "keyboard")
+        node.set("comparison", str(self.comparison))
+        node.set("scan-code", str(self.scan_code))
+        node.set("extended", str(self.is_extended))
+
+        if self.input_item:
+            child = self.input_item.to_xml()
+            node.append(child)
+
+        return node
+
+    def is_valid(self):
+        """Returns whether or not a condition is fully specified.
+
+        :return True if the condition is properly specified, False otherwise
+        """
+        return super().is_valid() and self.scan_code is not None and self.is_extended is not None
+
+    def __str__(self):
+        from gremlin.ui.keyboard_device import Key
+
+        key = Key(scan_code=self.scan_code, is_extended=self.is_extended)
+        return f"Keyboard condition: id: {self.id} comparison: {self.comparison} key {key.debug_name}"
+
+    def to_html(self) -> str:
+        """html output version"""
+        from gremlin.reporting import ReportTable
+        from gremlin.ui.keyboard_device import Key
+
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition", "Keyboard")
+        table.addField("Comparison", self.comparison)
+        key = Key(scan_code=self.scan_code, is_extended=self.is_extended)
+        table.addField("Key", key.name)
+        return table.to_html()
+
+
+class KeyboardConditionWidget(AbstractConditionWidget):
+    """Widget allowing the configuration of a keyboard based condition."""
+
+    def __init__(self, condition, extra_data: dict = None, parent=None):
+        """Creates a new widget.
+
+        :param condition_data the data to be represented by the widget
+        :param parent the parent of this widget
+        """
+
+        super().__init__(condition, extra_data, parent)
+        self.setTitle("Keyboard Condition")
+
+    def _create_ui(self, extra_data: dict = None):
+        """Creates the configuration UI for this widget."""
+        if not Shiboken.isValid(self):
+            return
+
+        ui_common.clear_layout(self.main_layout)
+
+        # self.grid_widget = QtWidgets.QWidget()
+        # self.grid_layout = QtWidgets.QGridLayout(self.grid_widget)
+
+        # self.ui_container_widget = QtWidgets.QWidget()
+        # self.ui_container_layout = QtWidgets.QGridLayout(self.ui_container_widget)
+
+        self.key_label = QtWidgets.QLabel("")
+
+        self._widget_map = {}
+
+        self.key_container_widget = QtWidgets.QWidget()
+        self.key_container_layout = QtWidgets.QHBoxLayout(self.key_container_widget)
+        self.key_container_layout.addWidget(self.key_label)
+
+        self.copy_widget = gremlin.ui.ui_common.Buttons.getCopyWidget("Copy Condition", callback=self._copy_condition)
+        self.paste_widget = gremlin.ui.ui_common.Buttons.getPasteWidget("Paste Condition", callback=self._paste_condition)
+
+        self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label="Listen", callback=self._request_user_input)
+        self.select_button_widget = gremlin.ui.ui_common.Buttons.getKeyboardWidget(label="Select Keys", callback=self._select_user_input)
+        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
+            callback=lambda: self.deleted.emit(self.condition),
+            tooltip="Delete condition",
+        )
+
+
+
+        self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
+        self.comparison_dropdown.addItem("Pressed")
+        self.comparison_dropdown.addItem("Released")
+        self.comparison_dropdown.setWidthToContent()
+        if self.condition.comparison:
+            self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
+        self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
+
+        widgets = [
+            QtWidgets.QLabel("Activate if"),
+            self.key_container_widget,
+            QtWidgets.QLabel("is"),
+            self.comparison_dropdown,
+            self.copy_widget,
+            self.paste_widget,
+            ("",100),
+            self.record_button_widget,
+            self.select_button_widget,
+            self.delete_button_widget,
+        ]
+
+
+        widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        self.main_layout.addWidget(widget)
+
+        # self.grid_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
+        # self.grid_layout.addWidget(self.key_container_widget, 0, 1)
+        # self.grid_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        # self.grid_layout.addWidget(gremlin.ui.ui_common.getVContainer(self.comparison_dropdown, widget_only=True, alignment=QtCore.Qt.AlignmentFlag.AlignVCenter), 0, 3, alignment=QtCore.Qt.AlignmentFlag.AlignLeft)
+        # self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+        # self.grid_layout.addWidget(widgets, 0, 5)
+        # self.grid_layout.setColumnStretch(4, 2)
+
+        # self.main_layout.addWidget(self.grid_widget)
+        # self.main_layout.addWidget(self.ui_container_widget)
+
+        self._update_keys()
+
+    def _update_keys(self):
+        for widget in self._widget_map.values():
+            self.key_container_layout.removeWidget(widget)
+            widget.deleteLater()
+        self._widget_map.clear()
+        if self.condition.input_item:
+            items = self.condition.input_item.keymap.items()
+            css = gremlin.ui.ui_common.Color.cssEntry()
+            key: gremlin.keyboard.Key
+            if items:
+                for name, key in items:
+                    widget = QtWidgets.QLabel(name)
+                    widget.setStyleSheet(css)
+                    self.key_container_layout.addWidget(widget)
+                    self._widget_map[key] = widget
+                self.key_label.setText("")
+                return
+
+        self.key_label.setText("(select key(s))")
+
+    @QtCore.Slot(object)
+    def _key_pressed_cb(self, key):
+        """Updates the UI and model with the newly pressed key information.
+
+        :param key the key that has been pressed
+        """
+
+        input_item = self._getKeyboardInputItem()
+        if isinstance(key, list):
+            key = key.pop()
+        input_item.key = key
+        self.condition.input_item = input_item
+        self.condition.scan_code = key.scan_code
+        self.condition.is_extended = key.is_extended
+        self.condition.comparison = self.comparison_dropdown.currentText().lower()
+        self._update_keys()
+
+    def _getKeyboardInputItem(self):
+        import gremlin.ui.keyboard_device
+        import gremlin.shared_state
+
+        device_guid = self.attached_input_item.device_guid
+        mode_object = gremlin.shared_state.current_profile.getMode(device_guid, gremlin.shared_state.edit_mode)
+        assert mode_object is not None, "Mode object cannot be None"
+        return gremlin.ui.keyboard_device.KeyboardInputItem(mode_object)
+
+    @QtCore.Slot(str)
+    def _comparison_changed_cb(self, text):
+        """Updates the comparison operation to use.
+
+        :param text the new comparison operation name
+        """
+        self.condition.comparison = text.lower()
+
+    @QtCore.Slot()
+    def _request_user_input(self):
+        """Prompts the user for the input to bind to this item."""
+        self.input_dialog = ui_common.InputListenerWidget(
+            [
+                InputType.Keyboard,
+                InputType.KeyboardLatched,
+            ],
+            return_kb_event=False,
+            multi_keys=False,
+        )
+        self.input_dialog.item_selected.connect(self._input_pressed_cb)
+
+        # Display the dialog centered in the middle of the UI
+        root = self
+        while root.parent():
+            root = root.parent()
+        geom = root.geometry()
+
+        self.input_dialog.setGeometry(
+            int(geom.x() + geom.width() / 2 - 150),
+            int(geom.y() + geom.height() / 2 - 75),
+            300,
+            150,
+        )
+        self.input_dialog.show()
+
+    @QtCore.Slot(object)
+    def _input_pressed_cb(self, key):
+        """Processes input events to update the UI and model.
+
+        :param event the input event to process
+        """
+
+        self.condition.comparison = "pressed"
+
+        self._key_pressed_cb(key)
+
+    @QtCore.Slot()
+    def _select_user_input(self):
+        """brings up the keyboard to select keys from"""
+
+        from gremlin.ui.virtual_keyboard import InputKeyboardDialog
+
+        sequence = []
+        if self.condition.input_item and hasattr(self.condition.input_item, "sequence"):
+            sequence = self.condition.input_item.sequence
+        self._keyboard_dialog = InputKeyboardDialog(sequence=sequence, parent=self, select_single=False, index=-1)
+        self._keyboard_dialog.setModal(True)
+        self._keyboard_dialog.accepted.connect(self._dialog_ok_cb)
+        gremlin.util.centerDialog(self._keyboard_dialog)
+        self._keyboard_dialog.showNormal()
+
+    @QtCore.Slot()
+    def _dialog_ok_cb(self):
+        """callled when the dialog completes"""
+
+        # grab a new data index as this is a new entry
+        self._key_pressed_cb(self._keyboard_dialog.latched_key)
 
 
 class KeyboardInputItemModel(gremlin.input_item.InputItemListModel):
@@ -671,7 +979,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._keyboard_dialog = None
         self._update_input_widget(self.getContentWidget(), self.getContentWidget().parent)
 
-
     def _dialog_ok_cb(self):
         """called when the add/edit key dialog completes"""
 
@@ -690,7 +997,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         widget = self.inputItemListView.widget(index)
         if widget:
             self._update_input_widget(widget, None)
-
 
     def _process_input_keys(self, keys, index, root_key=None):
         """processes input keys
@@ -816,8 +1122,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         widget.enable_close()
         widget.enable_edit()
 
-
-
         self._update_input_widget(widget, widget.parent)
 
         return widget
@@ -828,7 +1132,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             # clear content
             input_widget.setCustomContent(None)
             return
-
 
         widgets = []
         if len(values) < 8:
@@ -893,7 +1196,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
             input_widget.setStatus(status_text, icon)
 
-    def _populate_input_widget_ui(self, input_widget, container_widget, data = None):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data=None):
         """called when a button is created for custom content"""
 
         self._update_input_widget(input_widget, container_widget)
@@ -912,7 +1215,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._keyboard_dialog.closed.connect(self._dialog_close_cb)
         self._keyboard_dialog.setModal(True)
         self._keyboard_dialog.showNormal()
-
 
     def _close_item_cb(self, widget, index, data):
         """called when the close button is clicked"""

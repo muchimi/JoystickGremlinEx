@@ -741,7 +741,7 @@ def _osc(message, mode="Default", always_execute=False):
         def wrapper_fn(*args, **kwargs):
             callback(*args, **kwargs)
 
-        mode_object = gremlin.shared_state.current_profile.getMode(mode)
+        mode_object = gremlin.shared_state.current_profile.getMode(gremlin.shared_state.osc_tab_guid, mode)
         input_item = gremlin.ui.osc_device.OscInputItem(mode_object)
         input_item.message = message
         input_item.command_mode = gremlin.ui.osc_device.OscInputItem.CommandMode.Message
@@ -945,6 +945,7 @@ class JoystickInputSignificant:
         self._event_registry = {}
         self._mre_registry = {}
         self._time_registry = {}
+        self._axis_registry = {}
 
     def should_process_axis(self, event, deviation=0.1) -> bool:
         return self._process_axis(event, deviation)
@@ -958,29 +959,24 @@ class JoystickInputSignificant:
         Returns:
             True if it should be processed, False otherwise
         """
-        offset = 0.25  # quarter second
         key = event.callbackKey
-        if key in self._event_registry:
-            if self._time_registry[key] >= time.time():
-                # enough time passed
-                self._event_registry[key] = event
-                self._time_registry[key] = time.time() + 0.25
-                return True
-            else:
-                self._time_registry[key] = time.time() + offset
-
-                if abs(self._event_registry[key].value - event.value) > deviation:
-                    self._event_registry[key] = event
-                    self._time_registry[key] = time.time()
-                    # print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} TRUE")
-                    return True
-                else:
-                    # print (f"axis move: {abs(self._event_registry[key].value - event.value)} deviation: {deviation} FALSE")
-                    return False
-        else:
-            self._event_registry[key] = event
-            self._time_registry[key] = time.time()
+        if key not in self._axis_registry:
+            self._axis_registry[key] = event
             return False
+
+        else:
+            last_value = self._axis_registry[key].value
+            delta = abs(last_value - event.value)
+            if delta >= deviation:
+                self._event_registry[key] = event
+                self._time_registry[key] = time.time()
+                syslog.info(f"axis move:  last_value: {last_value:0.3f} delta: {delta:0.3f} deviation: {deviation:0.3f} TRUE")
+                return True
+
+
+        self._event_registry[key] = event
+        self._time_registry[key] = time.time()
+        return False
 
     def _process_button(self, event) -> bool:
         """Process a button event.

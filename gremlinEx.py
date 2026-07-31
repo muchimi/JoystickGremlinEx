@@ -5733,6 +5733,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.setWindowTitle(the_title)
 
 
+
 def configure_logger(config: dict):
     """Creates a new logger instance.
 
@@ -5835,6 +5836,9 @@ if __name__ == "__main__":
     app.setQuitOnLastWindowClosed(False)  # don't quit when the main window is hidden (minimize to tray)
     app.setStyle(gremlin.ui.ui_common.GexAppStyle())
     app.setStyleSheet(gremlin.ui.ui_common.Color.cssApplication())
+    icon = gremlin.util.load_icon("gex.ico")
+    if icon:
+        app.setWindowIcon(icon)
 
     # set faster context switch for Python
     sys.setswitchinterval(0.001)
@@ -6001,7 +6005,9 @@ if __name__ == "__main__":
         locale = QtCore.QLocale("UnitedStates")
         QtCore.QLocale.setDefault(locale)
 
-        app.setWindowIcon(load_icon("icon.png"))
+        icon = gremlin.util.load_icon("gex.ico")
+        if icon:
+            app.setWindowIcon(icon)
         app.setApplicationDisplayName(gremlin.version.APPLICATION_NAME + " " + gremlin.version.APPLICATION_VERSION)
         app.setApplicationVersion(gremlin.version.APPLICATION_VERSION)
         # no longer needed in QT6

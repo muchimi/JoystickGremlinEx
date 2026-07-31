@@ -3711,6 +3711,17 @@ class Profile:
         self._ensure_mode_tree()
         return anytree.find(self._mode_tree, lambda node: self._compare_mode(node, mode))
 
+    def getMode(self, device_guid : dinput.GUID, mode: str) -> ProfileModeNode:
+        """gets the profile mode node for the given name"""
+        mode = mode.strip().casefold()
+        device_node = self.getDeviceNode(device_guid, autocreate=False)
+        if device_node:
+            for mode_name in device_node.modes:
+                if mode_name.casefold() == mode:
+                    return device_node.modes[mode_name]
+        return None
+
+
     def find_input(self, device_guid, input_id):
         """finds the input item for the give device_guid, input_id"""
         device_guid = gremlin.util.normalize_guid(device_guid)

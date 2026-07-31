@@ -138,7 +138,7 @@ exe = EXE(
     strip=None,
     upx=True,
     console=False,
-    icon="icons\\icon.ico"
+    icon="icons\\gex.ico"
 )
 
 coll = COLLECT(

@@ -37,7 +37,7 @@ from gremlin.util import safe_format, safe_read, write_guid, read_guid
 import gremlin.base_profile
 from psygnal import Signal
 import gremlin.input_item
-from gremlin.input_item import InputItemWidget
+from gremlin.input_item import InputItemWidget, BaseAbstractCondition, AbstractConditionWidget
 from shiboken6 import Shiboken
 import html
 from typing import Callable
@@ -1289,6 +1289,182 @@ class StateInputItem(gremlin.input_item.InputItem):
         return table.to_html()
 
 
+
+
+class BaseStateCondition(BaseAbstractCondition):
+    """state condition"""
+
+    def __init__(self, extra_data : dict = None):
+        super().__init__(extra_data)
+
+        self.key = None
+        self.description = None
+        self.comparison = "pressed"
+        self.ignore_release = False
+
+    def from_xml(self, node, data=None, extra_data=None):
+        import gremlin.ui.state_device
+
+        super().from_xml(node, data, extra_data)
+
+        condition_type = node.get("condition-type")
+        if condition_type != "state":
+            return
+
+        self.key = node.get("key")
+        if "description" in node.attrib:
+            self.description = html.unescape(node.get("description"))
+        self.comparison = safe_read(node, "comparison", str, "")
+        self.ignore_release = safe_read(node, "ignore-release", bool, False)
+        sd = gremlin.ui.state_device.StateData()
+        sd.register(self.key, description=self.description)
+
+    def to_xml(self):
+        node = super().to_xml()
+        node.set("comparison", str(self.comparison))
+        node.set("condition-type", "state")
+        node.set("key", self.key)
+        node.set("ignore-release", safe_format(self.ignore_release, bool))
+        if self.description:
+            node.set("description", html.escape(self.description))
+
+        return node
+
+    def is_valid(self):
+        """Returns whether or not a condition is fully specified.
+
+        :return True if the condition is properly specified, False otherwise
+        """
+        return super().is_valid() and bool(self.key)
+
+    def __str__(self):
+        return f"State Condition: [{self.key}] comparison: {self.comparison}"
+
+    def to_html(self) -> str:
+        """html output version"""
+        from gremlin.reporting import ReportTable
+
+        table = ReportTable(cellpadding=4)
+        table.addField("Condition", "State")
+        table.addField("Comparison", self.comparison)
+        table.addField("State", self.key)
+        table.addField("Ignore release", "Yes" if self.ignore_release else "No")
+        if self.description:
+            table.addField("Description", self.description)
+        return table.to_html()
+
+
+class StateConditionWidget(AbstractConditionWidget):
+    """state condition UI"""
+
+    def __init__(self, condition, parent=None):
+        super().__init__(condition, parent)
+        self.setTitle("State Condition")
+
+    def _create_ui(self, extra_data : dict = None):
+        if not Shiboken.isValid(self):
+            return
+        self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
+            callback=lambda: self.deleted.emit(self.condition),
+            tooltip="Delete condition",
+        )
+        widget = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True, widget_only=True)
+        self.main_layout.addWidget(widget)
+
+        self.state_selector = gremlin.ui.ui_common.QDataComboBox()
+        self.state_selector.currentIndexChanged.connect(self._state_changed)
+        self.state_description_widget = QtWidgets.QLabel()
+        widget = gremlin.ui.ui_common.getHContainer(["State:", self.state_selector], widget_only=True)
+        self.main_layout.addWidget(widget)
+
+        widget = gremlin.ui.ui_common.getHContainer(["Description:", self.state_description_widget], widget_only=True)
+        self.main_layout.addWidget(widget)
+
+        self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
+        self.comparison_dropdown.addItem("Pressed")
+        self.comparison_dropdown.addItem("Released")
+        self.comparison_dropdown.setWidthToContent()
+        if self.condition.comparison:
+            self.comparison_dropdown.setCurrentText(self.condition.comparison.capitalize())
+        self.comparison_dropdown.currentTextChanged.connect(self._comparison_changed_cb)
+
+        self.key_label = QtWidgets.QLabel("")
+
+        self.grid_widget = QtWidgets.QWidget()
+        self.grid_layout = QtWidgets.QGridLayout(self.grid_widget)
+        self.grid_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
+        self.grid_layout.addWidget(self.key_label, 0, 1)
+        self.grid_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
+        self.grid_layout.addWidget(self.comparison_dropdown, 0, 3, alignment=QtCore.Qt.AlignLeft)
+        self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
+
+        self.ignore_release_widget = QtWidgets.QCheckBox("Apply condition on press only")
+        self.ignore_release_widget.setToolTip(
+            "When enabled, the condition will only apply to a press (on) event and always succeed on a release (off) event.\nThis option only has meaning on press events."
+        )
+        self.ignore_release_widget.setChecked(self.condition.ignore_release)
+        self.ignore_release_widget.clicked.connect(self._ignore_release_cb)
+
+        self.grid_layout.addWidget(self.ignore_release_widget, 0, 5)
+
+        self.grid_layout.setColumnStretch(5, 2)
+
+        self.main_layout.addWidget(self.grid_widget)
+
+        self.populate_selector()
+
+    @QtCore.Slot(bool)
+    def _ignore_release_cb(self, checked: bool):
+        self.condition.ignore_release = checked
+
+    def setDescription(self, value):
+        self.state_description_widget.setText(value if value else "n/a")
+
+    @QtCore.Slot()
+    def _state_changed(self):
+        if Shiboken.isValid(self.state_selector):
+            data = self.state_selector.currentData()
+            description = data.description
+            self.setDescription(description)
+            self.condition.key = data.key
+            self.condition.description = description
+
+    @QtCore.Slot(str)
+    def _comparison_changed_cb(self, text):
+        """Updates the comparison operation to use.
+
+        :param text the new comparison operation name
+        """
+        self.condition.comparison = text.lower()
+
+    def populate_selector(self):
+        """updates the available states"""
+        import gremlin.ui.state_device
+
+        with QtCore.QSignalBlocker(self.state_selector):
+            self.state_selector.clear()
+            sd = gremlin.ui.state_device.StateData()
+            for key, data in sd.getStates().items():
+                self.state_selector.addItem(key, data)
+
+            self.state_selector.setWidthToContent()
+
+            key = self.condition.key
+            if key:
+                index = self.state_selector.findText(key)
+                if index >= 0:
+                    self.state_selector.setCurrentIndex(index)
+            else:
+                # pick the first as the default
+                self.condition.key = self.state_selector.currentText()
+
+            if self.state_selector.count():
+                data = self.state_selector.currentData()
+                description = data.description
+                self.setDescription(description)
+                self.condition.description = description
+
+
 @SingletonDecorator
 class StateData:
     """holds state information"""
@@ -1562,6 +1738,22 @@ class StateData:
         if return_usage:
             return (used, used_list)
         return used
+
+    def filterData(self, state: StateInputItem | str, filter: str) -> bool:
+        """ applies a filter to a state """
+        import fnmatch
+        if isinstance(state, str):
+            key = state.casefold().strip()
+        else:
+            key = state.key
+        filter = filter.casefold().strip()
+        if filter in key.casefold():
+            return True
+        return fnmatch.fnmatch(key, filter)
+
+
+
+
 
     def clear(self):
         """clears all data"""
@@ -2955,6 +3147,8 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if self._filter in key:
             return True
         return fnmatch.fnmatch(key, self._filter)
+
+
 
     def onInputListViewCreated(self):
         """called when list view is created"""

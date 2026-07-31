@@ -4466,19 +4466,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
     def _convert_condition(self, condition):
         """converts a base condition to an action condition"""
-        if isinstance(condition, gremlin.input_item.BaseKeyboardCondition):
-            return gremlin.actions.KeyboardCondition(condition.scan_code, condition.is_extended, condition.comparison)
-
-        elif isinstance(condition, gremlin.input_item.BaseJoystickCondition):
-            return gremlin.actions.JoystickCondition(condition)
-
-        elif isinstance(condition, gremlin.input_item.BaseVJoyCondition):
-            return gremlin.actions.VJoyCondition(condition)
-
-        elif isinstance(condition, gremlin.input_item.BaseInputActionCondition):
-            return gremlin.actions.InputActionCondition(condition.comparison)
-
-        assert False, f"Invalid base condition to convert: {type(condition).__name__}"
+        return gremlin.actions.convert_condition(condition)
 
     def _create_activation_condition(self, activation_condition, target):
         """Creates activation condition objects base on the given data.
