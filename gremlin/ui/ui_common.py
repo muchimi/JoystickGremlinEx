@@ -10509,9 +10509,9 @@ class QRememberMainWindow(ResizableWindow):
 
         window_location = config.getWindowLocation(self._window_key)
 
-        if window_size:
+        if window_size and window_size[0] is not None and window_size[1] is not None:
             self.resize(window_size[0], window_size[1])
-        if window_location:
+        if window_location and window_location[0] is not None and window_location[1] is not None:
             self.move(window_location[0], window_location[1])
         else:
             self.active_screen = QtWidgets.QApplication.screenAt(self.pos())
@@ -10632,12 +10632,14 @@ class QRememberDialog(QtWidgets.QDialog):
             config = gremlin.config.Configuration()
             window_size = config.getWindowSize(self._window_key)
             window_location = config.getWindowLocation(self._window_key)
-            if window_size:
+            if window_size and window_size[0] is not None and window_size[1] is not None:
                 self.resize(window_size[0], window_size[1])
             else:
                 self.resize(self._default_width, self._default_height)
             if window_location:
                 x, y = window_location
+                if x is None or y is None:
+                    x, y = self.x(), self.y()
                 pos = QtCore.QPoint(x, y)
                 # syslog.info(f"recall move window {self.window_key} to {x},{y}")
                 self.move(pos)
@@ -10649,7 +10651,7 @@ class QRememberDialog(QtWidgets.QDialog):
         config = gremlin.config.Configuration()
         window_size = config.getWindowSize(self._window_key)
         hint_size = self.sizeHint()
-        if window_size:
+        if window_size and window_size[0] is not None and window_size[1] is not None:
             size = QtCore.QSize(window_size[0], window_size[1])
             return size.expandedTo(hint_size)
 
