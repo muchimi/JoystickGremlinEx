@@ -183,6 +183,10 @@ class Color:
         return "#4e4511" if gremlin.shared_state.is_dark_theme else "#3D3B30"
 
     @staticmethod
+    def redColor():
+        return "#bd542a"
+
+    @staticmethod
     def greenColor():
         return "#2abd38" if gremlin.shared_state.is_dark_theme else "#088814"
 
@@ -680,6 +684,18 @@ class Color:
 
             """
         return css
+
+    @staticmethod
+    def cssTitleBar():
+        background_color = Color.selectedBackgroundColor()
+        css = f"""
+            #title_bar {{
+                background-color: {background_color};
+                padding: 4px;
+            }}
+        """
+        return css
+
 
     @staticmethod
     def cssTab():
@@ -1283,6 +1299,10 @@ class Icons:
         return Icons._icon("ri.radio-button-line", qta_color)
 
     @staticmethod
+    def boxIcon(qta_color=None) -> QtGui.QIcon:
+        return Icons._icon("ri.checkbox-blank-fill", qta_color)
+
+    @staticmethod
     def hatIcon(qta_color=None) -> QtGui.QIcon:
         return Icons._icon("fa5s.arrows-alt", qta_color)
 
@@ -1324,7 +1344,7 @@ class Icons:
         return Icons._icon("fa6s.sitemap", qta_color=qta_color)
 
     @staticmethod
-    def warningIcon(qta_color=Color.warningColor()):
+    def warningIcon(qta_color=Color.yellowColor()):
         return Icons._icon("ph.shield-warning-fill", qta_color=qta_color)
 
 
@@ -3775,6 +3795,7 @@ class InputListenerWidget(QBoxFrame):
 
         super().__init__(parent)
         from gremlin.keyboard import key_from_name
+        import gremlin.input_devices
 
         self._event_types = event_types
         self._return_kb_event = return_kb_event
@@ -3791,6 +3812,8 @@ class InputListenerWidget(QBoxFrame):
         self._mouse_x = None  # mouse x coord for mouse move
         self._mouse_y = None  # mouse y coord for mouse move
 
+        self._significant = gremlin.input_devices.JoystickInputSignificant()
+        self._significant.reset()
         self._listen_mouse = InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types or InputType.Mouse in event_types
 
         self._close_on_key = not (InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types)
@@ -3879,16 +3902,20 @@ class InputListenerWidget(QBoxFrame):
         if self.filter_func is not None and not self.filter_func(event):
             return
 
+        # syslog.info(f"listener: got event: {event}")
+
         # Ensure the event corresponds to a significant enough change in input
         if event.is_axis:
-            process_event = True  # gremlin.input_devices.JoystickInputSignificant().should_process(event)
+            process_event = self._significant.should_process(event, deviation = 0.25) # move 1/4
+            syslog.info(f"axis move: result: {process_event}")
+
         elif event.event_type == InputType.JoystickButton:
             process_event = event.is_pressed
         elif event.event_type == InputType.JoystickHat:
             process_event = event.value != (0, 0)
 
         if process_event:
-            gremlin.input_devices.JoystickInputSignificant().reset()
+            self._significant.reset()
             gremlin.util.InvokeUiMethod(self._selected_ui, event)
 
     def _selected_ui(self, event):
@@ -4695,6 +4722,7 @@ class QDataRadioButton(QtWidgets.QRadioButton):
         callback=None,
         callbackEx=None,
         value: bool = None,
+        checked : bool = None, # alt for value
         tooltip=None,
         parent=None,
     ):
@@ -4711,8 +4739,9 @@ class QDataRadioButton(QtWidgets.QRadioButton):
         super().__init__(label, parent)
         self._data = data
 
-        if value:
-            self.setChecked(value)
+        is_checked = value or checked
+        if is_checked:
+            self.setChecked(is_checked)
         self._callback = callback
         self._callback_ex = callbackEx
         self.clicked.connect(self._handle_callback)
@@ -4735,6 +4764,9 @@ class QDataRadioButton(QtWidgets.QRadioButton):
     @data.setter
     def data(self, value):
         self._data = value
+
+
+
 
 
 class QDataPushButton(QtWidgets.QPushButton):
@@ -5220,7 +5252,7 @@ class QDataComboBox(QComboBox):
         parent=None,
         wheel_enabled: bool = None,
         auto_adjust: bool = True,
-        source=None,
+        source: list[tuple]=None,
         value=None,
         tooltip: str = None,
         max_items=20,
@@ -5233,15 +5265,13 @@ class QDataComboBox(QComboBox):
         :auto_adjust: true if the combo box autosizes to contents
         :source: optional, list of tuples (display, data) to populate the combo box with
         :value: optional, if source is provided, the default display value to select
+        :items: optional, list of tuples (display, data) to populate the combo box with
 
         """
         super().__init__(parent)
         self._data = data
         self._wheel_enabled = gremlin.config.Configuration().dropdown_use_mouse_wheel if wheel_enabled is None else wheel_enabled
         self.installEventFilter(self)
-        if auto_adjust:
-            self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        # self.setStyleSheet("QComboBox { padding: 5px; margin: 10px; }")
         self.setStyleSheet("QComboBox { padding: 5px; }")
         self._callback = callback
         self._callback_index = callback_index
@@ -5259,8 +5289,9 @@ class QDataComboBox(QComboBox):
                 if index != -1:
                     self.setCurrentIndex(index)
 
-            if auto_adjust:
-                self.adjustSize()
+        if auto_adjust:
+            self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+            self.adjustSize()
 
         self.currentIndexChanged.connect(self._handle_callback)
 
@@ -5323,14 +5354,15 @@ class QDataComboBox(QComboBox):
     def data(self, value):
         self._data = value
 
-    def setWidthToContent(self):
-        """updates the width of the combo box to its contents"""
+    def setWidthToContent(self, min_width = 50):
+        """updates the width of the combo box to its contents as autosize often does not work """
         count = 0
         for i in range(self.count()):
             item_text = self.itemText(i)
             count = max(count, len(item_text))
 
         width = get_char_width(count + 4)
+        width = max(width, min_width)
         self.setMaximumWidth(width)
 
 
@@ -7460,6 +7492,7 @@ class StateVisualizerWidget(QWidget):
             if not category:
                 category = default_category
         if items:
+            filter = self._state_filter_widget.filter
             for key, state in items:
                 if state.value is None:
                     syslog.warning(f"viewer state: bad state data for state: {state.name} id [{state.id}] - null value - skipping display")
@@ -7469,7 +7502,7 @@ class StateVisualizerWidget(QWidget):
                     item_category = state.category if state.category else default_category
                     if item_category != category:
                         continue  # filter out
-                if is_filter and not self._filter_data(state):
+                if is_filter and not sd.filterData(key, filter):
                     continue
 
                 btn = StateRepeaterButton(state, callback=self._state_toggle)
@@ -13121,6 +13154,7 @@ class QModeSelector(QWidget):
 
         for mode in profile.mode_list():
             self.dropdown.addItem(mode, mode)
+        self.dropdown.setWidthToContent()
         self.dropdown.currentIndexChanged.connect(self._update_cb)
 
         if title:
