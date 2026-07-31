@@ -18,6 +18,7 @@
 from __future__ import annotations  # deprecated with python 3.14+
 import logging
 import fnmatch
+import random
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtCore import QModelIndex
 import threading
@@ -378,6 +379,7 @@ class StateInputItem(gremlin.input_item.InputItem):
         autorelease_delay=1,
         autorelease_mode="toggle",
         autorelease_trigger_mode="on",
+        data = None,
 
     ):
         master_mode = gremlin.shared_state.master_mode
@@ -397,6 +399,7 @@ class StateInputItem(gremlin.input_item.InputItem):
         self._default_value = default_value
         self._last_value = None
         self._value = default_value
+        self._data = data
         self._type_cast = type(default_value) if default_value is not None else None
         self.setDescription(description)  # parent property
         self._expression = expression  # expression to evaluate to derive a state
@@ -795,6 +798,10 @@ class StateInputItem(gremlin.input_item.InputItem):
         if description:
             node.set("description", html.escape(description))
 
+        if value is None:
+            # assume boolean state by default
+            value = False
+
         if isinstance(value, str):
             node.set("value", value)
             node.set("type", "str")
@@ -806,6 +813,7 @@ class StateInputItem(gremlin.input_item.InputItem):
             node.set("type", "bool")
         else:
             # ignore other types
+            syslog.warning(f"XML: state: unsupported value type for state: {self.key} [{value}] - this state will not save")
             return None
 
         if self._category:
@@ -1809,6 +1817,7 @@ class StateData:
 
     def to_xml(self):
         """persists the data to XML"""
+        syslog.info(f"Persisting states to XML - state count: {len(self._data)}")
         root = ElementTree.Element("states")
         for key in self._data:
             item = self._data[key]
@@ -2756,6 +2765,10 @@ class StateFilterWidget(QtWidgets.QWidget):
         self.main_layout.setSpacing(2)
         self._update_count()
 
+    @property
+    def isFiltered(self) -> bool:
+        return self.filter_enabled_widget.isChecked()
+
     @QtCore.Slot(bool)
     def _filter_enabled_changed(self, is_filter):
         if self._is_iv:
@@ -3013,6 +3026,9 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         clear_button.confirmed.connect(self._confirm_clear_inputs_cb)
         button_container_layout.addWidget(clear_button)
 
+        test_button = gremlin.ui.ui_common.QDataPushButton("Test", callback=self._test_input_cb)
+        button_container_layout.addWidget(test_button)
+
         # right align
         button_container_layout.addStretch(1)
 
@@ -3051,6 +3067,28 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
         el.find_next.connect(self._handle_find_next)
+
+    def _test_input_cb(self):
+        """called when the test button is pressed"""
+        syslog.info("Test input callback triggered")
+        # add random states
+
+        def randomName(min_len=5, max_len=15):
+            import string
+            length = random.randint(min_len, max_len)
+            letters = string.ascii_letters + string.digits
+            return ''.join(random.choices(letters, k=length))
+
+        sd = self.profile.state
+        count = 70
+        self.inputItemListModel.pushSuspend()
+        for i in range(count):  # add 50 random states
+            key = randomName()
+            state = sd.register(key)
+            input_item = StateInputItem(key, data = state)
+            self.inputItemListModel.add(input_item)
+        self.inputItemListModel.popSuspend()
+
 
     def _load_handler(self, model: StateInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""

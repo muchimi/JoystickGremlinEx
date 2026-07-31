@@ -48,6 +48,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T20)
+- Fix: Input Viewer: C++ GC issue if input is refreshed while QT is updated with new contents  
+- Fix: API: Event registration does not handle custom keyboard condition identifier
+- Fix: Input Viewer: pass on state visualizer height layout issue (workaround) - this is likely not the last iteration of this and will be further improved in a later patch.
+
 ### (m77T19)
 - Change: API: pass extra data to condition objects
 - Change: Keyboard Condition: visual pass

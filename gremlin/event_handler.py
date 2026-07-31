@@ -2525,6 +2525,7 @@ class EventHandler(QtCore.QObject):
         """
         import gremlin.config
         import gremlin.keyboard
+        import gremlin.ui.keyboard_device
 
         assert isinstance(device_guid, dinput.GUID), "invalid device GUID"
         assert isinstance(callback, Callable), "Callback must be provided and be a callable"
@@ -2538,9 +2539,15 @@ class EventHandler(QtCore.QObject):
                 verbose = gremlin.config.Configuration().verbose_mode_keyboard
                 # keyboard latched event
                 identifier = event.identifier  # Key()
-                primary_key = identifier
-                if not primary_key:
+                if isinstance(identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
+                    identifier = identifier.key()
+                elif isinstance(identifier, gremlin.keyboard.Key):
+                    primary_key = identifier
+                else:
+                    syslog.warning(f"AddCallback: Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
                     return
+
+
 
                 # verbose = True
                 # if the key can latch with multiple primary keys, build the table of all combinations
@@ -2551,7 +2558,6 @@ class EventHandler(QtCore.QObject):
 
                 for key in key_list:
                     # the events will arrive as keyboard events - in any order - this makes sure latching is checked regardless of the order of key presses
-
                     virtual_code = key.virtual_code
                     keyid_source = key.index_tuple()  # use the scan code for now
                     # index = virtual_code if virtual_code > 0 else keyid

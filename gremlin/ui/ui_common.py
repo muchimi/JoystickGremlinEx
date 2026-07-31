@@ -22,11 +22,11 @@ import anytree
 import os
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
-from PySide6.QtWidgets import QLayout, QMainWindow, QMainWindow, QVBoxLayout, QWidget, QProxyStyle, QStyle, QStyleFactory, QWidget, QHBoxLayout
+from PySide6.QtWidgets import QLayout, QMainWindow, QMainWindow, QVBoxLayout, QWidget, QProxyStyle, QStyle, QStyleFactory, QWidget, QHBoxLayout, QLayoutItem
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QEvent, QSize
 from PySide6.QtGui import QPixmap, QPainter, QIcon, QResizeEvent
 import collections
-from typing import Callable, Any
+from typing import Callable, Any, Iterable
 
 
 import gremlin.config
@@ -7367,6 +7367,57 @@ def resetWidgetSize(widget):
         widget.setMaximumSize(QtCore.QSize(16777215, 16777215))
 
 
+def required_container_height(
+    sizes: Iterable[tuple[int, int]],
+    container_width: int,
+    horizontal_spacing: int = 0,
+    vertical_spacing: int = 0,
+    top_margin: int = 0,
+    bottom_margin: int = 0,
+) -> int:
+    """Return the height needed to arrange widgets in wrapping rows.
+
+    Each size tuple is (width, height).
+    """
+    row_width = 0
+    row_height = 0
+    total_height = top_margin
+    has_row = False
+    row_count = 0
+    col = 0
+    widget_per_row = 0
+
+    for width, height in sizes:
+        syslog.info(f"Widget size: {width}x{height}  running width: {row_width}  max width: {container_width}  remaining width: {container_width - row_width}")
+        if has_row and row_width + horizontal_spacing + width > container_width:
+            # wider than will fit - bump to next row starting with the new widget
+            total_height += row_height + vertical_spacing
+            row_width = width + horizontal_spacing # start with prior widget width
+            syslog.info(f"new row: total_height={total_height}, row [{row_count}] height {row_height}, total rows [{row_count}], row columns: {col}  widget count: [{widget_per_row}]")
+            row_count += 1
+            total_height += row_height
+            col = 0
+            widget_per_row = 0
+
+        else:
+            # normal width
+            if has_row:
+                row_width += horizontal_spacing # not first widget, adjust for spacer
+            row_width += width
+            row_height = max(row_height, height) # adjust height in case the widget is taller than previous widgets in the row
+            has_row = True
+            col += 1
+            widget_per_row += 1
+    if has_row:
+        total_height += row_height
+        syslog.info(f"final row: total_height={total_height}, row [{row_count}] height {row_height}, total rows [{row_count}], row columns: {col}")
+        row_count += 1
+
+
+    return total_height + bottom_margin
+
+
+
 class StateVisualizerWidget(QWidget):
     """state visualization widget - input viewer"""
 
@@ -7375,9 +7426,13 @@ class StateVisualizerWidget(QWidget):
 
         import gremlin.ui.state_device
 
+        # self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
+
         self.widgets = []
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
+
+        self._widget_list = [] # list of widgets to include in max height computation
 
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
@@ -7390,8 +7445,11 @@ class StateVisualizerWidget(QWidget):
         self._state_buttons = {} # holds the buttons created for each state
 
 
-        self.group_widget = QGroupBox("States")
+        #self.group_widget = QGroupBox("States")
+        self.group_widget = QWidget()
         group_layout = QVBoxLayout(self.group_widget)
+
+        group_layout.addWidget(QtWidgets.QLabel("States"))
 
         self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv=True)
         self._state_filter_widget.apply.connect(self.reloadStates)
@@ -7402,6 +7460,7 @@ class StateVisualizerWidget(QWidget):
 
         widgets = [filter_container, QHorizontalLine()]
         container = getHContainer(widgets, widget_only=True)
+        self._widget_list.append(container)
         self.main_layout.addWidget(container)
 
         config = gremlin.config.Configuration()
@@ -7426,6 +7485,8 @@ class StateVisualizerWidget(QWidget):
         group_layout.addWidget(self._button_widget)
 
         self.main_layout.addWidget(self.group_widget)
+
+
         self._populateState_ui()
 
     def _cleanup_ui(self):
@@ -7459,7 +7520,24 @@ class StateVisualizerWidget(QWidget):
         """reloads profile state data in the UI"""
         gremlin.util.InvokeUiMethod(self._populateState_ui)
 
+    def _filter_data(self, input_item) -> bool:
+        """custom filter handler - true if the data is included in the filter, false otherwise"""
+        import fnmatch
+        from gremlin.ui.state_device import StateInputItem
 
+        filter = self._state_filter_widget.filter
+        if not filter:
+            return True  # ok
+        item: StateInputItem = input_item.input_id
+        key = item.key
+        if not key:
+            # no key = match
+            return True
+
+        key = item.key.casefold().strip()
+        if filter in key:
+            return True
+        return fnmatch.fnmatch(key, filter)
 
 
     def _populateState_ui(self):
@@ -7486,13 +7564,13 @@ class StateVisualizerWidget(QWidget):
 
         sd = gremlin.ui.state_device.StateData()
 
-        is_filter = config.iv_state_filter_enabled
+        is_filter = self._state_filter_widget.isFiltered
+
         if is_filter:
             category = self._state_filter_widget.category
             if not category:
                 category = default_category
         if items:
-            filter = self._state_filter_widget.filter
             for key, state in items:
                 if state.value is None:
                     syslog.warning(f"viewer state: bad state data for state: {state.name} id [{state.id}] - null value - skipping display")
@@ -7502,7 +7580,7 @@ class StateVisualizerWidget(QWidget):
                     item_category = state.category if state.category else default_category
                     if item_category != category:
                         continue  # filter out
-                if is_filter and not sd.filterData(key, filter):
+                if is_filter and not self._filter_data(state):
                     continue
 
                 btn = StateRepeaterButton(state, callback=self._state_toggle)
@@ -7529,38 +7607,9 @@ class StateVisualizerWidget(QWidget):
         self.updateLayout()
 
     def updateLayout(self):
-        # update the height for the flow layout - this is tricky because the flow layout adjusts based on width and contents which is dynamic
-        resetWidgetSize(self._button_widget) # allow the widget to grow
-        self._button_widget.adjustSize() # recompute layout
-        layout = self._button_layout
-        st = layout.sizeTable() # get size of each contained widget in the flow
-        margin = 4
-        max_width = self.width() # working width
+        """ coerce QT into correct height information -  update the height for the flow layout - this is tricky because the flow layout adjusts based on width and contents which is dynamic"""
+        self.adjustSize()
 
-        row_width = 0
-        row_height = self._row_height
-        row_count = 0
-
-        for width, height in st:
-            next_width = row_width + width + margin
-
-            if row_width and next_width > max_width:
-                row_width = width + margin
-                # row_height = height
-            else:
-                row_width = next_width
-                # if height > row_height:
-                #     row_height = height
-
-        if row_width:
-            row_count += 1
-
-        # add an extra row for spacing
-        total_height = (row_height + margin) * (row_count + 2)
-
-        # constrain the height to override default QT layout which adds entirely too much vertical space
-        self._button_widget.setFixedHeight(total_height)
-        # syslog.info(f"state layout update: height: {total_height}  rows: {row_count}  row_height: {row_height}")
 
 
 

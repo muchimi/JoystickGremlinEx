@@ -56,7 +56,7 @@ class KeyboardInputItem(InputItem):
         """Keyboard input id
         :param mode: the profile mode for this input
         """
-        self._key = None  # associated primary key (containing latched items)
+        self._key: Key = None  # associated primary key (containing latched items)
         super().__init__(mode_object, device_guid=KeyboardDeviceTabWidget.device_guid, input_type=InputType.KeyboardLatched)
 
         self._title_name = "Keyboard input (not configured)"
@@ -93,7 +93,8 @@ class KeyboardInputItem(InputItem):
         return self._display_tooltip
 
     @property
-    def key(self):
+    def key(self) -> Key:
+        """associated primary key for this input (the key may include latched keys as well)"""
         return self._key
 
     @key.setter
@@ -417,8 +418,9 @@ class BaseKeyboardCondition(BaseAbstractCondition):
 
         syslog.info(f"node source line: {node.sourceline} {etree.tostring(node)} ")
         for child in node:
-            if child.tag in ("keylatched","keyboard"):
+            if child.tag in ("keylatched", "keyboard"):
                 from gremlin.ui.keyboard_device import KeyboardInputItem
+
                 input_item = KeyboardInputItem(mode_object)
                 input_item.parse_xml(child, data)
                 break
@@ -513,8 +515,6 @@ class KeyboardConditionWidget(AbstractConditionWidget):
             tooltip="Delete condition",
         )
 
-
-
         self.comparison_dropdown = gremlin.ui.ui_common.QDataComboBox()
         self.comparison_dropdown.addItem("Pressed")
         self.comparison_dropdown.addItem("Released")
@@ -530,12 +530,11 @@ class KeyboardConditionWidget(AbstractConditionWidget):
             self.comparison_dropdown,
             self.copy_widget,
             self.paste_widget,
-            ("",100),
+            ("", 100),
             self.record_button_widget,
             self.select_button_widget,
             self.delete_button_widget,
         ]
-
 
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(widget)

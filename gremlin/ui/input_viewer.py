@@ -18,7 +18,9 @@
 import json
 import threading
 from PySide6 import QtCore, QtWidgets
+from PySide6.QtGui import QResizeEvent
 from typing import Callable
+
 import dinput
 import traceback
 from shiboken6 import Shiboken
@@ -408,11 +410,12 @@ class VisualizationSelector(QtWidgets.QWidget):
             self.main_layout.addWidget(box)
 
             for key, widget in self._selector_widgets.items():
-                checked = widget.isChecked()
-                if checked:
-                    callback = self._selector_callbacks.get(key, None)
-                    if callback:
-                        callback()
+                if Shiboken.isValid(widget):
+                    checked = widget.isChecked()
+                    if checked:
+                        callback = self._selector_callbacks.get(key, None)
+                        if callback:
+                            callback()
 
     def _handle_visualizer_action(self, widget):
         if not Shiboken.isValid(widget):
@@ -569,7 +572,10 @@ class VisualizerWidget(QtWidgets.QWidget):
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(4, 0, 4, 0)
-        # self.setStyleSheet(".QWidget { background-color: gray; }")
+
+        # self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
+        #self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
+        self.main_layout.setSizeConstraint(QtWidgets.QVBoxLayout.SetFixedSize)
 
         self._key = key
         self._device = device
@@ -601,7 +607,7 @@ class VisualizerWidget(QtWidgets.QWidget):
         return self._widget
 
 
-    def setWidget(self, widget):
+    def setWidget(self, widget : QtWidgets.QWidget):
         """sets the widget to display"""
 
         if widget is None:
@@ -618,10 +624,15 @@ class VisualizerWidget(QtWidgets.QWidget):
             close_widget.clicked.connect(lambda: self.closed.emit(self._key))
 
             # give the widget a 100x expansion ratio so it fills most of the available space horizontally
+            widget.setFixedWidth(600)
             self._widget_container = gremlin.ui.ui_common.getHContainer([(widget, 100), "||", close_widget], widget_only=True, alignment=QtCore.Qt.AlignTop)
-            self._container = gremlin.ui.ui_common.getVContainer([gremlin.ui.ui_common.QHorizontalLine(), self._widget_container], widget_only=True)
 
-            # syslog.info(f"content desired size: {self._widget_container.sizeHint().height()}  content widget: {widget.height()}")
+            container_widget = QtWidgets.QWidget()
+            container_layout = QtWidgets.QVBoxLayout(container_widget)
+            container_layout.setContentsMargins(0, 0, 0, 0)
+            container_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+            container_layout.addWidget(self._widget_container)
+            self._container = container_widget
 
             if self._debug_visuals:
                 self.blank_widget.setText(
@@ -629,6 +640,7 @@ class VisualizerWidget(QtWidgets.QWidget):
                 )
 
             self.main_layout.addWidget(self._container)
+
             widget.show()
 
 
@@ -673,8 +685,13 @@ class VisualizerWidget(QtWidgets.QWidget):
 
                     case VisualizationType.State:
                         # handle state widget
-                        self._widget.updateLayout()
-                        gremlin.ui.ui_common.resetWidgetSize(self)
+                        #self.setFixedHeight(self.layout().sizeHint().height())
+                        h = self._container.sizeHint().height()
+                        self.setFixedHeight(h)
+
+
+                        #self._widget.updateLayout()
+                        #gremlin.ui.ui_common.resetWidgetSize(self)
                     case _:
                         # all others - free size
                         gremlin.ui.ui_common.resetWidgetSize(self)
@@ -743,7 +760,9 @@ class InputViewerDialog(ui_common.BaseDialogUi):
 
         self.view_container_widget = QtWidgets.QWidget()
         self.view_container_layout = QtWidgets.QVBoxLayout(self.view_container_widget)
-        self.views = InputViewerArea()
+
+        # self.views = InputViewerArea()
+        self.views = InputViewerArea(size_changed_callback=self._handle_view_resized)
         self.view_container_layout.addWidget(self.views)
 
         # configure the scroll area for the selectors
@@ -914,6 +933,9 @@ States can be toggled by clicking on the state button.  Expression states will u
         el.profile_loaded.connect(self.refresh)
         el.profile_unhook.connect(self.reload)
 
+    def _handle_view_resized(self, old_size, new_size):
+        self._update_layout(new_size)
+
     def _handle_keyboard_action(self):
         """handles the focus action for keyboard selectors """
         vc = VisualizationConfig()
@@ -1031,6 +1053,21 @@ States can be toggled by clicking on the state button.  Expression states will u
         if key not in self._viewer_widget_map:
             self._add_widget(device, visualization)
 
+    def _update_layout(self, size : QtCore.QSize = None):
+        widget : QtWidgets.QWidget
+        margin = 8
+        if size:
+            width = size.width()
+        else:
+            width = self.views.width()
+
+        for widget in self._viewer_widget_map.values():
+            sub_widget = widget.widget
+            # widget.setFixedWidth(width)
+            if sub_widget:
+                sub_widget.setFixedWidth(width-margin)
+
+
     def _add_widget(self, device: DeviceSummary, visualization: VisualizationType, description: str = None):
         vc = VisualizationConfig()
         key = vc.getKey(device, visualization)
@@ -1038,11 +1075,14 @@ States can be toggled by clicking on the state button.  Expression states will u
             return
 
         widget = VisualizerWidget(key, device=device, vis=visualization, description=description)
+
         # widget.layout().addWidget(QtWidgets.QLabel(f"visualizer widget for device: [{device.name}] visualization: [{visualization.name}]"))
         widget.closed.connect(lambda key: self.closeSystemWidget(key))
         self._viewer_widget_map[key] = widget
         self._device_key_map[key] = device
         self.views.add_widget(key, widget)
+
+        self._update_layout()
 
     def _clear_all(self):
         """clears all items"""
@@ -1351,7 +1391,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         #self.populateState()
         viewer_widget.setWidget(self._state_visualizer_widget)
         self._state_visible = True
-
+        self._state_visualizer_widget.populateState()
         self._update_ui()
 
 
@@ -1433,12 +1473,15 @@ States can be toggled by clicking on the state button.  Expression states will u
 class InputViewerArea(QtWidgets.QWidget):
     """Holds individual input visualization widgets."""
 
-    def __init__(self, parent=None):
+
+
+    def __init__(self, size_changed_callback : Callable = None, parent=None):
         """Creates a new instance.
 
         :param parent the parent of this widget
         """
         super().__init__(parent)
+        self._size_changed_callback = size_changed_callback
         layout = QtWidgets.QVBoxLayout(self)
         # layout.setContentsMargins(4, 0, 4, 0)
 
@@ -1457,6 +1500,15 @@ class InputViewerArea(QtWidgets.QWidget):
         self.installEventFilter(self)
 
         layout.addWidget(self.scroll_area)
+
+    def resizeEvent(self, event: QResizeEvent):
+        super().resizeEvent(event)
+        old_size = event.oldSize()
+        new_size = event.size()
+
+        if self._size_changed_callback:
+            self._size_changed_callback(old_size, new_size)
+
 
     def eventFilter(self, widget, event):
         if event.type() == QtCore.QEvent.Type.Wheel:
