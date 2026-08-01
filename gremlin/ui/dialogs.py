@@ -4700,6 +4700,9 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
         """populates the list widget with the tab_map"""
         self._list_widget.clear()
         for index, (device, visible) in tab_map.items():
+            if not isinstance(device, dinput.DeviceSummary):
+                syslog.warning(f"DeviceDisplayDialog: got an invalid device: [{device}]")
+                continue
             if device.disabled:
                 # skip disabled devices
                 continue

@@ -969,17 +969,10 @@ States can be toggled by clicking on the state button.  Expression states will u
         """returns the width of the visualizer widgets"""
         if not self._visualizer_width:
             self.views.adjustSize()
-
-            # get the width of an existing widget if available
-            width = 16777215
-            for widget in self._visualizer_widgets.values():
-                if widget and Shiboken.isValid(widget):
-                    width = min(width, widget.width())
-
+            self.views.update()
+            width = self.views.width()
             self._visualizer_width = width
 
-        if not self._visualizer_width:
-            self._visualizer_width = self.views.width()
         return self._visualizer_width
 
     def _handle_view_resized(self, old_size: QtCore.QSize, new_size: QtCore.QSize):

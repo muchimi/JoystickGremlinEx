@@ -285,7 +285,7 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self._last_event = None
 
         self.installEventFilter(self)  # capture keys so the window doesn't go nuts when we hit special keys
-        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
 
         main_layout = QtWidgets.QVBoxLayout(self)
 

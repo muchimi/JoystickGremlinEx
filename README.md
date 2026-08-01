@@ -49,6 +49,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T21)
+- Change: Play Sound: Renamed to Play Sound/TTS to reflect new AI capabilities for TTS
 - Fix: Input Viewer: show/hide content not always updating the visualizers.
 - Fix: Input Viewer: One more C++ GC issue with state/keyboard visualizers due to caching.
 - Fix: Input Viewer: clicking on the selector button could result in a QT exception.
@@ -56,6 +57,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: Input Viewer: clear button does not save visualizer visual states.
 - Fix: Input Viewer: keyboard visualizer key spacing (due to height workaround)
 - Fix: API: Event registration for keyboard condition property called as a method
+- Fix: VJOY: hat output going to incorrect VJOY hat (courtesy of RazOrLegend)
+- Fix: UI: window resize (courtesy of RazOrLegend)
+- Fix: Device Dialog: exception on invalid device (will issue warning in log file as to what it received while ignoring the invalid entry)
+
+
+Known issue: Input Viewer: when displayed without a joystick device, keyboard and state visualizers may have the incorrect width.  This will be resolved at a later time.
 
 ### (m77T20)
 - Fix: Input Viewer: C++ GC issue if input is refreshed while QT is updated with new contents  

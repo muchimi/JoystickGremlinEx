@@ -1252,7 +1252,7 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
 class PlaySound(gremlin.input_item.AbstractAction):
     """Action to resume callback execution."""
 
-    name = "Play Sound"
+    name = "Play Sound/TTS"
     tag = "play-sound"
     hint = "Play a sound."
 

@@ -7461,7 +7461,7 @@ class StateVisualizerWidget(QWidget):
         group_layout = QVBoxLayout(self.group_widget)
 
         group_layout.addWidget(QtWidgets.QLabel("States"))
-        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        # self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
 
         self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv=True)
         self._state_filter_widget.apply.connect(self.reloadStates)
