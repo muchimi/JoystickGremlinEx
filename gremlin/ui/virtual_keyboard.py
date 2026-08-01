@@ -42,6 +42,7 @@ class QKeyWidget(QtWidgets.QPushButton):
         self._readOnly = False
         self._border_radius = 8 # border size in pixels
 
+
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_Hover, True)
         #self.clicked.connect(self._clicked)
         self._auto_release = False
@@ -284,13 +285,13 @@ class QKeyboardWidget(QtWidgets.QWidget):
         self._last_event = None
 
         self.installEventFilter(self)  # capture keys so the window doesn't go nuts when we hit special keys
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
 
         main_layout = QtWidgets.QVBoxLayout(self)
 
         keyboard_layout = QtWidgets.QVBoxLayout()
         keyboard_layout.setContentsMargins(0,0,0,0)
         grid_layout = QtWidgets.QGridLayout()
-        grid_layout.setSpacing(2)
         keyboard_layout.addLayout(grid_layout)
 
         main_layout.addLayout(keyboard_layout)

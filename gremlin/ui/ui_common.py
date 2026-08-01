@@ -4657,6 +4657,7 @@ class QActionCheckbox(QWidget):
         self._checkbox = QDataCheckbox(label, data=data, callback=callback, callbackEx=callbackEx, value=value, tooltip=tooltip, parent=self)
         self._checkbox.clicked.connect(self._handle_checkbox_clicked)
 
+
         self._action_callback = action_callback
         self._action_icon = action_icon or Icons.circleArrowRight()
         self._action_deselect_icon = action_deselect_icon or Icons.circleArrowLeft()
@@ -4669,8 +4670,14 @@ class QActionCheckbox(QWidget):
             if action_tooltip:
                 self._action_widget.setToolTip(action_tooltip)
             self._update_action_icon()
+
+            sig = inspect.signature(action_callback)
+            takes_parameters = len(sig.parameters) > 0
+            self._callback_param = takes_parameters
+
         else:
             self._action_widget = None
+            self._callback_param  = False
 
 
         layout = QtWidgets.QHBoxLayout(self)
@@ -4685,9 +4692,13 @@ class QActionCheckbox(QWidget):
         self._update_action_icon()
         self.clicked.emit(checked)
 
-    def _handle_action(self):
+    def _handle_action(self, widget = None):
         if self._action_callback:
-            self._action_callback()
+            if self._callback_param:
+                # pass the parameter to the callback if it takes one
+                self._action_callback(self._checkbox)
+            else:
+                self._action_callback()
         self._update_action_icon()
 
     def _update_action_icon(self):
@@ -7450,6 +7461,7 @@ class StateVisualizerWidget(QWidget):
         group_layout = QVBoxLayout(self.group_widget)
 
         group_layout.addWidget(QtWidgets.QLabel("States"))
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
 
         self._state_filter_widget = gremlin.ui.state_device.StateFilterWidget(is_iv=True)
         self._state_filter_widget.apply.connect(self.reloadStates)
@@ -7544,6 +7556,8 @@ class StateVisualizerWidget(QWidget):
         """loads or reloads states"""
         if not self._button_widget or not Shiboken.isValid(self._button_widget):
             return
+
+        # syslog.info(f"State Visualizer: populate state UI - width: {self.size().width()}")
 
         layout = self._button_layout # layout that holds the state buttons
         config = gremlin.config.Configuration()
@@ -16236,3 +16250,16 @@ class QStepTile(QtWidgets.QWidget):
             if label:
                 self.label = QtWidgets.QLabel(label)
                 self.main_layout.addWidget(self.label)
+
+
+class QScrollAreaResizeCallback(QtWidgets.QScrollArea):
+    """scroll area widget that reports its size when the current widget changes"""
+    def __init__(self, callback : Callable[[QtCore.QSize, QtCore.QSize], None] = None, parent=None):
+        super().__init__(parent)
+        self._resize_callback = callback
+
+
+    def resizeEvent(self, event : QtGui.QResizeEvent):
+        super().resizeEvent(event)
+        if self._resize_callback:
+            self._resize_callback(event.oldSize(), event.size())

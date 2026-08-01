@@ -2050,7 +2050,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _handle_input_item_lock_changed_ui(self, input_item):
 
-        if Shiboken.isValid(self._lock_widget):
+        if self._lock_widget and Shiboken.isValid(self._lock_widget):
             with QtCore.QSignalBlocker(self._lock_widget):
                 self._lock_widget.setChecked(input_item.locked)
 
@@ -2118,7 +2118,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _update_container_id_ui(self):
         """updates the container ID display for this input"""
-        if self._container_id_widget:
+        if self._container_id_widget and Shiboken.isValid(self._container_id_widget):
+            # check for C++ GC
             widget = self._create_container_id_ui()
             self._container_id_widget.setWidget(widget)
 

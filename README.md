@@ -22,13 +22,13 @@ Please visit the [Discord](https://discord.gg/pNadcReth9) server for discussion,
 
 # Support and donations
 
-GremlinEx is a work of passion and donations to support and sustain the project are welcome. It takes a significant amount of time and commitment to research and implement and deploy new features.  With the landscape of hardware and platforms and games constantly evolving, GremlinEx is kept up to date and modernized, and it also builds on your feedback and ideas.
+GremlinEx is a passion project dedicated to solving complex controller mapping challenges across a wide range of hardware from different manufacturers. It also introduces powerful features that are unavailable in many other applications, including commercial alternatives.
 
-I strongly believe there are very few applications, if any, open source or payware, that do what GremlinEx does.  GremlinEx elegantly solves simple to extremely complex controller mapping issues across a wide selection of manufacturer devices, both physical and software based. As such, GremlinEx has wide support for games and hardware cockpits, it is manufacturer agnostic and relies on standards and published APIs to make this work. GremlinEx supports esoteric hardware, networked controller configuraitons, OSC and MIDI devices, remote control and most recently adds high quality AI voice generation.  It also builds on years of experience gaming and a shared passion.
+Developing and maintaining GremlinEx requires a significant investment of time, research, and ongoing development. As gaming platforms, hardware, and software continue to evolve, GremlinEx is continually updated, modernized, and improved based on both emerging technologies and the invaluable feedback and ideas shared by its community.
 
-If you find GremlinEx of use to you, if you like what it does, if it helps you manage your devices and game controls, if you use it regularly or it resolved an issue for you, please consider a donation to the project.
+If GremlinEx has been helpful to you, please consider supporting its continued development with a donation.
 
-Any amount is appreciated and goes a long way to sustain and the long hours supporting this project.
+Every contribution, regardless of size, is sincerely appreciated. Your support helps sustain the countless hours spent developing, maintaining, and improving the project.
 
 There are two ways you can safely and securely contribute to the project:
 
@@ -47,6 +47,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 
 # Change log
+
+### (m77T21)
+- Fix: Input Viewer: show/hide content not always updating the visualizers.
+- Fix: Input Viewer: One more C++ GC issue with state/keyboard visualizers due to caching.
+- Fix: Input Viewer: clicking on the selector button could result in a QT exception.
+- Fix: Input Viewer: workaround to QT layout visualizer width (due to height workaround)
+- Fix: Input Viewer: clear button does not save visualizer visual states.
+- Fix: Input Viewer: keyboard visualizer key spacing (due to height workaround)
+- Fix: API: Event registration for keyboard condition property called as a method
 
 ### (m77T20)
 - Fix: Input Viewer: C++ GC issue if input is refreshed while QT is updated with new contents  
