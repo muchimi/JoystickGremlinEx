@@ -1822,24 +1822,23 @@ Unlike a macro, any action suitable for the input can be used."""
 
         table = ReportTable(cellpadding=4)
 
-        count = sum(len(actions) for actions in self.action_sets)
-
-        table.addField("Steps", f"{count}")
+        step_count = len(self.action_sets)
+        table.addField("Steps", f"{step_count}")
 
         match self.mode:
-            case "normal":
+            case SequenceMode.Normal:
                 mode_name = "Run Once"
-            case "toggle":
+            case SequenceMode.Toggle:
                 mode_name = "Toggle"
-            case "loop":
+            case SequenceMode.Loop:
                 mode_name = "Loop (while pressed)"
-            case "wiggle":
+            case SequenceMode.Wiggle:
                 mode_name = "Wiggle"
             case _:
                 mode_name = f"unknown: {self.mode}"
 
         table.addField("Mode:", f"{mode_name}")
-        if self.mode == "wiggle":
+        if self.mode == SequenceMode.Wiggle:
             table.addField("Wiggle Mode", "Enabled")
             if self.wiggle_random:
                 table.addField("Wiggle Random", "Enabled")

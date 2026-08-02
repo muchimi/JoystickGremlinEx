@@ -2540,7 +2540,7 @@ class EventHandler(QtCore.QObject):
                 # keyboard latched event
                 identifier = event.identifier  # Key()
                 if isinstance(identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
-                    identifier = identifier.key
+                    primary_key = identifier.key
                 elif isinstance(identifier, gremlin.keyboard.Key):
                     primary_key = identifier
                 else:

@@ -529,6 +529,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el.reload_axis_state.connect(self._handle_axis_state_request)
 
     @property
+    def input_item(self):
+        """returns self as the input item for older API compatibility"""
+        return self
+
+    @property
     def input_id(self) -> int:
         """returns the input id for this input item"""
         if self._custom_input_id_handler is not None:
@@ -1426,6 +1431,9 @@ class InputItemMessage(InputItem):
             self.message_key,
             self._guid,
         )
+
+
+
 
     @property
     def message(self):

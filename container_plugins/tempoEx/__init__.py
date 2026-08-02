@@ -1272,11 +1272,11 @@ More than one action per short press or long press can be added."""
 
         table = ReportTable(cellpadding=4)
 
-        count = sum(len(actions) for actions in self.short_action_set)
+        count = len(self.short_action_set)
         table.addField("Short Steps", f"{count}")
-        count = sum(len(actions) for actions in self.long_action_set)
+        count = len(self.long_action_set)
         table.addField("Long Steps", f"{count}")
-        count = sum(len(actions) for actions in self.double_action_set)
+        count = len(self.double_action_set)
         table.addField("Double Steps", f"{count}")
 
         table.addField("Exec on", self.activate_on)

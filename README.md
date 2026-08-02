@@ -48,6 +48,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T22)
+- Fix: API: Event registration for keyboard condition undefined variable
+- Fix: Reporting: updates for API changes - various devices and containers
+
 ### (m77T21)
 - Change: Play Sound: Renamed to Play Sound/TTS to reflect new AI capabilities for TTS
 - Fix: Input Viewer: show/hide content not always updating the visualizers.

@@ -590,6 +590,7 @@ class ReportEngine:
             if device.device_type == gremlin.types.DeviceType.State:
                 # state device (modeless) - special handling of state input items
                 state_data = gremlin.shared_state.current_profile.state
+
                 input_items = [state_data[key].input_item for key in state_data]
                 if input_items:
                     device_node.parent = root
@@ -606,7 +607,7 @@ class ReportEngine:
                     mode_node = ReportNode(ReportNodeType.Mode, data=mode_object)
                     for input_type in mode_object.config.keys():
                         for input_item in mode_object.config[input_type].values():
-                            if input_item.containers:
+                            if input_item and input_item.containers:
                                 if not device_node.parent:
                                     device_node.parent = root
                                 if not mode_node.parent:

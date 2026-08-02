@@ -1833,6 +1833,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         match self.mode:
             case PlayMode.AudioFile:
                 table.addField("Play", html.escape(self.sound_file))
+
             case PlayMode.CoquiAI:
                 ktts = gremlin.sound.KTTS()
                 text = self.text
@@ -1844,6 +1845,28 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 else:
                     table.addField("Play (AI)", "not found")
                 table.addField("Speaker", self.speaker if self.speaker else "n/a")
+
+            case PlayMode.EdgeAI:
+                text = self.text
+                text = html.escape(text) if text else ""
+                table.addField("Play (EdgetAI)", text)
+                if self.speaker:
+                    etts = gremlin.sound.EdgeTTS()
+                    voice = etts.getVoice(self.speaker)
+                    if voice:
+                        table.addField("Speaker", f"{voice.name} ({voice.gender}, {voice.friendly_locale})")
+                    else:
+                        table.addField("Speaker", self.speaker)
+                table.addField("Speed", f"{self.etts_speed}%")
+                table.addField("Pitch", f"{self.etts_pitch} Hz")
+                table.addField("Volume", f"{self.etts_volume}%")
+
+            case PlayMode.PyTTS:
+                text = self.text
+                text = html.escape(text) if text else ""
+                table.addField("Play (PyTTS)", text)
+                table.addField("Speed", f"{self.ptts_speed} WPM")
+                table.addField("Volume", f"{self.ptts_volume}%")
 
         table.addField("Volume", f"{self.playback_volume}")
 

@@ -331,6 +331,19 @@ Unlike a macro or sequence container, only one step is executed for each trigger
         return True
 
 
+    def to_html(self) -> str:
+        """returns reporting graphviz data for this action"""
+        from gremlin.reporting import ReportTable
+
+        table = ReportTable(cellpadding=4)
+
+        count = len(self.action_sets[0]) if self.action_sets else 0
+        table.addField("Steps", f"{count}")
+        table.addField("Timeout", f"{self.timeout:.2f} seconds")
+
+        return table.to_html()
+
+
 # Plugin definitions
 version = 1
 name = "chain"

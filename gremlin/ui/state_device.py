@@ -38,7 +38,7 @@ from gremlin.util import safe_format, safe_read, write_guid, read_guid
 import gremlin.base_profile
 from psygnal import Signal
 import gremlin.input_item
-from gremlin.input_item import InputItemWidget, BaseAbstractCondition, AbstractConditionWidget
+from gremlin.input_item import InputItemWidget, BaseAbstractCondition, AbstractConditionWidget, InputItem
 from shiboken6 import Shiboken
 import html
 from typing import Callable
@@ -357,7 +357,7 @@ class StateCategories(QtCore.QObject):
 
 
 # class StateInputItem(AbstractInputItem):
-class StateInputItem(gremlin.input_item.InputItem):
+class StateInputItem(InputItem):
     """holds a single state"""
 
     changed = Signal(object)  # fires when a state changes (state)
@@ -422,7 +422,6 @@ class StateInputItem(gremlin.input_item.InputItem):
         self._hooked = False
         self.hook()  # hook on creation
         self._profile_mode = gremlin.shared_state.master_mode_name  # states all belong to the master mode
-
 
     def _handle_input_id_callback(self):
         """input id is self for STATE"""
