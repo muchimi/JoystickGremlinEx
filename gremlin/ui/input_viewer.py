@@ -749,7 +749,7 @@ class InputViewerDialog(ui_common.BaseDialogUi):
 
         :param parent the parent of this widget
         """
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent =  parent)
 
         self.setStyleSheet("QGroupBox { border: 0px }")  # turn group box borders off
 
@@ -1289,7 +1289,7 @@ States can be toggled by clicking on the state button.  Expression states will u
         :param enabled: the state - if None, uses the current state
         """
 
-        verbose = True
+        verbose = gremlin.config.Configuration().verbose_mode_ui
         assert gremlin.util.is_ui_thread()
         if not Shiboken.isValid(self):
             if verbose:

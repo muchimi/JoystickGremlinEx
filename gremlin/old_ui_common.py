@@ -93,8 +93,6 @@
 # syslog = logging.getLogger("system")
 
 
-
-
 # def clearStackedWidget(stacked_widget: QtWidgets.QStackedWidget):
 #     """deletes the contents of a stacked widget"""
 #     for i in range(stacked_widget.count() - 1, -1, -1):
@@ -7328,9 +7326,6 @@
 #         widget.setMaximumSize(QtCore.QSize(16777215, 16777215))
 
 
-
-
-
 # class JoystickDeviceWidget(QWidget):
 #     """joystick visualization widget in the input viewer"""
 
@@ -8067,7 +8062,6 @@
 #         # self.flow_layout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
 
-
 #     @property
 #     def lineCount(self):
 #         """returns the current line count of the flow layout"""
@@ -8098,8 +8092,6 @@
 #     #     h = (self._row_height + margin * 2 ) * rows
 #     #     syslog.info(f"button layout: {w}x{h}")
 #     #     return QtCore.QSize(w,h)
-
-
 
 
 #     @QtCore.Slot()
@@ -9306,10 +9298,6 @@
 #         return self._desired_size
 
 
-
-
-
-
 # class QFlowWidget(QWidget):
 #     """flow layout widget"""
 
@@ -9328,8 +9316,6 @@
 #     def getWidgets(self) -> list:
 #         """gets a list of widgets in the flow widget"""
 #         return gremlin.util.get_layout_widgets(self.main_layout)
-
-
 
 
 # class QBubble(QtWidgets.QLabel):
@@ -14310,7 +14296,7 @@
 
 # class FindWindowDialog(BaseDialogUi):
 #     def __init__(self, parent=None):
-#         super().__init__(self.__class__.__name__, parent)
+#         super().__init__(self.__class__.__name__, parent = parent)
 #         self.setWindowTitle("Find Process Window")
 #         self.setModal(True)
 

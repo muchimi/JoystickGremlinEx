@@ -3831,23 +3831,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _create_input_grid(self):
         """create a grid of buttons for easy selection"""
 
-        # if self.action_data.virtual_id not in self.action_data.virtual_device_map:
-        #     self.action_data.refresh_virtual_inputs()
-        #     if self.action_data.virtual_id not in self.action_data.virtual_device_map:
-        #         # gremlin.ui.ui_common.MessageBox(
-        #         #     prompt=f"VJOY configuration has changed and GremlinEx is unable to find the requested Vjoy device # {self.action_data.virtual_id}"
-        #         # )
-        #         return
-
         self.button_grid_stack_widget = QtWidgets.QStackedWidget()
         self.button_grid_stack_widget.addWidget(QtWidgets.QWidget())  # blank item at index 0
+        self.main_layout.addWidget(self.button_grid_stack_widget)
 
         if self.action_data.virtual_device and self.action_data.grid_visible and not self.button_grid_widget:
             # create the widget if requested
-
             self._create_grid_widgets()
 
-        self.main_layout.addWidget(self.button_grid_stack_widget)
 
     def _create_grid_widgets(self):
         # creates (or recreates) the widgets for the button grid
@@ -3859,6 +3850,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         button_count = self.action_data.virtual_device.button_count
         if not button_count:
             # no buttons = no grid
+            return
+
+        if not Shiboken.isValid(self.button_grid_stack_widget):
             return
 
         if self.button_grid_stack_widget.count() > 1:
@@ -3917,52 +3911,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         used_list = state.used_button_list(self.action_data.virtual_device_guid)
 
         for id in range(1, button_count + 1):
-            # container for the vertical box
-
-            # if self._use_radio:
-            #     v_cont = QtWidgets.QWidget()
-            #     # v_cont.setFixedWidth(32)
-            #     v_box = QtWidgets.QVBoxLayout(v_cont)
-            #     v_box.setContentsMargins(0, 0, 0, 5)
-            #     v_box.setAlignment(QtCore.Qt.AlignCenter)
-
-            #     # line 1
-            #     h_cont = QtWidgets.QWidget()
-            #     h_cont.setFixedWidth(36)
-            #     h_box = QtWidgets.QHBoxLayout(h_cont)
-            #     h_box.setContentsMargins(0, 0, 0, 0)
-            #     h_box.setAlignment(QtCore.Qt.AlignCenter)
-            #     cb = gremlin.ui.ui_common.QDataRadioButton()
-
-            #     self.button_group.addButton(cb)
-            #     self.button_group.setId(cb, id)
-            #     cb.data = id  # data has the button id
-
-            #     name = str(id)
-            #     h_box.addWidget(cb)
-            #     v_box.addWidget(h_cont)
-
-            #     # line 2
-            #     line2_cont = gremlin.ui.ui_common.GridClickWidget(vjoy_id, input_type, id)
-            #     line2_cont.setFixedWidth(36)
-            #     h_box = QtWidgets.QHBoxLayout(line2_cont)
-            #     h_box.setContentsMargins(0, 0, 0, 0)
-            #     h_box.setSpacing(0)
-
-            #     icon_lbl = QtWidgets.QLabel()
-
-            #     lbl = QtWidgets.QLabel(name)
-            #     lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-
-            #     self.icon_map[id] = icon_lbl
-
-            #     h_box.addWidget(icon_lbl)
-            #     h_box.addWidget(lbl)
-            #     v_box.addWidget(line2_cont)
-
-            #     line2_cont.clicked.connect(self._grid_button_clicked)
-
-            #     grid.addWidget(v_cont, row, col)
+           
 
             # else:
             # use used push button

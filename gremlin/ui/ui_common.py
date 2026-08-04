@@ -93,8 +93,6 @@ import gremlin.event_handler
 syslog = logging.getLogger("system")
 
 
-
-
 def clearStackedWidget(stacked_widget: QtWidgets.QStackedWidget):
     """deletes the contents of a stacked widget"""
     for i in range(stacked_widget.count() - 1, -1, -1):
@@ -695,7 +693,6 @@ class Color:
             }}
         """
         return css
-
 
     @staticmethod
     def cssTab():
@@ -1318,7 +1315,6 @@ class Icons:
     def recordIcon(qta_color="#c7450e"):
         return Icons._icon("mdi.checkbox-blank-circle", qta_color=qta_color)
 
-
     @staticmethod
     def stopIcon(qta_color="#c7450e"):
         return Icons._icon("mdi.stop", qta_color=qta_color)
@@ -1347,12 +1343,9 @@ class Icons:
     def warningIcon(qta_color=Color.yellowColor()):
         return Icons._icon("ph.shield-warning-fill", qta_color=qta_color)
 
-
     @staticmethod
     def yellowWarningIcon(qta_color=Color.yellowColor()):
         return Icons._icon("ph.shield-warning-fill", qta_color=qta_color)
-
-
 
     @staticmethod
     def errorIcon(qta_color="#c7450e"):
@@ -3906,7 +3899,7 @@ class InputListenerWidget(QBoxFrame):
 
         # Ensure the event corresponds to a significant enough change in input
         if event.is_axis:
-            process_event = self._significant.should_process(event, deviation = 0.25) # move 1/4
+            process_event = self._significant.should_process(event, deviation=0.25)  # move 1/4
             syslog.info(f"axis move: result: {process_event}")
 
         elif event.event_type == InputType.JoystickButton:
@@ -4282,7 +4275,7 @@ def ConfirmBox(prompt="Are you sure", informative_text=None, parent=None) -> boo
         nonlocal result
         result = value == QtWidgets.QMessageBox.StandardButton.Yes
 
-    MessageBoxYesNo(prompt=prompt, informative_text=informative_text, callback=set_result, parent = parent)
+    MessageBoxYesNo(prompt=prompt, informative_text=informative_text, callback=set_result, parent=parent)
     return result
 
 
@@ -4353,7 +4346,6 @@ def _message_box_ui(
             buttons = QtWidgets.QMessageBox.StandardButton.Ok | QtWidgets.QMessageBox.StandardButton.Cancel
         case _:
             icon = Icons.infoIcon()
-
 
     pixmap = icon.pixmap(48)
     msgbox = QtWidgets.QMessageBox(parent=parent)
@@ -4570,6 +4562,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         callback=None,
         callbackEx=None,
         value: bool = None,
+        checked : bool = None, # alt param for value
         tooltip=None,
         parent=None,
     ):
@@ -4591,8 +4584,10 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         self._callback = callback
         self._callbackEx = callbackEx
         assert isinstance(value, (bool, type(None))), "value must be a boolean or None"
-        if value is not None:
-            self.setChecked(value)
+        is_checked = checked if checked is not None else value if value is not None else False
+        self.setChecked(is_checked)
+        # if value is not None:
+        #     self.setChecked(value)
         self.stateChanged.connect(self._handle_clicked)
         if tooltip:
             self.setToolTip(tooltip)
@@ -4621,6 +4616,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
     def setIgnoreKeyboard(self, value: bool):
         self._ignore_keyboard = value
 
+
 class QActionCheckbox(QWidget):
     """a checkbox that emits focus events"""
 
@@ -4635,12 +4631,12 @@ class QActionCheckbox(QWidget):
         value: bool = None,
         tooltip=None,
         parent=None,
-        action_callback : Callable = None,
-        action_icon = None,
-        action_deselect_icon = None,
-        action_size : int = 16,
-        action_tooltip : str = None,
-        ):
+        action_callback: Callable = None,
+        action_icon=None,
+        action_deselect_icon=None,
+        action_size: int = 16,
+        action_tooltip: str = None,
+    ):
         """
         :param text: the label (optional, recommended)
         :param data: the data tracked by this control (optional)
@@ -4657,7 +4653,6 @@ class QActionCheckbox(QWidget):
         self._checkbox = QDataCheckbox(label, data=data, callback=callback, callbackEx=callbackEx, value=value, tooltip=tooltip, parent=self)
         self._checkbox.clicked.connect(self._handle_checkbox_clicked)
 
-
         self._action_callback = action_callback
         self._action_icon = action_icon or Icons.circleArrowRight()
         self._action_deselect_icon = action_deselect_icon or Icons.circleArrowLeft()
@@ -4665,8 +4660,8 @@ class QActionCheckbox(QWidget):
         if action_callback:
             # create the action button with the provided icon and callback
             icon_size = action_size - 2 if action_size > 2 else action_size
-            self._action_widget = QIconButton(icon=action_icon, callback=self._handle_action, parent=self, data = data, icon_size=icon_size)
-            self._action_widget.setFixedSize(action_size, action_size) # icon size
+            self._action_widget = QIconButton(icon=action_icon, callback=self._handle_action, parent=self, data=data, icon_size=icon_size)
+            self._action_widget.setFixedSize(action_size, action_size)  # icon size
             if action_tooltip:
                 self._action_widget.setToolTip(action_tooltip)
             self._update_action_icon()
@@ -4677,8 +4672,7 @@ class QActionCheckbox(QWidget):
 
         else:
             self._action_widget = None
-            self._callback_param  = False
-
+            self._callback_param = False
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -4692,7 +4686,7 @@ class QActionCheckbox(QWidget):
         self._update_action_icon()
         self.clicked.emit(checked)
 
-    def _handle_action(self, widget = None):
+    def _handle_action(self, widget=None):
         if self._action_callback:
             if self._callback_param:
                 # pass the parameter to the callback if it takes one
@@ -4723,6 +4717,8 @@ class QActionCheckbox(QWidget):
 
     def setData(self, value):
         self._checkbox.data = value
+
+
 class QDataRadioButton(QtWidgets.QRadioButton):
     """a radio button that has a data property to track an object associated with the checkbox"""
 
@@ -4733,7 +4729,7 @@ class QDataRadioButton(QtWidgets.QRadioButton):
         callback=None,
         callbackEx=None,
         value: bool = None,
-        checked : bool = None, # alt for value
+        checked: bool = None,  # alt for value
         tooltip=None,
         parent=None,
     ):
@@ -4775,9 +4771,6 @@ class QDataRadioButton(QtWidgets.QRadioButton):
     @data.setter
     def data(self, value):
         self._data = value
-
-
-
 
 
 class QDataPushButton(QtWidgets.QPushButton):
@@ -5075,7 +5068,7 @@ class NoKeyboardPushButton(QIconPushButton):
 
 
 class QIconButton(QIconPushButton):
-    def __init__(self, text=None, icon: str = None, icon_size=24, data=None, parent=None, tooltip=None, callback : Callable = None, callbackEx : Callable = None):
+    def __init__(self, text=None, icon: str = None, icon_size=24, data=None, parent=None, tooltip=None, callback: Callable = None, callbackEx: Callable = None):
         super().__init__(text=text, icon=icon, icon_size=icon_size, data=data, parent=parent, tooltip=tooltip, callback=callback, callbackEx=callbackEx)
 
 
@@ -5263,7 +5256,7 @@ class QDataComboBox(QComboBox):
         parent=None,
         wheel_enabled: bool = None,
         auto_adjust: bool = True,
-        source: list[tuple]=None,
+        source: list[tuple] = None,
         value=None,
         tooltip: str = None,
         max_items=20,
@@ -5365,8 +5358,8 @@ class QDataComboBox(QComboBox):
     def data(self, value):
         self._data = value
 
-    def setWidthToContent(self, min_width = 50):
-        """updates the width of the combo box to its contents as autosize often does not work """
+    def setWidthToContent(self, min_width=50):
+        """updates the width of the combo box to its contents as autosize often does not work"""
         count = 0
         for i in range(self.count()):
             item_text = self.itemText(i)
@@ -7371,8 +7364,9 @@ class VigemDeviceWidget(QWidget):
     def _cleanup_ui(self):
         self.unhook()
 
+
 def resetWidgetSize(widget):
-    """ undo fixed size on the widget"""
+    """undo fixed size on the widget"""
     if widget and Shiboken.isValid(widget):
         widget.setMinimumSize(QtCore.QSize(0, 0))
         widget.setMaximumSize(QtCore.QSize(16777215, 16777215))
@@ -7403,8 +7397,10 @@ def required_container_height(
         if has_row and row_width + horizontal_spacing + width > container_width:
             # wider than will fit - bump to next row starting with the new widget
             total_height += row_height + vertical_spacing
-            row_width = width + horizontal_spacing # start with prior widget width
-            syslog.info(f"new row: total_height={total_height}, row [{row_count}] height {row_height}, total rows [{row_count}], row columns: {col}  widget count: [{widget_per_row}]")
+            row_width = width + horizontal_spacing  # start with prior widget width
+            syslog.info(
+                f"new row: total_height={total_height}, row [{row_count}] height {row_height}, total rows [{row_count}], row columns: {col}  widget count: [{widget_per_row}]"
+            )
             row_count += 1
             total_height += row_height
             col = 0
@@ -7413,9 +7409,9 @@ def required_container_height(
         else:
             # normal width
             if has_row:
-                row_width += horizontal_spacing # not first widget, adjust for spacer
+                row_width += horizontal_spacing  # not first widget, adjust for spacer
             row_width += width
-            row_height = max(row_height, height) # adjust height in case the widget is taller than previous widgets in the row
+            row_height = max(row_height, height)  # adjust height in case the widget is taller than previous widgets in the row
             has_row = True
             col += 1
             widget_per_row += 1
@@ -7424,9 +7420,7 @@ def required_container_height(
         syslog.info(f"final row: total_height={total_height}, row [{row_count}] height {row_height}, total rows [{row_count}], row columns: {col}")
         row_count += 1
 
-
     return total_height + bottom_margin
-
 
 
 class StateVisualizerWidget(QWidget):
@@ -7443,7 +7437,7 @@ class StateVisualizerWidget(QWidget):
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
-        self._widget_list = [] # list of widgets to include in max height computation
+        self._widget_list = []  # list of widgets to include in max height computation
 
         config = gremlin.config.Configuration()
         config.changed.connect(self._config_changed)
@@ -7453,10 +7447,9 @@ class StateVisualizerWidget(QWidget):
 
         self._hooked = False
 
-        self._state_buttons = {} # holds the buttons created for each state
+        self._state_buttons = {}  # holds the buttons created for each state
 
-
-        #self.group_widget = QGroupBox("States")
+        # self.group_widget = QGroupBox("States")
         self.group_widget = QWidget()
         group_layout = QVBoxLayout(self.group_widget)
 
@@ -7497,7 +7490,6 @@ class StateVisualizerWidget(QWidget):
         group_layout.addWidget(self._button_widget)
 
         self.main_layout.addWidget(self.group_widget)
-
 
         self._populateState_ui()
 
@@ -7551,7 +7543,6 @@ class StateVisualizerWidget(QWidget):
             return True
         return fnmatch.fnmatch(key, filter)
 
-
     def _populateState_ui(self):
         """loads or reloads states"""
         if not self._button_widget or not Shiboken.isValid(self._button_widget):
@@ -7559,7 +7550,7 @@ class StateVisualizerWidget(QWidget):
 
         # syslog.info(f"State Visualizer: populate state UI - width: {self.size().width()}")
 
-        layout = self._button_layout # layout that holds the state buttons
+        layout = self._button_layout  # layout that holds the state buttons
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_state
         i = 0
@@ -7621,11 +7612,8 @@ class StateVisualizerWidget(QWidget):
         self.updateLayout()
 
     def updateLayout(self):
-        """ coerce QT into correct height information -  update the height for the flow layout - this is tricky because the flow layout adjusts based on width and contents which is dynamic"""
+        """coerce QT into correct height information -  update the height for the flow layout - this is tricky because the flow layout adjusts based on width and contents which is dynamic"""
         self.adjustSize()
-
-
-
 
     @QtCore.Slot(object)
     def _category_filter_changed(self, category):
@@ -7670,7 +7658,6 @@ class StateVisualizerWidget(QWidget):
         # called on state create/add/remove/edit
         self.reloadStates()
 
-
     def unhook(self):
         """unhooks events"""
         if not self._hooked:
@@ -7685,6 +7672,7 @@ class StateVisualizerWidget(QWidget):
 
     def _cleanup_ui(self):
         self.unhook()
+
 
 class JoystickDeviceWidget(QWidget):
     """joystick visualization widget in the input viewer"""
@@ -7709,8 +7697,8 @@ class JoystickDeviceWidget(QWidget):
         self.hook_id = gremlin.util.get_guid()
         self.vis_type = vis_type
         self._widgets = []  # holds the list of widgets in the display
-        self._hat_widget = None # hat widget if shown
-        self._button_widget = None # button widget if known
+        self._hat_widget = None  # hat widget if shown
+        self._button_widget = None  # button widget if known
 
         # horizontal layout
         self.main_layout = QtWidgets.QHBoxLayout(self)
@@ -7730,7 +7718,6 @@ class JoystickDeviceWidget(QWidget):
             if widget:
                 return widget.lineCount
         return 0
-
 
     def _handle_shutdown(self):
         self.unhook()
@@ -8082,7 +8069,7 @@ class QUsedPushButton(QDataPushButton):
         checkable=False,
         checked=None,
         interactive=True,
-        size : int = 32,
+        size: int = 32,
     ):
         """Initializes a QUsedPushButton instance.
 
@@ -8100,7 +8087,7 @@ class QUsedPushButton(QDataPushButton):
         :param checkable: indicates if the button is checkable
         :param checked: initial checked state
         """
-        super().__init__(text, data, parent, tooltip, callback=callback, callbackEx=callbackEx, size = size)
+        super().__init__(text, data, parent, tooltip, callback=callback, callbackEx=callbackEx, size=size)
         self._used = used
         self._marker = marker
         self._device_guid = used_device_guid
@@ -8392,7 +8379,7 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
                 used_input_id=input_id,
                 callback=None if is_disabled else self._button_clicked,
                 interactive=not is_disabled,
-                size=38
+                size=38,
             )
 
             # hook the input
@@ -8421,19 +8408,16 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
 
         # self.flow_layout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
-
-
     @property
     def lineCount(self):
         """returns the current line count of the flow layout"""
         return self.flow_layout.lineCount
 
     def hasHeightForWidth(self):
-        """ indicate that the height of the widget depends on the width """
+        """indicate that the height of the widget depends on the width"""
         return True
 
-
-    def _handle_line_count_changed(self, widget, count : int):
+    def _handle_line_count_changed(self, widget, count: int):
         """called when the line count of the flow layout changes"""
         self.updateGeometry()
 
@@ -8453,9 +8437,6 @@ class JoystickDeviceButtonStateWidget(QtWidgets.QGroupBox):
     #     h = (self._row_height + margin * 2 ) * rows
     #     syslog.info(f"button layout: {w}x{h}")
     #     return QtCore.QSize(w,h)
-
-
-
 
     @QtCore.Slot()
     def _button_clicked(self, btn):
@@ -9500,7 +9481,6 @@ class QFlowLayout(QtWidgets.QLayout):
         self._item_list = []
         self._line_count = 0  # number of lines in the layout
 
-
     def __del__(self):
         self.clear()
 
@@ -9528,7 +9508,7 @@ class QFlowLayout(QtWidgets.QLayout):
         return None
 
     def sizeTable(self):
-        """ gets the actual size of each widget in the layout"""
+        """gets the actual size of each widget in the layout"""
         return [(widget.width(), widget.height()) for widget in [item.widget() for item in self._item_list]]
 
     def expandingDirections(self):
@@ -9608,8 +9588,9 @@ class QFlowLayout(QtWidgets.QLayout):
 
 
 class QManualLayout(QtWidgets.QLayout):
-    """ manual layout """
-    def __init__(self, callback : Callable, parent=None):
+    """manual layout"""
+
+    def __init__(self, callback: Callable, parent=None):
         """Creates a new manual layout.
 
         :param callback: a callable to be used for layout updates
@@ -9647,7 +9628,7 @@ class QManualLayout(QtWidgets.QLayout):
     def _do_layout(self, rect, test_only):
         for item in self._item_list:
             widget = item.widget()
-            wr : QRect = self._callback(widget)
+            wr: QRect = self._callback(widget)
             item.setGeometry(wr)
 
     def sizeHint(self):
@@ -9659,10 +9640,6 @@ class QManualLayout(QtWidgets.QLayout):
             height += size.height()
         self._desired_size = QSize(width, height)
         return self._desired_size
-
-
-
-
 
 
 class QFlowWidget(QWidget):
@@ -9683,8 +9660,6 @@ class QFlowWidget(QWidget):
     def getWidgets(self) -> list:
         """gets a list of widgets in the flow widget"""
         return gremlin.util.get_layout_widgets(self.main_layout)
-
-
 
 
 class QBubble(QtWidgets.QLabel):
@@ -10290,7 +10265,6 @@ class QSplitTabWidget(QDataWidget):
             if iis.contains(key):
                 iis.removeWidget(key)
 
-
             index = self._widget_config_index_map.get(key, -1)
             if index != -1:
                 widget = self._right_panel_stacked_widget.widget(index)
@@ -10667,13 +10641,14 @@ class QRememberDialog(QtWidgets.QDialog):
         super().__init__(parent)
 
         assert key, "unique key must be provided"
+        assert isinstance(width, int) and isinstance(height, int), "width and height must be integers"
         self._window_key = key
         self._moving = False
         self._resizable = True
         self._move_stack = []
         self._move_lock = False
-        self._default_width = width
-        self._default_height = height
+        self._default_width = width or 300
+        self._default_height = height or 200
         self._close_event_triggered = False
 
     def getResizable(self) -> bool:
@@ -10698,7 +10673,7 @@ class QRememberDialog(QtWidgets.QDialog):
             if window_size and window_size[0] is not None and window_size[1] is not None:
                 self.resize(window_size[0], window_size[1])
             else:
-                self.resize(self._default_width, self._default_height)
+                self.resize(self._default_width or 300, self._default_height or 200)
             if window_location:
                 x, y = window_location
                 if x is None or y is None:
@@ -10725,7 +10700,6 @@ class QRememberDialog(QtWidgets.QDialog):
                 self._default_width = max(400, screen_size.width() // 3)
             if self._default_height == -1:
                 self._default_height = max(300, screen_size.height() // 3)
-
 
         return QtCore.QSize(self._default_width, self._default_height)
 
@@ -10823,11 +10797,15 @@ class BaseDialogUi(QRememberDialog):
     # Signal emitted when the dialog is being closed
     closed = QtCore.Signal()
 
-    def __init__(self, key, width=400, height=300, parent=None):
+    def __init__(self, key: str = None, width: int = 400, height: int = 300, parent=None):
         """Creates a new options UI instance.
-
+        :param key the unique key for this dialog
+        :param width the default width of the dialog
+        :param height the default height of the dialog
         :param parent the parent of this widget
         """
+        assert key, "unique key must be provided"
+        assert isinstance(width, int) and isinstance(height, int), "width and height must be integers"
         super().__init__(key, width=width, height=height, parent=parent)
 
     def closeEvent(self, event):
@@ -11089,7 +11067,6 @@ def getHContainer(
                         item = QtWidgets.QLabel(item)
                         if font:
                             item.setFont(font)
-
 
                 if use_vcontainers:
                     item, _ = getVContainer(item)
@@ -14668,7 +14645,7 @@ class QUrlLabel(QtWidgets.QLabel):
 
 class FindWindowDialog(BaseDialogUi):
     def __init__(self, parent=None):
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
         self.setWindowTitle("Find Process Window")
         self.setModal(True)
 
@@ -15670,7 +15647,7 @@ class ResizingStackedWidget(QtWidgets.QStackedWidget):
                 self.removeWidget(w)
                 gremlin.util.delete_widget(w)
             if self.count() == 0:
-                self.addWidget(QWidget()) # ensure empty widget in slot 0
+                self.addWidget(QWidget())  # ensure empty widget in slot 0
             self.setCurrentIndex(0)
             return
 
@@ -15742,10 +15719,8 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
             height = widget.sizeHint().height()
             self.setFixedHeight(height)
         else:
-            self.setFixedHeight(0) # hide
+            self.setFixedHeight(0)  # hide
         self.widgetChanged.emit()
-
-
 
     def layout(self):
         if not self._widget:
@@ -16096,19 +16071,21 @@ class GexAppStyle(QProxyStyle):
 
 
 class QInteractWidget(QtWidgets.QWidget):
-    """ interact widget """
+    """interact widget"""
 
     interacted = QtCore.Signal(Interactions)
 
-    def __init__(self,
-                  index : int = 0,
-                  max_index : int = 0,
-                  data : Any = None,
-                  size : int = 24,
-                  allowed_interactions: list[Interactions] = None,
-                  callback : Callable[[Interactions, int, Any], None] = None,
-                  auto_disable: bool = False,
-                  parent=None):
+    def __init__(
+        self,
+        index: int = 0,
+        max_index: int = 0,
+        data: Any = None,
+        size: int = 24,
+        allowed_interactions: list[Interactions] = None,
+        callback: Callable[[Interactions, int, Any], None] = None,
+        auto_disable: bool = False,
+        parent=None,
+    ):
         """
         Initialize the interact widget.
 
@@ -16122,8 +16099,8 @@ class QInteractWidget(QtWidgets.QWidget):
         """
         super().__init__(parent)
 
-        self._index = index # current index of the item
-        self._max_index = max_index # max number of items
+        self._index = index  # current index of the item
+        self._max_index = max_index  # max number of items
         self._interactions = allowed_interactions
         self._interact_callback = callback
         self.data = data
@@ -16170,8 +16147,7 @@ class QInteractWidget(QtWidgets.QWidget):
 
         self.main_layout.addWidget(widget)
 
-        self._update_buttons() # update button state based on index
-
+        self._update_buttons()  # update button state based on index
 
     @property
     def deleteEnabled(self) -> bool:
@@ -16185,8 +16161,7 @@ class QInteractWidget(QtWidgets.QWidget):
         if self.remove_widget:
             self.remove_widget.setEnabled(value)
 
-
-    def updateIndex(self, index : int = 0, max_index : int = 0):
+    def updateIndex(self, index: int = 0, max_index: int = 0):
         self._index = index
         self._max_index = max_index
         self._update_buttons()
@@ -16239,8 +16214,10 @@ class QInteractWidget(QtWidgets.QWidget):
     #             syslog.info("Widget was enabled!")
     #     super().changeEvent(event)
 
+
 class QStepTile(QtWidgets.QWidget):
-    """ step title widget """
+    """step title widget"""
+
     def __init__(self, label: str = None, icon=None, parent=None):
         super().__init__(parent)
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -16256,12 +16233,12 @@ class QStepTile(QtWidgets.QWidget):
 
 class QScrollAreaResizeCallback(QtWidgets.QScrollArea):
     """scroll area widget that reports its size when the current widget changes"""
-    def __init__(self, callback : Callable[[QtCore.QSize, QtCore.QSize], None] = None, parent=None):
+
+    def __init__(self, callback: Callable[[QtCore.QSize, QtCore.QSize], None] = None, parent=None):
         super().__init__(parent)
         self._resize_callback = callback
 
-
-    def resizeEvent(self, event : QtGui.QResizeEvent):
+    def resizeEvent(self, event: QtGui.QResizeEvent):
         super().resizeEvent(event)
         if self._resize_callback:
             self._resize_callback(event.oldSize(), event.size())

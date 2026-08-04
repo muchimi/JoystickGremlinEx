@@ -1634,6 +1634,13 @@ class StateData:
         else:
             syslog.error(f"STATE: latch state: [{key}] not found")
 
+    def getValue(self, key: str):
+        """gets the state value"""
+        key = key.casefold().strip()
+        if key in self._data:
+            return self._data[key].value
+        return None
+
     def latch(self, key: str, delay: float):
         key = key.casefold().strip()
         verbose = gremlin.config.Configuration().verbose_mode_state

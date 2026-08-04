@@ -631,6 +631,8 @@ class EventListener(QtCore.QObject):
     # remove action
     action_delete = Signal(object, object, object)  # fires when an action is about to be deleted, passes the (input_item, container, action) as a parameters
     action_deleted = Signal(object) # fires when an action is deleted, passes the action as a parameter
+    action_crud = Signal(object,object)  # fires when an action is created, updated or deleted, passes the (action_set, action) as a parameter
+
 
     virtual_button_changed = Signal(object, object, object)  # runs when the action has modified its input mode (input_item, container, action) as parameters
 
@@ -1183,7 +1185,7 @@ class EventListener(QtCore.QObject):
         delay = 0.250  # delay in seconds between press/release events for mode control change
         _new_mode = gremlin.shared_state.runtime_mode
         master_mode = gremlin.shared_state.master_mode
-        extra_data = {"mode": master_mode}  # override execution mode
+        extra_data = {"mode": master_mode, "target_mode": _new_mode}  # override execution mode
 
         # profile start event
         event_start_pressed = Event(
@@ -1305,6 +1307,8 @@ class EventListener(QtCore.QObject):
             return
         items = list(self._keyboard_queue.getall())
         for item, is_pressed in items:
+            if not self._keyboard_thread_running:
+                break
             verbose = gremlin.config.Configuration().verbose_mode_detailed
             is_error = False
             if verbose:
@@ -1399,11 +1403,11 @@ class EventListener(QtCore.QObject):
         self._keyboard_buffer = {}
         self._key_listener_started = True
         threading.current_thread().reset()
-        while not self._keyboard_thread.stopped():
+        while not self._keyboard_thread.stopped() and self._keyboard_thread_running:
             if self._keyboard_queue.empty():
                 time.sleep(0)
                 continue
-            else:
+            if self._keyboard_thread_running:
                 self._process_queue()
                 time.sleep(0)  # yield to other threads
 
@@ -1412,6 +1416,7 @@ class EventListener(QtCore.QObject):
     def start_key_listener(self):
         """starts the key listener"""
         if not self._key_listener_started:
+            self._keyboard_thread_running = True
             self._keyboard_queue : FastQueue[Event] = FastQueue(name="keyboard_queue") # queue.Queue()
             self._keyboard_thread = gremlin.threading.AbortableThread(target=self._keyboard_runner)
             self._keyboard_thread.start()
@@ -3285,7 +3290,9 @@ class EventHandler(QtCore.QObject):
                 InputType.JoystickButton,
                 InputType.JoystickHat,
                 InputType.OctaviIfr1,
+                InputType.ModeControl,
             ):
+
                 m_list = self._matching_callbacks(event)
                 f_list = self._matching_functors(event)
 
@@ -3434,20 +3441,29 @@ class EventHandler(QtCore.QObject):
 
         # mode we're looking for
         run_mode = event.mode if event.mode else self.runtime_mode
+
+        mode_list = [run_mode]
+        if event.extra_data:
+            if "mode" in event.extra_data:
+                mode_list = [event.extra_data["mode"]]
+            if "target_mode" in event.extra_data:
+                # override
+                mode_list.append(event.extra_data["target_mode"])
         if event.extra_data and "mode" in event.extra_data:
             # override
             run_mode = event.extra_data["mode"]
 
         device_guid = event.device_guid
         if device_guid in self.latched_functors:
-            modes = gremlin.shared_state.current_profile.getModeHierarchy(run_mode)
-            for mode in modes:
-                if mode in self.latched_functors[device_guid]:
-                    key = event.callbackKey
-                    if key in self.latched_functors[device_guid][mode]:
-                        functors_list = self.latched_functors[device_guid][mode][key]
-                        if functors_list:
-                            break
+            for run_mode in mode_list:
+                modes = gremlin.shared_state.current_profile.getModeHierarchy(run_mode)
+                for mode in modes:
+                    if mode in self.latched_functors[device_guid]:
+                        key = event.callbackKey
+                        if key in self.latched_functors[device_guid][mode]:
+                            functors_list = self.latched_functors[device_guid][mode][key]
+                            if functors_list:
+                                break
         return functors_list
 
     def _matching_callbacks(self, event: Event):
@@ -3463,21 +3479,27 @@ class EventHandler(QtCore.QObject):
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_details  # or config.verbose_mode_condition
         mode = event.mode if event.mode else self.runtime_mode  # mode we're looking for
-        if event.extra_data and "mode" in event.extra_data:
-            # override
-            mode = event.extra_data["mode"]
+        mode_list = [mode]
+        if event.extra_data:
+            if "mode" in event.extra_data:
+                # override
+                mode_list = [event.extra_data["mode"]]
+            if "target_mode" in event.extra_data:
+                # override
+                mode_list.append(event.extra_data["target_mode"])
 
         # Obtain callbacks matching the event
         callback_list = []
         key = event.callbackKey
         device_guid = event.device_guid
         if device_guid in self.callbacks:
-            if mode in self.callbacks[device_guid]:
-                if key in self.callbacks[device_guid][mode]:
-                    callback_list = self.callbacks[device_guid][mode][key]
-                    if verbose:
-                        event = self.callback_key_map[key]
-                        self.dump_exectree(device_guid, mode, event)
+            for mode in mode_list:
+                if mode in self.callbacks[device_guid]:
+                    if key in self.callbacks[device_guid][mode]:
+                        callback_list = self.callbacks[device_guid][mode][key]
+                        if verbose:
+                            event = self.callback_key_map[key]
+                            self.dump_exectree(device_guid, mode, event)
 
         if verbose:
             syslog.info(f"CALLBACK: device: {gremlin.shared_state.get_device_name(event.device_guid)} mode: {self.runtime_mode} found: {len(callback_list)}")

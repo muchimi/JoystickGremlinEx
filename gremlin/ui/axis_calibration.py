@@ -46,7 +46,7 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
 
         :param parent the parent widget of this object
         """
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
         self.devices = gremlin.joystick_handling.physical_devices()
         self.current_selection_id = 0
 

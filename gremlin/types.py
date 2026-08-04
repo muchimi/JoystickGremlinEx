@@ -1031,6 +1031,7 @@ class VerboseMode(IntFlag):
     L1 = auto()
     L2 = auto()
     L3 = auto()
+    Plugin = auto()
     All = (
         Keyboard
         | Joystick
@@ -1073,6 +1074,7 @@ class VerboseMode(IntFlag):
         | L1
         | L2
         | L3
+        | Plugin
     )
 
     def __contains__(self, item):

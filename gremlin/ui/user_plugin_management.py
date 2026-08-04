@@ -170,7 +170,7 @@ class ModuleManagementController(QtCore.QObject):
         module_widget.add_instance(new_instance_widget)
         self._connect_instance_signals(new_instance, new_instance_widget)
 
-    def configure_instance(self, instance, widget):
+    def  configure_instance(self, instance, widget):
         # Get data from the custom module itself
         variables = gremlin.user_plugin.get_variable_definitions(
             instance.parent.file_name
@@ -275,6 +275,9 @@ class ModuleManagementController(QtCore.QObject):
                 f"{data["device_name"]} {InputType.to_string(data["input_type"]).capitalize()} {input_id}"
                 )
 
+        verbose = gremlin.config.Configuration().verbose_mode_plugin
+        if verbose:
+            syslog.info(f"plugin: update variable: {variable.name} to value: {variable.value}")
         variable.is_valid = True
 
     def _create_value_changed_cb(self, variable, widget, callback):

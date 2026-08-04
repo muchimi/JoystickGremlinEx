@@ -1554,7 +1554,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 if not result:
                     # profile start failed
                     gremlin.shared_state.profile_state = False
-                    self.ui.tray_icon.setIcon(load_icon("icon.ico"))
+                    self.ui.tray_icon.setIcon(load_icon("gex.ico"))
                     with QtCore.QSignalBlocker(self.ui.actionActivate):
                         self.ui.actionActivate.setChecked(False)  # toolbar icon "off"
 
@@ -1620,7 +1620,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 try:
                     if self.ui.tray_icon is not None:
-                        self.ui.tray_icon.setIcon(load_icon("icon.ico"))
+                        self.ui.tray_icon.setIcon(load_icon("gex.ico"))
                 except Exception as err:
                     syslog.error(f"Load Icon: error: {err}\n{traceback.format_exc()}")
         except Exception as err:
@@ -2247,7 +2247,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.action_tray_quit.triggered.connect(self._force_close)
 
         self.ui.tray_icon = QtWidgets.QSystemTrayIcon()
-        self.ui.tray_icon.setIcon(load_icon("icon.ico"))
+        self.ui.tray_icon.setIcon(load_icon("gex.ico"))
         self.ui.tray_icon.setContextMenu(self.ui.tray_menu)
         self.ui.tray_icon.show()
 
@@ -3692,6 +3692,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         selection_change handler
         """
 
+        import gremlin.shared_state
+        if gremlin.shared_state.is_running:
+            # do not allow input selection while the engine is running
+            return
+
         restore_device_guid: dinput.GUID
         restore_input_type: gremlin.input_types.InputType = None
         restore_input_id = None
@@ -3716,6 +3721,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         import gremlin.util
         import gremlin.shared_state
         import gremlin.joystick_handling
+
 
         completion_callback = None
         if extra_data:

@@ -243,9 +243,9 @@ def create_document():
             "Codepage": "1252",
             "Version": "13.40.14ex"
         })
-    
-    
-    
+
+
+
     mug = create_node("MajorUpgrade",
         {
             "DowngradeErrorMessage":
@@ -364,7 +364,7 @@ def create_shortcuts(doc, root):
                     "Name": "Joystick Gremlin Ex",
                     "WorkingDirectory": "INSTALLDIR",
                     "Advertise": "yes",
-                    "Icon": "icon.ico"
+                    "Icon": "gex.ico"
                 }
             ))
 
@@ -408,7 +408,7 @@ def create_shortcuts(doc, root):
     product = doc.find("Product")
     product.append(create_node(
         "Icon",
-        {"Id": "icon.ico", "SourceFile": "joystick_gremlin\gfx\icon.ico"}
+        {"Id": "icon.ico", "SourceFile": "joystick_gremlin\\icons\\gex.ico"}
     ))
 
 
@@ -424,7 +424,7 @@ def write_xml(node, fname):
     # with open(fname, "w") as out:
     #     out.write(dom_xml.toprettyxml(indent="    "))
 
-    
+
     tree = ElementTree.ElementTree(node)
     tree.write(fname, pretty_print=True,xml_declaration=True,encoding="utf-8")
 

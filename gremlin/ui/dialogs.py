@@ -203,7 +203,7 @@ class HostIpDialog(ui_common.BaseDialogUi):
     def __init__(self, host_ip: str = None, parent=None):
         """
         :param host_ip: current host IP to display (optional)"""
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
 
         self._host_ip = host_ip
         self._ip_list = gremlin.util.getHostIp()  # get list of host IPs
@@ -309,7 +309,7 @@ class HostIpDialog(ui_common.BaseDialogUi):
 #     """dialog controlling which devices are removed from a particular profile"""
 
 #     def __init__(self, parent=None):
-#         super().__init__(self.__class__.__name__, parent)
+#         super().__init__(self.__class__.__name__, parent = parent)
 
 #         self.setWindowTitle("Profile Device List")
 #         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -3110,7 +3110,7 @@ class ProcessWindow(ui_common.BaseDialogUi):
         :param text: the process exe to select by default (if one is provided, and the item is not in the list, the file open will executed at that folder location)
         :param parent the parent of the widget
         """
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
 
         self.setWindowTitle("Process List")
         self.setMinimumWidth(400)
@@ -3230,7 +3230,7 @@ class LogWindowUi(ui_common.BaseDialogUi):
 
         :param parent the parent of this widget
         """
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
 
         self.setWindowTitle("Log Viewer")
         self.setMinimumWidth(600)
@@ -3316,7 +3316,7 @@ class AboutUi(ui_common.BaseDialogUi):
 
         :param parent parent of this widget
         """
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
         self.ui = ui_about.Ui_About()
         self.ui.setupUi(self)
 
@@ -3342,7 +3342,7 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
     """presents an add dialog box for a new mode"""
 
     def __init__(self, profile, parent=None):
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
         self._profile: gremlin.base_profile.Profile = profile
         self.setWindowTitle("Mode Manager - Add Profile Mode")
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -3350,19 +3350,21 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
         self._edit_widget = ui_common.QDataLineEdit()
         self._edit_widget.setToolTip("Name of the new mode (should be unique)")
 
+        grid_widgets = []
+
         widgets = []
         widget, layout = ui_common.getGridContainer(["New mode:", self._edit_widget])
-        self.main_layout.addWidget(widget)
-        widgets.append(widget)
+        grid_widgets.append(widget)
 
         self._parent_widget = gremlin.ui.ui_common.QDataComboBox()
         self._parent_widget.setToolTip("Select the parent mode of the new mode.\nLeave blank if the new mode is a top level mode.")
 
         widget, layout = ui_common.getGridContainer(["Parent mode:", self._parent_widget])
-        self.main_layout.addWidget(widget)
-        widgets.append(widget)
+        grid_widgets.append(widget)
 
-        gremlin.ui.ui_common.synchronize_grids(widgets)
+        widget = gremlin.ui.ui_common.getVContainer(grid_widgets, widget_only=True)
+
+        self.main_layout.addWidget(widget)
 
         mode_list: list = self._profile.get_modes()
         self._parent_widget.addItem("")
@@ -3385,6 +3387,8 @@ class ModeManagerAddUI(ui_common.BaseDialogUi):
         button_container_widget = widget
 
         self.main_layout.addWidget(button_container_widget)
+
+        gremlin.ui.ui_common.synchronize_grids(widgets)
         self.setModal(True)
 
     @property
@@ -3429,7 +3433,7 @@ class ModeManagerDialog(ui_common.BaseDialogUi):
         :param mode: the startup mode to select (optional)
         :param parent the parent of this widget
         """
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
         self._profile: gremlin.base_profile.Profile = profile
         self.setWindowTitle("Mode Manager")
 
@@ -3781,7 +3785,7 @@ class DeviceInformationDialog(ui_common.BaseDialogUi):
 
         :param parent the parent widget
         """
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
         assert isinstance(profile, gremlin.base_profile.Profile)
 
         self.profile = profile
@@ -4031,7 +4035,7 @@ class SwapDevicesUi(ui_common.BaseDialogUi):
         :param profile the current profile
         :param parent the parent of this widget
         """
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
 
         self.profile = profile
 

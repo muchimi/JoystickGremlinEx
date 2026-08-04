@@ -384,8 +384,11 @@ class BoolVariable(AbstractVariable):
         super().__init__(label, description, gremlin.types.PluginVariableType.Bool, is_optional)
 
         self.value = initial_value
+        syslog.info(f"Plugin: BoolVariable {self.label} initial value: {self.value}")
         if not isinstance(self.value, bool):
-            self.default_value = False
+            self.value = bool(self.value)
+
+
 
         self._load_from_registry(self._get_identifier())
 
@@ -395,10 +398,13 @@ class BoolVariable(AbstractVariable):
         label.setToolTip(self.description)
         layout.addWidget(label, 0, 0)
 
-        value_widget = QtWidgets.QCheckBox()
-        if isinstance(value, bool):
-            value_widget.setCheckState(QtCore.Qt.Checked if value else QtCore.Qt.Unchecked)
-        value_widget.stateChanged.connect(lambda x: self.value_changed.emit({"value": x}))
+        value = bool(value)
+
+        value_widget = gremlin.ui.ui_common.QDataCheckbox(data = self, checked = value, callback = self._handle_checkbox_clicked)
+        #value_widget = QtWidgets.QCheckBox()
+
+        #value_widget.setCheckState(QtCore.Qt.Checked if value else QtCore.Qt.Unchecked)
+        # value_widget.stateChanged.connect(lambda x: self.value_changed.emit({"value": x}))
 
         if value_widget is not None:
             layout.addWidget(value_widget, 0, 1)
@@ -407,6 +413,10 @@ class BoolVariable(AbstractVariable):
         layout.setColumnMinimumWidth(0, 150)
 
         return layout
+
+    def _handle_checkbox_clicked(self, checked : bool):
+        self.value = checked
+        self.value_changed.emit({"value": checked})
 
     def _process_registry_value(self, value):
         return value

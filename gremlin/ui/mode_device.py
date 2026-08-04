@@ -18,6 +18,7 @@
 from __future__ import annotations  # deprecated with python 3.14+
 
 from PySide6 import QtWidgets
+
 import gremlin.config
 import gremlin.event_handler
 from typing import Callable
@@ -43,7 +44,8 @@ syslog = logging.getLogger("system")
 class ModeInputModeType(enum.IntEnum):
     """possible input modes"""
 
-    ModeEnter = 0  # executes on mode enter
+    NotSet = 0 # not set
+    ModeEnter = 8  # executes on mode enter
     ModeExit = 1  # executes on mode exit
     ModeGlobalEnter = 2  # executes on any mode change (activate)
     ModeGlobalExit = 3  # executes on any mode change (deactivate)
@@ -163,6 +165,8 @@ class ModeInputItem(gremlin.input_item.InputItem):
         assert mode_node.device_guid is not None, "mode node must have a valid device ID"
         assert isinstance(input_id, ModeInputModeType), "invalid input id"
 
+        self._value : bool = False
+
         super().__init__(
             mode_node,
             input_type=InputType.ModeControl,
@@ -179,6 +183,17 @@ class ModeInputItem(gremlin.input_item.InputItem):
 
         # syslog.info(f"InputItem: CREATE MODE INPUT ITEM: input item id: {Ansi.YELLOW}[{self._id}]{Ansi.RESET} input id: {Ansi.GREEN}[{input_id.name}/{input_id}]{Ansi.RESET} mode name: [{mode_node.name}] mode node id: [{mode_node.id}] device node id: [{mode_node.parent.id}] profile id: [{mode_node.profile.id}]")
         # pass
+
+    @property
+    def value(self) -> bool:
+        """gets the current value of the input"""
+        return self._value
+
+    @value.setter
+    def value(self, new_value: bool):
+        """sets the current value of the input"""
+        if self._value != new_value:
+            self._value = new_value
 
     def from_xml(self, node, data=None, extra_data: dict = None):
         # mode data
@@ -260,6 +275,7 @@ def ensureModeInputItems(profile: gremlin.base_profile.Profile, mode: str):
     if not mode_node.getInputItem(InputType.ModeControl, ModeInputModeType.ModeExit):
         input_item = ModeInputItem(mode_node, input_id=ModeInputModeType.ModeExit)
         mode_node.addInputItem(input_item)
+
 
 
 class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
@@ -522,6 +538,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """refreshes input list"""
         # syslog.info(f"refresh: mode {self.current_mode}")
         self.inputItemListModel.refresh()
+
 
     def display_name(self, input_id):
         """returns the name for the given input ID"""

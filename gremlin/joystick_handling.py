@@ -19,6 +19,9 @@
 import logging
 import threading
 
+
+
+
 import dinput
 import time
 import traceback
@@ -428,20 +431,21 @@ def get_button(device_guid : str | dinput.GUID | int, input_id : int) -> bool:
         if device and device.device_type in (DeviceType.VJoy, DeviceType.Maestro, DeviceType.Joystick):
             assert input_id > 0 and input_id <= device.button_count, f"Invalid button index for vjoy device [{device.name}] [{input_id}]"
     if device and input_id:
-        if device.button_count:
-            if device.is_virtual and device.vjoy_id:
-                # query the vjoy interface rather than dinput
-                button = VJoyProxy()[device.vjoy_id].button(input_id)
-                if button:
-                    return button.is_pressed
-                else:
-                    syslog.warning(f"GetButton(): invalid vjoy [{device.vjoy_id}] button [{input_id}] not found")
-                # invalid button
-                return False
-            # physical device
-            return device.get_button(input_id)
-        else:
-            if device.device_type == DeviceType.Osc:
+        match device.device_type:
+            case DeviceType.VJoy | DeviceType.Maestro | DeviceType.Joystick:
+                if device.button_count:
+                    if device.is_virtual and device.vjoy_id:
+                        # query the vjoy interface rather than dinput
+                        button = VJoyProxy()[device.vjoy_id].button(input_id)
+                        if button:
+                            return button.is_pressed
+                        else:
+                            syslog.warning(f"GetButton(): invalid vjoy [{device.vjoy_id}] button [{input_id}] not found")
+                        # invalid button
+                        return False
+                # physical device
+                return device.get_button(input_id)
+            case DeviceType.Osc:
                 if hasattr(input_id, "message"):
                     # OSC device
                     import gremlin.ui.osc_device
@@ -450,11 +454,48 @@ def get_button(device_guid : str | dinput.GUID | int, input_id : int) -> bool:
                     osc.start()  # ensure started
                     data = osc.getData(input_id.message)  # gets data arguments or None if no data
                     if data:
+                        return bool(data[0])  # first argument is the button state
+                return False  # not received, assume not set
+            case DeviceType.Midi:
+                if hasattr(input_id, "message"):
+                    # MIDI device
+                    import gremlin.ui.midi_device
+
+                    midi = gremlin.ui.midi_device.InputMidiClient()
+                    midi.start()  # ensure started
+                    data = midi.getData(input_id.message)  # gets data arguments or None if no data
+                    if data:
                         return data
                 return False  # not received, assume not set
+            case DeviceType.ModeControl:
+                # always trigger for mode control
+                import gremlin.ui.mode_device
+                import gremlin.shared_state
+                mode = gremlin.shared_state.current_mode
+                mode_type = gremlin.ui.mode_device.ModeInputModeType(input_id)
+                profile = gremlin.shared_state.current_profile
+                input_item = profile.getInputItem(device.device_guid, mode, InputType.ModeControl, mode_type)
+                if input_item:
+                    return input_item.value
+                return False
+            case DeviceType.State:
+                # state device
+                import gremlin.ui.state_device
+                sd = gremlin.ui.state_device.StateData()
+                value = sd.getValue(input_id.key)
+                if value is None:
+                    return False
+                return value
+
+
+
 
     else:
-        syslog.error(f"JOYSTICK: unable to get button state for device for id [{device_guid}] index [{input_id}]")
+        syslog.warning(f"JOYSTICK: unable to get button state for device for id [{device_guid}] index [{input_id}]")
+        if not device:
+            syslog.warning("\tdevice not found")
+        if not input_id:
+            syslog.warning("\tinvalid id (should be >= 1)")
     return False
 
 

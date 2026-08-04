@@ -5740,14 +5740,21 @@ class PluginInstance:
     def has_variable(self, name):
         return name in self.variables
 
-    def set_variable(self, name, variable):
+    def set_variable(self, name : str, variable : PluginVariable):
+        syslog.info(f"Plugin: set variable {name} to variable {variable} value: {variable.value}")
         self.variables[name] = variable
 
-    def get_variable(self, name):
+    def get_variable(self, name : str):
+        verbose = gremlin.config.Configuration().verbose_mode_plugin
         if name not in self.variables:
             var = PluginVariable(self)
             var.name = name
             self.variables[name] = var
+            if verbose:
+                syslog.info(f"Plugin: get variable {name} not found, creating new variable with default value: {var.value}")
+        else:
+            if verbose:
+                syslog.info(f"Plugin: get variable {name} found with value: {self.variables[name].value}")
 
         return self.variables[name]
 

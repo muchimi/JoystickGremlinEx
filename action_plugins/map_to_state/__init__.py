@@ -773,6 +773,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
             self.sd.register(key, False, description if description else "auto-created state")
 
         # self.last_event = None
+        self.pulse_worker_map = {}
 
     def profile_start(self):
         import gremlin.event_handler
@@ -953,6 +954,7 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         """processes an input event - must return True on success, False to abort the input sequence"""
 
         verbose = gremlin.config.Configuration().verbose_mode_state
+        # verbose = True
 
         key = self.action_data.key
         mode = self.action_data.mode

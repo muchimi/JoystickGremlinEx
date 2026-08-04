@@ -934,7 +934,8 @@ class AbstractCallbackModel(AbstractModel):
         self._index_map = TriggerDict()  # map of input_id to index
         self._index_map.addCallback(self._handle_data_changed)  # only track one of the two maps as a change in one also changes the other
         self._item_map = TriggerDict()  # map of input_id to index
-        self._extra_data = data  # optional data to store with the model
+        self._extra_data = data
+
 
         # assume no filters
         self._filtered_index_map = TriggerDict()

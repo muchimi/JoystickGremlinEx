@@ -482,7 +482,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             assert callable(custom_mode_name_handler), "Mode name handler must be callable "
         self._profile_mode_callback = custom_mode_name_handler  # special callback to use to get the profile mode for this item (if special)
         self._containers = ContainerModel(self)  # holds the containers for this input
-        # self._containers.addCallback(self._handle_containers_changed)  # called when containers are changed
         self._selected = False  # true if the item is selected
         self._is_action = False  # true if the object is a sub-item for a sub-action (GateHandler for example)
 
@@ -1725,6 +1724,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         if input_item:
             self._lock_widget.setChecked(input_item.locked)
+
         self._lock_widget.clicked.connect(self._handle_lock_changed)
 
         # top row
@@ -1919,6 +1919,19 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
+        el = gremlin.event_handler.EventListener()
+        el.action_crud.connect(self._handle_action_crud_event)
+
+    def _handle_action_crud_event(self, action_set : ActionSet, action : AbstractAction):
+        """handles action CRUD events"""
+        if self._input_item and action:
+            container = action.container
+            input_item = container.input_item
+            if input_item == self._input_item:
+                self._update_action_icons()
+
+
+
     def _handle_remove_unused_actions(self):
         input_item = self._input_item
         remove_list = []
@@ -1969,6 +1982,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         # refresh IDs
         self._update_container_id()
+
 
     def handleMappingChanged(self, input_item: InputItem):
         """called when the input item changes"""
@@ -2346,6 +2360,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _update_action_icons_ui(self):
         # update mapping icons
+        # syslog.info(f"update action icons for input item: {self.input_item.display_name}")
         self.create_action_icons(self.input_item)
 
     def _icon_changed_cb(self, event: gremlin.event_handler.DeviceChangeEvent):
@@ -5510,6 +5525,21 @@ class ActionSet(AbstractCallbackModel):
         self._data = data  # any special tag to identify the action set
         self.description: str = None  # description of the action set (optional)
 
+    def onItemChanged(self, model, index: int, new_item, old_item, operation):
+        """override by derived classes as needed"""
+        match operation:
+            case "add":
+                # handle add operation
+                action = new_item
+            case "remove":
+                # handle remove operation
+                action = old_item
+            case _:
+                action = None
+        if action:
+                el = gremlin.event_handler.EventListener()
+                el.action_crud.emit(self, action)
+
     @staticmethod
     def fromList(source: list | tuple):
         """returns an action set from the source list"""
@@ -5640,7 +5670,8 @@ class ActionSetModel(AbstractCallbackModel):
     def add_action(self, action):
         """adds an action to the model"""
         self.add(action)
-        self._fireIconChange(self, action)
+        syslog.info("fire icon change for action add")
+        self._fireIconChange(action)
 
     def _fireIconChange(self, action):
         # fire change event for action icons
@@ -5661,21 +5692,12 @@ class ActionSetModel(AbstractCallbackModel):
             container: AbstractContainer = action.get_container()
             self.remove(action)
 
-            # del self._items[self._items.index(action)]
-
-            # # run action delete if the action supports it
-            # if hasattr(action,"actionDeleted"):
-            #     action.actionDeleted()
-
-            # if hasattr(action,"_cleanup"):
-            #     action._cleanup()
-
-            # self._fireChanged()
-
             el = gremlin.event_handler.EventListener()
             el.action_delete.emit(input_item, container, action)  # tell the UI the action is being deleted
 
-            self._fireIconChange(self, action)
+            syslog.info("fire icon change for action delete")
+
+            self._fireIconChange(action)
 
 
 # class BaseAbstractCondition(QtCore.QObject, metaclass=ABCMetaQObject):
@@ -6626,8 +6648,6 @@ class ActionSetsView(AbstractView):
             action_set = self.model[0]  # first action set
 
         action_set.add(action)
-
-        # self._container.add_action(action, 0) # for basic containers, add the action to action set 0
 
     def _create_ui(self):
         """recreates the UI to view action sets in a container"""

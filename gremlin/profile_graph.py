@@ -247,7 +247,7 @@ class RemapData:
 
 class DeviceCopyDialogUI(ui_common.QShowAtCursorDialog):
     def __init__(self, device_guid=None, parent=None):
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
 
         self.setWindowTitle("Device Assignment Copy")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -306,7 +306,7 @@ class DeviceRemapDialogUI(ui_common.BaseDialogUi):
     """dialog box to handle a profile remap between like devices"""
 
     def __init__(self, graph: ProfileGraph, parent=None, device_guid=None):  # noqa: F821
-        super().__init__(self.__class__.__name__, parent)
+        super().__init__(self.__class__.__name__, parent=parent)
 
         self._remap_map = {}  # map of profile device node ID to RemapData object holding the configured mapping information
 
@@ -1474,7 +1474,9 @@ class ProfileGraph:
     def joystick_devices(self) -> list[DeviceSummary]:
         """gets a list of joystick devices defined in the profile"""
         device_nodes = [node for node in self._root.children if node.nodeType == ProfileNodeType.Device]
-        device_list = [node.device for node in device_nodes if node.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy) and not node.device.disabled]
+        device_list = [
+            node.device for node in device_nodes if node.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy) and not node.device.disabled
+        ]
         return device_list
 
     def remap(self):

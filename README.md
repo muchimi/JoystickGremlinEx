@@ -48,6 +48,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T23)
+- Fix: UI: default dialog parameters for some dialogs may map to incorrect parameters
+- Fix: UI: add mode dialog incorrect parent mode dropdown size.
+- Fix: API: Mode device event handling may not result in a trigger.
+- Fix: UI: remove an action does not always update the action icon list
+- Fix: API: Mode Enter/Mode Exit mappings may not trigger mappings.
+- Fix: API (plugins): boolean plugin variable UI no longer using multi-state checkboxes.
+- Fix: UI: old icon when minimized to tray
+
+
 ### (m77T22)
 - Fix: API: Event registration for keyboard condition undefined variable
 - Fix: Reporting: updates for API changes - various devices and containers
