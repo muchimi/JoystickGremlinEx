@@ -79,6 +79,8 @@ class ModeInputModeType(enum.IntEnum):
     @staticmethod
     def from_name(value: str) -> ModeInputModeType:
         match value.casefold():
+            case "not-set":
+                return ModeInputModeType.NotSet
             case "enter":
                 return ModeInputModeType.ModeEnter
             case "exit":
@@ -101,6 +103,8 @@ class ModeInputModeType(enum.IntEnum):
     @staticmethod
     def to_name(value: ModeInputModeType):
         match value:
+            case ModeInputModeType.NotSet:
+                return "not-set"
             case ModeInputModeType.ModeEnter:
                 return "enter"
             case ModeInputModeType.ModeExit:
@@ -166,6 +170,11 @@ class ModeInputItem(gremlin.input_item.InputItem):
         assert isinstance(input_id, ModeInputModeType), "invalid input id"
 
         self._value : bool = False
+
+        if input_id == ModeInputModeType.NotSet:
+            # if not set, use the appropriate default
+            input_id = ModeInputModeType.DelayLoad
+
 
         super().__init__(
             mode_node,

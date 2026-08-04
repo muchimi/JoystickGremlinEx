@@ -48,6 +48,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T24)
+- Fix: handle default value for Mode Device for new API.
+- Fix: adjust default message box minimum size to avoid a QT exception
+
 ### (m77T23)
 - Fix: UI: default dialog parameters for some dialogs may map to incorrect parameters
 - Fix: UI: add mode dialog incorrect parent mode dropdown size.
@@ -56,6 +61,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: API: Mode Enter/Mode Exit mappings may not trigger mappings.
 - Fix: API (plugins): boolean plugin variable UI no longer using multi-state checkboxes.
 - Fix: UI: old icon when minimized to tray
+
+
 
 
 ### (m77T22)

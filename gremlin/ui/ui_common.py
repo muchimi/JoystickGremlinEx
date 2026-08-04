@@ -4355,6 +4355,9 @@ def _message_box_ui(
     if informative_text:
         msgbox.setInformativeText(informative_text)
     msgbox.setStandardButtons(buttons)
+    # bracket min size
+    if not width or not isinstance(width, int) or width < 300:
+        width = 300
     msgbox.setMinimumWidth(width)
     msgbox.setMinimumHeight(200)
 
