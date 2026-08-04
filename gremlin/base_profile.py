@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
+import re
 import sys
 import collections
 import os
@@ -25,7 +26,8 @@ import logging
 import traceback
 import json
 import time
-# import gremlin.base_classes
+
+
 
 from typing import Callable
 
@@ -244,7 +246,7 @@ class ProfileDeviceNode:
 
         :param node the xml node to parse to populate this device
         """
-        assert node.tag == "device", f"XML: ProfileDeviceNode: Expected 'device' tag, got '{node.tag}'"
+        assert node.tag in ("device", "vjoy-device"), f"XML: ProfileDeviceNode: Expected 'device' or 'vjoy-device' tag, got '{node.tag}'  offending line: {node.sourceline}"
         self.name = node.get("name")
 
         if "guid" in node.attrib:
@@ -265,6 +267,20 @@ class ProfileDeviceNode:
                 # for disconnectd devices, assume maximum axis and buttons to avoid problems
                 device.axis_count = 8
                 device.device_category = DeviceCategory.Physical # assume physical device if in a profile not under virtual sticks
+                device_type_str = safe_read(node, "type", str, "")
+                device_type = DeviceType.to_enum(device_type_str)
+                device.setVirtual(device_type in (DeviceType.VJoy, DeviceType.Maestro))
+                if device_type == DeviceType.VJoy:
+                    vjoy_id = int(safe_read(node, "vjoy-id", int, -1))
+                    if vjoy_id == -1:
+                        # see if the vjoy # can be derived from the name
+                        match = re.search(r'(\d+)\D*$', self.name)
+                        if match:
+                            vjoy_id = int(match.group(1))
+
+                    device.vjoy_id = vjoy_id
+                    device.virtual_id = device.vjoy_id
+
 
                 # assume linear axis mapping for disconnected devices
                 for axis_id in range(1, device.axis_count+1):
@@ -4013,7 +4029,9 @@ class Profile:
         dummy = ProfileModeNode()
         dummy.load(profile=self, name="*placeholder*", device_guid=gremlin.joystick_handling.invalidDeviceGuid())
         extra_data["mode_object"] = dummy
-        for child in root.iter("vjoy-device"):
+
+        vjoy_nodes = root.xpath("//profile/devices/vjoy-device")
+        for child in vjoy_nodes:
             device_node = ProfileDeviceNode(self)
             device_node.from_xml(child, data, extra_data)
             self.vjoy_devices[device_node.device_guid] = device_node
@@ -4308,14 +4326,18 @@ class Profile:
         # VJoy settings
         add_vjoy = False
         vjoy_devices = etree.Element("vjoy-devices")
-        for device in self.vjoy_devices.values():
-            node = device.to_xml()
+        for device_node in self.vjoy_devices.values():
+            node = device_node.to_xml()
             if node is None:
                 continue  # skip VJoy devices that do not produce an XML node
             has_container = node.xpath("./container")
             if has_container:
                 vjoy_devices.append(node)
                 add_vjoy = True
+            if device_node.device:
+                node.set("vjoy-id", safe_format(device_node.device.vjoy_id, int))
+
+
 
         if add_vjoy:
             root.append(vjoy_devices)

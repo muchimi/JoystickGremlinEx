@@ -733,6 +733,9 @@ class DeviceSummary:
             self._is_virtual = self.vendor_id in (VJOY_VID, GEX_VID)
         return self._is_virtual
 
+    def setVirtual(self, is_virtual: bool):
+        self._is_virtual = is_virtual
+
     def set_vjoy_id(self, vjoy_id : int):
         """Sets the vJoy id for this device summary.
 

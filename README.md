@@ -49,6 +49,9 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 
+### (m77T24A)
+- Fix: XML: (proposed) handling of vjoy (as input) device definitions not recognized in some profiles preventing the profile from loading correctly.
+
 ### (m77T24)
 - Fix: handle default value for Mode Device for new API.
 - Fix: adjust default message box minimum size to avoid a QT exception
