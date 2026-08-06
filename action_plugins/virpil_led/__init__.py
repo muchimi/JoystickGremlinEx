@@ -828,9 +828,15 @@ class VirpilAction(gremlin.input_item.AbstractAction):
     def setState(self, r: int, g: int, b: int, led: VirpilButtonType):
         if self.device and self.device.enabled and os.path.isfile(self.virpil_executable):
             syslog.info(f"VIRPIL: setting LED state: r={r}, g={g}, b={b}, led={led.value}")
-            command = f"{self.virpil_executable} {self.device.vendor_id} {self.device.product_id} {led.value} {r} {g} {b}"
+
+            # LED tool expects the product and vendor IDs to be in hex values, 4 digits
+            command = f"{self.virpil_executable} {self.device.vendor_id:04x} {self.device.product_id:04x} {led.value} {r} {g} {b}"
             syslog.info(f"VIRPIL: {command}")
-            subprocess.Popen(command, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            # for diagnostics window
+            # subprocess.Popen(command, creationflags=subprocess.CREATE_NEW_CONSOLE)
+
+            # no window
+            subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
 
     def _parse_xml(self, node, data=None, extra_data=None):
         assert node.tag == self.tag, f"Expected tag {self.tag} but got {node.tag}"

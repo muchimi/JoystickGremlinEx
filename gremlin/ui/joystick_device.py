@@ -1248,9 +1248,10 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                         self._update_curve_icon(index, self.inputItemListView.model.data(index))
 
     def _update_curve_icon(self, index: int, data):
-        widget = self.inputItemListView.widget(index)
-        if widget is not None:
-            widget.update_display()
+        if self.inputItemListView:
+            widget = self.inputItemListView.widget(index)
+            if widget is not None:
+                widget.update_display()
 
     def _config_changed_cb(self):
         if self.inputItemListView:  # check for delay load

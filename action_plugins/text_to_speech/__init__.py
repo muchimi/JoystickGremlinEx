@@ -18,6 +18,7 @@
 
 from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
+from sympy.benchmarks.bench_meijerint import rate
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.input_item
@@ -25,11 +26,11 @@ import gremlin.tts
 import gremlin.ui.ui_common
 import gremlin.util
 import gremlin.config
-import gremlin.sound
+from gremlin.sound import Sound, PhraseData, EdgeTTSVoice, SoundEvent
 import os
 from gremlin.types import PlaybackMode, PlayMode
 import random
-
+import time
 from gremlin.util import safe_format, safe_read, TimedRandomInt
 from shiboken6 import Shiboken
 import logging
@@ -119,6 +120,26 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="Aborts any prior speech processing when triggered.",
         )
 
+        self.tts_suppress_enabled_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Suppress Duplicate Playback",
+            value=self.action_data.tts_suppress_duplicate,
+            callback=self._handle_tts_suppress_enabled_changed,
+            tooltip="Suppress duplicate playback within the cooldown period.",
+        )
+
+        self.tts_suppress_cooldown_widget = gremlin.ui.ui_common.QIntLineEdit(
+            min_range=0,
+            max_range=60,
+            value=self.action_data.tts_suppress_cooldown,
+            callback=self._handle_tts_suppress_cooldown_changed,
+            chars=4,
+            tooltip="Cooldown time in seconds to suppress duplicate TTS playback.",
+        )
+
+        cooldown_container = gremlin.ui.ui_common.getHContainer(
+            [self.tts_suppress_enabled_widget, "Cooldown (s):", self.tts_suppress_cooldown_widget], widget_only=True
+        )
+
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
@@ -140,14 +161,22 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
         self.container_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         self.main_layout.addWidget(self.container_mode_widget)
-        self.main_layout.addWidget(self.container_options_widget)
-
         self.main_layout.addWidget(self.text_field)
         self.main_layout.addWidget(self.container_options_widget)
+        self.main_layout.addWidget(cooldown_container)
+
+
 
         self._content_changed_cb()  # update buttons
 
         self._update_ui()
+
+    def _handle_tts_suppress_enabled_changed(self, checked: bool):
+        self.action_data.tts_suppress_duplicate = checked
+
+    def _handle_tts_suppress_cooldown_changed(self, value: int):
+        self.action_data._tts_suppress_cooldown = value
+
 
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked: bool):
@@ -305,10 +334,41 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
         self.exec_on_press = True  # true if trigger should execute on input press event
         self.exec_on_release = False  # true if trigger should execute on input release event
         self.override_suppress = False  # override suppression flag
+        self._tts_suppress_duplicate = False
+        self._tts_suppress_cooldown = 0
+        self.sound = Sound()
+
+
+
+    @property
+    def tts_suppress_duplicate(self) -> bool:
+        return self._tts_suppress_duplicate
+
+    @tts_suppress_duplicate.setter
+    def tts_suppress_duplicate(self, value: bool):
+        self._tts_suppress_duplicate = value
+        config = gremlin.config.Configuration()
+        config.tts_suppress_enabled = value
+
+    @property
+    def tts_suppress_cooldown(self) -> int:
+        return self._tts_suppress_cooldown
+
+    @tts_suppress_cooldown.setter
+    def tts_suppress_cooldown(self, value: int):
+        self._tts_suppress_cooldown = value
+        config = gremlin.config.Configuration()
+        config.tts_suppress_cooldown = value
 
     def play(self):
-        sound = gremlin.sound.Sound()
-        sound.playPyTTS(self.text, voice=self.voice_name, rate=self.rate, timed_random=self._timed_random)
+
+        # generate the sound file if needed - returns the path to the audio file to play
+        self.sound.playPyTTS(self.text,
+                        voice=self.voice_name,
+                        rate=self.rate,
+                        timed_random=self._timed_random,
+                        supress_duplicate=self._tts_suppress_duplicate,
+                        cooldown_seconds=self._tts_suppress_cooldown)
 
     @property
     def voice_name(self):

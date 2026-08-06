@@ -4672,9 +4672,9 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
 
                 for device in missing_list:
                     index = len(loaded_list)
-                    device = existing_map[device]
-                    device[0] = index
-                    loaded_list[device] = (index, device, True)
+                    data = list(existing_map[device])
+                    data[0] = index
+                    loaded_list[device] = tuple(data)
 
                 # loaded list now contains the loaded info with any missing devices added at the end
                 tab_map = {index: (device, visible) for index, device, visible in loaded_list.values()}

@@ -867,7 +867,8 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         """updates the list of available voices / speakers for the appropriate TTS engines"""
         match self.action_data.mode:
             case PlayMode.CoquiAI:
-                self._update_ktts_speakers()
+                # self._update_ktts_speakers()
+                pass
             case PlayMode.EdgeAI:
                 self._update_etts_genders()
                 self._update_etts_locales()
@@ -1708,15 +1709,25 @@ class PlaySound(gremlin.input_item.AbstractAction):
         return os.path.isfile(wav)
 
     def _parse_xml(self, node, data=None, extra_data=None):
+        """loads data from xml"""
         config = gremlin.config.Configuration()
         mode = safe_read(node, "mode", str, "")
         self.mode = PlayMode.from_string(mode)
-        self.text = None
-        if "text" in node.attrib:
-            self.text = html.unescape(node.get("text"))
+
         speaker = None
         if "speaker" in node.attrib:
             speaker = node.get("speaker")
+
+        # auto convert CoquiAI text to EdgeTTS as Coqui is deprecated
+        if self.mode == PlayMode.CoquiAI:
+            self.mode = PlayMode.EdgeAI
+            # convert speaker to default
+            speaker = "en-US-AriaNeural"
+
+        self.text = None
+        if "text" in node.attrib:
+            self.text = html.unescape(node.get("text"))
+
         self.speaker = speaker  # speaker for AI
         if self.mode == PlayMode.EdgeAI:
             if speaker:

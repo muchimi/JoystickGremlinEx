@@ -3767,10 +3767,10 @@ class InputItemListView(AbstractView):
                             # id update
                             widget._update_container_id()
 
-                            widget.edit.connect(self._create_edit_callback(model_index))
-                            widget.edit_curve.connect(self._create_edit_curve_callback(model_index))
-                            widget.delete_curve.connect(self._create_delete_curve_callback(model_index))
-                            widget.closed.connect(self._create_closed_callback(model_index))
+                            widget.edit.connect(self._create_edit_callback(input_item))
+                            widget.edit_curve.connect(self._create_edit_curve_callback(input_item))
+                            widget.delete_curve.connect(self._create_delete_curve_callback(input_item))
+                            widget.closed.connect(self._create_closed_callback(input_item))
 
                             if verbose:
                                 syslog.info(
@@ -3929,6 +3929,7 @@ class InputItemListView(AbstractView):
         if not gremlin.shared_state.is_running:
             gremlin.util.InvokeUiMethod(self._redraw_index_ui, index)  # ensure on UI thread
 
+
     def _redraw_index_ui(self, index: int):
         """Redraws the view entry at the given index.
 
@@ -3964,41 +3965,43 @@ class InputItemListView(AbstractView):
             if verbose:
                 syslog.info(f"InputItemListView: redraw input item: widget not found for index: [{index}]")
 
-    def _create_edit_callback(self, index: int):
+    def _create_edit_callback(self, input_item: InputItem):
         """Creates a callback handling the edit action of an input widget
 
         :param index the index of the item to create the callback for
         :return callback to be triggered when the item at the provided index
             is selected
         """
-        return lambda x: self._edit_item_cb(index)
+        return lambda x: self._edit_item_cb(input_item)
 
-    def _create_edit_curve_callback(self, index: int):
-        return lambda: self._edit_curve_item_cb(index)
+    def _create_edit_curve_callback(self, input_item:InputItem):
+        return lambda: self._edit_curve_item_cb(input_item)
 
-    def _create_delete_curve_callback(self, index: int):
-        return lambda: self._delete_curve_item_cb(index)
+    def _create_delete_curve_callback(self, input_item: InputItem):
+        return lambda: self._delete_curve_item_cb(input_item)
 
-    def _create_closed_callback(self, index: int):
+    def _create_closed_callback(self, input_item: InputItem):
         """Creates a callback handling the close action of an input widget
 
-        :param index the index of the item to create the callback for
+        :param input_item the input item to create the callback for
         :return callback to be triggered when the item at the provided index
             is selected
         """
 
         # get the index for this widget
-        return lambda x: self._close_item_cb(index)
+        return lambda x: self._close_item_cb(input_item)
 
-    def _close_item_cb(self, index):
+    def _close_item_cb(self, input_item: InputItem):
         """remove a particular input"""
 
+        index = self.model.indexOf(input_item)
         widget: QtWidgets.QWidget = self.widget(index)
         if hasattr(widget, "closed") and widget.receivers("closed"):
             widget.closed.emit(self, index)
             return
 
         # select the widget if it's not selected
+        index = self.model.indexOf(input_item)
         data = self.model.data(index)
         if data and (data.containers or data.input_type == InputType.KeyboardLatched):
             # prompt confirm
@@ -4017,19 +4020,20 @@ class InputItemListView(AbstractView):
         # self.item_closed.emit(self, index, item)  # widget, index, data
         self.removeRow(index)
 
-    def _edit_item_cb(self, index: int):
+    def _edit_item_cb(self, input_item: InputItem):
         """emits the edit event along with the item being edited"""
-        self.item_edit.emit(self, index, self.model.data(index))  # widget, index, data
+        index = self.model.indexOf(input_item)
+        self.item_edit.emit(self, index, input_item)  # widget, index, data
 
-    def _edit_curve_item_cb(self, index: int):
-        input_item = self.model.data(index)
+    def _edit_curve_item_cb(self, input_item : InputItem):
+        index = self.model.indexOf(input_item)
         self.item_edit_curve.emit(self, index, input_item)
         el = gremlin.event_handler.EventListener()
         el.curve_edit.emit(index, input_item)
 
-    def _delete_curve_item_cb(self, index: int):
-        input_item = self.model.data(index)
-        self.item_delete_curve.emit(self, index, self.model.data(index))
+    def _delete_curve_item_cb(self, input_item: InputItem):
+        index = self.model.indexOf(input_item)
+        self.item_delete_curve.emit(self, index, input_item)
         el = gremlin.event_handler.EventListener()
         el.curve_delete.emit(index, input_item)
 
@@ -5611,7 +5615,7 @@ class ActionSet(AbstractCallbackModel):
             if "description" in node.attrib:
                 self.description = html.unescape(node.get("description"))
             if "modelDescription" in node.attrib:
-                self.modelDescription = html.unescape(node.get("modelDescription"))
+                self.setModelDescription(html.unescape(node.get("modelDescription")))
 
         config = gremlin.config.Configuration()
         self.clear()
@@ -7073,6 +7077,7 @@ class ActionSetView(AbstractView):
     def _remove_model_action_data(self, action_data):
         try:
             self.model.remove_action(action_data)
+            self.redraw()
         except Exception:
             pass
 
@@ -9211,6 +9216,10 @@ class ContainerView(AbstractView):
                     # display container widgets in the defined order
                     for model_index in range(container_count):
                         container: AbstractContainer = self.model.itemAt(model_index)
+                        if container is None:
+                            # probably 1 based
+                            items = self.model.getUnfilteredItems()
+                            container = items[model_index] if model_index < len(items) else None
                         assert container is not None, f"Invalid data at model index [{model_index}]"
                         assert container.id in self._widget_map, (
                             f"ContainerView model and UI are not synchronized: widget not found for container id [{container.id}]"

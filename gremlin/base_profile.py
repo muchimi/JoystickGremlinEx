@@ -4445,8 +4445,6 @@ class Profile:
                 device.name = device_name
                 device.device_guid = device_guid
 
-                # Set the correct device type
-                device.type = device_type
                 self.devices[device_guid] = device
             return self.devices[device_guid]
 

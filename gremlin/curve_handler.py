@@ -1646,8 +1646,7 @@ class AxisCurveWidget(QtWidgets.QWidget):
         self.container_options_layout.addWidget(self.curve_type_selection)
 
         # Curve inversion
-        self.curve_inversion = QtWidgets.QPushButton("Invert")
-        self.curve_inversion.clicked.connect(self._invert_curve)
+        self.curve_inversion = gremlin.ui.ui_common.QDataPushButton("Invert", callback=self._invert_curve, tooltip="Inverts the current response curve")
         self.container_options_layout.addWidget(self.curve_inversion)
 
         # Curve symmetry
@@ -2530,7 +2529,7 @@ class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
         :param curve_data: the curve configuration data
         :param parent: the parent widget
         """
-        super().__init__(self.__class__.__name__, parent=parent)
+        super().__init__(self.__class__.__name__, parent=parent, width=640, height=480)
 
         self.setWindowTitle("Curve Editor")
 
@@ -2567,4 +2566,3 @@ class AxisCurveDialog(gremlin.ui.ui_common.QRememberDialog):
             pass
         else:
             super().keyPressEvent(event)
-
