@@ -422,13 +422,15 @@ class PhraseDataManager:
         if phrase:
             if phrase.text:
                 # GUID based sound file
+                verbose = gremlin.config.Configuration().verbose_mode_tts
                 sound_file = phrase.sound_file
                 if not sound_file:
                     # create a unique file for this phrase
                     # file_name = f"{phrase.key}.wav"
                     file_name = f"{phrase.id}.wav"
                     sound_file = os.path.join(self.getSoundFolder(), file_name)
-                    syslog.info(f"Phrase: update sound file: {phrase}")
+                    if verbose:
+                        syslog.info(f"Phrase: update sound file: {phrase}")
                     phrase.sound_file = sound_file
                 key = phrase.key
                 if key not in self._sound_map:

@@ -3973,14 +3973,15 @@ class AxisState:
         """resets the state data"""
         verbose = gremlin.config.Configuration().verbose_mode_joystick
         if verbose:
-            syslog.info("AXIS STATE: reset")
+            syslog.info("AXIS STATE: reset...")
         self._data.clear()
         self._registered_devices.clear()
         self._joystick_input_item_map.clear()
         profile = gremlin.shared_state.current_profile
         if profile:
             self._update_inputs()
-        syslog.info("axis data reset")
+        if verbose:
+            syslog.info("\taxis data reset complete")
 
     def _update_inputs(self):
         """reload all axes on profile load"""

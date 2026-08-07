@@ -1843,17 +1843,15 @@ This setting is also available on a profile by profile basis on the profile tab,
         page_layout.addWidget(verbose_widget)
 
         # verbose modes
-        container_widget, container_layout = gremlin.ui.ui_common.getGridContainer()
-        self._verbose_mode_widgets = {}
-        row = 0
-        col = 0
 
+        self._verbose_mode_widgets = {}
         box = gremlin.ui.ui_common.QBoxFrameLayout(title="Verbose Modes", transparent=True)
 
         modes = [mode for mode in gremlin.types.VerboseMode]
         modes.sort(key=lambda x: x.name.casefold())
 
-        max_col = 6
+
+        width = 0
 
         for mode in modes:
             if mode in (
@@ -1861,19 +1859,21 @@ This setting is also available on a profile by profile basis on the profile tab,
                 gremlin.types.VerboseMode.All,
             ):
                 continue
-            widget = ui_common.QDataCheckbox(mode.name, mode)
             is_checked = self.config.is_verbose_mode(mode)
-            widget.setChecked(is_checked)
-            widget.clicked.connect(self._verbose_set_cb)
-            container_layout.addWidget(widget, row, col)
-            col += 1
-            if col >= max_col:
-                col = 0
-                row += 1
+            widget = ui_common.QDataCheckbox(mode.name, data=mode, callback=self._verbose_set_cb, value=is_checked)
+            w = widget.sizeHint().width()
+            width = max(width, w)
+
             self._verbose_mode_widgets[mode] = widget
 
-        widget = gremlin.ui.ui_common.getHContainer(container_widget, widget_only=True)
-        box.addWidget(widget)
+        for widget in self._verbose_mode_widgets.values():
+            widget.setMinimumWidth(width)
+
+        container_widget = gremlin.ui.ui_common.getFlowContainer(self._verbose_mode_widgets, widget_only=True)
+        box.addWidget(container_widget)
+
+        # widget = gremlin.ui.ui_common.getHContainer(container_widget, widget_only=True)
+        # box.addWidget(widget)
         page_layout.addWidget(box)
 
         widget = ui_common.QDataPushButton("All Off", callback=self._handle_verbose_all_off, tooltip="All options off")
@@ -2488,12 +2488,10 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         # for widget in self._verbose_mode_widgets.values():
         #     widget.setEnabled(checked)
 
-    def _verbose_set_cb(self):
+    def _verbose_set_cb(self, widget, checked : bool):
         # is_checked = self._verbose_mode_widgets[mode].isChecked()
-        widget = self.sender()
         mode = widget.data
-        is_checked = widget.isChecked()
-        self.config.verbose_set_mode(mode, is_checked)
+        self.config.verbose_set_mode(mode, checked)
 
     @QtCore.Slot(bool)
     def _numlock_off(self, checked: bool):

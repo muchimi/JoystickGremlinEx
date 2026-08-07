@@ -1636,7 +1636,9 @@ class VirtualDeviceUsageState:
 
     def reset(self):
         """resets the usage state"""
-        syslog.info("Button State: reset usage state")
+        verbose = gremlin.config.Configuration().verbose_mode_joystick
+        if verbose:
+            syslog.info("Button State: reset usage state")
         # self._button_usage.clear()
         self._button_usage_map.clear()
         self._axis_invert_map.clear()

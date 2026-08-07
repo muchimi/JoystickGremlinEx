@@ -2445,7 +2445,9 @@ class Mapper:
 
         @QtCore.Slot()
         def _select_vjoy(self):
-            self.vjoy_id = self.cb_vjoy_device_selector.currentData()
+            vjoy_id = self.cb_vjoy_device_selector.currentData()
+            syslog.info(f"Selected vjoy ID: {vjoy_id}")
+            self.vjoy_id = vjoy_id
 
         @QtCore.Slot(MapperMode)
         def _rollover_mode_changed(self, mode: MapperMode):
@@ -2531,11 +2533,31 @@ class Mapper:
             container = container_plugins.repository["basic"](input_item)
             input_item.containers.append(container)
 
+            extra_data = {
+                "input_item": input_item,
+                "container": container,
+                "vjoy_id": vjoy_id,
+                "vjoy_input_id": vjoy_input_id,}
+
             # add a vjoy remap action to that container
-            action = action_plugins.repository[vjoy_mapper](container)
-            action.input_type = input_type
-            action.vjoy_input_id = vjoy_input_id
-            action.vjoy_id = vjoy_id
+            match vjoy_input_type:
+                case InputType.JoystickAxis:
+                    vjoy_axis_id = vjoy_input_id
+                    extra_data["vjoy_axis_id"] = vjoy_axis_id
+
+                case InputType.JoystickHat:
+                    vjoy_hat_id = vjoy_input_id
+                    extra_data["vjoy_hat_id"] = vjoy_hat_id
+                    extra_data["vjoy_hat_position"] = (0, 0)
+                    extra_data["vjoy_hat_return_position"] = (0, 0)
+                case InputType.JoystickButton:
+                    vjoy_button_id = vjoy_input_id
+                    extra_data["vjoy_button_id"] = vjoy_button_id
+                case _:
+                    pass
+
+
+            action = action_plugins.repository[vjoy_mapper](container, extra_data)
             container.add_action(action)
 
             # add the new input to the device
@@ -2550,11 +2572,7 @@ class Mapper:
             vjoy_mapper: str = "Vjoy Remap",
             rollover: MapperMode = MapperMode.Unused,
         ):
-            """Creates a 1 to 1 mapping of the given device to the first
-            vJoy device.
-            """
-            import gremlin.base_profile
-            import gremlin.input_item
+            """Creates a 1 to 1 mapping of the given device to the specified VJOY device """
             import gremlin.joystick_handling
 
             try:

@@ -52,6 +52,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 Change: VPC LED action: add non-debug mode execution mode to hide the Virpil LED utility window.
 Change: Virpil folder: adds the plugin version of the VPC LED action to source code control.
 Change: UI: Curve Dialog invert button updated to new style
+Change: UI: Options Dialog: Verbose options layout update
 Change: TTS (legacy) action: add duplication options for playback (defaults to OFF)
 - Fix: API: delay load of joystick device UI causes invalid curve dialog updates for a call that didn't check for a delay load situation (new API in m77).
 - Fix: VPC LED action: change parameters to hex values as the LED tool expects hex values as parameters
@@ -59,6 +60,11 @@ Change: TTS (legacy) action: add duplication options for playback (defaults to O
 - Fix: UI: initial size of curve dialog too small.
 - Fix: UI: update for new API for axis input related triggers (curve, calibration) so they apply to the correct input under the m77 model-view system.
 - Fix: TTS: convert CoquiTTS to EdgeTTS on profile load and pick suitable defaults (Coqui is deprecated and was only available briefly as an experiment in 2025).
+- Fix: LOG: verbose mode for axis lookup on compound input types unable to get virtual axis #.
+- Fix: LOG: attach new verbosity elements to verbosity modes in m77.
+- Fix: Chain Container: invalid type referenced due to incomplete automatic name refactor of condition objects.
+- Fix: 1:1 mapping: vjoy remap action set to vjoy 1 regardless of selected vjoy device.
+ 
 
 
 

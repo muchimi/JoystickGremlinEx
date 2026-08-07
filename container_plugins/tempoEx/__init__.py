@@ -1160,7 +1160,9 @@ More than one action per short press or long press can be added."""
         self.action_sets.add(self.double_action_set, 2) # 2
         self.action_sets.addCallback(self._action_set_changed)
         assert len(self.action_sets) == 3, f"TempoEx container must have exactly 3 action sets: short, long, and double. got {len(self.action_sets)}"
-        syslog.info(f"TempoEx: action set count: {len(self.action_sets)}")
+        verbose = gremlin.config.Configuration().verbose_mode_container
+        if verbose:
+            syslog.info(f"TempoEx: action set count: {len(self.action_sets)}")
 
     def _action_set_changed(self, data):
         """Callback for when the action sets change."""

@@ -3911,7 +3911,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         used_list = state.used_button_list(self.action_data.virtual_device_guid)
 
         for id in range(1, button_count + 1):
-           
+
 
             # else:
             # use used push button
@@ -4250,6 +4250,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _populate_grid_ui(self):
         """updates the usage grid based on current VJOY mappings"""
 
+        if not Shiboken.isValid(self):
+            return
+
         if not self.action_data.grid_visible:
             # nothing to do
             return
@@ -4265,6 +4268,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         used_list = self.usage_state.used_button_list(self.action_data.virtual_device.device_guid)
         # syslog.info(f"populate grid button: [{self.action_data.virtual_device.virtual_id}]  used_list: {used_list}")
         for button_id, widget in self._grid_widgets.items():
+            if not Shiboken.isValid(widget):
+                continue
             used = button_id == self.action_data.vjoy_input_id
             widget.setUsed(used)  # local
             marker = not used and button_id in used_list
@@ -6198,10 +6203,10 @@ Supports axis merging, curved output, command, hat and button mappings.
     functor = VJoyRemapFunctor
     widget = VJoyRemapWidget
 
-    def __init__(self, parent, extra_data: dict = None):
+    def __init__(self, container, extra_data: dict = None):
         """vjoyremap action block"""
-        super().__init__(parent, extra_data=extra_data)
-        self.parent = parent
+        super().__init__(container, extra_data=extra_data)
+        self.parent = container
         self.setPriority(9)
 
         self.id_changed.connect(self._on_id_changed)
@@ -6210,6 +6215,8 @@ Supports axis merging, curved output, command, hat and button mappings.
         state.registerAction(self.id)
 
         # syslog.info(f"VJOY REMAP: create action [{self.id}]")
+
+
 
         self.virtual_device_map = (
             None  # list of all virtual devices that can be used as output   [device_type:DeviceType][index:int] -> device : dinput.DeviceSummary
@@ -6220,12 +6227,31 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._vjoy_input_id: int = 1
         self._vjoy_axis_id = 1
         self._virtual_button_id = 1
+
         self.vjoy_hat_id = 1
         self.vjoy_hat_position = (0, 0)  # hat position as a tuple
         self.vjoy_hat_return_position = (
             0,
             0,
         )  # hat return position - center is the default
+
+
+        if extra_data:
+            # populate from data if provided
+            if "vjoy_id" in extra_data:
+                self._vjoy_id = extra_data["vjoy_id"]
+                self._virtual_device = gremlin.joystick_handling.getDeviceFromVjoyId(self._vjoy_id)
+            if "vjoy_input_id" in extra_data:
+                self._vjoy_input_id = extra_data["vjoy_input_id"]
+            if "vjoy_axis_id" in extra_data:
+                self._vjoy_axis_id = extra_data["vjoy_axis_id"]
+            if "vjoy_hat_id" in extra_data:
+                self.vjoy_hat_id = extra_data["vjoy_hat_id"]
+            if "vjoy_hat_position" in extra_data:
+                self.vjoy_hat_position = extra_data["vjoy_hat_position"]
+            if "vjoy_hat_return_position" in extra_data:
+                self.vjoy_hat_return_position = extra_data["vjoy_hat_return_position"]
+
 
         self.usage_data = gremlin.joystick_handling.VirtualDeviceUsageState()
         input_type: InputType = self.get_input_type()
@@ -6379,6 +6405,11 @@ Supports axis merging, curved output, command, hat and button mappings.
         super().actionDeleted()
 
     @property
+    def vjoy_id(self) -> int:
+        """returns the VJOY device id"""
+        return self._vjoy_id
+
+    @property
     def virtual_id(self):
         """virtual device number"""
         return self.virtual_device.virtual_id if self.virtual_device else -1
@@ -6516,7 +6547,11 @@ Supports axis merging, curved output, command, hat and button mappings.
             if not device:
                 syslog.warning(f"Unable to find device: [{gremlin.util.normalize_guid(self.hardware_device_guid)}]")
                 return None
-            device_stub = f"[{device.name}/{device.get_axis_name(self.hardware_input_id)}]"
+            input_id = self.hardware_input_id
+            if not isinstance(input_id, int):
+                input_id = 1 # compound input like OSC or MIDI or other non-integer input types
+
+            device_stub = f"[{device.name}/{device.get_axis_name(input_id)}]"
 
         if value is not None:
             if verbose:

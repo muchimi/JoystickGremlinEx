@@ -30,11 +30,10 @@ class Ui_Gremlin(object):
 
         # holds the device widget
         self.tab_content_widget = QtWidgets.QWidget()
-        self.tab_content_widget.setContentsMargins(0,0,0,0)
+        self.tab_content_widget.setContentsMargins(0, 0, 0, 0)
         tab_content_layout = QtWidgets.QVBoxLayout(self.tab_content_widget)
-        tab_content_layout.setContentsMargins(0,0,0,0)
+        tab_content_layout.setContentsMargins(0, 0, 0, 0)
         tab_content_layout.setSpacing(0)
-
 
         self.tab_filter_widget = gremlin.ui.ui_common.Buttons.getTabFilterWidget(callback=self._handle_tab_filter, tooltip="Device display Options")
 
@@ -46,23 +45,18 @@ class Ui_Gremlin(object):
         self.devices_tab_header_widget.setObjectName("devices")
         self.devices_tab_header_widget.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
 
-
-        tab_container_widget = gremlin.ui.ui_common.getHContainer([self.tab_filter_widget, self.devices_tab_header_widget],widget_only=True)
+        tab_container_widget = gremlin.ui.ui_common.getHContainer([self.tab_filter_widget, self.devices_tab_header_widget], widget_only=True)
         tab_container_widget.setContentsMargins(0, 0, 0, 0)
         tab_container_widget.setMaximumHeight(30)
 
-
-
         self.device_page_widget = QtWidgets.QStackedWidget()  # holds the device widgets for each device - the index changes with the tab
         self.device_page_widget.setContentsMargins(0, 0, 0, 0)
-
 
         tab_content_layout.addWidget(tab_container_widget)
         tab_content_layout.addWidget(self.device_page_widget)
 
         # blank input for device content
         self.device_page_widget.addWidget(gremlin.ui.ui_common.QEmptyWidget(mode="wait"))  # index 0
-
 
         # bottom status bar
         self.statusbar_widget = QtWidgets.QWidget()
@@ -145,8 +139,8 @@ class Ui_Gremlin(object):
         self.actionOpenGremlinExFolder = QtGui.QAction(main_window)
         self.actionOpenGremlinExFolder.setObjectName("actionOpenGremlinExFolder")
 
-        #self.actionProfileDevices = QtGui.QAction(main_window)
-        #self.actionProfileDevices.setObjectName("actionProfileDevice")
+        # self.actionProfileDevices = QtGui.QAction(main_window)
+        # self.actionProfileDevices.setObjectName("actionProfileDevice")
 
         self.actionGenerate = QtGui.QAction(main_window)
         self.actionGenerate.setObjectName("actionGenerate")
@@ -321,9 +315,9 @@ class Ui_Gremlin(object):
 
     def _handle_tab_filter(self, widget):
         import gremlin.ui.dialogs
+
         dialog = gremlin.ui.dialogs.DeviceDisplayDialog()
         dialog.exec()
-
 
     def _handle_convert_legacy(self):
         import gremlin.profile
@@ -353,7 +347,6 @@ class Ui_Gremlin(object):
         import gremlin.shared_state
         import gremlin.sound
 
-
         # if not ktts.is_available():
         #     gremlin.ui.ui_common.MessageBoxWarning(prompt="AI engine not found on this system.", parent=ui)
         #     return False
@@ -363,7 +356,6 @@ class Ui_Gremlin(object):
         if new_file:
             el = gremlin.event_handler.EventListener()
             el.request_profile_reload.emit(new_file, False)
-
 
         # profile_converter = gremlin.profile.ProfileConverter()
         # profile = gremlin.shared_state.current_profile
@@ -430,7 +422,7 @@ class Ui_Gremlin(object):
         self.actionOpenXmlProfile.setText(_translate("GremlinEx", "&Open profile XML in Editor..."))
         self.actionOpenGremlinExFolder.setText(_translate("GremlinEx", "&Open GremlinEx Folder..."))
         self.actionGenerate.setText(_translate("GremlinEx", "Generate"))
-        #self.actionProfileDevices.setText(_translate("GremlinEx", "Change Visible Devices..."))
+        # self.actionProfileDevices.setText(_translate("GremlinEx", "Change Visible Devices..."))
         self.actionDeviceInformation.setText(_translate("GremlinEx", "Device Information"))
         self.actionAbout.setText(_translate("GremlinEx", "&About..."))
         self.actionManageCustomModules.setText(_translate("GremlinEx", "&Manage Custom Modules"))
@@ -444,7 +436,7 @@ class Ui_Gremlin(object):
         # self.actionViewInput.setText(_translate("GremlinEx","View Input Map"))
         self.actionExit.setText(_translate("GremlinEx", "E&xit"))
         self.actionOptions.setText(_translate("GremlinEx", "&Options"))
-        self.actionCreate1to1Mapping.setText(_translate("GremlinEx", "Create 1:1 mapping"))
+        self.actionCreate1to1Mapping.setText(_translate("GremlinEx", "Create 1:1 mapping..."))
         self.actionLogDisplay.setText(_translate("GremlinEx", "&Log display"))
         self.actionLogEdit.setText(_translate("GremlinEx", "&Log display in editor"))
         # self.actionMergeAxis.setText(_translate("GremlinEx", "&Merge Axis"))

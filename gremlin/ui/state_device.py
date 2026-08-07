@@ -1823,7 +1823,9 @@ class StateData:
 
     def to_xml(self):
         """persists the data to XML"""
-        syslog.info(f"Persisting states to XML - state count: {len(self._data)}")
+        verbose = gremlin.config.Configuration().verbose_mode_state
+        if verbose:
+            syslog.info(f"Persisting states to XML - state count: {len(self._data)}")
         root = ElementTree.Element("states")
         for key in self._data:
             item = self._data[key]

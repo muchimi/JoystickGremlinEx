@@ -4589,8 +4589,11 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         assert isinstance(value, (bool, type(None))), "value must be a boolean or None"
         is_checked = checked if checked is not None else value if value is not None else False
         self.setChecked(is_checked)
-        # if value is not None:
-        #     self.setChecked(value)
+        if callback and isinstance(callback, Callable):
+            sig = inspect.signature(callback)
+            self._callback_param_count = len(sig.parameters)
+        else:
+            self._callback_param_count = 0
         self.stateChanged.connect(self._handle_clicked)
         if tooltip:
             self.setToolTip(tooltip)
@@ -4598,7 +4601,16 @@ class QDataCheckbox(QtWidgets.QCheckBox):
     def _handle_clicked(self):
         checked = self.isChecked()
         if self._callback:
-            self._callback(checked)
+            match self._callback_param_count:
+                case 0:
+                    self._callback()
+                case 1:
+                    self._callback(checked)
+                case 2:
+                    self._callback(self, checked)
+                case _:
+                    raise ValueError("Callback has an unsupported number of parameters, needs 1, 2 or 3")
+
         if self._callbackEx:
             self._callbackEx(self, checked)
 
@@ -11051,7 +11063,9 @@ def getHContainer(
         if not no_stretch:
             stretch = True
     if widget_or_list:
-        if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
+        if isinstance(widget_or_list, dict):
+            widget_or_list = list(widget_or_list.values())
+        if isinstance(widget_or_list, (list, tuple, set)):
             for item in widget_or_list:
                 stretch_factor = None
                 if item is None:
@@ -11162,7 +11176,9 @@ def getVContainer(
         layout.addWidget(QtWidgets.QLabel(label))
         stretch = True
     if widget_or_list:
-        if isinstance(widget_or_list, list) or isinstance(widget_or_list, tuple):
+        if isinstance(widget_or_list, dict):
+            widget_or_list = list(widget_or_list.values())
+        if isinstance(widget_or_list, (list, tuple, set)):
             for item in widget_or_list:
                 if item is None:
                     continue
@@ -11200,10 +11216,13 @@ def getFlowContainer(widget_or_list=None, label=None, widget_only=False):
     layout.setContentsMargins(0, 0, 0, 0)
 
     if widget_or_list:
-        if isinstance(widget_or_list, tuple):
+        if isinstance(widget_or_list, (tuple, set)):
             widget_or_list = [item for item in widget_or_list]
+        elif isinstance(widget_or_list, dict):
+            widget_or_list = list(widget_or_list.values())
         elif not isinstance(widget_or_list, list):
             widget_or_list = [widget_or_list]
+
 
         if label:
             if isinstance(label, str):

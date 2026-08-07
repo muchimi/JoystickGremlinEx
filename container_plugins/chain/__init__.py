@@ -226,7 +226,7 @@ class ChainContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         # ensure proper cycling.
         self.switch_on_press = False
         for cond in container.activation_condition.conditions:
-            if isinstance(cond, gremlin.input_item.InputActionCondition):
+            if isinstance(cond, gremlin.input_item.BaseInputActionCondition):
                 if cond.comparison == "press":
                     self.switch_on_press = True
 
