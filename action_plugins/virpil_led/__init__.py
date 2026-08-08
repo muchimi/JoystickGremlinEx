@@ -1026,6 +1026,12 @@ class VirpilActionFunctor(gremlin.base_profile.AbstractFunctor):
             self._pulse_timer = None
             if self._valid:
                 self._turn_off_leds()
+        try:
+            import gremlin.virpil_led_hid
+
+            gremlin.virpil_led_hid.VirpilLedHid().close_all()
+        except Exception:
+            pass
 
 
     def process_event(self, event: gremlin.event_handler.Event, value: gremlin.actions.Value, extra_data=None):
@@ -1153,28 +1159,50 @@ class VirpilAction(gremlin.input_item.AbstractAction):
         return "FF"
 
     def setState(self, r: int, g: int, b: int, led_id: int):
-        if self.device and self.device.enabled and os.path.isfile(self.virpil_executable):
-            rh = self._channel_to_virpil_hex(r)
-            gh = self._channel_to_virpil_hex(g)
-            bh = self._channel_to_virpil_hex(b)
-            syslog.info(f"VIRPIL: setting LED state: r={rh}, g={gh}, b={bh}, led={led_id}")
+        if not self.device or not self.device.enabled:
+            return
 
-            # LED tool expects hex VID/PID and intensity codes (00/40/80/FF), not 0..255 RGB
-            args = [
-                self.virpil_executable,
-                f"{self.device.vendor_id:04x}",
-                f"{self.device.product_id:04x}",
-                str(led_id),
-                rh,
-                gh,
-                bh,
-            ]
-            syslog.info(f"VIRPIL: {' '.join(args)}")
-            # for diagnostics window
-            # subprocess.Popen(args, creationflags=subprocess.CREATE_NEW_CONSOLE)
+        # Prefer direct HID (keeps device open) — fall back to VPC_LED_Control.exe
+        try:
+            import gremlin.virpil_led_hid
 
-            # no window
-            subprocess.Popen(args, creationflags=subprocess.CREATE_NO_WINDOW)
+            if gremlin.virpil_led_hid.VirpilLedHid().set_led(
+                self.device.vendor_id,
+                self.device.product_id,
+                led_id,
+                r,
+                g,
+                b,
+            ):
+                return
+        except Exception as exc:
+            syslog.warning(f"VIRPIL HID: unavailable, using exe fallback: {exc}")
+
+        if not os.path.isfile(self.virpil_executable):
+            syslog.warning("VIRPIL: LED update failed (HID unavailable and executable missing)")
+            return
+
+        rh = self._channel_to_virpil_hex(r)
+        gh = self._channel_to_virpil_hex(g)
+        bh = self._channel_to_virpil_hex(b)
+        syslog.info(f"VIRPIL: setting LED state via exe: r={rh}, g={gh}, b={bh}, led={led_id}")
+
+        # LED tool expects hex VID/PID and intensity codes (00/40/80/FF), not 0..255 RGB
+        args = [
+            self.virpil_executable,
+            f"{self.device.vendor_id:04x}",
+            f"{self.device.product_id:04x}",
+            str(led_id),
+            rh,
+            gh,
+            bh,
+        ]
+        syslog.info(f"VIRPIL: {' '.join(args)}")
+        # for diagnostics window
+        # subprocess.Popen(args, creationflags=subprocess.CREATE_NEW_CONSOLE)
+
+        # no window
+        subprocess.Popen(args, creationflags=subprocess.CREATE_NO_WINDOW)
 
     def _parse_xml(self, node, data=None, extra_data=None):
         assert node.tag == self.tag, f"Expected tag {self.tag} but got {node.tag}"
