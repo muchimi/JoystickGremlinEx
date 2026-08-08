@@ -18,7 +18,6 @@
 
 from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
-from sympy.benchmarks.bench_meijerint import rate
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.input_item
@@ -165,8 +164,6 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
         self.main_layout.addWidget(self.container_options_widget)
         self.main_layout.addWidget(cooldown_container)
 
-
-
         self._content_changed_cb()  # update buttons
 
         self._update_ui()
@@ -176,7 +173,6 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_tts_suppress_cooldown_changed(self, value: int):
         self.action_data._tts_suppress_cooldown = value
-
 
     @QtCore.Slot(bool)
     def _execute_on_press_changed(self, checked: bool):
@@ -338,8 +334,6 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
         self._tts_suppress_cooldown = 0
         self.sound = Sound()
 
-
-
     @property
     def tts_suppress_duplicate(self) -> bool:
         return self._tts_suppress_duplicate
@@ -363,12 +357,14 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
     def play(self):
 
         # generate the sound file if needed - returns the path to the audio file to play
-        self.sound.playPyTTS(self.text,
-                        voice=self.voice_name,
-                        rate=self.rate,
-                        timed_random=self._timed_random,
-                        supress_duplicate=self._tts_suppress_duplicate,
-                        cooldown_seconds=self._tts_suppress_cooldown)
+        self.sound.playPyTTS(
+            self.text,
+            voice=self.voice_name,
+            rate=self.rate,
+            timed_random=self._timed_random,
+            supress_duplicate=self._tts_suppress_duplicate,
+            cooldown_seconds=self._tts_suppress_cooldown,
+        )
 
     @property
     def voice_name(self):

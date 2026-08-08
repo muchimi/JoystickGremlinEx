@@ -3662,6 +3662,8 @@ class InputItemListView(AbstractView):
         """creates or recreates the contents of the input list view (left side input selector)"""
         if not Shiboken.isValid(self):
             return
+        if not Shiboken.isValid(self._scroll_layout):
+            return
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui_level(1)
         if verbose:
@@ -9388,6 +9390,13 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         """gets the associated item data"""
         return self._input_item
 
+    def clearInputItem(self):
+        """clears the associated item data"""
+        self._input_item = None
+        self._input_type = None
+        self._container_model = None
+        
+
     def setInputItem(self, input_item: InputItem):
         """sets the item data and redraws the control"""
 
@@ -11209,6 +11218,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _handle_widget_registered(self, key, index, widget):
         """called when a mapping widget is added"""
+        pass
 
     def _handle_widget_unregistered(self, key, index, widget):
         """called when a mapping widget is removed"""
@@ -11378,12 +11388,18 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             if widget is None:
                 if self._create_widget_callback:
                     widget = self._create_widget_callback(input_item)
+                    assert widget is not None, f"failed to get a mapping widget via custom callback for [{input_item.display_name}]"
                 else:
                     # create a new widget and register it (this adds it to the page)
                     widget = self._handle_create_widget(input_item)
-                    self.registerWidget(key, widget)
 
-            assert widget is not None, f"failed to get a widget for [{input_item.display_name}]"
+                self.registerWidget(key, widget)
+
+            assert widget is not None, f"failed to get a mapping widget for [{input_item.display_name}]"
+            if __debug__:
+                r_widget = self.getRegisteredWidget(key)
+                assert r_widget == widget, f"Registered widget does not match the expected widget for [{input_item.display_name}]"
+
             return widget
         return None
 
@@ -11414,8 +11430,12 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if input_item:
             widget = self.getInputItemMappingWidget(input_item)
             assert widget is not None, f"failed to get a widget for [{input_item.display_name}]"
-            _key = self.getWidgetKeyForWidget(widget)
-            self.selectRegisteredWidget(widget)  # make it visible
+            result = self.selectRegisteredWidget(widget)
+            if not result:
+                widget = self.getInputItemMappingWidget(input_item)
+                result = self.selectRegisteredWidget(widget)
+                pass
+
             self.setLastSelectedInputItem(input_item)
             self.setLastSelectedWidget(widget)
             widget.redraw()  # update if needed

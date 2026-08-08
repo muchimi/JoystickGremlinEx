@@ -607,43 +607,42 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_command_header_layout = QtWidgets.QHBoxLayout(self.container_command_header_widget)
         self.container_command_header_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.command_one_to_one_button_widget = QtWidgets.QPushButton("Map 1:1")
-        self.command_one_to_one_button_widget.setToolTip(
-            "Maps inputs to outputs 1:1 if the input exists in the output.<br>If the output doesn't exist, the first available slot to import to will be used."
-        )
-        self.command_one_to_one_button_widget.clicked.connect(self._cmd_one_to_one)
+        self.command_one_to_one_button_widget = gremlin.ui.ui_common.QDataPushButton("Map 1:1",
+                                                                                     callback=self._cmd_one_to_one,
+                                                                                      tooltip = "Maps inputs to outputs 1:1 if the input exists in the output.<br>If the output doesn't exist, the first available slot to import to will be used.")
 
-        self.command_deselect_all_button_widget = QtWidgets.QPushButton("Select None")
-        self.command_deselect_all_button_widget.setToolTip("Deselects all imports")
-        self.command_deselect_all_button_widget.clicked.connect(self._cmd_deselect_all)
 
-        self.command_select_all_button_widget = QtWidgets.QPushButton("Select All")
-        self.command_select_all_button_widget.setToolTip("Selects all imports")
-        self.command_select_all_button_widget.clicked.connect(self._cmd_select_all)
+        self.command_deselect_all_button_widget = gremlin.ui.ui_common.QDataPushButton("Select None",
+                                                                                       callback=self._cmd_deselect_all,
+                                                                                       tooltip="Deselects all imports")
+
+        self.command_select_all_button_widget = gremlin.ui.ui_common.QDataPushButton("Select All",
+                                                                                     callback=self._cmd_select_all,
+                                                                                     tooltip="Selects all imports")
 
         width = ui_common.get_text_width("MMMM")
 
         # cmd_resize = QtWidgets.QPushButton("Resize")
         # cmd_resize.clicked.connect(self._resize_map)
 
-        self.command_level_1_button_widget = QtWidgets.QPushButton("L1")
-        self.command_level_1_button_widget.setToolTip("Expand/Collapse to Devices")
-        self.command_level_1_button_widget.clicked.connect(lambda: self._cmd_set_level(1))
+        self.command_level_1_button_widget = gremlin.ui.ui_common.QDataPushButton("L1",
+                                                                                 callback=lambda: self._cmd_set_level(1),
+                                                                                 tooltip="Expand/Collapse to Devices")
         self.command_level_1_button_widget.setMaximumWidth(width)
 
-        self.command_level_2_button_widget = QtWidgets.QPushButton("L2")
-        self.command_level_2_button_widget.setToolTip("Expand/Collapse to Modes")
-        self.command_level_2_button_widget.clicked.connect(lambda: self._cmd_set_level(2))
+        self.command_level_2_button_widget = gremlin.ui.ui_common.QDataPushButton("L2",
+                                                                                 callback=lambda: self._cmd_set_level(2),
+                                                                                 tooltip="Expand/Collapse to Modes")
         self.command_level_2_button_widget.setMaximumWidth(width)
 
-        self.command_level_3_button_widget = QtWidgets.QPushButton("L3")
-        self.command_level_3_button_widget.setToolTip("Expand/Collapse to Inputs")
-        self.command_level_3_button_widget.clicked.connect(lambda: self._cmd_set_level(3))
+        self.command_level_3_button_widget = gremlin.ui.ui_common.QDataPushButton("L3",
+                                                                                 callback=lambda: self._cmd_set_level(3),
+                                                                                 tooltip="Expand/Collapse to Inputs")
         self.command_level_3_button_widget.setMaximumWidth(width)
 
-        self.command_level_4_button_widget = QtWidgets.QPushButton("L4")
-        self.command_level_4_button_widget.setToolTip("Expand/Collapse to Containers")
-        self.command_level_4_button_widget.clicked.connect(lambda: self._cmd_set_level(4))
+        self.command_level_4_button_widget = gremlin.ui.ui_common.QDataPushButton("L4",
+                                                                                 callback=lambda: self._cmd_set_level(4),
+                                                                                 tooltip="Expand/Collapse to Containers")
         self.command_level_4_button_widget.setMaximumWidth(width)
 
         self.container_command_header_layout.addWidget(self.command_one_to_one_button_widget)
@@ -662,16 +661,16 @@ class ImportProfileDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_buttons_layout = QtWidgets.QHBoxLayout(self.container_buttons_widget)
         self.container_buttons_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.clear_profile_widget = QtWidgets.QPushButton("Clear Profile")
-        self.clear_profile_widget.setToolTip("Clears the current profile before import")
-        self.clear_profile_widget.clicked.connect(self._clear_profile)
+        self.clear_profile_widget = gremlin.ui.ui_common.QDataPushButton("Clear Profile",
+                                                                         callback=self._clear_profile,
+                                                                         tooltip="Clears the current profile before import")
 
-        self.import_button_widget = QtWidgets.QPushButton("Import")
-        self.import_button_widget.setToolTip("Imports the mapped items into the current profile")
-        self.import_button_widget.clicked.connect(self._execute_import)
-        self.close_button_widget = QtWidgets.QPushButton("Close")
-        self.close_button_widget.setToolTip("Closes the dialog")
-        self.close_button_widget.clicked.connect(self._close_cb)
+        self.import_button_widget = gremlin.ui.ui_common.QDataPushButton("Import",
+                                                                        callback=self._execute_import,
+                                                                        tooltip="Imports the mapped items into the current profile")
+        self.close_button_widget = gremlin.ui.ui_common.QDataPushButton("Close",
+                                                                      callback=self._close_cb,
+                                                                      tooltip="Closes the dialog")
 
         self.container_buttons_layout.addStretch()
         self.container_buttons_layout.addWidget(self.clear_profile_widget)
@@ -2395,10 +2394,10 @@ class Mapper:
             self.rollover_widget.mode_changed.connect(self._rollover_mode_changed)
             self.mode: MapperMode = self.rollover_widget.mode
 
-            self.execute_button = QtWidgets.QPushButton("Map 1:1")
-            self.execute_button.clicked.connect(self._execute_mapping)
-            self.cancel_button = QtWidgets.QPushButton("Cancel")
-            self.cancel_button.clicked.connect(self.close)
+            self.execute_button = gremlin.ui.ui_common.QDataPushButton("Map 1:1",
+                                                                      callback=self._execute_mapping)
+            self.cancel_button = gremlin.ui.ui_common.QDataPushButton("Cancel",
+                                                                     callback=self.close)
 
             self.container_button_layout.addStretch()
             self.container_button_layout.addWidget(self.execute_button)

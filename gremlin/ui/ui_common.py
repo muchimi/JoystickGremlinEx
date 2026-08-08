@@ -4565,7 +4565,7 @@ class QDataCheckbox(QtWidgets.QCheckBox):
         callback=None,
         callbackEx=None,
         value: bool = None,
-        checked : bool = None, # alt param for value
+        checked: bool = None,  # alt param for value
         tooltip=None,
         parent=None,
     ):
@@ -9803,8 +9803,8 @@ class WidgetCacheTracker:
         self._enabled = config.ui_max_input_enabled
         self._max_widgets = config.ui_max_input_maps  # -1 if disabled
         self._widget_map = {}  # list of widgets
+        self._key_time_map = {}  # map of keys to time stamp
         self._param_map = {}  # list of paramaters to recreate the widget if needed
-        self._widget_queue = collections.deque()
 
         el = gremlin.event_handler.EventListener()
         el.shutdown.connect(self.clear)  # cleanup on shutdown
@@ -9820,12 +9820,12 @@ class WidgetCacheTracker:
             self._max_widgets = max_widgets
             if max_widgets > 0:
                 # remove excess items from the queu
-                while len(self._widget_queue) > max_widgets:
-                    key = self._widget_queue.pop()
+                while len(self._widget_map) > max_widgets:
+                    key = self.oldestKey()
                     self._remove(key)
             else:
                 # unlimited
-                self._widget_queue.clear()
+                self._widget_map.clear()
 
     def addWidget(self, key, widget):
         """adds a widget to the cache and drops the oldest one in round robin style if a cache size is specified
@@ -9854,29 +9854,36 @@ class WidgetCacheTracker:
         if self._enabled and max_widgets > 0:
             # queue check
 
-            if len(self._widget_queue) >= self._max_widgets:
-                while len(self._widget_queue) > max_widgets:
-                    remove_key = self._widget_queue.pop()  # remove the oldest
+            if len(self._widget_map) >= self._max_widgets:
+                while len(self._widget_map) > max_widgets:
+                    oldest_key = self.oldestKey()
                     if verbose:
-                        syslog.info(f"WidgetCache: pop oldest widget key: [{remove_key}] ")
-                    self._remove(remove_key)
+                        syslog.info(f"WidgetCache: pop oldest widget key: [{oldest_key}] ")
+                    self._remove(oldest_key)
             # add to the queue
-            self._widget_queue.append(key)
+
         else:
             # cache disabled
-            if len(self._widget_queue):
-                self._widget_queue.clear()
+            if len(self._widget_map):
+                self._widget_map.clear()
 
         # add to the cache (could also replace)
         self._widget_map[key] = widget
+        self._key_time_map[key] = time.time()
 
         if verbose:
-            syslog.info(f"WidgetCache: added new widget - cache size: {len(self._widget_queue)}  known widgets to the cache: [{len(self._param_map)}]")
+            syslog.info(f"WidgetCache: added new widget - cache size: {len(self._widget_map)}  known widgets to the cache: [{len(self._param_map)}]")
 
     @property
     def cacheEnabled(self) -> bool:
         # true if cache is enabled
         return self._max_widgets >= 0
+
+    def oldestKey(self):
+        """returns the oldest key in the cache based on the time stamp"""
+        if not self._key_time_map:
+            return None
+        return min(self._key_time_map, key=lambda k: self._key_time_map[k])
 
     def _remove(self, key):
         """removes a mapping and notifies the owner"""
@@ -9886,11 +9893,9 @@ class WidgetCacheTracker:
             return
         if key in self._widget_map:
             widget = self._widget_map[key]
-
-            # remove from the queue
-            if key in self._widget_queue:
-                self._widget_queue.remove(key)
             del self._widget_map[key]  # remove from the active widget list
+            del self._key_time_map[key]
+            del self._param_map[key]
 
             if verbose:
                 syslog.info(f"Trigger widget expiration: [{key}]")
@@ -9960,7 +9965,7 @@ class WidgetCacheTracker:
     def clear(self):
         """resets the cache - does not delete widgets from memory"""
         self._widget_map.clear()
-        self._widget_queue.clear()
+        self._key_time_map.clear()
         self._param_map.clear()
 
 
@@ -10004,6 +10009,7 @@ class QSplitTabWidget(QDataWidget):
         self._splitter.splitterMoved.connect(self._splitter_moved)
         self._splitter.setChildrenCollapsible(False)
         self._last_sizes = None
+        self._registered_widget_map = {}  # map of registered widget keys to widgets
 
         self._left_panel_widget, self._left_panel_layout = getVContainer()
         # self._left_panel_widget.setMinimumWidth(200)
@@ -10158,6 +10164,7 @@ class QSplitTabWidget(QDataWidget):
     def registerWidget(self, key, widget) -> int:
         """adds a new config input to the right panel"""
 
+        syslog.info(f"Registering widget with key: [{key}]")
         assert widget is not None, "Invalid widget"
         index = self._right_panel_stacked_widget.indexOf(widget)
         if index != -1:
@@ -10168,6 +10175,7 @@ class QSplitTabWidget(QDataWidget):
         index = self._right_panel_stacked_widget.indexOf(widget)
         self._widget_config_index_map[key] = index
         self._widget_config_device_map[index] = key
+        self._registered_widget_map[key] = widget
 
         if hasattr(widget, "params"):
             # add to the cache and bounce the oldest iteration if a cache limit is set
@@ -10226,12 +10234,16 @@ class QSplitTabWidget(QDataWidget):
 
             self._right_panel_stacked_widget.setCurrentIndex(index)
         else:
-            raise ValueError("Unable to select widget in right panel: missing from right panel - did you register?")
+            widget = None  # raise ValueError("Unable to select widget in right panel: missing from right panel - did you register?")
 
         return widget
 
     def unregisterWidget(self, key):
         """removes a widget from the cleanup list"""
+
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+        if verbose:
+            syslog.info(f"RIGHT PANEL: Unregistering widget with key: [{key}]")
 
         if key in self._widget_config_index_map:
             iis = gremlin.ui.ui_common.WidgetCacheTracker()
@@ -10240,9 +10252,21 @@ class QSplitTabWidget(QDataWidget):
                 iis.removeWidget(key)
             else:
                 index = self._widget_config_index_map[key]
+                widget = self._registered_widget_map[key]
+
+                index = -1
+                for i in range(self._right_panel_stacked_widget.count()):
+                    w = self._right_panel_stacked_widget.widget(i)
+                    if w == widget:
+                        index = i
+                        break
+
                 if index != -1:
                     # this will trigger the expired event on the widget
-                    widget = self._right_panel_stacked_widget.widget(index)
+                    input_item = widget.input_item
+                    input_item.setMappingWidget(None)
+
+                    widget.clearInputItem()
                     self._right_panel_stacked_widget.removeWidget(widget)
 
                     # notify of the deletion
@@ -10255,8 +10279,13 @@ class QSplitTabWidget(QDataWidget):
                     widget.hide()
                     widget.deleteLater()
 
-            del self._widget_config_index_map[key]
-            del self._widget_config_device_map[index]
+            if key in self._widget_config_index_map:
+                del self._widget_config_index_map[key]
+            if key in self._registered_widget_map:
+                del self._registered_widget_map[key]
+            if index != -1 and index in self._widget_config_device_map:
+                del self._widget_config_device_map[index]
+
 
     def getCurrentRegisteredWidgetDevice(self):
         """gets the device ID for the currently selected device widget"""
@@ -10310,14 +10339,16 @@ class QSplitTabWidget(QDataWidget):
                     # widget removed from cache - sync up if needed
                     if key in self._widget_config_index_map:
                         index = self._widget_config_index_map[key]
-                        del self._widget_config_index_map[index]
-                        del self._widget_config_device_map[key]
+                        del self._widget_config_index_map[key]
+                        del self._widget_config_device_map[index]
+                        del self._registered_widget_map[key]
                         widget = self._right_panel_stacked_widget.widget(index)
                         self._right_panel_stacked_widget.removeWidget(widget)
                     return None
 
-            index = self._widget_config_index_map[key]
-            return self._right_panel_stacked_widget.widget(index)
+            # return the registered widget if it exists
+            return self._registered_widget_map.get(key, None)
+
         return None
 
     def getRegisteredWidgetIndex(self, key) -> int:
@@ -11222,7 +11253,6 @@ def getFlowContainer(widget_or_list=None, label=None, widget_only=False):
             widget_or_list = list(widget_or_list.values())
         elif not isinstance(widget_or_list, list):
             widget_or_list = [widget_or_list]
-
 
         if label:
             if isinstance(label, str):

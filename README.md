@@ -48,6 +48,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T25A)
+Fix: UI: resolve cache issue (could cause exception when selecting a new input depending on the cache state)
+Fix: removed spurious import from TTS action
+
 ### (m77T25)
 Change: VPC LED action: add non-debug mode execution mode to hide the Virpil LED utility window.
 Change: Virpil folder: adds the plugin version of the VPC LED action to source code control.

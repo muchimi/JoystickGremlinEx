@@ -202,9 +202,9 @@ class QGatedAxisWidget(QtWidgets.QWidget):
         self.container_slider_widget.setContentsMargins(0, 0, 0, 0)
 
         # configure trigger button
-        self._configure_trigger_widget = QtWidgets.QPushButton("Configure")
+        self._configure_trigger_widget = gremlin.ui.ui_common.QDataPushButton("Configure",
+                                                                              callback=self._trigger_cb)
         self._configure_trigger_widget.setIcon(self._setup_icon)
-        self._configure_trigger_widget.clicked.connect(self._trigger_cb)
         self._show_configuration = show_configuration
         # self._configure_trigger_widget.setVisible(show_configuration)
 
@@ -1227,10 +1227,10 @@ making changes that impact the order of gates or ranges."""
 
         row += 1
         col = 0
-        select_all_widget = QtWidgets.QPushButton("All")
-        select_all_widget.clicked.connect(self._select_all_filters_cb)
-        clear_all_widget = QtWidgets.QPushButton("None")
-        clear_all_widget.clicked.connect(self._clear_all_filters_cb)
+        select_all_widget = gremlin.ui.ui_common.QDataPushButton("All",
+                                                                 callback=self._select_all_filters_cb)
+        clear_all_widget = gremlin.ui.ui_common.QDataPushButton("None",
+                                                                callback=self._clear_all_filters_cb)
         self.container_filter_layout.addWidget(select_all_widget, row, col)
         col += 1
         self.container_filter_layout.addWidget(clear_all_widget, row, col)
