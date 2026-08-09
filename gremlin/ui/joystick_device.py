@@ -45,7 +45,9 @@ import dinput
 
 syslog = logging.getLogger("system")
 
-
+# Prevent stacked Curve Editor dialogs when multiple device tabs still hold
+# stale EventListener.curve_edit connections (cleanup used to skip disconnect).
+_active_curve_dialog = None
 
 
 class BaseJoystickCondition(BaseAbstractCondition):
@@ -1117,30 +1119,46 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """called when deleted"""
         super()._cleanup_ui()
 
-        if gremlin.util.isSignalConnected(self.inputItemListView, "_edit_curve_item_cb"):
-            # self.inputItemListView.item_edit_curve.disconnect(self._edit_curve_item_cb)
-            # self.inputItemListView.item_delete_curve.disconnect(self._delete_curve_item_cb)
+        el = gremlin.event_handler.EventListener()
+        # Always disconnect EventListener slots. The previous gate checked for a
+        # non-existent signal on the list view, so connections (including
+        # curve_edit) accumulated across tab rebuilds and stacked Curve Editors.
+        for signal, slot in (
+            (el.edit_mode_changed, self._handle_edit_mode_changed),
+            (el.config_changed, self._config_changed_cb),
+            (el.lock_inputs, self._handle_lock_inputs),
+            (el.unlock_inputs, self._handle_unlock_inputs),
+            (el.jump_to_mapped_input, self._handle_jump_to_mapped_input),
+            (el.input_filtered_change, self._handle_input_filter_changed),
+            (el.curve_edit, self._edit_curve_item_cb),
+            (el.curve_delete, self._delete_curve_item_cb),
+        ):
+            try:
+                signal.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
 
+        if self.inputItemListView is not None and Shiboken.isValid(self.inputItemListView):
             self.inputItemListView.setParent(None)
             self.inputItemListView.deleteLater()
-
-            el = gremlin.event_handler.EventListener()
-
-            el.edit_mode_changed.disconnect(self._handle_edit_mode_changed)
-            el.config_changed.disconnect(self._config_changed_cb)
-            el.lock_inputs.disconnect(self._handle_lock_inputs)
-            el.unlock_inputs.disconnect(self._handle_unlock_inputs)
-            el.jump_to_mapped_input.disconnect(self._handle_jump_to_mapped_input)
-            el.input_filtered_change.disconnect(self._handle_input_filter_changed)
 
     def _edit_curve_item_cb(self, index : int,  input_item : InputItem):
         """edit curve request"""
         import gremlin.curve_handler
         import gremlin.event_handler
 
+        global _active_curve_dialog
+
+        if not Shiboken.isValid(self):
+            return
+
         assert isinstance(input_item, InputItem), "Invalid input item"
-        if input_item.device_guid != self.device_guid:
+        if gremlin.util.normalize_guid(input_item.device_guid) != gremlin.util.normalize_guid(self.device_guid):
             # not ours
+            return
+
+        # One Curve Editor at a time — stale curve_edit slots must not stack dialogs
+        if _active_curve_dialog is not None and Shiboken.isValid(_active_curve_dialog):
             return
 
         device_guid = input_item.device_guid
@@ -1155,6 +1173,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         dialog = gremlin.curve_handler.AxisCurveDialog(curve_data)
         gremlin.util.centerDialog(dialog, dialog.width(), dialog.height())
+        _active_curve_dialog = dialog
 
         # hook input value changed handler
         self._curve_update_handler = dialog.curve_update_handler
@@ -1166,13 +1185,14 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         jep = gremlin.event_handler.JoystickEventProcessor()
         jep.registerListenerUICallback(device_guid = device_guid, input_id = input_id, input_type = input_item.input_type, callback=self._handle_curve_update)
 
-        # el = gremlin.event_handler.EventListener()
-        # el.joystick_event_ui.connect(self._handle_curve_update)
-
         # disable highlighting
         gremlin.shared_state.push_suspend_highlighting()
         dialog.dialog_closed.connect(self._unhook_curve)
-        dialog.exec()
+        try:
+            dialog.exec()
+        finally:
+            if _active_curve_dialog is dialog:
+                _active_curve_dialog = None
 
         self.curve_update_handler[index] = None
 
@@ -1203,8 +1223,11 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _delete_curve_item_cb(self, index : int, input_item):
         """delete curve request"""
 
+        if not Shiboken.isValid(self):
+            return
+
         assert isinstance(input_item, InputItem), "Invalid input item"
-        if input_item.device_guid != self.device_guid:
+        if gremlin.util.normalize_guid(input_item.device_guid) != gremlin.util.normalize_guid(self.device_guid):
             # not ours
             return
 

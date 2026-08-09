@@ -4253,11 +4253,26 @@ class AxisState:
         return gremlin.joystick_handling.get_axis(device_guid, input_id)
 
     def getAxisCurve(self, device_guid, input_id):
-        """returns the curve data if the axis has a curve applied"""
-        if device_guid:
-            item = self.getItem(device_guid, input_id)
-            if item:
-                return item.curve_data
+        """returns the curve data if the axis has a curve applied for the active mode"""
+        if not device_guid:
+            return None
+
+        # Prefer the profile InputItem for the active mode. AxisState's
+        # registration map is mode-agnostic (last writer wins), so edit-mode
+        # browsing can otherwise hide the runtime mode's input curve.
+        try:
+            profile = gremlin.shared_state.current_profile
+            mode = gremlin.shared_state.current_mode
+            if profile is not None and mode is not None:
+                input_item = profile.getInputItem(device_guid, mode, InputType.JoystickAxis, input_id)
+                if input_item is not None:
+                    return input_item.curve_data
+        except Exception:
+            pass
+
+        item = self.getItem(device_guid, input_id)
+        if item:
+            return item.curve_data
         return None
 
     def getAxisCalibration(self, device_guid, input_id):
@@ -4281,10 +4296,9 @@ class AxisState:
 
     def applyCurve(self, device_guid, input_id, value: float, return_null: bool = True):
         if device_guid:
-            item = self.getItem(device_guid, input_id)
-            if item and item.curve_data:
-                curved_value = item.curve_data.curve_value(value)
-                return curved_value
+            curve_data = self.getAxisCurve(device_guid, input_id)
+            if curve_data:
+                return curve_data.curve_value(value)
 
             # no curve to apply
             if return_null:
