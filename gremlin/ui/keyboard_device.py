@@ -57,7 +57,10 @@ class KeyboardInputItem(InputItem):
         :param mode: the profile mode for this input
         """
         self._key: Key = None  # associated primary key (containing latched items)
-        super().__init__(mode_object, device_guid=KeyboardDeviceTabWidget.device_guid, input_type=InputType.KeyboardLatched)
+        super().__init__(mode_object,
+                         device_guid=KeyboardDeviceTabWidget.device_guid,
+                         input_type=InputType.KeyboardLatched,
+                         custom_input_id_handler = self._handle_input_id_callback)
 
         self._title_name = "Keyboard input (not configured)"
 
@@ -66,6 +69,11 @@ class KeyboardInputItem(InputItem):
         self.setInputIdCallback(self._handle_input_id_callback)
         self.setSortCallback(self._handle_get_sort_key)
         self._update()
+
+    def _handle_input_id_callback(self):
+        """input id is the key for keyboard"""
+        return self._key
+
 
     def _handle_get_sort_key(self, input_item: KeyboardInputItem):
         """sorting key for this input item"""
@@ -77,7 +85,9 @@ class KeyboardInputItem(InputItem):
 
     def _handle_input_id_callback(self):
         """input id is the key for keyboard"""
-        return self._key
+        if self._key is None:
+            return None
+        return self._key.message_key
 
     def getOverrideInputType(self):
         """override type"""
@@ -695,6 +705,35 @@ class KeyboardInputItemModel(gremlin.input_item.InputItemListModel):
             custom_filter_handler=custom_filter_handler,
         )
 
+    def onItemChanged(self, model, index, new_item, old_item, operation):
+        """called when an item in the model changes"""
+        if operation in ("remove"):
+            self._profile.removeInputItem(old_item)
+
+class KeyboardInputItemWidget(gremlin.input_item.InputItemWidget):
+    """Widget for a single keyboard input item"""
+    def __init__(self,
+        input_item : KeyboardInputItem,
+        populate_ui_callback=None,
+        populate_name_callback=None,
+        selection_changed_callback=None,
+        update_callback=None,
+        confirm_delete_callback=None,
+        config_external=False,
+        data=None,
+        parent=None,
+    ):
+        assert isinstance(input_item, KeyboardInputItem), "input_item must be an instance of KeyboardInputItem"
+        super().__init__(input_item = input_item,
+                         populate_ui_callback=populate_ui_callback,
+                         populate_name_callback=populate_name_callback,
+                         selection_changed_callback=selection_changed_callback,
+                         update_callback=update_callback,
+                         confirm_delete_callback=confirm_delete_callback,
+                         config_external=config_external,
+                         data=data,
+                         parent=parent)
+
 
 class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     """Widget used to configure keyboard inputs"""
@@ -729,10 +768,15 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # List of inputs
         model = KeyboardInputItemModel(
-            self.profile, mode=mode, custom_load_handler=self._load_handler, custom_remove_handler=self._remove_handler, custom_filter_handler=self._filter_data
+            self.profile,
+            mode=mode,
+            custom_load_handler=self._load_handler,
+            custom_filter_handler=self._filter_data
         )
 
         self.setInputItemListModel(model)
+
+        self._filter = None
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
@@ -798,6 +842,8 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
+
+
     def _load_handler(self, model: KeyboardInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
 
@@ -816,15 +862,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             model.trigger()  # causes an update
         return True
 
-    def _remove_handler(self, model: KeyboardInputItemModel, index, emit_change=True):
-        """clears a single index"""
-        if index in model._index_map:
-            del model._index_map[index]
-            item = next((key for key, data in model._item_map.items() if data == index), None)
-            if item:
-                del model._item_map[item]
-
-            model._update_filter()
 
     def _filter_data(self, input_item) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
@@ -1107,7 +1144,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         """
 
-        widget = InputItemWidget(
+        widget = KeyboardInputItemWidget(
             input_item=identifier.input_item,
             populate_ui_callback=self._populate_input_widget_ui,
             update_callback=self._update_input_widget,

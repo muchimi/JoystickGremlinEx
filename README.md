@@ -48,6 +48,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T26)
+Fix: Additional pass on UI cache.
+Fix: Keyboard Device: input delete does not delete from profile (API change)
+Fix: OSC Device: input delete does not delete from profile (API change)
+Fix: OSC Device: OSC message is not visible in input
+
 ### (m77T25A)
 Fix: UI: resolve cache issue (could cause exception when selecting a new input depending on the cache state)
 Fix: removed spurious import from TTS action

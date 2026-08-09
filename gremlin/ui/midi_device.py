@@ -207,6 +207,7 @@ class MidiInputItem(gremlin.input_item.InputItemMessage):
         if midi_enabled and not self._interface.started:
             self._interface.start()
 
+
         self._update()
 
     def _on_message_key_changed(self, old_key, new_key):
@@ -220,7 +221,7 @@ class MidiInputItem(gremlin.input_item.InputItemMessage):
             client.registerInput(self)
 
     def _handle_input_id_callback(self):
-        return self
+        return self.message_key
 
 
 
@@ -343,6 +344,7 @@ class MidiInputItem(gremlin.input_item.InputItemMessage):
 
         if node.tag == "input":
             self.parse_xml(node, data, extra_data)
+
 
     def parse_xml(self, node, data=None, extra_data: dict = None):
         """reads an input item from xml"""
@@ -1761,6 +1763,11 @@ class MidiInputItemModel(gremlin.input_item.InputItemListModel):
             custom_remove_handler=custom_remove_handler,
             custom_filter_handler=custom_filter_handler,
         )
+
+    def onItemChanged(self, model, index, new_item, old_item, operation):
+        """called when an item in the model changes"""
+        if operation in ("remove"):
+            self._profile.removeInputItem(old_item)
 
 
 class MidiDeviceTabWidget(BaseDeviceTabWidget):

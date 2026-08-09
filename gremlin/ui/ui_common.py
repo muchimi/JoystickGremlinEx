@@ -10164,7 +10164,10 @@ class QSplitTabWidget(QDataWidget):
     def registerWidget(self, key, widget) -> int:
         """adds a new config input to the right panel"""
 
-        syslog.info(f"Registering widget with key: [{key}]")
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
+        if verbose:
+            syslog.info(f"RIGHT PANEL: Registering widget with key: [{key}]")
+
         assert widget is not None, "Invalid widget"
         index = self._right_panel_stacked_widget.indexOf(widget)
         if index != -1:
@@ -10320,9 +10323,13 @@ class QSplitTabWidget(QDataWidget):
 
         self._widget_config_index_map.clear()
         self._widget_config_device_map.clear()
+        self._registered_widget_map.clear()
 
     def getRegisteredWidget(self, key) -> QWidget:
         """gets the widget for the given device id, None if not found"""
+        if __debug__:
+            # ensure key is hashable
+            _h = hash(key)
         if key in self._widget_config_index_map:
             # see if widget needs to be recreated
             iim = WidgetCacheTracker()
@@ -10341,13 +10348,27 @@ class QSplitTabWidget(QDataWidget):
                         index = self._widget_config_index_map[key]
                         del self._widget_config_index_map[key]
                         del self._widget_config_device_map[index]
+                        widget = self._registered_widget_map.get(key, None)
                         del self._registered_widget_map[key]
-                        widget = self._right_panel_stacked_widget.widget(index)
-                        self._right_panel_stacked_widget.removeWidget(widget)
+                        if widget and Shiboken.isValid(widget):
+                            widget.hide()
+                            self._right_panel_stacked_widget.removeWidget(widget)
+                            gremlin.util.delete_widget(widget)
                     return None
 
             # return the registered widget if it exists
-            return self._registered_widget_map.get(key, None)
+            widget = self._registered_widget_map.get(key, None)
+            if widget and not Shiboken.isValid(widget):
+                # discarded by QT
+                del self._registered_widget_map[key]
+                if key in self._widget_config_index_map:
+                    index = self._widget_config_index_map[key]
+                    del self._widget_config_index_map[key]
+                    if index in self._widget_config_device_map:
+                        del self._widget_config_device_map[index]
+                return None
+
+            return widget
 
         return None
 
@@ -10388,13 +10409,22 @@ class QSplitTabWidget(QDataWidget):
 
     def getWidgetKey(self, input_type, input_id):
         """gets the content widget compound key for the item / input combination"""
-        if isinstance(input_id, list):
-            input_id = tuple(input_id)  # convert to hashable type
+        try:
+            _h = hash(input_id)
+        except Exception as e:
+            input_id = tuple(input_id)
+            try:
+                _h = hash(input_id)
+            except Exception as e:
+                syslog.error(f"Failed to hash input_id after converting to tuple: {input_id} - {e}")
+
         key = (gremlin.shared_state.edit_mode, self._device_id, input_type, input_id)
         if __debug__:
             # ensure key is hashable
-            _h = hash(key)
-
+            try:
+                _h = hash(key)
+            except Exception as e:
+                syslog.error(f"Failed to hash widget key: {key} - {e}")
         return key
 
     def getWidgetKeyForWidget(self, widget):
@@ -15758,7 +15788,7 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
         return self._widget
 
     def setWidget(self, widget: QWidget):
-        if self._widget is not None:
+        if self._widget is not None and widget != self._widget:
             # delete the old widget
             self.removeWidget(self._widget)
             gremlin.util.delete_widget(self._widget)
@@ -15814,56 +15844,58 @@ class AutohideContainer(AutoHideStackedWidget):
     pass
 
 
-class AutoHideIconTextWidget(AutoHideStackedWidget):
+class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
     """autohide label widget - shows a label if text is set, otherwise hides the widget"""
 
     def __init__(self, text: str = None, icon: QtGui.QIcon = None, size: int = 16, style: str = None, tooltip: str = None, data=None, parent=None):
-        super().__init__(data=data, parent=parent)
+        super().__init__(parent=parent)
+        self.data = data
         self._text = text
         self._icon = icon
         self._size = size
         self._css = style
         self._tooltip = tooltip
-        if text is not None:
-            widget = QtWidgets.QLabel(text)
-            if self._css is not None:
-                widget.setStyleSheet(self._css)
-            if icon is not None:
-                widget.setPixmap(icon.pixmap(self._size, self._size))
-            if tooltip is not None:
-                widget.setToolTip(tooltip)
-            self.setWidget(widget)
+        widget = QtWidgets.QLabel(text)
+        if self._css is not None:
+            widget.setStyleSheet(self._css)
+        if icon is not None:
+            widget.setPixmap(icon.pixmap(self._size, self._size))
+        if tooltip is not None:
+            widget.setToolTip(tooltip)
+        self.addWidget(widget)
+        self._widget = widget
+        self._update()
+
+    def _update(self):
+        height = 0
+        if self._text or self._icon:
+            height = max(height, self._widget.sizeHint().height())
+        self.setFixedHeight(height)
+
+
 
     def text(self):
         return self._widget.text() if self._widget is not None else None
 
     def setText(self, text: str, icon: QtGui.QIcon = None, size: int = 16, style: str = None):
-        if text or icon is not None:
-            if self._widget is None:
-                widget = QtWidgets.QLabel(text)
-                self.setWidget(widget)
-                if self._tooltip:
-                    widget.setToolTip(self._tooltip)
-            else:
-                widget = self._widget
-            if style is not None:
-                self._css = style
-            if self._css is not None:
-                widget.setStyleSheet(self._css)
-            if icon:
-                self._icon = icon
-            if size is not None:
-                self._size = size
-            if self._icon is not None:
-                widget.setPixmap(self._icon.pixmap(self._size, self._size))
-            self._widget.setText(text)
+        self._text = text
+        self._icon = icon
+        self._size = size
+        self._css = style
+        self._widget.setStyleSheet(style)
+        self._widget.setText(text)
+        if icon:
+            self.setIcon(icon)
         else:
-            self.setWidget(None)  # hides the widget
+            self._update()
 
     def setIcon(self, icon: QtGui.QIcon):
         self._icon = icon
-        if self._widget is not None:
+        if icon:
             self._widget.setPixmap(icon.pixmap(self._size, self._size))
+        else:
+            self._widget.setPixmap(None)
+        self._update()
 
     def setTooltip(self, tooltip: str):
         self._tooltip = tooltip
@@ -15877,89 +15909,11 @@ class AutoHideIconTextWidget(AutoHideStackedWidget):
 
     def setIconSize(self, size: int):
         self._size = size
-        if self._widget is not None and self._icon is not None:
+        if self._icon is not None:
             self._widget.setPixmap(self._icon.pixmap(self._size, self._size))
+        self._update()
 
 
-# class AutohideContainer(QtWidgets.QStackedWidget):
-#     """container that automatically hides itself if no widget is set"""
-#     sizeChanged = QtCore.Signal()
-#     def __init__(self, data = None, name : str = None, parent=None):
-#         super().__init__(parent=parent)
-#         self.setContentsMargins(0, 0, 0, 0)
-#         self.setSpacing(0)
-#         self.setStyleSheet("")
-#         self._widget_map = {}
-#         self._key_map = {}
-#         self._computed_height = 0
-#         self._name = name
-#         if name:
-#             self.setObjectName(name)
-
-#     def setWidget(self, widget : QWidget):
-#         if widget is not None:
-#             self.addWidget("default", widget)
-#             self.setCurrentWidget(widget)
-#         else:
-#             self.removeWidget(self.getWidget())
-
-#     def getWidget(self):
-#         return self._widget_map.get("default", None)
-
-#     def addWidget(self, key, widget : QWidget ):
-#         layout = self.layout()
-#         if layout is None:
-#             layout = QtWidgets.QVBoxLayout(self)
-#         layout.addWidget(widget)
-#         if key in self._widget_map:
-#             self.removeWidget(self._widget_map[key])
-#         self._widget_map[key] = widget
-#         self._key_map[widget] = key
-#         if isinstance(widget, AutoHideStackedWidget):
-#             widget.sizeChanged.connect(self._update_height)
-#         self._update_height()
-
-
-#     def removeWidget(self, widget : QWidget):
-
-#         if widget in self._key_map:
-#             key = self._key_map[widget]
-#             widget = self._widget_map[key]
-#             layout = self.layout()
-#             if layout is not None:
-#                 layout.removeWidget(widget)
-#                 if isinstance(widget, AutoHideStackedWidget):
-#                     widget.sizeChanged.disconnect(self._update_height)
-#                 widget.setParent(None)
-#             del self._key_map[widget]
-#             del self._widget_map[key]
-#             self._update_height()
-
-#     def addWidgets(self, widget_map : dict):
-#         for key, widget in widget_map.items():
-#             self.addWidget(key, widget)
-
-#     def _update_height(self):
-#         """updates the height of the widget based on the content"""
-#         h = 0
-#         for widget in self._widget_map.values():
-#             h += widget.sizeHint().height()
-#         self._computed_height = h
-#         syslog.info(f"AutohideContainer: {self._name if self._name else 'unnamed'} computed height: {h}")
-
-#         self.sizeChanged.emit()
-#         self.updateGeometry()
-
-
-#     def sizeHint(self):
-#         hint = super().sizeHint()
-#         hint.setHeight(self._computed_height)
-#         return hint
-
-#     def minimumSizeHint(self):
-#         hint = super().minimumSizeHint()
-#         hint.setHeight(self._computed_height)
-#         return hint
 
 
 class AutohideContainerIdWidget(QtWidgets.QStackedWidget):

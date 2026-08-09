@@ -5566,7 +5566,7 @@ class ProfileModeNode:
 
                 item.from_xml(child, item, extra_data)  # send owner item to sub components as the data member
 
-                assert item.input_id is not None, "XML: invalid input id on load"
+                assert item.input_id is not None, f"XML: invalid input id on load: source line: [{child.sourceline}] xml: [{etree.tostring(child, encoding='unicode')}]"
 
                 input_item = self.getInputItem(item.input_type, item.input_id)
 

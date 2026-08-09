@@ -1144,7 +1144,7 @@ class AbstractCallbackModel(AbstractModel):
             self.applyFilter(emit=emit)
             if emit:
                 self._fireChanged()
-            self.onItemChanged(self, index, None, item, "removeAt")
+            self.onItemChanged(self, index, None, item, "remove")
 
     def removeRow(self, index: int, emit=True):
         """removes the entry at the given model index"""

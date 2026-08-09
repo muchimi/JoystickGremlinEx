@@ -2243,9 +2243,14 @@ class OscInputItem(gremlin.input_item.InputItemMessage):
         client.registerInput(self)
         self.setInputIdCallback(self._handle_input_id_callback)
 
+    def onItemChanged(self, model, index, new_item, old_item, operation):
+        """called when an item in the model changes"""
+        if operation in ("remove"):
+            self._profile.removeInputItem(old_item)
+
     def _handle_input_id_callback(self):
         """input id is self for OSC"""
-        return self  # whole input
+        return self.message_key
 
     def to_html(self) -> str:
         """returns reporting graphviz data for this action"""
@@ -2718,6 +2723,7 @@ class OscInputItemWidget(gremlin.input_item.InputItemWidget):
     ):
         # store the get_state_callback to be used by child widgets
         get_state_callback = self._handle_get_state
+        assert isinstance(input_item, OscInputItem), "input_item must be an instance of OscInputItem"
         super().__init__(
             input_item=input_item,
             populate_ui_callback=populate_ui_callback,
@@ -3698,6 +3704,11 @@ class OscInputItemModel(gremlin.input_item.InputItemListModel):
             custom_filter_handler=custom_filter_handler,
         )
 
+    def onItemChanged(self, model, index, new_item, old_item, operation):
+            """called when an item in the model changes"""
+            if operation in ("remove"):
+                self._profile.removeInputItem(old_item)
+
 
 class OscDeviceTabWidget(BaseDeviceTabWidget):
     """Widget used to configure open sound control (OSC) inputs"""
@@ -3742,7 +3753,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             profile=self.profile,
             mode=mode,
             custom_load_handler=self._load_handler,
-            custom_remove_handler=self._remove_handler,
+            # custom_remove_handler=self._remove_handler,
             custom_filter_handler=self._handle_filter_data,
         )
 
@@ -3851,15 +3862,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             model.trigger()  # causes an update
         return True
 
-    def _remove_handler(self, model: OscInputItemModel, index, emit_change=True):
-        """clears a single index"""
-        if index in model._index_map:
-            del model._index_map[index]
-            item = next((key for key, data in model._item_map.items() if data == index), None)
-            if item:
-                del model._item_map[item]
 
-            model._update_filter()
 
     def _handle_filter_data(self, input_item) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
@@ -4268,18 +4271,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         """called when the widget has to update itself on a data change"""
         input_item: OscInputItem = input_widget.input_item
         input_item._update_display_name()
-        # background_color = gremlin.ui.ui_common.Color.entryBackgroundColor()
-        # border_color = gremlin.ui.ui_common.Color.keyBorderColor()
 
-        # css = f"""
-        #     QLabel {{
-        #         background-color: {background_color};
-        #         padding: 4px;
-        #         border-radius: 8px;
-        #         border: solid {background_color};
-        #         margin: 4px;
-        #         }}
-        # """
         css = gremlin.ui.ui_common.Color.cssEntry()
         input_widget.setTitle(input_item.title_name)
         input_widget.setInputDescription(input_item.display_name)
