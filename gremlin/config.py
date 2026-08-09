@@ -1557,6 +1557,11 @@ class Configuration(QtCore.QObject):
         return self.verbose and VerboseMode.OSC in self.verbose_mode
 
     @property
+    def verbose_mode_streamdeck(self):
+        """true if verbose mode includes Stream Deck bridge"""
+        return self.verbose and VerboseMode.StreamDeck in self.verbose_mode
+
+    @property
     def verbose_mode_midi(self):
         """true if verbose mode is in MIDI mode"""
         return self.verbose and VerboseMode.Midi in self.verbose_mode
@@ -2433,6 +2438,24 @@ class Configuration(QtCore.QObject):
         self._data["osc_enabled"] = value
         self._osc_enabled = None  # force a re-read
         self.save()  # save the change
+
+    @property
+    def streamdeck_enabled(self) -> bool:
+        """True if Stream Deck plugin bridge support is enabled"""
+        return self._get_data("streamdeck_enabled", False)
+
+    @streamdeck_enabled.setter
+    def streamdeck_enabled(self, value: bool):
+        self._set_data("streamdeck_enabled", value)
+
+    @property
+    def streamdeck_bridge_port(self) -> int:
+        """Localhost WebSocket port for the Stream Deck plugin bridge"""
+        return self._get_data("streamdeck_bridge_port", 9020)
+
+    @streamdeck_bridge_port.setter
+    def streamdeck_bridge_port(self, value: int):
+        self._set_data("streamdeck_bridge_port", int(value))
 
     @property
     def osc_pad_args(self) -> bool:

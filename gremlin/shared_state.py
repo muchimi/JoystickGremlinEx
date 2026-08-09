@@ -147,6 +147,12 @@ state_tab_id = gremlin.util.normalize_guid(state_tab_guid)
 octavi_tab_guid = gremlin.util.parse_guid('e04aaf53-4838-4763-bc60-d5c7f8e653a1')
 octavi_tab_id = gremlin.util.normalize_guid(octavi_tab_guid)
 
+# UUID namespace for per-physical Stream Deck devices (uuid5 from Elgato device id)
+streamdeck_namespace_guid = gremlin.util.parse_guid('7c3e9a12-4f8b-4d2e-9a61-0b5c8e2d1740')
+# Default / bridge Stream Deck tab when no physical device id is known yet
+streamdeck_tab_guid = gremlin.util.parse_guid('7c3e9a12-4f8b-4d2e-9a61-0b5c8e2d1741')
+streamdeck_tab_id = gremlin.util.normalize_guid(streamdeck_tab_guid)
+
 # fake GUID for fake inputs
 fake_tab_guid = gremlin.util.parse_guid('f7cbbba2-a490-4401-b2bb-1f7f541d9e45')
 fake_tab_id = gremlin.util.normalize_guid(fake_tab_guid)
@@ -179,7 +185,8 @@ virtual_device_guid_type_map = [
     (settings_tab_guid, DeviceType.Settings),
     (midi_tab_guid, DeviceType.Midi),
     (osc_tab_guid, DeviceType.Osc),
-    (mode_tab_guid, DeviceType.ModeControl)
+    (mode_tab_guid, DeviceType.ModeControl),
+    (streamdeck_tab_guid, DeviceType.StreamDeck),
 ]
 
 virtual_device_guid = None
@@ -195,6 +202,7 @@ def _init_special_device_guids():
     _virtual_device_guid_to_name_map[str(settings_tab_guid).casefold()] = "Settings"
     _virtual_device_guid_to_name_map[str(plugins_tab_guid).casefold()] = "Plugins"
     _virtual_device_guid_to_name_map[str(mode_tab_guid).casefold()] = "Modes"
+    _virtual_device_guid_to_name_map[str(streamdeck_tab_guid).casefold()] = "Stream Deck (legacy)"
 
     virtual_device_guid = str(dinput.GUID_Virtual).casefold()
     _virtual_device_guid_to_name_map[virtual_device_guid] = "(VirtualButton)"

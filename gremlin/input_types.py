@@ -35,6 +35,7 @@ class InputType(enum.IntEnum):
     ModeControl = 10  # mode actions
     State = 11  # state input
     OctaviIfr1 = 12  # octavi IFR1
+    StreamDeck = 13  # Elgato Stream Deck via plugin bridge
 
 
     @staticmethod
@@ -92,6 +93,8 @@ class InputType(enum.IntEnum):
                 return "State"
             case InputType.OctaviIfr1:
                 return "IFR1"
+            case InputType.StreamDeck:
+                return "StreamDeck"
             case _:
                 return f"Don't know how to handle {value}"
 
@@ -141,6 +144,7 @@ _InputType_to_string_lookup = {
     InputType.ModeControl: "mode-control",
     InputType.State: "state",
     InputType.OctaviIfr1: "ifr1",
+    InputType.StreamDeck: "streamdeck",
     InputType.Mouse: "mouse",
 }
 
@@ -156,6 +160,7 @@ _InputType_to_display_lookup = {
     InputType.ModeControl: "Mode Control",
     InputType.State: "State",
     InputType.OctaviIfr1: "Octavi IFR1",
+    InputType.StreamDeck: "Stream Deck",
     InputType.Mouse: "Mouse",
 }
 
@@ -175,6 +180,7 @@ _InputType_to_enum_lookup = {
     "mode-control": InputType.ModeControl,
     "state": InputType.State,
     "ifr1": InputType.OctaviIfr1,
+    "streamdeck": InputType.StreamDeck,
     "NotSet": InputType.NotSet,
     "JoystickAxis": InputType.JoystickAxis,
     "Mouse": InputType.Mouse,
@@ -187,4 +193,5 @@ _InputType_to_enum_lookup = {
     "ModeControl": InputType.ModeControl,
     "State": InputType.State,
     "OctaviIfr1": InputType.OctaviIfr1,
+    "StreamDeck": InputType.StreamDeck,
 }

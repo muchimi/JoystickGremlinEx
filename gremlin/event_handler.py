@@ -534,6 +534,9 @@ class EventListener(QtCore.QObject):
     # signal emitted when an OSC input is received
     osc_event = Signal(Event)
 
+    # signal emitted when a Stream Deck plugin bridge input is received
+    streamdeck_event = Signal(Event)
+
     # state event
     state_event = Signal(Event)
 
@@ -2325,6 +2328,7 @@ class EventHandler(QtCore.QObject):
         self.latched_callbacks = {}
         self.midi_callbacks = {}
         self.osc_callbacks = {}
+        self.streamdeck_callbacks = {}
         self.state_callbacks = {}
         self._event_lookup = {}
         self.latched_functors = {}
@@ -2620,6 +2624,22 @@ class EventHandler(QtCore.QObject):
                     self.osc_callbacks[device_guid][mode][key] = []
                 data = self.osc_callbacks[device_guid][mode][key]
                 data.append((self._install_plugins(callback), permanent))
+
+            elif event.event_type == InputType.StreamDeck:
+                # Stream Deck plugin bridge — keyed by message_key like OSC/MIDI
+                # (not in getValidJoystickDevicesMap, so must not use the joystick path)
+                verbose = gremlin.config.Configuration().verbose_mode_streamdeck
+                sd_input = event.identifier
+                key = sd_input.message_key if hasattr(sd_input, "message_key") else str(sd_input)
+                if device_guid not in self.streamdeck_callbacks:
+                    self.streamdeck_callbacks[device_guid] = {}
+                if mode not in self.streamdeck_callbacks[device_guid]:
+                    self.streamdeck_callbacks[device_guid][mode] = {}
+                if key not in self.streamdeck_callbacks[device_guid][mode]:
+                    self.streamdeck_callbacks[device_guid][mode][key] = []
+                self.streamdeck_callbacks[device_guid][mode][key].append((self._install_plugins(callback), permanent))
+                if verbose:
+                    syslog.info(f"STREAMDECK: register callback mode={mode} key={key}")
 
             elif event.event_type == InputType.State:
                 verbose = gremlin.config.Configuration().verbose
@@ -2974,6 +2994,11 @@ class EventHandler(QtCore.QObject):
                             mode_exists = True
 
                 if not mode_exists:
+                    for device in self.streamdeck_callbacks.values():
+                        if new_mode in device:
+                            mode_exists = True
+
+                if not mode_exists:
                     for device in self.midi_callbacks.values():
                         if new_mode in device:
                             mode_exists = True
@@ -3141,6 +3166,7 @@ class EventHandler(QtCore.QObject):
         self.latched_callbacks = {}
         self.midi_callbacks = {}
         self.osc_callbacks = {}
+        self.streamdeck_callbacks = {}
         self.state_callbacks = {}
 
     def execute_event(self, event: Event, skip_execute=False):
@@ -3277,6 +3303,15 @@ class EventHandler(QtCore.QObject):
                 m_list = self._matching_osc_callbacks(event)
                 if verbose_detailed and not (m_list or f_list):
                     syslog.info(f"EVENT: [OSC] no matching inputs for {event.identifier.message_key} mode: {self.runtime_mode}")
+            elif event.event_type == InputType.StreamDeck:
+                m_list = self._matching_streamdeck_callbacks(event)
+                f_list = self._matching_functors(event)
+                if verbose_detailed and not (m_list or f_list):
+                    key = event.identifier.message_key if hasattr(event.identifier, "message_key") else str(event.identifier)
+                    syslog.info(f"EVENT: [StreamDeck] no matching inputs for {key} mode: {self.runtime_mode}")
+                elif verbose and (m_list or f_list):
+                    key = event.identifier.message_key if hasattr(event.identifier, "message_key") else str(event.identifier)
+                    syslog.info(f"EVENT: [StreamDeck] found callbacks for {key} mode: {self.runtime_mode} m: {len(m_list)} f: {len(f_list)}")
             elif event.event_type == InputType.State:
                 m_list = self._matching_state_callbacks(event)
                 if verbose_detailed and not (m_list or f_list):
@@ -3412,6 +3447,30 @@ class EventHandler(QtCore.QObject):
             return [c[0] for c in callback_list if c[1]]
         else:
             return [c[0] for c in callback_list]
+
+    def _matching_streamdeck_callbacks(self, event):
+        """Returns callbacks for Stream Deck plugin-bridge events (message_key lookup)."""
+        callback_list = []
+        if event.event_type == InputType.StreamDeck:
+            identifier = event.identifier
+            key = identifier.message_key if hasattr(identifier, "message_key") else str(identifier)
+            if event.device_guid in self.streamdeck_callbacks:
+                import gremlin.execution_graph
+
+                ec = gremlin.execution_graph.ExecutionContext()
+                callback_list = ec.getCallbacks(self.streamdeck_callbacks[event.device_guid], key, self.runtime_mode)
+
+            config = gremlin.config.Configuration()
+            verbose = config.verbose_mode_streamdeck and config.verbose_mode_extra
+            if verbose and not callback_list:
+                syslog.info(
+                    f"EVENT: STREAMDECK: no callbacks for key: [{key}] mode: [{self.runtime_mode}]. "
+                    "Normal if this button has no mappings."
+                )
+
+        if not self.process_callbacks:
+            return [c[0] for c in callback_list if c[1]]
+        return [c[0] for c in callback_list]
 
     def _matching_state_callbacks(self, event):
         """returns list of callbacks matching the event"""

@@ -107,6 +107,8 @@ While GremlinEx releases are provided as self-contained Python packages, you can
 
 OSC (Open Sound Control) is a very important feature support in GremlinEx that allows it to communicate hardware panels like Elgato Streamdeck via [Bitfocus Companion](https://bitfocus.io/companion).  The feature also provides support for glass surfaces (touch screens) via tools like [Open Stage Control](https://openstagecontrol.ammd.net/).  While supported in the box, it does require some ports to be specified.
 
+For Elgato Stream Deck specifically, GremlinEx also supports a direct [Stream Deck plugin bridge](streamdeck.md) that keeps Stream Deck software running (no Companion required for those keys).
+
 Please see the [OSC configuration section](usage.md#osc-device-open-sound-control) for OSC specific setup to enable this feature.  
 
 ### Virus False positives

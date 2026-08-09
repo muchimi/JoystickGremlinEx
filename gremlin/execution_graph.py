@@ -2151,6 +2151,7 @@ class ContainerCallback:
             InputType.JoystickButton,
             InputType.Midi,
             InputType.OpenSoundControl,
+            InputType.StreamDeck,
             InputType.Keyboard,
             InputType.Mouse,
             InputType.VirtualButton,
