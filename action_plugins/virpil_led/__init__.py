@@ -418,7 +418,9 @@ class VirpilButton:
         option = resolve_led_option(device, self.led_key)
         self.led_id: int = led_id if led_id is not None else (option.led_id if option else 0)
 
-        self.rgb: int = 0
+        self.rgb: int = 0  # activation / blink primary
+        self.deactivation_rgb: int = 0  # color when inactive / after blink stops
+        self.blink_rgb: int = 0  # blink secondary color
 
         self.index: int = index
 
@@ -514,6 +516,8 @@ class VirpilButton:
         node.set("index", safe_format(self.index, int))
         node.set("guid", safe_format(self.id, str))
         node.set("rgb", safe_format(self.rgb, int))
+        node.set("deactivation_rgb", safe_format(self.deactivation_rgb, int))
+        node.set("blink_rgb", safe_format(self.blink_rgb, int))
         return node
 
     def from_xml(self, node):
@@ -523,10 +527,20 @@ class VirpilButton:
         self.index = safe_read(node, "index", int, -1)
         self.id = safe_read(node, "guid", str, gremlin.util.get_guid())
         self.rgb = safe_read(node, "rgb", int, 0)
+        self.deactivation_rgb = safe_read(node, "deactivation_rgb", int, 0)
+        self.blink_rgb = safe_read(node, "blink_rgb", int, 0)
 
     def getRGB(self) -> tuple[int, int, int]:
-        """gets the clamped RGB value from any RGB color"""
-        return self._int_to_rgb(self.rgb)  # clamped value per channel
+        """Activation / blink primary color (clamped)."""
+        return self._int_to_rgb(self.rgb)
+
+    def getDeactivationRGB(self) -> tuple[int, int, int]:
+        """Deactivation / post-blink color (clamped)."""
+        return self._int_to_rgb(self.deactivation_rgb)
+
+    def getBlinkRGB(self) -> tuple[int, int, int]:
+        """Blink secondary color (clamped)."""
+        return self._int_to_rgb(self.blink_rgb)
 
     def __hash__(self):
         return hash(self.id)
@@ -570,7 +584,7 @@ class VirpilActionModel(gremlin.input_item.AbstractCallbackModel):
 
 
 class VirpilButtonWidget(QtWidgets.QWidget):
-    """displays a configured Virpil LED row (label + color)"""
+    """displays a configured Virpil LED row (On / Off / Blink colors)"""
 
     def __init__(self, action_data: VirpilAction, button_data: VirpilButton, index: int = -1, delete_callback: Callable = None, parent=None):
         super().__init__(parent)
@@ -589,14 +603,13 @@ class VirpilButtonWidget(QtWidgets.QWidget):
 
         main_widgets = ["LED:", self.led_label_widget]
 
-        # color
-        self.current_color_widget = QtWidgets.QLabel("     ")
-        self.current_color_widget.setFixedWidth(50)
-        self._update_color()
+        self.on_swatch, self.on_button = self._make_color_controls("On", self._handle_get_on_color)
+        self.off_swatch, self.off_button = self._make_color_controls("Off", self._handle_get_off_color)
+        self.blink_swatch, self.blink_button = self._make_color_controls("Blink", self._handle_get_blink_color)
+        self.blink_label = QtWidgets.QLabel("Blink:")
 
-        self.color_widget = gremlin.ui.ui_common.QDataPushButton("Select Color", callback=self._handle_get_color)
-        main_widgets.append(self.current_color_widget)
-        main_widgets.append(self.color_widget)
+        main_widgets.extend(["On:", self.on_swatch, self.on_button, "Off:", self.off_swatch, self.off_button])
+        main_widgets.extend([self.blink_label, self.blink_swatch, self.blink_button])
 
         if delete_callback is not None:
             delete_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._handle_delete)
@@ -604,24 +617,66 @@ class VirpilButtonWidget(QtWidgets.QWidget):
 
         widget = gremlin.ui.ui_common.getHContainer(main_widgets, widget_only=True, no_stretch=True)
         self.main_layout.addWidget(widget)
+        self._update_colors()
+        self.set_blink_visible(bool(getattr(self.action_data, "blink_enabled", False)))
+
+    def _make_color_controls(self, title: str, callback: Callable):
+        swatch = QtWidgets.QLabel("     ")
+        swatch.setFixedWidth(50)
+        button = gremlin.ui.ui_common.QDataPushButton(f"Select {title}", callback=callback)
+        return swatch, button
 
     def refresh_led_options(self):
         """Refresh the displayed LED label after the parent Virpil device changes."""
         self.button_data.sync_led_to_device(self.action_data.device)
         self.led_label_widget.setText(led_display_label(self.action_data.device, self.button_data.led_key))
 
-    def _handle_get_color(self):
-        color = QColor.fromRgb(self.button_data.rgb)
-        dialog = QColorDialog.getColor(initial=color, parent=self, title="Select a Color")
-        if dialog.isValid():
-            rgb = dialog.rgb()
-            self.button_data.rgb = rgb
-            self._update_color()
+    def set_blink_visible(self, visible: bool):
+        self.blink_label.setVisible(visible)
+        self.blink_swatch.setVisible(visible)
+        self.blink_button.setVisible(visible)
 
-    def _update_color(self):
-        color = QColor.fromRgb(self.button_data.rgb)
+    def _pick_color(self, current_rgb: int, title: str) -> int | None:
+        color = QColor.fromRgb(current_rgb)
+        # Use Qt's dialog, not the Windows native one. Native "Add to Custom Colors"
+        # always overwrites the selected (usually first) custom slot.
+        selected = QColorDialog.getColor(
+            initial=color,
+            parent=self,
+            title=title,
+            options=QColorDialog.ColorDialogOption.DontUseNativeDialog,
+        )
+        if selected.isValid():
+            return selected.rgb()
+        return None
+
+    def _handle_get_on_color(self):
+        rgb = self._pick_color(self.button_data.rgb, "Select On Color")
+        if rgb is not None:
+            self.button_data.rgb = rgb
+            self._update_colors()
+
+    def _handle_get_off_color(self):
+        rgb = self._pick_color(self.button_data.deactivation_rgb, "Select Off Color")
+        if rgb is not None:
+            self.button_data.deactivation_rgb = rgb
+            self._update_colors()
+
+    def _handle_get_blink_color(self):
+        rgb = self._pick_color(self.button_data.blink_rgb, "Select Blink Color")
+        if rgb is not None:
+            self.button_data.blink_rgb = rgb
+            self._update_colors()
+
+    def _paint_swatch(self, widget: QtWidgets.QLabel, rgb: int):
+        color = QColor.fromRgb(rgb)
         border_color = gremlin.ui.ui_common.Color.borderColor()
-        self.current_color_widget.setStyleSheet(f".QLabel {{ background-color: {color.name()}; border: 4px solid {border_color}; }}")
+        widget.setStyleSheet(f".QLabel {{ background-color: {color.name()}; border: 4px solid {border_color}; }}")
+
+    def _update_colors(self):
+        self._paint_swatch(self.on_swatch, self.button_data.rgb)
+        self._paint_swatch(self.off_swatch, self.button_data.deactivation_rgb)
+        self._paint_swatch(self.blink_swatch, self.button_data.blink_rgb)
 
     def _handle_delete(self):
         """handles the delete button click"""
@@ -833,6 +888,22 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
 
+        self.blink_enabled_widget = QtWidgets.QCheckBox("Blink between On and Blink colors")
+        self.blink_enabled_widget.setChecked(bool(self.action_data.blink_enabled))
+        self.blink_enabled_widget.toggled.connect(self._handle_blink_enabled_changed)
+
+        self.blink_while_held_widget = QtWidgets.QCheckBox("Blink while held")
+        self.blink_while_held_widget.setToolTip(
+            "Checked: blink while the button is held, stop on release.\n"
+            "Unchecked: each press toggles blinking on/off (then Off colors)."
+        )
+        self.blink_while_held_widget.setChecked(bool(self.action_data.blink_while_held))
+        self.blink_while_held_widget.toggled.connect(self._handle_blink_while_held_changed)
+
+        self.blink_interval_widget = gremlin.ui.ui_common.QDelayWidget(
+            value=self.action_data.blink_interval_ms, callback=self._handle_blink_interval_changed
+        )
+
         self.main_layout.addWidget(self.output_mode_widget)
         self.main_layout.addWidget(self.device_selector)
 
@@ -852,6 +923,19 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
         # delay widget
         self.pulse_container_widget = gremlin.ui.ui_common.getHContainer(["Pulse Duration (ms):", self.delay_widget], widget_only=True)
         self.main_layout.addWidget(self.pulse_container_widget)
+
+        # blink panel
+        blink_row = gremlin.ui.ui_common.getHContainer(
+            [
+                self.blink_enabled_widget,
+                self.blink_while_held_widget,
+                "Interval (ms):",
+                self.blink_interval_widget,
+            ],
+            widget_only=True,
+        )
+        self.blink_container_widget = blink_row
+        self.main_layout.addWidget(self.blink_container_widget)
 
         self.main_layout.addWidget(self._execute_widget)
 
@@ -888,11 +972,17 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
         has_device = self._has_valid_device()
         pulse_visible = has_device and self.action_data.output_mode == VirpilOutputMode.Pulse
         self.pulse_container_widget.setVisible(pulse_visible)
+        self.blink_container_widget.setVisible(has_device)
+        self.blink_while_held_widget.setEnabled(self.action_data.blink_enabled)
+        self.blink_interval_widget.setEnabled(self.action_data.blink_enabled)
         self.no_device_warning_widget.setVisible(not has_device)
         self.view_widget.setVisible(has_device)
         self.button_bar_widget.setVisible(has_device)
         self.add_widget.setEnabled(has_device)
         self.test_widget.setEnabled(has_device)
+        for widget in self._widget_map.values():
+            if hasattr(widget, "set_blink_visible"):
+                widget.set_blink_visible(bool(self.action_data.blink_enabled))
 
     def _handle_test(self):
         if not self._has_valid_device():
@@ -905,6 +995,16 @@ class VirpilActionWidget(gremlin.input_item.AbstractActionWidget):
 
     def _handle_delay_changed(self, value: int):
         self.action_data.pulse_duration = value
+
+    def _handle_blink_enabled_changed(self, checked: bool):
+        self.action_data.blink_enabled = bool(checked)
+        self._update()
+
+    def _handle_blink_while_held_changed(self, checked: bool):
+        self.action_data.blink_while_held = bool(checked)
+
+    def _handle_blink_interval_changed(self, value: int):
+        self.action_data.blink_interval_ms = max(100, min(25000, int(value)))
 
     def _handle_executable_changed(self):
         fname = self.file_path_widget.text()
@@ -1012,20 +1112,24 @@ class VirpilActionFunctor(gremlin.base_profile.AbstractFunctor):
         self._toggle_state = False
         self._valid = action_data.device and action_data.device.enabled
         self._pulse_timer = None
+        self._blink_timer = None
+        self._blink_phase = False  # False = On/primary, True = Blink secondary
+        self._blinking = False
 
     def profile_start(self):
         self._valid = self.action_data.device and self.action_data.device.enabled
+        self._toggle_state = False
+        self._stop_blink(apply_deactivation=False)
         if self._valid:
-            self._turn_off_leds()
-
-
+            self._apply_deactivation()
 
     def profile_stop(self):
         if self._pulse_timer is not None:
             self._pulse_timer.cancel()
             self._pulse_timer = None
-            if self._valid:
-                self._turn_off_leds()
+        self._stop_blink(apply_deactivation=False)
+        if self._valid:
+            self._apply_deactivation()
         try:
             import gremlin.virpil_led_hid
 
@@ -1033,55 +1137,114 @@ class VirpilActionFunctor(gremlin.base_profile.AbstractFunctor):
         except Exception:
             pass
 
-
     def process_event(self, event: gremlin.event_handler.Event, value: gremlin.actions.Value, extra_data=None):
-
         if not self._valid:
-            # no valid output device
             return False
-        is_pressed = event.is_pressed
-        trigger = self.action_data.exec_on_press and is_pressed or self.action_data.exec_on_release and not is_pressed
 
-        button: VirpilButton
+        is_pressed = bool(event.is_pressed)
         mode = self.action_data.output_mode
 
+        # Blink overlays Hold/Toggle press semantics when enabled
+        if self.action_data.blink_enabled:
+            if self.action_data.blink_while_held:
+                if is_pressed:
+                    self._start_blink()
+                else:
+                    self._stop_blink(apply_deactivation=True)
+            else:
+                # Momentary toggle: each press starts/stops blinking
+                if is_pressed:
+                    if self._blinking:
+                        self._stop_blink(apply_deactivation=True)
+                    else:
+                        self._start_blink()
+            return True
 
         match mode:
             case VirpilOutputMode.Hold:
-                for button in self.action_data.model:
-                    if trigger:
-                        r, g, b = button.getRGB()
-                    else:
-                        # turn off
-                        r, g, b = 0, 0, 0
-
-                    self.action_data.setState(r, g, b, button.led_id)
+                # Always honor both edges so Off colors apply on release
+                if is_pressed:
+                    self._apply_activation()
+                else:
+                    self._apply_deactivation()
             case VirpilOutputMode.Pulse:
-                if trigger:
-                    for button in self.action_data.model:
-                        r, g, b = button.getRGB()
-                        self.action_data.setState(r, g, b, button.led_id)
-                    self._pulse_timer = threading.Timer(self.action_data.pulse_duration / 1000.0, self._turn_off_leds)
+                if is_pressed:
+                    self._apply_activation()
+                    if self._pulse_timer is not None:
+                        self._pulse_timer.cancel()
+                    self._pulse_timer = threading.Timer(
+                        max(1, int(self.action_data.pulse_duration)) / 1000.0,
+                        self._apply_deactivation,
+                    )
+                    self._pulse_timer.daemon = True
                     self._pulse_timer.start()
-
-                # no further action needed here as the timer will handle turning off the LEDs
             case VirpilOutputMode.Toggle:
-                if trigger:
+                if is_pressed:
                     self._toggle_state = not self._toggle_state
                     if self._toggle_state:
-                        for button in self.action_data.model:
-                            r, g, b = button.getRGB()
-                            self.action_data.setState(r, g, b, button.led_id)
+                        self._apply_activation()
                     else:
-                        for button in self.action_data.model:
-                            self.action_data.setState(0, 0, 0, button.led_id)
+                        self._apply_deactivation()
 
         return True
 
-    def _turn_off_leds(self):
-        if self._valid:
-            for button in self.action_data.model:
-                self.action_data.setState(0, 0, 0, button.led_id)
+    def _apply_activation(self):
+        if not self._valid:
+            return
+        for button in self.action_data.model:
+            r, g, b = button.getRGB()
+            self.action_data.setState(r, g, b, button.led_id)
+
+    def _apply_deactivation(self):
+        if not self._valid:
+            return
+        for button in self.action_data.model:
+            r, g, b = button.getDeactivationRGB()
+            self.action_data.setState(r, g, b, button.led_id)
+
+    def _apply_blink_phase(self):
+        if not self._valid:
+            return
+        for button in self.action_data.model:
+            if self._blink_phase:
+                r, g, b = button.getBlinkRGB()
+            else:
+                r, g, b = button.getRGB()
+            self.action_data.setState(r, g, b, button.led_id)
+
+    def _blink_interval_sec(self) -> float:
+        ms = int(getattr(self.action_data, "blink_interval_ms", 500) or 500)
+        ms = max(100, min(25000, ms))
+        return ms / 1000.0
+
+    def _start_blink(self):
+        self._stop_blink(apply_deactivation=False)
+        self._blinking = True
+        self._blink_phase = False
+        self._apply_blink_phase()
+        self._schedule_blink_tick()
+
+    def _schedule_blink_tick(self):
+        if not self._blinking:
+            return
+        self._blink_timer = threading.Timer(self._blink_interval_sec(), self._blink_tick)
+        self._blink_timer.daemon = True
+        self._blink_timer.start()
+
+    def _blink_tick(self):
+        if not self._blinking or not self._valid:
+            return
+        self._blink_phase = not self._blink_phase
+        self._apply_blink_phase()
+        self._schedule_blink_tick()
+
+    def _stop_blink(self, apply_deactivation: bool = True):
+        self._blinking = False
+        if self._blink_timer is not None:
+            self._blink_timer.cancel()
+            self._blink_timer = None
+        if apply_deactivation and self._valid:
+            self._apply_deactivation()
 
 
 class VirpilAction(gremlin.input_item.AbstractAction):
@@ -1092,7 +1255,7 @@ class VirpilAction(gremlin.input_item.AbstractAction):
     hint = "Virpil LED action plugin."
 
     # trigger condition (trigger_on_press, trigger_on_release)
-    default_button_activation = (True, False)
+    default_button_activation = (True, True)
 
     input_types = [
         InputType.JoystickButton,
@@ -1114,7 +1277,10 @@ class VirpilAction(gremlin.input_item.AbstractAction):
         self.output_mode: VirpilOutputMode = VirpilOutputMode.Hold
         self.pulse_duration: int = 1000  # duration of the pulse in milliseconds
         self.exec_on_press = True  # true if trigger should execute on input press event
-        self.exec_on_release = False  # true if trigger should execute on input release event
+        self.exec_on_release = True  # release needed for Off colors / blink-while-held
+        self.blink_enabled = False
+        self.blink_interval_ms = 500
+        self.blink_while_held = True
 
     @property
     def device_id(self) -> str:
@@ -1220,8 +1386,11 @@ class VirpilAction(gremlin.input_item.AbstractAction):
         self.output_mode = VirpilOutputMode.from_string(safe_read(node, "output_mode", str, "hold"))
 
         self.exec_on_press = safe_read(node, "exec_on_press", bool, True)
-        self.exec_on_release = safe_read(node, "exec_on_release", bool, False)
+        self.exec_on_release = safe_read(node, "exec_on_release", bool, True)
         self.pulse_duration = safe_read(node, "pulse_duration", int, 1000)
+        self.blink_enabled = safe_read(node, "blink_enabled", bool, False)
+        self.blink_while_held = safe_read(node, "blink_while_held", bool, True)
+        self.blink_interval_ms = max(100, min(25000, safe_read(node, "blink_interval_ms", int, 500)))
 
     def _generate_xml(self):
         node = ElementTree.Element(self.tag)
@@ -1230,6 +1399,9 @@ class VirpilAction(gremlin.input_item.AbstractAction):
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))
         node.set("pulse_duration", safe_format(self.pulse_duration, int))
+        node.set("blink_enabled", safe_format(self.blink_enabled, bool))
+        node.set("blink_while_held", safe_format(self.blink_while_held, bool))
+        node.set("blink_interval_ms", safe_format(self.blink_interval_ms, int))
         node.append(self.model.to_xml())
 
         return node
