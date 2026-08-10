@@ -1733,7 +1733,7 @@ class StateData:
             nonlocal used, key, used_list
             import gremlin.input_item
 
-            if isinstance(condition, gremlin.input_item.BaseStateCondition):
+            if isinstance(condition, BaseStateCondition):
                 if condition.key == key:
                     used = True  # state is used
                     if return_usage:

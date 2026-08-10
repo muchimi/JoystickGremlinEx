@@ -297,7 +297,7 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
 class TextToSpeech(gremlin.input_item.AbstractAction):
     """Action representing a single TTS entry."""
 
-    name = "Text to Speech"
+    name = "(legacy) Text to Speech"
     tag = "text-to-speech"
     hint = "Converts a text string to voice using the TTS API."
 
@@ -362,7 +362,7 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
             voice=self.voice_name,
             rate=self.rate,
             timed_random=self._timed_random,
-            supress_duplicate=self._tts_suppress_duplicate,
+            suppress_duplicate=self._tts_suppress_duplicate,
             cooldown_seconds=self._tts_suppress_cooldown,
         )
 

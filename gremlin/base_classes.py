@@ -943,8 +943,8 @@ class AbstractCallbackModel(AbstractModel):
 
 
         # assume no filters
-        self._filtered_index_map = TriggerDict()
-        self._filtered_item_map = TriggerDict()
+        self._filtered_index_map = TriggerDict() # map of index : int to item : object
+        self._filtered_item_map = TriggerDict() # map of item : object to index : int
 
         self._filtered_callback: Callable = None
         self._sort_callback: Callable = None
@@ -1122,18 +1122,32 @@ class AbstractCallbackModel(AbstractModel):
 
         self.onItemChanged(self, index, item, old_item, "place")
 
+    def _reindex(self):
+        """reorders the indices in the model to be consecutive starting from 0"""
+        for new_index, item in enumerate(self._index_map.values()):
+            self._item_map[item] = new_index
+        self._index_map = {new_index: item for new_index, item in enumerate(self._index_map.values())}
+        self.applyFilter(emit=False) # update filtered data as well
+        syslog.info("Reindex results:")
+        for index, item in self._filtered_index_map.items():
+            syslog.info(f"Filtered index [{index}] maps to item [{item}]")
+
+
+
     def remove(self, item, emit=True):
         """Removes the given entry from the model."""
         if item in self._item_map:
-            syslog.info(f"removing item {item.id} from model {self.id} current count: {self.count()}")
+
+            # syslog.info(f"removing item {item.id} from model {self.id} current count: {self.count()}")
             index = self._item_map[item]
             if hasattr(item, "_cleanup"):
                 item._cleanup()
             del self._item_map[item]
             del self._index_map[index]
-            self.applyFilter(emit=emit)
+            # reorder indices
+            self._reindex()
             assert item not in self._item_map, "item not removed from model"
-            syslog.info(f"item {item.id} removed from model {self.id} new count: {self.count()}")
+            # syslog.info(f"item {item.id} removed from model {self.id} new count: {self.count()}")
             if emit:
                 self._fireChanged()
             self.onItemChanged(self, index, None, item, "remove")
@@ -1146,7 +1160,7 @@ class AbstractCallbackModel(AbstractModel):
                 item._cleanup()
             del self._item_map[item]
             del self._index_map[index]
-            self.applyFilter(emit=emit)
+            self._reindex()
             if emit:
                 self._fireChanged()
             self.onItemChanged(self, index, None, item, "remove")
@@ -1476,6 +1490,14 @@ class AbstractCallbackModel(AbstractModel):
     def getUnfilteredItems(self):
         """returns the list of unfiltered items"""
         return self._index_map.values()
+
+    def getSequentialItemIndex(self, index : int):
+        """returns the item by sequential index in the filtered list """
+        items = list(self._filtered_index_map.values())
+        if index >= 0 and index < len(items):
+            return items[index]
+        return None
+
 
     def getFilteredMap(self):
         """gets index,input_item tuples for all filtered items in the model"""

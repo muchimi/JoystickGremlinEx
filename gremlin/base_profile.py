@@ -4673,8 +4673,18 @@ class Profile:
                 backup_file = os.path.join(backup_path, f"{base_name}.{backup_count}.xml")
                 try:
                     shutil.copyfile(use_name, backup_file)
-                    # verbose = gremlin.config.Configuration().verbose
-                    # if verbose:
+                    ext_list = ["json", ".calib"]
+                    for ext in ext_list:
+                        json_source = gremlin.util.swap_ext(use_name, ext)
+                        json_target = gremlin.util.swap_ext(backup_file, ext)
+                        if os.path.exists(json_source):
+                            try:
+                                shutil.copyfile(json_source, json_target)
+                            except Exception as e:
+                                syslog.error(f"BACKUP: Failed to copy companion file {ext}: {e}")
+
+
+
                     syslog.info(f"BACKUP: Saved backup profile: {gremlin.util.toUrl(backup_file)}")
                 except Exception as err:
                     syslog.error(f"BACKUP: save error: Unable to backup profile: [{gremlin.util.toUrl(backup_file)}]")
@@ -4978,8 +4988,8 @@ class Profile:
                     for input_type in mode_object.config:
                         for item in mode_object.config[input_type].values():
                             result = self._filter_actions_input_item(item, tag_or_list, callback, extra_data)
-                            if not result:
-                                return
+
+
 
     def _filter_conditions_input_item(self, input_item: InputItem, callback, extra_data: dict = None) -> bool:
         """extracts all conditions from the profile and executes the callback for each condition found - if the callback returns false, the chain exits"""
@@ -5250,6 +5260,22 @@ class Profile:
 
 
         tree.write(save_fname, encoding="utf-8", xml_declaration=True, pretty_print=True)
+
+        # companion files
+        ext_list = ["json", ".calib"]
+        for ext in ext_list:
+            source = gremlin.util.swap_ext(fname, ext)
+            target = gremlin.util.swap_ext(save_fname, ext)
+            if os.path.exists(source):
+                try:
+                    shutil.copyfile(source, target)
+                except Exception as e:
+                    syslog.error(f"BACKUP: Failed to copy companion file {ext}: {e}")
+
+
+
+
+
         return save_fname
 
 
@@ -5259,8 +5285,7 @@ class Profile:
         if not os.path.isfile(fname):
             return False
 
-        from gremlin.types import PlayMode
-        import gremlin.tts
+
         import gremlin.ui.ui_common
         from PySide6 import QtWidgets
 

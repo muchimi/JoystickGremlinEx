@@ -6195,6 +6195,7 @@ class VjoyRemap(gremlin.input_item.AbstractAction):
     """Action remapping physical joystick inputs to vJoy inputs."""
 
     name = "Vjoy Remap"
+    aliases = ["Vjoy Remap","Map to Vjoy"]
     tag = "vjoyremap"
     hint = """Advanced VJOY mapper.
 This action maps an input to a VJOY device.

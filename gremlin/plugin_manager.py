@@ -267,6 +267,10 @@ class ActionPlugins:
     def _create_action_name_map(self):
         """Creates a lookup table from action names to actions."""
         for entry in self._plugins.values():
+            if hasattr(entry, "aliases"):
+                for alias in entry.aliases:
+                    self._name_to_type_map[alias] = entry
+            self._name_to_type_map[entry.name] = entry
             self._name_to_type_map[entry.name] = entry
             self._tag_to_type_map[entry.tag] = entry
 

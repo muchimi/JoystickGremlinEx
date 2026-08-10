@@ -371,7 +371,7 @@ class RemapFunctor(gremlin.base_profile.AbstractFunctor):
 class Remap(gremlin.input_item.AbstractAction):
     """Action remapping physical joystick inputs to vJoy inputs."""
 
-    name = "Remap"
+    name = "(legacy) Remap"
     tag = "remap"
     hint = """Legacy VJOY mapper.
 Use Vjoy Remap instead."""

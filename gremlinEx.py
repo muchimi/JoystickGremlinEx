@@ -478,6 +478,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if os.path.isfile(self._comparative_file):
             os.unlink(self._comparative_file)
 
+
     def handle_tab_selected(self, device_guid):
         """persists the last selected device for the profile"""
         if self.profile:

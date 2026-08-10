@@ -48,6 +48,18 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T27)
+New: Actions API: add aliases for supported actions (allows multiple names for a given action to facilitate searching/on boarding).
+Change: UI: prompt on action delete.
+Fix: VJoy Remap Action: "next unused" did not search complete profile
+Fix: State Device: missing type reference on state conditions
+Fix: API: update indexing on model delete
+Fix: TTS (legacy) Action: typo in parameter
+Fix: TTS (legacy) conversion tool: include profile companion files when converting  TTS legacy to new.
+Fix: API: (backup) include profile companion files in automatic profile backups.
+Fix: Play Sound: provide suitable default when changing TTS engine modes.
+
+
 ### (m77T26)
 Fix: Additional pass on UI cache.
 Fix: Keyboard Device: input delete does not delete from profile (API change)

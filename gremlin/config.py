@@ -84,6 +84,8 @@ class Configuration(QtCore.QObject):
         self._app_path = None  # path where data is stored
         self._profile_path = self.data_path()
         self._visuals_hidden_map = None
+        self._last_version = None # version string of the last version that ran
+        self._last_version_path = None # path to last used version
 
         self._midi_enabled = None
         self._osc_enabled = None
@@ -114,6 +116,7 @@ class Configuration(QtCore.QObject):
         self._last_reload = None
         self._last_profile_reload = None
         data_path = self.data_path()
+        self.getLastVersion()
         gremlin.shared_state.data_path = data_path
 
         self.watcher = QtCore.QFileSystemWatcher([fname])
@@ -228,9 +231,76 @@ class Configuration(QtCore.QObject):
             )  # can be blank
         return f"{app_main}_{app_base}" if app_base else app_main
 
+
+    def ensureProfilePath(self):
+        if not self._profile_path:
+            user_profile_path = os.path.abspath(
+                os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex")
+            )
+            self._profile_path = user_profile_path
+            os.path.makedirs(self._profile_path, exist_ok=True)
+
     def versionString(self):
         """returns the version string for the current application"""
+        self.ensureProfilePath()
         return self._clean_version()
+
+
+    def ensureVersion(self):
+        """ensures that the data folder for the current version exists and copies data from the previous version if necessary"""
+        self.ensureProfilePath()
+        self.getLastVersion()
+        current_data_path = self.data_path()
+        if not os.path.isdir(current_data_path):
+            try:
+                os.makedirs(current_data_path)
+                self.saveVersion()
+            except Exception as err:
+                syslog.error(f"Unable to create data folder for current version: {err}")
+                sys.exit(-1)
+
+    def getVersionFile(self):
+        """returns the path to the last version file"""
+        self.ensureProfilePath()
+        return os.path.join(self._profile_path, "version.json")
+
+
+
+    def getLastVersion(self):
+        if self._last_version is None:
+            version_file = self.getVersionFile()
+            if os.path.isfile(version_file):
+                try:
+                    with open(version_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+
+                    self._last_version = data.get("last_version", None)
+                    self._last_version_path = data.get("last_version_path", None)
+                    if not self._last_version:
+                        self._last_version = self.versionString()
+                        self._last_version_path = self.data_path()
+
+                    syslog.info(f"CONFIG: last version found: {self._last_version }")
+                except Exception as err:
+                    syslog.error(f"Unable to read last version file: {err}")
+
+            # save the new version
+            self.saveVersion()
+        return self._last_version
+
+    def saveVersion(self):
+        """saves the current version information to the version file"""
+        version_file = self.getVersionFile()
+        data = {
+            "last_version": self.versionString(),
+            "last_version_path": self.data_path(),
+        }
+        try:
+            self.ensureProfilePath()
+            with open(version_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4)
+        except Exception as err:
+            syslog.error(f"Unable to save version file: {err}")
 
 
     def data_path(self):
@@ -254,6 +324,7 @@ class Configuration(QtCore.QObject):
                 if not os.path.isdir(app_path):
                     try:
                         os.makedirs(app_path)
+
                     except Exception:
                         print(
                             f"Error: unable to create application data folder: {app_path}",
@@ -415,6 +486,7 @@ class Configuration(QtCore.QObject):
         if self._lock:
             # ignore concurrent save requests (technically not necessary due to UI thread placement)
             return
+        self.ensureProfilePath()
         data_path = self.data_path()
         tmp = os.path.join(data_path, "temp")
         os.makedirs(tmp, exist_ok=True)
@@ -431,6 +503,15 @@ class Configuration(QtCore.QObject):
                 hdl.write(encoder.encode(self._data))
                 hdl.flush()
                 hdl.close()
+
+            self._last_version_path = self.data_path()
+            last_version_file = os.path.join(self._profile_path, "version.json")
+            try:
+                json.dump({"last_version_path": self._last_version_path}, open(last_version_file, "w", encoding="utf-8"))
+            except Exception as ex:
+                syslog.error(f"CONFIG: unable to write last version file: {last_version_file}")
+                syslog.error(ex)
+
         except Exception as ex:
             syslog.error(f"CONFIG: unable to save file: {fname}")
             syslog.error(ex)

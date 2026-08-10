@@ -873,6 +873,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                 self._update_etts_genders()
                 self._update_etts_locales()
                 self._update_etts_speakers()
+
             case PlayMode.PyTTS:
                 self._update_ptts_speakers()
 
@@ -972,12 +973,12 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
             config = gremlin.config.Configuration()
             voices: dict[str, EdgeTTSVoice] = self._get_etts_filtered_voices()
             etts = gremlin.sound.EdgeTTS()
-            current_voice = etts.getVoice(self.etts_speaker_widget.currentText())
+            current_voice = etts.getVoice(self.action_data.etts_speaker)
             if current_voice:
                 if current_voice.gender != self.action_data.etts_gender or current_voice.locale != self.action_data.etts_locale:
                     voice = list(voices.values())[0]
                     self.action_data.etts_speaker = voice.short_name
-                    self.action_data.speaker = voice.short_name
+                    self.action_data.etts_speaker = voice.short_name
 
             with QtCore.QSignalBlocker(self.etts_speaker_widget):
                 self.etts_speaker_widget.clear()
@@ -986,8 +987,8 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                     for voice in voices.values():
                         speaker = voice.short_name
                         self.etts_speaker_widget.addItem(speaker, speaker)
-                    if self.action_data.speaker:
-                        speaker = self.action_data.speaker
+                    if self.action_data.etts_speaker:
+                        speaker = self.action_data.etts_speaker
                     else:
                         speaker = config.ai_etts_last_speaker
                     index = self.etts_speaker_widget.findText(speaker)
@@ -1257,6 +1258,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
     tag = "play-sound"
     hint = "Play a sound."
 
+    DEFAULT_ETTS_SPEAKER = "en-US-JennyNeural"  # default Edge TTS speaker
+
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
 
@@ -1283,7 +1286,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self.mode = PlayMode.AudioFile
         self.auto_generate = True  # automatically generate AI voice when text changes (valid for some modes only)
         self.text = None  # text to speech for AI mode
-        self.speaker = None  # text to speech AI speaker
+        self._pytts_speaker = None  # speaker for PyTTS
         self._sound_file = None  # the sound file to play in audio mode
         self._sound_files = []  # list of sound files to pick from if in folder mode
         self._tts_file = None  # sound file for TTS
@@ -1330,6 +1333,16 @@ class PlaySound(gremlin.input_item.AbstractAction):
             self.device_map[index] = device
 
         self.sound = Sound()
+
+    @property
+    def speaker(self) -> str:
+        match self.mode:
+            case PlayMode.EdgeAI:
+                return self._etts_speaker
+            case PlayMode.PyTTS:
+                return self._pytts_speaker
+            case _:
+                return None
 
     @property
     def sound_file(self) -> str:
@@ -1398,12 +1411,13 @@ class PlaySound(gremlin.input_item.AbstractAction):
 
     @property
     def etts_speaker(self) -> str:
+        if not self._etts_speaker:
+            self._etts_speaker = PlaySound.DEFAULT_ETTS_SPEAKER
         return self._etts_speaker
 
     @etts_speaker.setter
     def etts_speaker(self, value: str):
         self._etts_speaker = value
-        self.speaker = value
         if self.mode == PlayMode.EdgeAI:
             etts = gremlin.sound.EdgeTTS()
             voice = etts.getVoice(self._etts_speaker)
@@ -1722,13 +1736,19 @@ class PlaySound(gremlin.input_item.AbstractAction):
         if self.mode == PlayMode.CoquiAI:
             self.mode = PlayMode.EdgeAI
             # convert speaker to default
-            speaker = "en-US-AriaNeural"
+            speaker = PlaySound.DEFAULT_ETTS_SPEAKER
+
+        match self.mode:
+            case PlayMode.EdgeAI:
+                self._etts_speaker = speaker
+            case PlayMode.PyTTS:
+                self._pytts_speaker = speaker
+
 
         self.text = None
         if "text" in node.attrib:
             self.text = html.unescape(node.get("text"))
 
-        self.speaker = speaker  # speaker for AI
         if self.mode == PlayMode.EdgeAI:
             if speaker:
                 etts = gremlin.sound.EdgeTTS()

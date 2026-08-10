@@ -7043,7 +7043,7 @@ class ActionSetView(AbstractView):
 
             for model_index in range(self.model.rows()):
                 # re-order the display if needed
-                data = self.model.data(model_index)
+                data = self.model.itemAt(model_index)
                 assert data.id in self._widget_map, f"ActionSetView model and UI are not synchronized: widget not found for action id [{data.id}]"
 
                 widget = self._widget_map[data.id]
@@ -7271,12 +7271,16 @@ class ActionSelector(QtWidgets.QWidget):
         """reloads the selector based on the input"""
         with QtCore.QSignalBlocker(self.action_dropdown):
             self.action_dropdown.clear()
-            action_list = self._valid_action_list(self._input_type)
-            for name in action_list:
-                self.action_dropdown.addItem(name)
+            action_map = self._valid_action_map(self._input_type)
+            item_names = [name for name, action in action_map.items()]
+            item_names.sort(key=str.casefold)
+            self.action_dropdown.addItems(item_names)
             config = gremlin.config.Configuration()
             self.action_dropdown.setCurrentText(config.last_action)
             self.action_dropdown.autoSize()
+
+
+
 
     @property
     def inputItem(self):
@@ -7336,6 +7340,18 @@ class ActionSelector(QtWidgets.QWidget):
                 #     continue
                 action_list.append(entry.name)
         return sorted(action_list)
+
+    def _valid_action_map(self, input_type: InputType):
+        """Returns a dictionary mapping valid action names to their corresponding plugin entries for this InputItemWidget."""
+        action_map = {}
+        for entry in gremlin.plugin_manager.ActionPlugins().repository.values():
+            if not entry.input_types or input_type in entry.input_types:
+                if hasattr(entry, "aliases"):
+                    for alias in entry.aliases:
+                        action_map[alias] = entry
+                else:
+                    action_map[entry.name] = entry
+        return action_map
 
     def _handle_help(self):
         """handles the help box on an action"""
@@ -8662,6 +8678,7 @@ class TitleBar(QtWidgets.QWidget):
         clipboard_callback: Callable = None,
         parent: object = None,
         data: object = None,
+        prompt_on_close: bool = False,
     ):
         """Creates a new instance.
 
@@ -8670,6 +8687,7 @@ class TitleBar(QtWidgets.QWidget):
         :param close_cb the function to call when closing the widget
         :param clipboard_cb the function to call for clipboard operations (optional)
         :param parent the parent of this widget
+        :param prompt_on_close whether to prompt the user for confirmation before closing the widget
         """
         import gremlin.ui.ui_common
 
@@ -8682,6 +8700,8 @@ class TitleBar(QtWidgets.QWidget):
         self.hint = tooltip
         if tooltip:
             self.setToolTip(tooltip)
+
+        self._prompt_on_close = prompt_on_close
 
         self.label = gremlin.ui.ui_common.QDataLabel(label, label_width=200) if label else None
         self._close_callback = close_callback
@@ -8776,10 +8796,6 @@ class TitleBar(QtWidgets.QWidget):
     def setIdValue(self, value: str):
         self._id_value = value
 
-    # def setIdVisible(self, visible: bool):
-    #     if self.label:
-    #         self.label.setVisible(visible)
-
     @QtCore.Slot()
     def _comment_changed(self):
         """called when comment text is changed"""
@@ -8798,8 +8814,14 @@ class TitleBar(QtWidgets.QWidget):
 
     def _delete_cb(self):
         """called on delete button"""
-        if self._close_callback:
-            self._close_callback()
+        assert gremlin.util.is_ui_thread()
+        if self._prompt_on_close:
+            result = gremlin.ui.ui_common.ConfirmBox("Are you sure you want to delete this item?")
+        else:
+            result = True
+        if result:
+            if self._close_callback:
+                self._close_callback()
 
 
 class InteractableActionWrapper(QtWidgets.QWidget):
@@ -8856,6 +8878,7 @@ class BasicActionWrapper(AbstractActionWrapper):
             self._remove,
             self._clipboard_copy,
             data=action_widget.action_data,
+            prompt_on_close=True
         )
 
         self.title_frame_widget = gremlin.ui.ui_common.QBorderWidget()
@@ -9249,12 +9272,7 @@ class ContainerView(AbstractView):
                     if verbose:
                         syslog.info(f"\t[{container_count}] containers to display")
                     # display container widgets in the defined order
-                    for model_index in range(container_count):
-                        container: AbstractContainer = self.model.itemAt(model_index)
-                        if container is None:
-                            # probably 1 based
-                            items = self.model.getUnfilteredItems()
-                            container = items[model_index] if model_index < len(items) else None
+                    for model_index, container in self.model.getFilteredMap():
                         assert container is not None, f"Invalid data at model index [{model_index}]"
                         assert container.id in self._widget_map, (
                             f"ContainerView model and UI are not synchronized: widget not found for container id [{container.id}]"
