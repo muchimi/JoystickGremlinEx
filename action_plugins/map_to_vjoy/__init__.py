@@ -3275,7 +3275,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         extra_data = {"buttons": {}, "axis": {}, "hats": {}}
         tag_list = ["vjoyremap", "remap"]  # grab new and legacy actions
         profile.filter_actions(tag_list, self._handle_tag_callback, extra_data)
-        input_type = self._get_input_type()
+        input_type =  self.action_data.hardware_input_type # gets the override type if available
+
         used_list = None
         device = self.action_data.virtual_device
         if device is None:
@@ -3291,6 +3292,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             case InputType.JoystickHat:
                 used_list = list(extra_data["hats"].keys())
                 valid_list = list(range(1, device.hat_count))
+            case _:
+                syslog.warning(f"VJOY REMAP: unsupported next unused selection for input type [{input_type}]")
+                return
 
         if valid_list:
             # device has the required outputs

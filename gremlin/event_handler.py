@@ -650,6 +650,7 @@ class EventListener(QtCore.QObject):
     input_selected = Signal(object)  # widget item was selected, parameter = InputItemWidget
     input_item_selected = Signal(object, int)  # widget item was selected, parameter = InputItem, index of input item in the listview
     input_unselected = Signal(object)  # widget item was unselected selected, parameter = InputItemWidget
+    input_deleted = Signal(object)  # called when an input item is deleted, parameter = InputItem
 
     tab_selected = Signal(
         str
@@ -2550,8 +2551,9 @@ class EventHandler(QtCore.QObject):
                 elif isinstance(identifier, gremlin.keyboard.Key):
                     primary_key = identifier
                 else:
-                    syslog.warning(f"AddCallback: Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
-                    return
+                    syslog.error(f"AddCallback: Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
+                    raise ValueError(f"Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
+
 
 
 

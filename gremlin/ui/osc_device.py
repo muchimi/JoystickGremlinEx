@@ -2246,11 +2246,11 @@ class OscInputItem(gremlin.input_item.InputItemMessage):
     def onItemChanged(self, model, index, new_item, old_item, operation):
         """called when an item in the model changes"""
         if operation in ("remove"):
-            self._profile.removeInputItem(old_item)
+            self._profile.removeInputItem(old_item.message_key)
 
     def _handle_input_id_callback(self):
         """input id is self for OSC"""
-        return self.message_key
+        return self
 
     def to_html(self) -> str:
         """returns reporting graphviz data for this action"""

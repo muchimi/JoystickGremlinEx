@@ -60,6 +60,7 @@ class KeyboardInputItem(InputItem):
         super().__init__(mode_object,
                          device_guid=KeyboardDeviceTabWidget.device_guid,
                          input_type=InputType.KeyboardLatched,
+                         override_input_type=InputType.JoystickButton,
                          custom_input_id_handler = self._handle_input_id_callback)
 
         self._title_name = "Keyboard input (not configured)"
@@ -85,9 +86,7 @@ class KeyboardInputItem(InputItem):
 
     def _handle_input_id_callback(self):
         """input id is the key for keyboard"""
-        if self._key is None:
-            return None
-        return self._key.message_key
+        return self
 
     def getOverrideInputType(self):
         """override type"""
@@ -709,6 +708,8 @@ class KeyboardInputItemModel(gremlin.input_item.InputItemListModel):
         """called when an item in the model changes"""
         if operation in ("remove"):
             self._profile.removeInputItem(old_item)
+            el = gremlin.event_handler.EventListener()
+            el.input_deleted.emit(old_item)
 
 class KeyboardInputItemWidget(gremlin.input_item.InputItemWidget):
     """Widget for a single keyboard input item"""
@@ -768,10 +769,10 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # List of inputs
         model = KeyboardInputItemModel(
-            self.profile,
+            profile = self.profile,
             mode=mode,
             custom_load_handler=self._load_handler,
-            custom_filter_handler=self._filter_data
+            custom_filter_handler=self._filter_data,
         )
 
         self.setInputItemListModel(model)
@@ -841,6 +842,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # lock all inputs
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
+
 
 
 
@@ -951,17 +953,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 input_item.locked = False
             self.setUpdatesEnabled(True)
 
-    def _reload_model(self, mode=None):
-        """reloads the data for the current device/mode"""
-        current_mode = mode if mode else gremlin.shared_state.edit_mode
-        self.profile.ensure_mode_exists(current_mode)
-        self.inputItemListModel = InputItemListModel(self.profile, current_mode, [InputType.Keyboard, InputType.KeyboardLatched])
-        self.inputItemListView.setModel(self.inputItemListModel)
 
-        self.selectInputItemIndex(self._last_selected_index)
-
-        el = gremlin.event_handler.EventListener()
-        el.device_mapping_changed.emit(self._device_id)
 
     def _handle_edit_mode_changed(self, mode: str):
         gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode)  # ensure on UI thread
@@ -1177,6 +1169,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 if not key.name:
                     input_widget.setCustomContent(None)
                     return
+    
 
                 widget = gremlin.ui.virtual_keyboard.QKeyWidget()
                 icon = gremlin.keyboard.KeyMap.icon(key)

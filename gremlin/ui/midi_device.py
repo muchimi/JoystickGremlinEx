@@ -1767,7 +1767,7 @@ class MidiInputItemModel(gremlin.input_item.InputItemListModel):
     def onItemChanged(self, model, index, new_item, old_item, operation):
         """called when an item in the model changes"""
         if operation in ("remove"):
-            self._profile.removeInputItem(old_item)
+            self._profile.removeInputItem(old_item.message_key)
 
 
 class MidiDeviceTabWidget(BaseDeviceTabWidget):

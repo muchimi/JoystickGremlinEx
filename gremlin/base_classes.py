@@ -782,8 +782,13 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
     def hardware_input_type(self) -> InputType:
         """gets the type of hardware device attached to this"""
         if self._input_item:
-            input_id = self._input_item.input_id
+            input_item = self._input_item
+            if hasattr(input_item, "getOverrideInputType"):
+                self.override_input_type = input_item.getOverrideInputType()
+                return self.override_input_type
+
             input_type = None
+            input_id = self._input_item.input_id
             if hasattr(input_id, "getOverrideInputType"):
                 self.override_input_type = input_id.getOverrideInputType()
             else:

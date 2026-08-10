@@ -10249,12 +10249,13 @@ class QSplitTabWidget(QDataWidget):
             syslog.info(f"RIGHT PANEL: Unregistering widget with key: [{key}]")
 
         if key in self._widget_config_index_map:
+            index = self._widget_config_index_map[key]
             iis = gremlin.ui.ui_common.WidgetCacheTracker()
             if iis.contains(key):
                 # this will trigger the expired event that will remove the widget
                 iis.removeWidget(key)
-            else:
-                index = self._widget_config_index_map[key]
+
+            if key in self._registered_widget_map:
                 widget = self._registered_widget_map[key]
 
                 index = -1
@@ -10282,12 +10283,12 @@ class QSplitTabWidget(QDataWidget):
                     widget.hide()
                     widget.deleteLater()
 
-            if key in self._widget_config_index_map:
-                del self._widget_config_index_map[key]
-            if key in self._registered_widget_map:
-                del self._registered_widget_map[key]
-            if index != -1 and index in self._widget_config_device_map:
-                del self._widget_config_device_map[index]
+                if key in self._widget_config_index_map:
+                    del self._widget_config_index_map[key]
+                if key in self._registered_widget_map:
+                    del self._registered_widget_map[key]
+                if index != -1 and index in self._widget_config_device_map:
+                    del self._widget_config_device_map[index]
 
 
     def getCurrentRegisteredWidgetDevice(self):
@@ -10409,6 +10410,8 @@ class QSplitTabWidget(QDataWidget):
 
     def getWidgetKey(self, input_type, input_id):
         """gets the content widget compound key for the item / input combination"""
+        if isinstance(input_id, list):
+            input_id = tuple(input_id)  # convert to hashable type
         try:
             _h = hash(input_id)
         except Exception as e:
