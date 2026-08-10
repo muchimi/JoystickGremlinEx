@@ -466,6 +466,9 @@ class CodeRunner:
             # hook osc events
             evt_listener.osc_event.connect(self.event_handler.execute_event)
 
+            # hook stream deck plugin bridge events
+            evt_listener.streamdeck_event.connect(self.event_handler.execute_event)
+
             # # hook state events
             # evt_listener.state_event.connect(self.event_handler.execute_event)
 
@@ -519,6 +522,12 @@ class CodeRunner:
             # listen to OSC
             if config.osc_enabled:
                 evt_listener.request_osc.emit(True)
+
+            # Stream Deck plugin bridge
+            if config.streamdeck_enabled:
+                from gremlin.ui import streamdeck_device as streamdeck_ui
+
+                streamdeck_ui.ensure_bridge_started()
 
             # hook mode change callbacks
             evt_listener.runtime_mode_changed.connect(gremlin.input_devices.mode_registry.runtime_mode_changed)
@@ -662,6 +671,10 @@ class CodeRunner:
         el.virtual_event.disconnect(self.event_handler.execute_event)
         el.midi_event.disconnect(self.event_handler.execute_event)
         el.osc_event.disconnect(self.event_handler.execute_event)
+        try:
+            el.streamdeck_event.disconnect(self.event_handler.execute_event)
+        except Exception:
+            pass
         # el.state_event.disconnect(self.event_handler.execute_event)
 
         el.keyboard_event.disconnect(kb.keyboard_event)

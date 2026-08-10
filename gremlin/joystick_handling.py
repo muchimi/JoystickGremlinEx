@@ -679,6 +679,42 @@ def registerSpecialDevice(dev):
     syslog.info(f"\tid: [{dev.device_id}] type: [{dev.device_type.name}] name: [{dev.name}]")
 
 
+def upsertSpecialDevice(dev):
+    """Register or update a special device by GUID (no duplicate list entries)."""
+    global _special_devices_map, _all_devices_map, _special_devices
+    existing = _special_devices_map.get(dev.device_guid)
+    if existing is not None:
+        existing.name = dev.name
+        existing.device_type = dev.device_type
+        existing.device_category = dev.device_category
+        _all_devices_map[dev.device_guid] = existing
+        return existing
+    registerSpecialDevice(dev)
+    return dev
+
+
+def unregisterSpecialDevice(device_guid):
+    """Remove a special device from tracking (profile data is left intact)."""
+    global _special_devices_map, _all_devices_map, _special_devices
+    if device_guid is None:
+        return
+    existing = _special_devices_map.pop(device_guid, None)
+    if existing is None:
+        # Try string / alternate GUID identity
+        for key in list(_special_devices_map.keys()):
+            if gremlin.util.compare_guid(key, device_guid):
+                existing = _special_devices_map.pop(key, None)
+                device_guid = key
+                break
+    if existing is None:
+        return
+    if existing in _special_devices:
+        _special_devices.remove(existing)
+    if device_guid in _all_devices_map:
+        del _all_devices_map[device_guid]
+    syslog.info(f"\tunregistered special device: [{getattr(existing, 'name', device_guid)}]")
+
+
 def registerDisconnectedDevice(dev):
     """adds a disconnected device to the tracking list"""
     global _disconnected_devices_map, _all_devices_map, _disconnected_devices
@@ -1030,6 +1066,22 @@ def registerSpecialDevices():
     oo = gremlin.ui.octavi_device.OctaviInterface()
     device.setButtonCallback(oo.get_button)
     registerSpecialDevice(device)
+
+    # Stream Deck legacy tab GUID (old profiles). Live decks register per deviceId.
+    device = dinput.DeviceSummary()
+    device.name = "Stream Deck (legacy)"
+    device.device_guid = gremlin.shared_state.streamdeck_tab_guid
+    device.device_type = DeviceType.StreamDeck
+    device.device_category = DeviceCategory.Special
+    registerSpecialDevice(device)
+
+    # Re-attach any Stream Decks the bridge already knows about (after a rescan).
+    try:
+        from gremlin.ui import streamdeck_device as streamdeck_ui
+
+        streamdeck_ui.resync_streamdeck_special_devices()
+    except Exception:
+        pass
 
     # mode
     device = dinput.DeviceSummary()

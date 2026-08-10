@@ -1,0 +1,22 @@
+body {
+  font-family: system-ui, sans-serif;
+  color: #d8d8d8;
+  background: #2d2d2d;
+  margin: 0;
+  padding: 8px;
+}
+.sdpi-wrapper { display: flex; flex-direction: column; gap: 8px; }
+.sdpi-item { display: flex; align-items: center; gap: 8px; }
+.sdpi-item-label { min-width: 90px; font-size: 12px; }
+.sdpi-item-value { flex: 1; }
+input.sdpi-item-value, button.sdpi-item-value {
+  background: #3d3d3d;
+  border: 1px solid #555;
+  color: #eee;
+  padding: 4px 6px;
+  border-radius: 3px;
+}
+.sdpi-heading { font-weight: 600; margin-top: 8px; font-size: 12px; }
+.ok { color: #6dce6d; }
+.err { color: #e07a7a; }
+details { font-size: 11px; opacity: 0.9; }

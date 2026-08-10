@@ -2136,7 +2136,10 @@ class ContainerCallback:
             input_type = event.event_type
             match input_type:
                 case InputType.JoystickAxis:
-                    value = gremlin.actions.Value(event.curve_value)
+                    # Prefer curved value when present; fall back so uncurved
+                    # events (curve_value still None) still drive actions.
+                    axis_value = event.curve_value if event.curve_value is not None else event.value
+                    value = gremlin.actions.Value(axis_value)
                 case InputType.Midi:
                     value = gremlin.actions.Value(event.value)
                 case InputType.OpenSoundControl:
@@ -2151,6 +2154,7 @@ class ContainerCallback:
             InputType.JoystickButton,
             InputType.Midi,
             InputType.OpenSoundControl,
+            InputType.StreamDeck,
             InputType.Keyboard,
             InputType.Mouse,
             InputType.VirtualButton,

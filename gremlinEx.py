@@ -744,6 +744,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     return TabDeviceType.Plugins
                 case DeviceType.OctaviIFR1:  # octavi IFR1 special device
                     return TabDeviceType.OctaviIFR1
+                case DeviceType.StreamDeck:
+                    return TabDeviceType.StreamDeck
 
             raise ValueError(f"Don't know how to handle type: [{device.device_type}]")
 
@@ -2855,6 +2857,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             midi_enabled = self.config.midi_enabled
             osc_enabled = self.config.osc_enabled
+            streamdeck_enabled = self.config.streamdeck_enabled
 
             self.push_highlighting()
             el = gremlin.event_handler.EventListener()
@@ -3237,6 +3240,37 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     self._add_tab(device.device_guid, TabDeviceType.OctaviIFR1)
                                     tab_device_list.append(device)
                                     gremlin.shared_state.device_type_map[device_guid] = device_type
+                                    index += 1
+
+                        case DeviceType.StreamDeck:
+                            # =======================================================
+                            # Stream Deck via Elgato plugin bridge — one tab per
+                            # connected physical deck; legacy shared tab only if needed.
+                            if streamdeck_enabled:
+                                from gremlin.ui import streamdeck_device as streamdeck_ui
+
+                                streamdeck_ui.ensure_bridge_started()
+                                if not streamdeck_ui.should_show_streamdeck_tab(device.device_guid, self.profile):
+                                    continue
+                                device_guid = gremlin.util.normalize_guid(device.device_guid)
+                                widget = self.getRegisteredWidget(device_guid)
+                                if not widget:
+                                    widget = streamdeck_ui.StreamDeckDeviceTabWidget(
+                                        profile=self.profile,
+                                        mode=self.current_mode,
+                                        device_guid=device.device_guid,
+                                        object_name=device.name or "Stream Deck",
+                                    )
+                                    self.registerWidget(device_guid, widget)
+                                    gremlin.shared_state.device_type_map[device_guid] = DeviceType.StreamDeck
+                                    widget.data = (
+                                        TabDeviceType.StreamDeck,
+                                        device_guid,
+                                        index,
+                                    )
+                                if device not in tab_device_list:
+                                    self._add_tab(device.device_guid, TabDeviceType.StreamDeck, override_name=device.name)
+                                    tab_device_list.append(device)
                                     index += 1
 
                         case DeviceType.ModeControl:
@@ -4189,6 +4223,16 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             guid_list.append(self._find_tab_data_guid(gremlin.shared_state.midi_tab_guid))
         if self.config.osc_enabled:
             guid_list.append(self._find_tab_data_guid(gremlin.shared_state.osc_tab_guid))
+        if self.config.streamdeck_enabled:
+            # One tab per connected Stream Deck (+ legacy tab only when still needed)
+            from gremlin.ui import streamdeck_device as streamdeck_ui
+
+            streamdeck_ui.ensure_bridge_started()
+            bridge = streamdeck_ui.StreamDeckBridge()
+            for info in bridge.devices.values():
+                guid_list.append(self._find_tab_data_guid(info.get("guid")))
+            if streamdeck_ui.legacy_streamdeck_tab_needed(self.profile):
+                guid_list.append(self._find_tab_data_guid(gremlin.shared_state.streamdeck_tab_guid))
 
         # add the input vjoy devices
         for device_guid in self._vjoy_input_device_guids:
@@ -4981,10 +5025,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         @QtCore.Slot()
         def run(self):
             widget = self.ui.getCurrentRegisteredWidget()
-            while widget is None:  # not available yet
+            # Cap wait so a failed profile load cannot leave GEX Not Responding forever
+            waited_ms = 0
+            while widget is None and waited_ms < 10000:
                 QThread.msleep(100)
+                waited_ms += 100
                 widget = self.ui.getCurrentRegisteredWidget()
-            widget.refresh()
+            if widget is not None:
+                widget.refresh()
             self.finished.emit()  # indicate done
 
     def _profile_load_completed(self, *args):
@@ -5091,6 +5139,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             el.push_input_selection()  # suspend input selection
 
+            new_profile = None
             while self._profile_load_stack:
                 source_xml = self._profile_load_stack[0]
 
@@ -5124,7 +5173,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         os.unlink(self._comparative_file)
 
                     # save a copy using new setup if any
-                    new_profile.to_xml(self._comparative_file)
+                    try:
+                        new_profile.to_xml(self._comparative_file)
+                    except Exception as cmp_err:
+                        # Non-fatal: comparative snapshot must not abort profile load / freeze UI
+                        syslog.error(f"Profile: comparative XML export failed (ignored): {cmp_err}")
+                        syslog.error(traceback.format_exc())
 
                     # Save the profile at this point if it was converted from a prior
                     # profile version, as otherwise the change detection logic will
@@ -5171,9 +5225,24 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 except Exception as err:
                     syslog.error("Profile load error (generic):")
                     syslog.error(traceback.format_exc())
-                    gremlin.util.display_error(f"Failed to load the profile {source_xml} (see log for details)")
+                    # Must not call QMessageBox.exec from the worker thread (freezes UI).
+                    gremlin.util.InvokeUiMethod(
+                        gremlin.util.display_error,
+                        f"Failed to load the profile {source_xml} (see log for details)",
+                    )
                     syslog.error(f"{err}\n{traceback.format_exc()}")
                     self._profile_load_stack.clear()
+                    # Fall back to an empty profile so post-load UI setup has a valid object
+                    try:
+                        self.new_profile()
+                        new_profile = gremlin.shared_state.current_profile
+                        self.profile = new_profile
+                    except Exception as fallback_err:
+                        syslog.error(f"Profile: empty fallback failed: {fallback_err}")
+                        return False
+
+            if new_profile is None:
+                return False
 
             if not last_edit_mode:
                 # pick the top mode if nothing was saved in the configuration

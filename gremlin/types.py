@@ -283,6 +283,7 @@ class DeviceType(IntEnum):
     Plugins = 9  # plugins special device
     OctaviIFR1 = 10  # octavi IFR1 special device
     Maestro = 11  # maestro special device
+    StreamDeck = 12  # Elgato Stream Deck via plugin bridge
 
     @staticmethod
     def isFixedInput(value: DeviceType) -> bool:
@@ -342,6 +343,7 @@ _DeviceType_to_display_name = {
     DeviceType.Plugins: "Plugins",
     DeviceType.OctaviIFR1: "Octavi IFR1",
     DeviceType.Maestro: "Maestro",
+    DeviceType.StreamDeck: "Stream Deck",
 }
 
 _DeviceType_to_string_lookup = {
@@ -357,6 +359,7 @@ _DeviceType_to_string_lookup = {
     DeviceType.Plugins: "plugins",
     DeviceType.OctaviIFR1: "octaviifr1",
     DeviceType.Maestro: "maestro",
+    DeviceType.StreamDeck: "streamdeck",
 }
 
 
@@ -373,6 +376,7 @@ _DeviceType_to_enum_lookup = {
     "plugins": DeviceType.Plugins,
     "octaviifr1": DeviceType.OctaviIFR1,
     "maestro": DeviceType.Maestro,
+    "streamdeck": DeviceType.StreamDeck,
 }
 
 
@@ -1013,6 +1017,7 @@ class VerboseMode(IntFlag):
     Remote = auto()  # remote receive
     Container = auto()  # container debug mode
     Octavi = auto()
+    StreamDeck = auto()
     dinput = auto()
     Curve = auto()
     TTS = auto()
@@ -1056,6 +1061,7 @@ class VerboseMode(IntFlag):
         | Remote
         | Container
         | Octavi
+        | StreamDeck
         | dinput
         | Curve
         | TTS
@@ -1099,6 +1105,7 @@ class TabDeviceType(int, Enum):
     OctaviIFR1 = 11
     MaestroInput = 12
     MaestroOutput = 13
+    StreamDeck = 14
 
 
 class GamePadOutput(Enum):
@@ -1568,7 +1575,8 @@ class EventSourceType(enum.Enum):
     Virtual = 2
     Midi = 3
     OSC = 4
-    Any = 5 # any source
+    StreamDeck = 5
+    Any = 6  # any source
 
 
 

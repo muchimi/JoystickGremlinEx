@@ -2168,6 +2168,14 @@ class ProfileRegistry:
                         input_item = gremlin.ui.midi_device.MidiInputItem(mode_node)
                         if override_input_type:
                             input_item.setOverrideInputType(override_input_type)
+                    case InputType.StreamDeck:
+                        from gremlin.ui.streamdeck_device import StreamDeckInputItem
+
+                        input_item = StreamDeckInputItem(mode_node)
+                        if override_input_type:
+                            input_item.setOverrideInputType(override_input_type)
+                        else:
+                            input_item.setOverrideInputType(InputType.JoystickButton)
 
                     case InputType.ModeControl:
                         raise ValueError("mode control cannot be autocreated - use create handler")
@@ -2185,7 +2193,19 @@ class ProfileRegistry:
                         input_item.setSortCallback(self._handle_joystick_sort)
 
                 input_item.setInputType(input_type)
-                input_item.setInputId(input_id)
+                # OSC / MIDI / Stream Deck use the item itself as input_id — never assign a string key.
+                if input_type not in (InputType.OpenSoundControl, InputType.Midi, InputType.StreamDeck, InputType.State, InputType.Keyboard, InputType.KeyboardLatched):
+                    input_item.setInputId(input_id)
+                elif input_type == InputType.StreamDeck and isinstance(input_id, str):
+                    # Best-effort restore identity from message key when autocreating by key string
+                    parts = input_id.split(":")
+                    if len(parts) >= 3:
+                        input_item.device_id = parts[0]
+                        input_item.kind = parts[1]
+                        input_item.button_id = ":".join(parts[2:])
+                    elif len(parts) == 2:
+                        input_item.kind = parts[0]
+                        input_item.button_id = parts[1]
                 if description is not None:
                     input_item.description = description
                 if description_readonly is not None:
@@ -2603,6 +2623,24 @@ class Profile:
                                         input_item = gremlin.ui.osc_device.OscInputItem(self)
                                     case InputType.Midi:
                                         input_item = gremlin.ui.midi_device.MidiInputItem(self)
+                                    case InputType.StreamDeck:
+                                        from gremlin.ui.streamdeck_device import StreamDeckInputItem
+
+                                        input_item = StreamDeckInputItem(self)
+                                        input_item.setOverrideInputType(InputType.JoystickButton)
+                                        # Do not setInputId(string) — Stream Deck uses the item as input_id.
+                                        if isinstance(input_id, str) and ":" in input_id:
+                                            parts = input_id.split(":")
+                                            if len(parts) >= 3:
+                                                input_item.device_id = parts[0]
+                                                input_item.kind = parts[1]
+                                                input_item.button_id = ":".join(parts[2:])
+                                            elif len(parts) == 2:
+                                                input_item.kind = parts[0]
+                                                input_item.button_id = parts[1]
+                                        mode_node.config[input_type][input_id] = input_item
+                                        input_list.append(input_item)
+                                        continue
                                     case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
                                         input_item = InputItem(mode_node=mode_node, input_type=input_type)
                                     case InputType.ModeControl:
@@ -4464,6 +4502,7 @@ class Profile:
             InputType.Keyboard,
             InputType.Midi,
             InputType.OpenSoundControl,
+            InputType.StreamDeck,
             InputType.State,
         ]
 
@@ -5342,6 +5381,7 @@ class ProfileModeNode:
         InputType.Midi,
         InputType.ModeControl,
         InputType.OctaviIfr1,
+        InputType.StreamDeck,
     ]
 
     def __init__(self, name: str = None, system: bool = None, parent: ProfileDeviceNode = None):
@@ -5481,6 +5521,7 @@ class ProfileModeNode:
         import gremlin.ui.keyboard_device
         import gremlin.ui.midi_device
         import gremlin.ui.osc_device
+        from gremlin.ui.streamdeck_device import StreamDeckInputItem
         import gremlin.joystick_handling
         import gremlin.ui.mode_device
 
@@ -5546,6 +5587,9 @@ class ProfileModeNode:
                         item = gremlin.ui.osc_device.OscInputItem(self)
                     case InputType.Midi:
                         item = gremlin.ui.midi_device.MidiInputItem(self)
+                    case InputType.StreamDeck:
+                        item = StreamDeckInputItem(self)
+                        item.setOverrideInputType(InputType.JoystickButton)
                     case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
                         item = InputItem(mode_node=self, input_type=input_type)
                     case InputType.ModeControl:

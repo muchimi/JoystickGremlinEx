@@ -2098,6 +2098,39 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
 
         page_layout.addWidget(info_box)
 
+        # Stream Deck plugin bridge
+        page_layout.addWidget(QtWidgets.QLabel("Stream Deck (Elgato plugin bridge):"))
+        sd_container = QtWidgets.QWidget()
+        sd_container.setContentsMargins(8, 0, 0, 0)
+        sd_layout = QtWidgets.QGridLayout(sd_container)
+        sd_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.streamdeck_enabled = QtWidgets.QCheckBox("Enable Stream Deck bridge")
+        self.streamdeck_enabled.setChecked(self.config.streamdeck_enabled)
+        self.streamdeck_enabled.setToolTip(
+            "When set, GremlinEx listens for the JG Ex Stream Deck plugin over a localhost WebSocket. "
+            "Stream Deck software stays running (Wave Link / multi-deck safe)."
+        )
+        self.streamdeck_enabled.clicked.connect(self._streamdeck_enabled)
+
+        self.streamdeck_bridge_port = ui_common.QIntLineEdit()
+        self.streamdeck_bridge_port.setRange(4096, 65535)
+        self.streamdeck_bridge_port.setValue(self.config.streamdeck_bridge_port)
+        self.streamdeck_bridge_port.setEnabled(self.config.streamdeck_enabled)
+        self.streamdeck_bridge_port.valueChanged.connect(self._streamdeck_bridge_port)
+
+        sd_layout.addWidget(self.streamdeck_enabled, 0, 0, 1, 2)
+        sd_layout.addWidget(QtWidgets.QLabel("Bridge port:"), 1, 0)
+        sd_layout.addWidget(self.streamdeck_bridge_port, 1, 1)
+        page_layout.addWidget(sd_container)
+
+        sd_msg = (
+            "Install the JG Ex Stream Deck plugin, keep Elgato Stream Deck software running, "
+            "and place JG Ex Button / JG Ex Dial actions on keys. Icons and titles stay in Stream Deck software. "
+            "Default bridge: ws://127.0.0.1:9020"
+        )
+        page_layout.addWidget(gremlin.ui.ui_common.QInfoBox(sd_msg))
+
         page_layout.addStretch()
 
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
@@ -2507,6 +2540,33 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         self.config.osc_enabled = checked
         self.osc_input_port.setEnabled(checked)
         self._reload_needed = True
+
+    @QtCore.Slot(bool)
+    def _streamdeck_enabled(self, checked: bool):
+        self.config.streamdeck_enabled = checked
+        self.streamdeck_bridge_port.setEnabled(checked)
+        self._reload_needed = True
+        try:
+            from gremlin.ui import streamdeck_device as streamdeck_ui
+
+            if checked:
+                streamdeck_ui.ensure_bridge_started()
+            else:
+                streamdeck_ui.StreamDeckBridge().stop()
+        except Exception as err:
+            syslog.error(f"STREAMDECK: enable toggle error: {err}")
+
+    @QtCore.Slot()
+    def _streamdeck_bridge_port(self):
+        self.config.streamdeck_bridge_port = self.streamdeck_bridge_port.value()
+        try:
+            from gremlin.ui import streamdeck_device as streamdeck_ui
+
+            if self.config.streamdeck_enabled:
+                streamdeck_ui.StreamDeckBridge().stop()
+                streamdeck_ui.ensure_bridge_started()
+        except Exception as err:
+            syslog.error(f"STREAMDECK: port change error: {err}")
 
     @QtCore.Slot()
     def _osc_input_port(self):
@@ -4520,6 +4580,7 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
 
         midi_enabled = self.config.midi_enabled
         osc_enabled = self.config.osc_enabled
+        streamdeck_enabled = self.config.streamdeck_enabled
 
         tab_map = {}
         for index, (key, device) in enumerate(all_devices.items()):
@@ -4533,6 +4594,9 @@ class DeviceDisplayDialog(gremlin.ui.ui_common.QRememberDialog):
                         continue
                 case DeviceType.Osc:
                     if not osc_enabled:
+                        continue
+                case DeviceType.StreamDeck:
+                    if not streamdeck_enabled:
                         continue
             device_id = device.device_id
             visible = self.visible_map[device_id] if device_id in self.visible_map else True

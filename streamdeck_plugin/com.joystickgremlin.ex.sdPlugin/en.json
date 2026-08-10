@@ -1,0 +1,12 @@
+{
+  "Description": "Two-way bridge between Stream Deck and Joystick Gremlin Ex",
+  "Name": "Joystick Gremlin Ex",
+  "com.joystickgremlin.ex.button": {
+    "Name": "JG Ex Button",
+    "Tooltip": "Send this key to Joystick Gremlin Ex"
+  },
+  "com.joystickgremlin.ex.dial": {
+    "Name": "JG Ex Dial",
+    "Tooltip": "Send dial rotate / press to Joystick Gremlin Ex"
+  }
+}

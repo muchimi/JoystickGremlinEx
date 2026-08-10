@@ -1,0 +1,102 @@
+{
+  "Name": "Joystick Gremlin Ex",
+  "Version": "1.0.16",
+  "Author": "Lolo401 / Joystick Gremlin Ex fork",
+  "URL": "https://github.com/Lolo401/JoystickGremlinEx",
+  "Description": "Two-way bridge between Stream Deck and Joystick Gremlin Ex. Keep Stream Deck software running; map JG Ex Button / Dial actions to GEX inputs.",
+  "CodePath": "app.html",
+  "PropertyInspectorPath": "pi.html",
+  "Icon": "imgs/plugin",
+  "Category": "Joystick Gremlin Ex",
+  "CategoryIcon": "imgs/category",
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "6.5"
+  },
+  "Profiles": [
+    {
+      "Name": "profiles/jgex-xl",
+      "DeviceType": 2,
+      "Readonly": false,
+      "DontAutoSwitchWhenInstalled": true,
+      "AutoInstall": true
+    },
+    {
+      "Name": "profiles/jgex-plus",
+      "DeviceType": 7,
+      "Readonly": false,
+      "DontAutoSwitchWhenInstalled": true,
+      "AutoInstall": true
+    },
+    {
+      "Name": "profiles/jgex",
+      "DeviceType": 0,
+      "Readonly": false,
+      "DontAutoSwitchWhenInstalled": true,
+      "AutoInstall": true
+    },
+    {
+      "Name": "profiles/jgex-mini",
+      "DeviceType": 1,
+      "Readonly": false,
+      "DontAutoSwitchWhenInstalled": true,
+      "AutoInstall": true
+    },
+    {
+      "Name": "profiles/jgex-neo",
+      "DeviceType": 9,
+      "Readonly": false,
+      "DontAutoSwitchWhenInstalled": true,
+      "AutoInstall": true
+    }
+  ],
+  "Actions": [
+    {
+      "Icon": "imgs/action",
+      "Name": "JG Ex Button",
+      "Controllers": [
+        "Keypad",
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "imgs/key",
+          "TitleAlignment": "middle",
+          "FontSize": "12"
+        }
+      ],
+      "Tooltip": "Send this key press/release to Joystick Gremlin Ex. Icons and titles stay customizable here.",
+      "UUID": "com.joystickgremlin.ex.button"
+    },
+    {
+      "Icon": "imgs/dial",
+      "Name": "JG Ex Dial",
+      "Controllers": [
+        "Encoder"
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "TriggerDescription": {
+          "Rotate": "Rotate",
+          "Push": "Push"
+        }
+      },
+      "States": [
+        {
+          "Image": "imgs/dialkey",
+          "TitleAlignment": "middle",
+          "FontSize": "12"
+        }
+      ],
+      "Tooltip": "Send dial rotate / press to Joystick Gremlin Ex.",
+      "UUID": "com.joystickgremlin.ex.dial"
+    }
+  ],
+  "UUID": "com.joystickgremlin.ex"
+}

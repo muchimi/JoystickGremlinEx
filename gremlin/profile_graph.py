@@ -1160,6 +1160,17 @@ class ProfileInputItemNode(ProfileBaseNode):
                     osc_input_item.parse_xml(child, osc_input_item)
             self.input_id = osc_input_item
 
+        elif self.input_type == InputType.StreamDeck:
+            from gremlin.ui.streamdeck_device import StreamDeckInputItem
+
+            sd_input_item = StreamDeckInputItem(mode_object)
+            for child in node:
+                if child.tag == "input":
+                    sd_input_item.parse_xml(child, sd_input_item)
+            if node.tag == "input":
+                sd_input_item.parse_xml(node, sd_input_item)
+            self.input_id = sd_input_item
+
         elif self.input_type == InputType.ModeControl:
             # mode control entries - input id is the only item we need
             self.is_axis = False
