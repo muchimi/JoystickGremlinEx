@@ -1865,8 +1865,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             "action_icons": self._action_icon_widget,
             "description": self._description_widget,
             "status": self._status_widget,
-            "input_description": gremlin.ui.ui_common.getHContainer(
-                [self._input_description_widget, "||", "||"], widget_only=True, left_margin=4, top_margin=4, bottom_margin=4, right_margin=4
+            "input_description": gremlin.ui.ui_common.getVContainer(
+                [self._input_description_widget], widget_only=True, left_margin=4, top_margin=4, bottom_margin=4, right_margin=4
             ),
             "custom_content": self._custom_container_widget,
             "comment": self._comment_widget,
@@ -1874,8 +1874,13 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             # "bottom": QtWidgets.QLabel("bottom widget")
         }
 
-        for _, widget in items.items():
-            self._content_layout.addWidget(widget)
+        if gremlin.config.Configuration().show_container_id:
+            for key, widget in items.items():
+                w = gremlin.ui.ui_common.getHContainer([key, widget], widget_only = True)
+                self._content_layout.addWidget(w)
+        else:
+            for widget in items.values():
+                self._content_layout.addWidget(widget)
 
 
         # InputItemContentLayout(widgets = items, parent = self._content_widget)
@@ -2177,10 +2182,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         if self.input_item:
             self.input_item.setInputWidget(None)  # clear reference on the input
 
-        self._status_widget.setWidget(None)
-        self._description_widget.setWidget(None)
-        self._input_description_widget.setWidget(None)
-        # self._status_container_widget.setWidget(None)
+
         self._container_id_widget.setWidget(None)
         self._repeater_container_widget.setWidget(None)
         self._custom_container_widget.setWidget(None)
@@ -2505,10 +2507,20 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def setInputDescription(self, description: str | None):
         """sets the input description for an input widget (optional)"""
+        verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
         if description is not None:
+            if verbose:
+                syslog.info(f"InputItemWidget: setting input description: [{description}]")
             self._input_description_widget.setText(description, self._input_description_icon)
+
         else:
+            if verbose:
+                syslog.info("InputItemWidget: clearing input description")
             self._input_description_widget.setWidget(None)
+
+        height = self._input_description_widget.height()
+        if verbose:
+            syslog.info(f"InputItemWidget: input description widget height: [{height}]")
 
     def setInputDescriptionIcon(self, icon_path, use_qta=True):
         """sets (or clears) the icon for the input description line"""
@@ -2528,7 +2540,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def setDescription(self, description: str | None):
         """sets the description of the input widget"""
-        self._description_widget.setText(description)
+        self.setInputDescription(description)
+
 
     def setComment(self, value: str | None, icon=None):
         """sets the comment field of the input widget"""
@@ -3080,6 +3093,22 @@ class InputItemListModel(AbstractCallbackModel):
 
         if device:
             self.refresh(False)
+
+    def removeAt(self, index: int, emit=True):
+        """removes the entry at the given model index"""
+        if self._custom_remove_handler:
+            self._custom_remove_handler(self, index, emit)
+        else:
+            super().removeAt(index, emit=emit)
+
+    def clear(self, emit=True):
+        """clears all entries from the model"""
+        if self._custom_clear_handler:
+            self._custom_clear_handler()
+        else:
+            super().clear(emit=emit)
+
+
 
     def _handle_sort(self, items) -> tuple:
         """returns a sort list for the items if a custom handler was not provided"""
@@ -3694,6 +3723,7 @@ class InputItemListView(AbstractView):
                         assert isinstance(input_item, InputItem), "invalid input item"
                         assert isinstance(model_index, int), "invalid index"
                         new_widget = True  # assume creating a new widget
+                        widget = None
 
                         if __debug__:
                             time_start = time.perf_counter()
@@ -3710,7 +3740,10 @@ class InputItemListView(AbstractView):
                                     widget
                                 )  # remove the existing widget because position may have changed so it's added at the right spot
 
-                        else:
+
+
+
+                        if not widget:
                             # create new input widget
                             identifier = InputIdentifier(
                                 input_item.input_type,
@@ -3722,8 +3755,6 @@ class InputItemListView(AbstractView):
                                 is_button=input_item.is_button,
                                 input_item=input_item,
                             )
-
-                            # syslog.info(f"\t[{model_index}]  {input_item.display_name}")
 
                             if self.custom_widget_handler:
                                 # get the widget from the custom handler
@@ -3760,7 +3791,6 @@ class InputItemListView(AbstractView):
 
                             input_item.setInputWidget(widget)  # keep a reference to the input widget
 
-                        widget.index = model_index
                         if new_widget:
                             # handle new widget updates
                             widget.create_action_icons(input_item)
@@ -3782,6 +3812,8 @@ class InputItemListView(AbstractView):
                             # add new widget to the input map
                             self._input_item_map[input_item] = widget
 
+
+
                         if verbose and __debug__:
                             time_end = time.perf_counter()
                             elapsed = time_end - time_start
@@ -3790,6 +3822,7 @@ class InputItemListView(AbstractView):
                             )
 
                         # store a reference to this widget for the model
+                        assert widget is not None, "widget should not be None"
                         self._widget_map[model_index] = widget
 
                         self._scroll_layout.addWidget(widget)
@@ -9395,7 +9428,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self._input_item = None
         self._input_type = None
         self._container_model = None
-        
+
 
     def setInputItem(self, input_item: InputItem):
         """sets the item data and redraws the control"""
@@ -10999,6 +11032,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         # global event handling
         el = gremlin.event_handler.EventListener()
         el.tab_selected.connect(self._handle_tab_changed)
+        el.input_deleted.connect(self._handle_input_deleted)
         el.jump_to_mapped_input.connect(self._handle_jump_to_mapped_input)
         if self.filtersEnabled:
             el.input_filtered_change.connect(self._handle_input_filter_changed)
@@ -11014,21 +11048,9 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.listview_container.addWidget(gremlin.ui.ui_common.QEmptyWidget())  # QtWidgets.QLabel("Not loaded"))  # index 0 = blank placeholder
 
         self.addLeftPanelWidget(self.listview_container)
-
-        # el = gremlin.event_handler.EventListener()
-        # el.profile_unloaded.connect(self._handle_profile_changed)
-
         self._blank_input()
 
-    # def _handle_profile_changed(self):
-    #     gremlin.util.InvokeUiMethod(self._handle_profile_changed_ui)
 
-    # def _handle_profile_changed_ui(self):
-    #     self.unregisterAllWidgets()
-    #     self._input_item_list_model.pushSuspend()
-    #     self._input_item_list_model.clear()
-    #     self._input_item_list_model.popSuspend()
-    #     self._blank_input()
 
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""
@@ -11059,8 +11081,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
     def _cleanup_ui(self):
         el = gremlin.event_handler.EventListener()
 
-        # el.edit_mode_changed.disconnect(self._handle_edit_mode_changed)
-        # el.config_changed.disconnect(self._config_changed_cb)
         el.lock_inputs.disconnect(self._handle_lock_inputs)
         el.unlock_inputs.disconnect(self._handle_unlock_inputs)
 
@@ -11069,6 +11089,12 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             el.input_filtered_change.disconnect(self._handle_input_filter_changed)
 
         self.setInputItemListView(None)
+        el.input_deleted.disconnect(self._handle_input_deleted)
+
+    def _handle_input_deleted(self, input_item: InputItem):
+        """handles the input_deleted event"""
+        if input_item:
+            self.clearInputItemMappingWidget(input_item)
 
     def ensureInputVisible(self, input_item: InputItem):
         """ensures the specified input is visible in the input list view"""
@@ -11402,6 +11428,13 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
             return widget
         return None
+
+    def clearInputItemMappingWidget(self, input_item: InputItem):
+        """clears all registered input item mapping widgets"""
+        if input_item:
+            key = self.getInputItemWidgetKey(input_item)
+            self.unregisterWidget(key)
+
 
     def getInputItemMappingWidgetAt(self, index: int) -> InputItemMappingWidget:
         """gets the mapping widget for an input item at the given index"""

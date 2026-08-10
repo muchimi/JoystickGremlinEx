@@ -2038,19 +2038,22 @@ class Configuration(QtCore.QObject):
         elif isinstance(input_id, int):
             pass
         elif isinstance(input_id, str):
-            if input_id.isnumeric():
-                input_id = int(input_id)
-            else:
-                guid = gremlin.util.parse_guid(input_id)
-                if guid is not None:
-                    input_id = str(guid)
-                else:
-                    syslog.warning(
-                        f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}"
-                    )
-                    input_id = None
+            pass
+            # if input_id.isnumeric():
+            #     input_id = int(input_id)
+            # else:
+            #     guid = gremlin.util.parse_guid(input_id)
+            #     if guid is not None:
+            #         input_id = str(guid)
+            #     else:
+            #         syslog.warning(
+            #             f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}"
+            #         )
+            #         input_id = None
         elif isinstance(input_id, gremlin.keyboard.Key):
             input_id = input_id.key_id
+        elif isinstance(input_id, (list, set, tuple)):
+            pass
         else:
             syslog.warning(
                 f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}"

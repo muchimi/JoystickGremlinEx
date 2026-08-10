@@ -653,6 +653,7 @@ class EventListener(QtCore.QObject):
     input_selected = Signal(object)  # widget item was selected, parameter = InputItemWidget
     input_item_selected = Signal(object, int)  # widget item was selected, parameter = InputItem, index of input item in the listview
     input_unselected = Signal(object)  # widget item was unselected selected, parameter = InputItemWidget
+    input_deleted = Signal(object)  # called when an input item is deleted, parameter = InputItem
 
     tab_selected = Signal(
         str
@@ -1405,8 +1406,7 @@ class EventListener(QtCore.QObject):
         syslog.info("KBD: processing start")
         self._keyboard_buffer = {}
         self._key_listener_started = True
-        threading.current_thread().reset()
-        while not self._keyboard_thread.stopped() and self._keyboard_thread_running:
+        while self._keyboard_thread_running:
             if self._keyboard_queue.empty():
                 time.sleep(0)
                 continue
@@ -1419,19 +1419,21 @@ class EventListener(QtCore.QObject):
     def start_key_listener(self):
         """starts the key listener"""
         if not self._key_listener_started:
+            self._key_listener_started = True
             self._keyboard_thread_running = True
             self._keyboard_queue : FastQueue[Event] = FastQueue(name="keyboard_queue") # queue.Queue()
-            self._keyboard_thread = gremlin.threading.AbortableThread(target=self._keyboard_runner)
+            self._keyboard_thread = threading.Thread(target=self._keyboard_runner, daemon=True)
+            # self._keyboard_thread = gremlin.threading.AbortableThread(target=self._keyboard_runner)
             self._keyboard_thread.start()
+
 
     def stop_key_listener(self):
         """stops the key listener"""
         if self._key_listener_started:
 
             syslog.info("KEY THREAD: stopping...")
-            self._keyboard_thread_running = False
             self._keyboard_queue.clear()
-            self._keyboard_thread.stop()
+            self._keyboard_thread_running = False
             self._keyboard_thread.join(timeout=1)
 
 
@@ -2553,8 +2555,9 @@ class EventHandler(QtCore.QObject):
                 elif isinstance(identifier, gremlin.keyboard.Key):
                     primary_key = identifier
                 else:
-                    syslog.warning(f"AddCallback: Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
-                    return
+                    syslog.error(f"AddCallback: Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
+                    raise ValueError(f"Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
+
 
 
 
@@ -3271,10 +3274,12 @@ class EventHandler(QtCore.QObject):
                             syslog.info(f"\tLatched state: {is_latched}")
 
                         if is_latched:
-                            latch_key = input_item
+                            latch_key = input_item.key
 
                         if latch_key:
                             # override the event type for keyboard so actions treat mouse/kbd input as a joystick button for mapping purposes
+                            import gremlin.keyboard
+                            assert isinstance(latch_key, gremlin.keyboard.Key), f"invalid key type, got {type(latch_key)} - expecting [gremlin.keyboard.Key]"
                             event.override_input_type = InputType.JoystickButton
 
                             m_list = self._matching_latched_callbacks(event, latch_key)
@@ -3572,7 +3577,9 @@ class EventHandler(QtCore.QObject):
 
     def _matching_latched_callbacks(self, event, key):
         from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
+        import gremlin.keyboard
 
+        assert isinstance(key, gremlin.keyboard.Key), f"invalid key type, got {type(key)} - expecting [gremlin.keyboard.Key]"
         callback_list = []
         if event.event_type in (
             InputType.KeyboardLatched,
