@@ -57,6 +57,9 @@ Fix: OSC Device: input delete does not delete from profile (API change)
 Fix: OSC Device: OSC message is not visible in input
 Fix: Vjoy Remap Action: clicking "next unused" button would fail on keyboard input.
 Fix: UI: deleting an input may not clear associated mapping in the UI.
+ 
+PRR merge: Virpil LED fixes + Map to Streamdeck action contributed by Lolo_350
+
 
 
 ### (m77T25A)
