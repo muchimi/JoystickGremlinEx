@@ -28,7 +28,6 @@ import json
 import time
 
 
-
 from typing import Callable
 
 import container_plugins
@@ -171,7 +170,6 @@ class ProfileDeviceNode:
     def device_type(self, value: DeviceType):
         assert False, "attribute is readonly - set device_guid instead"
 
-
     @property
     def type(self) -> DeviceType:
         """device type"""
@@ -185,7 +183,6 @@ class ProfileDeviceNode:
         self._device_guid = value
         device = gremlin.joystick_handling.getDevice(value)
         self._device = device
-
 
     @property
     def device_id(self) -> str:
@@ -246,7 +243,9 @@ class ProfileDeviceNode:
 
         :param node the xml node to parse to populate this device
         """
-        assert node.tag in ("device", "vjoy-device"), f"XML: ProfileDeviceNode: Expected 'device' or 'vjoy-device' tag, got '{node.tag}'  offending line: {node.sourceline}"
+        assert node.tag in ("device", "vjoy-device"), (
+            f"XML: ProfileDeviceNode: Expected 'device' or 'vjoy-device' tag, got '{node.tag}'  offending line: {node.sourceline}"
+        )
         self.name = node.get("name")
 
         if "guid" in node.attrib:
@@ -266,7 +265,7 @@ class ProfileDeviceNode:
                 device.device_id = device_id
                 # for disconnectd devices, assume maximum axis and buttons to avoid problems
                 device.axis_count = 8
-                device.device_category = DeviceCategory.Physical # assume physical device if in a profile not under virtual sticks
+                device.device_category = DeviceCategory.Physical  # assume physical device if in a profile not under virtual sticks
                 device_type_str = safe_read(node, "type", str, "")
                 device_type = DeviceType.to_enum(device_type_str)
                 device.setVirtual(device_type in (DeviceType.VJoy, DeviceType.Maestro))
@@ -274,16 +273,15 @@ class ProfileDeviceNode:
                     vjoy_id = int(safe_read(node, "vjoy-id", int, -1))
                     if vjoy_id == -1:
                         # see if the vjoy # can be derived from the name
-                        match = re.search(r'(\d+)\D*$', self.name)
+                        match = re.search(r"(\d+)\D*$", self.name)
                         if match:
                             vjoy_id = int(match.group(1))
 
                     device.vjoy_id = vjoy_id
                     device.virtual_id = device.vjoy_id
 
-
                 # assume linear axis mapping for disconnected devices
-                for axis_id in range(1, device.axis_count+1):
+                for axis_id in range(1, device.axis_count + 1):
                     device.linear_id_map[axis_id] = axis_id
                     device.axis_id_map[axis_id] = axis_id
                     am = dinput.AxisMap()
@@ -291,9 +289,6 @@ class ProfileDeviceNode:
                     am.axis_index = axis_id
                     device.axismap_list.append(am)
                     device.axis_names.append(am.getName())
-
-
-
 
                 device.button_count = 128
                 device.hat_count = 4
@@ -892,8 +887,6 @@ class JoystickInputStats:
         for input_type in self.input_types:
             self.filtered_counts[input_type] = 0
 
-
-
         if device_guid in input_filter:
             device = gremlin.joystick_handling.getDevice(device_guid)
             for input_type in input_filter[device_guid]:
@@ -946,7 +939,7 @@ class Settings:
         if verbose:
             syslog.info("profile settings init...")
         self.profile: Profile = profile
-        self.vjoy_as_input = {}  # key by index : int, boolean, true if the vjoy device can be used as input to GEX
+        self._vjoy_as_input = {}  # key by index : int, boolean, true if the vjoy device can be used as input to GEX
         self.maestro_as_input = {}  # key by index : int, boolean, true if the maestro device can be used as input to GEX
         self.vjoy_initial_values = {}
         self.startup_mode = None
@@ -961,7 +954,7 @@ class Settings:
         verbose = gremlin.config.Configuration().verbose_mode_ui
         if verbose:
             syslog.info("profile settings reset...")
-        self.vjoy_as_input.clear()
+        self._vjoy_as_input.clear()
         self.maestro_as_input.clear()
         self.vjoy_initial_values.clear()
         self.startup_mode = None
@@ -995,7 +988,7 @@ class Settings:
         node.append(delay_node)
 
         # Process vJoy as input settings
-        for vid, visible in self.vjoy_as_input.items():
+        for vid, visible in self._vjoy_as_input.items():
             if visible is True:
                 vjoy_node = etree.Element("vjoy-input")
                 vjoy_node.set("id", safe_format(vid, int))
@@ -1052,10 +1045,6 @@ class Settings:
 
         return node
 
-    def vjoyAsInput(self, vid: int):
-        """true if vjoy device is setup as input in the profile options"""
-        return vid in self.vjoy_as_input
-
     def from_xml(self, node, data=None, extra_data=None):
         """Populates the data storage with the XML node's contents.
 
@@ -1078,7 +1067,7 @@ class Settings:
             self.default_delay = float(node.find("default-delay").text)
 
         # vJoy as input settings
-        self.vjoy_as_input.clear()
+        self._vjoy_as_input.clear()
 
         for vjoy_node in node.findall("vjoy-input"):
             vid = safe_read(vjoy_node, "id", int, 0)
@@ -1087,7 +1076,7 @@ class Settings:
                 device_guid = device.device_guid
                 sd.setOutputEnabled(device_guid, True)  # allow as output
                 sd.setInputEnabled(device_guid, True)  # allow as input
-            self.vjoy_as_input[vid] = True
+            self._vjoy_as_input[vid] = True
 
         # maestro as input settings
         self.maestro_as_input.clear()
@@ -1161,9 +1150,22 @@ class Settings:
 
     def setVjoyAsInput(self, vid, enabled=True):
         """enables a vjoy device as an input device"""
-        self.vjoy_as_input[vid] = enabled
-        sd = gremlin.event_handler.JoystickState()
-        sd.setVjoyAsInput(vid, enabled)
+        self._vjoy_as_input[vid] = enabled
+        syslog.info(f"Set vjoy as input: device [{vid}] enabled [{enabled}]")
+        el= gremlin.event_handler.EventListener()
+        el.vjoy_as_input_changed.emit(vid, enabled)
+
+    def getVjoyAsInput(self, vid) -> bool:
+        """returns true if the vjoy device is configured as an input device"""
+        if vid in self._vjoy_as_input:
+            return self._vjoy_as_input[vid]
+        return False
+        
+
+    def getVjoyAsInputList(self) -> list[int]:
+        """returns a list of vjoy device IDs that are configured as input devices"""
+        return list(vid for vid, enabled in self._vjoy_as_input.items() if enabled)
+
 
     def get_vjoy_axis_enabled(self, vid, aid) -> bool:
         """true if the value is enabled for this axis"""
@@ -1668,12 +1670,7 @@ class Settings:
                 return True
         return False
 
-    def getVisibleInputCounts(
-        self,
-        device_guid: dinput.GUID | str | int,
-        input_type: InputType | list[InputType],
-        as_list : bool = False
-    ) -> int:
+    def getVisibleInputCounts(self, device_guid: dinput.GUID | str | int, input_type: InputType | list[InputType], as_list: bool = False) -> int:
         """gets the counts of filtered inputs in the device in the profile input filter settings - add multiple types by including them in the list"""
 
         input_type_list = input_type if hasattr(input_type, "__iter__") else [input_type]
@@ -1689,9 +1686,10 @@ class Settings:
                     count += filtered_count
                     if as_list:
                         item_list.extend(
-                            (device_guid, input_type, input_id) for input_id in self.input_visible_map[device_guid][input_type] if self.input_visible_map[device_guid][input_type][input_id]
+                            (device_guid, input_type, input_id)
+                            for input_id in self.input_visible_map[device_guid][input_type]
+                            if self.input_visible_map[device_guid][input_type][input_id]
                         )
-
 
         return item_list if as_list else count
 
@@ -1783,7 +1781,7 @@ class Settings:
         for device in device_list:
             # come up with a suitable default
             assert device is not None, "invalid device"
-            assert device.device_type in (DeviceType.Maestro, DeviceType.Joystick,DeviceType.VJoy), "not a joystick axis"
+            assert device.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy), "not a joystick axis"
             if device.disabled:
                 # skip disabled devices
                 continue
@@ -2183,8 +2181,8 @@ class ProfileRegistry:
                     case _:
                         input_item = InputItem(
                             mode_node=mode_node,
-                            input_type = input_type,
-                            input_id = input_id,
+                            input_type=input_type,
+                            input_id=input_id,
                             device_guid=device_guid,
                             override_input_type=override_input_type,
                             custom_name_handler=custom_name_handler,
@@ -2194,7 +2192,14 @@ class ProfileRegistry:
 
                 input_item.setInputType(input_type)
                 # OSC / MIDI / Stream Deck use the item itself as input_id — never assign a string key.
-                if input_type not in (InputType.OpenSoundControl, InputType.Midi, InputType.StreamDeck, InputType.State, InputType.Keyboard, InputType.KeyboardLatched):
+                if input_type not in (
+                    InputType.OpenSoundControl,
+                    InputType.Midi,
+                    InputType.StreamDeck,
+                    InputType.State,
+                    InputType.Keyboard,
+                    InputType.KeyboardLatched,
+                ):
                     input_item.setInputId(input_id)
                 elif input_type == InputType.StreamDeck and isinstance(input_id, str):
                     # Best-effort restore identity from message key when autocreating by key string
@@ -2440,9 +2445,8 @@ class Profile:
         gremlin.ui.mode_device.ensureModeInputItems(self, "Default")
 
     def getProfileKey(self):
-        """ unique key for this profile """
+        """unique key for this profile"""
         self
-
 
     def _shutdown_handler(self):
         """handles shutdown events"""
@@ -3703,7 +3707,7 @@ class Profile:
 
         return self.devices[device_guid]
 
-    def readDeviceNode(self, node : etree.Element) -> ProfileDeviceNode:
+    def readDeviceNode(self, node: etree.Element) -> ProfileDeviceNode:
         """gets a disconnected device node"""
         verbose = gremlin.config.Configuration().verbose_mode_execution
         device_node = ProfileDeviceNode(self)
@@ -3711,8 +3715,6 @@ class Profile:
         if verbose:
             syslog.info(f"Profile: CREATE disconnected device node: [{str(device_node)}] profile id: [{self.id}]")
         return device_node
-
-
 
     def getModeNode(self, device_guid, mode: str, is_system: bool = False, autocreate=False):
         """gets a mode node
@@ -3765,7 +3767,7 @@ class Profile:
         self._ensure_mode_tree()
         return anytree.find(self._mode_tree, lambda node: self._compare_mode(node, mode))
 
-    def getMode(self, device_guid : dinput.GUID, mode: str) -> ProfileModeNode:
+    def getMode(self, device_guid: dinput.GUID, mode: str) -> ProfileModeNode:
         """gets the profile mode node for the given name"""
         mode = mode.strip().casefold()
         device_node = self.getDeviceNode(device_guid, autocreate=False)
@@ -3774,7 +3776,6 @@ class Profile:
                 if mode_name.casefold() == mode:
                     return device_node.modes[mode_name]
         return None
-
 
     def find_input(self, device_guid, input_id):
         """finds the input item for the give device_guid, input_id"""
@@ -3973,7 +3974,7 @@ class Profile:
         else:
             # regenerate the profile
             root.set("guid", self.id)
-            tree.write(fname, encoding="utf-8", xml_declaration=True) # update the file with the new profile ID if it's missing
+            tree.write(fname, encoding="utf-8", xml_declaration=True)  # update the file with the new profile ID if it's missing
 
         self._start_mode = None
         if "start_mode" in root.attrib:
@@ -4163,7 +4164,6 @@ class Profile:
                 if new_device.virtual:
                     self.vjoy_devices[dev.device_guid] = new_device
 
-
         # Parse merge axis entries
         for child in root.iter("merge-axis"):
             self.merge_axes.append(self._parse_merge_axis(child))
@@ -4268,7 +4268,7 @@ class Profile:
         root.set("restore_last", str(self._restore_last_mode))
         root.set("force_numlock", str(self._force_numlock_off))
         root.set("force_numlock_on", str(self._force_numlock_on))
-        root.set("guid",self.id) # profile ID
+        root.set("guid", self.id)  # profile ID
 
         # mode list
 
@@ -4374,8 +4374,6 @@ class Profile:
                 add_vjoy = True
             if device_node.device:
                 node.set("vjoy-id", safe_format(device_node.device.vjoy_id, int))
-
-
 
         if add_vjoy:
             root.append(vjoy_devices)
@@ -4683,8 +4681,6 @@ class Profile:
                             except Exception as e:
                                 syslog.error(f"BACKUP: Failed to copy companion file {ext}: {e}")
 
-
-
                     syslog.info(f"BACKUP: Saved backup profile: {gremlin.util.toUrl(backup_file)}")
                 except Exception as err:
                     syslog.error(f"BACKUP: save error: Unable to backup profile: [{gremlin.util.toUrl(backup_file)}]")
@@ -4724,9 +4720,6 @@ class Profile:
             if not completed:
                 syslog.warning("Profile config read timed out")
             return result
-
-
-
 
     def _readConfig_ui(self) -> dict:
         """reads the profile config"""
@@ -4940,7 +4933,6 @@ class Profile:
         else:
             tag_list = [tag_or_list]
 
-
         for container in input_item.containers:
             for action_set in container.action_sets:
                 for action in action_set:
@@ -4988,8 +4980,6 @@ class Profile:
                     for input_type in mode_object.config:
                         for item in mode_object.config[input_type].values():
                             result = self._filter_actions_input_item(item, tag_or_list, callback, extra_data)
-
-
 
     def _filter_conditions_input_item(self, input_item: InputItem, callback, extra_data: dict = None) -> bool:
         """extracts all conditions from the profile and executes the callback for each condition found - if the callback returns false, the chain exits"""
@@ -5142,7 +5132,7 @@ class Profile:
         return count
 
     def convertTTSToPlaySound(self):
-        """converts profile TTS entries to playsound entries - prompt the user and saves to a new profile """
+        """converts profile TTS entries to playsound entries - prompt the user and saves to a new profile"""
         fname = self.profile_file
         if not fname or not os.path.isfile(fname):
             return False
@@ -5160,7 +5150,9 @@ class Profile:
             gremlin.ui.ui_common.MessageBox(informative_text="No TTS entries found in the profile.")
             return None
 
-        result = gremlin.ui.ui_common.ConfirmBox(informative_text ="Do you want to convert all TTS entries to lay sound entries?\nThis will save to a new profile.")
+        result = gremlin.ui.ui_common.ConfirmBox(
+            informative_text="Do you want to convert all TTS entries to lay sound entries?\nThis will save to a new profile."
+        )
         if not result:
             return None
 
@@ -5169,9 +5161,7 @@ class Profile:
         if not save_fname:
             return None
 
-
         for node in nodes:
-
             # read the node
             voice_id = None
             tts = gremlin.tts.TextToSpeech()
@@ -5188,11 +5178,8 @@ class Profile:
                     speaker = voice.name
             else:
                 # get a default voice
-                default_voice = next(
-                    (voice for voice in self.voices if "David Desktop" in voice.name), None
-                )
+                default_voice = next((voice for voice in self.voices if "David Desktop" in voice.name), None)
                 speaker = default_voice.name
-
 
             if "volume" in node.attrib:
                 volume = safe_read(node, "volume", int, 50)
@@ -5203,9 +5190,7 @@ class Profile:
             rate = safe_read(node, "rate", int, 100)
             if rate == 0:
                 rate = 100  # default
-            rate = gremlin.util.clamp(
-                rate, tts.rate_offset_min, tts.rate_offset_max
-            )
+            rate = gremlin.util.clamp(rate, tts.rate_offset_min, tts.rate_offset_max)
             if "text" in node.attrib:
                 text = node.get("text")
             else:
@@ -5216,7 +5201,6 @@ class Profile:
             exec_on_press = safe_read(node, "exec_on_press", bool, True)
             exec_on_release = safe_read(node, "exec_on_release", bool, False)
             # override_suppress = safe_read(node, "override-suppress", bool, False)
-
 
             # replace with new play sound node
 
@@ -5240,7 +5224,6 @@ class Profile:
             node.set("type", "playsound")
             node.set("randomize", safe_format(randomize_sound_file, bool))
 
-
             node.set("speaker", speaker)
             node.set("volume", safe_format(volume, int))
             node.set("text", html.escape(text))
@@ -5257,8 +5240,6 @@ class Profile:
             node.set("playback-mode", safe_format(playback_mode.name, str))
             node.set("auto-generate", safe_format(auto_generate, bool))
 
-
-
         tree.write(save_fname, encoding="utf-8", xml_declaration=True, pretty_print=True)
 
         # companion files
@@ -5272,19 +5253,13 @@ class Profile:
                 except Exception as e:
                     syslog.error(f"BACKUP: Failed to copy companion file {ext}: {e}")
 
-
-
-
-
         return save_fname
 
-
     def convertMacroToSequence(self):
-        """ converts macro entries to sequence container entries """
+        """converts macro entries to sequence container entries"""
         fname = self.profile_file
         if not os.path.isfile(fname):
             return False
-
 
         import gremlin.ui.ui_common
         from PySide6 import QtWidgets
@@ -5298,7 +5273,9 @@ class Profile:
             gremlin.ui.ui_common.MessageBox(informative_text="No Macro entries found in the profile.")
             return None
 
-        result = gremlin.ui.ui_common.ConfirmBox(informative_text ="Do you want to convert all Macro entries to sequence containers??\nThis will save to a new profile.")
+        result = gremlin.ui.ui_common.ConfirmBox(
+            informative_text="Do you want to convert all Macro entries to sequence containers??\nThis will save to a new profile."
+        )
         if not result:
             return None
 
@@ -5308,6 +5285,7 @@ class Profile:
             return None
 
         macro_actions = []
+
         def _apply_macro(action, extra_data: dict = None) -> bool:
             nonlocal macro_actions
             macro_actions.append(action)
@@ -5316,12 +5294,8 @@ class Profile:
         # get all macro entries in the current profile
         self.filter_actions("macro", _apply_macro)
 
-
-
         plugin_manager = gremlin.plugin_manager.ActionPlugins()
         container_plugins = gremlin.plugin_manager.ContainerPlugins()
-
-
 
         from action_plugins.macro import Macro
         from action_plugins.map_to_vjoy import VjoyRemap
@@ -5331,18 +5305,16 @@ class Profile:
         from container_plugins.sequence import SequenceContainer
         import gremlin.macro
 
-
-        action : Macro
+        action: Macro
         input_item_map = {}
         for action in macro_actions:
             input_item = action.input_item
             if input_item not in input_item_map:
-                container : SequenceContainer = container_plugins.get_class("Sequence")(input_item=input_item)
+                container: SequenceContainer = container_plugins.get_class("Sequence")(input_item=input_item)
                 input_item_map[input_item] = container
                 input_item.containers.append(container)
             else:
                 container = input_item_map[input_item]
-
 
             action_set = ActionSet()
             container.add_action_set(action_set)
@@ -5365,8 +5337,8 @@ class Profile:
                     action_set.add_action(new_action)
                 elif isinstance(macro_action, gremlin.macro.MouseButtonAction):
                     new_action = MapToKeyboardEx(container)
-                    button : MouseButton = macro_action.button
-                    key =  key = gremlin.keyboard.key_from_mousebutton(button.value)
+                    button: MouseButton = macro_action.button
+                    key = key = gremlin.keyboard.key_from_mousebutton(button.value)
                     new_action.keys.append(key)
                     action_set.add_action(new_action)
                 elif isinstance(macro_action, gremlin.macro.MouseMotionAction):
@@ -5381,12 +5353,6 @@ class Profile:
                     state = macro_action.state
                     new_action.state = state
                     action_set.add_action(new_action)
-
-
-
-
-
-
 
 
 """ END PROFILE """
@@ -5635,10 +5601,11 @@ class ProfileModeNode:
 
                 item.from_xml(child, item, extra_data)  # send owner item to sub components as the data member
 
-                assert item.input_id is not None, f"XML: invalid input id on load: source line: [{child.sourceline}] xml: [{etree.tostring(child, encoding='unicode')}]"
+                assert item.input_id is not None, (
+                    f"XML: invalid input id on load: source line: [{child.sourceline}] xml: [{etree.tostring(child, encoding='unicode')}]"
+                )
 
                 input_item = self.getInputItem(item.input_type, item.input_id)
-
 
                 if input_item is not None:
                     input_item.setContainers(item.containers)
@@ -5646,17 +5613,16 @@ class ProfileModeNode:
                 if input_item is None:
                     input_item = item
                     self.addInputItem(item)
-                    self.profile.registry.registerInputItem(input_item = input_item,
-                                                            device_guid = self.device_guid,
-                                                            input_type = input_type,
-                                                            input_id = item.input_id)
+                    self.profile.registry.registerInputItem(input_item=input_item, device_guid=self.device_guid, input_type=input_type, input_id=item.input_id)
 
                 if __debug__:
                     test = self.profile.registry.getInputItem(device_guid=self.device_guid, mode_name=self.name, input_type=input_type, input_id=item.input_id)
                     assert test == input_item
 
             except Exception as e:
-                syslog.error(f"XML: unknown input type: [{node.tag}] - offending line: [{node.sourceline}]  contents: [{etree.tostring(node, encoding='unicode')}")
+                syslog.error(
+                    f"XML: unknown input type: [{node.tag}] - offending line: [{node.sourceline}]  contents: [{etree.tostring(node, encoding='unicode')}"
+                )
                 syslog.error(f"\texception occurred: {str(e)}\n{traceback.format_exc()}")
 
             # sorting index
@@ -5829,11 +5795,11 @@ class PluginInstance:
     def has_variable(self, name):
         return name in self.variables
 
-    def set_variable(self, name : str, variable : PluginVariable):
+    def set_variable(self, name: str, variable: PluginVariable):
         syslog.info(f"Plugin: set variable {name} to variable {variable} value: {variable.value}")
         self.variables[name] = variable
 
-    def get_variable(self, name : str):
+    def get_variable(self, name: str):
         verbose = gremlin.config.Configuration().verbose_mode_plugin
         if name not in self.variables:
             var = PluginVariable(self)
@@ -6424,6 +6390,3 @@ class ProfileMap:
     @property
     def valid(self):
         return self._valid
-
-
-

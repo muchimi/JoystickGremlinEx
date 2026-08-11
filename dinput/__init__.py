@@ -639,6 +639,10 @@ class DeviceSummary:
             return self._get_axis_callback(axis)
         return DILL.get_axis(self.device_guid, axis)
 
+    def get_axis_list(self) -> list:
+        """ gets the list of axis input ids for this device (1 based, skips unmapped axes)"""
+        return list(self.axis_id_map.keys())
+
     def get_hat(self, hat):
         """gets a hat position for this device"""
         if self._get_hat_callback:

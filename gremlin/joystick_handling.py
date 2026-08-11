@@ -161,27 +161,53 @@ def all_maestro_devices() -> list[dinput.DeviceSummary]:
     """gets connected Maestro devices"""
     return list(_maestro_devices_map.values())
 
+def vjoy_input_devices() -> list[dinput.DeviceSummary]:
+    """returns the list of input vjoy devices"""
+    import gremlin.shared_state
+    profile = gremlin.shared_state.current_profile
+    settings = profile.settings
+    syslog.info(f"Vjoy as input list: {settings.getVjoyAsInputList()}")
+    devices = [dev for dev in _all_joystick_devices if dev.device_type == DeviceType.VJoy and dev.enabled and settings.getVjoyAsInput(dev.vjoy_id)]
+    return devices
+
+def vjoy_output_devices() -> list[dinput.DeviceSummary]:
+    """ gets the list of output vjoy devices """
+    import gremlin.shared_state
+    profile = gremlin.shared_state.current_profile
+    settings = profile.settings
+    devices = [dev for dev in _all_joystick_devices if dev.device_type == DeviceType.VJoy and dev.enabled and not settings.getVjoyAsInput(dev.vjoy_id)]
+    return devices
 
 def axis_input_devices() -> list[dinput.DeviceSummary]:
     """returns the list of devices that has axes"""
-    devices = [dev for dev in _joystick_devices if dev.axis_count]
+    global _all_joystick_devices
+    vjoy_devices = vjoy_input_devices()
+    devices = [dev for dev in _all_joystick_devices if dev.axis_count and dev.enabled and dev.device_type != DeviceType.VJoy]
+    devices.extend(vjoy_devices)
     return devices
 
 
 def button_input_devices() -> list[dinput.DeviceSummary]:
     """returns the list of devices that have buttons"""
-    devices = [dev for dev in _joystick_devices if dev.button_count]
+    global _all_joystick_devices
+    vjoy_devices = vjoy_input_devices()
+    devices = [dev for dev in _all_joystick_devices if dev.button_count and dev.enabled and dev.device_type != DeviceType.VJoy]
+    devices.extend(vjoy_devices)
     return devices
 
 
 def hat_input_devices() -> list[dinput.DeviceSummary]:
     """returns the list of devices that define hats"""
-    devices = [dev for dev in _joystick_devices if dev.hat_count]
+    global _all_joystick_devices
+    vjoy_devices = vjoy_input_devices()
+    devices = [dev for dev in _all_joystick_devices if dev.hat_count and dev.enabled and dev.device_type != DeviceType.VJoy]
+    devices.extend(vjoy_devices)
     return devices
 
 
 def filtered_input_devices(input_type_list=[InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat], virtual_only=False):
     """gets a list of devices filtered by axis, button or hat"""
+    global _all_joystick_devices
 
     def filter_func(dev: dinput.DeviceSummary):
         # returns TRUE if device can be used
@@ -200,7 +226,7 @@ def filtered_input_devices(input_type_list=[InputType.JoystickAxis, InputType.Jo
 
 
 
-    devices = [dev for dev in _joystick_devices if filter_func(dev)]
+    devices = [dev for dev in _all_joystick_devices if filter_func(dev) and dev.enabled]
     return devices
 
 
@@ -763,11 +789,10 @@ def removeDevice(dev: dinput.DeviceSummary):
     device_guid = gremlin.util.normalize_guid(dev.device_guid)
     if device_guid in _joystick_device_guid_map:
         del _joystick_device_guid_map[device_guid]
-        _all_joystick_devices = [d for d in _all_joystick_devices if d.device_guid != device_guid]
+        _all_joystick_devices = list(set(d for d in _all_joystick_devices if d.device_guid != device_guid))
         if dev.device_type == DeviceType.VJoy:
             _vjoy_devices_map = {d.vjoy_id: d for d in _vjoy_devices_map if d.device_guid != device_guid}
 
-        _joystick_devices = [d for d in _joystick_devices if d.device_guid != device_guid]
 
 
 def device_name_from_guid(device_guid, refresh=False) -> str:
@@ -1281,8 +1306,7 @@ def joystick_devices_initialization():
 
         # Process all connected devices in order to properly initialize the device registry
         devices = []
-        _joystick_devices = []  # [DeviceSummary] of connected devices only
-        _all_joystick_devices = []  # [DeviceSummary] of all devices, virtual, connected and disconnected
+
         _joystick_device_guid_map.clear()
         _all_vjoy_devices_map.clear()
         _vjoy_devices_map.clear()
@@ -1294,7 +1318,9 @@ def joystick_devices_initialization():
             _all_devices_map[dev.device_guid] = dev
             if dev.device_type == DeviceType.Joystick:
                 _joystick_device_guid_map[dev.device_guid] = dev
-                _all_joystick_devices.append(dev)
+
+
+
         virtual_count = 0
         real_count = 0
         virtual_devices = {}
@@ -1328,8 +1354,6 @@ def joystick_devices_initialization():
                 syslog.info(f"\t\tIndex: [{device_index}] {str(dev)}")
 
                 if dev.device_type == DeviceType.Joystick:
-                    _joystick_devices.append(dev)
-                    _all_joystick_devices.append(dev)
                     _joystick_device_guid_map[dev.device_guid] = dev  # key by GUID
 
                 _all_devices_map[dev.device_guid] = dev  # key by GUID
@@ -1349,10 +1373,15 @@ def joystick_devices_initialization():
                 else:
                     real_count += 1
 
+
+
+
+
             syslog.info(f"INIT: Found {real_count} hardware devices and {virtual_count} virtual devices")
         except Exception as ex:
             syslog.error(f"INIT: Error while initializing devices: {ex}")
             syslog.error(traceback.format_exc())
+
 
         vjoy_lookup = {}
         vjoy_wheel_lookup = {}
@@ -1494,15 +1523,7 @@ def joystick_devices_initialization():
                 if verbose_detailed:
                     syslog.info(f"Adding undetected VJOY device: [{vjoy_index}] {str(dev)}")
 
-            # If the device can be acquired, configure the mapping from
-            # vJoy axis id, which may not be sequential, to the
-            # sequential SDL axis id
-            # if dev.connected and hash_value in vjoy_lookup:
-            #     try:
-            #         # register the vjoy device with the proxy
-            #         _vjoy_dev = vjoy_proxy[vjoy_index]
-            #     except error.VJoyError:
-            #         syslog.error(f"vJoy id {vjoy_index:} can't be acquired")
+
 
         if not should_terminate:
             if len(_joystick_device_guid_map) == 0:
@@ -1540,6 +1561,13 @@ def joystick_devices_initialization():
 
         _joystick_initialized = True
         syslog.info("Joystick input initialized")
+
+
+    # update final list
+    
+    _all_joystick_devices = [dev for dev in _joystick_device_guid_map.values()] # all joystick devices
+    _joystick_devices = [dev for dev in _all_joystick_devices if dev.enabled] # all connected joystick devices
+
 
     # register special devices
     registerSpecialDevices()

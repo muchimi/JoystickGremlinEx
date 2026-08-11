@@ -69,7 +69,7 @@ class ProfileSettingsWidget(QDataWidget):
         self._create_ui()
 
 
-   
+
 
     def isLoaded(self) -> bool:
         return True
@@ -109,9 +109,6 @@ class ProfileSettingsWidget(QDataWidget):
             # ensure the VJOy device is released so another app can trigger UI events here
             vjoy = gremlin.joystick_handling.VJoyProxy()[vid]
             vjoy.ensure_released()
-        el = gremlin.event_handler.EventListener()
-        el.vjoy_as_input_changed.emit(vid, enabled)
-        el.device_change_event.emit()
 
     def _create_ui(self):
         """Creates the UI elements of this widget."""
@@ -147,14 +144,6 @@ class ProfileSettingsWidget(QDataWidget):
 
         vjoy_devices = sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id)
         for dev in vjoy_devices:
-            # Only show devices that are not treated as inputs
-            # if not dev.connected:
-            #     # device is disconnected
-            #     continue
-            # if self.profile_settings.vjoy_as_input.get(dev.vjoy_id) is True:
-            #     continue
-            # update: allow vjoy devices used as input to be configured on profile start as we now support concurrent output/input
-
             dialog_widget = gremlin.ui.ui_common.Buttons.getEditWidget(callback=partial(self._edit_dialog, dev), label=f"Edit {dev.name} #{dev.vjoy_id}")
             grid_layout.addWidget(dialog_widget, row, col)
             col += 1
@@ -668,7 +657,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
     # Signal emitted when a change occurs
     changed = Signal(int, bool)  # (vid, enabled)
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, profile_settings, parent=None):
         """Creates a new instance.
 
         :param profile_data profile information read and modified by the
@@ -677,7 +666,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
         """
         super().__init__(parent)
 
-        self.profile_data = profile_data
+        self.settings = profile_settings
 
         self.setTitle("vJoy as Input")
         self.main_layout = QtWidgets.QHBoxLayout(self)
@@ -691,10 +680,10 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
             return
 
         for dev in sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id):
-            widget = gremlin.ui.ui_common.QDataCheckbox(dev.name, data=dev.vjoy_id)
-            if self.profile_data.vjoy_as_input.get(dev.vjoy_id, False):
-                widget.setChecked(True)
-            widget.clicked.connect(self._state_changed)
+            widget = gremlin.ui.ui_common.QDataCheckbox(dev.name,
+                                                        data=dev.vjoy_id,
+                                                        value = self.settings.getVjoyAsInput(dev.vjoy_id),
+                                                        callback=self._state_changed)
             self.vjoy_layout.addWidget(widget)
 
         # Information label
@@ -722,8 +711,7 @@ class VJoyAsInputWidget(QtWidgets.QGroupBox):
         self.main_layout.addStretch()
 
     @QtCore.Slot(bool)
-    def _state_changed(self, checked: bool):
-        widget = self.sender()
+    def _state_changed(self, widget, checked: bool):
         vid: int = widget.data
-        self.profile_data.vjoy_as_input[vid] = checked
+        self.settings.setVjoyAsInput(vid, checked)
         self.changed.emit(vid, checked)

@@ -9887,27 +9887,28 @@ class WidgetCacheTracker:
 
     def _remove(self, key):
         """removes a mapping and notifies the owner"""
-        verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if not self._enabled:
             # caching disabled - never remove
             return
+
         if key in self._widget_map:
             widget = self._widget_map[key]
             del self._widget_map[key]  # remove from the active widget list
             del self._key_time_map[key]
             del self._param_map[key]
 
-            if verbose:
-                syslog.info(f"Trigger widget expiration: [{key}]")
-            widget.expired.emit(key, widget)
 
-            if verbose:
-                syslog.info(f"Delete widget: [{key}]")
-            # delete the widget proper
-            widget.hide()
-            if hasattr(widget, "_cleanup_ui"):
-                widget._cleanup_ui()
-            widget.deleteLater()
+            if Shiboken.isValid(widget):
+                try:
+                    widget.expired.emit(key, widget)
+                    widget.hide()
+                    # delete the widget proper
+                    if hasattr(widget, "_cleanup_ui"):
+                        widget._cleanup_ui()
+                    widget.deleteLater()
+                except Exception as e:
+                    pass # C++ exception might occur here
+
 
     def contains(self, key) -> bool:
         """true if the key is in the cache for a valid widget"""

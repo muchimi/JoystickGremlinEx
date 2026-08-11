@@ -96,7 +96,7 @@ class RemapWidget(gremlin.input_item.AbstractActionWidget):
         self.vjoy_selector = ui_common.VJoySelector(
             lambda x: self.save_changes(),  # handler when selection changes
             input_types[input_type],
-            self.action_data.get_settings().vjoy_as_input,
+            self.action_data.get_settings().getVjoyAsInputList(),
         )
 
         self.vjoy_selector.input_changed.connect(self._input_changed)

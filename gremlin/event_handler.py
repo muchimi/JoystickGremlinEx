@@ -1783,7 +1783,7 @@ class EventListener(QtCore.QObject):
                     syslog.info(f"Ignore input: {device.name} input: {dinput_event.input_index} type: {dinput_event.input_type}")
                 return
 
-            if self.js.vjoyAsInput(vjoy_id):
+            if gremlin.shared_state.current_profile.settings.getVjoyAsInput(vjoy_id):
                 # update the event tracker for loop back devices
                 # we need to record the event because vjoy can sometimes trigger, or not trigger a DINPUT event when it's receiving commands.
                 verbose_vjoy = self._verbose_vjoy
@@ -3638,8 +3638,7 @@ class JoystickState:
     def __init__(self):
         self._input_ignored_device_list = {}  # list of ignored devices (device_guid)
         self._output_ignored_device_list = {}  # list of ignored devices (device_guid)
-        self._vjoy_output_ignored_list = {}  # list of ignored vjoy IDs for output (int)
-        self._vjoy_as_input = {}  # map of VJOY devices used as input by GremlinEx
+
 
     def hook(self):
         el = EventListener()
@@ -3654,8 +3653,6 @@ class JoystickState:
 
         self._input_ignored_device_list.clear()
         self._output_ignored_device_list.clear()
-        self._vjoy_output_ignored_list.clear()
-        self._vjoy_as_input.clear()
 
         """ reload on new profile """
         current_profile = gremlin.shared_state.current_profile
@@ -3668,7 +3665,7 @@ class JoystickState:
                 self.setInputEnabled(dev.device_guid, False)
                 self.setOutputEnabled(device_guid, True)
             elif dev.is_virtual:
-                is_input_enabled = current_profile.settings.vjoy_as_input.get(dev.vjoy_id, False) if current_profile else False
+                is_input_enabled = current_profile.settings.getVjoyAsInput(vid=dev.vjoy_id) if current_profile else False
                 is_output_enabled = True  # not is_input
                 self.setInputEnabled(device_guid, is_output_enabled)
                 self.setOutputEnabled(device_guid, is_input_enabled)
@@ -3680,14 +3677,18 @@ class JoystickState:
                 self.setInputEnabled(device_guid, False)
                 self.setOutputEnabled(device_guid, True)
 
-    def setVjoyAsInput(self, vid: int, enabled: bool):
-        self._vjoy_as_input[vid] = enabled
-
-    def vjoyAsInput(self, vid: int) -> bool:
+    def getVjoyAsInput(self, vid: int) -> bool:
         """true if vjoy device is also used as input"""
-        if vid in self._vjoy_as_input:
-            return self._vjoy_as_input[vid]
+        profile = gremlin.shared_state.current_profile
+        if profile:
+            return profile.settings.getVjoyAsInput(vid)
         return False
+
+    def setVjoyAsInput(self, vid: int, enabled: bool):
+        profile = gremlin.shared_state.current_profile
+        if profile:
+            profile.settings.setVjoyAsInput(vid, enabled)
+
 
     def inputEnabled(self, device_guid) -> bool:
         """true if device input is enabled"""
@@ -3699,12 +3700,6 @@ class JoystickState:
         if id in self._input_ignored_device_list:
             return self._input_ignored_device_list[id]
         return True  # ignore input by default
-
-    def vjoyOutputIgnored(self, vid: int) -> bool:
-        """true if VJOY output is ignored"""
-        if vid in self._vjoy_output_ignored_list:
-            return self._vjoy_output_ignored_list[vid]
-        return False
 
     def outputIgnored(self, device_guid) -> bool:
         """true if the device output should be ignored"""
@@ -3740,8 +3735,7 @@ class JoystickState:
         device = gremlin.joystick_handling.getDevice(device_guid)
         if verbose:
             syslog.info(f"VJOY: {device.name} output: {'off' if enabled else 'on'}")
-        if device.is_virtual:
-            self._vjoy_output_ignored_list[device.vjoy_id] = not enabled
+
 
     def _vjoy_as_input_changed(self, vjoy_id: int, enabled: bool):
         dev = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
@@ -3750,7 +3744,7 @@ class JoystickState:
             device_guid = gremlin.util.normalize_guid(dev.device_guid)
             self.setOutputEnabled(device_guid, enabled)  # vjoy used as input cannot be used as output
             self.setInputEnabled(device_guid, not enabled)
-            self.setVjoyAsInput(vjoy_id, enabled)
+
 
 
 class AxisValues:
@@ -4489,6 +4483,7 @@ class JoystickEventProcessor:
         self._dinput_state = DInputState()  # dinput state tracker
         self._lock = threading.RLock()
         self.handle_config_changed()  # setup verbose flags
+        self._group_map = {}  # map of group to callbacks [group_key] -> [list of callbacks]
 
         # hook joystick events for the UI
         el.joystick_event_ui.connect(self.process_event_ui)  # ui thread joystick input event
@@ -4503,7 +4498,7 @@ class JoystickEventProcessor:
         return gremlin.input_item.getInputIdKey(input_id)
 
     def registerListenerUICallback(
-        self, device_guid: str | dinput.GUID, input_type: InputType, input_id: int, callback: Callable = None, mode=CallbackMode.Edit, source = EventSourceType.Any
+        self, device_guid: str | dinput.GUID, input_type: InputType, input_id: int, callback: Callable = None, mode=CallbackMode.Edit, source = EventSourceType.Any, group = None
     ):
         """register a joystick listener
 
@@ -4559,6 +4554,14 @@ class JoystickEventProcessor:
                 self._listener_callbacks[source][mode][device_guid][input_type][input_id_key] = []
             if callback not in self._listener_callbacks[source][mode][device_guid][input_type][input_id_key]:
                 self._listener_callbacks[source][mode][device_guid][input_type][input_id_key].append(callback)
+            if group:
+                if group not in self._group_map:
+                    self._group_map[group] = []
+                if callback not in self._group_map[group]:
+                    self._group_map[group].append((callback, source, mode, device_guid, input_type, input_id))
+
+
+
 
         if verbose:
             device_name = gremlin.joystick_handling.getDeviceName(device_guid) if device_guid else "N/A"
@@ -4569,6 +4572,19 @@ class JoystickEventProcessor:
             syslog.info(
                 f"JEP: add listener: device: [{device_name}] input type: [{input_type}] mode: [{mode}] input_id: [{input_id}] key: [{key}] source: [{source.name}]"
             )
+
+    def unregisterGroup(self, group):
+        """removes all callbacks associated with a group"""
+        if group in self._group_map:
+            for callback, source, mode, device_guid, input_type, input_id in self._group_map[group]:
+                self.unregisterListenerUICallback(
+                    device_guid=device_guid,
+                    input_type=input_type,
+                    input_id=input_id,
+                    callback=callback,
+                    source=source,
+                )
+            del self._group_map[group]
 
 
     def unregisterListenerUICallback(
@@ -4591,14 +4607,6 @@ class JoystickEventProcessor:
         if __debug__:
             if input_type is not None:
                 assert isinstance(input_type, InputType), "invalid input type"
-                # assert is
-                # match input_type:
-                #     case InputType.Midi:
-                #         assert isinstance(input_id, gremlin.ui.midi_device.MidiInputItem), "invalid midi input item"
-                #     case InputType.OpenSoundControl:
-                #         assert isinstance(input_id, gremlin.ui.osc_device.OscInputItem), "invalid osc input item"
-                #     case _:
-                #         assert isinstance(input_id, int), "invalid input id"
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(3)
 
@@ -4636,6 +4644,9 @@ class JoystickEventProcessor:
 
             if not self._callback_map[callback]:
                 del self._callback_map[callback]
+
+
+
 
     def _fireCallbacks(self, event: Event):
         """first all the callbacks on the UI thread"""

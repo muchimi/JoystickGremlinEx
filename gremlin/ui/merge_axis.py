@@ -30,7 +30,7 @@ syslog = logging.getLogger("system")
 class MergeAxisUi(ui_common.BaseDialogUi):
     """Allows merging physical axes into a single virtual ones."""
 
-    def __init__(self, profile_data, parent=None):
+    def __init__(self, profile, parent=None):
         """Creates a new instance.
 
         :param profile_data complete profile data
@@ -40,14 +40,15 @@ class MergeAxisUi(ui_common.BaseDialogUi):
 
         self.setWindowTitle("Merge Axis")
 
-        self.profile_data = profile_data
+        self.profile_data = profile
         self.entries = []
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.merge_layout = QtWidgets.QVBoxLayout()
 
         # If there are no valid output vJoy devices present we can't show
         # the merge dialog.
-        if len(self._output_vjoy_devices()) == 0:
+        id_list = profile.settings.getVjoyAsInputList()
+        if len(id_list) == 0:
             label = QtWidgets.QLabel(
                 "No virtual devices available for axis merging. Either no vJoy devices are configured or all vJoy devices are defined as physical inputs."
             )
@@ -124,7 +125,7 @@ class MergeAxisUi(ui_common.BaseDialogUi):
         for entry in self.profile_data.merge_axes:
             # Show an error if the desired vJoy device is no longer available
             # as an output
-            if self.profile_data.settings.vjoy_as_input.get(entry["vjoy"]["vjoy_id"], False):
+            if self.profile_data.settings.getVjoyAsInput(vid=entry["vjoy"]["vjoy_id"]):
                 entries_to_remove.append(entry)
                 gremlin.util.display_error(f"vJoy device {entry['vjoy']['vjoy_id']} used as physical input")
             else:
@@ -135,14 +136,6 @@ class MergeAxisUi(ui_common.BaseDialogUi):
         for entry in entries_to_remove:
             del self.profile_data.merge_axes[self.profile_data.merge_axes.index(entry)]
 
-    def _output_vjoy_devices(self):
-        output_devices = []
-        for dev in gremlin.joystick_handling.vjoy_devices():
-            is_virtual = not self.profile_data.settings.vjoy_as_input.get(dev.vjoy_id, False)
-            has_axes = dev.axis_count > 0
-            if is_virtual and has_axes:
-                output_devices.append(dev)
-        return output_devices
 
 
 class MergeAxisEntry(QtWidgets.QDockWidget):

@@ -56,7 +56,7 @@ class BaseJoystickCondition(BaseAbstractCondition):
     This condition is based on the state of a joystick axis, button, or hat.
     """
 
-    def __init__(self, extra_data : dict =None):
+    def __init__(self, extra_data: dict = None):
         """Creates a new instance."""
         super().__init__(extra_data)
         self.device_guid = 0  # use this as the invalid GUID
@@ -145,7 +145,6 @@ class BaseJoystickCondition(BaseAbstractCondition):
         return table.to_html()
 
 
-
 class JoystickConditionWidget(AbstractConditionWidget):
     """Widget allowing the configuration of a joystick based condition."""
 
@@ -159,7 +158,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
         super().__init__(condition, parent)
         self.setTitle("Joystick Condition")
 
-    def _create_ui(self, extra_data : dict = None):
+    def _create_ui(self, extra_data: dict = None):
         """Creates the configuration UI for this widget."""
         if not Shiboken.isValid(self):
             return
@@ -803,7 +802,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # Handle vJoy as input and vJoy as output devices properly
 
-        vjoy_as_input = profile.settings.vjoy_as_input
+        vjoy_as_input = profile.settings._vjoy_as_input
 
         # For vJoy as output only show axes entries, for all others treat them
         # as if they were physical input devices
@@ -892,7 +891,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         model.pushSuspend()  # suspend triggers
         model.clear(emit=False)
 
-        #device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(self.device_guid)
+        # device : dinput.DeviceSummary = gremlin.joystick_handling.getDevice(self.device_guid)
         # if device.is_virtual and device.vjoy_id == 4:
         #     pass
 
@@ -957,10 +956,10 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             syslog.info("JoystickDevice: update stats on model change")
         self.update_stats_display(refresh=True)
 
-    def setInputVisible(self, input_item: InputItem, visible: bool, emit = False):
+    def setInputVisible(self, input_item: InputItem, visible: bool, emit=False):
         """ensures the given input item is visible in the list view"""
         settings = self.profile.settings
-        settings.setInputVisible(input_item.device_guid, input_item.input_type, input_item.input_id, visible, emit = emit)
+        settings.setInputVisible(input_item.device_guid, input_item.input_type, input_item.input_id, visible, emit=emit)
 
     def getDefaultFilter(self) -> dict:
         """gets the default filter for the given device"""
@@ -1142,7 +1141,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             self.inputItemListView.setParent(None)
             self.inputItemListView.deleteLater()
 
-    def _edit_curve_item_cb(self, index : int,  input_item : InputItem):
+    def _edit_curve_item_cb(self, index: int, input_item: InputItem):
         """edit curve request"""
         import gremlin.curve_handler
         import gremlin.event_handler
@@ -1183,7 +1182,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self._curve_update_handler(value)
 
         jep = gremlin.event_handler.JoystickEventProcessor()
-        jep.registerListenerUICallback(device_guid = device_guid, input_id = input_id, input_type = input_item.input_type, callback=self._handle_curve_update)
+        jep.registerListenerUICallback(device_guid=device_guid, input_id=input_id, input_type=input_item.input_type, callback=self._handle_curve_update)
 
         # disable highlighting
         gremlin.shared_state.push_suspend_highlighting()
@@ -1205,8 +1204,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _unhook_curve(self):
         jep = gremlin.event_handler.JoystickEventProcessor()
-        jep.unregisterListenerUICallback(device_guid = self.device_guid, input_id = None, input_type = None, callback=self._handle_curve_update)
-
+        jep.unregisterListenerUICallback(device_guid=self.device_guid, input_id=None, input_type=None, callback=self._handle_curve_update)
 
     def _handle_curve_update(self, event: gremlin.event_handler.Event):
         if not event.is_axis:
@@ -1219,8 +1217,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def unhook(self):
         pass
 
-
-    def _delete_curve_item_cb(self, index : int, input_item):
+    def _delete_curve_item_cb(self, index: int, input_item):
         """delete curve request"""
 
         if not Shiboken.isValid(self):

@@ -411,7 +411,7 @@ class CodeRunner:
             self.event_handler.build_event_lookup(inheritance_tree)
 
             # list of vjoys as input
-            input_vids = [vid for vid in range(1, 17) if gremlin.shared_state.current_profile.settings.vjoy_as_input.get(vid, False)]
+            input_vids = gremlin.shared_state.current_profile.settings.getVjoyAsInputList()
 
             # list of vjoy device ID to force a release on
             for vid in input_vids:

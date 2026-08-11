@@ -478,7 +478,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if os.path.isfile(self._comparative_file):
             os.unlink(self._comparative_file)
 
-
     def handle_tab_selected(self, device_guid):
         """persists the last selected device for the profile"""
         if self.profile:
@@ -1383,7 +1382,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # tell components of the possible changes to the options
         el = gremlin.event_handler.EventListener()
         el.options_changed.emit()
-
 
     def profile_creator(self):
         """Opens the UI used to create a profile from an existing one."""
@@ -2646,8 +2644,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _get_vjoy_input_enabled(self, device):
         """gets the vjoy input enabled state"""
         if device:
-            if device.vjoy_id in self.profile.settings.vjoy_as_input:
-                return self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
+            if device.vjoy_id in self.profile.settings._vjoy_as_input:
+                return self.profile.settings._vjoy_as_input.get(device.vjoy_id, False)
         return False
 
     def _get_maestro_input_enabled(self, device):
@@ -2741,7 +2739,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     continue
                 if device.is_virtual:
                     # skip devices if the VJOY device is not setup as input
-                    input_enabled = self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
+                    input_enabled = self.profile.settings._vjoy_as_input.get(device.vjoy_id, False)
                     if not input_enabled:
                         continue
 
@@ -3035,7 +3033,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                     device_guid = gremlin.util.normalize_guid(device.device_guid)
                     device_name = device.name
-                    input_enabled = self.profile.settings.vjoy_as_input.get(device.vjoy_id, False)
+                    input_enabled = self.profile.settings._vjoy_as_input.get(device.vjoy_id, False)
 
                     if not input_enabled:
                         if verbose_l1:
@@ -3728,6 +3726,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """
 
         import gremlin.shared_state
+
         if gremlin.shared_state.is_running:
             # do not allow input selection while the engine is running
             return
@@ -3756,7 +3755,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         import gremlin.util
         import gremlin.shared_state
         import gremlin.joystick_handling
-
 
         completion_callback = None
         if extra_data:
@@ -5807,7 +5805,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             the_title = f"{the_title} [{gremlin.remote.remote_client.getClientName()}]"
 
         self.setWindowTitle(the_title)
-
 
 
 def configure_logger(config: dict):

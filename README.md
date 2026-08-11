@@ -48,6 +48,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T27a)
+Fix: Map to Vjoy Action: button output uses incorrect button ID
+Fix: Map to Vjoy Action: merge axis widget can cause exception
+Fix: UI: wrap C++ error when cleaning up QT widget (QT may destroy the widget before Python is finished destroying it)
+Fix: API: joystick devices: exclude vjoy as an input devices if not set as an input (avoids loops)
+Fix: API: joystick devices: ensure device lists are not duplicated
+
+Known issue: Map to Vjoy Action: merge axis repeater does not update at design time.
+
 ### (m77T27)
 New: Actions API: add aliases for supported actions (allows multiple names for a given action to facilitate searching/on boarding).
 Change: UI: prompt on action delete.
