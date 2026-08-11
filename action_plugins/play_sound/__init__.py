@@ -152,8 +152,10 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="Cooldown time in seconds to suppress duplicate TTS playback.",
         )
 
+        self.tts_sync_cooldown_widget = gremlin.ui.ui_common.QDataPushButton("Sync", callback=self._handle_tts_sync_cooldown, tooltip="Synchronize the cooldown for duplicate TTS playback to the entire profile.")
+
         cooldown_container = gremlin.ui.ui_common.getHContainer(
-            [self.tts_suppress_enabled_widget, "Cooldown (s):", self.tts_suppress_cooldown_widget], widget_only=True
+            [self.tts_suppress_enabled_widget, "Cooldown (s):", self.tts_suppress_cooldown_widget, self.tts_sync_cooldown_widget], widget_only=True
         )
 
         self.tts_file_delete_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(callback=self._handle_file_delete, tooltip="Delete the audio file")
@@ -496,6 +498,31 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self._update_speakers()  # update voice lists
 
         self._update_ui()
+
+
+    def _handle_tag_callback(self, action: PlaySound, extra_data: dict):  # noqa: F821
+        # Implement the logic to handle tag callback
+        if action != self:
+            enabled = extra_data.get("enabled", False)
+            cooldown = extra_data.get("cooldown", 0)
+            action.tts_suppress_duplicate = enabled
+            action.tts_cooldown = cooldown
+            extra_data["count"] += 1
+
+
+    def _handle_tts_sync_cooldown(self):
+        # Implement the logic to synchronize the TTS cooldown across the entire profile
+        result = gremlin.ui.ui_common.ConfirmBox("Synchronize cooldown settings with entire profile?")
+        if result:
+            extra_data = {"enabled": self.action_data.tts_suppress_duplicate,
+                          "cooldown": self.action_data.tts_suppress_cooldown,
+                          "count" : 0}
+            profile = gremlin.shared_state.current_profile
+            profile.filter_actions("play-sound", callback = self._handle_tag_callback, extra_data=extra_data)
+
+            count = extra_data["count"]
+            if count:
+                gremlin.ui.ui_common.MessageBoxInfo(prompt=f"Updated {count} actions with synchronized cooldown settings.", parent=gremlin.shared_state.ui)
 
     def _update_status(self, status: str, icon=None):
         gremlin.util.InvokeUiMethod(self._update_status_ui, status, icon)

@@ -48,6 +48,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T28)
+New: Play Sound Action: added sync button for cooldown options (synchronizes settings with other play sound actions in the profile instead of changing them one at a time).
+Fix: Add additional diagnostics wrapper code around file search to better identify issues with OS I/O errors.
+
 ### (m77T27a)
 Fix: Map to Vjoy Action: button output uses incorrect button ID
 Fix: Map to Vjoy Action: merge axis widget can cause exception

@@ -51,6 +51,9 @@ import functools
 
 
 from . import error
+import traceback
+
+syslog = logging.getLogger("system")
 
 
 # Table storing which modules have been imported already
@@ -194,7 +197,7 @@ def script_path():
     :return path to the scripts location
     """
     return get_root_folder()
-    
+
 
 
 
@@ -719,24 +722,30 @@ def find_files(root_folder, source_pattern="*") -> list:
     if not os.path.isdir(root_folder):
         return []
 
-    wd = os.getcwd()
-    os.chdir(root_folder)
-    process = subprocess.Popen(
-        ["cmd", "/c", "dir", source_pattern, "/b", "/s"],
-        creationflags=subprocess.CREATE_NO_WINDOW,
-        stdout=subprocess.PIPE,
-    )
-    out, err = process.communicate()
-    os.chdir(wd)
-    encoding = "utf-8"
-    # the link will be in square brackets
-    if out:
-        lines = str(out, encoding)
-        if lines:
-            lines = lines.replace("\r", "")
-            lines = lines.split("\n")
-            lines = [ln.casefold() for ln in lines if ln]
-            return lines
+    try:
+
+        wd = os.getcwd()
+        os.chdir(root_folder)
+        process = subprocess.Popen(
+            ["cmd", "/c", "dir", source_pattern, "/b", "/s"],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            stdout=subprocess.PIPE,
+        )
+        out, err = process.communicate()
+        os.chdir(wd)
+        encoding = "utf-8"
+        # the link will be in square brackets
+        if out:
+            lines = str(out, encoding)
+            if lines:
+                lines = lines.replace("\r", "")
+                lines = lines.split("\n")
+                lines = [ln.casefold() for ln in lines if ln]
+                return lines
+    except Exception as e:
+        syslog.error(f"FindFiles: Error in finding files in [{root_folder}] with pattern [{source_pattern}]")
+        syslog.error(f"Exception: {e}")
+        syslog.error(traceback.format_exc())
 
     return []
 
