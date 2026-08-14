@@ -5300,8 +5300,12 @@ class QDataComboBox(QComboBox):
 
         if source:
             # source is expected to be a list of tuples of display/data
-            for display, item in source:
-                self.addItem(display, item)
+            for item in source:
+                if isinstance(item, tuple) and len(item) == 2:
+                    display, item = item
+                    self.addItem(display, item)
+                else:
+                    self.addItem(item)
 
             if value is not None:
                 index = self.findData(value)
@@ -15875,8 +15879,6 @@ class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
         if self._text or self._icon:
             height = max(height, self._widget.sizeHint().height())
         self.setFixedHeight(height)
-
-
 
     def text(self):
         return self._widget.text() if self._widget is not None else None

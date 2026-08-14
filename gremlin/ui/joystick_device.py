@@ -39,7 +39,7 @@ from shiboken6 import Shiboken
 from psygnal import Signal
 import gremlin.util
 from gremlin.util import parse_bool, safe_read, safe_format, parse_guid, write_guid, load_icon
-from gremlin.input_item import InputItem, BaseAbstractCondition, AbstractConditionWidget
+from gremlin.input_item import InputItem, BaseAbstractCondition, AbstractConditionWidget, AbstractContainer, AbstractAction
 import dinput
 
 
@@ -56,9 +56,9 @@ class BaseJoystickCondition(BaseAbstractCondition):
     This condition is based on the state of a joystick axis, button, or hat.
     """
 
-    def __init__(self, extra_data: dict = None):
+    def __init__(self, extra_data: dict = None, target : AbstractContainer | AbstractAction = None):
         """Creates a new instance."""
-        super().__init__(extra_data)
+        super().__init__(extra_data, target = target)
         self.device_guid = 0  # use this as the invalid GUID
         self.input_type = None
         self.input_id = 0

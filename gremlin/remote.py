@@ -310,11 +310,13 @@ class RemoteClient:
         """called when request to enable remote control has been made"""
         self.start()
 
-    def getDatablock(self, action: str = None, data=None) -> dict:
+    def getDatablock(self, action: str = None, key : str = None, data=None) -> dict:
         """gets a dict with the sender info"""
         block = {}
         if action:
             block["action"] = action
+        if key:
+            block["key"] = key
         if data:
             block["data"] = data
 
@@ -323,7 +325,7 @@ class RemoteClient:
     def start(self):
         """creates a multicast client send socket on profile start"""
         if not self._started:
-            if self.remote_control.remoteEnabled:
+            if self.remote_control.remoteEnabled():
                 if self.ensure_socket():
                     el = gremlin.event_handler.EventListener()
                     el.heartbeat.connect(self._alive_ticker)
@@ -459,7 +461,7 @@ class RemoteClient:
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: send button: VJoyId: {device_id} button {button_id} pressed: {is_pressed}")
             bd = ButtonData.create(device_id, button_id, is_pressed, action="button")
-            data = self.getDatablock("button", bd.toPayload())
+            data = self.getDatablock("button", key=ButtonData.key, data=bd.toPayload())
             self._dispatch(data, client_list)
 
     def toggle_button(self, device_id, button_id, client_list=None, force_remote=False):
@@ -469,7 +471,7 @@ class RemoteClient:
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: toggle button: VJoyId: {device_id} button {button_id}")
             bd = ButtonData.create(device_id, button_id, action="toggle")
-            data = self.getDatablock("toggle", bd.toPayload())
+            data = self.getDatablock("toggle", key=ButtonData.key, data=bd.toPayload())
             self._dispatch(data, client_list)
 
     def send_axis(self, device_id, axis_id, value, client_list=None, force_remote=False):
@@ -480,7 +482,7 @@ class RemoteClient:
                 stub = f"{value:0.3f}" if value is not None else "None"
                 syslog.info(f"REMOTE OUTPUT: send axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
             payload = AxisData.create(device_id, axis_id, value, action="value").toPayload()
-            data = self.getDatablock("axis", payload)
+            data = self.getDatablock("axis", key=AxisData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_relative_axis(self, device_id, axis_id, value, client_list=None, force_remote=False):
@@ -491,7 +493,7 @@ class RemoteClient:
                 stub = f"{value:0.3f}" if value is not None else "None"
                 syslog.info(f"REMOTE OUTPUT: send relative axis: VJoyId: [{device_id}] axis: [{axis_id}] value: [{stub}]")
             payload = AxisData.create(device_id, axis_id, relative_value=value, action="relative").toPayload()
-            data = self.getDatablock("axis", payload)
+            data = self.getDatablock("axis", key=AxisData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_hat(self, device_id, hat_id, direction, client_list=None, force_remote=False):
@@ -501,7 +503,7 @@ class RemoteClient:
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: VJoyId: {device_id} hat: {hat_id} direction: {direction}")
             payload = AxisData.create(device_id, hat_id, direction, action="value").toPayload()
-            data = self.getDatablock("hat", payload)
+            data = self.getDatablock("hat", key=AxisData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_key(
@@ -521,7 +523,7 @@ class RemoteClient:
                 syslog.info(f"REMOTE OUTPUT: key: 0x{code:02x} flags: 0x{flags:02x}")
             payload = KeyData.create(virtual_code, scan_code, flags, action="value", extra_data=extra_data).toPayload()
 
-            data = self.getDatablock("key", payload)
+            data = self.getDatablock("key", key=KeyData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_mouse_button(
@@ -539,7 +541,7 @@ class RemoteClient:
                 syslog.info(f"REMOTE OUTPUT: mouse button: {button_id} pressed: {is_pressed}")
 
             payload = MouseData().create(button_id, is_pressed, "button", extra_data).toPayload()
-            data = self.getDatablock("mouse", payload)
+            data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_mouse_button_double_click(
@@ -556,7 +558,7 @@ class RemoteClient:
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse dblclick {button_id} pressed: {is_pressed}")
             payload = MouseData().create(button_id, is_pressed, "button_double", extra_data).toPayload()
-            data = self.getDatablock("mouse", payload)
+            data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_mouse_wheel(self, direction, client_list=None, force_remote=False, extra_data: dict = None):
@@ -566,7 +568,7 @@ class RemoteClient:
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: mouse wheel: {direction}")
             payload = MouseData().create(MouseButton.Wheel, direction, "wheel", extra_data).toPayload()
-            data = self.getDatablock("mouse", payload)
+            data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_mouse_h_wheel(self, direction, client_list=None, force_remote=False, extra_data: dict = None):
@@ -577,7 +579,7 @@ class RemoteClient:
                 syslog.info(f"REMOTE OUTPUT: mouse H wheel: {direction}")
 
             payload = MouseData().create(MouseButton.HWheel, direction, "hwheel", extra_data).toPayload()
-            data = self.getDatablock("mouse", payload)
+            data = self.getDatablock("mouse", key=MouseData.key, data= payload)
             self._dispatch(data, client_list)
 
     def send_mouse_motion(self, dx, dy, client_list=None, force_remote=False, extra_data: dict = None):
@@ -588,7 +590,7 @@ class RemoteClient:
                 syslog.info(f"REMOTE OUTPUT: mouse motion: {dx}, {dy}")
 
             payload = MouseData().create(MouseButton.NotSet, (dx, dy), "axis", extra_data).toPayload()
-            data = self.getDatablock("mouse", payload)
+            data = self.getDatablock("mouse", key=MouseData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_mouse_motion_acceleration(
@@ -616,32 +618,34 @@ class RemoteClient:
                 )
                 .toPayload()
             )
-            data = self.getDatablock("mouse", payload)
+            data = self.getDatablock("mouse", key=MouseData.key, data= payload)
             self._dispatch(data, client_list)
 
-    def send_gamepad_axis(self, index, mode, value, client_list=None, force_remote=False):
+    def send_gamepad_axis(self, device_id : int | str, mode, value, client_list=None, force_remote=False):
         """sends a gamepad axis to the remote client"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: gamepad axis: index: {index} mode: {mode} value: {value:0.3f}")
+                syslog.info(f"REMOTE OUTPUT: gamepad axis: index: {device_id} mode: {mode} value: {value:0.3f}")
 
             data = self.getDatablock("gamepad")
+            data["key"] = "gamepad"
             data["subtype"] = "axis"
-            data["index"] = index  # which device to send to
+            data["index"] = device_id  # which device to send to
             data["mode"] = mode
             data["value"] = value
             self._dispatch(data, client_list)
 
-    def send_gamepad_button(self, index, mode, is_pressed, client_list=None, force_remote=False):
+    def send_gamepad_button(self, device_id : int | str, mode, is_pressed, client_list=None, force_remote=False):
         """sends a gamepad button to the remote client"""
         if self.enabled or force_remote:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
-                syslog.info(f"REMOTE OUTPUT: gamepad: index: {index} mode: {mode} pressed: {is_pressed}")
+                syslog.info(f"REMOTE OUTPUT: gamepad: index: {device_id} mode: {mode} pressed: {is_pressed}")
 
             data = self.getDatablock("gamepad")
-            data["index"] = index  # which device to send to
+            data["key"] = "gamepad"
+            data["index"] = device_id  # which device to send to (int or string)
             data["subtype"] = "button"
             data["mode"] = mode
             data["is_pressed"] = is_pressed
@@ -1152,106 +1156,133 @@ class InternalSpeech:
             pass
 
 
-class ButtonData:
-    """holds button data"""
+class BaseData:
+    """base class for input data"""
 
-    def __init__(self):
-        self.device_id = None
-        self.button_id = None
-        self.is_pressed = None
-        self.action = None
-
-    @staticmethod
-    def create(device_id: str, button_id: int, is_pressed: bool = None, action: str = None):
-        self = ButtonData()
-        self.device_id = device_id
-        self.button_id = button_id
-        self.is_pressed = is_pressed
-        self.action = action
-        return self
+    def __init__(self, key : str, action : str, extra_data : dict = None):
+        self.key : str = key
+        self.action : str= action
+        self.extra_data : dict = extra_data
 
     def toPayload(self) -> dict:
         """creates a payload from the data"""
         return {
+            "key": self.key,
+            "action": self.action,
+            "extra_data": self.extra_data,
+        }
+
+    def fromPayload(data: dict) -> BaseData:
+        """loads from payload"""
+        return BaseData(
+            key=data["key"],
+            action=data["action"],
+            extra_data=data.get("extra_data")
+        )
+
+class ButtonData(BaseData):
+    """holds button data"""
+    key = "button"
+    def __init__(self, action : str = None, extra_data : dict = None):
+        super().__init__(self.key, action, extra_data)
+        self.device_id : int | str = None # vjoy device ID (int or guid) GUID
+        self.button_id : int = None
+        self.is_pressed : bool = None
+
+
+    @staticmethod
+    def create(device_id: int | str, button_id: int, is_pressed: bool = None, action: str = None, extra_data: dict = None):
+        self = ButtonData(action, extra_data=extra_data)
+        self.device_id = device_id
+        self.button_id = button_id
+        self.is_pressed = is_pressed
+        return self
+
+    def toPayload(self) -> dict:
+        """creates a payload from the data"""
+        payload = super().toPayload()
+        return {
+            **payload,
             "device": self.device_id,
             "target": self.button_id,
             "value": self.is_pressed,
-            "action": self.action,
         }
 
     @staticmethod
     def fromPayload(data: dict) -> ButtonData:
         """loads from payload"""
-        self = ButtonData()
+        assert data.get("key") == ButtonData.key, "Invalid key for ButtonData"
+        self = ButtonData(action=data["action"], extra_data=data.get("extra_data"))
         self.device_id = data["device"]
         self.button_id = data["target"]
         self.is_pressed = data["value"]
-        self.action = data["action"]
         return self
 
 
-class AxisData:
+class AxisData(BaseData):
     """holds axis data"""
+    key = "axis"
 
-    def __init__(self):
-        self.device_id: str = None
+    def __init__(self, action : str = None, extra_data : dict = None):
+        super().__init__(self.key, action, extra_data)
+        self.device_id: int | str = None
         self.axis_id: int = None
-        self.value = None
-        self.relative_value = None
-        self.action = None
+        self.value : float = None
+        self.relative_value : float = None
 
     @staticmethod
     def create(
-        device_id: str,
+        device_id: int | str,
         axis_id: int,
         value: float = None,
         relative_value: float = None,
         action: str = None,
     ):
-        self = AxisData()
+        self = AxisData(action=action)
         self.device_id = device_id
         self.axis_id = axis_id
         self.value = value
         self.relative_value = relative_value
-        self.action = action
 
         return self
 
     def toPayload(self) -> dict:
         """creates a payload from the data"""
+        payload = super().toPayload()
         return {
+            **payload,
             "device": self.device_id,
             "target": self.axis_id,
             "value": self.value,
             "rvalue": self.relative_value,
-            "action": self.action,
         }
 
     @staticmethod
     def fromPayload(data: dict) -> AxisData:
         """loads from payload"""
-        self = AxisData()
+        assert data.get("key") == AxisData.key, "Invalid key for AxisData"
+        self = AxisData(action=data["action"], extra_data=data.get("extra_data"))
         self.device_id = data["device"]
         self.axis_id = data["target"]
         self.value = data["value"]
         self.relative_value = data["rvalue"]
-        self.action = data["action"]
 
         return self
 
 
-class HatData:
+class HatData(BaseData):
     """holds hat data"""
+    key = "hat"
 
-    def __init__(self):
-        self.device_id: str = None
+    def __init__(self, action : str = None, extra_data : dict = None):
+        super().__init__(self.key, action, extra_data)
+        self.device_id: int | str = None
         self.hat_id: int = None
         self.direction: tuple = None  # tuple
-        self.action: str = None
 
     @staticmethod
-    def create(device_id: str, hat_id: int, direction: tuple, action: str = None) -> HatData:
-        self = HatData()
+    def create(device_id: int | str, hat_id: int, direction: tuple, action: str = None, extra_data: dict = None) -> HatData:
+        self = HatData(action=action, extra_data=extra_data)
         self.device_id = device_id
         self.hat_id = hat_id
         self.direction = direction
@@ -1259,26 +1290,32 @@ class HatData:
         return self
 
     def toPayload(self) -> dict:
+        payload = super().toPayload()
         return {
+            **payload,
             "device": self.device_id,
             "target": self.hat_id,
             "value": self.direction,
-            "action": self.action,
         }
 
     @staticmethod
     def fromPayload(data: dict) -> HatData:
-        self = HatData()
+        assert data.get("key") == HatData.key, "Invalid key for HatData"
+        self = HatData(action=data.get("action"), extra_data=data.get("extra_data"))
         self.device_id = data["device"]
         self.hat_id = data["target"]
         self.direction = data["value"]
-        self.action = data["action"]
+
+        return self
 
 
-class KeyData:
+class KeyData(BaseData):
     """holds key data"""
 
-    def __init__(self):
+    key = "key"
+
+    def __init__(self, action : str = None, extra_data : dict = None):
+        super().__init__(self.key, action, extra_data)
         self.virtual_code: int = None
         self.scan_code: int = None
         self.flags: int = None
@@ -1293,7 +1330,7 @@ class KeyData:
         action: str = None,
         extra_data: dict = None,
     ) -> KeyData:
-        self = KeyData()
+        self = KeyData(action=action, extra_data=extra_data)
         self.virtual_code = virtual_code
         self.scan_code = scan_code
         self.flags = flags
@@ -1302,37 +1339,38 @@ class KeyData:
         return self
 
     def toPayload(self) -> dict:
+        payload = super().toPayload()
         return {
+            **payload,
             "vc": self.virtual_code,
             "sc": self.scan_code,
             "flags": self.flags,
-            "action": self.action,
-            "extra": self.extra_data,
         }
 
     @staticmethod
     def fromPayload(data: dict) -> KeyData:
-        self = KeyData()
+        assert data.get("key") == KeyData.key, "Invalid key for KeyData"
+        self = KeyData(action=data.get("action"), extra_data=data.get("extra_data"))
         self.virtual_code = data["vc"]
         self.scan_code = data["sc"]
         self.flags = data["flags"]
-        self.action = data["action"]
-        self.extra_data = data["extra"]
+
         return self
 
 
-class MouseData:
+class MouseData(BaseData):
     """holds mouse data"""
 
-    def __init__(self):
+    key = "mouse"
+
+    def __init__(self, action: str = None, extra_data: dict = None):
+        super().__init__(self.key, action, extra_data)
         self.button_id: int = None
         self.value = None
-        self.action: str = None
-        self.extra_data: dict = None
 
     @staticmethod
     def create(button_id: int, value, action: str = None, extra_data: dict = None) -> MouseData:
-        self = MouseData()
+        self = MouseData(action=action, extra_data=extra_data)
         self.button_id = button_id
         self.value = value
         self.action = action
@@ -1340,20 +1378,19 @@ class MouseData:
         return self
 
     def toPayload(self) -> dict:
+        payload = super().toPayload()
         return {
+            **payload,
             "button": self.button_id,
             "value": self.value,
-            "action": self.action,
-            "extra": self.extra_data,
         }
 
     @staticmethod
     def fromPayload(data: dict) -> MouseData:
-        self = MouseData()
+        assert data.get("key") == MouseData.key, "Invalid key for MouseData"
+        self = MouseData(action=data.get("action"), extra_data=data.get("extra_data"))
         self.button_id = data["button"]
         self.value = data["value"]
-        self.action = data["action"]
-        self.extra_data = data["extra"]
         return self
 
 

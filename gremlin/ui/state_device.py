@@ -38,7 +38,7 @@ from gremlin.util import safe_format, safe_read, write_guid, read_guid
 import gremlin.base_profile
 from psygnal import Signal
 import gremlin.input_item
-from gremlin.input_item import InputItemWidget, BaseAbstractCondition, AbstractConditionWidget, InputItem
+from gremlin.input_item import InputItemWidget, BaseAbstractCondition, AbstractConditionWidget, InputItem, AbstractContainer, AbstractAction
 from shiboken6 import Shiboken
 import html
 from typing import Callable
@@ -1301,8 +1301,8 @@ class StateInputItem(InputItem):
 class BaseStateCondition(BaseAbstractCondition):
     """state condition"""
 
-    def __init__(self, extra_data : dict = None):
-        super().__init__(extra_data)
+    def __init__(self, extra_data : dict = None, target : AbstractContainer | AbstractAction = None):
+        super().__init__(extra_data, target = target)
 
         self.key = None
         self.description = None

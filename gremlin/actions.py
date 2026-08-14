@@ -111,7 +111,7 @@ class KeyboardCondition(AbstractCondition):
     particular key is pressed or released.
     """
 
-    def __init__(self, scan_code, is_extended, comparison, input_item=None):
+    def __init__(self, scan_code, is_extended, comparison, input_item=None, container_condition=False):
         """Creates a new instance.
 
         :param scan_code the scan code of the key to evaluate
@@ -119,7 +119,7 @@ class KeyboardCondition(AbstractCondition):
         :param comparison the comparison operation to perform when evaluated
         """
         assert isinstance(input_item, gremlin.ui.keyboard_device.KeyboardInputItem), "invalid input_item for keyboard condition"
-        super().__init__(comparison)
+        super().__init__(comparison, container_condition)
         self.input_item = input_item
 
     def __call__(self, event, value, extra_data=None):
@@ -162,14 +162,14 @@ class KeyboardCondition(AbstractCondition):
 class StateCondition(AbstractCondition):
     """Condition verifying a state"""
 
-    def __init__(self, condition):
+    def __init__(self, condition, container_condition=False):
         """Creates a new instance.
 
         :param key: name of the state
         :param is_extended whether or not the key code is extended
         :param comparison the comparison operation to perform when evaluated
         """
-        super().__init__(condition.comparison)
+        super().__init__(condition.comparison, container_condition)
 
         self.key = condition.key
         self.ignore_release = condition.ignore_release
@@ -227,14 +227,14 @@ class StateCondition(AbstractCondition):
 class ModeCondition(AbstractCondition):
     """Condition verifying a runtime mode"""
 
-    def __init__(self, condition):
+    def __init__(self, condition, container_condition=False):
         """Creates a new instance.
 
         :param key: name of the state
         :param is_extended whether or not the key code is extended
         :param comparison the comparison operation to perform when evaluated
         """
-        super().__init__(condition.comparison)
+        super().__init__(condition.comparison, container_condition)
         self.mode = condition.mode
         self.ignore_release = condition.ignore_release
 
@@ -294,12 +294,12 @@ class JoystickCondition(AbstractCondition):
     one of eight possible directions.
     """
 
-    def __init__(self, condition):
+    def __init__(self, condition, container_condition=False):
         """Creates a new instance.
 
         :param condition the condition to check against
         """
-        super().__init__(condition.comparison)
+        super().__init__(condition.comparison, container_condition)
         self.device_guid = condition.device_guid
         self.input_type = condition.input_type
         self.input_id = condition.input_id
@@ -450,12 +450,12 @@ class VJoyCondition(AbstractCondition):
     one of eight possible directions.
     """
 
-    def __init__(self, condition):
+    def __init__(self, condition, container_condition=False):
         """Creates a new instance.
 
         :param condition the condition to check against
         """
-        super().__init__(condition.comparison)
+        super().__init__(condition.comparison, container_condition)
 
         self.vjoy_id = condition.vjoy_id
         self.device_guid = None
@@ -915,19 +915,19 @@ def convert_condition(condition):
     import gremlin.actions
     import gremlin.input_item
     if isinstance(condition, gremlin.ui.keyboard_device.BaseKeyboardCondition):
-        return gremlin.actions.KeyboardCondition(condition.scan_code, condition.is_extended, condition.comparison, input_item = condition.input_item)
+        return gremlin.actions.KeyboardCondition(condition.scan_code, condition.is_extended, condition.comparison, input_item = condition.input_item, target = condition.target)
 
     elif isinstance(condition, gremlin.ui.joystick_device.BaseJoystickCondition):
-        return gremlin.actions.JoystickCondition(condition)
+        return gremlin.actions.JoystickCondition(condition, target = condition.target)
 
     elif isinstance(condition, gremlin.input_item.BaseVJoyCondition):
-        return gremlin.actions.VJoyCondition(condition)
+        return gremlin.actions.VJoyCondition(condition, target = condition.target)
 
     elif isinstance(condition, gremlin.input_item.BaseInputActionCondition):
-        return gremlin.actions.InputActionCondition(condition.comparison)
+        return gremlin.actions.InputActionCondition(condition.comparison, target = condition.target)
     elif isinstance(condition, gremlin.ui.state_device.BaseStateCondition):
-        return gremlin.actions.StateCondition(condition)
+        return gremlin.actions.StateCondition(condition, target = condition.target)
     elif isinstance(condition, gremlin.input_item.BaseModeCondition):
-        return gremlin.actions.ModeCondition(condition)
+        return gremlin.actions.ModeCondition(condition, target = condition.target)
 
     assert False, f"Invalid base condition to convert: {type(condition).__name__}"

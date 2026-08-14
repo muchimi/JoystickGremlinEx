@@ -303,6 +303,7 @@ class AbstractView(QtWidgets.QWidget):
     def _handle_model_changed(self, data=None, force=False):
         """Handles changes in the model."""
 
+        syslog.info("model change detected")
         if not Shiboken.isValid(self):
             # widget was destroyed - self unhook
             self._model_change_callbacks.clear()
@@ -809,11 +810,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         """true if this item is setup as an axis input (momentary)"""
         return not self.is_axis
 
-    # def _handle_containers_changed(self):
-    #     """tells the UI about the container change"""
-    #     el = gremlin.event_handler.EventListener()
-    #     el.mapping_changed.emit(self)
-
     def remove_container(self, container):
 
         if container not in self._containers:
@@ -1040,7 +1036,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             else:
                 self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
 
-    def from_xml(self, node : etree._Element, data, extra_data: dict = None, skip_root=False):
+    def from_xml(self, node: etree._Element, data, extra_data: dict = None, skip_root=False):
         """Parses an InputItem node.
 
         :param node: xml element node to parse
@@ -1076,7 +1072,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         if not valid:
             # not a node we should process
             return
-
 
         if not skip_root:  # skip header processing if set
             self._description = html.unescape(safe_read(node, "description", str, ""))
@@ -1116,7 +1111,6 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
                     if "id" in node.attrib:
                         button = safe_read(node, "id", int, 0)
                         self.input_id = gremlin.ui.octavi_device.OctaviButton(button)
-
 
         # read containers for this input item
         self._containers.pushSuspend()  # stop updates
@@ -1430,9 +1424,6 @@ class InputItemMessage(InputItem):
             self.message_key,
             self._guid,
         )
-
-
-
 
     @property
     def message(self):
@@ -1876,18 +1867,19 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         if gremlin.config.Configuration().show_container_id:
             for key, widget in items.items():
-                w = gremlin.ui.ui_common.getHContainer([key, widget], widget_only = True)
+                w = gremlin.ui.ui_common.getHContainer([key, widget], widget_only=True)
                 self._content_layout.addWidget(w)
         else:
             for widget in items.values():
                 self._content_layout.addWidget(widget)
 
-
         # InputItemContentLayout(widgets = items, parent = self._content_widget)
 
         self._container_layout.addWidget(self._content_widget)
 
-        self._not_configured_widget = gremlin.ui.ui_common.QIconLabel(gremlin.ui.ui_common.Icons.yellowWarningIcon(), text = "Not configured",tooltip="Not configured")
+        self._not_configured_widget = gremlin.ui.ui_common.QIconLabel(
+            gremlin.ui.ui_common.Icons.yellowWarningIcon(), text="Not configured", tooltip="Not configured"
+        )
         self._content_layout.addWidget(self._not_configured_widget)
         self._not_configured_widget.setVisible(False)
 
@@ -1927,15 +1919,13 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         el = gremlin.event_handler.EventListener()
         el.action_crud.connect(self._handle_action_crud_event)
 
-    def _handle_action_crud_event(self, action_set : ActionSet, action : AbstractAction):
+    def _handle_action_crud_event(self, action_set: ActionSet, action: AbstractAction):
         """handles action CRUD events"""
         if self._input_item and action:
             container = action.container
             input_item = container.input_item
             if input_item == self._input_item:
                 self._update_action_icons()
-
-
 
     def _handle_remove_unused_actions(self):
         input_item = self._input_item
@@ -1987,7 +1977,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         # refresh IDs
         self._update_container_id()
-
 
     def handleMappingChanged(self, input_item: InputItem):
         """called when the input item changes"""
@@ -2181,7 +2170,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         if self.input_item:
             self.input_item.setInputWidget(None)  # clear reference on the input
-
 
         self._container_id_widget.setWidget(None)
         self._repeater_container_widget.setWidget(None)
@@ -2474,16 +2462,12 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.setDescription(None)
         self.setComment(None, None)
 
-    def setConfigured(self, value : bool):
+    def setConfigured(self, value: bool):
         if value:
             self._not_configured_widget.setVisible(False)
         else:
             self.clear()
             self._not_configured_widget.setVisible(True)
-
-
-
-
 
     def setCustomContent(self, items: QtWidgets.QWidget | list[QtWidgets.QWidget]):
         """adds custom content to the input widget (vertical container)"""
@@ -2497,13 +2481,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             self._custom_container_widget.setWidget(widgets[0])
         else:
             # multiple widgets
-            container = gremlin.ui.ui_common.getHContainer(widgets, widget_only = True)
+            container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
             self._custom_container_widget.setWidget(container)
-
-
-
-
-
 
     def setInputDescription(self, description: str | None):
         """sets the input description for an input widget (optional)"""
@@ -2516,7 +2495,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         else:
             if verbose:
                 syslog.info("InputItemWidget: clearing input description")
-            self._input_description_widget.setWidget(None)
+            self._input_description_widget.setText(None)
 
         height = self._input_description_widget.height()
         if verbose:
@@ -2541,7 +2520,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
     def setDescription(self, description: str | None):
         """sets the description of the input widget"""
         self.setInputDescription(description)
-
 
     def setComment(self, value: str | None, icon=None):
         """sets the comment field of the input widget"""
@@ -2765,8 +2743,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         :param input_item: the InputItem instance for which to create action icons
         """
 
-
-
         if not self._icons_dirty:
             return
 
@@ -2836,7 +2812,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
             # self._setWidgetHeight(self._action_container_widget, rh * (row + 1))
 
-
         else:
             widget = QtWidgets.QLabel("∅", alignment=QtCore.Qt.AlignmentFlag.AlignRight)
             font = widget.font()
@@ -2846,12 +2821,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             layout.addWidget(widget, 0, 1)
             # self._setWidgetHeight(self._action_container_widget, rh)
 
-
-
-        height = int(widget.sizeHint().height()*1.1) # grow by 10%
+        height = int(widget.sizeHint().height() * 1.1)  # grow by 10%
         self._action_icon_widget.setFixedHeight(height)
-
-
 
     def _handle_action_icon_clicked(self, widget):
         """handles clicks on action icons"""
@@ -3107,8 +3078,6 @@ class InputItemListModel(AbstractCallbackModel):
             self._custom_clear_handler()
         else:
             super().clear(emit=emit)
-
-
 
     def _handle_sort(self, items) -> tuple:
         """returns a sort list for the items if a custom handler was not provided"""
@@ -3740,9 +3709,6 @@ class InputItemListView(AbstractView):
                                     widget
                                 )  # remove the existing widget because position may have changed so it's added at the right spot
 
-
-
-
                         if not widget:
                             # create new input widget
                             identifier = InputIdentifier(
@@ -3811,8 +3777,6 @@ class InputItemListView(AbstractView):
 
                             # add new widget to the input map
                             self._input_item_map[input_item] = widget
-
-
 
                         if verbose and __debug__:
                             time_end = time.perf_counter()
@@ -3964,7 +3928,6 @@ class InputItemListView(AbstractView):
         if not gremlin.shared_state.is_running:
             gremlin.util.InvokeUiMethod(self._redraw_index_ui, index)  # ensure on UI thread
 
-
     def _redraw_index_ui(self, index: int):
         """Redraws the view entry at the given index.
 
@@ -4009,7 +3972,7 @@ class InputItemListView(AbstractView):
         """
         return lambda x: self._edit_item_cb(input_item)
 
-    def _create_edit_curve_callback(self, input_item:InputItem):
+    def _create_edit_curve_callback(self, input_item: InputItem):
         return lambda: self._edit_curve_item_cb(input_item)
 
     def _create_delete_curve_callback(self, input_item: InputItem):
@@ -4060,7 +4023,7 @@ class InputItemListView(AbstractView):
         index = self.model.indexOf(input_item)
         self.item_edit.emit(self, index, input_item)  # widget, index, data
 
-    def _edit_curve_item_cb(self, input_item : InputItem):
+    def _edit_curve_item_cb(self, input_item: InputItem):
         index = self.model.indexOf(input_item)
         self.item_edit_curve.emit(self, index, input_item)
         el = gremlin.event_handler.EventListener()
@@ -4328,7 +4291,7 @@ class ConditionContainer:
 
     def __init__(self):
         self._id = gremlin.util.get_guid()  # unique GUID of this container
-        self.activation_condition = BaseActivationCondition(ConditionModel(self), ActivationRule.All)  # activation condition that applies to the container
+        self.activation_condition = BaseActivationCondition(self, ActivationRule.All)  # activation condition that applies to the container
 
     @property
     def condition_count(self):
@@ -4404,7 +4367,9 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
         self._abstract_container_generating_xml = False  # true if generating
         self._action_sets = ActionSets(self)  # containers contain one or more action sets, each action sets contains a list of action set object
-        self.activation_condition: BaseActivationCondition = None  # conditions
+        self._conditions = ConditionModel(self)
+        self._activation_condition = BaseActivationCondition(self, ActivationRule.All)  # conditions
+
         self.custom_action_sets = custom_action_sets  # true if the container uses custom action sets (need a converter to produce action_sets)
         self._condition_enabled = True  # condition flag
         self._virtual_button_enabled = (
@@ -4636,7 +4601,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     @property
     def has_conditions(self):
         """true if the container has conditions defined"""
-        return self.activation_condition is not None and len(self.activation_condition.conditions) > 0
+        return self._activation_condition is not None and len(self._activation_condition.conditions) > 0
 
     def hasConditions(self):
         """true if the container has a condition or contains actions with conditions"""
@@ -4655,10 +4620,22 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     @property
     def condition_count(self) -> int:
-        """gets the count of container conditions currently defined"""
-        if self.activation_condition is not None:
-            return len(self.activation_condition.conditions)
-        return 0
+        """gets the count of container conditions currently defined at the container level"""
+        return len(self._conditions)
+
+    @property
+    def action_condition_count(self) -> int:
+        """gets the count of action conditions currently defined at the action level"""
+        count = 0
+        for action_set in self.action_sets:
+            if action_set:
+                count += sum(action.condition_count for action in action_set)
+        return count
+
+    @property
+    def conditions(self):
+        """gets the list of conditions model for this container"""
+        return self._conditions
 
     @property
     def condition_enabled(self):
@@ -5075,7 +5052,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
     def _parse_activation_condition_xml(self, node, data, extra_data=None):
         """load the container condition"""
 
-        self.activation_condition = BaseActivationCondition(ConditionModel(self), ActivationRule.All)
+        self.activation_condition = BaseActivationCondition(self, ActivationRule.All)
         input_item = data
         activation_node = gremlin.util.get_xml_child(node, "activation-condition")
         if activation_node is not None:
@@ -5135,15 +5112,10 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
 
 class AbstractAction(BaseProfileData):
-    """Base class for all actions that can be encoded via the XML and
-    UI system."""
-
-    # id_changed = Signal(str, str)  # triggers when the ID changes
+    """Base class for all actions that can be encoded via the XML and UI system."""
 
     # allow all input types by default
     input_types = InputType.to_list()
-    # data_changed = QtCore.Signal() # indicates the action data changed
-
     id_changed = Signal(str, str)  # triggers when the ID changes (old_id, new_id)
     icon_changed = Signal()  # triggers when the icon changes
 
@@ -5164,7 +5136,8 @@ class AbstractAction(BaseProfileData):
         self.parent_container = self.container
 
         self._abstract_action_generating_xml = False  # true if generating XML
-        self.activation_condition = None  # stores the conditions attached to that action
+        self._conditions = ConditionModel(self)
+        self.activation_condition = BaseActivationCondition(self, ActivationRule.All)  # stores the conditions attached to that action
         self._id = gremlin.util.get_guid()
         self._action_type = None
         self._enabled = False  # true if the action is enabled
@@ -5193,6 +5166,19 @@ class AbstractAction(BaseProfileData):
     def debug_name(self) -> str:
         """friendly display name"""
         return f"[action: {self.tag} id: {str(self.id)}] input: [{self.get_container().debug_name}]"
+
+    @property
+    def conditions(self) -> ConditionModel:
+        return self._conditions
+
+    @property
+    def condition_count(self) -> int:
+        """gets the count of conditions currently defined for this action"""
+        return len(self._conditions)
+
+    @property
+    def has_conditions(self) -> bool:
+        return len(self._conditions) > 0
 
     def hook(self):
         if not self._hooked:
@@ -5298,11 +5284,6 @@ class AbstractAction(BaseProfileData):
         """sets the priority of the action, numeric"""
         value = gremlin.util.clamp(value, 0, 1000)
         self._priority = value
-
-    @property
-    def has_conditions(self):
-        """true if the action has conditions defined"""
-        return self.activation_condition is not None and len(self.activation_condition.conditions) > 0
 
     def actionDeleted(self):
         """called when the action is deleted"""
@@ -5475,7 +5456,7 @@ class AbstractAction(BaseProfileData):
 
         super().from_xml(node, data, extra_data)
 
-        self.activation_condition = BaseActivationCondition(ConditionModel(self), ActivationRule.All)
+        self.activation_condition = BaseActivationCondition(self, ActivationRule.All)
         for _ in node.findall("activation-condition"):
             cond_node = node.find("activation-condition")
             if cond_node is not None:
@@ -5576,8 +5557,8 @@ class ActionSet(AbstractCallbackModel):
             case _:
                 action = None
         if action:
-                el = gremlin.event_handler.EventListener()
-                el.action_crud.emit(self, action)
+            el = gremlin.event_handler.EventListener()
+            el.action_crud.emit(self, action)
 
     @staticmethod
     def fromList(source: list | tuple):
@@ -5745,22 +5726,28 @@ class BaseAbstractCondition:
 
     # id_changed = Signal(str, str)  # triggers when the ID changes
 
-    def __init__(self, extra_data: dict = None):
+    def __init__(self, extra_data: dict = None, target: AbstractContainer | AbstractAction = None):
         """Creates a new condition."""
 
         import gremlin.util
 
         self._id = gremlin.util.get_guid()
         self._comparison = ""
-        self._activation_condition = None  # owning container
         self.delay = 0.0  # delay in seconds
-
-    def setOwner(self, owner):
-        self._activation_condition = owner
+        self.data = extra_data
+        self._target = target
 
     @property
-    def owner(self):
-        return self._activation_condition
+    def target(self) -> AbstractContainer | AbstractAction:
+        return self._target
+
+    @target.setter
+    def target(self, value):
+        self._target = value
+
+    @property
+    def isContainerCondition(self) -> bool:
+        return isinstance(self._target, AbstractContainer)
 
     @property
     def id(self):
@@ -5961,7 +5948,7 @@ class AbstractCondition(metaclass=ABCMeta):
     as possibly processed Value when being evaluated.
     """
 
-    def __init__(self, comparison=None):
+    def __init__(self, comparison=None, container_condition=False):
         """Creates a new condition with a specific comparision operation.
 
         :param comparison the comparison operation to perform when evaluated
@@ -5970,6 +5957,7 @@ class AbstractCondition(metaclass=ABCMeta):
         self.id = gremlin.util.get_guid()
         self.manual_callback = False
         self.delay = 0.0  # delay in seconds
+        self.isContainerCondition = container_condition  # true if the condition applies to the container, false if it applies to an action
 
     @abstractmethod
     def __call__(self, event, value, extra_data=None):
@@ -5993,13 +5981,11 @@ class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
     pass
 
 
-
-
 class BaseModeCondition(BaseAbstractCondition):
     """mode condition"""
 
-    def __init__(self, extra_data : dict = None):
-        super().__init__(extra_data)
+    def __init__(self, extra_data: dict = None, target: AbstractContainer | AbstractAction = None):
+        super().__init__(extra_data, target=target)
 
         self.description = None
         self.comparison = "equal"
@@ -6061,9 +6047,9 @@ class BaseVJoyCondition(BaseAbstractCondition):
     This condition is based on the state of a vjoy axis, button, or hat.
     """
 
-    def __init__(self, extra_data : dict = None):
+    def __init__(self, extra_data: dict = None, target: AbstractContainer | AbstractAction = None):
         """Creates a new instance."""
-        super().__init__(extra_data)
+        super().__init__(extra_data, target=target)
         self.vjoy_id = 0
         self.input_type = None
         self.input_id = 0
@@ -6240,11 +6226,14 @@ class ConditionModel(AbstractCallbackModel):
             ),
             model_description="ConditionModel",
         )
-        # self.condition_data = condition_data
-        # self.action_data = action_data
 
         self.container = None
         self.setContainer(container)
+
+    def onItemChanged(self, model, index: int, new_item, old_item, operation):
+        """Called when an item in the model changes."""
+        el = gremlin.event_handler.EventListener()
+        el.condition_changed(self.container)
 
     @property
     def input_item(self) -> InputItem:
@@ -6270,7 +6259,6 @@ class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
 
     activation_condition_modified = Signal()
 
-
     rule_lookup = {
         # String to enum
         "all": ActivationRule.All,
@@ -6280,8 +6268,7 @@ class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
         ActivationRule.Any: "any",
     }
 
-
-    def __init__(self, conditions: list[AbstractCondition], rule: ActivationRule):
+    def __init__(self, container: AbstractAction | AbstractContainer, rule: ActivationRule):
         """Creates a new instance."""
         import gremlin.ui.keyboard_device
         import gremlin.ui.joystick_device
@@ -6289,33 +6276,29 @@ class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
 
         super().__init__()
         assert rule in (ActivationRule.All, ActivationRule.Any), "invalid rule"
-        # assert isinstance(conditions, list) and all(isinstance(c, AbstractCondition) for c in conditions), "invalid condition model"
-
-
+        assert isinstance(container, (AbstractContainer, AbstractAction)), "invalid container type"
 
         self.condition_lookup = {
-                "keyboard": gremlin.ui.keyboard_device.BaseKeyboardCondition,
-                "joystick": gremlin.ui.joystick_device.BaseJoystickCondition,
-                "vjoy": BaseVJoyCondition,
-                "action": BaseInputActionCondition,
-                "state": gremlin.ui.state_device.BaseStateCondition,
-                "mode": BaseModeCondition,
-            }
-
+            "keyboard": gremlin.ui.keyboard_device.BaseKeyboardCondition,
+            "joystick": gremlin.ui.joystick_device.BaseJoystickCondition,
+            "vjoy": BaseVJoyCondition,
+            "action": BaseInputActionCondition,
+            "state": gremlin.ui.state_device.BaseStateCondition,
+            "mode": BaseModeCondition,
+        }
 
         self._rule = rule
-        self.conditions = conditions
+        self._container = container
         self._id = gremlin.util.get_guid()
 
-    def setContainer(self, container: AbstractContainer | AbstractAction):
-        """Sets the container for this activation condition."""
-        assert isinstance(container, (AbstractContainer, AbstractAction)), "invalid container type"
-        self.conditions.container = container
+    @property
+    def conditions(self):
+        return self._container.conditions
 
     @property
     def container(self):
         """gets the container or action of owning this activation condition"""
-        return self.conditions.container
+        return self._container
 
     @property
     def rule(self) -> ActivationRule:
@@ -6369,10 +6352,9 @@ class BaseActivationCondition(gremlin.base_classes.BaseCallbacks):
         condition_nodes = node.xpath(".//condition")
         for cond_node in condition_nodes:
             condition_type = safe_read(cond_node, "condition-type", str, "")
-            condition = self.condition_lookup[condition_type]()
+            condition = self.condition_lookup[condition_type](target=container)
             condition.from_xml(cond_node, data)
             self.conditions.add(condition)
-            condition.setOwner(self)
             if input_item:
                 item = ConditionTrackerData(mode, input_item, container, condition, rule)
                 tracker.registerCondition(item)
@@ -6953,8 +6935,6 @@ class ActionSetView(AbstractView):
                     match self.view_type:
                         case ContainerViewTypes.Action:
                             widget = self._get_action_widget(action)
-                            # if self._action_interact_enabled:
-                            #     widget = InteractableActionWrapper(widget, self._action_interact_callback, index, max_index)
                             wrapped_widget = BasicActionWrapper(widget)
                             wrapped_widget.closed.connect(self._create_closed_cb(widget))
 
@@ -7278,9 +7258,6 @@ class ActionSelector(QtWidgets.QWidget):
             config = gremlin.config.Configuration()
             self.action_dropdown.setCurrentText(config.last_action)
             self.action_dropdown.autoSize()
-
-
-
 
     @property
     def inputItem(self):
@@ -8148,7 +8125,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                 pass
 
         if self.container == container and self.activation_condition_widget:
-            self._update_counts()
+            # self._update_counts()
             self.activation_condition_widget._update_conditions_ui()
 
     @QtCore.Slot(object, object)
@@ -8230,8 +8207,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.activation_condition_layout = QtWidgets.QVBoxLayout(self.action_condition_frame_widget)
         self.activation_condition_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.activation_count_widget = QtWidgets.QLabel()
-        self.activation_condition_layout.addWidget(self.activation_count_widget)
+        # self.activation_count_widget = QtWidgets.QLabel()
+        # self.activation_condition_layout.addWidget(self.activation_count_widget)
 
         self.activation_condition_tab_layout.addWidget(self.action_condition_frame_widget)
 
@@ -8247,23 +8224,15 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         self.activation_condition_layout.addStretch()
         self.activation_condition_tab_layout.addStretch()
 
-        self._update_counts()
+        # self._update_counts()
 
         self._update_selected(self.dock_tabs.currentIndex())
 
-    def _update_condition_ui(self):
+    def _update_condition_ui(self, container):
         """updates the condition UI tab only"""
         self.activation_condition_widget._update_conditions_ui()
 
-    def _update_counts(self):
-        """refreshes counts"""
 
-        if self.activation_count_widget:  # can get called before all is loaded
-            if self.container:
-                self.activation_count_widget.setText(f"Container conditions ({self.container.condition_count} found):")
-            else:
-                # not a container
-                self.activation_count_widget.setText("Container conditions (N/A):")
 
     def _create_virtual_button_tab(self):
         # Return if nothing is to be done
@@ -8447,7 +8416,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         if not self._use_view:
             raise gremlin.error.MissingImplementationError("AbstractContainerWidget._create_condition_ui not implemented in subclass")
 
-    def _update_condition_ui(self):
+    def _update_condition_ui(self, container=None):
         """updates the condition UI for the widget"""
         pass
 
@@ -8873,12 +8842,7 @@ class BasicActionWrapper(AbstractActionWrapper):
             hint = gremlin.hints.hint.get(action.tag, "")
 
         self._title_bar_widget = TitleBar(
-            f"{action.name} ({mode})",
-            hint,
-            self._remove,
-            self._clipboard_copy,
-            data=action_widget.action_data,
-            prompt_on_close=True
+            f"{action.name} ({mode})", hint, self._remove, self._clipboard_copy, data=action_widget.action_data, prompt_on_close=True
         )
 
         self.title_frame_widget = gremlin.ui.ui_common.QBorderWidget()
@@ -8938,44 +8902,23 @@ class ConditionActionWrapperWidget(AbstractActionWrapper):
         # Setup activation condition UI
         action_data = action_widget.action_data
         if isinstance(action_data, AbstractAction):
-            # syslog.info("action")
-            container = action_data.parent_container
-            # action = action_data
-            # action_condition_model = action_data.activation_condition.conditions if action_data.activation_condition else None
-        elif isinstance(action_widget, AbstractContainer):
-            # syslog.info("container")
-            container = action_widget.action_data
-            # action = None
-            # action_condition_model = None
-
+            action = action_data
         else:
             raise TypeError(f"Unsupported action widget type: {type(action_widget)}")
 
-        assert isinstance(container, AbstractContainer), f"Expected condition container to be AbstractContainer, got {type(container)}"
+        if action.activation_condition is None:
+            action.activation_condition = BaseActivationCondition(action, ActivationRule.All)
 
-        # container_condition_model = container.activation_condition.conditions if container.activation_condition else None
-        # syslog.info(f"Conditions input: container: [{container.input_item.device_name} {container.input_item.display_name}] for: {container.name} count: {container_condition_model.count() if container_condition_model else 0}")
-        # for condition in container_condition_model or []:
-        #     syslog.info(f"Container condition: {condition}")
-        # if action:
-        #     syslog.info(f"Conditions input: action: [{action.input_item.device_name} {action.input_item.display_name}] for: {action.name} count: {action_condition_model.count() if action_condition_model else 0}")
-        #     for condition in action_condition_model or []:
-        #         syslog.info(f"Action condition: {condition}")
-
-        # if action_data.parent.has_action_conditions:
-        if container.activation_condition is None:
-            container.activation_condition = BaseActivationCondition(ConditionModel(container), ActivationRule.All)
-
-        self.condition_model = container.activation_condition.conditions
-        # syslog.info(f"Conditions input: [{container.input_item.device_name} {container.input_item.display_name}] for: {container.name} count: {self.condition_model.count()}")
-        self.condition_view = ConditionView(self.condition_model)
-        container.condition_view = self.condition_view
-        self.condition_view.setContainer(container)
+        self.condition_model = action.activation_condition.conditions
+        syslog.info(
+            f"Conditions input: [{action.input_item.device_name} {action.input_item.display_name}] for: {action.name} type: [{action.__class__.__name__}] count: {len(action.conditions)}"
+        )
+        self.condition_view = ConditionView(action)
+        action.condition_view = self.condition_view
+        self.condition_view.setContainer(action)
         self.condition_view.setModel(self.condition_model)
         self.condition_view.redraw()
         self.main_layout.addWidget(self.condition_view)
-        # else:
-        #     action_data.activation_condition = None
 
 
 class ContainerModel(AbstractCallbackModel):
@@ -9446,7 +9389,6 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self._input_item = None
         self._input_type = None
         self._container_model = None
-
 
     def setInputItem(self, input_item: InputItem):
         """sets the item data and redraws the control"""
@@ -10148,7 +10090,7 @@ class ConditionHelper:
                 node = lxml.etree.fromstring(xml)
                 if node.tag == "activation-condition":
                     # temporary activation condition
-                    activation_condition = BaseActivationCondition(ConditionModel(self), ActivationRule.All)
+                    activation_condition = BaseActivationCondition(self, ActivationRule.All)
                     rule = container.activation_condition.rule
                     activation_condition.from_xml(node, data)
                     for condition in activation_condition.conditions:
@@ -10168,7 +10110,7 @@ class ConditionHelper:
                 node = lxml.etree.fromstring(xml)
                 if node.tag == "condition":
                     condition_type = safe_read(node, "condition-type", str, "")
-                    condition = self.condition_lookup[condition_type]()
+                    condition = self.condition_lookup[condition_type](target=container)
                     condition.from_xml(node, data)
                     condition.setId(gremlin.util.get_guid())
 
@@ -10224,7 +10166,7 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
     # deleted = Signal(base_classes.AbstractCondition)
     deleted = Signal(object)
 
-    def __init__(self, condition: AbstractCondition | BaseAbstractCondition, extra_data : dict = None, parent=None):
+    def __init__(self, condition: AbstractCondition | BaseAbstractCondition, extra_data: dict = None, parent=None):
         """Creates a new widget.
 
         :param condition_data the data to be represented by the widget
@@ -10242,7 +10184,6 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
         self._create(extra_data)
 
         self._create_ui(extra_data)
-
 
     def _create(self, extra_data: dict = None):
         """Creates the configuration UI for this widget."""
@@ -10264,8 +10205,6 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
         helper.paste_condition(self.condition.owner.container, clipboard.data)
 
 
-
-
 class ModeConditionWidget(AbstractConditionWidget):
     """mode condition UI"""
 
@@ -10273,7 +10212,7 @@ class ModeConditionWidget(AbstractConditionWidget):
         super().__init__(condition, parent)
         self.setTitle("Mode Condition")
 
-    def _create_ui(self, extra_data : dict = None):
+    def _create_ui(self, extra_data: dict = None):
         if not Shiboken.isValid(self):
             return
 
@@ -10343,8 +10282,6 @@ class ModeConditionWidget(AbstractConditionWidget):
         self.condition.comparison = self.comparison_dropdown.currentData()
 
 
-
-
 class VJoyConditionWidget(AbstractConditionWidget):
     """Widget allowing the configuration of a vJoy based condition."""
 
@@ -10365,7 +10302,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
         # Initialize UI fully
         self._modify_vjoy(self.vjoy_selector.get_selection())
 
-    def _create_ui(self, extra_data : dict = None):
+    def _create_ui(self, extra_data: dict = None):
         """Creates the configuration UI for this widget."""
         if not Shiboken.isValid(self):
             return
@@ -10649,7 +10586,7 @@ class InputActionConditionWidget(AbstractConditionWidget):
         super().__init__(condition_data, parent)
         self.setTitle("Action Condition")
 
-    def _create_ui(self, extra_data : dict = None):
+    def _create_ui(self, extra_data: dict = None):
         """Creates the configuration UI for this widget."""
         if not Shiboken.isValid(self):
             return
@@ -10697,13 +10634,10 @@ class InputActionConditionWidget(AbstractConditionWidget):
         self.condition.comparison = label.lower()
 
 
-
-
 class ConditionView(AbstractView):
     """Widget visualizing a condition model instance."""
 
     # Mapping between data and ui classes
-
 
     # Mapping between application rule label and enumeration
     rules_map = {
@@ -10713,7 +10647,7 @@ class ConditionView(AbstractView):
         ActivationRule.Any: "Any",
     }
 
-    def __init__(self, model: ConditionModel, parent=None):
+    def __init__(self, container: AbstractContainer | AbstractAction, parent=None):
         """Creates a new instance.
 
         :param parent the parent of this widget
@@ -10722,21 +10656,20 @@ class ConditionView(AbstractView):
         from gremlin.ui.joystick_device import BaseJoystickCondition, JoystickConditionWidget
         from gremlin.ui.state_device import BaseStateCondition, StateConditionWidget
 
-        assert isinstance(model, ConditionModel), "invalid condition model"
-        super().__init__(model=model, parent=parent)
+        assert isinstance(container, AbstractContainer | AbstractAction), "invalid container"
+        super().__init__(model=container.conditions, parent=parent)
 
         self.condition_map = {
-                "Keyboard": [BaseKeyboardCondition, KeyboardConditionWidget],
-                "Joystick": [BaseJoystickCondition, JoystickConditionWidget],
-                "vJoy": [BaseVJoyCondition, VJoyConditionWidget],
-                "Action": [BaseInputActionCondition, InputActionConditionWidget],
-                "State": [BaseStateCondition, StateConditionWidget],
-                "Mode": [BaseModeCondition, ModeConditionWidget],
-            }
+            "Keyboard": [BaseKeyboardCondition, KeyboardConditionWidget],
+            "Joystick": [BaseJoystickCondition, JoystickConditionWidget],
+            "vJoy": [BaseVJoyCondition, VJoyConditionWidget],
+            "Action": [BaseInputActionCondition, InputActionConditionWidget],
+            "State": [BaseStateCondition, StateConditionWidget],
+            "Mode": [BaseModeCondition, ModeConditionWidget],
+        }
 
-
-        self._container = model.container
-        self._input_item = self._container.input_item
+        self._container = container
+        self._input_item = container.input_item
         self._draw_once = False
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
@@ -10760,22 +10693,12 @@ class ConditionView(AbstractView):
         self.controls_layout.addStretch()
 
         # Condition selector
-        self.condition_selector = gremlin.ui.ui_common.QDataComboBox()
-        self.condition_selector.addItem(
-            "Keyboard Condition",
-        )
-        self.condition_selector.addItem("Joystick Condition")
-        self.condition_selector.addItem("vJoy Condition")
-        self.condition_selector.addItem("Action Condition")
-        self.condition_selector.addItem("State Condition")
-        self.condition_selector.addItem("Mode Condition")
-
         config = gremlin.config.Configuration()
         last_selector = config.condition_selector
-        index = self.condition_selector.findText(last_selector)
-        if index != -1:
-            self.condition_selector.setCurrentIndex(index)
-        self.condition_selector.currentIndexChanged.connect(self._change_condition_selector)
+        items = ["Keyboard Condition", "Joystick Condition", "vJoy Condition", "Action Condition", "State Condition", "Mode Condition"]
+        self.condition_selector = gremlin.ui.ui_common.QDataComboBox(source=items, value=last_selector, callback=self._handle_condition_selector_changed)
+
+        self.condition_selector.currentIndexChanged.connect(self._handle_condition_selector_changed)
         self.condition_add_button = gremlin.ui.ui_common.Buttons.getAddWidget(tooltip="Adds a condition", callback=self._add_condition)
 
         self.controls_layout.addWidget(self.condition_selector)
@@ -10802,16 +10725,16 @@ class ConditionView(AbstractView):
     @QtCore.Slot()
     def _copy_condition(self):
         helper = ConditionHelper()
-        helper.copy_condition(self._container.activation_condition)
+        helper.copy_condition(self._model)
 
     @QtCore.Slot()
     def _paste_condition(self):
         clipboard = gremlin.clipboard.Clipboard()
         helper = ConditionHelper()
-        helper.paste_condition(self._container, clipboard.data)
+        helper.paste_condition(self._model, clipboard.data)
 
     @QtCore.Slot()
-    def _change_condition_selector(self):
+    def _handle_condition_selector_changed(self, data):
         config = gremlin.config.Configuration()
         config.condition_selector = self.condition_selector.currentText()
 
@@ -10819,7 +10742,7 @@ class ConditionView(AbstractView):
         # assert inspect.stack()[1].function == "_fireChanged","redraw should only be called due to a model trigger"
         gremlin.util.InvokeUiMethod(self._redraw_ui, force)  # ensure on UI thread
 
-    def _create_ui(self, extra_data : dict = None):
+    def _create_ui(self, extra_data: dict = None):
         """recreates the UI based on the model"""
         if not Shiboken.isValid(self):
             return
@@ -10831,15 +10754,17 @@ class ConditionView(AbstractView):
         for entry in self.condition_map.values():
             lookup[entry[0]] = entry[1]
 
-        for data in self.model:
-            extra_data = {"input_item": self.input_item}
-            condition_widget = lookup[type(data)](data, extra_data)
+        condition: AbstractCondition
+        extra_data = {"input_item": self.input_item, "container": self._container}
+        for condition in self.model:
+            condition_widget = lookup[type(condition)](condition, extra_data)
             condition_widget.deleted.connect(lambda local_data: self.model.remove(local_data))
             self.conditions_layout.addWidget(condition_widget)
 
     def _redraw_ui(self, force=False):
         """Redraws the entire view.  must be on UI thread"""
 
+        syslog.info("condition view: redraw")
         if force or not self._draw_once or self._model.modelChanged:
             # only update the UI on model change
             self._create_ui()
@@ -10849,19 +10774,20 @@ class ConditionView(AbstractView):
         """Adds a condition to the view's model."""
         data_type = self.condition_map[self.condition_selector.currentText().split()[0]][0]
         extra_data = {"input_item": self.input_item}
-        condition = data_type(extra_data)
-        self.model.add(condition)
+        condition = data_type(extra_data, target=self._container)
+        syslog.info(f"adding condition to model: {self.model.id}")
+        self._model.add(condition)
 
     def _rule_changed_cb(self, text):
         """Updates the rule of the model.
 
         :param text the new rule value
         """
-        self.model.rule = ConditionView.rules_map[text]
+        self._model.rule = ConditionView.rules_map[text]
 
     def _model_changed(self):
         """Updates the view when the model changes."""
-        self.rule_selector.setCurrentText(ConditionView.rules_map[self.model.rule])
+        self.rule_selector.setCurrentText(ConditionView.rules_map[self._model.rule])
         self.redraw()
 
     def _show_hint(self, state):
@@ -10900,7 +10826,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
         el = gremlin.event_handler.EventListener()
         el.condition_state_changed.connect(self._update_ui)
 
-    def _create_ui(self, extra_data : dict = None):
+    def _create_ui(self, extra_data: dict = None):
         """Creates the configuration UI."""
         if not Shiboken.isValid(self):
             return
@@ -10908,7 +10834,7 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         self.controls_layout = QtWidgets.QHBoxLayout()
         self.controls_layout.setContentsMargins(0, 0, 0, 0)
-        self.controls_layout.addWidget(QtWidgets.QLabel("Conditions Definitions:"))
+        self.controls_layout.addWidget(QtWidgets.QLabel("Conditions"))
         self.controls_layout.addWidget(self.help_button)
         self.controls_layout.addStretch()
 
@@ -10922,21 +10848,28 @@ class ActivationConditionWidget(QtWidgets.QWidget):
 
         self.activation_count_widget = QtWidgets.QLabel()
         self.container_condition_frame_layout.addWidget(self.activation_count_widget)
-        # self.container_condition_model = ConditionModel(self.container, self.container.activation_condition)
-        self.container_condition_model = ConditionModel(self.container)
-
-        self.container_condition_view = ConditionView(self.container_condition_model)
-        self.container_condition_view.setContainer(self.container)
-        self.container_condition_view.setModel(self.container_condition_model)
+        self.container_condition_view = ConditionView(self.container)
 
         self.container_condition_frame_layout.addWidget(self.container_condition_view)
-        # self.container_condition_frame_layout.addStretch()
 
         self.main_layout.addWidget(self.container_condition_frame_widget)
 
         self.container_condition_view.redraw()
 
+        el = gremlin.event_handler.EventListener()
+        el.condition_changed.connect(self._handle_condition_changed)
+
+        trigger_containers = [self.container]
+        for action_set in self.container.action_sets:
+            trigger_containers.extend(action for action in action_set)
+        self.trigger_containers = trigger_containers
+
         self._update_counts()
+
+    def _handle_condition_changed(self, container):
+        """Handles the condition changed signal."""
+        if container in self.trigger_containers:
+            self._update_counts()
 
     def _update_condition(self):
         gremlin.util.InvokeUiMethod(self._update_conditions_ui)
@@ -10950,14 +10883,20 @@ class ActivationConditionWidget(QtWidgets.QWidget):
     @QtCore.Slot(object)
     def _update_ui(self, container):
         if self.container.id == container.id:
-            self._update_counts()
+            self._update_counts_ui()
 
     def _update_counts(self):
+        gremlin.util.InvokeUiMethod(self._update_counts_ui)
+
+    def _update_counts_ui(self):
         """refreshes counts"""
         if not Shiboken.isValid(self.activation_count_widget):
             return
         if self.container:
-            self.activation_count_widget.setText(f"Container action conditions ({self.container.condition_count} found):")
+            container_condition_count = self.container.condition_count
+            action_condition_count = self.container.action_condition_count
+
+            self.activation_count_widget.setText(f"Container conditions: {container_condition_count if container_condition_count > 0 else 'n/a'} Action conditions: {action_condition_count if action_condition_count > 0 else 'n/a'}")
         else:
             # not a container
             self.activation_count_widget.setText("Conditions:")
@@ -11067,8 +11006,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
         self.addLeftPanelWidget(self.listview_container)
         self._blank_input()
-
-
 
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""
@@ -11452,7 +11389,6 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if input_item:
             key = self.getInputItemWidgetKey(input_item)
             self.unregisterWidget(key)
-
 
     def getInputItemMappingWidgetAt(self, index: int) -> InputItemMappingWidget:
         """gets the mapping widget for an input item at the given index"""

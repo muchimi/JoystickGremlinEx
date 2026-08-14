@@ -48,6 +48,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T29)
+Change: Remote API change for upcoming new feature support.
+Fix: exception when adding a state in some situations.
+Fix: conditions may not persist to profile
+Fix: conditions UI may not update counts/distinguish between container conditions and action conditions
+
 ### (m77T28)
 New: Play Sound Action: added sync button for cooldown options (synchronizes settings with other play sound actions in the profile instead of changing them one at a time).
 Fix: Add additional diagnostics wrapper code around file search to better identify issues with OS I/O errors.

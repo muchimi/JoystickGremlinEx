@@ -36,6 +36,8 @@ from gremlin.input_item import (
     InputItemListModel,
     BaseAbstractCondition,
     AbstractConditionWidget,
+    AbstractContainer,
+    AbstractAction,
 )
 import uuid
 from gremlin.util import read_guid, write_guid, safe_read, parse_bool
@@ -394,9 +396,9 @@ class BaseKeyboardCondition(BaseAbstractCondition):
     code as well as the extended flag.
     """
 
-    def __init__(self, extra_data: dict = None):
+    def __init__(self, extra_data: dict = None, target : AbstractContainer | AbstractAction = None):
         """Creates a new instance."""
-        super().__init__(extra_data)
+        super().__init__(extra_data, target )
         self._input_item = extra_data.get("input_item") if extra_data else None
         self.scan_code = None
         self.is_extended = None
@@ -1169,7 +1171,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 if not key.name:
                     input_widget.setCustomContent(None)
                     return
-    
+
 
                 widget = gremlin.ui.virtual_keyboard.QKeyWidget()
                 icon = gremlin.keyboard.KeyMap.icon(key)
