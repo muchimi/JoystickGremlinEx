@@ -49,60 +49,65 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T29)
-Change: Remote API change for upcoming new feature support.
-Fix: exception when adding a state in some situations.
-Fix: conditions may not persist to profile
-Fix: conditions UI may not update counts/distinguish between container conditions and action conditions
+- New: Sequence Container: Continue on trigger change option.  This option applies to normal and wiggle modes only (not loop/round-robin modes). When set, it will ignore the input trigger state change (for example, a button release after a button press that triggered the sequence), and continue running the sequence until all steps complete. Has no effect in loop or toggle modes.  This can also be called a "fire and forget" mode, so all steps will always execute once triggered.  When off, the sequence stops executing even if the sequence is not completed when the input trigger changes states.
+- New: Play/TTS action: Blocking option added.  When enabled, only one sound will play at a time and any queued sounds will be blocked until the prior sound fully plays.  Default is off, sounds will play simultaneously when triggered.
+- New: Play/TTS action: Stop playback mode.  When in this mode, the action, when triggered, will stop all playback going through the sound engine.  Note, this only stops sounds currently in the playback queue or actively playing.  If another profile action is adding new sounds to the queue, playback will resume until the sounds are played or the next stop playback trigger is received.
+Change: network API data packets refactor to support upcoming features
+Change: UI: tweak mapping user interface with improved section headers
+- Fix: exception when adding a state to the state device in some situations.
+- Fix: condition model API
+- Fix: conditions may not persist to profile
+- Fix: conditions UI may not update counts/distinguish between container conditions and action conditions
 
 ### (m77T28)
-New: Play Sound Action: added sync button for cooldown options (synchronizes settings with other play sound actions in the profile instead of changing them one at a time).
-Fix: Add additional diagnostics wrapper code around file search to better identify issues with OS I/O errors.
+- New: Play Sound Action: added sync button for cooldown options (synchronizes settings with other play sound actions in the profile instead of changing them one at a time).
+- Fix: Add additional diagnostics wrapper code around file search to better identify issues with OS I/O errors.
 
 ### (m77T27a)
-Fix: Map to Vjoy Action: button output uses incorrect button ID
-Fix: Map to Vjoy Action: merge axis widget can cause exception
-Fix: UI: wrap C++ error when cleaning up QT widget (QT may destroy the widget before Python is finished destroying it)
-Fix: API: joystick devices: exclude vjoy as an input devices if not set as an input (avoids loops)
-Fix: API: joystick devices: ensure device lists are not duplicated
+- Fix: Map to Vjoy Action: button output uses incorrect button ID
+- Fix: Map to Vjoy Action: merge axis widget can cause exception
+vFix: UI: wrap C++ error when cleaning up QT widget (QT may destroy the widget before Python is finished destroying it)
+- Fix: API: joystick devices: exclude vjoy as an input devices if not set as an input (avoids loops)
+- Fix: API: joystick devices: ensure device lists are not duplicated
 
 Known issue: Map to Vjoy Action: merge axis repeater does not update at design time.
 
 ### (m77T27)
-New: Actions API: add aliases for supported actions (allows multiple names for a given action to facilitate searching/on boarding).
+- New: Actions API: add aliases for supported actions (allows multiple names for a given action to facilitate searching/on boarding).
 Change: UI: prompt on action delete.
-Fix: VJoy Remap Action: "next unused" did not search complete profile
-Fix: State Device: missing type reference on state conditions
-Fix: API: update indexing on model delete
-Fix: TTS (legacy) Action: typo in parameter
-Fix: TTS (legacy) conversion tool: include profile companion files when converting  TTS legacy to new.
-Fix: API: (backup) include profile companion files in automatic profile backups.
-Fix: Play Sound: provide suitable default when changing TTS engine modes.
+- Fix: VJoy Remap Action: "next unused" did not search complete profile
+- Fix: State Device: missing type reference on state conditions
+- Fix: API: update indexing on model delete
+- Fix: TTS (legacy) Action: typo in parameter
+- Fix: TTS (legacy) conversion tool: include profile companion files when converting  TTS legacy to new.
+- Fix: API: (backup) include profile companion files in automatic profile backups.
+- Fix: Play Sound: provide suitable default when changing TTS engine modes.
 
 
 ### (m77T26)
-Fix: Additional pass on UI cache.
-Fix: Keyboard Device: input delete does not delete from profile (API change)
-Fix: Keyboard Device: input override type did not default to joystick button
-Fix: Keyboard Device: input did not trigger for mouse related inputs.
-Fix: OSC Device: input delete does not delete from profile (API change)
-Fix: OSC Device: OSC message is not visible in input
-Fix: Vjoy Remap Action: clicking "next unused" button would fail on keyboard input.
-Fix: UI: deleting an input may not clear associated mapping in the UI.
+- Fix: Additional pass on UI cache.
+- Fix: Keyboard Device: input delete does not delete from profile (API change)
+- Fix: Keyboard Device: input override type did not default to joystick button
+- Fix: Keyboard Device: input did not trigger for mouse related inputs.
+- Fix: OSC Device: input delete does not delete from profile (API change)
+- Fix: OSC Device: OSC message is not visible in input
+- Fix: Vjoy Remap Action: clicking "next unused" button would fail on keyboard input.
+- Fix: UI: deleting an input may not clear associated mapping in the UI.
  
 PRR merge: Virpil LED fixes + Map to Streamdeck action contributed by Lolo_350
 
 
 
 ### (m77T25A)
-Fix: UI: resolve cache issue (could cause exception when selecting a new input depending on the cache state)
-Fix: removed spurious import from TTS action
+- Fix: UI: resolve cache issue (could cause exception when selecting a new input depending on the cache state)
+- Fix: removed spurious import from TTS action
 
 ### (m77T25)
-Change: VPC LED action: add non-debug mode execution mode to hide the Virpil LED utility window.
-Change: Virpil folder: adds the plugin version of the VPC LED action to source code control.
-Change: UI: Curve Dialog invert button updated to new style
-Change: UI: Options Dialog: Verbose options layout update
-Change: TTS (legacy) action: add duplication options for playback (defaults to OFF)
+- Change: VPC LED action: add non-debug mode execution mode to hide the Virpil LED utility window.
+- Change: Virpil folder: adds the plugin version of the VPC LED action to source code control.
+- Change: UI: Curve Dialog invert button updated to new style
+- Change: UI: Options Dialog: Verbose options layout update
+- Change: TTS (legacy) action: add duplication options for playback (defaults to OFF)
 - Fix: API: delay load of joystick device UI causes invalid curve dialog updates for a call that didn't check for a delay load situation (new API in m77).
 - Fix: VPC LED action: change parameters to hex values as the LED tool expects hex values as parameters
 - Fix: UI: (device display options): device order load missing data type conversion on indexing update

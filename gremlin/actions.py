@@ -24,7 +24,7 @@ import gremlin.base_profile
 import gremlin.config
 from gremlin.input_types import InputType
 from gremlin.types import AxisButtonDirection
-from gremlin.input_item import AbstractCondition
+from gremlin.input_item import AbstractCondition, AbstractContainer, AbstractAction
 
 
 import gremlin.input_types
@@ -111,7 +111,7 @@ class KeyboardCondition(AbstractCondition):
     particular key is pressed or released.
     """
 
-    def __init__(self, scan_code, is_extended, comparison, input_item=None, container_condition=False):
+    def __init__(self, scan_code, is_extended, comparison, input_item=None, container_condition=False, target = None):
         """Creates a new instance.
 
         :param scan_code the scan code of the key to evaluate
@@ -162,17 +162,18 @@ class KeyboardCondition(AbstractCondition):
 class StateCondition(AbstractCondition):
     """Condition verifying a state"""
 
-    def __init__(self, condition, container_condition=False):
+    def __init__(self, condition, container_condition=False, target : AbstractContainer | AbstractAction = None):
         """Creates a new instance.
 
         :param key: name of the state
         :param is_extended whether or not the key code is extended
         :param comparison the comparison operation to perform when evaluated
         """
-        super().__init__(condition.comparison, container_condition)
+        super().__init__(condition.comparison, container_condition, target=target)
 
         self.key = condition.key
         self.ignore_release = condition.ignore_release
+
 
     def __call__(self, event, value, extra_data=None):
         # default call

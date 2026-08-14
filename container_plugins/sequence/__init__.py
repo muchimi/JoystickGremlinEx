@@ -75,7 +75,6 @@ class SequenceRepeatMode(IntEnum):
     Random = 2
     Loop = 3
 
-
     @staticmethod
     def toString(mode: SequenceRepeatMode) -> str:
         return mode.name.casefold()
@@ -196,12 +195,12 @@ class StepOptions:
 class StepOptionsWidget(QtWidgets.QWidget):
     """widget to manage step options"""
 
-    def __init__(self, action_data: SequenceContainer, options: StepOptions, index : int, parent=None):  # noqa: F821
+    def __init__(self, action_data: SequenceContainer, options: StepOptions, index: int, parent=None):  # noqa: F821
         super().__init__(parent)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        self.options = options # data block for the execution options
+        self.options = options  # data block for the execution options
         self.action_data = action_data
         self.index = index
 
@@ -215,10 +214,10 @@ class StepOptionsWidget(QtWidgets.QWidget):
 
         widgets = []
         for label, mode in modes:
-            widget = gremlin.ui.ui_common.QDataRadioButton(label=label, data=mode, value = mode == options.mode, callbackEx=self._handle_mode_changed)
+            widget = gremlin.ui.ui_common.QDataRadioButton(label=label, data=mode, value=mode == options.mode, callbackEx=self._handle_mode_changed)
             widgets.append(widget)
 
-        self.repeat_mode_widget =  gremlin.ui.ui_common.getHContainer(widgets, "Repeat Mode:", widget_only=True)
+        self.repeat_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, "Repeat Mode:", widget_only=True)
 
         self.repeat_count_widget = gremlin.ui.ui_common.QIntLineEdit(
             value=options.repeat_count,
@@ -342,7 +341,7 @@ class StepOptionsWidget(QtWidgets.QWidget):
         self.options.repeat_count = value
 
     @QtCore.Slot()
-    def _handle_mode_changed(self,widget, checked):
+    def _handle_mode_changed(self, widget, checked):
         if checked:
             self.options.mode = widget.data
             self._update_widgets()
@@ -377,7 +376,7 @@ class StepOptionsWidget(QtWidgets.QWidget):
 class SequenceContainerWidget(AbstractContainerWidget):
     """Container which holds a sequence of actions."""
 
-    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : SequenceContainer, parent=None):  # noqa: F821
+    def __init__(self, input_item: gremlin.input_item.AbstractInputItem, container: SequenceContainer, parent=None):  # noqa: F821
         """Creates a new instance.
 
         :param input_item the input item represented by this widget
@@ -420,6 +419,13 @@ class SequenceContainerWidget(AbstractContainerWidget):
             self.container.exec_on_release,
             press_callback=self._execute_on_press_changed,
             release_callback=self._execute_on_release_changed,
+        )
+
+        self.ignore_release_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Continue on trigger reset",
+            callback=self._handle_ignore_release_change,
+            value=self.container.ignore_release,
+            tooltip="If enabled, the sequence will continue running when the trigger state changes.  When off, the sequence will stop when the input trigger state changes.  (normal behavior)",
         )
 
         modes = [
@@ -626,7 +632,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.action_layout.addWidget(self.info_widget)
 
         self.action_layout.addWidget(self._warning_widget)
-        self.action_layout.addWidget(self._trigger_widget)
+
+        self.action_layout.addWidget(gremlin.ui.ui_common.getHContainer([self._trigger_widget, (self.ignore_release_widget,100)], widget_only=True))
 
         self.action_layout.addLayout(self.widget_layout)
 
@@ -635,10 +642,8 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.action_set_layout = QtWidgets.QVBoxLayout(self.action_set_widget)
         self.action_layout.addWidget(self.action_set_widget)
 
-
         self._update_action_sets()
         self._update_widgets()
-
 
     def _update_action_sets(self):
         """redraws action steps in the sequence - each step is an action set"""
@@ -662,21 +667,19 @@ class SequenceContainerWidget(AbstractContainerWidget):
             options_widget = StepOptionsWidget(self.container, options, index)
 
             # action set actions
-            widget : ActionSetView = self._create_action_set_widget(action_set,
-                                                    f"Step {index+1:d}",
-                                                    ContainerViewTypes.Action,
-                                                    interact_callback = self._handle_interaction,
-                                                    allowed_interactions = self.container.interaction_types,
-                                                    index = index,
-                                                    title_widgets = [options_widget]
-                                                                                                                               )
+            widget: ActionSetView = self._create_action_set_widget(
+                action_set,
+                f"Step {index + 1:d}",
+                ContainerViewTypes.Action,
+                interact_callback=self._handle_interaction,
+                allowed_interactions=self.container.interaction_types,
+                index=index,
+                title_widgets=[options_widget],
+            )
             self._widget_map[action_set] = widget
             self.action_set_layout.addWidget(widget)
             widget.redraw()
             widget.model.data_changed.connect(self.container_modified.emit)
-
-
-
 
     def _handle_sync_changed(self, mode):
         self.container.sync_mode = mode
@@ -688,6 +691,10 @@ class SequenceContainerWidget(AbstractContainerWidget):
     @QtCore.Slot(bool)
     def _execute_on_release_changed(self, checked: bool):
         self.container.exec_on_release = checked
+
+    @QtCore.Slot(bool)
+    def _handle_ignore_release_change(self, checked: bool):
+        self.container.ignore_release = checked
 
     @QtCore.Slot(bool)
     def _handle_wiggle_mode_change(self, checked: bool):
@@ -827,6 +834,11 @@ class SequenceContainerWidget(AbstractContainerWidget):
         stepped_enabled = mode == SequenceMode.Step
         normal_enabled = mode == SequenceMode.Normal
         resume_enabled = mode != SequenceMode.Normal and mode != SequenceMode.Step
+
+
+        ignore_enabled = mode in (SequenceMode.Normal, SequenceMode.Wiggle)
+        self.ignore_release_widget.setVisible(ignore_enabled)
+
         self._wiggle_min_delay_widget.setVisible(wiggle_enabled)
 
         self.container_normal_options.setVisible(normal_enabled)
@@ -949,7 +961,7 @@ class SequenceContainerWidget(AbstractContainerWidget):
         self.container.add_action(action_item)
         self.container_modified.emit()
 
-    def _handle_interaction(self, interaction : Interactions, index : int, widget : ActionSetView):
+    def _handle_interaction(self, interaction: Interactions, index: int, widget: ActionSetView):
         """Handles interaction icons being pressed on the individual actions.
 
         :param widget the action widget on which an action was invoked
@@ -996,13 +1008,13 @@ class SequenceContainerWidget(AbstractContainerWidget):
 
         self._update_action_sets()
 
-
     def _get_window_title(self):
         """Returns the title to use for this container.
 
         :return title to use for the container
         """
         return f"Sequence: {' -> '.join([', '.join([a.name for a in actions]) for actions in self.container.action_sets])}"
+
 
 class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
     def __init__(self, container: SequenceContainer, parent=None):  # noqa: F821
@@ -1022,15 +1034,20 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         config = gremlin.config.Configuration()
         self._verbose = config.verbose_mode_container or config.verbose_mode_sequence
         self._verbose_extra = self._verbose and config.verbose_mode_extra
+        self._verbose = True
 
         self._hook_mode_change = False
         self.action_data._thread = None
         self.action_data._is_running = False
         self._started = False
+        if self._verbose:
+            syslog.info("SEQUENCE: initialized")
 
         self._current_step = None  # tracks the next step to execute
 
     def profile_start(self):
+        if self._verbose:
+            syslog.info("SEQUENCE: profile start")
         self.action_data._is_running = False
 
         config = gremlin.config.Configuration()
@@ -1038,7 +1055,6 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self._verbose_extra = self._verbose and config.verbose_mode_extra
         gs = GlobalSequence()
         gs.sequence_count = 0
-
 
         # stepped mode current step
         if self.container.stepped_exec_reset:
@@ -1170,7 +1186,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         """stops the normal process"""
         if self.action_data._is_running:
             if self._verbose:
-                syslog.info("SEQUENCE: stop sequence runner")
+                syslog.info("SEQUENCE: normal mode: stop sequence runner")
             self.action_data._is_running = False
             if self.action_data._thread.is_alive():
                 self.action_data._thread.join()
@@ -1199,7 +1215,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         """stops the stepped process"""
         if self.action_data._is_running:
             if self._verbose:
-                syslog.info("SEQUENCE: stop sequence runner")
+                syslog.info("SEQUENCE: stepped mode: stop sequence runner")
             self.action_data._is_running = False
             if self.action_data._thread.is_alive():
                 self.action_data._thread.join()
@@ -1226,6 +1242,10 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
         is_pressed = trigger
         is_running = self.action_data._is_running
+        if is_running and self.action_data.ignore_release and mode in (SequenceMode.Normal, SequenceMode.Wiggle):
+            if verbose:
+                syslog.info("SEQUENCE EVENT: ignoring trigger state change while sequence is running")
+            return True
 
         match mode:
             case SequenceMode.Wiggle:
@@ -1305,21 +1325,19 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         verbose = self._verbose
         verbose_extra = self._verbose_extra
 
-        verbose = True
-
+       
 
         # no resume mode if running once
         resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
 
         if verbose:
-            syslog.info(f"SEQUENCE NORMAL: [{self.id}] {self.action_data.mode} mode - runner start - resume mode: {resume}")
+            syslog.info(f"SEQUENCE: normal mode: normal runner start [{self.id}] {self.action_data.mode} mode - runner start - resume mode: {resume}")
 
         if not nodes:
             # nothing to run
             self.action_data._is_running = False
-
             if verbose:
-                syslog.info("SEQUENCE NORMAL: Trigger Functor: nothing to run")
+                syslog.info("SEQUENCE: normal mode: normal runner: no steps found to run")
             return
         index = None
         if resume:
@@ -1374,9 +1392,9 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             # next node to run
             index += 1
             if index == count:
-                if self.action_data.mode == "normal":
+                if self.action_data.mode == SequenceMode.Normal:
                     self.action_data._is_running = False
-
+                    syslog.info("SEQUENCE: normal mode stop: reached end of sequence")
                     break  # only run once
                 # loop
                 index = 0
@@ -1390,10 +1408,21 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     syslog.info(f"\tstep interval delay: {exec_delay_s:03f}")
                 self._wait(exec_delay_s)
 
-            time.sleep(0) # free up resources for other things to run
+            if verbose:
+                syslog.info("\tloop sequence")
+
+            time.sleep(0)  # free up resources for other things to run
+
+            # ---------------------- end of runner loop
+
+
+        # send special end of sequence event to steps so they can stop whatever they are doing
+        extra_data = {"sequence_end": True}
+        for node in nodes:
+            self._ec.execute_node(node, event_release, False, extra_data)  # issue release for end of sequence
 
         if verbose:
-            syslog.info(f"SEQUENCE NORMAL STOP: {self.id}")
+            syslog.info(f"SEQUENCE: normal runner: exiting runner {self.id}")
         self.action_data._is_running = False
 
     def _stepped_runner(self):
@@ -1404,7 +1433,6 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
 
         nodes = [node for node in self.action_set_nodes]
         verbose = self._verbose
-
 
         # no resume mode if running once
         resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
@@ -1470,7 +1498,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                     if not self.action_data._is_running:
                         break
 
-            time.sleep(0) # free up resources for other things to run
+            time.sleep(0)  # free up resources for other things to run
 
         # next node to run
         index += 1
@@ -1510,7 +1538,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
             # nothing to run
             self.action_data._is_running = False
             if verbose:
-                syslog.info("SEQUENCE WIGGLE: Trigger Functor: nothing to wiggle")
+                syslog.info("SEQUENCE: wiggle runner: nothing to wiggle")
             return
         index = None
         if self.action_data.resume_mode:
@@ -1578,7 +1606,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                             self._wait(delay)
                             if not self.action_data._is_running:
                                 break
-                time.sleep(0) # free up resources for other things to run
+                time.sleep(0)  # free up resources for other things to run
 
             if not self.action_data._is_running:
                 break
@@ -1612,14 +1640,14 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
                 step_count += 1
                 if step_count >= max_count:
                     if verbose:
-                        syslog.info(f"SEQUENCE RUNNER: (wiggle) max step count reached ({step_count})")
+                        syslog.info(f"SEQUENCE: wiggle runner: max step count reached ({step_count})")
                     self.action_data._is_running = False
                     break
 
-            time.sleep(0) # free up resources for other things to run
+            time.sleep(0)  # free up resources for other things to run
 
         if verbose:
-            syslog.info(f"SEQUENCE WIGGLE STOP: {self.id}")
+            syslog.info(f"SEQUENCE: wiggle runner: exiting runner {self.id}")
         self.action_data._is_running = False
 
     def _wait(self, delay: float):
@@ -1650,23 +1678,17 @@ Unlike a macro, any action suitable for the input can be used."""
         InputType.JoystickHat,
     ]
 
-    interaction_types = [
-        Interactions.Up,
-        Interactions.Down,
-        Interactions.Delete,
-        Interactions.Top,
-        Interactions.Bottom
-    ]
+    interaction_types = [Interactions.Up, Interactions.Down, Interactions.Delete, Interactions.Top, Interactions.Bottom]
 
     functor = SequenceContainerFunctor
     widget = SequenceContainerWidget
 
-    def __init__(self, parent=None, node=None, extra_data : dict =None):
+    def __init__(self, parent=None, node=None, extra_data: dict = None):
         """Creates a new instance.
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node, extra_data=extra_data, custom_action_sets = True, custom_parse_callback = self._parse_steps_xml)
+        super().__init__(parent, node, extra_data=extra_data, custom_action_sets=True, custom_parse_callback=self._parse_steps_xml)
         self.exec_on_release = False  # true if the sequence triggers on input release
         self.exec_on_press = True  # true if the sequence triggers on input press
 
@@ -1680,6 +1702,7 @@ Unlike a macro, any action suitable for the input can be used."""
         self.last_step = None  # stores the last step
         self.normal_exec_delay = 0  # wait time between steps when running normally
         self.normal_autorelease_delay = 250  # wait time between autoreleases of each step when running normally
+        self.ignore_release = False  # if set, normal mode will ignore input release events and the sequence will continue running when the trigger changes while the sequence is running
         self.step_options = {}  # map of step options indexed by step number
         self.stepped_exec_reset = True  # true if the stepped execution should reset on profile start, or continue from the last step otherwise
         self.wiggle_count_min = 1  # min number of wiggle steps to take.
@@ -1710,6 +1733,7 @@ Unlike a macro, any action suitable for the input can be used."""
             self.exec_on_press = safe_read(node, "trigger-on-press", bool, True)
 
         self.exec_on_release = safe_read(node, "trigger-on-release", bool, False)
+        self.ignore_release = safe_read(node, "ignore-release", bool, False)
 
         self.wiggle_min_delay = safe_read(node, "wiggle-min", int, 250)
         self.wiggle_max_delay = safe_read(node, "wiggle-max", int, 5000)
@@ -1764,13 +1788,12 @@ Unlike a macro, any action suitable for the input can be used."""
         for index, child in enumerate(actionset_nodes):
             action_set = ActionSet(self)
             action_set.index = index
-            action_set.from_xml(child, self, input_item = self.input_item)
+            action_set.from_xml(child, self, input_item=self.input_item)
             self.action_sets.append(action_set)
             if verbose:
                 syslog.info(f"SEQUENCE: read step [{index}] with {len(action_set)} actions")
                 for action_index, action in enumerate(action_set):
                     syslog.info(f"SEQUENCE: action [{action_index}] - {action}")
-
 
         self.action_sets.popSuspend()
 
@@ -1799,6 +1822,7 @@ Unlike a macro, any action suitable for the input can be used."""
         node.set("sync-mode", safe_format(self.sync_mode, int))
         node.set("mode", SequenceMode.toString(self.mode))
         node.set("stepped-exec-reset", safe_format(self.stepped_exec_reset, bool))
+        node.set("ignore-release", safe_format(self.ignore_release, bool))
 
         # save step options
         if self.step_options:

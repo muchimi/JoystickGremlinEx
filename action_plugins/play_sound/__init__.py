@@ -112,6 +112,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
                 "Generates an audio file from text via local TTS (uses operating system TTS - options and quality may be limited), dynamic generation supported.",
             ),
             ("AI (Edge-TTS)", PlayMode.EdgeAI, "Generates an audio file from text via AI (requires Edge-TTS installation), dynamic generation supported."),
+            ("Stop Playback", PlayMode.Stop, "Stops any currently playing (queued) audio."),
         ]
         if ktts_enabled:
             options.append(
@@ -279,9 +280,6 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         self.tts_text_container = gremlin.ui.ui_common.getVContainer(["Text:", self.tts_text_widget], widget_only=True)
 
-        # self.tts_file_container_widget = gremlin.ui.ui_common.getHContainer(
-        #                 [self.tts_file_widget, self.tts_file_delete_widget, self.tts_file_rename_widget,playback_container], label="Cache file:", widget_only=True
-        #             )
 
         widgets = [
             "PTTS Generation Options:",
@@ -395,6 +393,13 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="If checked, any other audio playing will stop before playing this sample.",
         )
 
+        self.block_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Block playback",
+            value=self.action_data.blocking,
+            callback=self._handle_blocking_changed,
+            tooltip="If checked, the playback will block until the audio finishes so playbacks will not be concurrent",
+        )
+
         self._execute_widget = gremlin.ui.ui_common.QExecuteWidget(self.action_data.exec_on_press, self.action_data.exec_on_release)
         self._execute_widget.pressChanged.connect(self._execute_on_press_changed)
         self._execute_widget.releaseChanged.connect(self._execute_on_release_changed)
@@ -437,7 +442,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
         self.playback_file_container = gremlin.ui.ui_common.getHContainer(widgets, "Sound file:", widget_only=True)
 
-        widgets = ["Volume:", self.volume_widget, "Loops:", self.loops_widget, self.stop_widget]
+        widgets = ["Volume:", self.volume_widget, "Loops:", self.loops_widget, self.stop_widget, self.block_widget]
 
         playback_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
@@ -493,7 +498,9 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         container_widgets.append(self.status_container)
         container_widgets.append(info_widget)
 
-        self.main_layout.addWidget(gremlin.ui.ui_common.getVContainer(container_widgets, widget_only=True))
+        self.body_container =gremlin.ui.ui_common.getVContainer(container_widgets, widget_only=True)
+
+        self.main_layout.addWidget(self.body_container)
 
         self._update_speakers()  # update voice lists
 
@@ -706,6 +713,9 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.action_data.ptts_volume = value
 
     def _update_ui(self):
+
+        options_visible = self.action_data.mode != PlayMode.Stop
+        self.body_container.setVisible(options_visible)
 
         tts_visible = self.action_data.mode in (PlayMode.CoquiAI, PlayMode.EdgeAI, PlayMode.PyTTS)
         self.tts_container_widget.setVisible(tts_visible)
@@ -1105,7 +1115,11 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
     def _handle_stop_audio_changed(self, checked: bool):
         self.action_data.stop_previous = checked
-        self._update_status_ui(f"Stop previous changed to {checked}", "info")
+        self._update_status_ui(f"Stop previous changed to {'on' if checked else 'off'}", "info")
+
+    def _handle_blocking_changed(self, checked: bool):
+        self.action_data.blocking = checked
+        self._update_status_ui(f"Blocking changed to {'on' if checked else 'off'}", "info")
 
     @QtCore.Slot()
     def _content_changed_cb(self):
@@ -1229,7 +1243,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
     @QtCore.Slot()
     def _handle_play(self):
-        self.action_data.play()
+        self.action_data.play(blocking=self.action_data.blocking)
 
 
 class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
@@ -1274,7 +1288,12 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
         trigger = (is_pressed and self.action_data.exec_on_press) or (not is_pressed and self.action_data.exec_on_release)
 
         if trigger:
-            self.action_data.play()
+            self.action_data.play(self.action_data.blocking)
+
+        # stop playing sound on sequence end if the action is part of a sequence
+        if extra_data is not None and "sequence_end" in extra_data:
+            self.action_data.stopPlayback()
+
         return True
 
 
@@ -1316,6 +1335,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self._pytts_speaker = None  # speaker for PyTTS
         self._sound_file = None  # the sound file to play in audio mode
         self._sound_files = []  # list of sound files to pick from if in folder mode
+        self.blocking = False  # whether playback should block until finished
         self._tts_file = None  # sound file for TTS
         self.ptts_speed: int = 100  # words per minute, 100 is the default
         self.ptts_volume: int = 100  # volume, 0 to 100
@@ -1584,7 +1604,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
                     profile = gremlin.shared_state.current_profile
                     profile.save()
 
-    def play(self):
+    def play(self, blocking = False):
         """plays the sound"""
 
         sound_file = None
@@ -1603,9 +1623,13 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 volume = 1.0
                 pitch = 0
                 sound_file = self.sound_file
+            case PlayMode.Stop:
+                # stop all playbacks
+                self.stopPlayback()
+                return
             case _:
-                # default case
-                pass
+                # skip any other mode
+                return
 
         # generate the sound file if needed - returns the path to the audio file to play
         phrase: PhraseData = self.sound.generate(
@@ -1620,6 +1644,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
             sound_file=self._sound_file,
             sound_files=self._sound_files,
             timed_random=self._timed_random,
+
         )
 
         sound_file = phrase.sound_file if phrase else None
@@ -1677,6 +1702,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 fadeout_ms=self.fadeout_ms,
                 stop_previous=self.stop_previous,
                 rate=self.playback_rate,
+                blocking=blocking
             )
             actions.append(action)
 
@@ -1689,6 +1715,14 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 self.sound.queueAction(action)
             else:
                 syslog.error(f"PLAY: don't know how to play: {sound_file}")
+
+    def stopPlayback(self):
+        """ stops all playbacks """
+        verbose = gremlin.config.Configuration().verbose_mode_sound
+        if verbose:
+            syslog.info("Stopping playback")
+        self.sound.stopPlayback()
+
 
     def findDevice(self, index: int):
         if index == DEFAULT_AUDIO_DEVICE_INDEX:
@@ -1758,6 +1792,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
         speaker = None
         if "speaker" in node.attrib:
             speaker = node.get("speaker")
+
+        self.blocking = safe_read(node, "blocking", bool, False)
 
         # auto convert CoquiAI text to EdgeTTS as Coqui is deprecated
         if self.mode == PlayMode.CoquiAI:
@@ -1843,6 +1879,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
             node.set("file", self.sound_file)
 
         node.set("randomize", safe_format(self.randomize_sound_file, bool))
+        node.set("blocking", safe_format(self.blocking, bool))
 
         if self.tts_file:
             node.set("tts_file", self.tts_file)

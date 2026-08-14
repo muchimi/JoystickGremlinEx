@@ -137,6 +137,7 @@ class Color:
     def normalColor():
         return "#AAAAAA" if gremlin.shared_state.is_dark_theme else "#111111"
 
+    @staticmethod
     def disabledColor():
         return "#2E2E2E" if gremlin.shared_state.is_dark_theme else "#9C9C9C"
 
@@ -154,7 +155,7 @@ class Color:
 
     @staticmethod
     def normalLightColor():
-        return "#111111"
+        return "#E9E9E9" if gremlin.shared_state.is_dark_theme else "#252525"
 
     @staticmethod
     def normalGradientColor():
@@ -667,16 +668,18 @@ class Color:
         return css
 
     @staticmethod
-    def cssTitleBox():
-        background_color = Color.normalColor()
-        foreground_color = Color.backgroundColor()
+    def cssTitleBox(fontSize = 14, foreground_color = None, background_color = None):
+        if background_color is None:
+            background_color = Color.normalColor()
+        if foreground_color is None:
+            foreground_color = Color.backgroundColor()
         css = f"""
             .QLabel {{
                 border: 0px solid {background_color};
                 background-color: {background_color};
                 color: {foreground_color};
                 border-radius: 6px;
-                font: bold 14px;
+                font: bold {fontSize}px;
                 padding: 4px;
             }}
 
@@ -16230,10 +16233,10 @@ class QInteractWidget(QtWidgets.QWidget):
 class QStepTile(QtWidgets.QWidget):
     """step title widget"""
 
-    def __init__(self, label: str = None, icon=None, parent=None):
+    def __init__(self, label: str = None, icon=None, font_size = 14, foreground_color=None, background_color=None, parent=None):
         super().__init__(parent)
         self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.setStyleSheet(Color.cssTitleBox())
+        self.setStyleSheet(Color.cssTitleBox(fontSize=font_size, foreground_color=foreground_color, background_color=background_color))
         if icon:
             self.icon_label = gremlin.ui.ui_common.QIconLabel(icon, icon_size=16, text=label)
             self.main_layout.addWidget(self.icon_label)
@@ -16241,6 +16244,12 @@ class QStepTile(QtWidgets.QWidget):
             if label:
                 self.label = QtWidgets.QLabel(label)
                 self.main_layout.addWidget(self.label)
+
+    def setText(self, text: str):
+        if hasattr(self, "label"):
+            self.label.setText(text)
+        elif hasattr(self, "icon_label"):
+            self.icon_label.setText(text)
 
 
 class QScrollAreaResizeCallback(QtWidgets.QScrollArea):

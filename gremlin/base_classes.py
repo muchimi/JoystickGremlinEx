@@ -1995,6 +1995,11 @@ class FastQueue(Generic[T]):
 
             return item
 
+    def all_tasks_done(self) -> bool:
+        """Check if all tasks in the queue are done."""
+        with self._condition:
+            return not self._queue
+
     def getNowait(self) -> list[T]:
         """Remove and return all items currently in the queue without blocking."""
 

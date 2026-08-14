@@ -1586,6 +1586,7 @@ class PlayMode(enum.Enum):
     CoquiAI = 2  # use KTTS
     EdgeAI = 3  # use ETTS
     PyTTS = 4  # use PyTTS
+    Stop = 5  # stop playback
 
     @staticmethod
     def to_string(value) -> str:
@@ -1600,6 +1601,8 @@ class PlayMode(enum.Enum):
                 return "blank"
             case PlayMode.PyTTS:
                 return "pytts"
+            case PlayMode.Stop:
+                return "stop"
 
     @staticmethod
     def from_string(value) -> PlayMode:  # noqa: F821
@@ -1612,6 +1615,8 @@ class PlayMode(enum.Enum):
                 return PlayMode.EdgeAI
             case "pytts":
                 return PlayMode.PyTTS
+            case "stop":
+                return PlayMode.Stop
             case _:
                 return PlayMode.AudioFile
 

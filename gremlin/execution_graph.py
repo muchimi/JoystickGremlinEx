@@ -2341,7 +2341,7 @@ class AbstractExecutionGraph(QtCore.QObject):
 
 
 
-        return gremlin.input_item.BaseActivationCondition(conditions, activation_condition.rule)
+        return gremlin.input_item.BaseActivationCondition(conditions = conditions, target=target, rule=activation_condition.rule)
 
     def _contains_input_action_condition(self, activation_condition):
         """Returns whether or not an input action condition is present.

@@ -1394,6 +1394,33 @@ class MouseData(BaseData):
         return self
 
 
+class BlockData(BaseData):
+    """holds generic block data"""
+    key = "data"
+
+    def __init__(self, data : dict, action: str = None, extra_data: dict = None):
+        super().__init__(self.key, action, extra_data)
+        self.data = data
+
+    @staticmethod
+    def create(data : dict, action: str = None, extra_data: dict = None) -> BlockData:
+        self = BlockData(data=data, action=action, extra_data=extra_data)
+        return self
+
+    def toPayload(self) -> dict:
+        payload = super().toPayload()
+        return {
+            **payload,
+            "data": self.data
+        }
+
+    @staticmethod
+    def fromPayload(data: dict) -> BlockData:
+        assert data.get("key") == BlockData.key, "Invalid key for BlockData"
+        self = BlockData(data=data["data"], action=data.get("action"), extra_data=data.get("extra_data"))
+        return self
+
+
 class ClientData:
     """holds network client data"""
 

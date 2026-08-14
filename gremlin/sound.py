@@ -94,6 +94,7 @@ class PlaybackOptions:
         stop_previous: bool = False,
         rate: float = None,
         timed_random: TimedRandomInt = TimedRandomInt(),
+        blocking: bool = False,
     ):
         """playback options
 
@@ -117,6 +118,7 @@ class PlaybackOptions:
         self.fadeout_ms = fadeout_ms  # this only works for PG mode
         self.stop_previous = stop_previous
         self.rate = rate  # playback rate (1.0 = normal)
+        self.blocking = blocking  # whether playback should block until finished
 
 
 class SoundEvent:
@@ -140,8 +142,9 @@ class SoundEvent:
         stop_previous: bool = False,
         rate: float = 1.0,
         timed_random: TimedRandomInt = TimedRandomInt(),
+        blocking: bool = False,
     ):
-        data = PlaybackOptions(key, sound_file, device, loops, volume, playback_ms, fadein_ms, fadeout_ms, stop_previous, rate, timed_random=timed_random)
+        data = PlaybackOptions(key, sound_file, device, loops, volume, playback_ms, fadein_ms, fadeout_ms, stop_previous, rate, timed_random=timed_random, blocking=blocking)
         return SoundEvent(action=SoundAction.Play, key=key, data=data)
 
     @staticmethod
@@ -668,7 +671,9 @@ class Sound:
             self._thread = threading.Thread(target=self._queue_runner)
             self._thread.name = "Sound Runner"
             self._thread.start()
-            syslog.info("SOUND: starting engine")
+            verbose = gremlin.config.Configuration().verbose_mode_sound
+            if verbose:
+                syslog.info("SOUND: starting engine")
 
     def stop(self):
         """stops the sound queue"""
@@ -677,7 +682,9 @@ class Sound:
             if self._thread.is_alive():
                 self._thread.join()
             self._thread = None
-            syslog.info("SOUND: engine shutdown")
+            verbose = gremlin.config.Configuration().verbose_mode_sound
+            if verbose:
+                syslog.info("SOUND: engine shutdown")
 
     def ensureStarted(self) -> bool:
         """makes sure the mixer is started - returns true if initialized"""
@@ -855,7 +862,7 @@ class Sound:
             done_list = [t for t in self._sound_tasks if t.done()]
             self._sound_tasks = [t for t in self._sound_tasks if t not in done_list]
 
-    def play(self, filename: str, options: PlaybackOptions):
+    def play(self, filename: str, options: PlaybackOptions, blocking: bool = False):
         """plays a sound file via SD low level library"""
         try:
             if not self._playback_enabled:
@@ -962,6 +969,8 @@ class Sound:
 
             task = self.pool.submit(self._play_runner, data, device_id, loops)
             self._sound_tasks.append(task)
+            if blocking:
+                task.result()  # wait for the task to complete if blocking
 
         except Exception as e:
             syslog.error(f"SOUND: PLAY: An error occurred: {e}")
@@ -1319,6 +1328,12 @@ class Sound:
             self._event_queue.all_tasks_done()
         self._is_paused = False  # resume processing
 
+    def stopPlayback(self):
+        """stops all playbacks"""
+        self.clearQueue()
+        self.soundStop()
+
+
     def _queue_runner(self):
         """processes the sound queue - PG mode onlyt"""
         config = gremlin.config.Configuration()
@@ -1347,11 +1362,12 @@ class Sound:
                 case SoundAction.Play:
                     # play item
                     key = event.key
-                    data : PlaybackOptions= event.data
+                    data : PlaybackOptions = event.data
                     sound_file = data.sound_file
                     if verbose:
                         syslog.info(f"\tplay [{key}] [{gremlin.util.toUrl(sound_file)}]")
                     if USE_SD:
+
                         if data.stop_previous:
                             # stop any sounds currently playing before starting
                             # the new one. On the sounddevice (SD) path this was
@@ -1359,12 +1375,11 @@ class Sound:
                             # on the pygame path below - so 'Stop previous audio'
                             # had no effect for AI/Edge-TTS playback.
                             self.soundStop()
-                        self.play(sound_file, data)
+                        self.play(sound_file, data, blocking=data.blocking)
                     elif USE_PG:
                         if key in self.sound_map:
                             _audio_file = self.sound_audio_file_map[key]
-                            sound = pygame.mixer.Sound(self.sound_audio_file_map[key])
-                            # sound : pygame.mixer.Sound = self.sound_map[key]
+                            sound = pygame.mixer.Sound(_audio_file)
                             if data.stop_previous:
                                 # stop previous sounds
                                 pygame.mixer.stop()
