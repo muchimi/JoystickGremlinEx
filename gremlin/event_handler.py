@@ -2254,6 +2254,7 @@ class EventHandler(QtCore.QObject):
         self._mode_queue_enabled = not gremlin.config.Configuration().mode_change_aborts_sequence
 
         self._mode_change_callbacks = []  # holds callbacks to validate if mode changes should occur
+        self._keyboard_callback_map = {}  # holds callbacks for keyboard event by latched key
 
         self.reset()
 
@@ -3191,10 +3192,6 @@ class EventHandler(QtCore.QObject):
         self.registry.update(event)  # record the event
 
         try:
-            # if verbose: syslog.info("EVENT EXECUTE: enter critical phase")
-
-            # self._lock.acquire()
-
             # mode to act on
             mode = event.mode if event.mode else self.runtime_mode
 
@@ -3220,10 +3217,13 @@ class EventHandler(QtCore.QObject):
                 InputType.KeyboardLatched,
                 InputType.Mouse,
             ):
-                verbose = gremlin.config.Configuration().verbose_mode_detailed
+                config = gremlin.config.Configuration()
+
                 data = event.data  # holds keyboard state info
                 if event.event_type == InputType.Mouse:
-                    verbose = gremlin.config.Configuration().verbose_mode_mouse
+                    verbose = config.verbose_mode_mouse
+                else:
+                    verbose = config.verbose_mode_keyboard
                 if verbose:
                     syslog.info(f"process keyboard event: {event}")
                     syslog.info("\tKeyboard state data:")
@@ -3238,16 +3238,19 @@ class EventHandler(QtCore.QObject):
                         for index, input_item in enumerate(items):
                             syslog.info(f"\t[{index}]: {input_item.name}")
 
+                    input_key = input_item.key
+
                     for input_item in items:
                         if verbose:
                             syslog.info("-" * 50)
                         is_latched = True
                         latch_key = None
-                        # print (data)
+
                         latched_keys = [input_item]
                         latched_keys.extend(input_item.latched_keys)
                         if verbose:
                             syslog.info(f"KEY: Checking latching: {len(latched_keys)} key(s)")
+                        latch_key = input_item.key
                         if len(latched_keys) > 1:
                             # key is latched - check the other keys are also pressed
                             for k in latched_keys:
@@ -3268,7 +3271,36 @@ class EventHandler(QtCore.QObject):
                                     )
                                     if not found:
                                         syslog.info("\t\t* Key not found *")
+
+                                if self._keyboard_callback_map:
+                                    pass
+
+                                if not state and input_key in self._keyboard_callback_map:
+                                    if verbose:
+                                        syslog.info(f"\tdetected latch release - found matching callbacks for latched key: {input_key.name}")
+                                    m_list = self._keyboard_callback_map[input_key]
+                                    # indicate processed
+                                    del self._keyboard_callback_map[input_key]
+                                    if m_list:
+                                        # trigger release events
+                                        event.is_pressed = False
+                                        event.override_input_type = InputType.JoystickButton
+                                        if verbose:
+                                            trigger_line = "***** TRIGGER KEY INPUT RELEASE" + "*" * 30
+                                            syslog.info(trigger_line)
+                                            syslog.info(f"\tmode: [{mode}] Found latched key: Check key {input_key.name} callbacks: {len(m_list)} event: {event}")
+                                            syslog.info(trigger_line)
+                                        self._trigger_callbacks(m_list, event)
+
+
                                 is_latched = is_latched and state  # make sure all latched keys are currently pressed (state = True)
+
+
+
+
+
+
+
 
                         if verbose:
                             syslog.info(f"\tLatched state: {is_latched}")
@@ -3276,21 +3308,28 @@ class EventHandler(QtCore.QObject):
                         if is_latched:
                             latch_key = input_item.key
 
+
                         if latch_key:
                             # override the event type for keyboard so actions treat mouse/kbd input as a joystick button for mapping purposes
                             import gremlin.keyboard
                             assert isinstance(latch_key, gremlin.keyboard.Key), f"invalid key type, got {type(latch_key)} - expecting [gremlin.keyboard.Key]"
                             event.override_input_type = InputType.JoystickButton
 
+                            # register a release callback for the latched key
+
+
                             m_list = self._matching_latched_callbacks(event, latch_key)
 
                             if m_list:
                                 if verbose:
-                                    trigger_line = "***** TRIGGER " + "*" * 30
+                                    trigger_line = "***** TRIGGER KEY INPUT PRESS " + "*" * 30
                                     syslog.info(trigger_line)
                                     syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
                                     syslog.info(trigger_line)
                                 self._trigger_callbacks(m_list, event)
+                                if verbose:
+                                    syslog.info(f"\tSaving matching callbacks for latched key: {latch_key.name}")
+                                self._keyboard_callback_map[latch_key] = m_list # save the matching callbacks for the latched key for release
                             return
 
                     verbose = gremlin.config.Configuration().verbose_mode_inputs
@@ -3362,8 +3401,6 @@ class EventHandler(QtCore.QObject):
         except Exception as err:
             syslog.error(f"EVENT EXECUTE: error: {err}\n{traceback.format_exc()}")
         finally:
-            # if verbose: syslog.info("EVENT EXECUTE: exit critical phase")
-            # self._lock.release()
             pass
 
     def _trigger_callbacks(self, callbacks, event):

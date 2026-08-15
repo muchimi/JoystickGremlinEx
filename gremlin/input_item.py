@@ -1894,7 +1894,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         # update the defaults
         input_name = input_item.input_name
         self.setTitle(input_name)
-        self.setDescription(input_item.description)
+        # self.setDescription(input_item.description)
 
         # update mapping action icons
         self._update_repeater()  # create the correct repeater widget
@@ -2490,6 +2490,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         if description is not None:
             if verbose:
                 syslog.info(f"InputItemWidget: setting input description: [{description}]")
+            if "x" in description:
+                pass
             self._input_description_widget.setText(description, self._input_description_icon)
 
         else:

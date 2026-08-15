@@ -166,9 +166,11 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
             self.button_pulse_widget,
             self.button_repeat_widget,
             self.button_pulse_repeat_widget,
+            "||",
+
         ]
 
-        self.container_pulse_widget = gremlin.ui.ui_common.getHContainer(widgets, "Pulse Options:", widget_only=True)
+        self.container_pulse_widget = gremlin.ui.ui_common.getHContainer(widgets, label = "Pulse Options:", widget_only=True)
 
         mode = self.action_data.mode
         widgets = []
@@ -269,7 +271,7 @@ class MapToStateWidget(gremlin.input_item.AbstractActionWidget):
             value=self.action_data.reset_default_on_stop,
         )
 
-        widgets = [self._execute_widget, self._reset_default_widget]
+        widgets = [self._execute_widget, self._reset_default_widget, "||"]
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(widget)
 
@@ -803,8 +805,8 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
 
         self.pulse_worker_map = {}  # map of (state_name) to pulse worker object
         if self.verbose:
-            input_item = self.action_data.input_item
-            syslog.info(f"STATE FUNCTOR PROFILE START SYNC: (map to state) [{self.action_data.state.key}] : mapped to input: {input_item.debug_display}")
+            input_item: gremlin.input_item.InputItem = self.action_data.input_item
+            syslog.info(f"STATE FUNCTOR PROFILE START SYNC: (map to state) [{self.action_data.state.key}] : mapped to input: {input_item.display_name}")
             syslog.info(f"\tsync mode: [{self.action_data.sync_mode.name}]")
 
         # input inversion

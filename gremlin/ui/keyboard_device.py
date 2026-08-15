@@ -59,11 +59,13 @@ class KeyboardInputItem(InputItem):
         :param mode: the profile mode for this input
         """
         self._key: Key = None  # associated primary key (containing latched items)
-        super().__init__(mode_object,
-                         device_guid=KeyboardDeviceTabWidget.device_guid,
-                         input_type=InputType.KeyboardLatched,
-                         override_input_type=InputType.JoystickButton,
-                         custom_input_id_handler = self._handle_input_id_callback)
+        super().__init__(
+            mode_object,
+            device_guid=KeyboardDeviceTabWidget.device_guid,
+            input_type=InputType.KeyboardLatched,
+            override_input_type=InputType.JoystickButton,
+            custom_input_id_handler=self._handle_input_id_callback,
+        )
 
         self._title_name = "Keyboard input (not configured)"
 
@@ -77,6 +79,11 @@ class KeyboardInputItem(InputItem):
         """input id is the key for keyboard"""
         return self._key
 
+    # override description property to provide custom tooltip for this input item
+
+    @property
+    def description(self) -> str:
+        return None
 
     def _handle_get_sort_key(self, input_item: KeyboardInputItem):
         """sorting key for this input item"""
@@ -396,9 +403,9 @@ class BaseKeyboardCondition(BaseAbstractCondition):
     code as well as the extended flag.
     """
 
-    def __init__(self, extra_data: dict = None, target : AbstractContainer | AbstractAction = None):
+    def __init__(self, extra_data: dict = None, target: AbstractContainer | AbstractAction = None):
         """Creates a new instance."""
-        super().__init__(extra_data, target )
+        super().__init__(extra_data, target)
         self._input_item = extra_data.get("input_item") if extra_data else None
         self.scan_code = None
         self.is_extended = None
@@ -713,10 +720,13 @@ class KeyboardInputItemModel(gremlin.input_item.InputItemListModel):
             el = gremlin.event_handler.EventListener()
             el.input_deleted.emit(old_item)
 
+
 class KeyboardInputItemWidget(gremlin.input_item.InputItemWidget):
     """Widget for a single keyboard input item"""
-    def __init__(self,
-        input_item : KeyboardInputItem,
+
+    def __init__(
+        self,
+        input_item: KeyboardInputItem,
         populate_ui_callback=None,
         populate_name_callback=None,
         selection_changed_callback=None,
@@ -727,15 +737,17 @@ class KeyboardInputItemWidget(gremlin.input_item.InputItemWidget):
         parent=None,
     ):
         assert isinstance(input_item, KeyboardInputItem), "input_item must be an instance of KeyboardInputItem"
-        super().__init__(input_item = input_item,
-                         populate_ui_callback=populate_ui_callback,
-                         populate_name_callback=populate_name_callback,
-                         selection_changed_callback=selection_changed_callback,
-                         update_callback=update_callback,
-                         confirm_delete_callback=confirm_delete_callback,
-                         config_external=config_external,
-                         data=data,
-                         parent=parent)
+        super().__init__(
+            input_item=input_item,
+            populate_ui_callback=populate_ui_callback,
+            populate_name_callback=populate_name_callback,
+            selection_changed_callback=selection_changed_callback,
+            update_callback=update_callback,
+            confirm_delete_callback=confirm_delete_callback,
+            config_external=config_external,
+            data=data,
+            parent=parent,
+        )
 
 
 class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
@@ -771,7 +783,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         # List of inputs
         model = KeyboardInputItemModel(
-            profile = self.profile,
+            profile=self.profile,
             mode=mode,
             custom_load_handler=self._load_handler,
             custom_filter_handler=self._filter_data,
@@ -845,9 +857,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
-
-
-
     def _load_handler(self, model: KeyboardInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
 
@@ -865,7 +874,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if emit:
             model.trigger()  # causes an update
         return True
-
 
     def _filter_data(self, input_item) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
@@ -954,8 +962,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             for input_item in self.inputItemListModel.getFilteredItems():
                 input_item.locked = False
             self.setUpdatesEnabled(True)
-
-
 
     def _handle_edit_mode_changed(self, mode: str):
         gremlin.util.InvokeUiMethod(self._edit_mode_changed_ui, mode)  # ensure on UI thread
@@ -1172,7 +1178,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                     input_widget.setCustomContent(None)
                     return
 
-
                 widget = gremlin.ui.virtual_keyboard.QKeyWidget()
                 icon = gremlin.keyboard.KeyMap.icon(key)
                 name = gremlin.keyboard.KeyMap.get_name(key)
@@ -1189,6 +1194,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
                 widget.setReadOnly(True)
                 widgets.append(widget)
+
         else:
             # output as text that can wrap
             keys = "".join(key.name + " " for key in values)
@@ -1202,10 +1208,12 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _update_input_widget(self, input_widget, container_widget):
         """called when the keyboard input widget has to update itself on a data change"""
-        input_item = input_widget.input_item
+        input_item: KeyboardInputItem = input_widget.input_item
         input_widget.setTitle(input_item.title_name)
         values = input_item.getKeyList()
         self._set_custom_content(input_widget, values)
+
+        input_widget.setDescription(input_item.description)
 
         is_warning = False
         status_text = ""
@@ -1235,6 +1243,8 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _edit_item_cb(self, widget, index, data):
         """called when the edit button is clicked"""
         from gremlin.ui.virtual_keyboard import InputKeyboardDialog
+
+        assert index >= 0, "invalid index"
 
         data = self.model.data(index)
         sequence = data.input_id.sequence

@@ -2300,7 +2300,7 @@ class MidiClient(QtCore.QObject):
         """registers a MIDI input item"""
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_midi
-        verbose = True
+        # verbose = True
         current_mode = gremlin.shared_state.current_mode
 
         if not self._started:

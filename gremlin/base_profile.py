@@ -1160,7 +1160,7 @@ class Settings:
         if vid in self._vjoy_as_input:
             return self._vjoy_as_input[vid]
         return False
-        
+
 
     def getVjoyAsInputList(self) -> list[int]:
         """returns a list of vjoy device IDs that are configured as input devices"""
@@ -1711,7 +1711,7 @@ class Settings:
         device_id = device.device_id  # key must be a string
         # config = gremlin.config.Configuration()
         # verbose = config.verbose_mode_filter or config.verbose_mode_ui
-        # # verbose = True
+        # verbose = True
         device_guid = device.device_guid  # ensure a dinput.GUID
 
         visible = False

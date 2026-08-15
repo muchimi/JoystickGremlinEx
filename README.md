@@ -48,6 +48,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T30)
+- Change: API: changed device enumeration logic and added additional filter for invalid (ghost) devices
+- Fix: Input Viewer: state visualizer enumeration exception in some situations.
+- Fix: Input Viewer: state and keyboard/mouse visualizers initial checked state does not reflect persisted visualization state
+- Fix: API: state tracker: unhandled new device types can cause exceptions
+- Fix: Keyboard Device: release events may not auto trigger (actions could only get a press, but not a release)
+- Fix: Map to State action: incorrect spacing in the layout of some options.
+
 ### (m77T29)
 - New: Sequence Container: Continue on trigger change option.  This option applies to normal and wiggle modes only (not loop/round-robin modes). When set, it will ignore the input trigger state change (for example, a button release after a button press that triggered the sequence), and continue running the sequence until all steps complete. Has no effect in loop or toggle modes.  This can also be called a "fire and forget" mode, so all steps will always execute once triggered.  When off, the sequence stops executing even if the sequence is not completed when the input trigger changes states.
 - New: Play/TTS action: Blocking option added.  When enabled, only one sound will play at a time and any queued sounds will be blocked until the prior sound fully plays.  Default is off, sounds will play simultaneously when triggered.

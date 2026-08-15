@@ -608,7 +608,7 @@ class ExecutionContext:
             return  # already built
 
         verbose = gremlin.config.Configuration().verbose_mode_exec
-        verbose = True
+        # verbose = True
         if verbose:
             syslog.info("CONTEXT: rebuild")
 

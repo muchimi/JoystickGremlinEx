@@ -2879,7 +2879,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # update device lists
             phys_devices = gremlin.joystick_handling.physical_devices()
-            vjoy_devices = gremlin.joystick_handling.virtual_devices()
+            # if verbose_l1:
+            #     syslog.info(f"Physical Devices: {len(phys_devices)}")
+            #     for dev in phys_devices:
+            #         syslog.info(f"\t{str(dev)}")
+
+            vjoy_devices = gremlin.joystick_handling.all_vjoy_devices()
             maestro_devices = gremlin.joystick_handling.all_maestro_devices()
             self._active_devices = gremlin.joystick_handling.all_joystick_devices()
 
@@ -2964,7 +2969,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if verbose_l1:
                         syslog.info(f"\tdevice [{device_name}] is disabled - skipping tab")
                     continue
-                visible = visible_map[device_id] if device_id in visible_map else True
+                visible = visible_map.get(device.device_guid, True) # visible_map.get[device_id] if device_id in visible_map else True
                 device.visible = visible
                 if not visible:
                     if verbose_l1:
@@ -4454,6 +4459,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if verbose_detailed:
                         syslog.info("Device change end")
                     self.device_change_locked = False
+
+                    # update joysticks
+                    gremlin.joystick_handling.refresh_devices()
 
                     self._create_tabs()
 

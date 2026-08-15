@@ -160,13 +160,27 @@ class VisualizationConfig:
     def setValue(self, key, device: DeviceSummary, input_id, value):
         """saves a viewer config item"""
         assert isinstance(key, tuple), "key must be a tuple"
+        if key[1] in (VisualizationType.State, VisualizationType.Keyboard):
+            key = (None, key[1])
         self.register(key, device, input_id)
         self._config[key][input_id] = value
         self.save()
 
     def getValue(self, key, device: DeviceSummary, visualization: VisualizationType, default_value=False):
         """gets a value"""
-        assert isinstance(key, tuple), "key must be a tuple"
+        assert isinstance(key, tuple) if key is not None else True, "key must be a tuple"
+
+        if not self._config:
+            self.reload()
+
+        if key is None or key not in self._config:
+            # old style data
+            if visualization in (VisualizationType.State, VisualizationType.Keyboard):
+                for k, v in self._config.keys():
+                    if v == visualization:
+                        key = (k, v)
+                        break
+
         if key not in self._config:
             return default_value
         if visualization not in self._config[key]:
@@ -236,7 +250,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         self.unfocus_icon = unfocus_icon or gremlin.ui.ui_common.Icons.circleArrowLeft()
         self.focus_icon_size = focus_icon_size
 
-        devices = gremlin.joystick_handling.joystick_devices() + gremlin.joystick_handling.virtual_devices()
+        devices = gremlin.joystick_handling.getVisibleJoystickDevices()
 
         self.viewer = viewer
         self._selector_widgets = {}  # created input checkbox widgets by key - if not in this list or None, not created
@@ -310,6 +324,8 @@ class VisualizationSelector(QtWidgets.QWidget):
         for device in self._devices:
             if device.disabled:
                 continue  # skip disabled devices
+
+
 
             device_name = gremlin.joystick_handling.getDeviceName(device.device_guid)
             box = QtWidgets.QGroupBox(device_name)
@@ -418,6 +434,10 @@ class VisualizationSelector(QtWidgets.QWidget):
 
             self.main_layout.addWidget(box)
 
+
+
+
+
             for key, widget in self._selector_widgets.items():
                 if Shiboken.isValid(widget):
                     checked = widget.isChecked()
@@ -425,6 +445,10 @@ class VisualizationSelector(QtWidgets.QWidget):
                         callback = self._selector_callbacks.get(key, None)
                         if callback:
                             callback()
+
+
+
+
 
     def _handle_visualizer_action(self, widget):
         if not Shiboken.isValid(widget):
@@ -816,7 +840,8 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         device = gremlin.joystick_handling.getDevice(gremlin.shared_state.keyboard_tab_guid)
         key = vc.keyboard_key
         vc.registerKey(key, device)
-        checked = vc.getValue(key, device, VisualizationType.Keyboard, False)
+
+        checked = vc.getValue(None, None, VisualizationType.Keyboard, False)
         self.keyboard_widget_selector = gremlin.ui.ui_common.QActionCheckbox(
             "Keyboard/Mouse",
             value=checked,
@@ -834,7 +859,7 @@ class InputViewerDialog(ui_common.BaseDialogUi):
         device = gremlin.joystick_handling.getDevice(gremlin.shared_state.state_tab_guid)
         key = vc.state_key
         vc.registerKey(key, device)
-        checked = vc.getValue(key, device, VisualizationType.State, False)
+        checked = vc.getValue(None, None, VisualizationType.State, False)
         self.state_widget_selector = gremlin.ui.ui_common.QActionCheckbox(
             "State",
             value=checked,

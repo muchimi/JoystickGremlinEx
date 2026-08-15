@@ -2004,19 +2004,24 @@ class StateTracker:
 
         self._process_event(event)
 
-    def _process_event(self, event):
+    def _process_event(self, event : gremlin.event_handler.Event):
+        if event.is_axis:
+            # ignore non button events
+            return
         device_guid = event.device_guid
         input_type = event.event_type
         input_id = event.identifier
         match input_type:
-            case InputType.JoystickButton:
+            case InputType.JoystickButton | InputType.Midi | InputType.OpenSoundControl:
                 state = event.is_pressed
             case InputType.JoystickHat:
                 state = event.value
-            case InputType.OpenSoundControl:
-                state = input_id.button_value
-            case InputType.Midi:
-                state = input_id.button_value
+            case _:
+                if hasattr(input_id, "button_value"):
+                    state = input_id.button_value
+                else:
+                    state = input_id
+
 
         self._store_state(device_guid, input_type, input_id, state)
         self._update_widget(device_guid, input_type, input_id, state)
@@ -7598,7 +7603,8 @@ class StateVisualizerWidget(QWidget):
             if not category:
                 category = default_category
         if items:
-            for key, state in items:
+            source_data = list(items)
+            for key, state in source_data:
                 if state.value is None:
                     syslog.warning(f"viewer state: bad state data for state: {state.name} id [{state.id}] - null value - skipping display")
                     continue

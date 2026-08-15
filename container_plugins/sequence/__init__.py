@@ -1325,7 +1325,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         verbose = self._verbose
         verbose_extra = self._verbose_extra
 
-       
+
 
         # no resume mode if running once
         resume = False if self.action_data.mode == "normal" else self.action_data.resume_mode
@@ -1780,7 +1780,7 @@ Unlike a macro, any action suitable for the input can be used."""
             self.sync_mode = SyncMode(safe_read(node, "sync-mode", int, 0))
 
     def _parse_steps_xml(self, node, data=None, extra_data=None):
-        verbose = True
+        verbose = False
         self.action_sets.pushSuspend()
         self.action_sets.clear()
         actionset_nodes = node.xpath("./action-set")
