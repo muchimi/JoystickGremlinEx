@@ -2725,8 +2725,13 @@ class TriggerDict(collections.UserDict):
     @staticmethod
     def copyFrom(source: dict, deep=False):
         import copy
-
         assert isinstance(source, (dict, TriggerDict)), "Source must be a dictionary"
+        if isinstance(source, dict):
+            new_dict = TriggerDict()
+            for key, value in source.items():
+                new_dict[key] = copy.deepcopy(value) if deep else copy.copy(value)
+            return new_dict
+
         if deep:
             return copy.deepcopy(source)
         return copy.copy(source)

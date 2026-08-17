@@ -3777,6 +3777,7 @@ class InputListenerWidget(QBoxFrame):
         filter_func=None,
         callback=None,
         virtual_only=False,
+        any_button=False,
         parent=None,
     ):
         """Creates a new instance.
@@ -3792,6 +3793,7 @@ class InputListenerWidget(QBoxFrame):
             complex unwanted inputs
         :param callback : callback on selection
         :param parent the parent widget of this widget
+        :param any_button whether or not to accept any button press as input
         """
 
         super().__init__(parent)
@@ -3815,9 +3817,10 @@ class InputListenerWidget(QBoxFrame):
 
         self._significant = gremlin.input_devices.JoystickInputSignificant()
         self._significant.reset()
-        self._listen_mouse = InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types or InputType.Mouse in event_types
+        self._any_button = any_button
+        self._listen_mouse = any_button or InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types or InputType.Mouse in event_types
 
-        self._close_on_key = not (InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types)
+        self._close_on_key = not any_button and not (InputType.Keyboard in event_types or InputType.KeyboardLatched in event_types)
         self._esc_key = key_from_name("esc")
 
         # Create and configure the ui overlay
@@ -3910,6 +3913,8 @@ class InputListenerWidget(QBoxFrame):
             process_event = self._significant.should_process(event, deviation=0.25)  # move 1/4
             syslog.info(f"axis move: result: {process_event}")
 
+        if self._any_button:
+            process_event = event.is_pressed
         elif event.event_type == InputType.JoystickButton:
             process_event = event.is_pressed
         elif event.event_type == InputType.JoystickHat:
@@ -3951,6 +3956,7 @@ class InputListenerWidget(QBoxFrame):
 
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
+        verbose = True
         if verbose:
             syslog.info(f"LISTEN: Keyboard event: {event} {key}")
 
@@ -3959,13 +3965,23 @@ class InputListenerWidget(QBoxFrame):
                 self.close()
             return  # ignore keys otherwise
 
+        if not event.is_pressed:
+            # ignore releases
+            return
+
         # Return immediately once the first key press is detected
+        valid =  self._any_button or InputType.Keyboard in self._event_types or InputType.KeyboardLatched in self._event_types
+        if not valid:
+            return
+
+
+
         if not self._multi_keys:
             # single key mode
             if event.is_pressed and key == self._esc_key:
                 if not self._abort_timer.is_alive():
                     self._abort_timer.start()
-            elif not event.is_pressed and InputType.Keyboard in self._event_types:
+            elif not event.is_pressed and valid:
                 if not self._return_kb_event:
                     self.item_selected.emit([key])
                 else:
@@ -3983,8 +3999,8 @@ class InputListenerWidget(QBoxFrame):
         # Record all key presses and return on the first key release
         else:
             # multi-key mode
-            if event.is_pressed:
-                if InputType.Keyboard in self._event_types:
+
+                if valid:
                     if not self._return_kb_event:
                         self._multi_key_storage.append(key)
                     else:
@@ -3992,6 +4008,9 @@ class InputListenerWidget(QBoxFrame):
                     self.keyInput.emit(self._multi_key_storage)  # notify a key was pressed
                     self._echo_key(key)
                     self.selection = self._multi_key_storage
+                    if verbose:
+                        syslog.info(f"multi-key storage: {self._multi_key_storage}")
+
 
     def _mouse_event_ui(self, event):
         """process mouse events on UI thread"""

@@ -276,11 +276,12 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     def __init__(self, mode: str | object, device_guid):
 
-        super().__init__()
+
         self._id = uuid.uuid4()  # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-", "")
         self._device_guid = device_guid
         self._device_guid = DeviceType.NotSet
+
         if device_guid is not None:
             device = gremlin.joystick_handling.getDevice(device_guid)
             assert device is not None, "device does not exist"
@@ -304,6 +305,8 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
             self._profile_mode = mode.name
         self._sort_index: int = None  # sorting index (int)
         self._input_id_callback = None  # optional callback
+
+        super().__init__()
 
     def setInputIdCallback(self, callback: Callable):
         """callback to use (optional) to get the input id"""
@@ -629,6 +632,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         self.code = None
         self._id = gremlin.util.get_guid(no_brackets=True)
         self._input_item: gremlin.input_item.InputItem = None
+        self._hardware_input_id_callback: Callable = None
         if extra_data:
             if "input_item" in extra_data:
                 self._input_item = extra_data["input_item"]
@@ -643,6 +647,9 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         else:
             self.override_input_type = None
             self.override_input_id = None
+
+
+
 
     def icon(self):
         """gets the default icon"""
@@ -767,9 +774,19 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
             return profile.devices[device_guid]
         return None
 
+    def setHardwareInputIdCallback(self, callback : Callable):
+        """Sets a callback to be invoked when a hardware input id is needed """
+        self._hardware_input_id_callback = callback
+
+    def getHardwareInputIdCallback(self):
+        """Gets the currently set hardware input id callback"""
+        return self._hardware_input_id_callback
+
     @property
     def hardware_input_id(self):
         """gets the input id on the hardware device attached to this"""
+        if self._hardware_input_id_callback is not None:
+            return self._hardware_input_id_callback()
         if self.override_input_id is not None:
             return self.override_input_id
         return self.input_item.input_id if self.input_item else None
@@ -1126,7 +1143,7 @@ class AbstractCallbackModel(AbstractModel):
         """reorders the indices in the model to be consecutive starting from 0"""
         for new_index, item in enumerate(self._index_map.values()):
             self._item_map[item] = new_index
-        self._index_map = {new_index: item for new_index, item in enumerate(self._index_map.values())}
+        self._index_map = TriggerDict.copyFrom({new_index: item for new_index, item in enumerate(self._index_map.values())})
         self.applyFilter(emit=False) # update filtered data as well
         syslog.info("Reindex results:")
         for index, item in self._filtered_index_map.items():
@@ -1309,8 +1326,8 @@ class AbstractCallbackModel(AbstractModel):
         if not self._filtered_enabled:
             if self._filtered_index_map.id != self._index_map.id:
                 # reset filters if previously enabled
-                self._filtered_index_map = {key: value for key, value in self._index_map.items()}
-                self._filtered_item_map = {key: value for key, value in self._item_map.items()}
+                self._filtered_index_map = TriggerDict.copyFrom({key: value for key, value in self._index_map.items()})
+                self._filtered_item_map = TriggerDict.copyFrom({key: value for key, value in self._item_map.items()})
                 if emit:
                     self._fireChanged()
             return
@@ -1466,14 +1483,18 @@ class AbstractCallbackModel(AbstractModel):
 
     def _compare_maps(self, m1: TriggerDict, m2: TriggerDict):
         # look for differences in the stored values
-        if m1.id == m2.id:
-            # same map = no filter applied
-            return True
-        if len(m1) != len(m2):
-            # fast comparison on counts
-            return True
-        # same count = compare actual contents
-        return hash(m1) != hash(m2)
+        if isinstance(m1, TriggerDict) and isinstance(m2, TriggerDict):
+            if m1.id == m2.id:
+                # same map = no filter applied
+                return True
+            if len(m1) != len(m2):
+                # fast comparison on counts
+                return True
+            # same count = compare actual contents
+            return hash(m1) != hash(m2)
+        return False
+
+        # removed as it's now handled above
 
     def getFilteredIndices(self):
         """returns the list of indices currently visible in the model"""

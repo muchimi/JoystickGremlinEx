@@ -2663,7 +2663,10 @@ class Profile:
         device_guid = input_item.device_guid
         assert isinstance(device_guid, dinput.GUID), "invalid device id"
         input_type = input_item.input_type
-        input_id = input_item.input_id
+        if hasattr(input_item, "identifier"):
+            input_id = input_item.identifier
+        else:
+            input_id = input_item.input_id
         input_mode = input_item.profile_mode
         verbose = gremlin.config.Configuration().verbose_mode_ui
 

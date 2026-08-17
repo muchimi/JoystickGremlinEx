@@ -435,32 +435,28 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             assert device_guid is not None, "device_guid must be provided if mode provided as a name"
             mode_node = profile.getModeNode(device_guid, mode_node)
 
+        super().__init__(mode_node.name, None)
+
         if not device_guid:
             # grab the device from the mode object
             device_guid = mode_node.parent.device_guid
 
         assert device_guid is not None, "invalid device guid provided"
-
         assert input_type is not None, "input type must be provided"
-
-        import gremlin.joystick_handling
-
-        super().__init__(mode_node.name, None)
-
-        # if input_type == InputType.ModeControl:
-        #     syslog.info(f"create input item id: [{self.id}]")
-        #     pass
 
         self.parent = mode_node  # mode object
 
         self._input_item_generating_xml = False  # xml nesting level
         self._override_input_type = override_input_type  # override input type for some types that are different
-
         self._input_type = input_type
+
         self._custom_input_id_handler = custom_input_id_handler  # custom handler for input id
         if self._custom_input_id_handler is not None and input_id is not None:
             raise ValueError("input_id should not be provided when a custom input id handler is set")
+
+
         self.setInputId(input_id)
+
 
         device = gremlin.joystick_handling.getDevice(device_guid)
         self._device_guid = device.device_guid if device else None  # hardware input ID
@@ -468,8 +464,11 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._device_name = device.name if device else f"Unknownd device: [{device_guid}]"
         self._device_type = device.device_type if device else DeviceType.NotSet
 
-        if self._device_id == "53540000000000000000000000000000":
-            pass
+
+
+
+
+
 
         self._name = None  # device name
         self._input_name = None  # input name of the hardware (axis name if an axis)
@@ -538,9 +537,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         """returns the input id for this input item"""
         if self._custom_input_id_handler is not None:
             return self._custom_input_id_handler()
-        if self._input_id is None and self.input_type not in (InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat):
-            return self
+
         return self._input_id
+
+
 
     @input_id.setter
     def input_id(self, value: int):
@@ -845,21 +845,29 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         return self._containers
 
     @gremlin.base_classes.AbstractInputItem.input_type.setter
-    def input_type(self, input_type: InputType):
+    def input_type(self, source_type: InputType):
         # override mode/state inputs for legacy profiles
-        assert input_type is not None, "Invalid input type"
-        if self._device_type == DeviceType.ModeControl:
-            input_type = InputType.ModeControl
-        elif self._device_type == DeviceType.State:
-            input_type = InputType.State
-        elif self._device_type == DeviceType.Osc:
-            input_type = InputType.OpenSoundControl
-        elif self._device_type == DeviceType.Midi:
-            input_type = InputType.Midi
-        elif self._device_type == DeviceType.State:
-            input_type = InputType.State
-        elif self._device_type == DeviceType.Keyboard:
-            input_type = InputType.KeyboardLatched
+        assert source_type is not None, "Invalid input type"
+        if isinstance(source_type, InputType):
+            input_type = source_type
+        elif isinstance(source_type, DeviceType):
+            match source_type:
+                case DeviceType.ModeControl:
+                    input_type = InputType.ModeControl
+                case DeviceType.State:
+                    input_type = InputType.State
+                case DeviceType.Osc:
+                    input_type = InputType.OpenSoundControl
+                case DeviceType.Midi:
+                    input_type = InputType.Midi
+                case DeviceType.State:
+                    input_type = InputType.State
+                case DeviceType.Keyboard:
+                    input_type = InputType.KeyboardLatched
+                case _:
+                    raise ValueError(f"Unsupported source type: {source_type}")
+        else:
+            raise ValueError(f"Unsupported source type: {source_type}")
 
         self._input_type = input_type
         self._update_input()
@@ -890,6 +898,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     @property
     def device_guid(self):
         return self._device_guid
+
+    @property
+    def identifier(self):
+        return self.input_id
 
     @device_guid.setter
     def device_guid(self, value: dinput.GUID | uuid.UUID | str = None):  # noqa: F405
@@ -983,7 +995,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         """updates input name and registers an axis input if needed"""
         from gremlin.keyboard import key_from_code
 
-        input_id = self._input_id
+        input_id = self.input_id
         if input_id is not None and self._device_guid is not None:
             if isinstance(input_id, int):
                 if self._input_type == InputType.JoystickAxis:
@@ -1053,10 +1065,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         if extra_data and "input_type" in extra_data:
-            self.input_type = extra_data["input_type"]
+            self._input_type = extra_data["input_type"]
         else:
             try:
-                self.input_type = InputType.to_enum(node.tag)
+                self._input_type = InputType.to_enum(node.tag)
             except Exception:
                 syslog.error(f"XML: unknown input type: [{node.tag}]")
 
@@ -5138,6 +5150,9 @@ class AbstractAction(BaseProfileData):
                 self.container = parent
 
         self.parent_container = self.container
+        input_item = self.container.input_item if self.container else None
+        if input_item and hasattr(input_item, "getHardwareInputIdCallback"):
+            self.setHardwareInputIdCallback(input_item.getHardwareInputIdCallback())
 
         self._abstract_action_generating_xml = False  # true if generating XML
         self._conditions = ConditionModel(self)
@@ -5165,6 +5180,7 @@ class AbstractAction(BaseProfileData):
         el.profile_hook.connect(self.hook)
         el.profile_unhook.connect(self.unhook)
         el.profile_unload.connect(self._cleanup)
+
 
     @property
     def debug_name(self) -> str:

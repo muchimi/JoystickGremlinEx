@@ -288,14 +288,14 @@ class Key:
         self.scan_code = scan_code
         self._update()
 
-    # def _changed_cb(self, owner , action, index, value):
-    #     syslog.info(f"Key {self.name} latch change: {action} index: {index} value: {value}")
-    #     self._update()
 
     def _update(self):
 
         if len(self._latched_keys) > 0:
-            keys = [self]
+            keys = []
+            if self.name:
+                keys.append(self)
+
             keys.extend(self._latched_keys)
             # order the key by modifier
             keys = sort_keys(keys)
@@ -372,12 +372,6 @@ class Key:
     def debug_name(self):
         return f"{self.name} (0x{self._scan_code:02X}/{self._scan_code}{' EX' if self._is_extended else ''}]"
 
-    # def __eq__(self, other):
-    #     return hash(self) == hash(other)
-
-    # def __ne__(self, other):
-    #     return hash(self) != hash(other)
-
     def __hash__(self):
         # computes the hash value for this key combination
         data = [(self._scan_code, self._is_extended)]
@@ -413,9 +407,12 @@ class Key:
         return self._latched_keys
 
     @latched_keys.setter
-    def latched_keys(self, value):
+    def latched_keys(self, keys):
         self._latched_keys.clear()
-        self._latched_keys.extend(value)
+        for key in keys:
+            assert isinstance(key, Key), f"Expected a Key object, got {type(key)}"
+            if key.name:
+                self._latched_keys.append(key)
         self._update()
 
     @property

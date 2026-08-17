@@ -72,12 +72,19 @@ class KeyboardInputItem(InputItem):
         self._display_tooltip = None
         self._suspend_update = False
         self.setInputIdCallback(self._handle_input_id_callback)
+
         self.setSortCallback(self._handle_get_sort_key)
         self._update()
 
     def _handle_input_id_callback(self):
         """input id is the key for keyboard"""
         return self._key
+
+    @property
+    def identifier(self):
+        if self._key:
+            return self._key.message_key
+        return super().identifier
 
     # override description property to provide custom tooltip for this input item
 
@@ -354,7 +361,8 @@ class KeyboardInputItem(InputItem):
 
     @property
     def display_name(self) -> str:
-        return f"{self._display_name} {self.message_key}"
+        #return f"{self._display_name} {self.message_key}"
+        return self._display_name
 
     def duplicate(self) -> KeyboardInputItem:  # noqa: F821
         """duplicates this object"""
@@ -556,17 +564,6 @@ class KeyboardConditionWidget(AbstractConditionWidget):
 
         widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.main_layout.addWidget(widget)
-
-        # self.grid_layout.addWidget(QtWidgets.QLabel("Activate if"), 0, 0)
-        # self.grid_layout.addWidget(self.key_container_widget, 0, 1)
-        # self.grid_layout.addWidget(QtWidgets.QLabel("is"), 0, 2)
-        # self.grid_layout.addWidget(gremlin.ui.ui_common.getVContainer(self.comparison_dropdown, widget_only=True, alignment=QtCore.Qt.AlignmentFlag.AlignVCenter), 0, 3, alignment=QtCore.Qt.AlignmentFlag.AlignLeft)
-        # self.grid_layout.addWidget(QtWidgets.QWidget(), 0, 4)
-        # self.grid_layout.addWidget(widgets, 0, 5)
-        # self.grid_layout.setColumnStretch(4, 2)
-
-        # self.main_layout.addWidget(self.grid_widget)
-        # self.main_layout.addWidget(self.ui_container_widget)
 
         self._update_keys()
 
@@ -1168,6 +1165,9 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             # clear content
             input_widget.setCustomContent(None)
             return
+
+        # order the keys
+        values = gremlin.keyboard.sort_keys(values)
 
         widgets = []
         if len(values) < 8:

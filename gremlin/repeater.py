@@ -23,7 +23,8 @@ from PySide6 import QtCore
 
 import gremlin.config
 import gremlin.event_handler
-
+from typing import Callable
+from gremlin.singleton_decorator import SingletonDecorator
 from . import common, event_handler, input_devices, joystick_handling
 import logging
 
@@ -200,13 +201,14 @@ class Repeater(QtCore.QObject):
 class PulseWorker:
     """helper object to schedule repeated triggers (callback) at a given interval until the object is stopped."""
 
-    def __init__(self, pulse_duration: float, repeat_interval: float, on_callback, off_callback=None, data=None, count: int = None):
+    def __init__(self, pulse_duration: float, repeat_interval: float, on_callback : Callable, off_callback: Callable = None, iteration_callback: Callable = None, data=None, count: int = None):
         """Creates a new instance.
 
         :param pulse_duration: duration in seconds of the pulse
         :param repeat_interval: duration in seconds of the interval between pulses - send a negative value to disable - value of 0 means no delay (not recommended)
         :param on_callback: function to call when the pulse is on - if data is provided, that will be passed as an argument
         :param off_callback: function to call when the pusle if off (optional) - if data is provided, that will be passed as an argument
+        :param iteration_callback: function to call on each iteration of the pulse (optional) - if data is provided, that will be passed as an argument
         :param count: number of pulses, set to 0 to disable
         """
         # QtCore.QObject.__init__(self)
@@ -215,6 +217,7 @@ class PulseWorker:
         self._repeat_interval = repeat_interval  # repeat delay, none
         self._on_callback = on_callback
         self._off_callback = off_callback
+        self._iteration_callback = iteration_callback
         self._is_pulse = False  # true when the signal is active
         self._thread = None  # holds the running thread
         self._data = data  # any data
@@ -287,6 +290,12 @@ class PulseWorker:
                 while self._keep_running and time.time() < time_lapsed:
                     time.sleep(0)
 
+            if self._iteration_callback:
+                if self.data:
+                    self._iteration_callback(self.data)
+                else:
+                    self._iteration_callback()
+
             self._is_pulse = False
 
             # if verbose: syslog.info("Stop pulse")
@@ -325,3 +334,213 @@ class PulseWorker:
     def is_pulse(self) -> bool:
         """true if we're pulsing"""
         return self._is_pulse
+
+
+
+class AcceleratedEncoder:
+    """
+    Pulse manager for encoders - converts directional pulse inputs into a smooth setpoint value
+    Rotary encoder pulse -> setpoint in [-1.0, +1.0] (customizable)
+    Features:
+    - pulse-frequency-based acceleration
+    - smooth acceleration curve
+    - low-pass-filtered pulse frequency
+    - acceleration reset on direction change
+    - acceleration reset after an idle timeout
+    """
+
+    def __init__(
+        self,
+        initial_value : float =0.0,
+        min_value : float =-1.0,
+        max_value : float =1.0,
+        min_step : float =0.002,
+        max_step : float =0.08,
+        accel_start_hz : float =2.0,
+        accel_full_hz : float =30.0,
+        curve : float =2.0,
+        frequency_filter : float =0.25,
+        direction_change_speed_retention : float =0.0,
+        frequency_timeout : float =0.30,
+    ):
+        """
+        Accelerated encoder
+
+        :param initial_value (float): Initial setpoint value.
+        :param min_value (float): Minimum setpoint value.
+        :param max_value (float): Maximum setpoint value.
+        :param min_step (float): Minimum step size per pulse.
+        :param max_step (float): Maximum step size per pulse.
+        :param accel_start_hz (float): Frequency at which acceleration starts.
+        :param accel_full_hz (float): Frequency at which full acceleration is reached.
+        :param curve (float): Exponent for shaping the acceleration curve.
+        :param frequency_filter (float): Low-pass filter coefficient for pulse frequency.
+        :param direction_change_speed_retention (float): Fraction of speed retained on direction change.
+        :param frequency_timeout (float): Time in seconds after which acceleration resets if no pulses occur.
+        """
+        self.value = initial_value # starting position
+        self.min_value = min_value # min range (-1)
+        self.max_value = max_value # max range (+1)
+
+        self.min_step = min_step # minimum step size per pulse
+        self.max_step = max_step # maximum step size per pulse
+
+        self.accel_start_hz = accel_start_hz # frequency at which acceleration starts
+        self.accel_full_hz = accel_full_hz # frequency at which full acceleration is reached
+        self.curve = curve # exponent for shaping the acceleration curve
+
+        self.frequency_filter = frequency_filter # low-pass filter coefficient for pulse frequency
+
+        # Fraction of previous speed retained when direction reverses.
+        # 0.0 = full reset.
+        self.direction_change_speed_retention = (
+            direction_change_speed_retention
+        )
+
+        # Maximum time between pulses before acceleration is reset.
+        self.frequency_timeout = frequency_timeout
+
+        self.last_pulse_time = None
+        self.last_direction = None
+        self.filtered_frequency = 0.0
+
+    def _acceleration(self, frequency : float) -> float:
+        """
+        Convert pulse frequency to an acceleration factor 0.0 ... 1.0.
+        """
+
+        if frequency <= self.accel_start_hz:
+            return 0.0
+
+        if frequency >= self.accel_full_hz:
+            return 1.0
+
+        # Normalize frequency to 0...1.
+        x = (
+            (frequency - self.accel_start_hz)
+            / (self.accel_full_hz - self.accel_start_hz)
+        )
+
+        # Smoothstep gives a smooth transition at both ends.
+        x = x * x * (3.0 - 2.0 * x)
+
+        # Additional response shaping.
+        x = x ** self.curve
+
+        return x
+
+    def pulse(self, direction : int, timestamp: float = None, value: float = None) -> float:
+        """
+        Process one encoder pulse.
+        direction:
+            +1 = increase
+            -1 = decrease
+        Returns:
+            current setpoint
+        """
+
+        if direction not in (-1, 1):
+            raise ValueError("direction must be +1 or -1")
+
+        if timestamp is None:
+            timestamp = time.monotonic()
+
+        if value is not None:
+            # reset the value
+            self.value = value
+
+        # elapsed time since previous pulse.
+        dt = None
+
+        if self.last_pulse_time is not None:
+            dt = timestamp - self.last_pulse_time
+
+        # idle timeout check
+        timed_out = (
+            dt is not None
+            and dt >= self.frequency_timeout
+        )
+
+        if timed_out:
+            # Previous speed is now considered stale.
+            self.filtered_frequency = 0.0
+
+            # Treat this as the beginning of a new movement.
+            self.last_pulse_time = None
+            dt = None
+
+        # reversal check
+        direction_changed = (
+            self.last_direction is not None
+            and direction != self.last_direction
+        )
+
+        if direction_changed:
+            # Kill or reduce accumulated acceleration.
+            self.filtered_frequency *= (
+                self.direction_change_speed_retention
+            )
+
+            # Do not calculate frequency using an interval
+            # that spans two different directions.
+            self.last_pulse_time = None
+            dt = None
+
+        # pulse frequency.
+        if dt is not None and dt > 0:
+            instantaneous_frequency = 1.0 / dt
+
+            alpha = self.frequency_filter
+
+            self.filtered_frequency += alpha * (
+                instantaneous_frequency
+                - self.filtered_frequency
+            )
+
+        # state
+        self.last_pulse_time = timestamp
+        self.last_direction = direction
+
+        # compute acceleration
+        accel = self._acceleration(
+            self.filtered_frequency
+        )
+
+        offset = self.min_step + accel * (
+            self.max_step - self.min_step
+        )
+
+        # apply computed offset
+        self.value += direction * offset
+
+        # clamp
+        self.value = max(
+            self.min_value,
+            min(self.max_value, self.value)
+        )
+
+        return self.value
+
+    def get_value(self):
+        return self.value
+
+    def get_frequency(self):
+        return self.filtered_frequency
+
+    def get_step(self):
+        accel = self._acceleration(
+            self.filtered_frequency
+        )
+
+        return self.min_step + accel * (
+            self.max_step - self.min_step
+        )
+
+    def reset_acceleration(self):
+        """
+        Manually reset the current acceleration state.
+        """
+        self.filtered_frequency = 0.0
+        self.last_pulse_time = None
+        self.last_direction = None
+

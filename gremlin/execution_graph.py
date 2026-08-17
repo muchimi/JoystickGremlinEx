@@ -1263,16 +1263,21 @@ class ExecutionContext:
 
         extra_inputs = functor.latch_extra_inputs(container_condition_node, action_condition_node)
         if extra_inputs:
+            verbose = gremlin.config.Configuration().verbose_mode_exec
+            verbose = True
             # register the extra inputs for this functor
             eh = gremlin.event_handler.EventHandler()
             # add_latched_functor(self, device_guid, mode, event, functor):
             mode = action.profile_mode
             for device_guid, input_type, input_id in extra_inputs:
-                event = gremlin.event_handler.Event(event_type=input_type, device_guid=device_guid, identifier=input_id)
-                verbose = gremlin.config.Configuration().verbose_mode_exec
+                if isinstance(input_id, gremlin.keyboard.Key):
+                    event = gremlin.event_handler.Event(event_type=input_type, device_guid=device_guid, identifier=input_id.message_key, virtual_code=input_id.virtual_code)
+                else:
+                    event = gremlin.event_handler.Event(event_type=input_type, device_guid=device_guid, identifier=input_id)
+
                 if verbose:
                     device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                    syslog.info(f"LATCH: Added extra functor: [{device_name}] input id: [{input_id}] mode: {mode} event: {str(event)} ")
+                    syslog.info(f"LATCH: (_get_action_functor) Add extra functor: [{device_name}] input type: [{input_type.name} ({input_type.value})] input id: [{input_id}] mode: {mode} event: {str(event)} ")
                 eh.add_latched_functor(device_guid, mode, event, functor)
         action.setEnabled(True)
         return functor
@@ -2563,7 +2568,7 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
                     verbose = gremlin.config.Configuration().verbose_mode_exec
                     if verbose:
                         device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                        syslog.info(f"LATCH: Added extra functor: [{device_name}] input id: [{input_id}] mode: {mode} event: {str(event)} ")
+                        syslog.info(f"LATCH: (_build_graph) added extra functor: [{device_name}] input id: [{input_id}] mode: {mode} event: {str(event)} ")
                     eh.add_latched_functor(device_guid, mode, event, functor)
 
             action.setEnabled(True)

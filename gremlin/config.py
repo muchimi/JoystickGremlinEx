@@ -42,9 +42,7 @@ syslog = logging.getLogger("system")
 class Configuration(QtCore.QObject):
     """configuration data"""
 
-    changed = Signal(
-        str, object
-    )  # fires on some configuration value changes, passes the method to get the value that has changed
+    changed = Signal(str, object)  # fires on some configuration value changes, passes the method to get the value that has changed
 
     def get_config(self) -> str:
         """local config file (version based)"""
@@ -84,8 +82,8 @@ class Configuration(QtCore.QObject):
         self._app_path = None  # path where data is stored
         self._profile_path = self.data_path()
         self._visuals_hidden_map = None
-        self._last_version = None # version string of the last version that ran
-        self._last_version_path = None # path to last used version
+        self._last_version = None  # version string of the last version that ran
+        self._last_version_path = None  # path to last used version
 
         self._midi_enabled = None
         self._osc_enabled = None
@@ -172,9 +170,7 @@ class Configuration(QtCore.QObject):
                 os.unlink(backup_fname)
 
             self.save(backup_fname)
-            gremlin.ui.ui_common.MessageBoxInfo(
-                title="Backup Configuration", prompt="Backup saved"
-            )
+            gremlin.ui.ui_common.MessageBoxInfo(title="Backup Configuration", prompt="Backup saved")
         except Exception:
             gremlin.ui.ui_common.MessageBoxWarning(
                 title="Backup Configuration",
@@ -195,9 +191,7 @@ class Configuration(QtCore.QObject):
                 shutil.copy(backup_fname, fname)
                 syslog.info("CONFIG: backup restored")
                 self._reload()
-                gremlin.ui.ui_common.MessageBoxInfo(
-                    title="Restore Configuration", prompt="Backup restored"
-                )
+                gremlin.ui.ui_common.MessageBoxInfo(title="Restore Configuration", prompt="Backup restored")
             except Exception:
                 gremlin.ui.ui_common.MessageBoxWarning(
                     title="Restore Configuration",
@@ -226,17 +220,12 @@ class Configuration(QtCore.QObject):
         if not app_main:
             app_main = self._clean_string(gremlin.version.APPLICATION_MAIN)
         if not app_base:
-            app_base = self._clean_string(
-                gremlin.version.APPLICATION_BASE
-            )  # can be blank
+            app_base = self._clean_string(gremlin.version.APPLICATION_BASE)  # can be blank
         return f"{app_main}_{app_base}" if app_base else app_main
-
 
     def ensureProfilePath(self):
         if not self._profile_path:
-            user_profile_path = os.path.abspath(
-                os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex")
-            )
+            user_profile_path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex"))
             self._profile_path = user_profile_path
             os.path.makedirs(self._profile_path, exist_ok=True)
 
@@ -244,7 +233,6 @@ class Configuration(QtCore.QObject):
         """returns the version string for the current application"""
         self.ensureProfilePath()
         return self._clean_version()
-
 
     def ensureVersion(self):
         """ensures that the data folder for the current version exists and copies data from the previous version if necessary"""
@@ -264,8 +252,6 @@ class Configuration(QtCore.QObject):
         self.ensureProfilePath()
         return os.path.join(self._profile_path, "version.json")
 
-
-
     def getLastVersion(self):
         if self._last_version is None:
             version_file = self.getVersionFile()
@@ -280,7 +266,7 @@ class Configuration(QtCore.QObject):
                         self._last_version = self.versionString()
                         self._last_version_path = self.data_path()
 
-                    syslog.info(f"CONFIG: last version found: {self._last_version }")
+                    syslog.info(f"CONFIG: last version found: {self._last_version}")
                 except Exception as err:
                     syslog.error(f"Unable to read last version file: {err}")
 
@@ -302,7 +288,6 @@ class Configuration(QtCore.QObject):
         except Exception as err:
             syslog.error(f"Unable to save version file: {err}")
 
-
     def data_path(self):
         """returns a path to the data folder for the current application version - this folder is located in the user profile
         and as of m74t5 depends on the user option to create a folder for each version of the software or not
@@ -313,9 +298,7 @@ class Configuration(QtCore.QObject):
 
         if not self._app_path:
             enable_version = self.enable_log_version
-            user_profile_path = os.path.abspath(
-                os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex")
-            )
+            user_profile_path = os.path.abspath(os.path.join(os.getenv("userprofile"), "Joystick Gremlin Ex"))
             self._profile_path = user_profile_path
 
             if enable_version:
@@ -340,11 +323,7 @@ class Configuration(QtCore.QObject):
 
     def reload(self, force=False):
 
-        if (
-            not force
-            and self._last_reload is not None
-            and time.time() - self._last_reload < 1
-        ):
+        if not force and self._last_reload is not None and time.time() - self._last_reload < 1:
             return
 
         self._reload()  #  load that first because it cascades values into local if not in local yet
@@ -377,7 +356,7 @@ class Configuration(QtCore.QObject):
         load_successful = False
         if os.path.isfile(fname):
             if not self._is_blank(fname):
-                with open(fname,"r", encoding="utf-8") as hdl:
+                with open(fname, "r", encoding="utf-8") as hdl:
                     try:
                         # decoder = json.JSONDecoder()
                         # decoder.decode(hdl.read())
@@ -423,10 +402,7 @@ class Configuration(QtCore.QObject):
 
     def _reload_profile_ui(self):
         """Loads the profile's configuration file's content."""
-        if (
-            self._last_profile_reload is not None
-            and time.time() - self._last_profile_reload < 1
-        ):
+        if self._last_profile_reload is not None and time.time() - self._last_profile_reload < 1:
             return
 
         self._profile_data = {}
@@ -439,7 +415,7 @@ class Configuration(QtCore.QObject):
         # default empty values.
         data = None
         if os.path.isfile(fname) and os.path.getsize(fname):
-            with open(fname,"r", encoding="utf-8") as hdl:
+            with open(fname, "r", encoding="utf-8") as hdl:
                 try:
                     # decoder = json.JSONDecoder()
                     # self._profile_data = decoder.decode(hdl.read())
@@ -463,14 +439,13 @@ class Configuration(QtCore.QObject):
         else:
             self._save_ui(fname, save_profile)
 
-
         # tell UI of config changes
 
         el = gremlin.event_handler.EventListener()
         el.config_option_changed.emit()
 
     def getTemporaryFile(self, ext=None):
-        """gets a temporary file - the temporary file location is in the user folder """
+        """gets a temporary file - the temporary file location is in the user folder"""
         data_path = self.data_path()
         user_profile = os.path.join(data_path, "temp")
         os.makedirs(user_profile, exist_ok=True)
@@ -588,9 +563,7 @@ class Configuration(QtCore.QObject):
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_mode
         if verbose:
-            syslog.info(
-                f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]"
-            )
+            syslog.info(f"CONFIG: storing last runtime profile mode: [{mode_name}] for profile [{os.path.basename(profile_path)}]")
         self.save()
 
     def get_last_runtime_mode(self, profile_path):
@@ -717,9 +690,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def tts_mode_switch_enabled(self) -> bool:
-        return self._get_data(
-            "tts_mode_switch_enabled", False
-        )  # change in m77 default is to not speak mode changes by default
+        return self._get_data("tts_mode_switch_enabled", False)  # change in m77 default is to not speak mode changes by default
 
     @tts_mode_switch_enabled.setter
     def tts_mode_switch_enabled(self, value: bool):
@@ -849,9 +820,7 @@ class Configuration(QtCore.QObject):
 
         # Handle non files by treating them as regular expressions, returning
         # the first successful match.
-        for key, value in sorted(
-            self._data["profiles"].items(), key=lambda x: x[0].lower()
-        ):
+        for key, value in sorted(self._data["profiles"].items(), key=lambda x: x[0].lower()):
             # Ignore valid files
             if os.path.exists(key):
                 continue
@@ -859,9 +828,7 @@ class Configuration(QtCore.QObject):
             # Treat key as regular expression and attempt to match it to the
             # provided executable path
             if re.search(key, exec_path) is not None:
-                syslog.info(
-                    f"Found regex match in {key} for {exec_path}, returning {value}"
-                )
+                syslog.info(f"Found regex match in {key} for {exec_path}, returning {value}")
                 return value
 
     def set_profile(self, exec_path, profile_path):
@@ -1134,10 +1101,7 @@ class Configuration(QtCore.QObject):
     @enable_remote_broadcast.setter
     def enable_remote_broadcast(self, value):
         """remote broadcast master switch enable"""
-        if (
-            isinstance(value, bool)
-            and self._get_data("enable_remote_broadcast", False) != value
-        ):
+        if isinstance(value, bool) and self._get_data("enable_remote_broadcast", False) != value:
             self._set_data("enable_remote_broadcast", value)
 
     @property
@@ -1492,7 +1456,7 @@ class Configuration(QtCore.QObject):
         return VerboseMode(self._data["verbose_mode"])
 
     def setVerboseMode(self, value):
-        ''' sets the verbose mode to a value '''
+        """sets the verbose mode to a value"""
         self._data["verbose_mode"] = value
         self.save()
 
@@ -1525,28 +1489,25 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_keyboard(self):
         """true if verbose mode is in keyboard mode"""
-        return True
+        # return True
         return self.verbose and VerboseMode.Keyboard in self.verbose_mode
 
     @property
     def verbose_mode_keyboard_extra(self):
         """true if verbose mode is in keyboard mode"""
-        return (
-            self.verbose
-            and VerboseMode.Keyboard in self.verbose_mode
-            and VerboseMode.Extra in self.verbose_mode
-        )
+        return self.verbose and VerboseMode.Keyboard in self.verbose_mode and VerboseMode.Extra in self.verbose_mode
 
     @property
     def verbose_mode_ui(self):
         return self.verbose and VerboseMode.UI in self.verbose_mode
 
-    def verbose_mode_ui_level(self, level = 0):
+    def verbose_mode_ui_level(self, level=0):
         """true if verbose mode is in UI mode"""
         flag = self.verbose and VerboseMode.UI in self.verbose_mode
-        return flag and (level == 0 \
-            or (level >= 1 and VerboseMode.L1 in self.verbose_mode) \
-            or (level >= 2 and VerboseMode.L2 in self.verbose_mode) \
+        return flag and (
+            level == 0
+            or (level >= 1 and VerboseMode.L1 in self.verbose_mode)
+            or (level >= 2 and VerboseMode.L2 in self.verbose_mode)
             or (level >= 3 and VerboseMode.L3 in self.verbose_mode)
         )
 
@@ -1573,11 +1534,7 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_inputs_extra(self):
         """true if verbose mode is in inputs mode"""
-        return (
-            self.verbose
-            and VerboseMode.Inputs in self.verbose_mode
-            and VerboseMode.Extra in self.verbose_mode
-        )
+        return self.verbose and VerboseMode.Inputs in self.verbose_mode and VerboseMode.Extra in self.verbose_mode
 
     @property
     def verbose_mode_mouse(self):
@@ -1627,11 +1584,7 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_exec_detailed(self):
         """true if verbose mode is in exec detailed mode"""
-        return (
-            self.verbose
-            and self.verbose_mode_exec
-            and VerboseMode.ExecDetails in self.verbose_mode
-        )
+        return self.verbose and self.verbose_mode_exec and VerboseMode.ExecDetails in self.verbose_mode
 
     @property
     def verbose_mode_osc(self):
@@ -1709,11 +1662,7 @@ class Configuration(QtCore.QObject):
     @property
     def verbose_mode_remote_extra(self):
         """true if extra remote verbose mode on"""
-        return (
-            self.verbose
-            and VerboseMode.Remote in self.verbose_mode
-            and VerboseMode.Extra in self.verbose_mode
-        )
+        return self.verbose and VerboseMode.Remote in self.verbose_mode and VerboseMode.Extra in self.verbose_mode
 
     @property
     def verbose_mode_tts(self):
@@ -1734,14 +1683,18 @@ class Configuration(QtCore.QObject):
     def verbose_mode_perf(self):
         return self.verbose and VerboseMode.Perf in self.verbose_mode
 
-
-    def verbose_mode_perf_level(self, level = 0):
+    def verbose_mode_perf_level(self, level=0):
         """true if verbose mode for performance timing"""
         flag = self.verbose and VerboseMode.Perf in self.verbose_mode
-        return flag and (level == 0 \
-            or level == 1 and VerboseMode.L1 in self.verbose_mode \
-            or level == 2 and VerboseMode.L2 in self.verbose_mode \
-            or level >= 3 and VerboseMode.L3 in self.verbose_mode)
+        return flag and (
+            level == 0
+            or level == 1
+            and VerboseMode.L1 in self.verbose_mode
+            or level == 2
+            and VerboseMode.L2 in self.verbose_mode
+            or level >= 3
+            and VerboseMode.L3 in self.verbose_mode
+        )
 
     @property
     def verbose_mode_timing(self):
@@ -1799,14 +1752,13 @@ class Configuration(QtCore.QObject):
 
     @property
     def verbose_mode_l2(self):
-        """true if verbose mode level 2 """
+        """true if verbose mode level 2"""
         return self.verbose and VerboseMode.L2 in self.verbose_mode
 
     @property
     def verbose_mode_l3(self):
         """true if verbose mode level 3"""
         return self.verbose and VerboseMode.L3 in self.verbose_mode
-
 
     @property
     def osc_enabled(self):
@@ -1904,7 +1856,7 @@ class Configuration(QtCore.QObject):
             self.changed.emit("input_viewer_disables_repeaters", value)
 
     @property
-    def tab_list(self):# -> dict[Any, TabData] | None:# -> dict[Any, TabData] | None:
+    def tab_list(self):  # -> dict[Any, TabData] | None:# -> dict[Any, TabData] | None:
         """tab order for the UI devices as set by the user dict[tab_index : int, data: TabData]"""
         data = self._get_data("tab_device_order", None)
         # if data:
@@ -1917,18 +1869,16 @@ class Configuration(QtCore.QObject):
     @tab_list.setter
     def tab_list(self, tab_map):
         # convert the tab map to something serializable
-        #data = {key:item.to_json() for key, item in tab_map.items()}
+        # data = {key:item.to_json() for key, item in tab_map.items()}
         self._data["tab_device_order"] = tab_map
         self.save()
-
-
-
 
     @property
     def device_visible_map(self) -> dict[str, bool]:
         return self._get_data("device-visibility", {})
+
     @device_visible_map.setter
-    def device_visible_map(self, value : dict[str, bool]):
+    def device_visible_map(self, value: dict[str, bool]):
         self._set_data("device-visibility", value)
 
     @property
@@ -2058,9 +2008,7 @@ class Configuration(QtCore.QObject):
     @property
     def last_device_guid(self):
         """gets the last selected device guid"""
-        device_guid = self._profile_data.get(
-            "last_device_guid", None
-        )  # try the profile specific config first
+        device_guid = self._profile_data.get("last_device_guid", None)  # try the profile specific config first
         if not device_guid:
             device_guid = self._get_data("last_device_guid", None)
         return device_guid
@@ -2109,9 +2057,7 @@ class Configuration(QtCore.QObject):
 
         verbose = self.verbose_mode_inputs
 
-        if input_type != InputType.ModeControl and isinstance(
-            input_id, gremlin.base_classes.AbstractInputItem
-        ):
+        if input_type != InputType.ModeControl and isinstance(input_id, gremlin.base_classes.AbstractInputItem):
             # convert to an ID we can use
             input_id = input_id.guid
         elif input_id is None:
@@ -2137,9 +2083,7 @@ class Configuration(QtCore.QObject):
         elif isinstance(input_id, (list, set, tuple)):
             pass
         else:
-            syslog.warning(
-                f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}"
-            )
+            syslog.warning(f"CONFIG: SetLastInput(): Don't know how to handle input_id [{input_id}] type: {type(input_id).__name__}")
             input_id = None
 
         input_type = InputType.convert(input_type)
@@ -2159,12 +2103,8 @@ class Configuration(QtCore.QObject):
             self._data["last_input_mode"] = mode
 
             if verbose:
-                device_name = gremlin.joystick_handling.device_name_from_guid(
-                    device_guid
-                )
-                syslog.info(
-                    f"CONFIG: SetLastInput(): {device_name} {input_type_string} {input_id}"
-                )
+                device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+                syslog.info(f"CONFIG: SetLastInput(): {device_name} {input_type_string} {input_id}")
 
             self.save_profile()
             self.save()
@@ -2180,9 +2120,7 @@ class Configuration(QtCore.QObject):
         save_input_id = input_id
         input_type = None
         # syslog = logging.getLogger("system")
-        device_name = gremlin.joystick_handling.device_name_from_guid(
-            dinput_device_guid
-        )
+        device_name = gremlin.joystick_handling.device_name_from_guid(dinput_device_guid)
         if dinput_device_guid not in gremlin.shared_state.device_type_map:
             # input is missing
             # syslog.warning(f"Config: get last input: Unable to determine input type:  Unable to find device {dinput_device_guid} {device_name} in device map")
@@ -2194,7 +2132,7 @@ class Configuration(QtCore.QObject):
 
         device_type = gremlin.shared_state.device_type_map[dinput_device_guid]
         match device_type:
-            case  DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy:
+            case DeviceType.Maestro | DeviceType.Joystick | DeviceType.VJoy:
                 device_info = gremlin.joystick_handling.getDevice(dinput_device_guid)
                 if device_info:
                     if device_info.axis_count > 0:
@@ -2231,7 +2169,7 @@ class Configuration(QtCore.QObject):
                             save_input_id = item.guid
                     else:
                         count = widget.inputItemListModel.rows()
-                        #found = False
+                        # found = False
                         save_input_id = input_id
 
                         if count:
@@ -2240,7 +2178,7 @@ class Configuration(QtCore.QObject):
                                 input_id = item
                                 save_input_id = input_id.guid
 
-                        #items = list(widget.inputItemListModel)
+                        # items = list(widget.inputItemListModel)
                         # for item in items:
                         #     if item.guid == input_id:
                         #         input_id = item
@@ -2268,9 +2206,7 @@ class Configuration(QtCore.QObject):
                 save_input_id = None
                 input_id = None
             case _:
-                assert False, (
-                    f"Config: GetInputId() Don't know how to handle device type: {device_type}  {device_name}"
-                )
+                assert False, f"Config: GetInputId() Don't know how to handle device type: {device_type}  {device_name}"
 
         if input_type is None or input_id is None:
             # syslog.warning(f"Config: get last input: Unable to determine input type for device {dinput_device_guid} {device_name}")
@@ -2278,9 +2214,7 @@ class Configuration(QtCore.QObject):
 
         return (input_type, save_input_id, input_id)
 
-    def get_last_input(
-        self, device_guid=None, return_mode=False
-    ) -> tuple:  # (device_guid, input_type, input_id, mode)
+    def get_last_input(self, device_guid=None, return_mode=False) -> tuple:  # (device_guid, input_type, input_id, mode)
         """gets the last input for a given device
 
         :param device_guid: (optional) the device to look for - if None - uses the last known device
@@ -2293,7 +2227,6 @@ class Configuration(QtCore.QObject):
 
         # get the profile data
         if self._profile_data:
-
             data = self._profile_data.get("last_input", {})
             device_guid = self._profile_data.get("last_input_device_guid", None)
             input_id = self._profile_data.get("last_input_id", None)
@@ -2308,13 +2241,10 @@ class Configuration(QtCore.QObject):
                         return (device_guid, input_type, input_id, mode)
                     return (device_guid, input_type, input_id)
 
-
-
         if device_guid is None:
             # get the last profile device guid saved to config
 
             device_guid = self._get_data("last_input_device_guid", None)
-
 
             input_type_string = self._data.get("last_input_type", None)
             if input_type_string:
@@ -2324,12 +2254,7 @@ class Configuration(QtCore.QObject):
 
             input_id = self._get_data("last_input_id", None)
 
-
-            if (
-                device_guid is not None
-                and input_type is not None
-                and input_id is not None
-            ):
+            if device_guid is not None and input_type is not None and input_id is not None:
                 if return_mode:
                     mode = self._get_data("last_input_mode", None)
                     if mode is not None:
@@ -2368,43 +2293,31 @@ class Configuration(QtCore.QObject):
             try:
                 input_type = InputType.to_enum(input_type)
             except Exception:
-                syslog.error(
-                    f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type"
-                )
+                syslog.error(f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type")
                 input_type = InputType.NotSet
 
             if input_id is not None and isinstance(input_id, int):
                 if return_mode:
                     return (device_guid, input_type, input_id, mode)
                 if verbose:
-                    syslog.info(
-                        f"CONFIG: GetLastInput(): {device_guid} {device_name} {input_type} {input_id}"
-                    )
+                    syslog.info(f"CONFIG: GetLastInput(): {device_guid} {device_name} {input_type} {input_id}")
                 return (device_guid, input_type, input_id)
 
             if input_id is not None:
-                input_type, save_input_id, input_id = self._get_input_id(
-                    dinput_device_guid, input_id
-                )
+                input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid, input_id)
                 if input_type is None:
                     if verbose:
-                        syslog.info(
-                            f"CONFIG: GetLastInput(): nothing found for {device_guid} {device_name}"
-                        )
+                        syslog.info(f"CONFIG: GetLastInput(): nothing found for {device_guid} {device_name}")
                     if return_mode:
                         return (None, None, None, None)
                     return (None, None, None)
                 if verbose:
-                    syslog.info(
-                        f"CONFIG: GetLastInput(): {device_guid} {device_name} {input_type} {input_id}"
-                    )
+                    syslog.info(f"CONFIG: GetLastInput(): {device_guid} {device_name} {input_type} {input_id}")
 
                 try:
                     input_type = InputType.to_enum(input_type)
                 except Exception:
-                    syslog.error(
-                        f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type"
-                    )
+                    syslog.error(f"CONFIG: GetLastInput(): unable to convert input type {input_type} to a known type")
                     input_type = InputType.NotSet
                 if return_mode:
                     return (device_guid, input_type, input_id, mode)
@@ -2413,27 +2326,21 @@ class Configuration(QtCore.QObject):
         # provide a suitable default for the input
         input_id = None
         if dinput_device_guid in gremlin.shared_state.device_type_map:
-            input_type, save_input_id, input_id = self._get_input_id(
-                dinput_device_guid, input_id
-            )
+            input_type, save_input_id, input_id = self._get_input_id(dinput_device_guid, input_id)
             if input_type is not None and input_id is not None:
                 # save the new defaults
                 data[device_guid] = (input_type, save_input_id)
                 self._profile_data["last_input"] = data
                 self.save_profile()
                 if verbose:
-                    syslog.info(
-                        f"CONFIG: GetLastInput(): {device_guid} {device_name} {input_type} {input_id}"
-                    )
+                    syslog.info(f"CONFIG: GetLastInput(): {device_guid} {device_name} {input_type} {input_id}")
 
                 if return_mode:
                     return (device_guid, input_type, input_id, mode)
                 return (device_guid, input_type, input_id)
 
         if verbose:
-            syslog.info(
-                f"CONFIG: GetLastInput(): nothing found for {device_guid} {device_name}"
-            )
+            syslog.info(f"CONFIG: GetLastInput(): nothing found for {device_guid} {device_name}")
         if return_mode:
             return (None, None, None, None)
         return (None, None, None)
@@ -2494,7 +2401,7 @@ class Configuration(QtCore.QObject):
     @property
     def button_grid_visible(self) -> bool:
         """default state of the button grid in vjoy remap"""
-        return self._get_data("button_grid_visible", False) # off by default
+        return self._get_data("button_grid_visible", False)  # off by default
 
     @button_grid_visible.setter
     def button_grid_visible(self, value: bool):
@@ -2891,7 +2798,8 @@ class Configuration(QtCore.QObject):
     @property
     def filter_auto_unhide(self) -> bool:
         """true if auto unhide is enabled for filtered axis events"""
-        return self._get_data("filter_auto_unhide", True) # defaults to enabled
+        return self._get_data("filter_auto_unhide", True)  # defaults to enabled
+
     @filter_auto_unhide.setter
     def filter_auto_unhide(self, value: bool):
         if self.filter_auto_unhide != value:
@@ -3075,9 +2983,7 @@ class Configuration(QtCore.QObject):
     def last_control_action(self):
         import gremlin.types
 
-        value = self._get_data(
-            "last_control_action", gremlin.types.ControlAction.TTSAbort
-        )
+        value = self._get_data("last_control_action", gremlin.types.ControlAction.TTSAbort)
         return gremlin.types.ControlAction(value)
 
     @last_control_action.setter
@@ -3340,7 +3246,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def ai_tts_last_speaker(self) -> str:
-        """ pytts last speaker """
+        """pytts last speaker"""
         return self._get_data("ai_tts_last_speaker", None)
 
     @ai_tts_last_speaker.setter
@@ -3349,7 +3255,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def ai_ktts_last_speaker(self) -> str:
-        """ ktts last speaker """
+        """ktts last speaker"""
         return self._get_data("ai_ktts_last_speaker", None)
 
     @ai_ktts_last_speaker.setter
@@ -3358,7 +3264,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def ai_etts_last_speaker(self) -> str:
-        """ etts last speaker """
+        """etts last speaker"""
         return self._get_data("ai_etts_last_speaker", None)
 
     @ai_etts_last_speaker.setter
@@ -3367,7 +3273,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def ai_etts_last_locale(self) -> str:
-        """ etts last locale """
+        """etts last locale"""
         return self._get_data("ai_etts_last_locale", None)
 
     @ai_etts_last_locale.setter
@@ -3376,7 +3282,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def ai_etts_last_gender(self) -> str:
-        """ etts last gender """
+        """etts last gender"""
         return self._get_data("ai_etts_last_gender", None)
 
     @ai_etts_last_gender.setter
@@ -3401,13 +3307,12 @@ class Configuration(QtCore.QObject):
 
     @property
     def tts_generate_on_load(self) -> bool:
-        """ attempt to generate missing audio for TTS on profile load"""
+        """attempt to generate missing audio for TTS on profile load"""
         return self._get_data("tts_generate_on_load", False)
 
     @tts_generate_on_load.setter
     def tts_generate_on_load(self, value: bool):
         self._set_data("tts_generate_on_load", value)
-
 
     @property
     def ai_tts_overwrite_filenames(self) -> str:
@@ -3560,20 +3465,20 @@ class Configuration(QtCore.QObject):
     def ui_max_input_enabled(self, value: bool):
         self._set_data("ui_max_input_enabled", value)
 
-
     @property
     def last_reorder_file(self) -> str:
         """last reorder file used for device tabs"""
-        return self._get_data("last_reorder_file","")
+        return self._get_data("last_reorder_file", "")
+
     @last_reorder_file.setter
     def last_reorder_file(self, value: str):
         self._set_data("last_reorder_file", value)
 
-
     @property
     def maestro_device_count(self) -> int:
-        """returns the number of Maestro devices to create """
-        return self._get_data("maestro_device_count", 4) # defaults to 4
+        """returns the number of Maestro devices to create"""
+        return self._get_data("maestro_device_count", 4)  # defaults to 4
+
     @maestro_device_count.setter
     def maestro_device_count(self, value: int):
         self._set_data("maestro_device_count", value)
@@ -3582,7 +3487,8 @@ class Configuration(QtCore.QObject):
     def maestro_enabled(self) -> bool:
         """returns true if Maestro is enabled"""
         # return self._get_data("maestro_enabled", False)
-        return False # disable for now while Maestro integration is being worked on
+        return False  # disable for now while Maestro integration is being worked on
+
     @maestro_enabled.setter
     def maestro_enabled(self, value: bool):
         self._set_data("maestro_enabled", value)
@@ -3591,6 +3497,7 @@ class Configuration(QtCore.QObject):
     def maestro_dist_path(self) -> str:
         """returns the path to the Maestro distribution"""
         return self._get_data("maestro_dist_path", r"C:\HIDMaestro\dist")
+
     @maestro_dist_path.setter
     def maestro_dist_path(self, value: str):
         self._set_data("maestro_dist_path", value)
@@ -3599,6 +3506,7 @@ class Configuration(QtCore.QObject):
     def last_save_path(self) -> str:
         """returns the last save path used for audio files"""
         return self._get_data("last_save_path", "")
+
     @last_save_path.setter
     def last_save_path(self, value: str):
         self._set_data("last_save_path", value)
@@ -3607,6 +3515,7 @@ class Configuration(QtCore.QObject):
     def virpil_led_executable(self) -> str:
         """returns the path to the virpil LED executable"""
         return self._get_data("virpil_led_executable", r"C:\Program Files (x86)\VPC Software Suite\tools\VPC_LED_Control.exe")
+
     @virpil_led_executable.setter
     def virpil_led_executable(self, value: str):
         self._set_data("virpil_led_executable", value)
