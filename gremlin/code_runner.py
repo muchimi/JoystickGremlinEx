@@ -328,7 +328,7 @@ class CodeRunner:
                                     continue
 
                                 callbacks.extend(container.generate_callbacks(graph_mode_node))
-
+                                
                             for cb_data in callbacks:
                                 if cb_data.event is None:
                                     if verbose:
@@ -362,9 +362,13 @@ class CodeRunner:
                                                                     syslog.info(f"\t\t\t\tCommand:: {action.command}")
                                             else:
                                                 syslog.info(f"\t\t\tFunctor: {functor}")
+
+
                                     self.event_handler.addCallback(device_node.device_guid, mode_name, event, cb_data.callback, input_item.always_execute)
                                 else:
                                     self.event_handler.addCallback(dinput.GUID_Virtual, mode_name, cb_data.event, cb_data.callback, input_item.always_execute)
+
+
 
             # handle multimode actions - ensure they are hooked - these actions are actions that can process data for multiple modes such as gated axis
             nodes = ec.findActions("gated-axis")
@@ -406,6 +410,8 @@ class CodeRunner:
                         event_type=InputType.State, device_guid=state_device_guid, identifier=input_item.input_id, extra_data={"input_item": input_item}
                     )
                     self.event_handler.addCallback(state_device_guid, master_mode, event, cb_data.callback, input_item.always_execute)
+
+
 
             # Use inheritance to build input action lookup table
             self.event_handler.build_event_lookup(inheritance_tree)

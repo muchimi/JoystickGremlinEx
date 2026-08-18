@@ -409,6 +409,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         description: str = None,
         description_readonly: bool = None,
         tooltip: str = None,
+        extra_data : dict = None,
     ):
         """Creates a new InputItem instance.
         :param mode_node: profile mode node
@@ -445,6 +446,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         assert input_type is not None, "input type must be provided"
 
         self.parent = mode_node  # mode object
+        self.extra_data = extra_data if extra_data else {}
 
         self._input_item_generating_xml = False  # xml nesting level
         self._override_input_type = override_input_type  # override input type for some types that are different
@@ -4432,6 +4434,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.device_input_id = input_item.input_id
         self.device_input_type = input_item.input_type
         self.device = gremlin.joystick_handling.getDevice(self.device_guid)
+        self.extra_data = extra_data or {}
 
     def hasOutput(self) -> bool:
         """returns True if this container has output, meaning it contains an action that has output"""
@@ -4830,7 +4833,10 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         # events and another callback that triggers of these events
         # like a button would.
 
-        callbacks.append(CallbackData(gremlin.execution_graph.ContainerCallback(self, parent), None))
+
+        callback = gremlin.execution_graph.ContainerCallback(self, parent)
+        callbacks.append(CallbackData(callback , None))
+        self.extra_data["callback"] = callback  # store the callbacks for this container so they can be queried later
 
         return callbacks
 

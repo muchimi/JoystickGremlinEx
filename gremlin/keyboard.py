@@ -268,10 +268,13 @@ class Key:
     @property
     def sequence(self):
         """returns a list of (scan_code, extended) tuples for all latched keys in this sequence"""
-        sequence = [self.index_tuple()]
-        lk: Key
-        for lk in self._latched_keys:
-            sequence.append(lk.index_tuple())
+        sequence = [lk.index_tuple() for lk in self._latched_keys]
+
+        # sequence = [self.index_tuple()]
+        # lk: Key
+        # for lk in self._latched_keys:
+        #     sequence.append(lk.index_tuple())
+
         return sequence
 
     @property
@@ -288,7 +291,6 @@ class Key:
         self.scan_code = scan_code
         self._update()
 
-
     def _update(self):
 
         if len(self._latched_keys) > 0:
@@ -297,6 +299,7 @@ class Key:
                 keys.append(self)
 
             keys.extend(self._latched_keys)
+            keys = set(keys) # unique
             # order the key by modifier
             keys = sort_keys(keys)
             result = ""
@@ -369,6 +372,10 @@ class Key:
         return self._scan_code, self._is_extended
 
     @property
+    def key_tuple(self):
+        return self._scan_code, self._is_extended
+
+    @property
     def debug_name(self):
         return f"{self.name} (0x{self._scan_code:02X}/{self._scan_code}{' EX' if self._is_extended else ''}]"
 
@@ -409,9 +416,12 @@ class Key:
     @latched_keys.setter
     def latched_keys(self, keys):
         self._latched_keys.clear()
+        # eliminate duplicate keys
+        keys = set(keys)
         for key in keys:
             assert isinstance(key, Key), f"Expected a Key object, got {type(key)}"
-            if key.name:
+            if key.scan_code:
+                # not a null key
                 self._latched_keys.append(key)
         self._update()
 
@@ -471,8 +481,6 @@ class Key:
             # single keys - use the ascii sequence
             value = ord(lookup_name)
             return start_index + value
-
-
 
         # no clue
         return -1
@@ -1592,7 +1600,20 @@ class KeyMap:
     _keyboard_modifiers = ["leftshift", "leftcontrol", "leftalt", "rightshift", "rightshift2", "rightcontrol", "rightalt", "rightalt2", "leftwin", "rightwin"]
 
     # list of mouse keys
-    _keyboard_mouse = ["mouse_1", "mouse_2", "mouse_3", "mouse_d_1", "mouse_d_2", "mouse_d_3", "mouse_4", "mouse_5", "wheel_up", "wheel_down", "wheel_left", "wheel_right"]
+    _keyboard_mouse = [
+        "mouse_1",
+        "mouse_2",
+        "mouse_3",
+        "mouse_d_1",
+        "mouse_d_2",
+        "mouse_d_3",
+        "mouse_4",
+        "mouse_5",
+        "wheel_up",
+        "wheel_down",
+        "wheel_left",
+        "wheel_right",
+    ]
 
 
 # populate special mouse keys

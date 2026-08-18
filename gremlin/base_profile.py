@@ -480,6 +480,10 @@ class AbstractFunctor(QtCore.QObject):
     def hardware_input_type(self) -> InputType:
         return self.action_data.hardware_input_type
 
+    @property
+    def input_item(self) -> InputItem:
+        return self.action_data.input_item
+
     def latch_extra_inputs(self, container_condition_functors=None, action_condition_functors=None):
         """returns any extra inputs as a list of (device_guid, input_id) to latch to this action (trigger on change)"""
         return []

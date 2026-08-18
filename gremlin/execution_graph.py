@@ -1259,6 +1259,7 @@ class ExecutionContext:
 
     def _get_action_functor(self, action, node, container_condition_node, action_condition_node):
         """creates a functor instance for an action"""
+        import gremlin.keyboard
         functor: gremlin.base_profile.AbstractFunctor = action.functor(action, node)
 
         extra_inputs = functor.latch_extra_inputs(container_condition_node, action_condition_node)
@@ -1269,16 +1270,26 @@ class ExecutionContext:
             eh = gremlin.event_handler.EventHandler()
             # add_latched_functor(self, device_guid, mode, event, functor):
             mode = action.profile_mode
-            for device_guid, input_type, input_id in extra_inputs:
+            events = []
+            for device_guid, input_type, input_id, functor in extra_inputs:
                 if isinstance(input_id, gremlin.keyboard.Key):
-                    event = gremlin.event_handler.Event(event_type=input_type, device_guid=device_guid, identifier=input_id.message_key, virtual_code=input_id.virtual_code)
+                    # create multiple events for each key in the latch series as any could trigger the functor
+                    extra_data = {"latched": input_id}
+                    # for key in input_id.latched_keys:
+                    event = gremlin.event_handler.Event(event_type=input_type, device_guid=device_guid, identifier=input_id, virtual_code=input_id.virtual_code, extra_data=extra_data)
+                    events.append(event)
+
+
                 else:
                     event = gremlin.event_handler.Event(event_type=input_type, device_guid=device_guid, identifier=input_id)
+                    events.append(event)
 
+            for event in events:
                 if verbose:
                     device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
                     syslog.info(f"LATCH: (_get_action_functor) Add extra functor: [{device_name}] input type: [{input_type.name} ({input_type.value})] input id: [{input_id}] mode: {mode} event: {str(event)} ")
                 eh.add_latched_functor(device_guid, mode, event, functor)
+
         action.setEnabled(True)
         return functor
 
