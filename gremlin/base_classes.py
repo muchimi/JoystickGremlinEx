@@ -1002,8 +1002,7 @@ class AbstractCallbackModel(AbstractModel):
 
         self._index_map[index] = item
         self._item_map[item] = index
-        self._filtered_index_map[index] = item
-        self._filtered_item_map[item] = index
+        self.applyFilter()
         self.onItemChanged(self, index, item, old_item, "setItemAt")
         self.markDirty()
 
@@ -1042,6 +1041,14 @@ class AbstractCallbackModel(AbstractModel):
         if index in self._filtered_index_map:
             return self._filtered_index_map[index]
         raise IndexError("index out of range")
+
+    def __setitem__(self, index: int, item):
+        """sets an item at the specified index"""
+        self.setItemAt(index, item)
+
+    def __delitem__(self, index: int):
+        """deletes an item at the specified index"""
+        self.removeAt(index)
 
     def append(self, item) -> int:
         """
@@ -1145,9 +1152,11 @@ class AbstractCallbackModel(AbstractModel):
             self._item_map[item] = new_index
         self._index_map = TriggerDict.copyFrom({new_index: item for new_index, item in enumerate(self._index_map.values())})
         self.applyFilter(emit=False) # update filtered data as well
-        syslog.info("Reindex results:")
-        for index, item in self._filtered_index_map.items():
-            syslog.info(f"Filtered index [{index}] maps to item [{item}]")
+        verbose = gremlin.config.Configuration().verbose_mode_execution
+        if verbose:
+            syslog.info("Reindex results:")
+            for index, item in self._filtered_index_map.items():
+                syslog.info(f"Filtered index [{index}] maps to item [{item}]")
 
 
 
@@ -1170,7 +1179,7 @@ class AbstractCallbackModel(AbstractModel):
             self.onItemChanged(self, index, None, item, "remove")
 
     def removeAt(self, index: int, emit=True):
-        """removes the entry at the given model index"""
+        """removes the entry at the given filteredmodel index"""
         if index in self._index_map:
             item = self._index_map[index]
             if hasattr(item, "_cleanup"):
@@ -1178,6 +1187,7 @@ class AbstractCallbackModel(AbstractModel):
             del self._item_map[item]
             del self._index_map[index]
             self._reindex()
+
             if emit:
                 self._fireChanged()
             self.onItemChanged(self, index, None, item, "remove")
