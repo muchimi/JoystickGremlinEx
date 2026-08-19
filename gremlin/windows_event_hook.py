@@ -395,8 +395,14 @@ def process_mouse_event(n_code, w_param, l_param):
                     _mouse_wheel_state[button_id] = True  # mark pressed
 
                 if _mouse_wheel_timer[button_id]:
-                    # cancel current timer
-                    _mouse_wheel_timer[button_id].cancel()
+                    # cancel current timer. Guarded: on Python 3.14 Timer.cancel()
+                    # can raise "cannot notify on un-acquired lock" when called
+                    # from the ctypes mouse-hook callback, which otherwise loops
+                    # forever and stalls event processing (vJoy output included).
+                    try:
+                        _mouse_wheel_timer[button_id].cancel()
+                    except RuntimeError:
+                        pass
 
                 # new timer
 
@@ -438,8 +444,11 @@ def _queue_wheel_release(button_id):
             syslog.info(f"wheel release {button_id}")
         _mouse_wheel_state[button_id] = False
         if _mouse_wheel_timer[button_id]:
-            # cancel the timer
-            _mouse_wheel_timer[button_id].cancel()
+            # cancel the timer (guarded against Python 3.14 lock RuntimeError)
+            try:
+                _mouse_wheel_timer[button_id].cancel()
+            except RuntimeError:
+                pass
 
         evt = MouseEvent(button_id, False, False)
         for cb in g_mouse_callbacks:
@@ -689,7 +698,10 @@ class MouseHook:
         global _mouse_wheel_timer
         for id in _mouse_wheel_timer:
             if _mouse_wheel_timer[id]:
-                _mouse_wheel_timer[id].cancel()
+                try:
+                    _mouse_wheel_timer[id].cancel()
+                except RuntimeError:
+                    pass
                 _mouse_wheel_timer[id] = None
 
     def _listen(self):
