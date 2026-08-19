@@ -580,11 +580,11 @@ class SwitchContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         self._started = False
 
     def latch_extra_inputs(self, container_condition_functors=None, action_condition_functors=None):
-        """returns the list of extra devices to latch to this functor (device_guid, input_type, input_id)"""
+        """returns the list of extra devices to latch to this functor (device_guid, input_type, input_id, functor)"""
         latch_list = []
         data: SwitchData
         for data in self.action_data.position_data.values():
-            latch_list.append((data.device_guid, InputType.JoystickButton, data.input_id))
+            latch_list.append((data.device_guid, InputType.JoystickButton, data.input_id, self))
         return latch_list
 
     def process_event(self, event: gremlin.event_handler.Event, value: gremlin.actions.Value, extra_data=None):

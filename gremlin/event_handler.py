@@ -1350,7 +1350,7 @@ class EventListener(QtCore.QObject):
                     syslog.info(
                         f"DEQUEUE KEY {gremlin.keyboard.KeyMap.keyid_tostring(key_id)} id: {key_id} vk: {virtual_code} (0x{virtual_code:X}) name: {key.name} pressed: {is_pressed} event: {str(event)}"
                     )
-                verbose = True
+                
                 if verbose and is_pressed:
                     syslog.info(f"fire keyboard event on key press - key.name: [{key.name}]")
                 self.keyboard_event.emit(event)
@@ -2486,7 +2486,7 @@ class EventHandler(QtCore.QObject):
         self.addCallback(device_guid, mode, event, lambda e: self.triggerContainerCallback(container, e))
 
     def triggerContainerCallback(self, container, event):
-        """Creates a callback for the given container."""
+        """Creates a callback for the given container - this allows latched inputs to issue a trigger at the container node level so conditions are handled"""
         callback = container.extra_data.get("callback", None)
         if callback:
             callback(event)
@@ -2634,14 +2634,15 @@ class EventHandler(QtCore.QObject):
                         )
 
                 # prep map of keys to their callback/identifier
+                if event.extra_data and "latched" in event.extra_data:
+                    # record latched event
+                    perms = [tuple(primary_key.sequence)]
 
-                perms = [tuple(primary_key.sequence)]
-
-                for perm in perms:
-                    if perm not in self.latched_keys:
-                        self.latched_keys[perm] = []
-                    if callback not in self.latched_keys[perm]:
-                        self.latched_keys[perm].append((primary_key, callback))
+                    for perm in perms:
+                        if perm not in self.latched_keys:
+                            self.latched_keys[perm] = []
+                        if callback not in self.latched_keys[perm]:
+                            self.latched_keys[perm].append((primary_key, callback))
 
 
 
@@ -3341,7 +3342,11 @@ class EventHandler(QtCore.QObject):
                     verbose = config.verbose_mode_mouse
                 else:
                     verbose = config.verbose_mode_keyboard
-                
+
+                if not event.extra_data:
+                    # ensure additional data passed on in the event exists
+                    event.extra_data = {}
+
                 if verbose:
                     syslog.info(f"process keyboard event: {event}")
                     syslog.info("\tKeyboard state data:")
@@ -3355,16 +3360,57 @@ class EventHandler(QtCore.QObject):
                     event_key = event_key.message_key
 
                 latched_map = {}
-                for perm in self.latched_keys:
-                    if event_key in perm:
-                        # possible key match  - match all keys
-                        for primary_key, callback in self.latched_keys[perm]:
-                            is_latched = all(keyPressed(key) for key in primary_key.latched_keys)
-                            if is_latched:
+                latch_found = False
 
-                                if primary_key not in latched_map:
-                                    latched_map[primary_key] = []
-                                latched_map[primary_key].append(callback)
+                # see if matching the input item
+                latched_keys = input_item.getKeyList()
+                if latched_keys:
+                    # match on input key sequence first
+                    if verbose:
+                        syslog.info(f"Input item has latched keys: {latched_keys}")
+                    is_latched = all(keyPressed(key) for key in latched_keys)
+                    if is_latched:
+                        latch_found = True
+                        latch_key = input_item.key
+                        m_list = self._matching_latched_callbacks(event, latch_key)
+                        if m_list:
+                            if verbose:
+                                trigger_line = "***** TRIGGER KEY INPUT PRESS " + "*" * 30
+                                syslog.info(trigger_line)
+                                syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+                                syslog.info(trigger_line)
+                            self._trigger_callbacks(m_list, event)
+                            if verbose:
+                                syslog.info(f"\tSaving matching callbacks for latched key: {latch_key.name}")
+                            self._keyboard_callback_map[latch_key] = m_list  # save the matching callbacks for the latched key for release
+                            return
+
+
+                if not latch_found:
+                    # see if any latching entry matches
+                    for perm in self.latched_keys:
+                        if event_key in perm:
+                            # possible key match  - verify all the keys in the latched sequence are pressed if there is more than one key
+                            for primary_key, callback in self.latched_keys[perm]:
+
+                                is_latched = all(keyPressed(key) for key in primary_key.latched_keys)
+                                if verbose:
+                                    syslog.info(f"checking latch for perm: [{perm}] key: [{primary_key}] - all keys pressed: [{is_latched}]")
+                                if is_latched:
+                                    latch_found = True
+
+                                    if primary_key not in latched_map:
+                                        latched_map[primary_key] = []
+                                    latched_map[primary_key].append(callback)
+                                    if "latched_primary_key" not in event.extra_data:
+                                        event.extra_data["latched_primary_key"] = []
+                                    if primary_key not in event.extra_data["latched_primary_key"]:
+                                        event.extra_data["latched_primary_key"].append(primary_key)
+
+                if not latch_found:
+                    if verbose:
+                        syslog.info("No latched keys found for this event")
+                    return
 
                 if latched_map:
                     for latch_key, callbacks in latched_map.items():

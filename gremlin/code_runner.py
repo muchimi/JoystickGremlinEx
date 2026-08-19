@@ -328,7 +328,7 @@ class CodeRunner:
                                     continue
 
                                 callbacks.extend(container.generate_callbacks(graph_mode_node))
-                                
+
                             for cb_data in callbacks:
                                 if cb_data.event is None:
                                     if verbose:

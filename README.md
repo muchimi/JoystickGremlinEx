@@ -49,12 +49,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T31)
-- New: Map to Vjoy: stepped axis mode (button to axis): gains a new encoder mode.  This mode uses an acceleration curve and pulse time to step (modify) the axis output based on pulse frequency and direction.  This is used for inputs such as rotary encoders that generate a pulse trigger.  The mode supports a latching input to handle the reverse pulse input, enabling a single mapping to handle both rotary directions.  The encoder calculation is direction aware to speed up or slow down the rate of change and direction of rotation.  The mode operates in two output modes: The setpoint mode (axis will stay where it was based on the last pulse) - default, or a spring mode (axis will return to set value when the pulses stop).  The spring mode is named so after spring loaded rotary encoders that return to the center to mimic this behavior even if the input is not spring loaded.  This avoids having to map an extra input to recenter an axis.
+- New: Map to Vjoy: stepped axis mode (button to axis): gains a new encoder mode.  This mode uses an acceleration curve and pulse time to step (modify) the axis output based on pulse frequency and direction.  This is used for inputs such as rotary encoders that generate a pulse trigger.  The mode supports a latching input to handle the reverse pulse input, enabling a single mapping to handle both rotary directions.  The encoder calculation is direction aware to speed up or slow down the rate of change and direction of rotation.  The encoder uses acceleration measuring pulses per second and can increase/decrease the rate of change based on how fast you pulse the input (rotate the encoder).
 - Fix: Map to VJoy action: corrected output description in visual.
 - Fix: Keyboard Device: corrected input description.
 - Fix: Keyboard Device: display keys in correct order for latched keys (multi keys)
 - Fix: API: model reindex uses incorrect datatype for hash computation
-- 
+
 
 ### (m77T30)
 - Change: API: changed device enumeration logic and added additional filter for invalid (ghost) devices

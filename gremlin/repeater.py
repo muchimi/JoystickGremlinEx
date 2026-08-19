@@ -201,7 +201,16 @@ class Repeater(QtCore.QObject):
 class PulseWorker:
     """helper object to schedule repeated triggers (callback) at a given interval until the object is stopped."""
 
-    def __init__(self, pulse_duration: float, repeat_interval: float, on_callback : Callable, off_callback: Callable = None, iteration_callback: Callable = None, data=None, count: int = None):
+    def __init__(
+        self,
+        pulse_duration: float,
+        repeat_interval: float,
+        on_callback: Callable,
+        off_callback: Callable = None,
+        iteration_callback: Callable = None,
+        data=None,
+        count: int = None,
+    ):
         """Creates a new instance.
 
         :param pulse_duration: duration in seconds of the pulse
@@ -336,78 +345,79 @@ class PulseWorker:
         return self._is_pulse
 
 
-
 class AcceleratedEncoder:
     """
-    Pulse manager for encoders - converts directional pulse inputs into a smooth setpoint value
-    Rotary encoder pulse -> setpoint in [-1.0, +1.0] (customizable)
+    Converts rotary encoder pulses into an accelerated setpoint.
+
     Features:
-    - pulse-frequency-based acceleration
-    - smooth acceleration curve
-    - low-pass-filtered pulse frequency
-    - acceleration reset on direction change
-    - acceleration reset after an idle timeout
+    - Pulse-frequency-based acceleration
+    - Smooth acceleration curve
+    - Low-pass-filtered pulse frequency
+    - Acceleration reset on direction change
+    - Acceleration reset after an idle timeout
     """
 
     def __init__(
         self,
-        initial_value : float =0.0,
-        min_value : float =-1.0,
-        max_value : float =1.0,
-        min_step : float =0.002,
-        max_step : float =0.08,
-        accel_start_hz : float =2.0,
-        accel_full_hz : float =30.0,
-        curve : float =2.0,
-        frequency_filter : float =0.25,
-        direction_change_speed_retention : float =0.0,
-        frequency_timeout : float =0.30,
-    ):
-        """
-        Accelerated encoder
+        initial_value: float = 0.0,
+        min_value: float = -1.0,
+        max_value: float = 1.0,
+        min_step: float = 0.002,
+        max_step: float = 0.08,
+        accel_start_hz: float = 2.0,
+        accel_full_hz: float = 30.0,
+        curve: float = 2.0,
+        frequency_filter: float = 0.25,
+        direction_change_speed_retention: float = 0.0,
+        frequency_timeout: float = 0.30,
+    ) -> None:
 
-        :param initial_value (float): Initial setpoint value.
-        :param min_value (float): Minimum setpoint value.
-        :param max_value (float): Maximum setpoint value.
-        :param min_step (float): Minimum step size per pulse.
-        :param max_step (float): Maximum step size per pulse.
-        :param accel_start_hz (float): Frequency at which acceleration starts.
-        :param accel_full_hz (float): Frequency at which full acceleration is reached.
-        :param curve (float): Exponent for shaping the acceleration curve.
-        :param frequency_filter (float): Low-pass filter coefficient for pulse frequency.
-        :param direction_change_speed_retention (float): Fraction of speed retained on direction change.
-        :param frequency_timeout (float): Time in seconds after which acceleration resets if no pulses occur.
-        """
-        self.value = initial_value # starting position
-        self.min_value = min_value # min range (-1)
-        self.max_value = max_value # max range (+1)
+        if min_value >= max_value:
+            raise ValueError("min_value must be less than max_value")
 
-        self.min_step = min_step # minimum step size per pulse
-        self.max_step = max_step # maximum step size per pulse
+        if min_step < 0 or max_step < min_step:
+            raise ValueError("invalid step range")
 
-        self.accel_start_hz = accel_start_hz # frequency at which acceleration starts
-        self.accel_full_hz = accel_full_hz # frequency at which full acceleration is reached
-        self.curve = curve # exponent for shaping the acceleration curve
+        if accel_start_hz < 0 or accel_full_hz <= accel_start_hz:
+            raise ValueError("invalid acceleration frequency range")
 
-        self.frequency_filter = frequency_filter # low-pass filter coefficient for pulse frequency
+        if curve <= 0:
+            raise ValueError("curve must be greater than zero")
 
-        # Fraction of previous speed retained when direction reverses.
-        # 0.0 = full reset.
-        self.direction_change_speed_retention = (
-            direction_change_speed_retention
-        )
+        if not 0.0 <= frequency_filter <= 1.0:
+            raise ValueError("frequency_filter must be in range 0..1")
 
-        # Maximum time between pulses before acceleration is reset.
+        if not 0.0 <= direction_change_speed_retention <= 1.0:
+            raise ValueError("direction_change_speed_retention must be in range 0..1")
+
+        if frequency_timeout <= 0:
+            raise ValueError("frequency_timeout must be greater than zero")
+
+        self.min_value = min_value
+        self.max_value = max_value
+        self.value = max(min_value, min(max_value, initial_value))
+
+        self.min_step = min_step
+        self.max_step = max_step
+        self._step_range = max_step - min_step
+
+        self.accel_start_hz = accel_start_hz
+        self.accel_full_hz = accel_full_hz
+        self._accel_frequency_range = accel_full_hz - accel_start_hz
+
+        self.curve = curve
+        self.frequency_filter = frequency_filter
+
+        self.direction_change_speed_retention = direction_change_speed_retention
+
         self.frequency_timeout = frequency_timeout
 
-        self.last_pulse_time = None
-        self.last_direction = None
+        self.last_pulse_time: float | None = None
+        self.last_direction: int | None = None
         self.filtered_frequency = 0.0
 
-    def _acceleration(self, frequency : float) -> float:
-        """
-        Convert pulse frequency to an acceleration factor 0.0 ... 1.0.
-        """
+    def _acceleration(self, frequency: float) -> float:
+        """Convert pulse frequency to an acceleration factor in range 0..1."""
 
         if frequency <= self.accel_start_hz:
             return 0.0
@@ -415,132 +425,95 @@ class AcceleratedEncoder:
         if frequency >= self.accel_full_hz:
             return 1.0
 
-        # Normalize frequency to 0...1.
-        x = (
-            (frequency - self.accel_start_hz)
-            / (self.accel_full_hz - self.accel_start_hz)
-        )
+        x = (frequency - self.accel_start_hz) / self._accel_frequency_range
 
-        # Smoothstep gives a smooth transition at both ends.
+        # Smoothstep
         x = x * x * (3.0 - 2.0 * x)
 
-        # Additional response shaping.
-        x = x ** self.curve
+        if self.curve != 1.0:
+            x **= self.curve
 
         return x
 
-    def pulse(self, direction : int, timestamp: float = None, value: float = None) -> float:
-        """
-        Process one encoder pulse.
-        direction:
-            +1 = increase
-            -1 = decrease
-        Returns:
-            current setpoint
-        """
+    def pulse(
+        self,
+        direction: int,
+        timestamp: float | None = None,
+        value: float | None = None,
+    ) -> float:
+        """Process one encoder pulse."""
 
-        if direction not in (-1, 1):
+        if direction != 1 and direction != -1:
             raise ValueError("direction must be +1 or -1")
 
         if timestamp is None:
             timestamp = time.monotonic()
 
         if value is not None:
-            # reset the value
-            self.value = value
-
-        # elapsed time since previous pulse.
-        dt = None
-
-        if self.last_pulse_time is not None:
-            dt = timestamp - self.last_pulse_time
-
-        # idle timeout check
-        timed_out = (
-            dt is not None
-            and dt >= self.frequency_timeout
-        )
-
-        if timed_out:
-            # Previous speed is now considered stale.
-            self.filtered_frequency = 0.0
-
-            # Treat this as the beginning of a new movement.
-            self.last_pulse_time = None
-            dt = None
-
-        # reversal check
-        direction_changed = (
-            self.last_direction is not None
-            and direction != self.last_direction
-        )
-
-        if direction_changed:
-            # Kill or reduce accumulated acceleration.
-            self.filtered_frequency *= (
-                self.direction_change_speed_retention
+            self.value = max(
+                self.min_value,
+                min(self.max_value, value),
             )
 
-            # Do not calculate frequency using an interval
-            # that spans two different directions.
-            self.last_pulse_time = None
-            dt = None
+        last_time = self.last_pulse_time
+        dt = 0
 
-        # pulse frequency.
-        if dt is not None and dt > 0:
-            instantaneous_frequency = 1.0 / dt
+        if last_time is not None:
+            dt = timestamp - last_time
 
-            alpha = self.frequency_filter
+            if dt >= self.frequency_timeout:
+                # Encoder has been idle long enough to reset acceleration.
+                self.filtered_frequency = 0.0
+                dt = 0
 
-            self.filtered_frequency += alpha * (
-                instantaneous_frequency
-                - self.filtered_frequency
-            )
+            if self.last_direction is not None and direction != self.last_direction:
+                # Direction reversal.
+                self.filtered_frequency *= self.direction_change_speed_retention
+                dt = 0
 
-        # state
+            if dt > 0.0:
+                frequency = 1.0 / dt
+            else:
+                frequency = 0
+
+            self.filtered_frequency = frequency
+
+                # self.filtered_frequency += self.frequency_filter * (frequency - self.filtered_frequency)
+
+        elif self.last_direction is not None and direction != self.last_direction:
+            self.filtered_frequency *= self.direction_change_speed_retention
+
         self.last_pulse_time = timestamp
         self.last_direction = direction
 
-        # compute acceleration
-        accel = self._acceleration(
-            self.filtered_frequency
-        )
+        accel = self._acceleration(self.filtered_frequency)
 
-        offset = self.min_step + accel * (
-            self.max_step - self.min_step
-        )
+        step = self.min_step + accel * self._step_range
 
-        # apply computed offset
-        self.value += direction * offset
+        syslog.info(f"dt: {dt if dt is not None else 0:0.4f}, filtered_frequency {self.filtered_frequency:0.4f}, accel: {accel:0.4f}, step: {step:0.4f}")
 
-        # clamp
-        self.value = max(
-            self.min_value,
-            min(self.max_value, self.value)
-        )
 
+        value = self.value + direction * step
+
+        if value < self.min_value:
+            value = self.min_value
+        elif value > self.max_value:
+            value = self.max_value
+
+        self.value = value
+        return value
+
+    def get_value(self) -> float:
         return self.value
 
-    def get_value(self):
-        return self.value
-
-    def get_frequency(self):
+    def get_frequency(self) -> float:
         return self.filtered_frequency
 
-    def get_step(self):
-        accel = self._acceleration(
-            self.filtered_frequency
-        )
+    def get_step(self) -> float:
+        return self.min_step + self._acceleration(self.filtered_frequency) * self._step_range
 
-        return self.min_step + accel * (
-            self.max_step - self.min_step
-        )
-
-    def reset_acceleration(self):
-        """
-        Manually reset the current acceleration state.
-        """
+    def reset_acceleration(self) -> None:
+        """Reset acceleration history."""
         self.filtered_frequency = 0.0
         self.last_pulse_time = None
         self.last_direction = None
-

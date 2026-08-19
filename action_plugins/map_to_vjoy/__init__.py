@@ -2826,15 +2826,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.step_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
         self.step_container_layout.addWidget(self.step_mode_widget)
 
-
-
         # stepped mode options
         self.stepped_page_visualizer_container = QtWidgets.QStackedWidget()
         self.step_container_layout.addWidget(self.stepped_page_visualizer_container)
 
         container = self._create_latched_selector()
         self.step_container_layout.addWidget(container)  # latched visualizer
-
 
         if self.action_data.action_mode == VjoyAction.VJoySetAxisStepped:
             self._create_axis_stepping_ui()
@@ -3005,8 +3002,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         container = QtWidgets.QWidget()
         container_layout = QtWidgets.QVBoxLayout(container)
         container_layout.addWidget(QtWidgets.QLabel("Encoder Mode Configuration:"))
-
-
 
         # step
         widgets = []
@@ -4084,14 +4079,12 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 set_target_visible = not self.action_data.target_use_last
 
             case VjoyAction.VJoySetAxisStepped:
-
                 if not self._step_ui_loaded:
                     self._create_axis_stepping_ui()
 
                 self._update_steps_ui()
                 output_range_visible = False
                 grid_visible = False
-
 
             case VjoyAction.VJoyAxisToButton:
                 output_range_visible = False
@@ -4146,8 +4139,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         # self._execute_widget.setVisible()
         self.chkb_paired.setVisible(paired_visible)
         self.target_value_container_widget.setVisible(button_to_axis_visible)
-
-
 
         self.virtual_device_label_widget.setVisible(selector_visible)
         self.virtual_device_selector_widget.setVisible(selector_visible)
@@ -4728,7 +4719,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         super().__init__(action_data, parent)
         config = gremlin.config.Configuration()
         self.verbose = config.verbose_mode_vjoy or config.verbose_mode_joystick
-        self.verbose = True
+        # self.verbose = True
         self.verbose_extra = self.verbose and config.verbose_mode_extra
         self.vjoy_id = action_data.virtual_id
         self.vjoy_input_id = action_data.vjoy_input_id
@@ -4920,13 +4911,14 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.usage_data.set_inverted(self.vjoy_id, self.vjoy_input_id, value)
 
     def latch_extra_inputs(self, container_condition_node=None, action_condition_node=None):
-        """returns the list of extra devices to latch to this functor (device_guid, input_type, input_id)
+        """returns the list of extra devices to latch to this functor (device_guid, input_type, input_id, functor)
 
         :param container_condition_node: the execution graph condition node applied to the container, if any
         :param action_condition_node: the execution graph condition node applied to the action, if any
 
         """
         import gremlin.config
+
         config = gremlin.config.Configuration()
 
         self._latched_container_condition_node = container_condition_node
@@ -4946,6 +4938,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             if self.action_data._stepped_latched:
                 match self.action_data.latched_input_type:
                     case InputType.JoystickButton:
+                        # latch is a button or hat
                         return [
                             (
                                 self.action_data.stepped_device_guid,
@@ -4961,22 +4954,22 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         if keys:
                             # grab the primary key (last one as modifiers are first - doesn't matter as long as we pick one)
                             keys = gremlin.keyboard.sort_keys(keys)
-                            key : gremlin.keyboard.Key= keys[-1]
-                            key.latched_keys = keys
+                            primary_key: gremlin.keyboard.Key = keys[-1]
+                            primary_key.latched_keys = keys
 
                             syslog.info("VJOYRemap latch: ")
-                            for key in key.latched_keys:
-                                syslog.info(f"\tlatched key: {key}")
+                            for primary_key in primary_key.latched_keys:
+                                syslog.info(f"\tlatched key: {primary_key}")
+                            self.action_data.stepped_input_id = primary_key
 
                             return [
                                 (
-                                    gremlin.shared_state.keyboard_tab_guid,
-                                    InputType.Keyboard,
-                                    key,
-                                    self
+                                    gremlin.shared_state.keyboard_tab_guid, # keyboard device GUID
+                                    InputType.Keyboard, # keyboard type
+                                    primary_key, # primary latch key for the key seequence
+                                    self, # functor
                                 )
                             ]
-
 
         return []
 
@@ -4993,6 +4986,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         raw_input_type = self.action_data.hardware_raw_input_type
         self.pressed_hat_buttons = {}
         self.synced = False  # indicate not synchronized
+        self._last_time = time.time()
 
         # update the target client list
         self.client_list = self.action_data.remote_config.getClientList()
@@ -5664,7 +5658,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
     #         return (pow((value - v_start) / v_end - 1, power) + 1) * v_end + v_start
     #     return pow((value - v_start) / v_end, power) * v_end + v_start
 
-    def process_event(self, event : gremlin.event_handler.Event, action_value: gremlin.actions.Value = None, extra_data=None):
+    def process_event(self, event: gremlin.event_handler.Event, action_value: gremlin.actions.Value = None, extra_data=None):
         """runs when a joystick event occurs like a button press or axis movement when a profile is running"""
         # if self.action_data.merged and event.is_axis:
         #     # merged axis data is handled by the internal hook - ignore
@@ -5757,7 +5751,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             # force remote mode on if specified in the event
             is_remote = True
             is_local = False
-
 
         force_remote = event.force_remote
 
@@ -6325,25 +6318,36 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     # process stepped axis request
                     input_type = InputType.JoystickAxis
                     position = None
+                    latched = False
+                    primary_key = None
 
+                    if self.action_data._stepped_latched:
+                        # latch mode
+                        match self.action_data.latched_input_type:
+                            case InputType.JoystickButton:
+                                # button or hat latching mode (joystick device)
+                                latched = (
+                                    self.action_data._stepped_latched
+                                    and event.device_guid == self.action_data.stepped_device_guid
+                                    and event.identifier == self.action_data.stepped_input_id
+                                )
+                            case InputType.KeyboardLatched:
+                                # keyboard latching mode
+                                if self.action_data.latched_keys:
+                                    # action has latched data
+                                    if event.extra_data and "latched_primary_key" in event.extra_data:
+                                        latched_primary_keys = event.extra_data["latched_primary_key"]
+                                        for primary_key in latched_primary_keys:
+                                            # determine which trigger did what
+                                            if primary_key == self.action_data.latched_keys[-1]:
+                                                # this primary key is the one that triggered the event
+                                                latched = True
+                                                break
 
-                    if self.action_data.latched_keys:
-                        latched = self.action_data._stepped_latched
-                        primary_key = self.action_data.latched_keys[-1]
-                        event_device_name = gremlin.joystick_handling.getDeviceName(event.device_guid)
-                        stepped_device_name = gremlin.joystick_handling.getDeviceName(self.action_data.stepped_device_guid)
-                        syslog.info(f"******************************* Event device: {event_device_name}, Stepped device: {stepped_device_name}")
-                        latched = latched and event.device_guid == self.action_data.stepped_device_guid
-                        key_id = event.identifier.message_key if isinstance(event.identifier, gremlin.keyboard.Key) else event.identifier
-                        latched = latched and key_id in primary_key.sequence
-
-                    else:
-                        latched = (
-                                self.action_data._stepped_latched
-                                and event.device_guid == self.action_data.stepped_device_guid
-                                and event.identifier == self.action_data.stepped_input_id
-                            )
-
+                    # if latched:
+                    #     syslog.info("STEPPED MODE: latched event detected")
+                    # else:
+                    #     syslog.info("STEPPED MODE: non latched event detected")
 
 
                     match self.action_data.step_mode:
@@ -6351,7 +6355,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             # velocity mode
 
                             if latched or fire_event or self._pulse_active:
-
                                 identifier = self.action_data.input_item.identifier
                                 primary = event.device_guid == self.hardware_device_guid and event.identifier == identifier
 
@@ -6462,7 +6465,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 primary = event.device_guid == self.hardware_device_guid and event.identifier == identifier
 
                                 # reverse the direction for the latch
-                                direction = self.action_data.encoder_direction if fire_event else -self.action_data.encoder_direction
+                                direction = self.action_data.encoder_direction if latched else -self.action_data.encoder_direction
 
                                 if primary or latched:
                                     now = time.time()  # current time
@@ -6475,8 +6478,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                                     # new position
 
-                                    syslog.info(f"PULSE ENCODER: direction [{direction}]  new value: {value:0.4f}")
+
+                                    syslog.info(f"PULSE ENCODER: latched: [{latched}] direction [{direction}]  new value: {value:0.4f}  delay: {now - self._last_time:0.4f}")
                                     self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+                                    self._last_time = now
 
                                     self.encoder_target = value
 
@@ -7935,10 +7940,7 @@ Supports axis merging, curved output, command, hat and button mappings.
             if "encoder-max-step" in node.attrib:
                 self.encoder_max_step = safe_read(node, "encoder-max-step", float, 0.1)
 
-            if "latched-input-type" in node.attrib:
-                value = node.attrib["latched-input-type"]
-                self.latched_input_type = InputType.from_string(value)
-
+            # latching
             keys = []
             key_nodes = node.xpath(".//latched-key")
             for child in key_nodes:
@@ -7953,19 +7955,30 @@ Supports axis merging, curved output, command, hat and button mappings.
                 if key:
                     keys.append(key)
 
-            if not keys:
-                input_item: gremlin.input_item.InputItem = extra_data.get("input_item", None) if extra_data else None
-                syslog.warning(
-                    f"VjoyRemap: device: [{input_item.device_name if input_item else 'n/a'}] input: [{input_item.display_name if input_item else 'n/a'}] No keys found in XML.  This action will not do anything.: source line: [{node.sourceline}]"
-                )
-                pass
-
             # sort the keys for display purposes
-            self._latched_keys = gremlin.keyboard.sort_keys(keys)
-            if self._latched_keys:
-                primary_key = self._latched_keys[-1]
-                self.stepped_device_id = gremlin.shared_state.keyboard_tab_guid
-                self.stepped_input_id = primary_key
+            if keys:
+                self._latched_keys = gremlin.keyboard.sort_keys(keys)
+            else:
+                self._latched_keys = []
+
+            if "latched-input-type" in node.attrib:
+                value = node.attrib["latched-input-type"]
+                self.latched_input_type = InputType.from_string(value)
+            else:
+                # default latch mode
+                self.latched_input_type = InputType.JoystickButton
+
+            match self.latched_input_type:
+                case InputType.Keyboard:
+                    self.stepped_device_id = gremlin.shared_state.keyboard_tab_guid
+                    self.stepped_input_type = InputType.Keyboard
+                case InputType.JoystickButton:
+                    if "stepped-device-id" in node.attrib:
+                        self.stepped_device_id = safe_read(node, "stepped-device-id", str, "")
+                    if "stepped-input-type" in node.attrib:
+                        self.stepped_input_type = InputType.from_string(node.attrib["stepped-input-type"])
+                    else:
+                        self.stepped_input_type = None
 
             self.vjoy_hat_position = (0, 0)
             if self.action_mode in (
@@ -8165,8 +8178,6 @@ Supports axis merging, curved output, command, hat and button mappings.
                 value = node.get("stepped-input-id")
                 if value.isnumeric():
                     self.stepped_input_id = value
-
-
 
             if "step-start-index" in node.attrib:
                 self.target_step_start_index = safe_read(node, "step-start-index", int, 0)
@@ -8383,6 +8394,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                 # latched device info
                 node.set("stepped-device-id", self.stepped_device_id)
                 node.set("stepped-input-id", str(self.stepped_input_id))
+                node.set("stepped-input-type", InputType.to_string(self.stepped_input_type))
                 match self.step_mode:
                     case StepMode.Stepped:
                         node.set("step-mode", safe_format(StepMode.to_string(self.step_mode), str))
@@ -8412,7 +8424,6 @@ Supports axis merging, curved output, command, hat and button mappings.
 
         # latched input type
         node.set("latched-input-type", safe_format(InputType.to_string(self.latched_input_type), str))
-
 
         if self._latched_keys:
             for key in self._latched_keys:

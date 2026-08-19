@@ -230,7 +230,7 @@ class BaseExecutionConditionNode(ExecutionGraphNode):
         self.rule = ActivationRule.All  # rule set that applies to the condition node
         self.container = None  # owning container for the condition
         if condition:
-            self.addCondition(condition)
+            self.fondition(condition)
         # self.condition :  gremlin.input_item.BaseActivationCondition = condition # holds the condition
 
     def addCondition(self, condition):

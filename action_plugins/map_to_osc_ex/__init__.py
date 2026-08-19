@@ -1274,7 +1274,7 @@ class MapToOscExFunctor(gremlin.base_profile.AbstractFunctor):
 
     def latch_extra_inputs(self, container_condition_functors=None, action_condition_functors=None):
         """returns the list of additional latched inputs that should trigger this action
-        list of (device_guid, input_type, input_id) to latch to this action (trigger on change)"""
+        list of (device_guid, input_type, input_id, functor) to latch to this action (trigger on change)"""
         latched_list = []
         if self.action_data.input_is_axis():
             device_id = self.hardware_device_id
@@ -1286,9 +1286,11 @@ class MapToOscExFunctor(gremlin.base_profile.AbstractFunctor):
                 arg_input_id = arg.sourceAxis()
                 if arg_device_id == device_id and input_id == arg_input_id:
                     continue
-                latch_pair = (arg_device_id, InputType.JoystickAxis, arg_input_id)
+                latch_pair = (arg_device_id, InputType.JoystickAxis, arg_input_id, self)
                 if latch_pair not in latched_list:
                     latched_list.append(latch_pair)
+
+
 
         return latched_list
 

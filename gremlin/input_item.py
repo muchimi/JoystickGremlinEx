@@ -4837,6 +4837,9 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         callback = gremlin.execution_graph.ContainerCallback(self, parent)
         callbacks.append(CallbackData(callback , None))
         self.extra_data["callback"] = callback  # store the callbacks for this container so they can be queried later
+        # if not self.input_item.extra_data:
+        #     self.input_item.extra_data = {}
+        # self.input_item.extra_data["primary"]=True # mark input as primary
 
         return callbacks
 
