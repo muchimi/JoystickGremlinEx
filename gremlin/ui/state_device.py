@@ -321,14 +321,6 @@ class StateCategories(QtCore.QObject):
                 select_index = index
             index += 1
 
-        # if default_category:
-        #     key = default_category.key
-        #     if not key in categories:
-        #         widget.addItem(default_category.name, default_category)
-        #         if select_index is None and default_id and default_id == category.id:
-        #             select_index = index
-        #         index +=1
-
         widget.setMinimumWidth(200)
         if select_index is not None:
             widget.setCurrentIndex(select_index)
@@ -339,21 +331,22 @@ class StateCategories(QtCore.QObject):
 
     def updateSelector(self, widget):
         """refresh the selector with the updated data"""
-        with QtCore.QSignalBlocker(widget):
-            current = widget.currentData()
-            widget.clear()
-            widget.addItem(self._default_category.name, self._default_category)
-            index = 0
-            selected_index = None
-            # add default category
-            for category in self._categories.values():
-                widget.addItem(category.name, category)
-                if selected_index is None and current == category:
-                    selected_index = index
-                index += 1
+        if Shiboken.isValid(widget):
+            with QtCore.QSignalBlocker(widget):
+                current = widget.currentData()
+                widget.clear()
+                widget.addItem(self._default_category.name, self._default_category)
+                index = 0
+                selected_index = None
+                # add default category
+                for category in self._categories.values():
+                    widget.addItem(category.name, category)
+                    if selected_index is None and current == category:
+                        selected_index = index
+                    index += 1
 
-            if selected_index is not None:
-                widget.setCurrentIndex(selected_index)
+                if selected_index is not None:
+                    widget.setCurrentIndex(selected_index)
 
 
 # class StateInputItem(AbstractInputItem):

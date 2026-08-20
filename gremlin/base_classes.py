@@ -952,6 +952,7 @@ class AbstractCallbackModel(AbstractModel):
         super().__init__()
         self._old_hash = None  # last change hash
         self._data_changed_callbacks = []
+        self._item_changed_callbacks = [self.onItemChanged]
 
         self._index_map = TriggerDict()  # map of input_id to index
         self._index_map.addCallback(self._handle_data_changed)  # only track one of the two maps as a change in one also changes the other
@@ -1086,16 +1087,23 @@ class AbstractCallbackModel(AbstractModel):
                         index += 1
                 old_item = self.itemAt(index)
                 self.setItemAt(index, item)
-                self.onItemChanged(self, index, item, old_item, "add")
+                self._onItemChanged(self, index, item, old_item, "add")
 
             self.applyFilter()
             self._fireChanged()
             return index
         return -1  # if the item was not added
 
-    def onItemChanged(self, model, index: int, new_item, old_item, operation):
+    def _onItemChanged(self, model, index: int, new_item, old_item, operation):
         """override by derived classes as needed"""
+        for callback in self._item_changed_callbacks:
+            callback(model, index, new_item, old_item, operation)
+
+
+
+    def onItemChanged(self, model, index: int, new_item, old_item, operation):
         pass
+
 
     def insert(self, i, item, emit=True):
         """inserts an item
@@ -1120,7 +1128,7 @@ class AbstractCallbackModel(AbstractModel):
         self._index_map[i] = item
         self._item_map[item] = i
 
-        self.onItemChanged(self, index, item, old_item, "insert")
+        self._onItemChanged(self, i, item, old_item, "insert")
 
         self.applyFilter(emit=emit)
         if emit:
@@ -1144,7 +1152,7 @@ class AbstractCallbackModel(AbstractModel):
         if emit:
             self._fireChanged()
 
-        self.onItemChanged(self, index, item, old_item, "place")
+        self._onItemChanged(self, index, item, old_item, "place")
 
     def _reindex(self):
         """reorders the indices in the model to be consecutive starting from 0"""
@@ -1176,7 +1184,7 @@ class AbstractCallbackModel(AbstractModel):
             # syslog.info(f"item {item.id} removed from model {self.id} new count: {self.count()}")
             if emit:
                 self._fireChanged()
-            self.onItemChanged(self, index, None, item, "remove")
+            self._onItemChanged(self, index, None, item, "remove")
 
     def removeAt(self, index: int, emit=True):
         """removes the entry at the given filteredmodel index"""
@@ -1190,7 +1198,7 @@ class AbstractCallbackModel(AbstractModel):
 
             if emit:
                 self._fireChanged()
-            self.onItemChanged(self, index, None, item, "remove")
+            self._onItemChanged(self, index, None, item, "remove")
 
     def removeRow(self, index: int, emit=True):
         """removes the entry at the given model index"""
@@ -1207,7 +1215,7 @@ class AbstractCallbackModel(AbstractModel):
             self.popSuspend()
             if emit:
                 self._fireChanged()
-            self.onItemChanged(self, -1, None, None, "clear")
+            self._onItemChanged(self, -1, None, None, "clear")
 
     def data(self, index: int):
         """returns the item stored at the given index, None if not found
@@ -1579,6 +1587,14 @@ class AbstractCallbackModel(AbstractModel):
             raise TypeError("Callback must be callable")
         if callback not in self._data_changed_callbacks:
             self._data_changed_callbacks.append(callback)
+
+    def addOnItemChangedCallback(self, callback: Callable):
+        if callback not in self._item_changed_callbacks:
+            self._item_changed_callbacks.append(callback)
+
+    def removeOnItemChangedCallback(self, callback: Callable):
+        if callback in self._item_changed_callbacks:
+            self._item_changed_callbacks.remove(callback)
 
     def removeCallback(self, callback: Callable):
         """removes a callback from the list of callbacks to be called when the model data changes"""

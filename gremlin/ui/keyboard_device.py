@@ -135,6 +135,16 @@ class KeyboardInputItem(InputItem):
             return self._key.scan_code, self._key.is_extended
         return None
 
+    def setKeys(self, keys: list):
+        """sets the primary key and any latched keys"""
+        if keys:
+            keys = gremlin.keyboard.sort_keys(keys)
+            # primary key is the last one
+            self.key = keys[-1]
+            self._key._latched_keys = keys[1:]
+        else:
+            self.key = None
+
     @property
     def sequence(self):
         """returns a list of (scan_code, extended) tuples for all latched keys in this sequence"""
@@ -340,7 +350,7 @@ class KeyboardInputItem(InputItem):
         is_latched = self._key.is_latched
         self._title_name = f"Key/Mouse input {'(latched)' if is_latched else ''}"
 
-        self._display_name = self._key.latched_name
+        self._display_name = self._key.display_name
         self._description = self.key.latched_code
         try:
             self._display_tooltip = self._key.latched_name + " " + self.key.latched_code
@@ -401,6 +411,8 @@ class KeyboardInputItem(InputItem):
         return False
 
     def __str__(self):
+        if self._display_name:
+            return self._display_name
         return self.to_string()
 
 
@@ -788,7 +800,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self.setInputItemListModel(model)
 
-        self._filter = None
+
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
@@ -1040,28 +1052,21 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """
 
         # reload on new index
-        reload = index == -1
-        current_mode = gremlin.shared_state.edit_mode
 
-        # figure out the root key
-        if root_key is None:
-            if not keys:
-                # no data
-                root_key = Key()
-            else:
-                root_key = gremlin.keyboard.KeyMap.get_latched_key(keys)
+        current_mode = gremlin.shared_state.edit_mode
 
         # ensure the input item exists in the profile data
         if index >= 0:
-            input_item = self.inputItemListModel.data(index)
-
-            # syslog.info(f"Editing index {index} {input_id.display_name}")
+            input_item = self.inputItemListModel.itemAt(index)
+            input_item.setKeys(keys)
         else:
             input_item = KeyboardInputItem(current_mode)
-            index = self.inputItemListModel.rows()  # new index
-            # syslog.info(f"Adding new kbd input index {index} ")
+            input_item.setKeys(keys)
 
-        input_item.key = root_key
+            self.inputItemListModel.add(input_item)
+
+
+
         input_item.setOverrideInputType(InputType.JoystickButton)
 
         # creates the item in the profile if needed
@@ -1071,17 +1076,7 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # ensure override type for keyboard input is a joystick button
         registry.sync()
 
-        if reload:
-            # refreshes the model from the profile
-            self.inputItemListModel.refresh()
-
-            # select the new item - its index may have changed
-            index = self.inputItemListModel.indexOfInputItem(input_item)
-        # else:
-        # update the widget for this entry
-        # self.inputItemListView.update_item(index)
-
-        # select the item
+        index = self.inputItemListModel.indexOfInputItem(input_item)
         self.inputItemListView.selectItemAt(index, force=True)
 
         verbose = gremlin.config.Configuration().verbose_mode_keyboard

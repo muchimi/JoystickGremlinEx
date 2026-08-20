@@ -106,6 +106,7 @@ class Key:
         self._lookup_name = None
         self._latched_code = ""
         self._latched_name = ""
+        self._display_name = ""
 
         self._latched_keys = []  # TraceableList() #[] # list of keys latched to this keystroke (modifiers)
         # self._latched_keys.add_callback(self._changed_cb)
@@ -304,6 +305,7 @@ class Key:
             keys = sort_keys(keys)
             result = ""
             code = ""
+            key_names = []
             for key in keys:
                 if result:
                     result += " + "
@@ -311,7 +313,10 @@ class Key:
                     code += " + "
                 result += key._name
                 code += f"0x{key._scan_code:X}({key._scan_code:02}){' EX' if key._is_extended else ''}"
+                key_names.append(key._name)
             self._latched_name = result
+
+            self._display_name = " + ".join(key_names)
         else:
             code = f"0x{self._scan_code:02X}({self._scan_code:02}){' EX' if self._is_extended else ''}"
             self._latched_name = ""
@@ -324,6 +329,10 @@ class Key:
     @property
     def latched_name(self):
         return self._latched_name if self._latched_name else self._name
+
+    @property
+    def display_name(self):
+        return self._display_name or self._name
 
     @property
     def latched_code(self):
@@ -808,8 +817,9 @@ def sort_keys(keys):
     key: Key
     sequence = []
     for key in keys:
-        index = key.key_order()
-        sequence.append((key, index))
+        if key:
+            index = key.key_order()
+            sequence.append((key, index))
 
     sequence.sort(key=lambda x: x[1])
     keys_list = [pair[0] for pair in sequence]

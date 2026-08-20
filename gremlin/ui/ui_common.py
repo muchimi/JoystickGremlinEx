@@ -668,7 +668,7 @@ class Color:
         return css
 
     @staticmethod
-    def cssTitleBox(fontSize = 14, foreground_color = None, background_color = None):
+    def cssTitleBox(fontSize=14, foreground_color=None, background_color=None):
         if background_color is None:
             background_color = Color.normalColor()
         if foreground_color is None:
@@ -2004,7 +2004,7 @@ class StateTracker:
 
         self._process_event(event)
 
-    def _process_event(self, event : gremlin.event_handler.Event):
+    def _process_event(self, event: gremlin.event_handler.Event):
         if event.is_axis:
             # ignore non button events
             return
@@ -2021,7 +2021,6 @@ class StateTracker:
                     state = input_id.button_value
                 else:
                     state = input_id
-
 
         self._store_state(device_guid, input_type, input_id, state)
         self._update_widget(device_guid, input_type, input_id, state)
@@ -3970,11 +3969,9 @@ class InputListenerWidget(QBoxFrame):
             return
 
         # Return immediately once the first key press is detected
-        valid =  self._any_button or InputType.Keyboard in self._event_types or InputType.KeyboardLatched in self._event_types
+        valid = self._any_button or InputType.Keyboard in self._event_types or InputType.KeyboardLatched in self._event_types
         if not valid:
             return
-
-
 
         if not self._multi_keys:
             # single key mode
@@ -4000,17 +3997,16 @@ class InputListenerWidget(QBoxFrame):
         else:
             # multi-key mode
 
-                if valid:
-                    if not self._return_kb_event:
-                        self._multi_key_storage.append(key)
-                    else:
-                        self._multi_key_storage.append(event)
-                    self.keyInput.emit(self._multi_key_storage)  # notify a key was pressed
-                    self._echo_key(key)
-                    self.selection = self._multi_key_storage
-                    if verbose:
-                        syslog.info(f"multi-key storage: {self._multi_key_storage}")
-
+            if valid:
+                if not self._return_kb_event:
+                    self._multi_key_storage.append(key)
+                else:
+                    self._multi_key_storage.append(event)
+                self.keyInput.emit(self._multi_key_storage)  # notify a key was pressed
+                self._echo_key(key)
+                self.selection = self._multi_key_storage
+                if verbose:
+                    syslog.info(f"multi-key storage: {self._multi_key_storage}")
 
     def _mouse_event_ui(self, event):
         """process mouse events on UI thread"""
@@ -4813,6 +4809,55 @@ class QDataRadioButton(QtWidgets.QRadioButton):
     @data.setter
     def data(self, value):
         self._data = value
+
+
+class QDataRadioButtonGroup(QtWidgets.QWidget):
+    """a group of QDataRadioButton widgets that allows only one to be selected at a time"""
+
+    def __init__(self, options, value=None, callback=None, callbackEx=None, orientation=QtCore.Qt.Horizontal, parent=None):
+        """constructor
+        :param options: list of tuples containing the label and data and tooltip for each radio button (label, value, tooltip)
+        :param value: the initially selected value (optional) - the value should match the value in one of the options
+        :param callback: callback function to execute when a radio button is selected (optional)
+        :param orientation: layout orientation, either QtCore.Qt.Vertical or QtCore.Qt.Horizontal (optional)
+        :param parent: parent widget (optional)
+
+        """
+        super().__init__(parent)
+        self._options = options
+        self._value = value
+        self._callback = callback
+        self._callback_ex = callbackEx
+        self._widgets = []
+
+        layout = QtWidgets.QVBoxLayout(self) if orientation == QtCore.Qt.Vertical else QtWidgets.QHBoxLayout(self)
+        for item in options:
+            count = len(item)
+            match count:
+                case 3:
+                    label, data, tooltip = item
+                case 2:
+                    label, data = item
+                    tooltip = None
+                case _:
+                    label = item
+                    data = item
+                    tooltip = None
+
+            widget = QDataRadioButton(label, data=data, value=(value == data), callbackEx=self._handle_button_clicked, tooltip=tooltip)
+            layout.addWidget(widget)
+            self._widgets.append(widget)
+
+    def _handle_button_clicked(self, widget, checked):
+        if checked:
+            self._value = widget.data
+            for button in self._widgets:
+                if button is not widget:
+                    button.setChecked(False)
+            if self._callback:
+                self._callback(self._value)
+            if self._callback_ex:
+                self._callback_ex(widget, self._value)
 
 
 class QDataPushButton(QtWidgets.QPushButton):
@@ -9929,7 +9974,6 @@ class WidgetCacheTracker:
             del self._key_time_map[key]
             del self._param_map[key]
 
-
             if Shiboken.isValid(widget):
                 try:
                     widget.expired.emit(key, widget)
@@ -9939,8 +9983,7 @@ class WidgetCacheTracker:
                         widget._cleanup_ui()
                     widget.deleteLater()
                 except Exception as e:
-                    pass # C++ exception might occur here
-
+                    pass  # C++ exception might occur here
 
     def contains(self, key) -> bool:
         """true if the key is in the cache for a valid widget"""
@@ -10322,7 +10365,6 @@ class QSplitTabWidget(QDataWidget):
                     del self._registered_widget_map[key]
                 if index != -1 and index in self._widget_config_device_map:
                     del self._widget_config_device_map[index]
-
 
     def getCurrentRegisteredWidgetDevice(self):
         """gets the device ID for the currently selected device widget"""
@@ -15924,12 +15966,13 @@ class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
             self._update()
 
     def setIcon(self, icon: QtGui.QIcon):
-        self._icon = icon
         if icon:
-            self._widget.setPixmap(icon.pixmap(self._size, self._size))
-        else:
-            self._widget.setPixmap(None)
-        self._update()
+            self._icon = icon
+            if icon:
+                self._widget.setPixmap(icon.pixmap(self._size, self._size))
+            else:
+                self._widget.setPixmap(None)
+            self._update()
 
     def setTooltip(self, tooltip: str):
         self._tooltip = tooltip
@@ -15946,8 +15989,6 @@ class AutoHideIconTextWidget(QtWidgets.QStackedWidget):
         if self._icon is not None:
             self._widget.setPixmap(self._icon.pixmap(self._size, self._size))
         self._update()
-
-
 
 
 class AutohideContainerIdWidget(QtWidgets.QStackedWidget):
@@ -16258,7 +16299,7 @@ class QInteractWidget(QtWidgets.QWidget):
 class QStepTile(QtWidgets.QWidget):
     """step title widget"""
 
-    def __init__(self, label: str = None, icon=None, font_size = 14, foreground_color=None, background_color=None, parent=None):
+    def __init__(self, label: str = None, icon=None, font_size=14, foreground_color=None, background_color=None, parent=None):
         super().__init__(parent)
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.setStyleSheet(Color.cssTitleBox(fontSize=font_size, foreground_color=foreground_color, background_color=background_color))
@@ -16288,3 +16329,97 @@ class QScrollAreaResizeCallback(QtWidgets.QScrollArea):
         super().resizeEvent(event)
         if self._resize_callback:
             self._resize_callback(event.oldSize(), event.size())
+
+
+class QAutoResizeStackedWidget(QtWidgets.QStackedWidget):
+    """stacked widget that automatically resizes based on the current widget (not the largest widget)"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.currentChanged.connect(self.update_sizes)
+
+    def addWidget(self, widget):
+        # Default new widgets to Ignored until they are displayed
+        widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        return super().addWidget(widget)
+
+    def update_sizes(self, index):
+        for i in range(self.count()):
+            page = self.widget(i)
+            if i == index:
+                # Restore standard sizing for the active page
+                page.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+            else:
+                # Force the layout engine to completely ignore hidden pages
+                page.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+
+        if self.currentWidget():
+            self.currentWidget().adjustSize()
+        self.adjustSize()
+
+        # tell parent to adjust
+        parent = self.parentWidget()
+        if parent and hasattr(parent, "adjustSize"):
+            parent.adjustSize()
+
+    def sizeHint(self):
+        # Dictate layout space solely based on the visible widget
+        if self.currentWidget():
+            return self.currentWidget().sizeHint()
+        return super().sizeHint()
+
+    def minimumSizeHint(self):
+        # Override minimum space so the widget can shrink down
+        if self.currentWidget():
+            return self.currentWidget().minimumSizeHint()
+        return super().minimumSizeHint()
+
+
+class QSideBarContainer(QWidget):
+    """A custom widget that features a colored vertical bar on its left side."""
+
+    def __init__(self, widget=None, bar_width=5, bar_color=Color.selectColor(), left_margin=8, spacing=8, parent=None):
+        """constructor
+        :param widget: The main content widget to be placed inside the sidebar container.
+        :param bar_width: The width of the vertical bar on the left side.
+        :param bar_color: The color of the vertical bar.
+        :param left_margin: The left margin for the content area.
+        :param parent: The parent widget of this container.
+        """
+        super().__init__(parent)
+
+        # Main horizontal layout to place the bar and content side-by-side
+        self.main_layout = QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(spacing)
+
+        self.left_margin_bar = QWidget()
+        self.left_margin_bar.setFixedWidth(left_margin)
+
+        # 1. Create and style the vertical bar
+        self.vertical_bar = QWidget()
+        self.vertical_bar.setFixedWidth(bar_width)
+        self.vertical_bar.setStyleSheet(f"background-color: {bar_color}; border-radius: {int(bar_width / 2)}px;")
+
+        # 2. Create the container for user content
+        self.content_widget = QWidget()
+        self.content_layout = QVBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.main_layout.addWidget(self.left_margin_bar)
+        self.main_layout.addWidget(self.vertical_bar)
+        self.main_layout.addWidget(self.content_widget)
+
+        if widget is not None:
+            self.add_widget(widget)
+
+    def add_widget(self, widget):
+        """Helper method to add widgets to the internal content area."""
+        self.content_layout.addWidget(widget)
+
+    def set_layout(self, layout):
+        """Helper method to set a custom layout for the internal content area."""
+        # Clear default layout if replacing
+        if self.content_widget.layout():
+            QWidget().setLayout(self.content_widget.layout())
+        self.content_widget.setLayout(layout)

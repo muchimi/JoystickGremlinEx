@@ -57,6 +57,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: Keyboard Device: display keys in correct order for latched keys (multi keys)
 - Fix: API: model reindex uses incorrect datatype for hash computation
 - Fix: API: Python delete / set methods not supported by new model objects.
+- Fix: API: Python 3.14 threading timer behavior change causing a possible exception when handling mouse wheel low level events - PRR by RazOrLegend (thank you!)
+- Fix: Keyboard Device: Fixed a UI refresh issue when adding a new key.
 
 
 ### (m77T30)

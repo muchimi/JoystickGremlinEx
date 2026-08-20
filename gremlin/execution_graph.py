@@ -1272,6 +1272,7 @@ class ExecutionContext:
             mode = action.profile_mode
             events = []
             for device_guid, input_type, input_id, functor in extra_inputs:
+                assert isinstance(input_type, gremlin.input_types.InputType), f"invalid input type: {input_type}"
                 if isinstance(input_id, gremlin.keyboard.Key):
                     # create multiple events for each key in the latch series as any could trigger the functor
                     extra_data = {"latched": input_id}
@@ -1285,9 +1286,9 @@ class ExecutionContext:
                     events.append(event)
 
             for event in events:
-                if verbose:
-                    device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                    syslog.info(f"LATCH: (_get_action_functor) Add extra functor: [{device_name}] input type: [{input_type.name} ({input_type.value})] input id: [{input_id}] mode: {mode} event: {str(event)} ")
+                # if verbose:
+                #     device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
+                #     syslog.info(f"LATCH: (_get_action_functor) Add extra functor: [{device_name}] input type: [{input_type.name if input_type else 'n/a'} ({input_type.value if input_type else 'n/a'})] input id: [{input_id}] mode: {mode} event: {str(event)} ")
                 eh.add_latched_functor(device_guid, mode, event, functor)
 
         action.setEnabled(True)

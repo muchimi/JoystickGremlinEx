@@ -490,7 +490,7 @@ class AcceleratedEncoder:
 
         step = self.min_step + accel * self._step_range
 
-        syslog.info(f"dt: {dt if dt is not None else 0:0.4f}, filtered_frequency {self.filtered_frequency:0.4f}, accel: {accel:0.4f}, step: {step:0.4f}")
+        # syslog.info(f"dt: {dt if dt is not None else 0:0.4f}, filtered_frequency {self.filtered_frequency:0.4f}, accel: {accel:0.4f}, step: {step:0.4f}")
 
 
         value = self.value + direction * step

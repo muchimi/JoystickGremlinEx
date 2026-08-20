@@ -256,6 +256,7 @@ class AbstractView(QtWidgets.QWidget):
 
         self._redraw_suspended_stack = 0  # non 0 = redraw is suspended
         self._redraw_pending = True  # true if a redraw is pending while redraw is disabled - set to True initially to indicate a redraw is needed
+        self._redraw_force = False # true if a redraw should be forced at next redraw
 
         self._container = None
         if __debug__:
@@ -300,6 +301,9 @@ class AbstractView(QtWidgets.QWidget):
         if emit and self._redraw_suspended_stack == 0 and self._redraw_pending:
             self._handle_model_changed()
 
+    def onItemChanged(self, model, index: int, new_item, old_item, operation):
+        pass # override in derived classes
+
     def _handle_model_changed(self, data=None, force=False):
         """Handles changes in the model."""
 
@@ -326,6 +330,7 @@ class AbstractView(QtWidgets.QWidget):
                 # no redraw allowed currently
                 self._redraw_pending = True
                 return
+
 
             self.redraw()
 
@@ -3081,6 +3086,7 @@ class InputItemListModel(AbstractCallbackModel):
         if device:
             self.refresh(False)
 
+
     def removeAt(self, index: int, emit=True):
         """removes the entry at the given model index"""
         if self._custom_remove_handler:
@@ -3861,6 +3867,16 @@ class InputItemListView(AbstractView):
                     if self._current_index != index:
                         self.selectItemAt(index)
 
+    def onItemChanged(self, model, index: int, new_item, old_item, operation):
+        """override by derived classes as needed"""
+        super().onItemChanged(model, index, new_item, old_item, operation)
+        match operation:
+            case "add":
+                # handle add operation
+                self._redraw_pending = True
+                self._redraw_force = True # force a complete redraw on next redraw cycle
+
+
     def redraw(self, force: bool = False):
         # assert inspect.stack()[1].function == "_fireChanged", "redraw should only be called due to a model trigger"
         gremlin.util.InvokeUiMethod(self._redraw_ui, force)  # ensure on UI thread
@@ -3873,6 +3889,11 @@ class InputItemListView(AbstractView):
 
         if gremlin.shared_state.is_redraw_suspended():
             return  # don't redraw
+
+        force = force or self._redraw_force
+        if self._redraw_force:
+            syslog.info("input item list view - force redraw")
+
 
         widget_count = 0  # number of displayed input item widgets
         try:
@@ -3895,6 +3916,7 @@ class InputItemListView(AbstractView):
                     changed = True
 
             if not force and not changed:
+                syslog.info("input item list view - skip redraw")
                 return  # do not update
 
             if verbose:
@@ -3907,9 +3929,6 @@ class InputItemListView(AbstractView):
                 widget_count = self.getInputItemWidgetCount()
 
             model_count = len(self.model)
-
-            # if __debug__:
-            #     assert self._drawn_once and (widget_count == model_count), "InputItemListView model and UI are not synchronized (mismatched items)"
 
             if self.current_index == -1 and model_count > 0:
                 self.setCurrentIndex(0)  # pick the first item if nothing is selected now
@@ -3924,6 +3943,8 @@ class InputItemListView(AbstractView):
                 self.scrollToWidget(widget)
         finally:
             # toggle blank/content view
+            self._redraw_force = False
+            self._redraw_pending = False
             if widget_count == 0:
                 self.showBlank()
             else:
@@ -4687,7 +4708,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
 
     @property
     def input_display_name(self):
-        return f"{gremlin.shared_state.get_device_name(self.device_guid)} {InputType.to_display_name(self.device_input_type)} {self.device_input_id}"
+        return f"{gremlin.shared_state.get_device_name(self.device_guid)} {self.device_input_id}"
 
     @property
     def display_name(self) -> str:
@@ -5576,6 +5597,7 @@ class ActionSet(AbstractCallbackModel):
 
     def onItemChanged(self, model, index: int, new_item, old_item, operation):
         """override by derived classes as needed"""
+        super().onItemChanged(model, index, new_item, old_item, operation)
         match operation:
             case "add":
                 # handle add operation
@@ -6262,6 +6284,7 @@ class ConditionModel(AbstractCallbackModel):
 
     def onItemChanged(self, model, index: int, new_item, old_item, operation):
         """Called when an item in the model changes."""
+        super().onItemChanged(model, index, new_item, old_item, operation)
         el = gremlin.event_handler.EventListener()
         el.condition_changed(self.container)
 
@@ -9009,6 +9032,7 @@ class ContainerModel(AbstractCallbackModel):
         self.remove(container)
 
     def onItemChanged(self, model: ContainerModel, index: int, new_value: AbstractContainer, old_value: AbstractContainer, operation: str):
+        super().onItemChanged(model, index, new_value, old_value, operation)
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
             syslog.info(
@@ -10754,6 +10778,7 @@ class ConditionView(AbstractView):
 
     def onItemChanged(self, model, index: int, new_item, old_item, operation):
         """update the count whenever the model changes"""
+        super().onItemChanged(model, index, new_item, old_item, operation)
         gremlin.util.InvokeUiMethod(self._update_count_ui)
 
     def _update_count_ui(self):
@@ -11005,6 +11030,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             enable_filter=enable_filter,
             parent=parent,
         )
+
+        self._filter = None
 
         self.device = device
         self.profile = profile

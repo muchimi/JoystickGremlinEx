@@ -309,6 +309,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         assert isinstance(profile, gremlin.base_profile.Profile), "Invalid profile type"
         assert mode is not None and mode != "", "Mode cannot be None or empty"
 
+
         device = gremlin.joystick_handling.getDevice(self.device_guid)
         super().__init__(
             device=device, profile=profile, mode=mode, object_name=object_name, custom_input_widget_callback=self._custom_widget_handler, parent=parent

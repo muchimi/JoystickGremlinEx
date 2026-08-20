@@ -364,9 +364,9 @@ class CodeRunner:
                                                 syslog.info(f"\t\t\tFunctor: {functor}")
 
 
-                                    self.event_handler.addCallback(device_node.device_guid, mode_name, event, cb_data.callback, input_item.always_execute)
+                                    self.event_handler.addCallback(device_node.device_guid, mode_name, event, cb_data.callback, input_item.always_execute, extra_data={"input_item": input_item})
                                 else:
-                                    self.event_handler.addCallback(dinput.GUID_Virtual, mode_name, cb_data.event, cb_data.callback, input_item.always_execute)
+                                    self.event_handler.addCallback(dinput.GUID_Virtual, mode_name, cb_data.event, cb_data.callback, input_item.always_execute, extra_data={"input_item": input_item})
 
 
 

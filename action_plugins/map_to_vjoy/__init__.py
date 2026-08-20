@@ -19,6 +19,7 @@ from __future__ import annotations  # deprecated with python 3.14+
 import logging
 import threading
 import time
+import numpy as np
 
 from lxml import etree as ElementTree
 import traceback
@@ -2806,11 +2807,15 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _create_step_ui(self):
         """creates the axis step mode UI components"""
 
-        self.step_container = QtWidgets.QWidget()
-        self.step_container_layout = QtWidgets.QVBoxLayout(self.step_container)
-        self.main_layout.addWidget(self.step_container)
+        container = QtWidgets.QWidget()
+        container_layout = QtWidgets.QVBoxLayout(container)
+        self.step_container = gremlin.ui.ui_common.QSideBarContainer(widget=container)
 
-        self.step_container_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
+        self.main_layout.addWidget(self.step_container)
+        color = "#2980b9"
+        self.step_container.setStyleSheet(f".QWidget {{ border-left: 5px solid {color};  # Vertical bar on the left }}")
+
+        container_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
         # step mode header
         widgets = ["Button to Axis (step) Mode: "]
@@ -2824,14 +2829,14 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         widgets.append("||")
         self.step_mode_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
-        self.step_container_layout.addWidget(self.step_mode_widget)
+        container_layout.addWidget(self.step_mode_widget)
 
         # stepped mode options
-        self.stepped_page_visualizer_container = QtWidgets.QStackedWidget()
-        self.step_container_layout.addWidget(self.stepped_page_visualizer_container)
+        self.stepped_page_visualizer_container = gremlin.ui.ui_common.QAutoResizeStackedWidget()
+        container_layout.addWidget(self.stepped_page_visualizer_container)
 
         container = self._create_latched_selector()
-        self.step_container_layout.addWidget(container)  # latched visualizer
+        container_layout.addWidget(container)  # latched visualizer
 
         if self.action_data.action_mode == VjoyAction.VJoySetAxisStepped:
             self._create_axis_stepping_ui()
@@ -3006,51 +3011,33 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         # step
         widgets = []
         directions = [("Up", 1, "Increase"), ("Down", -1, "Decrease")]
-        for label, data, tooltip in directions:
-            widget = gremlin.ui.ui_common.QDataRadioButton(
-                label, data=data, value=self.action_data.encoder_direction == data, callbackEx=self._handle_encoder_direction_changed
-            )
-            widget.setToolTip(tooltip)
-            widgets.append(widget)
-
-        self.direction_widget = gremlin.ui.ui_common.getHContainer(widgets, "Direction:", widget_only=True)
-        container_layout.addWidget(self.direction_widget)
-
-        grid_layout = QtWidgets.QGridLayout()
-        container_layout.addLayout(grid_layout)
-
-        # start frequency
-        self.start_frequency_widget = gremlin.ui.ui_common.QFloatLineEdit(
-            min_range=0,
-            max_range=100,
-            value=self.action_data.encoder_accel_start_hz,
-            callback=self._handle_start_frequency_changed,
-            tooltip="Pulse rate at which acceleration starts (pulses per second)",
+        self.encoder_direction_widget = gremlin.ui.ui_common.QDataRadioButtonGroup(
+            directions, value=self.action_data.encoder_direction, callbackEx=self._handle_encoder_direction_changed
         )
-        widget = gremlin.ui.ui_common.getHContainer(["Start Frequency (Hz):", self.start_frequency_widget], widget_only=True)
-        grid_layout.addWidget(widget, 0, 1)
 
-        # full frequency
-        self.full_frequency_widget = gremlin.ui.ui_common.QFloatLineEdit(
-            min_range=0,
-            max_range=100,
-            value=self.action_data.encoder_accel_full_hz,
-            callback=self._handle_full_frequency_changed,
-            tooltip="Pulse rate for full acceleration (pulses per second)",
+        modes = [
+            ("Relative", EncoderMode.Relative, "In this mode, the encoder moves the axis value as a setpoint."),
+            ("Spring", EncoderMode.Spring, "In this mode, the encoder returns to the center position when pulses stop after the timeout."),
+        ]
+        self.encoder_mode_widget = gremlin.ui.ui_common.QDataRadioButtonGroup(
+            modes,
+            value=self.action_data.encoder_mode,
+            callbackEx=self._handle_encoder_mode_changed,
         )
-        widget = gremlin.ui.ui_common.getHContainer(["Full Frequency (Hz):", self.full_frequency_widget], widget_only=True)
-        grid_layout.addWidget(widget, 1, 1)
 
-        # curve power
-        self.curve_power_widget = gremlin.ui.ui_common.QFloatLineEdit(
-            min_range=0,
-            max_range=10,
-            value=self.action_data.encoder_accel_curve,
-            callback=self._handle_curve_power_changed,
-            tooltip="Curve exponent power for the acceleration curve, 3 meaans cubic, the higher the number, the faster the acceleration takes effect",
+        self.encoder_spring_timer_widget = gremlin.ui.ui_common.QDelayWidget(
+            value=self.action_data.encoder_spring_timeout,
+            show_zero=True,
+            callback=self._handle_spring_timeout_changed,
+            tooltip="Time (ms) after last pulse to spring the axis back to center",
         )
-        widget = gremlin.ui.ui_common.getHContainer(["Curve Power:", self.curve_power_widget], widget_only=True)
-        grid_layout.addWidget(widget, 0, 3)
+
+        self.encoder_spring_container = gremlin.ui.ui_common.getHContainer([ "Spring delay (ms):", self.encoder_spring_timer_widget], widget_only=True)
+        container_layout.addWidget(gremlin.ui.ui_common.getHContainer([self.encoder_direction_widget, self.encoder_mode_widget,self.encoder_spring_container], widget_only=True))
+
+        w1 = []
+        w2 = []
+        widgets = [w1, w2]
 
         # min step
         self.min_step_widget = gremlin.ui.ui_common.QFloatLineEdit(
@@ -3060,8 +3047,18 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             callback=self._handle_min_step_changed,
             tooltip="Minimum step size for the encoder at minimum acceleration",
         )
-        widget = gremlin.ui.ui_common.getHContainer(["Min Step:", self.min_step_widget], widget_only=True)
-        grid_layout.addWidget(widget, 0, 0)
+        w1.extend(["Min Step:", self.min_step_widget])
+
+        # start frequency
+        self.start_frequency_widget = gremlin.ui.ui_common.QFloatLineEdit(
+            min_range=0,
+            max_range=100,
+            value=self.action_data.encoder_accel_start_hz,
+            callback=self._handle_start_frequency_changed,
+            tooltip="Pulse rate at which acceleration starts (pulses per second)",
+        )
+
+        w1.extend(["Start Frequency (Hz):", self.start_frequency_widget])
 
         # max step
         self.max_step_widget = gremlin.ui.ui_common.QFloatLineEdit(
@@ -3071,24 +3068,59 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             callback=self._handle_max_step_changed,
             tooltip="Maximum step size for the encoder at full acceleration",
         )
-        widget = gremlin.ui.ui_common.getHContainer(["Max Step:", self.max_step_widget], widget_only=True)
-        grid_layout.addWidget(widget, 1, 0)
+        w2.extend(["Max Step:", self.max_step_widget])
+
+        # full frequency
+        self.full_frequency_widget = gremlin.ui.ui_common.QFloatLineEdit(
+            min_range=0,
+            max_range=100,
+            value=self.action_data.encoder_accel_full_hz,
+            callback=self._handle_full_frequency_changed,
+            tooltip="Pulse rate for full acceleration (pulses per second)",
+        )
+        w2.extend(["Full Frequency (Hz):", self.full_frequency_widget])
+
+        # curve power
+        self.curve_power_widget = gremlin.ui.ui_common.QFloatLineEdit(
+            min_range=0,
+            max_range=10,
+            value=self.action_data.encoder_accel_curve,
+            callback=self._handle_curve_power_changed,
+            tooltip="Curve exponent power for the acceleration curve, 3 meaans cubic, the higher the number, the faster the acceleration takes effect",
+        )
+        w1.extend(["Curve Power:", self.curve_power_widget])
 
         # timeout
         self.timeout_widget = gremlin.ui.ui_common.QDelayWidget(
-            value=self.action_data.encoder_frequency_timeout, callback=self._handle_timeout_changed, tooltip="Time after last pulse to reset acceleration"
+            value=self.action_data.encoder_frequency_timeout,
+            show_zero=True,
+            callback=self._handle_timeout_changed,
+            tooltip="Time after last pulse to reset acceleration",
         )
-        widget = gremlin.ui.ui_common.getHContainer(["Timeout (ms):", self.timeout_widget, "||"], widget_only=True)
-        grid_layout.addWidget(widget, 1, 3)
+        w2.extend(["Timeout (ms):", self.timeout_widget])
 
-        grid_layout.addWidget(QtWidgets.QLabel(""), 0, 4)
-        grid_layout.setColumnStretch(4, 2)
+
+
+        grids = []
+        for w in widgets:
+            grid = gremlin.ui.ui_common.getGridContainer(w, widget_only=True)
+            container_layout.addWidget(grid)
+            grids.append(grid)
+        gremlin.ui.ui_common.synchronize_grids(grids)
 
         return container
 
     def _handle_encoder_direction_changed(self, widget, checked):
         if checked:
             self.action_data.encoder_direction = widget.data
+
+    def _handle_encoder_mode_changed(self, widget, checked):
+        if checked:
+            self.action_data.encoder_mode = widget.data
+            self._update_ui()
+
+    def _handle_spring_timeout_changed(self, value):
+        self.action_data.encoder_spring_timeout = value
 
     def _handle_start_frequency_changed(self, value):
         self.action_data.encoder_accel_start_hz = value
@@ -3118,8 +3150,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.step_value_container_widget = QtWidgets.QWidget()
         self.step_value_container_layout = QtWidgets.QHBoxLayout(self.step_value_container_widget)
 
-        self.progression_container_widget = QtWidgets.QWidget()
-        self.progression_container_layout = QtWidgets.QHBoxLayout(self.progression_container_widget)
 
         self.step_start_index_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.step_count_widget = gremlin.ui.ui_common.QIntLineEdit()
@@ -3163,25 +3193,17 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.slider_widget.setMinimumWidth(200)
         self.slider_widget.setMarkerVisible(False)
 
-        self.normalize_widget = QtWidgets.QPushButton("Normalize")
-        self.normalize_widget.setToolTip("Normalizes steps to be evenly spaced")
-        self.normalize_widget.clicked.connect(self._normalize_steps)
+        self.normalize_widget = gremlin.ui.ui_common.QDataPushButton("Normalize", callback = self._normalize_steps, tooltip = "Normalizes steps to be evenly spaced")
 
-        self.low_progression_widget = QtWidgets.QPushButton("Low")
-        self.low_progression_widget.setToolTip("Steps follow a linear progression from the low range.  Most steps are in the lower half.")
-        self.low_progression_widget.clicked.connect(self._low_progression_steps)
+        self.low_progression_widget = gremlin.ui.ui_common.QDataPushButton("Low", callback=self._low_progression_steps, tooltip="Steps follow a linear progression from the low range.  Most steps are in the lower half.")
 
-        self.high_progression_widget = QtWidgets.QPushButton("High")
-        self.high_progression_widget.setToolTip("Steps follow a linear progression from the high range.  Most steps are in the higher half.")
-        self.high_progression_widget.clicked.connect(self._high_progression_steps)
+        self.high_progression_widget = gremlin.ui.ui_common.QDataPushButton("High", callback=self._high_progression_steps, tooltip="Steps follow a linear progression from the high range.  Most steps are in the higher half.")
 
-        self.cubic_progression_low_widget = QtWidgets.QPushButton("Geometric Low")
-        self.cubic_progression_low_widget.setToolTip("Steps follow a geometric (log) progression.")
-        self.cubic_progression_low_widget.clicked.connect(self._geometric_progression_steps_low)
+        self.cubic_progression_low_widget = gremlin.ui.ui_common.QDataPushButton("Geometric Low", callback=self._geometric_progression_steps_low, tooltip="Steps follow a geometric (log) progression.")
 
-        self.cubic_progression_high_widget = QtWidgets.QPushButton("Geometric High")
-        self.cubic_progression_high_widget.setToolTip("Steps follow a geometric (log) progression.")
-        self.cubic_progression_high_widget.clicked.connect(self._geometric_progression_steps_high)
+        self.cubic_progression_high_widget = gremlin.ui.ui_common.QDataPushButton("Geometric High", callback=self._geometric_progression_steps_high, tooltip="Steps follow a geometric (log) progression.")
+
+        self.cubic_progression_center_widget = gremlin.ui.ui_common.QDataPushButton("Cubic Center", callback=self._cubic_steps_center, tooltip="Steps follow a cubic progression.")
 
         # self.step_value_container_layout.addWidget(self.grab_widget)
         self.step_value_container_layout.addWidget(self.add_step_widget)
@@ -3195,16 +3217,18 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self.step_value_container_layout.addStretch()
 
-        self.progression_container_layout.addWidget(QtWidgets.QLabel("Distribution:"))
-        self.progression_container_layout.addWidget(self.normalize_widget)
-        self.progression_container_layout.addWidget(self.low_progression_widget)
-        self.progression_container_layout.addWidget(self.high_progression_widget)
-        self.progression_container_layout.addWidget(self.cubic_progression_low_widget)
-        self.progression_container_layout.addWidget(self.cubic_progression_high_widget)
-        self.progression_container_layout.addStretch()
+        widgets = ["Distribution:",
+                   self.normalize_widget,
+                   self.high_progression_widget,
+                   self.low_progression_widget,
+                   self.cubic_progression_low_widget,
+                   self.cubic_progression_high_widget,
+                   self.cubic_progression_center_widget,
+                   ]
+
+        self.progression_container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         # ticks for stepped mode
-
         self.step_widget_container = QtWidgets.QWidget()
         self.step_widget_layout = QtWidgets.QGridLayout(self.step_widget_container)
         self.step_widget_layout.addWidget(QtWidgets.QWidget(), 0, 6)
@@ -3431,6 +3455,17 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _geometric_progression_steps_high(self):
         self._geometric_progression(True)
 
+    @QtCore.Slot()
+    def _cubic_steps_center(self):
+        count = len(self.action_data.target_step_list)
+        x = np.linspace(-1, 1, count)
+        y = x ** 3
+        positions = y.tolist()
+        self.action_data.target_step_list = positions
+        self._update_steps_ui()
+
+
+
     def _geometric_progression(self, inverted=False):
         import numpy as np
 
@@ -3452,6 +3487,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self.action_data.target_step_list = data
         self._update_steps_ui()
+
+
 
     @QtCore.Slot()
     def _grab_handler(self):
@@ -4085,6 +4122,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
                 self._update_steps_ui()
                 output_range_visible = False
                 grid_visible = False
+
+                spring_timer_visible = self.action_data.encoder_mode == EncoderMode.Spring
+                self.encoder_spring_container.setVisible(spring_timer_visible)
 
             case VjoyAction.VJoyAxisToButton:
                 output_range_visible = False
@@ -4795,12 +4835,12 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self._relative_pulse_worker = None  # pulse worker for relative mode
         self.client_list = [0]  # send to all clients by default
 
-        self.encoder_timeout = 2.0  # encoder timeout in seconds
-        self.encoder_mode = EncoderMode.Relative
+
         self.encoder_timer = None  # encoder timeout
         self.encoder_target = 0.0  # encoder position target - if 0.0, springs back to center when the encoder stops rotations
         self.encoder_tick = 0.1  # encoder tick value
         self.encoder_direction = 1  # encoder direction, 1 for clockwise, -1 for counter-clockwise
+        self.encoder_timer = None  # timer used to spring the axis back to center after a pulse timeout
 
         self.encoder: AcceleratedEncoder = None  # encoder object
 
@@ -4927,7 +4967,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             latched = []
             verbose = config.verbose_mode_merge
             for data in self.action_data._merge_data:
-                latched.append((data.device_guid, InputType.JoystickAxis, data.input_id))
+                latched.append((data.device_guid, InputType.JoystickAxis, data.input_id, self))
                 device = gremlin.joystick_handling.getDevice(data.device_guid)
                 if verbose:
                     syslog.info(f"MERGE: latched [{device.name}] axis: {data.input_id}  {device.get_axis_name(data.input_id)}")
@@ -4939,6 +4979,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                 match self.action_data.latched_input_type:
                     case InputType.JoystickButton:
                         # latch is a button or hat
+                        assert self.action_data.stepped_input_type is not None, "stepped_input_type is None"
                         return [
                             (
                                 self.action_data.stepped_device_guid,
@@ -4949,25 +4990,30 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         ]
                     case InputType.KeyboardLatched:
                         import gremlin.keyboard
+                        import gremlin.ui.keyboard_device
+                        verbose = True
+                        primary_key : gremlin.keyboard.Key
 
                         keys = self.action_data.latched_keys
+
+
                         if keys:
                             # grab the primary key (last one as modifiers are first - doesn't matter as long as we pick one)
                             keys = gremlin.keyboard.sort_keys(keys)
                             primary_key: gremlin.keyboard.Key = keys[-1]
                             primary_key.latched_keys = keys
 
-                            syslog.info("VJOYRemap latch: ")
+                            syslog.info("VJOYRemap keyboard latch: ")
                             for primary_key in primary_key.latched_keys:
                                 syslog.info(f"\tlatched key: {primary_key}")
                             self.action_data.stepped_input_id = primary_key
 
                             return [
                                 (
-                                    gremlin.shared_state.keyboard_tab_guid, # keyboard device GUID
-                                    InputType.Keyboard, # keyboard type
-                                    primary_key, # primary latch key for the key seequence
-                                    self, # functor
+                                    gremlin.shared_state.keyboard_tab_guid,  # keyboard device GUID
+                                    InputType.Keyboard,  # keyboard type
+                                    primary_key,  # primary latch key for the key seequence
+                                    self,  # functor
                                 )
                             ]
 
@@ -4987,6 +5033,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self.pressed_hat_buttons = {}
         self.synced = False  # indicate not synchronized
         self._last_time = time.time()
+        self.encoder_timer = None
 
         # update the target client list
         self.client_list = self.action_data.remote_config.getClientList()
@@ -5273,17 +5320,20 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             # initial stepped axis value
 
             value = self._get_axis(self.vjoy_id, self.vjoy_input_id)
-            self.encoder = AcceleratedEncoder(
-                initial_value=value,
-                min_step=self.action_data.encoder_min_step,
-                max_step=self.action_data.encoder_max_step,
-                accel_start_hz=self.action_data.encoder_accel_start_hz,
-                accel_full_hz=self.action_data.encoder_accel_full_hz,
-                curve=self.action_data.encoder_accel_curve,
-                frequency_filter=self.action_data.encoder_frequency_filter,
-                direction_change_speed_retention=self.action_data.encoder_direction_change_speed_retention,
-                frequency_timeout=self.action_data.encoder_frequency_timeout,
-            )
+            if self.action_data.step_mode == StepMode.Encoder:
+                self.encoder = AcceleratedEncoder(
+                    initial_value=value,
+                    min_step=self.action_data.encoder_min_step,
+                    max_step=self.action_data.encoder_max_step,
+                    accel_start_hz=self.action_data.encoder_accel_start_hz,
+                    accel_full_hz=self.action_data.encoder_accel_full_hz,
+                    curve=self.action_data.encoder_accel_curve,
+                    frequency_filter=self.action_data.encoder_frequency_filter,
+                    direction_change_speed_retention=self.action_data.encoder_direction_change_speed_retention,
+                    frequency_timeout=self.action_data.encoder_frequency_timeout,
+                )
+            else:
+                self.encoder = None
 
             if self.action_data.encoder_mode == EncoderMode.Relative:
                 self.encoder_target = self._get_axis(self.vjoy_id, self.vjoy_input_id)  # current position
@@ -5318,6 +5368,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
         self.encoder_target = None
         self.encoder = None
+        if self.encoder_timer:
+            # terminate any encoder pulse
+            self.encoder_timer.cancel()
+            self.encoder_timer = None
 
         if self.input_type in VJoyRemapWidget.input_type_buttons:
             # issue vjoy button releases if needed
@@ -5751,6 +5805,12 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             # force remote mode on if specified in the event
             is_remote = True
             is_local = False
+
+        if extra_data and "input_item" in extra_data:
+            input_item = extra_data["input_item"]
+            # ignore calls that are not for our input (latched input scenario with multiple matching triggers)
+            if input_item != self.input_item:
+                return
 
         force_remote = event.force_remote
 
@@ -6320,6 +6380,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     position = None
                     latched = False
                     primary_key = None
+                    verbose = True
 
                     if self.action_data._stepped_latched:
                         # latch mode
@@ -6343,11 +6404,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                                 # this primary key is the one that triggered the event
                                                 latched = True
                                                 break
-
-                    # if latched:
-                    #     syslog.info("STEPPED MODE: latched event detected")
-                    # else:
-                    #     syslog.info("STEPPED MODE: non latched event detected")
+                                    # if not latched and self.action_data and "latched_key" in event.extra_data:
+                                    #     latched_keys = event.extra_data["latched_key"]
+                                    #     latched = event.identifier in latched_keys
 
 
                     match self.action_data.step_mode:
@@ -6408,6 +6467,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             # non linear step mode
                             # trigger = False
                             if fire_event or latched:
+                                identifier = self.action_data.input_item.identifier
+                                primary = event.device_guid == self.hardware_device_guid and event.identifier == identifier
+                                direction = 1 if primary else -1
                                 key = ("stepped-axis", self.vjoy_input_id)
                                 device = gremlin.joystick_handling.vjoy_info_from_vjoy_id(self.vjoy_id)
                                 if key not in device.data:
@@ -6465,25 +6527,34 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 primary = event.device_guid == self.hardware_device_guid and event.identifier == identifier
 
                                 # reverse the direction for the latch
-                                direction = self.action_data.encoder_direction if latched else -self.action_data.encoder_direction
+                                direction = -self.action_data.encoder_direction if latched else self.action_data.encoder_direction
 
                                 if primary or latched:
+                                    if self.encoder_timer:
+                                        # terminate prior spring back timer if needed
+                                        self.encoder_timer.cancel()
+                                        self.encoder_timer = None
+
                                     now = time.time()  # current time
                                     value = self.encoder.pulse(direction, now)
 
-                                    # if self.encoder_mode == EncoderMode.Spring:
-                                    #     # automatic return mode
-                                    #     if self.encoder_timer is not None:
-                                    #         self.encoder_timer.cancel()
-
                                     # new position
-
-
-                                    syslog.info(f"PULSE ENCODER: latched: [{latched}] direction [{direction}]  new value: {value:0.4f}  delay: {now - self._last_time:0.4f}")
+                                    if self.verbose:
+                                        syslog.info(
+                                            f"PULSE ENCODER: latched: [{latched}] direction [{direction}]  new value: {value:0.4f}  delay: {now - self._last_time:0.4f}  vjoy_id: {self.vjoy_id} axis_id: {self.vjoy_input_id}"
+                                        )
                                     self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
                                     self._last_time = now
-
                                     self.encoder_target = value
+
+                                    # spring action
+                                    if self.action_data.encoder_mode == EncoderMode.Spring:
+                                        # kick off a timer to return to the center location after the timeout
+                                        if self.action_data.encoder_spring_timeout > 0:
+                                            self.encoder_timer = threading.Timer(
+                                                interval=self.action_data.encoder_spring_timeout / 1000.0, function=self._return_encoder_to_center
+                                            )
+                                            self.encoder_timer.start()
 
                 case (
                     VjoyAction.VJoyDisableLocal
@@ -6541,6 +6612,14 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         if auto_complete:
             self.functor_complete.emit()  # indicate completed
         return result
+
+    def _return_encoder_to_center(self):
+        """called when the timer for encoder pulses has lapsed"""
+        self._set_axis(self.vjoy_id, self.vjoy_input_id, 0.0)
+        # reset the encoder acceleration and position
+        self.encoder.value = 0.0
+        self.encoder.reset_acceleration()
+
 
     def _set_axis(self, vid: int, axis_id: int, value: float):
         """sets the axis value using the inversion factor"""
@@ -6901,6 +6980,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.encoder_frequency_filter = 0.0  # default encoder frequency filter
         self.encoder_direction_change_speed_retention = 0.0  # default encoder direction change speed retention
         self.encoder_frequency_timeout = 0.0  # default encoder frequency timeout
+        self.encoder_spring_timeout = 1000.0 # default delay (ms) after last pulse to spring back to zero if the encoder is in spring mode
         self.encoder_min_step = 0.005  # minimum step for the encoder at min speed
         self.encoder_max_step = 0.1  # maximum step for the encoder at full speed
         self.encoder_accel_curve = 2.0
@@ -7935,6 +8015,8 @@ Supports axis merging, curved output, command, hat and button mappings.
                 self.encoder_direction_change_speed_retention = safe_read(node, "encoder-direction-change-speed-retention", float, 0.0)
             if "encoder-frequency-timeout" in node.attrib:
                 self.encoder_frequency_timeout = safe_read(node, "encoder-frequency-timeout", float, 0.0)
+            if "encoder-spring-timeout" in node.attrib:
+                self.encoder_spring_timeout = safe_read(node, "encoder-spring-timeout", float, 1000.0)
             if "encoder-min-step" in node.attrib:
                 self.encoder_min_step = safe_read(node, "encoder-min-step", float, 0.005)
             if "encoder-max-step" in node.attrib:
@@ -7954,6 +8036,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                 if key:
                     keys.append(key)
+                syslog.info(f"read key: {key.name}")
 
             # sort the keys for display purposes
             if keys:
@@ -7968,6 +8051,10 @@ Supports axis merging, curved output, command, hat and button mappings.
                 # default latch mode
                 self.latched_input_type = InputType.JoystickButton
 
+            self._stepped_latched = safe_read(node, "latched", bool, True)
+            if "stepped-device-id" in node.attrib:
+                self.stepped_device_id = node.get("stepped-device-id")
+
             match self.latched_input_type:
                 case InputType.Keyboard:
                     self.stepped_device_id = gremlin.shared_state.keyboard_tab_guid
@@ -7978,7 +8065,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     if "stepped-input-type" in node.attrib:
                         self.stepped_input_type = InputType.from_string(node.attrib["stepped-input-type"])
                     else:
-                        self.stepped_input_type = None
+                        self.stepped_input_type = InputType.JoystickButton # default to joystick button
 
             self.vjoy_hat_position = (0, 0)
             if self.action_mode in (
@@ -8171,13 +8258,6 @@ Supports axis merging, curved output, command, hat and button mappings.
                 csv = node.get("steps")
                 self.target_step_list = gremlin.util.csv_to_floatlist(csv)
 
-            self._stepped_latched = safe_read(node, "latched", bool, True)
-            if "stepped-device-id" in node.attrib:
-                self.stepped_device_id = node.get("stepped-device-id")
-            if not self._latched_keys and "stepped-input-id" in node.attrib:
-                value = node.get("stepped-input-id")
-                if value.isnumeric():
-                    self.stepped_input_id = value
 
             if "step-start-index" in node.attrib:
                 self.target_step_start_index = safe_read(node, "step-start-index", int, 0)
@@ -8421,6 +8501,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                         node.set("encoder-frequency-timeout", safe_format(self.encoder_frequency_timeout, float))
                         node.set("encoder-min-step", safe_format(self.encoder_min_step, float))
                         node.set("encoder-max-step", safe_format(self.encoder_max_step, float))
+                        node.set("encoder-spring-timeout", safe_format(self.encoder_spring_timeout, float))
 
         # latched input type
         node.set("latched-input-type", safe_format(InputType.to_string(self.latched_input_type), str))
