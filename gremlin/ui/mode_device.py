@@ -317,6 +317,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self.current_mode = mode
         self.widget_storage = {}
+        self._filter = ""  # active search filter string (empty = no filtering)
 
         el = gremlin.event_handler.EventListener()
         el.profile_loaded.connect(self._handle_new_profile)
