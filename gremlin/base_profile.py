@@ -3473,6 +3473,26 @@ class Profile:
 
         return modes  # unduplicated
 
+    def get_parent_mode(self, mode: str) -> str:
+        """gets the name of the parent (inherited) mode for the given mode.
+
+        Returns None if the mode has no parent (root mode) or is unknown.
+        Used to resolve input item inheritance at event-match time.
+        """
+        if not mode:
+            return None
+        try:
+            mode_node = self._profile_graph.getModeNode(mode)
+        except Exception:
+            return None
+        if mode_node is None:
+            return None
+        parent = mode_node.inherit
+        # guard against a mode inheriting from itself
+        if parent == mode:
+            return None
+        return parent
+
     def get_xml_modes(self, node, casefold=False) -> list[str]:
         """reads profile modes from an XML mode"""
         root = node.getroottree().getroot()
