@@ -47,6 +47,7 @@ from gremlin.types import DeviceType, EventSourceType
 import gremlin.shared_state
 
 import gremlin.util
+from gremlin.util import TriggerDict
 
 import gremlin.keyboard
 import gremlin.ui
@@ -591,6 +592,7 @@ class EventListener(QtCore.QObject):
     profile_reset = Signal()  # profile reset signal (when runtime for a profile needs to reset)
     profile_hook = Signal()  # hook functors - before profile start is emitted
     profile_unhook = Signal()  # unhook functors - when profiles stop
+    profile_before_start = Signal()  # occurs before the profile start signal
     profile_start = Signal()  # profile start signal (when a profile starts)
     profile_started = Signal()  # profile started signal (after a profile starts and all process start functions are completed)
     profile_after_start = Signal()  # occurs after the profile started signal
@@ -2299,6 +2301,8 @@ class EventHandler(QtCore.QObject):
         self.experimental = config.experimental
         self._last_vjoy_event = None  # tracks the last VJOY event for loopback detection
 
+
+
     @property
     def runtime_mode(self):
         """Returns the currently active mode.
@@ -2416,6 +2420,12 @@ class EventHandler(QtCore.QObject):
             # convert to GUID
             device_guid = gremlin.util.parse_guid(device_guid)
 
+        import gremlin.input_item
+
+        if isinstance(functor, gremlin.input_item.InputItem):
+            pass
+
+
         input_type = event.event_type
 
         # derive the input item from the functor
@@ -2462,12 +2472,13 @@ class EventHandler(QtCore.QObject):
 
         key = event.callbackKey
         if key not in self.latched_functors[device_guid][mode]:
-            self.latched_functors[device_guid][mode][key] = {}
-        if input_item not in self.latched_functors[device_guid][mode][key]:
-            self.latched_functors[device_guid][mode][key][input_item] = []
-        existing_ids = [f.id for f in self.latched_functors[device_guid][mode][key][input_item]]
+            self.latched_functors[device_guid][mode][key] = []
+
+
+        existing_ids = [f.id for f in self.latched_functors[device_guid][mode][key]]
         if functor.id not in existing_ids:
-            self.latched_functors[device_guid][mode][key][input_item].append(functor)
+            assert not isinstance(functor, gremlin.input_item.InputItem), "invalid functor type"
+            self.latched_functors[device_guid][mode][key].append(functor)
             if verbose:
                 device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
                 syslog.info(f"Added latched functor: {device_name} mode: {mode} key: [{key}] input: [{input_item.display_name}] event: [{str(event)}]")
@@ -2476,7 +2487,9 @@ class EventHandler(QtCore.QObject):
         # add the callback for the functor
         container = functor.action_data.container
 
-        self.addCallback(device_guid, mode, event, lambda e: self.triggerContainerCallback(container, e), extra_data={"container": container, "input_item": input_item})
+        self.addCallback(
+            device_guid, mode, event, lambda e: self.triggerContainerCallback(container, e), extra_data={"container": container, "input_item": input_item}
+        )
 
     def triggerContainerCallback(self, container, event):
         """Creates a callback for the given container - this allows latched inputs to issue a trigger at the container node level so conditions are handled"""
@@ -2555,7 +2568,7 @@ class EventHandler(QtCore.QObject):
         if verbose:
             syslog.info(f"Register InputItem: {input_item.display_name} mode {mode} {input_type} magic: {magic}")
 
-    def addCallback(self, device_guid: dinput.GUID, mode: str, event: Event, callback: Callable, permanent=False, node=None, extra_data : dict = {}):
+    def addCallback(self, device_guid: dinput.GUID, mode: str, event: Event, callback: Callable, permanent=False, node=None, extra_data: dict = {}):
         """Installs the provided callback for the given event.
 
         :param device_guid the GUID of the device the callback is
@@ -2583,7 +2596,6 @@ class EventHandler(QtCore.QObject):
         input_item = None
         if extra_data and "input_item" in extra_data:
             input_item = extra_data["input_item"]
-
 
         if event:
             if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
@@ -3240,11 +3252,12 @@ class EventHandler(QtCore.QObject):
 
         import gremlin.config
         import gremlin.keyboard
+        import gremlin.execution_graph
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_inputs or config.verbose_mode_exec
         verbose_detailed = verbose and config.verbose_mode_extra
-        # verbose = True
+        verbose = True
 
         self.registry.update(event)  # record the event
 
@@ -3259,11 +3272,18 @@ class EventHandler(QtCore.QObject):
             m_list = []
             f_list = []
 
-            input_item = self._matching_input_item(mode, event)
+            input_item: gremlin.input_item.InputItem = self._matching_input_item(mode, event)
+
             if verbose:
                 syslog.info(f"Matching input items: {input_item if input_item else 'None'}")
 
-            if input_item is None or not input_item.enabled:
+            if input_item is None:
+                # no matching input item found - ignore inputs that aren't registered or could not be found (latched keys for example)
+                if verbose:
+                    syslog.info(f"Event: input not registered {str(event)}")
+                return None, None
+
+            if not input_item.enabled:
                 # input item registered but not enabled - ignore inputs that aren't registered or could not be found (latched keys for example)
                 if verbose:
                     syslog.info(f"Event: input disabled {str(event)}")
@@ -3293,8 +3313,7 @@ class EventHandler(QtCore.QObject):
                         syslog.info(
                             f"\tcheck latched key: {gremlin.keyboard.KeyMap.keyid_tostring(index)} key: [{key.name}] found: {found} state: {state} {'*****' if state else ''}"
                         )
-                        if not found:
-                            syslog.info(f"\t\t* Key not found key: [{key.name}] *")
+
                     return state
 
                 # def releaseKey(state, key):
@@ -3320,11 +3339,18 @@ class EventHandler(QtCore.QObject):
 
                 config = gremlin.config.Configuration()
 
+                latched_inputs = input_item.getLatchedInputIds()
+                if verbose:
+                    syslog.info(f"Found {len(latched_inputs)} latched inputs for input item: {input_item.name}")
+                    for index, latched_input in enumerate(latched_inputs):
+                        syslog.info(f"\t[{index}]: {latched_input}")
+
                 data = event.data  # holds keyboard state info
                 if event.event_type == InputType.Mouse:
                     verbose = config.verbose_mode_mouse
                 else:
                     verbose = config.verbose_mode_keyboard
+                verbose = True
 
                 if not event.extra_data:
                     # ensure additional data passed on in the event exists
@@ -3343,174 +3369,75 @@ class EventHandler(QtCore.QObject):
                     event_key = event_key.message_key
 
                 latched_map = {}
-                latch_found = False
 
                 # see if matching the input item
-                latched_keys = input_item.getKeyList()
-                if latched_keys:
-                    # match on input key sequence first
-                    if verbose:
-                        syslog.info(f"Input item has latched keys: {latched_keys}")
-                    is_latched = all(keyPressed(key) for key in latched_keys)
-                    if is_latched:
-                        latch_found = True
-                        latch_key = input_item.key
-                        m_list = self._matching_latched_callbacks(event, latch_key)
-                        if m_list:
+                for input_id in latched_inputs:
+                    if not isinstance(input_id, gremlin.keyboard.Key):
+                        continue
+
+                    latch_found = False
+                    latched_keys = input_id.getKeys()
+                    m_list = []
+                    f_list = []
+
+                    if latched_keys:
+                        # match on input key sequence first
+                        if verbose:
+                            syslog.info(f"Input item has latched keys: {latched_keys}")
+                            for index, key in enumerate(latched_keys):
+                                syslog.info(f"\t[{index}]: {key.name} pressed: {keyPressed(key)}")
+
+                        is_latched = all(keyPressed(key) for key in latched_keys)
+                        if is_latched:
+                            latch_found = True
+
+
+                            # get callbacks for that input item
+                            latch_key = input_item.key
+                            m_list = self._matching_latched_callbacks(event, latch_key)
+                            if m_list:
+                                if event.extra_data is None:
+                                    event.extra_data = {}
+                                event.extra_data["input_item"] = input_item
+                                event.extra_data["latched_key"] = input_id  # key sequence that triggered the callback
+
+                                if verbose:
+                                    trigger_line = "***** TRIGGER KEY INPUT PRESS " + "*" * 30
+                                    syslog.info(trigger_line)
+                                    syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event} ")
+                                    syslog.info(trigger_line)
+                                self._trigger_callbacks(m_list, event)
+                                if verbose:
+                                    syslog.info(f"\tSaving matching callbacks for latched key: {latch_key.name}")
+                                self._keyboard_callback_map[latch_key] = m_list  # save the matching callbacks for the latched key for release
+                                return
+
+
+                    if not latch_found:
+                        if verbose:
+                            syslog.info("No latched keys found for this event")
+                        continue
+
+                    if latch_found and latched_map:
+                        for latch_key, callbacks in latched_map.items():
                             if verbose:
                                 trigger_line = "***** TRIGGER KEY INPUT PRESS " + "*" * 30
                                 syslog.info(trigger_line)
-                                syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
+                                syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(callbacks)} event: {event}")
                                 syslog.info(trigger_line)
-                            self._trigger_callbacks(m_list, event)
+
+                            self._trigger_callbacks(callbacks, event)
                             if verbose:
                                 syslog.info(f"\tSaving matching callbacks for latched key: {latch_key.name}")
-                            self._keyboard_callback_map[latch_key] = m_list  # save the matching callbacks for the latched key for release
-                            return
+                            self._keyboard_callback_map[latch_key] = callbacks  # save the matching callbacks for the latched key for release
 
-                if not latch_found:
-                    # see if any latching entry matches
-                    verbose = True
-                    for perm in self.latched_keys:
-                        if event_key in perm:
-                            # possible key match  - verify all the keys in the latched sequence are pressed if there is more than one key
-                            for input_item in self.latched_keys[perm]:
-                                for primary_key, callback in self.latched_keys[perm][input_item]:
-                                    is_latched = all(keyPressed(key) for key in primary_key.latched_keys)
-                                    if verbose:
-                                        syslog.info(f"checking latch for perm: [{perm}] key: [{primary_key}] - all keys pressed: [{is_latched}]")
-                                    if is_latched:
-                                        latch_found = True
+                        return
 
-                                        if primary_key not in latched_map:
-                                            latched_map[primary_key] = []
-                                        latched_map[primary_key].append(callback)
-                                        if "latched_primary_key" not in event.extra_data:
-                                            event.extra_data["latched_primary_key"] = []
-                                        if primary_key not in event.extra_data["latched_primary_key"]:
-                                            event.extra_data["latched_primary_key"].append(primary_key)
-                                        event.extra_data["input_item"] = input_item
 
-                if not latch_found:
-                    if verbose:
-                        syslog.info("No latched keys found for this event")
-                    return
-
-                if latch_found and latched_map:
-                    for latch_key, callbacks in latched_map.items():
+                    else:
                         if verbose:
-                            trigger_line = "***** TRIGGER KEY INPUT PRESS " + "*" * 30
-                            syslog.info(trigger_line)
-                            syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(callbacks)} event: {event}")
-                            syslog.info(trigger_line)
-                        # if "latched_key" not in event.extra_data:
-                        #     event.extra_data["latched_key"] = []
-                        # key_id = latch_key.key_id
-                        # if key_id not in event.extra_data["latched_key"]:
-                        #     event.extra_data["latched_key"].append(key_id)
-
-                        self._trigger_callbacks(callbacks, event)
-                        if verbose:
-                            syslog.info(f"\tSaving matching callbacks for latched key: {latch_key.name}")
-                        self._keyboard_callback_map[latch_key] = callbacks  # save the matching callbacks for the latched key for release
-
-                    # items = self._matching_event_keys(event)  # returns list of primary keys
-                    # if items:
-                    #     if verbose:
-                    #         syslog.info(f"Matched keys for mode: [{mode}]  event {event} pressed: {event.is_pressed} keys: {len(items)} ")
-                    #         for index, input_item in enumerate(items):
-                    #             syslog.info(f"\t[{index}]: {input_item.name}")
-
-                    #     input_keys = []
-                    #     if hasattr(input_item, "key"):
-                    #         input_keys.append(input_item.key)
-
-                    #     if hasattr(input_item, "extra_data") and "latched_keys" in input_item.extra_data:
-                    #         input_keys.extend(input_item.extra_data["latched_keys"].keys())
-
-                    #     for item in items:
-
-                    #         latched_keys = item.latched_keys
-                    #         if not latched_keys:
-                    #             # no keys in the sequence
-                    #             continue
-
-                    #         if verbose:
-                    #             syslog.info("-" * 50)
-                    #         is_latched = True
-                    #         # primary key
-                    #         latch_key = latched_keys[-1]
-
-                    #         if verbose:
-                    #             syslog.info(f"KEY: Checking latching: {len(latched_keys)} key(s)")
-                    #             for index, key in enumerate(latched_keys):
-                    #                 syslog.info(f"\t [{index}] key: [{key.name}]")
-
-                    #         for input_key in latched_keys:
-                    #             state = keyPressed(input_key)
-
-                    #             if not state and input_key in self._keyboard_callback_map:
-                    #                 if verbose:
-                    #                     syslog.info(f"\tdetected latch release - found matching callbacks for latched key: {input_key.name}")
-                    #                 m_list = self._keyboard_callback_map[input_key]
-                    #                 # indicate processed
-                    #                 del self._keyboard_callback_map[input_key]
-                    #                 if m_list:
-                    #                     # trigger release events
-                    #                     event.is_pressed = False
-                    #                     event.override_input_type = InputType.JoystickButton
-                    #                     if verbose:
-                    #                         trigger_line = "***** TRIGGER KEY INPUT RELEASE" + "*" * 30
-                    #                         syslog.info(trigger_line)
-                    #                         syslog.info(
-                    #                             f"\tmode: [{mode}] Found latched key: Check key {input_key.name} callbacks: {len(m_list)} event: {event}"
-                    #                         )
-                    #                         syslog.info(trigger_line)
-                    #                     self._trigger_callbacks(m_list, event)
-
-                    #             is_latched = is_latched and state  # make sure all latched keys are currently pressed (state = True)
-                    #             if not is_latched:
-                    #                 break # at least one key in the sequence is not pressed - no need to check the others
-
-                    # if verbose:
-                    #     syslog.info(f"Final latched state for sequence: {is_latched}")
-
-                    # if is_latched and latch_key:
-                    #     # override the event type for keyboard so actions treat mouse/kbd input as a joystick button for mapping purposes
-                    #     import gremlin.keyboard
-
-                    #     assert isinstance(latch_key, gremlin.keyboard.Key), f"invalid key type, got {type(latch_key)} - expecting [gremlin.keyboard.Key]"
-                    #     event.override_input_type = InputType.JoystickButton
-
-                    # register a release callback for the latched key
-
-                    # m_list = self._matching_latched_callbacks(event, latch_key)
-
-                    # if m_list:
-                    #     if verbose:
-                    #         trigger_line = "***** TRIGGER KEY INPUT PRESS " + "*" * 30
-                    #         syslog.info(trigger_line)
-                    #         syslog.info(f"\tmode: [{mode}] Found latched key: Check key {latch_key.name} callbacks: {len(m_list)} event: {event}")
-                    #         syslog.info(trigger_line)
-                    #     self._trigger_callbacks(m_list, event)
-                    #     if verbose:
-                    #         syslog.info(f"\tSaving matching callbacks for latched key: {latch_key.name}")
-                    #     self._keyboard_callback_map[latch_key] = m_list  # save the matching callbacks for the latched key for release
-
-                    # # extra latched functors for this event
-                    # f_list = self._matching_functors(event)
-                    # if f_list:
-                    #     if verbose:
-                    #         syslog.info(f"\tFound latched functors for event: {event}")
-                    #     self._latched_functors_map[event] = f_list  # save the matching functors for the latched event for release
-
-                    return
-
-                    verbose = gremlin.config.Configuration().verbose_mode_inputs
-                else:
-                    if verbose:
-                        syslog.info("No matching events")
-                return None, None
+                            syslog.info("No matching events")
+                    return None, None
 
             elif event.event_type == InputType.Midi:
                 m_list = self._matching_midi_callbacks(event)
@@ -3546,7 +3473,8 @@ class EventHandler(QtCore.QObject):
                 InputType.ModeControl,
             ):
                 m_list = self._matching_callbacks(event)
-                f_list = self._matching_functors(event)
+                if not m_list:
+                    f_list = self._matching_functors(event)
 
                 if not (m_list or f_list):
                     if verbose_detailed:
@@ -3561,7 +3489,8 @@ class EventHandler(QtCore.QObject):
                 # other inputs including control inputs
 
                 m_list = self._matching_callbacks(event)
-                f_list = self._matching_functors(event)
+                if not m_list:
+                    f_list = self._matching_functors(event)
 
                 if verbose_detailed and not (m_list or f_list):
                     syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")

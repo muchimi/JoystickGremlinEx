@@ -426,13 +426,20 @@ class Key:
     def latched_keys(self, keys):
         self._latched_keys.clear()
         # eliminate duplicate keys
-        keys = set(keys)
         for key in keys:
             assert isinstance(key, Key), f"Expected a Key object, got {type(key)}"
-            if key.scan_code:
-                # not a null key
+            if key.name:
+                # skip not a null key
                 self._latched_keys.append(key)
         self._update()
+
+    def getKeys(self):
+        """returns a list of latched keys including the primary key"""
+        keys = set(self._latched_keys)
+        if self not in keys:
+            keys.add(self)
+        sorted_keys = sort_keys(keys)
+        return sorted_keys
 
     @property
     def is_latched(self):

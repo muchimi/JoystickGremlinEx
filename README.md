@@ -51,7 +51,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 ### (m77T31)
 - New: Map to Vjoy action: stepped axis mode (button to axis): gains a new encoder mode.  This mode uses an acceleration curve and pulse time to step (modify) the axis output based on pulse frequency and direction.  This is used for inputs such as rotary encoders that generate a pulse trigger.  The mode supports a latching input to handle the reverse pulse input, enabling a single mapping to handle both rotary directions.  The encoder calculation is direction aware to speed up or slow down the rate of change and direction of rotation.  The encoder uses acceleration measuring pulses per second and can increase/decrease the rate of change based on how fast you pulse the input (rotate the encoder).  
 - New: Map to Vjoy action: ability to latch keyboard input for reverse motion.
-- Change: Execution engine: support multi-key keyboard latching triggers within actions (previously multi key triggers were only possible if defined as an input in the keyboard device.)
+- Change: Execution engine: support multi-key keyboard latching triggers within actions (previously multi key triggers were only possible if defined as an input in the keyboard device.) Latching is now tracked at the input level to ensure the full execution tree is followed, and is greatly simplified from the prior API.
 - Fix: Map to VJoy action: corrected output description in visual.
 - Fix: Keyboard Device: corrected input description.
 - Fix: Keyboard Device: display keys in correct order for latched keys (multi keys)
@@ -59,6 +59,8 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: API: Python delete / set methods not supported by new model objects.
 - Fix: API: Python 3.14 threading timer behavior change causing a possible exception when handling mouse wheel low level events - PRR by RazOrLegend (thank you!)
 - Fix: Keyboard Device: Fixed a UI refresh issue when adding a new key.
+- Fix: UI: Listen for input should disable auto-highlight.
+- 
 
 
 ### (m77T30)

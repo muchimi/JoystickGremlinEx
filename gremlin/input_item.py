@@ -530,9 +530,31 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         self._custom_sort_callback = None
 
+        self._latched_input_ids = set()  # set of input ids that are latched for this input item
+
+
         el = gremlin.event_handler.EventListener()
+        el.profile_before_start.connect(self._profile_before_start)
         el.profile_start.connect(self._profile_start)
         el.reload_axis_state.connect(self._handle_axis_state_request)
+
+    def registerLatchedInput(self, input_id):
+        """ registers an additional latched input for this input item - this is called on profile start when the excution tree is being built """
+        if hasattr(input_id, "key"):
+            input_id = input_id.key
+        elif hasattr(input_id, "identifier"):
+            input_id = input_id.identifier
+        self._latched_input_ids.add(input_id)
+
+    def getLatchedInputIds(self):
+        """returns the set of latched input ids for this input item"""
+        return self._latched_input_ids
+
+    def resetLatchedInputs(self):
+        """ resets latched inputs """
+        self._latched_input_ids.clear()
+        self.registerLatchedInput(self.input_id)  # always register the main input id as latched
+
 
     @property
     def input_item(self):
@@ -734,6 +756,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     def _profile_start(self):
         # enable the input at profile start
         self._enabled = True
+
+    def _profile_before_start(self):
+        self.resetLatchedInputs() # reset the list of latched inputs whenever the profile starts so old latches don't persist across profile runs
 
     @property
     def description(self):
@@ -2305,6 +2330,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _handle_button_state_change_callback(self, is_pressed: bool):
         config = gremlin.config.Configuration()
+        if gremlin.shared_state.is_highlighting_suspended:
+            return
         if not self.selected and config.highlight_enabled and config.highlight_input_buttons:
             self.selected = True
             self.trigger()
@@ -2620,6 +2647,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def _set_selected_ui(self, value: bool, emit=True):
         assert gremlin.util.is_ui_thread(), "Must be called from the UI thread"
+
+
         if not Shiboken.isValid(self):
             return
         if value != self._selected:

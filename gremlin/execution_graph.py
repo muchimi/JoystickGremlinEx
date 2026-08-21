@@ -23,6 +23,7 @@ import logging
 import time
 
 
+
 import gremlin.base_buttons
 import gremlin.input_item
 import gremlin.base_profile
@@ -530,6 +531,8 @@ class ExecutionContext:
         self._functor_map = {}  # map of node ID to action nodes to execute for condition checking
         self._node_map = {}  # map of node ID to node
         self._exec_map = {}  # map of node ID to the computed entry node for execution graph
+        self._latch_map = {}  # map of latched data - input ID -> functor
+
 
         self._processed_events = []
         self._processed_functors = {}
@@ -543,6 +546,9 @@ class ExecutionContext:
         self._functors = []  # list of functors in the execution graph
 
         self._handle_config_changed()  # update config params
+
+
+
 
     @property
     def functor_map(self) -> dict:
@@ -1257,7 +1263,7 @@ class ExecutionContext:
         functor: gremlin.base_profile.AbstractFunctor = container.functor(container, node)
         return functor
 
-    def _get_action_functor(self, action, node, container_condition_node, action_condition_node):
+    def _get_action_functor(self, action, node, container_condition_node, action_condition_node, extra_data : dict = None):
         """creates a functor instance for an action"""
         import gremlin.keyboard
         functor: gremlin.base_profile.AbstractFunctor = action.functor(action, node)
@@ -1265,7 +1271,6 @@ class ExecutionContext:
         extra_inputs = functor.latch_extra_inputs(container_condition_node, action_condition_node)
         if extra_inputs:
             verbose = gremlin.config.Configuration().verbose_mode_exec
-            verbose = True
             # register the extra inputs for this functor
             eh = gremlin.event_handler.EventHandler()
             # add_latched_functor(self, device_guid, mode, event, functor):
@@ -1275,15 +1280,23 @@ class ExecutionContext:
                 assert isinstance(input_type, gremlin.input_types.InputType), f"invalid input type: {input_type}"
                 if isinstance(input_id, gremlin.keyboard.Key):
                     # create multiple events for each key in the latch series as any could trigger the functor
-                    extra_data = {"latched": input_id}
+                    if extra_data is None:
+                        extra_data = {}
+                    extra_data["latched"] = input_id
                     # for key in input_id.latched_keys:
                     event = gremlin.event_handler.Event(event_type=input_type, device_guid=device_guid, identifier=input_id, virtual_code=input_id.virtual_code, extra_data=extra_data)
                     events.append(event)
 
-
                 else:
                     event = gremlin.event_handler.Event(event_type=input_type, device_guid=device_guid, identifier=input_id)
                     events.append(event)
+
+                # store the latched functor in the latch map
+                if extra_data and "input_item" in extra_data:
+                    input_item = extra_data["input_item"]
+                    self.registerInputItemLatchedNode(input_item, input_id, node)
+                    input_item.registerLatchedInput(input_id) # register the additional latched input with the input item
+
 
             for event in events:
                 # if verbose:
@@ -1293,6 +1306,26 @@ class ExecutionContext:
 
         action.setEnabled(True)
         return functor
+
+    def registerInputItemLatchedNode(self, input_item, input_id, node):
+        """ registers a node for more than one input id on a given input - this is used for latched inputs that can be triggered by multiple input ids"""
+        callback_key = input_item.callbackKey
+        if callback_key not in self._latch_map:
+            self._latch_map[callback_key] = {}
+        self._latch_map[callback_key][input_id] = node
+
+    def getInputItemLatchedNodes(self, input_item: gremlin.input_item.InputItem) -> list:
+        """gets the list of execution nodes for a given input item including latched data - tuples of (input_id, node)"""
+        if not input_item:
+            return []
+
+        node_list = []
+        callback_key = input_item.callbackKey
+        if callback_key in self._latch_map:
+            node_list = list(self._latch_map[callback_key].items())
+        return node_list
+
+
 
     def _get_gate_action_functor(self, action, node):
         _functor: gremlin.base_profile.AbstractFunctor = self._get_action_functor()
@@ -1389,6 +1422,8 @@ class ExecutionContext:
             container_group = ExecutionGraphGroupNode()
             container_group.parent = container_node
 
+            extra_data = {"container": container, "mode": mode_name, "device_node": device_node, "input_item": input_item}
+
             for action_set in container.action_sets:
                 # a container usually has a single action set, but some like tempo/tempoEx have multipe action sets so each is grouped by an action set
                 # sort actions by priority low to high
@@ -1440,7 +1475,7 @@ class ExecutionContext:
                     action_node.link = m_action_node  # link the execution tree action node to the input tree action node
 
                     action_node.container = container
-                    functor = self._get_action_functor(action, action_node, container_condition_node, action_condition_node)
+                    functor = self._get_action_functor(action, action_node, container_condition_node, action_condition_node, extra_data = extra_data)
                     action_node.functors.append(functor)
                     action_node.description = f"Action node: [{str(action)}]"
 

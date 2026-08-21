@@ -5373,11 +5373,19 @@ class QDataComboBox(QComboBox):
         if source:
             # source is expected to be a list of tuples of display/data
             for item in source:
-                if isinstance(item, tuple) and len(item) == 2:
-                    display, item = item
-                    self.addItem(display, item)
+                if isinstance(item, tuple):
+                    count = len(item)
+                    match count:
+                        case 3:
+                            display, item, _ = item
+                            self.addItem(display, item)
+                        case 2:
+                            display, item = item
+                            self.addItem(display, item)
+                        case 1:
+                            self.addItem(item, item)
                 else:
-                    self.addItem(item)
+                    self.addItem(item, item)
 
             if value is not None:
                 index = self.findData(value)

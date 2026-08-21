@@ -2925,7 +2925,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         sub_container_layout.addWidget(widget)
 
         # latch mode visualizers
-        self.latched_visualizer_container = QtWidgets.QStackedWidget()
+        self.latched_visualizer_container = gremlin.ui.ui_common.QAutoResizeStackedWidget()
         sub_container_layout.addWidget(self.latched_visualizer_container)
 
         # latch mode selector (keyboard or joystick)
@@ -2939,9 +2939,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         keyboard_container, keyboard_container_layout = gremlin.ui.ui_common.getVContainer()
         self.latched_visualizer_container.addWidget(keyboard_container)  # index 0
 
-        joystick_container, joystick_container_layout = gremlin.ui.ui_common.getVContainer()
-        self.latched_visualizer_container.addWidget(joystick_container)  # index 1
-
         # keyboard latch mode --------------------------
         keyboard_container_layout.addWidget(gremlin.ui.ui_common.getHContainer(["Latched Keys:", listen_keyboard_widget], widget_only=True))
         self.key_combination_widget, self.key_combination_layout = gremlin.ui.ui_common.getHContainer()
@@ -2949,36 +2946,13 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self._update_latched_keys()  # populate current latched keys
 
         # joystick latch mode ----------------------------
-        self.stepped_selector_device_widget = gremlin.ui.ui_common.QDataComboBox()
-        self.stepped_selector_input_widget = gremlin.ui.ui_common.QDataComboBox()
-        self.latched_button_widget, self.latched_button_layout = gremlin.ui.ui_common.getVContainer()
-        self.latched_visualizer_container.addWidget(self.latched_button_widget)  # index 1
 
-        device_layout = QtWidgets.QGridLayout(self.latched_device_widget)
+        device_items = []
+        buttom_items = []
 
-        row = 0
-        device_layout.addWidget(QtWidgets.QLabel("Down Device:"), row, 0)
-        device_layout.addWidget(self.stepped_selector_device_widget, row, 1)
-        device_layout.addWidget(listen_widget, row, 3)
-        device_layout.addWidget(QtWidgets.QLabel(" "), row, 4)
-
-        row += 1
-        device_layout.addWidget(QtWidgets.QLabel("Down Input:"), row, 0)
-        device_layout.addWidget(self.stepped_selector_input_widget, row, 1)
-        device_layout.setColumnStretch(4, 2)
-        self.latched_button_layout.addLayout(device_layout)
-
-        self.stepped_selector_device_widget.currentIndexChanged.connect(self._stepped_device_changed_cb)
-        self.stepped_selector_input_widget.currentIndexChanged.connect(self._stepped_input_changed_cb)
-
+        devices = sorted(joystick_handling.button_input_devices(), key=lambda x: x.name)
         self.stepped_device_map = {}  # holds the device information keyed by device_id (str)
         self.stepped_input_map = {}  # holds the list of buttons for the given device by device_id(str)
-        devices = sorted(joystick_handling.button_input_devices(), key=lambda x: x.name)
-
-        # default device
-        device_guid = self.action_data.hardware_device_guid if self.action_data.stepped_device_id is None else self.action_data.stepped_device_id
-        device_index = None
-        current_index = 0
 
         for dev in devices:
             self.stepped_device_map[dev.device_id] = dev
@@ -2991,17 +2965,56 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
             if button_list:
                 self.stepped_input_map[dev.device_id] = button_list
-                self.stepped_selector_device_widget.addItem(dev.name, dev.device_id)
-                if device_index is None and dev.device_id == device_guid:
-                    device_index = current_index
-                current_index += 1
+                device_items.append((dev.name, dev.device_id, f"Latched input device: {dev.name}"))
 
-        if device_index is not None:
-            self.stepped_selector_device_widget.setCurrentIndex(device_index)
+        dev = gremlin.joystick_handling.getDevice(self.action_data.stepped_device_id)
+        if dev is None:
+            # change to the first valid device
+            dev = devices[0] if devices else None
 
-        joystick_container_layout.addLayout(device_layout)
+        self.stepped_selector_device_widget = gremlin.ui.ui_common.QDataComboBox(
+            source=device_items, value=self.action_data.stepped_device_id, callback=self._stepped_device_changed_cb
+        )
+
+        self.stepped_selector_input_type_widget = gremlin.ui.ui_common.QDataComboBox(
+            source=[("Button", InputType.JoystickButton), ("Hat", InputType.JoystickHat)], value=self.action_data.stepped_input_type, callback=self._stepped_input_type_changed_cb
+        )
+
+        stub = "Button" if self.action_data.stepped_input_type == InputType.JoystickButton else "Hat"
+        button_items = [(f"{stub} {i}", i) for i in range(1, dev.button_count + 1)] if dev else []
+        self.stepped_selector_input_widget = gremlin.ui.ui_common.QDataComboBox(
+            source= button_items, value=self.action_data.stepped_input_id, callback=self._stepped_input_changed_cb
+        )
+        self.stepped_direction_widget = gremlin.ui.ui_common.QHatSelectorComboBox(
+            value=self.action_data.stepped_hat_direction, callback=self._handle_direction_changed
+        )
+
+        w1 = ["Reverse Device:", self.stepped_selector_device_widget, listen_widget]
+
+        w2 = ["Type", self.stepped_selector_input_type_widget]
+
+        w3 = ["Reverse Input:", self.stepped_selector_input_widget]
+
+        w4 = ["Reverse Direction:", self.stepped_direction_widget]  # hat line
+
+        device_selector_widget = QtWidgets.QWidget()
+        device_selector_layout = QtWidgets.QVBoxLayout(device_selector_widget)
+
+        widgets = [w1, w2, w3, w4]
+        grids = []
+        for w in widgets:
+            grid = gremlin.ui.ui_common.getGridContainer(w, widget_only=True)
+            device_selector_layout.addWidget(grid)
+            grids.append(grid)
+        gremlin.ui.ui_common.synchronize_grids(grids)
+
+        self.latched_visualizer_container.addWidget(device_selector_widget)  # index 1
+        self.stepped_hat_container = grids[-1]
 
         return container
+
+    def _handle_direction_changed(self, direction):
+        self.action_data.stepped_hat_direction = direction
 
     def _create_encoder_visualizer(self):
         container = QtWidgets.QWidget()
@@ -3032,8 +3045,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="Time (ms) after last pulse to spring the axis back to center",
         )
 
-        self.encoder_spring_container = gremlin.ui.ui_common.getHContainer([ "Spring delay (ms):", self.encoder_spring_timer_widget], widget_only=True)
-        container_layout.addWidget(gremlin.ui.ui_common.getHContainer([self.encoder_direction_widget, self.encoder_mode_widget,self.encoder_spring_container], widget_only=True))
+        self.encoder_spring_container = gremlin.ui.ui_common.getHContainer(["Spring delay (ms):", self.encoder_spring_timer_widget], widget_only=True)
+        container_layout.addWidget(
+            gremlin.ui.ui_common.getHContainer([self.encoder_direction_widget, self.encoder_mode_widget, self.encoder_spring_container], widget_only=True)
+        )
 
         w1 = []
         w2 = []
@@ -3099,8 +3114,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         )
         w2.extend(["Timeout (ms):", self.timeout_widget])
 
-
-
         grids = []
         for w in widgets:
             grid = gremlin.ui.ui_common.getGridContainer(w, widget_only=True)
@@ -3150,7 +3163,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.step_value_container_widget = QtWidgets.QWidget()
         self.step_value_container_layout = QtWidgets.QHBoxLayout(self.step_value_container_widget)
 
-
         self.step_start_index_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.step_count_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.step_count_widget.setRange(0, 100)
@@ -3193,17 +3205,29 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.slider_widget.setMinimumWidth(200)
         self.slider_widget.setMarkerVisible(False)
 
-        self.normalize_widget = gremlin.ui.ui_common.QDataPushButton("Normalize", callback = self._normalize_steps, tooltip = "Normalizes steps to be evenly spaced")
+        self.normalize_widget = gremlin.ui.ui_common.QDataPushButton(
+            "Normalize", callback=self._normalize_steps, tooltip="Normalizes steps to be evenly spaced"
+        )
 
-        self.low_progression_widget = gremlin.ui.ui_common.QDataPushButton("Low", callback=self._low_progression_steps, tooltip="Steps follow a linear progression from the low range.  Most steps are in the lower half.")
+        self.low_progression_widget = gremlin.ui.ui_common.QDataPushButton(
+            "Low", callback=self._low_progression_steps, tooltip="Steps follow a linear progression from the low range.  Most steps are in the lower half."
+        )
 
-        self.high_progression_widget = gremlin.ui.ui_common.QDataPushButton("High", callback=self._high_progression_steps, tooltip="Steps follow a linear progression from the high range.  Most steps are in the higher half.")
+        self.high_progression_widget = gremlin.ui.ui_common.QDataPushButton(
+            "High", callback=self._high_progression_steps, tooltip="Steps follow a linear progression from the high range.  Most steps are in the higher half."
+        )
 
-        self.cubic_progression_low_widget = gremlin.ui.ui_common.QDataPushButton("Geometric Low", callback=self._geometric_progression_steps_low, tooltip="Steps follow a geometric (log) progression.")
+        self.cubic_progression_low_widget = gremlin.ui.ui_common.QDataPushButton(
+            "Geometric Low", callback=self._geometric_progression_steps_low, tooltip="Steps follow a geometric (log) progression."
+        )
 
-        self.cubic_progression_high_widget = gremlin.ui.ui_common.QDataPushButton("Geometric High", callback=self._geometric_progression_steps_high, tooltip="Steps follow a geometric (log) progression.")
+        self.cubic_progression_high_widget = gremlin.ui.ui_common.QDataPushButton(
+            "Geometric High", callback=self._geometric_progression_steps_high, tooltip="Steps follow a geometric (log) progression."
+        )
 
-        self.cubic_progression_center_widget = gremlin.ui.ui_common.QDataPushButton("Cubic Center", callback=self._cubic_steps_center, tooltip="Steps follow a cubic progression.")
+        self.cubic_progression_center_widget = gremlin.ui.ui_common.QDataPushButton(
+            "Cubic Center", callback=self._cubic_steps_center, tooltip="Steps follow a cubic progression."
+        )
 
         # self.step_value_container_layout.addWidget(self.grab_widget)
         self.step_value_container_layout.addWidget(self.add_step_widget)
@@ -3217,14 +3241,15 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         self.step_value_container_layout.addStretch()
 
-        widgets = ["Distribution:",
-                   self.normalize_widget,
-                   self.high_progression_widget,
-                   self.low_progression_widget,
-                   self.cubic_progression_low_widget,
-                   self.cubic_progression_high_widget,
-                   self.cubic_progression_center_widget,
-                   ]
+        widgets = [
+            "Distribution:",
+            self.normalize_widget,
+            self.high_progression_widget,
+            self.low_progression_widget,
+            self.cubic_progression_low_widget,
+            self.cubic_progression_high_widget,
+            self.cubic_progression_center_widget,
+        ]
 
         self.progression_container_widget = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
@@ -3311,7 +3336,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         match self.action_data.latched_input_type:
             case InputType.KeyboardLatched:
                 self.latched_visualizer_container.setCurrentIndex(0)
-            case InputType.Joystick:
+            case InputType.JoystickButton:
                 self.latched_visualizer_container.setCurrentIndex(1)
 
     def _update_latched_keys(self):
@@ -3459,12 +3484,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _cubic_steps_center(self):
         count = len(self.action_data.target_step_list)
         x = np.linspace(-1, 1, count)
-        y = x ** 3
+        y = x**3
         positions = y.tolist()
         self.action_data.target_step_list = positions
         self._update_steps_ui()
-
-
 
     def _geometric_progression(self, inverted=False):
         import numpy as np
@@ -3488,8 +3511,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.action_data.target_step_list = data
         self._update_steps_ui()
 
-
-
     @QtCore.Slot()
     def _grab_handler(self):
         """grab the min value from the axis position"""
@@ -3505,9 +3526,11 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
     def _stepped_listen_ui(self):
         """listens for the button to use as the down step - runs on UI thread"""
 
+        gremlin.shared_state.push_suspend_highlighting()
         button_press_dialog = gremlin.ui.ui_common.InputListenerWidget(return_kb_event=False)
 
         button_press_dialog.item_selected.connect(self._update_button)
+        button_press_dialog.closed.connect(self._stepped_listen_closed_cb)
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -3522,6 +3545,10 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             150,
         )
         button_press_dialog.show()
+
+    def _stepped_listen_closed_cb(self, accepted: bool):
+        """called when the button listen dialog is closed"""
+        gremlin.shared_state.pop_suspend_highlighting()
 
     def _keyboard_dialog(self):
         """opens the keyboard dialog"""
@@ -3561,41 +3588,64 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.stepped_selector_input_widget.setCurrentIndex(input_index)
 
     @QtCore.Slot()
-    def _stepped_device_changed_cb(self):
+    def _stepped_device_changed_cb(self, device_id):
         """stepped device changed"""
-        index = self.stepped_selector_device_widget.currentIndex()
-        device_id = self.stepped_selector_device_widget.itemData(index)
-        active_input_id = self.action_data.stepped_input_id
-        current_index = 0
-        selected_input_index = None
-        with QtCore.QSignalBlocker(self.stepped_selector_input_widget):
-            self.stepped_selector_input_widget.clear()
-            first_input_id = None
-            for input_id, button_name in self.stepped_input_map[device_id].items():
-                self.stepped_selector_input_widget.addItem(button_name, input_id)
-                if first_input_id is None:
-                    first_input_id = input_id
-                if selected_input_index is None and input_id == active_input_id:
-                    selected_input_index = current_index
-                current_index += 1
-
-            if selected_input_index is not None:
-                index = self.stepped_selector_input_widget.findData(selected_input_index)
-                if index != -1:
-                    self.stepped_selector_input_widget.setCurrentIndex(selected_input_index)
-                else:
-                    self.action_data.stepped_input_id = first_input_id
-            else:
-                self.action_data.stepped_input_id = first_input_id
-
         self.action_data.stepped_device_id = device_id
 
+    def _update_stepped_selectors(self):
+        device_id = self.action_data.stepped_device_id
+        input_id = self.action_data.stepped_input_id
+
+        dev = gremlin.joystick_handling.getDevice(device_id)
+        input_types = []
+        if dev.button_count:
+            input_types.append(("Button", InputType.JoystickButton))
+        if dev.hat_count:
+            input_types.append(("Hat", InputType.JoystickHat))
+        with QtCore.QSignalBlocker(self.stepped_selector_input_type_widget):
+            self.stepped_selector_input_type_widget.clear()
+            for name, input_type in input_types:
+                self.stepped_selector_input_type_widget.addItem(name, input_type)
+            index = self.stepped_selector_input_type_widget.findData(self.action_data.stepped_input_type)
+            if index != -1:
+                self.stepped_selector_input_type_widget.setCurrentIndex(index)
+            else:
+                # not found, reset the input type to the first
+                self.action_data.stepped_input_type = input_types[0][1]
+                self.stepped_selector_input_type_widget.setCurrentIndex(0)
+
+        # populate hat or button ID list
+        with QtCore.QSignalBlocker(self.stepped_selector_input_widget):
+            match self.action_data.stepped_input_type:
+                case InputType.JoystickButton:
+                    self.stepped_selector_input_widget.setSource([(f"Button {i}", i) for i in range(1, dev.button_count + 1)])
+                case InputType.JoystickHat:
+                    self.stepped_selector_input_widget.setSource([(f"Hat {i}", i) for i in range(1, dev.hat_count + 1)])
+
+            index = self.stepped_selector_input_widget.findData(input_id)
+            if index != -1:
+                self.stepped_selector_input_widget.setCurrentIndex(index)
+            else:
+                index = 0
+                self.stepped_selector_input_widget.setCurrentIndex(index)
+                self.action_data.stepped_input_id = self.stepped_selector_input_widget.itemData(index)
+
+        # UI component visibility
+        self._update_ui()
+
+
+
     @QtCore.Slot()
-    def _stepped_input_changed_cb(self):
+    def _stepped_input_changed_cb(self, input_id):
         """stepped input changed"""
-        index = self.stepped_selector_input_widget.currentIndex()
-        input_id = self.stepped_selector_input_widget.itemData(index)
         self.action_data.stepped_input_id = input_id
+        self._update_stepped_selectors()
+
+    def _stepped_input_type_changed_cb(self, input_type):
+        """stepped input type changed"""
+        self.action_data.stepped_input_type = input_type
+        self._update_stepped_selectors()
+
 
     def load_actions_from_input_type(self):
         """occurs when the type of input is changed"""
@@ -4125,6 +4175,9 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
                 spring_timer_visible = self.action_data.encoder_mode == EncoderMode.Spring
                 self.encoder_spring_container.setVisible(spring_timer_visible)
+
+                hat_visible = self.action_data.stepped_input_type == InputType.JoystickHat
+                self.stepped_hat_container.setVisible(hat_visible)
 
             case VjoyAction.VJoyAxisToButton:
                 output_range_visible = False
@@ -4835,7 +4888,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         self._relative_pulse_worker = None  # pulse worker for relative mode
         self.client_list = [0]  # send to all clients by default
 
-
         self.encoder_timer = None  # encoder timeout
         self.encoder_target = 0.0  # encoder position target - if 0.0, springs back to center when the encoder stops rotations
         self.encoder_tick = 0.1  # encoder tick value
@@ -4991,11 +5043,11 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     case InputType.KeyboardLatched:
                         import gremlin.keyboard
                         import gremlin.ui.keyboard_device
+
                         verbose = True
-                        primary_key : gremlin.keyboard.Key
+                        primary_key: gremlin.keyboard.Key
 
                         keys = self.action_data.latched_keys
-
 
                         if keys:
                             # grab the primary key (last one as modifiers are first - doesn't matter as long as we pick one)
@@ -5718,6 +5770,13 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         #     # merged axis data is handled by the internal hook - ignore
         #     return True
 
+        # check the event is ours for latching input scenarios
+        if extra_data and "input_item" in extra_data:
+            input_item = extra_data["input_item"]
+            # ignore calls that are not for our input (latched input scenario with multiple matching triggers)
+            if input_item != self.input_item:
+                return
+
         if action_value is None:
             action_value = gremlin.actions.Value(event.value, event.raw_value, event.is_pressed)
         if event.is_axis:
@@ -5805,12 +5864,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             # force remote mode on if specified in the event
             is_remote = True
             is_local = False
-
-        if extra_data and "input_item" in extra_data:
-            input_item = extra_data["input_item"]
-            # ignore calls that are not for our input (latched input scenario with multiple matching triggers)
-            if input_item != self.input_item:
-                return
 
         force_remote = event.force_remote
 
@@ -6382,31 +6435,21 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     primary_key = None
                     verbose = True
 
+
                     if self.action_data._stepped_latched:
                         # latch mode
                         match self.action_data.latched_input_type:
                             case InputType.JoystickButton:
                                 # button or hat latching mode (joystick device)
-                                latched = (
-                                    self.action_data._stepped_latched
-                                    and event.device_guid == self.action_data.stepped_device_guid
-                                    and event.identifier == self.action_data.stepped_input_id
-                                )
+                                if not fire_event:
+                                    latched = (
+                                        self.action_data._stepped_latched
+                                        and event.device_guid == self.action_data.stepped_device_guid
+                                        and event.identifier == self.action_data.stepped_input_id
+                                    )
                             case InputType.KeyboardLatched:
                                 # keyboard latching mode
-                                if self.action_data.latched_keys:
-                                    # action has latched data
-                                    if event.extra_data and "latched_primary_key" in event.extra_data:
-                                        latched_primary_keys = event.extra_data["latched_primary_key"]
-                                        for primary_key in latched_primary_keys:
-                                            # determine which trigger did what
-                                            if primary_key == self.action_data.latched_keys[-1]:
-                                                # this primary key is the one that triggered the event
-                                                latched = True
-                                                break
-                                    # if not latched and self.action_data and "latched_key" in event.extra_data:
-                                    #     latched_keys = event.extra_data["latched_key"]
-                                    #     latched = event.identifier in latched_keys
+                                fire_event = True  # cannot get here if the keys didn't match
 
 
                     match self.action_data.step_mode:
@@ -6466,7 +6509,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         case StepMode.Stepped:
                             # non linear step mode
                             # trigger = False
-                            if fire_event or latched:
+                            verbose = True
+                            if fire_event:
                                 identifier = self.action_data.input_item.identifier
                                 primary = event.device_guid == self.hardware_device_guid and event.identifier == identifier
                                 direction = 1 if primary else -1
@@ -6498,10 +6542,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 else:
                                     # get the next or prior index
 
-                                    if primary:
-                                        index += direction
-                                    elif latched:
-                                        index -= direction
+                                    index += direction
                                     if index < 0:
                                         index = 0
                                     elif index == count:
@@ -6521,13 +6562,14 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                         case StepMode.Encoder:
                             # encoder mode - use a timer to determine the rate of change
+                            verbose = True
 
                             if fire_event or latched:
                                 identifier = self.action_data.input_item.identifier
                                 primary = event.device_guid == self.hardware_device_guid and event.identifier == identifier
 
                                 # reverse the direction for the latch
-                                direction = -self.action_data.encoder_direction if latched else self.action_data.encoder_direction
+                                direction = self.action_data.encoder_direction if primary else -self.action_data.encoder_direction
 
                                 if primary or latched:
                                     if self.encoder_timer:
@@ -6619,7 +6661,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         # reset the encoder acceleration and position
         self.encoder.value = 0.0
         self.encoder.reset_acceleration()
-
 
     def _set_axis(self, vid: int, axis_id: int, value: float):
         """sets the axis value using the inversion factor"""
@@ -6980,7 +7021,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.encoder_frequency_filter = 0.0  # default encoder frequency filter
         self.encoder_direction_change_speed_retention = 0.0  # default encoder direction change speed retention
         self.encoder_frequency_timeout = 0.0  # default encoder frequency timeout
-        self.encoder_spring_timeout = 1000.0 # default delay (ms) after last pulse to spring back to zero if the encoder is in spring mode
+        self.encoder_spring_timeout = 1000.0  # default delay (ms) after last pulse to spring back to zero if the encoder is in spring mode
         self.encoder_min_step = 0.005  # minimum step for the encoder at min speed
         self.encoder_max_step = 0.1  # maximum step for the encoder at full speed
         self.encoder_accel_curve = 2.0
@@ -7037,6 +7078,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self._stepped_device_id: str = None  # device of the down step action to latch
         self._stepped_device_guid: dinput.GUID = None  # device GUID of the down step device
         self.stepped_input_type = gremlin.input_types.InputType.JoystickButton
+        self.stepped_hat_direction: tuple = (0, 0)  # hat position of the down step action to latch when mapping to a hat input
         self.stepped_input_id: int = None  # input of the down step action to latch
 
         self.override_input_type = None  # manual input type override
@@ -7064,7 +7106,10 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     @property
     def latched_keys(self):
-        return self._latched_keys
+        if self.latched_input_type == InputType.KeyboardLatched:
+            return self._latched_keys
+        # no latched keys in button mode
+        return []
 
     def setKeys(self, value):
         self._latched_keys.clear()
@@ -8054,6 +8099,8 @@ Supports axis merging, curved output, command, hat and button mappings.
             self._stepped_latched = safe_read(node, "latched", bool, True)
             if "stepped-device-id" in node.attrib:
                 self.stepped_device_id = node.get("stepped-device-id")
+            if "stepped-input-id" in node.attrib:
+                self.stepped_input_id = safe_read(node, "stepped-input-id", int,1)
 
             match self.latched_input_type:
                 case InputType.Keyboard:
@@ -8065,7 +8112,10 @@ Supports axis merging, curved output, command, hat and button mappings.
                     if "stepped-input-type" in node.attrib:
                         self.stepped_input_type = InputType.from_string(node.attrib["stepped-input-type"])
                     else:
-                        self.stepped_input_type = InputType.JoystickButton # default to joystick button
+                        self.stepped_input_type = InputType.JoystickButton  # default to joystick button
+
+            if "stepped-hat-position" in node.attrib:
+                self.stepped_hat_direction = vjoy.vjoy.Hat.getDirection(node.get("stepped-hat-position"))
 
             self.vjoy_hat_position = (0, 0)
             if self.action_mode in (
@@ -8257,7 +8307,6 @@ Supports axis merging, curved output, command, hat and button mappings.
             if "steps" in node.attrib:
                 csv = node.get("steps")
                 self.target_step_list = gremlin.util.csv_to_floatlist(csv)
-
 
             if "step-start-index" in node.attrib:
                 self.target_step_start_index = safe_read(node, "step-start-index", int, 0)
@@ -8506,20 +8555,27 @@ Supports axis merging, curved output, command, hat and button mappings.
         # latched input type
         node.set("latched-input-type", safe_format(InputType.to_string(self.latched_input_type), str))
 
-        if self._latched_keys:
-            for key in self._latched_keys:
-                comment = (
-                    f"virtual: {key.name} 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
-                )
-                key_node = ElementTree.SubElement(node, "latched-key")
-                key_node.set("virtual-code", str(key.virtual_code))
-                key_node.set("scan-code", str(key.scan_code))
-                key_node.set("extended", str(key.is_extended))
-                # useful for xml readability purposes = what scan code is this
-                key_node.set("description", key.name)
-                node_comment = ElementTree.Comment(comment)
-                node.append(node_comment)
-                node.append(key_node)
+        if self.latched_input_type == InputType.Keyboard:
+            if self._latched_keys:
+                for key in self._latched_keys:
+                    comment = f"virtual: {key.name} 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
+                    key_node = ElementTree.SubElement(node, "latched-key")
+                    key_node.set("virtual-code", str(key.virtual_code))
+                    key_node.set("scan-code", str(key.scan_code))
+                    key_node.set("extended", str(key.is_extended))
+                    # useful for xml readability purposes = what scan code is this
+                    key_node.set("description", key.name)
+                    node_comment = ElementTree.Comment(comment)
+                    node.append(node_comment)
+                    node.append(key_node)
+
+        # joystick mode
+        node.set("stepped-device-id", self.stepped_device_id)
+        node.set("stepped-input-type", InputType.to_string(self.stepped_input_type))
+        node.set("stepped-input-id", safe_format(self.stepped_input_id, int))
+        if self.stepped_input_type == InputType.JoystickHat:
+            # hat position
+            node.set("stepped-hat-position", vjoy.vjoy.Hat.getName(self.stepped_hat_direction))
 
         node.set("auto_release", safe_format(self.auto_release, bool))
         node.set("ignore-release", safe_format(self.ignore_release, bool))

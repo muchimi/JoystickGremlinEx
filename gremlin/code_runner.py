@@ -131,6 +131,9 @@ class CodeRunner:
         vs = gremlin.joystick_handling.VjoyStart()
         vs.reset()  # reset the vjoy start data
 
+
+        el.profile_before_start.emit() # tell components the profile is about to start
+
         ec = gremlin.execution_graph.ExecutionContext()
         ec.reset(force_rebuild=True)  # rebuild the execution tree
 
