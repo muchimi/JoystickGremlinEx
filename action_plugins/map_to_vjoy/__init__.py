@@ -8569,10 +8569,14 @@ Supports axis merging, curved output, command, hat and button mappings.
                     node.append(key_node)
 
         # joystick mode
-        node.set("stepped-device-id", self.stepped_device_id)
-        node.set("stepped-input-type", InputType.to_string(self.stepped_input_type))
-        node.set("stepped-input-id", safe_format(self.stepped_input_id, int))
-        if self.stepped_input_type == InputType.JoystickHat:
+        if self.stepped_device_id:
+            node.set("stepped-device-id", self.stepped_device_id)
+        if self.stepped_input_type:
+            node.set("stepped-input-type", InputType.to_string(self.stepped_input_type))
+        if self.stepped_input_id:
+            node.set("stepped-input-id", safe_format(self.stepped_input_id, int))
+
+        if self.stepped_input_type == InputType.JoystickHat and self.stepped_hat_direction:
             # hat position
             node.set("stepped-hat-position", vjoy.vjoy.Hat.getName(self.stepped_hat_direction))
 

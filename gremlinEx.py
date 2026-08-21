@@ -1574,7 +1574,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 if gremlin.shared_state.profile_state:
                     # print ("set icon ACTIVE")
-                    self.ui.tray_icon.setIcon(load_icon("icon_active.ico"))
+                    self.ui.tray_icon.setIcon(load_icon("gex_active.ico"))
 
                     with QtCore.QSignalBlocker(self.ui.actionActivate):
                         self.ui.actionActivate.setChecked(True)  # toolbar icon "on"

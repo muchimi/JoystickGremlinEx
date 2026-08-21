@@ -281,7 +281,7 @@ def create_document():
     # Add the icon to the software center
     prod.append(create_node(
         "Property",
-        {"Id": "ARPPRODUCTICON", "Value": "icon.ico"}
+        {"Id": "ARPPRODUCTICON", "Value": "gex.ico"}
     ))
     # Remvoe the repair option from the installer
     prod.append(create_node(
@@ -353,7 +353,7 @@ def create_shortcuts(doc, root):
                     "Name": "Joystick Gremlin Ex",
                     "WorkingDirectory": "INSTALLDIR",
                     "Advertise": "yes",
-                    "Icon": "icon.ico"
+                    "Icon": "gex.ico"
                 }
             ))
             node.append(create_node(
@@ -408,7 +408,7 @@ def create_shortcuts(doc, root):
     product = doc.find("Product")
     product.append(create_node(
         "Icon",
-        {"Id": "icon.ico", "SourceFile": "joystick_gremlin\\icons\\gex.ico"}
+        {"Id": "gex.ico", "SourceFile": "joystick_gremlin\\icons\\gex.ico"}
     ))
 
 
