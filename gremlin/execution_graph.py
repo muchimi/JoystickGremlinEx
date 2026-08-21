@@ -23,7 +23,6 @@ import logging
 import time
 
 
-
 import gremlin.base_buttons
 import gremlin.input_item
 import gremlin.base_profile
@@ -231,7 +230,7 @@ class BaseExecutionConditionNode(ExecutionGraphNode):
         self.rule = ActivationRule.All  # rule set that applies to the condition node
         self.container = None  # owning container for the condition
         if condition:
-            self.fondition(condition)
+            self.addCondition(condition)
         # self.condition :  gremlin.input_item.BaseActivationCondition = condition # holds the condition
 
     def addCondition(self, condition):
@@ -533,7 +532,6 @@ class ExecutionContext:
         self._exec_map = {}  # map of node ID to the computed entry node for execution graph
         self._latch_map = {}  # map of latched data - input ID -> functor
 
-
         self._processed_events = []
         self._processed_functors = {}
 
@@ -546,9 +544,6 @@ class ExecutionContext:
         self._functors = []  # list of functors in the execution graph
 
         self._handle_config_changed()  # update config params
-
-
-
 
     @property
     def functor_map(self) -> dict:
@@ -1263,9 +1258,10 @@ class ExecutionContext:
         functor: gremlin.base_profile.AbstractFunctor = container.functor(container, node)
         return functor
 
-    def _get_action_functor(self, action, node, container_condition_node, action_condition_node, extra_data : dict = None):
+    def _get_action_functor(self, action, node, container_condition_node, action_condition_node, extra_data: dict = None):
         """creates a functor instance for an action"""
         import gremlin.keyboard
+
         functor: gremlin.base_profile.AbstractFunctor = action.functor(action, node)
 
         extra_inputs = functor.latch_extra_inputs(container_condition_node, action_condition_node)
@@ -1284,7 +1280,9 @@ class ExecutionContext:
                         extra_data = {}
                     extra_data["latched"] = input_id
                     # for key in input_id.latched_keys:
-                    event = gremlin.event_handler.Event(event_type=input_type, device_guid=device_guid, identifier=input_id, virtual_code=input_id.virtual_code, extra_data=extra_data)
+                    event = gremlin.event_handler.Event(
+                        event_type=input_type, device_guid=device_guid, identifier=input_id, virtual_code=input_id.virtual_code, extra_data=extra_data
+                    )
                     events.append(event)
 
                 else:
@@ -1295,8 +1293,7 @@ class ExecutionContext:
                 if extra_data and "input_item" in extra_data:
                     input_item = extra_data["input_item"]
                     self.registerInputItemLatchedNode(input_item, input_id, node)
-                    input_item.registerLatchedInput(input_id) # register the additional latched input with the input item
-
+                    input_item.registerLatchedInput(input_id)  # register the additional latched input with the input item
 
             for event in events:
                 # if verbose:
@@ -1308,7 +1305,7 @@ class ExecutionContext:
         return functor
 
     def registerInputItemLatchedNode(self, input_item, input_id, node):
-        """ registers a node for more than one input id on a given input - this is used for latched inputs that can be triggered by multiple input ids"""
+        """registers a node for more than one input id on a given input - this is used for latched inputs that can be triggered by multiple input ids"""
         callback_key = input_item.callbackKey
         if callback_key not in self._latch_map:
             self._latch_map[callback_key] = {}
@@ -1325,8 +1322,6 @@ class ExecutionContext:
         if callback_key in self._latch_map:
             node_list = list(self._latch_map[callback_key].items())
         return node_list
-
-
 
     def _get_gate_action_functor(self, action, node):
         _functor: gremlin.base_profile.AbstractFunctor = self._get_action_functor()
@@ -1476,7 +1471,7 @@ class ExecutionContext:
                     action_node.link = m_action_node  # link the execution tree action node to the input tree action node
 
                     action_node.container = container
-                    functor = self._get_action_functor(action, action_node, container_condition_node, action_condition_node, extra_data = extra_data)
+                    functor = self._get_action_functor(action, action_node, container_condition_node, action_condition_node, extra_data=extra_data)
                     action_node.functors.append(functor)
                     action_node.description = f"Action node: [{str(action)}]"
 
@@ -1802,7 +1797,14 @@ class ExecutionContext:
 
                         if self._verbose_exec:
                             syslog.info(f"Looking for id: {id}")
-                        node = next((n for n in self._safe_preorder_iter(self.graph) if n is not None and n.nodeType == ExecutionGraphNodeType.Container and n.id == id), None)
+                        node = next(
+                            (
+                                n
+                                for n in self._safe_preorder_iter(self.graph)
+                                if n is not None and n.nodeType == ExecutionGraphNodeType.Container and n.id == id
+                            ),
+                            None,
+                        )
                         if node:
                             self.registerNode(node)
 
@@ -2121,11 +2123,11 @@ class ExecutionContext:
         result = True  # assume pass
         functor_map = self._functor_map
 
-        #if extra_data and "trigger" in extra_data:
-            #trigger = extra_data["trigger"]
-            # if trigger.condition == gremlin.gated_handler.GateConditionType.EnterRange:
-            #     syslog.info(id)
-            #     pass
+        # if extra_data and "trigger" in extra_data:
+        # trigger = extra_data["trigger"]
+        # if trigger.condition == gremlin.gated_handler.GateConditionType.EnterRange:
+        #     syslog.info(id)
+        #     pass
 
         # if id in self._exec_map:
         #     root : ExecutionGraphNode = self._exec_map[id]
@@ -2378,7 +2380,7 @@ class AbstractExecutionGraph(QtCore.QObject):
         """converts a base condition to an action condition"""
         return gremlin.actions.convert_condition(condition)
 
-    def _create_activation_condition(self, activation_condition, target : gremlin.input_item.AbstractContainer | gremlin.base_profile.AbstractAction):
+    def _create_activation_condition(self, activation_condition, target: gremlin.input_item.AbstractContainer | gremlin.base_profile.AbstractAction):
         """Creates activation condition objects base on the given data.
 
         :param activation_condition data about activation condition to be
@@ -2392,9 +2394,7 @@ class AbstractExecutionGraph(QtCore.QObject):
             else:
                 conditions.append(self._convert_condition(condition))
 
-
-
-        return gremlin.input_item.BaseActivationCondition(conditions = conditions, target=target, rule=activation_condition.rule)
+        return gremlin.input_item.BaseActivationCondition(conditions=conditions, target=target, rule=activation_condition.rule)
 
     def _contains_input_action_condition(self, activation_condition):
         """Returns whether or not an input action condition is present.
