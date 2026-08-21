@@ -791,9 +791,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         tab_device_guid = gremlin.shared_state.current_tab_device_guid
         if tab_device_guid is None:
             tab_device_guid = self._tab_index_map.get(self.ui.devices_tab_header_widget.currentIndex())
-            gremlin.shared_state.current_tab_device_guid = tab_device_guid
-            gremlin.shared_state.current_tab_device_id = gremlin.util.normalize_guid(tab_device_guid)
+        if tab_device_guid is not None:
+            return None
+
         assert isinstance(tab_device_guid, dinput.GUID), "current tab device guid is not a dinput.GUID"
+        gremlin.shared_state.current_tab_device_guid = tab_device_guid
+        gremlin.shared_state.current_tab_device_id = gremlin.util.normalize_guid(tab_device_guid)
         return tab_device_guid
 
     def _inputswitch_needed(self, device_guid: dinput.GUID, input_id) -> bool:

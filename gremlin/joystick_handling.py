@@ -1775,7 +1775,7 @@ class VirtualDeviceUsageState:
 
     def _profile_changed(self):
         """new profile - clear data"""
-        syslog.info("Button State: profile change event")
+        # syslog.info("Button State: profile change event")
         self.reset()
         self.ensure_device_maps(force_update=True)
 

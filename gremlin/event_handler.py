@@ -2601,7 +2601,7 @@ class EventHandler(QtCore.QObject):
             if event.event_type in (InputType.Keyboard, InputType.KeyboardLatched):
                 assert input_item is not None, "adding a lacthed input requires passing the input item to addCallback()"
                 verbose = gremlin.config.Configuration().verbose_mode_keyboard
-                verbose = True
+                # verbose = True
                 # keyboard latched event
                 identifier = event.identifier  # Key()
                 if isinstance(identifier, gremlin.ui.keyboard_device.KeyboardInputItem):
@@ -2612,7 +2612,6 @@ class EventHandler(QtCore.QObject):
                     syslog.error(f"AddCallback: Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
                     raise ValueError(f"Unexpected keyboard identifier type: {type(identifier)}, expecting Key or KeyboardInputItem")
 
-                verbose = True
                 # if the key can latch with multiple primary keys, build the table of all combinations
                 key_list = [primary_key]
                 if primary_key.is_latched:
@@ -3257,7 +3256,7 @@ class EventHandler(QtCore.QObject):
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_inputs or config.verbose_mode_exec
         verbose_detailed = verbose and config.verbose_mode_extra
-        verbose = True
+        # verbose = True
 
         self.registry.update(event)  # record the event
 
@@ -3350,7 +3349,7 @@ class EventHandler(QtCore.QObject):
                     verbose = config.verbose_mode_mouse
                 else:
                     verbose = config.verbose_mode_keyboard
-                verbose = True
+                # verbose = True
 
                 if not event.extra_data:
                     # ensure additional data passed on in the event exists

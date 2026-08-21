@@ -175,7 +175,6 @@ class ModeInputItem(gremlin.input_item.InputItem):
             # if not set, use the appropriate default
             input_id = ModeInputModeType.DelayLoad
 
-
         super().__init__(
             mode_node,
             input_type=InputType.ModeControl,
@@ -187,11 +186,7 @@ class ModeInputItem(gremlin.input_item.InputItem):
             override_input_type=InputType.JoystickButton,
         )  # parent is the mode object this input belongs to
 
-        # if input_id == ModeInputModeType.ModeProfileStart:
-        #     pass
 
-        # syslog.info(f"InputItem: CREATE MODE INPUT ITEM: input item id: {Ansi.YELLOW}[{self._id}]{Ansi.RESET} input id: {Ansi.GREEN}[{input_id.name}/{input_id}]{Ansi.RESET} mode name: [{mode_node.name}] mode node id: [{mode_node.id}] device node id: [{mode_node.parent.id}] profile id: [{mode_node.profile.id}]")
-        # pass
 
     @property
     def value(self) -> bool:

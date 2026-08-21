@@ -68,7 +68,7 @@ is_dark_theme = False # true if windows is in dark theme
 # Flag indicating whether or not input highlighting should be
 # prevented even if it is enabled by the user
 _suspend_input_highlighting = False
-_suspend_input_highlighting_enabled = 0
+_suspend_input_highlighting_stack = 0
 
 _suspend_ui_update = 0  # stack = if non zero, UI updates should be suspended
 
@@ -400,8 +400,13 @@ def is_highlighting_suspended():
 
     :return True if input highlighting is SUSPENDED
     """
-    global _suspend_input_highlighting, _suspend_input_highlighting_enabled
-    suspended = not ui_ready and _suspend_input_highlighting or _suspend_input_highlighting_enabled > 0
+    global _suspend_input_highlighting, _suspend_input_highlighting_stack
+    config = gremlin.config.Configuration()
+    if config.highlight_enabled:
+        suspended = not ui_ready and _suspend_input_highlighting or _suspend_input_highlighting_stack > 0
+    else:
+        # disabled
+        suspended = False
     return suspended
 
 
@@ -420,10 +425,10 @@ def _set_input_highlighting_state(value):
 
 def push_suspend_highlighting():
     ''' push a suspend state '''
-    global _suspend_input_highlighting_enabled
-    if _suspend_input_highlighting_enabled == 0:
+    global _suspend_input_highlighting_stack
+    if _suspend_input_highlighting_stack == 0:
         _set_input_highlighting_state(False)
-    _suspend_input_highlighting_enabled += 1
+    _suspend_input_highlighting_stack += 1
 
 
 def pop_suspend_highlighting(force = False):
@@ -432,12 +437,12 @@ def pop_suspend_highlighting(force = False):
     :param: force = forces a reset (enables)
 
     '''
-    global _suspend_input_highlighting_enabled
-    if _suspend_input_highlighting_enabled > 0:
-        _suspend_input_highlighting_enabled -= 1
+    global _suspend_input_highlighting_stack
+    if _suspend_input_highlighting_stack > 0:
+        _suspend_input_highlighting_stack -= 1
     if force:
-        _suspend_input_highlighting_enabled = 0
-    if _suspend_input_highlighting_enabled == 0:
+        _suspend_input_highlighting_stack = 0
+    if _suspend_input_highlighting_stack == 0:
         _set_input_highlighting_state(False)
 
 

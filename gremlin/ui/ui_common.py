@@ -16406,8 +16406,11 @@ class QSideBarContainer(QWidget):
 
         # 1. Create and style the vertical bar
         self.vertical_bar = QWidget()
+        if bar_width < 2:
+            bar_width = 2  # Ensure the bar has a minimum width of 1 pixel
         self.vertical_bar.setFixedWidth(bar_width)
-        self.vertical_bar.setStyleSheet(f"background-color: {bar_color}; border-radius: {int(bar_width / 2)}px;")
+        css = f"background-color: {bar_color}; border-radius: {int(bar_width / 2)}px;"
+        self.vertical_bar.setStyleSheet(css)
 
         # 2. Create the container for user content
         self.content_widget = QWidget()

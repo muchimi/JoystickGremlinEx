@@ -435,34 +435,39 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         assert isinstance(mode_node, str) or isinstance(mode_node, gremlin.base_profile.ProfileModeNode), (
             "Parent parameter must be a string or mode object, cannot be NULL"
         )
-        if isinstance(mode_node, str):
-            # convert to a mode object
-            profile = gremlin.shared_state.current_profile
-            assert device_guid is not None, "device_guid must be provided if mode provided as a name"
-            mode_node = profile.getModeNode(device_guid, mode_node)
 
-        super().__init__(mode_node.name, None)
+
+        self._initialized = False
 
         if not device_guid:
             # grab the device from the mode object
             device_guid = mode_node.parent.device_guid
 
-        assert device_guid is not None, "invalid device guid provided"
-        assert input_type is not None, "input type must be provided"
+        self._custom_input_id_handler = custom_input_id_handler  # custom handler for input id
+        if self._custom_input_id_handler is not None and input_id is not None:
+            raise ValueError("input_id should not be provided when a custom input id handler is set")
+
+        super().__init__(mode_node.name, device_guid=device_guid, input_type=input_type)
+
+
 
         self.parent = mode_node  # mode object
         self.extra_data = extra_data if extra_data else {}
 
         self._input_item_generating_xml = False  # xml nesting level
         self._override_input_type = override_input_type  # override input type for some types that are different
-        self._input_type = input_type
-
-        self._custom_input_id_handler = custom_input_id_handler  # custom handler for input id
-        if self._custom_input_id_handler is not None and input_id is not None:
-            raise ValueError("input_id should not be provided when a custom input id handler is set")
-
 
         self.setInputId(input_id)
+
+
+        assert device_guid is not None, "invalid device guid provided"
+        assert input_type is not None, "input type must be provided"
+
+        if isinstance(mode_node, str):
+            # convert to a mode object
+            profile = gremlin.shared_state.current_profile
+            assert device_guid is not None, "device_guid must be provided if mode provided as a name"
+            mode_node = profile.getModeNode(device_guid, mode_node)
 
 
         device = gremlin.joystick_handling.getDevice(device_guid)
@@ -537,6 +542,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el.profile_before_start.connect(self._profile_before_start)
         el.profile_start.connect(self._profile_start)
         el.reload_axis_state.connect(self._handle_axis_state_request)
+
+        self._initialized = True
 
     def registerLatchedInput(self, input_id):
         """ registers an additional latched input for this input item - this is called on profile start when the excution tree is being built """
@@ -876,33 +883,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         """containers defined for this input"""
         return self._containers
 
-    @gremlin.base_classes.AbstractInputItem.input_type.setter
-    def input_type(self, source_type: InputType):
-        # override mode/state inputs for legacy profiles
-        assert source_type is not None, "Invalid input type"
-        if isinstance(source_type, InputType):
-            input_type = source_type
-        elif isinstance(source_type, DeviceType):
-            match source_type:
-                case DeviceType.ModeControl:
-                    input_type = InputType.ModeControl
-                case DeviceType.State:
-                    input_type = InputType.State
-                case DeviceType.Osc:
-                    input_type = InputType.OpenSoundControl
-                case DeviceType.Midi:
-                    input_type = InputType.Midi
-                case DeviceType.State:
-                    input_type = InputType.State
-                case DeviceType.Keyboard:
-                    input_type = InputType.KeyboardLatched
-                case _:
-                    raise ValueError(f"Unsupported source type: {source_type}")
-        else:
-            raise ValueError(f"Unsupported source type: {source_type}")
 
-        self._input_type = input_type
-        self._update_input()
+        if self._initialized:
+            self._update_input()
 
     def getInputType(self):
         """gets the input type or the override input type"""
@@ -1028,9 +1011,10 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         from gremlin.keyboard import key_from_code
 
         input_id = self.input_id
+        input_type = self.input_type
         if input_id is not None and self._device_guid is not None:
-            if isinstance(input_id, int):
-                if self._input_type == InputType.JoystickAxis:
+            match input_type:
+                case InputType.JoystickAxis:
                     self.is_axis = True  # indicate we are an axis
                     self._is_button = False
 
@@ -1046,39 +1030,39 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
                     el = gremlin.event_handler.EventListener()
                     el.update_input_icons.emit()
-                elif self._input_type == InputType.JoystickButton:
+                case InputType.JoystickButton:
                     self.is_axis = False
                     self._input_name = f"Button {input_id}"
                     self._is_button = True
-                elif self._input_type == InputType.JoystickHat:
+                case InputType.JoystickHat:
                     self.is_axis = False
                     self._input_name = f"Hat {input_id}"
                     self._is_button = True
 
-            elif self._input_type in (InputType.Keyboard, InputType.KeyboardLatched):
-                if isinstance(input_id, gremlin.keyboard.Key):
-                    self._input_name = key_from_code(input_id.scan_code, input_id.is_extended).name
-                elif isinstance(input_id, gremlin.ui.keyboard_device.KeyboardInputItem):
-                    self._input_name = input_id.display_name
-                else:
-                    try:
-                        self._input_name = key_from_code(input_id[0], input_id[1]).name
-                    except Exception as err:
-                        msg = f"Unable to parse type: {type(input_id).__name__}"
-                        self._input_name(msg)
-                        syslog.error(f"Unable to parse: {msg}")
-                        syslog.error(f"{err}\n{traceback.format_exc()}")
-            elif self._input_type == InputType.ModeControl:
-                self._input_name = f"Mode [{gremlin.shared_state.edit_mode}] {'enter' if self._input_id == 0 else 'exit'} actions"
-            elif self._input_type == InputType.OpenSoundControl:
-                self._is_axis = self.input_id.is_axis
-                self._is_button = self.input_id.is_button
-            elif self._input_type == InputType.OctaviIfr1:
-                self._is_axis = False
-                self._is_button = True
+                case InputType.Keyboard | InputType.KeyboardLatched:
+                    if isinstance(input_id, gremlin.keyboard.Key):
+                        self._input_name = key_from_code(input_id.scan_code, input_id.is_extended).name
+                    elif isinstance(input_id, gremlin.ui.keyboard_device.KeyboardInputItem):
+                        self._input_name = input_id.display_name
+                    else:
+                        try:
+                            self._input_name = key_from_code(input_id[0], input_id[1]).name
+                        except Exception as err:
+                            msg = f"Unable to parse type: {type(input_id).__name__}"
+                            self._input_name(msg)
+                            syslog.error(f"Unable to parse: {msg}")
+                            syslog.error(f"{err}\n{traceback.format_exc()}")
+                case InputType.ModeControl:
+                    self._input_name = f"Mode [{gremlin.shared_state.edit_mode}] {'enter' if self._input_id == 0 else 'exit'} actions"
+                case InputType.OpenSoundControl:
+                    self._is_axis = self.input_id.is_axis
+                    self._is_button = self.input_id.is_button
+                case InputType.OctaviIfr1:
+                    self._is_axis = False
+                    self._is_button = True
 
-            else:
-                self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
+        else:
+            self._input_name = f"{InputType.to_string(self._input_type).capitalize()} {input_id}"
 
     def from_xml(self, node: etree._Element, data, extra_data: dict = None, skip_root=False):
         """Parses an InputItem node.
@@ -1097,17 +1081,17 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         container_plugins = ContainerPlugins()
         container_tag_map = container_plugins.tag_map
         if extra_data and "input_type" in extra_data:
-            self._input_type = extra_data["input_type"]
+            self.setInputType(extra_data["input_type"])
         else:
             try:
-                self._input_type = InputType.to_enum(node.tag)
+                self.setInputType(InputType.to_enum(node.tag))
             except Exception:
                 syslog.error(f"XML: unknown input type: [{node.tag}]")
 
         # ensure this is an input item
         valid = False
         parent = node.getparent()
-        while parent:
+        while parent is not None:
             if parent.tag in ("mode", "gate", "states"):
                 valid = True
                 break
@@ -8995,9 +8979,11 @@ class ConditionActionWrapperWidget(AbstractActionWrapper):
             action.activation_condition = BaseActivationCondition(action, ActivationRule.All)
 
         self.condition_model = action.activation_condition.conditions
-        syslog.info(
+        verbose = gremlin.config.Configuration().verbose_mode_condition
+        if verbose:
+            syslog.info(
             f"Conditions input: [{action.input_item.device_name} {action.input_item.display_name}] for: {action.name} type: [{action.__class__.__name__}] count: {len(action.conditions)}"
-        )
+            )
         self.condition_view = ConditionView(action, f"Action conditions for {action.name}")
         action.condition_view = self.condition_view
         self.condition_view.setContainer(action)

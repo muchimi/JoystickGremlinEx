@@ -2812,9 +2812,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.step_container = gremlin.ui.ui_common.QSideBarContainer(widget=container)
 
         self.main_layout.addWidget(self.step_container)
-        color = "#2980b9"
-        self.step_container.setStyleSheet(f".QWidget {{ border-left: 5px solid {color};  # Vertical bar on the left }}")
-
         container_layout.addWidget(gremlin.ui.ui_common.QHorizontalLine())
 
         # step mode header
@@ -2977,13 +2974,15 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         )
 
         self.stepped_selector_input_type_widget = gremlin.ui.ui_common.QDataComboBox(
-            source=[("Button", InputType.JoystickButton), ("Hat", InputType.JoystickHat)], value=self.action_data.stepped_input_type, callback=self._stepped_input_type_changed_cb
+            source=[("Button", InputType.JoystickButton), ("Hat", InputType.JoystickHat)],
+            value=self.action_data.stepped_input_type,
+            callback=self._stepped_input_type_changed_cb,
         )
 
         stub = "Button" if self.action_data.stepped_input_type == InputType.JoystickButton else "Hat"
         button_items = [(f"{stub} {i}", i) for i in range(1, dev.button_count + 1)] if dev else []
         self.stepped_selector_input_widget = gremlin.ui.ui_common.QDataComboBox(
-            source= button_items, value=self.action_data.stepped_input_id, callback=self._stepped_input_changed_cb
+            source=button_items, value=self.action_data.stepped_input_id, callback=self._stepped_input_changed_cb
         )
         self.stepped_direction_widget = gremlin.ui.ui_common.QHatSelectorComboBox(
             value=self.action_data.stepped_hat_direction, callback=self._handle_direction_changed
@@ -3633,8 +3632,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         # UI component visibility
         self._update_ui()
 
-
-
     @QtCore.Slot()
     def _stepped_input_changed_cb(self, input_id):
         """stepped input changed"""
@@ -3645,7 +3642,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         """stepped input type changed"""
         self.action_data.stepped_input_type = input_type
         self._update_stepped_selectors()
-
 
     def load_actions_from_input_type(self):
         """occurs when the type of input is changed"""
@@ -5068,6 +5064,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                     self,  # functor
                                 )
                             ]
+                        else:
+                            syslog.warning("VJOYRemap keyboard latch: latching mode is set but no latched keys were found")
 
         return []
 
@@ -6432,9 +6430,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                     input_type = InputType.JoystickAxis
                     position = None
                     latched = False
-                    primary_key = None
-                    verbose = True
-
+                    # verbose = True
 
                     if self.action_data._stepped_latched:
                         # latch mode
@@ -6450,7 +6446,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                             case InputType.KeyboardLatched:
                                 # keyboard latching mode
                                 fire_event = True  # cannot get here if the keys didn't match
-
 
                     match self.action_data.step_mode:
                         case StepMode.Velocity:
@@ -6509,7 +6504,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         case StepMode.Stepped:
                             # non linear step mode
                             # trigger = False
-                            verbose = True
+                            # verbose = True
                             if fire_event:
                                 identifier = self.action_data.input_item.identifier
                                 primary = event.device_guid == self.hardware_device_guid and event.identifier == identifier
@@ -6555,14 +6550,14 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 device.data[key] = index  # remember the last step index used
                                 if verbose:
                                     syslog.info(f"STEPPED AXIS: previous index: [{start_index}] new index: [{index}] new value: {value:0.3f}")
+                                    syslog.info(f"set step last value: {value:0.3f}")
 
                                 # remember the last value
-                                syslog.info(f"set step last value: {value:0.3f}")
                                 self.action_data.axis_last_value = value
 
                         case StepMode.Encoder:
                             # encoder mode - use a timer to determine the rate of change
-                            verbose = True
+                            # verbose = True
 
                             if fire_event or latched:
                                 identifier = self.action_data.input_item.identifier
@@ -6571,32 +6566,31 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 # reverse the direction for the latch
                                 direction = self.action_data.encoder_direction if primary else -self.action_data.encoder_direction
 
-                                if primary or latched:
-                                    if self.encoder_timer:
-                                        # terminate prior spring back timer if needed
-                                        self.encoder_timer.cancel()
-                                        self.encoder_timer = None
+                                if self.encoder_timer:
+                                    # terminate prior spring back timer if needed
+                                    self.encoder_timer.cancel()
+                                    self.encoder_timer = None
 
-                                    now = time.time()  # current time
-                                    value = self.encoder.pulse(direction, now)
+                                now = time.time()  # current time
+                                value = self.encoder.pulse(direction, now)
 
-                                    # new position
-                                    if self.verbose:
-                                        syslog.info(
-                                            f"PULSE ENCODER: latched: [{latched}] direction [{direction}]  new value: {value:0.4f}  delay: {now - self._last_time:0.4f}  vjoy_id: {self.vjoy_id} axis_id: {self.vjoy_input_id}"
+                                # new position
+                                if self.verbose:
+                                    syslog.info(
+                                        f"PULSE ENCODER: latched: [{latched}] direction [{direction}]  new value: {value:0.4f}  delay: {now - self._last_time:0.4f}  vjoy_id: {self.vjoy_id} axis_id: {self.vjoy_input_id}"
+                                    )
+                                self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
+                                self._last_time = now
+                                self.encoder_target = value
+
+                                # spring action
+                                if self.action_data.encoder_mode == EncoderMode.Spring:
+                                    # kick off a timer to return to the center location after the timeout
+                                    if self.action_data.encoder_spring_timeout > 0:
+                                        self.encoder_timer = threading.Timer(
+                                            interval=self.action_data.encoder_spring_timeout / 1000.0, function=self._return_encoder_to_center
                                         )
-                                    self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
-                                    self._last_time = now
-                                    self.encoder_target = value
-
-                                    # spring action
-                                    if self.action_data.encoder_mode == EncoderMode.Spring:
-                                        # kick off a timer to return to the center location after the timeout
-                                        if self.action_data.encoder_spring_timeout > 0:
-                                            self.encoder_timer = threading.Timer(
-                                                interval=self.action_data.encoder_spring_timeout / 1000.0, function=self._return_encoder_to_center
-                                            )
-                                            self.encoder_timer.start()
+                                        self.encoder_timer.start()
 
                 case (
                     VjoyAction.VJoyDisableLocal
@@ -8081,7 +8075,7 @@ Supports axis merging, curved output, command, hat and button mappings.
                     key = gremlin.keyboard.KeyMap.find(scan_code, is_extended)
                 if key:
                     keys.append(key)
-                syslog.info(f"read key: {key.name}")
+                # syslog.info(f"read key: {key.name}")
 
             # sort the keys for display purposes
             if keys:
@@ -8100,7 +8094,12 @@ Supports axis merging, curved output, command, hat and button mappings.
             if "stepped-device-id" in node.attrib:
                 self.stepped_device_id = node.get("stepped-device-id")
             if "stepped-input-id" in node.attrib:
-                self.stepped_input_id = safe_read(node, "stepped-input-id", int,1)
+                value = node.get("stepped-input-id")
+                if value:
+                    if value.isnumeric():
+                        self.stepped_input_id = int(value)
+                    else:
+                        self.stepped_input_id = None
 
             match self.latched_input_type:
                 case InputType.Keyboard:
@@ -8555,7 +8554,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         # latched input type
         node.set("latched-input-type", safe_format(InputType.to_string(self.latched_input_type), str))
 
-        if self.latched_input_type == InputType.Keyboard:
+        if self.latched_input_type in (InputType.Keyboard, InputType.KeyboardLatched):
             if self._latched_keys:
                 for key in self._latched_keys:
                     comment = f"virtual: {key.name} 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"

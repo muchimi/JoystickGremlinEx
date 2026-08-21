@@ -274,13 +274,18 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     input_type_change = Signal(object)  # fires when an input item needs to refresh the output mapping due to input type changed
 
-    def __init__(self, mode: str | object, device_guid):
+    def __init__(self, mode: str | object, device_guid : dinput.GUID | str, input_type: InputType):
 
+
+        super().__init__()
 
         self._id = uuid.uuid4()  # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-", "")
+
+
         self._device_guid = device_guid
-        self._device_guid = DeviceType.NotSet
+        self._device_type = DeviceType.NotSet
+        assert isinstance(input_type, InputType), "input_type must be an InputType enum value"
 
         if device_guid is not None:
             device = gremlin.joystick_handling.getDevice(device_guid)
@@ -288,7 +293,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
             self._device_type = device.device_type
         self._input_id: int | any = None  # input Id on the hardware (can be a int or a class)
         self._input_id_readonly: bool = False  # true if the input id cannot be changed
-        self._input_type: InputType = InputType.NotSet
+        self._input_type: InputType = input_type  # input type (InputType)
         self._display_name: str = None
         self._description: str = None
         self._input_description: str = None
@@ -297,7 +302,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self._is_action: bool = False
         self._is_axis: bool = False
         self._is_button: bool = True
-        self._input_type: InputType = None
+
         if isinstance(mode, str):
             self._profile_mode: str = mode  # profile mode
         else:
@@ -306,7 +311,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         self._sort_index: int = None  # sorting index (int)
         self._input_id_callback = None  # optional callback
 
-        super().__init__()
+
 
     def setInputIdCallback(self, callback: Callable):
         """callback to use (optional) to get the input id"""
@@ -369,7 +374,39 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     def setInputType(self, value: InputType):
         """force a different input type"""
-        self._input_type = value
+        # override mode/state inputs for legacy profiles
+        if isinstance(value, InputType):
+            input_type = value
+        elif isinstance(value, DeviceType):
+            match value:
+                case DeviceType.ModeControl:
+                    input_type = InputType.ModeControl
+                case DeviceType.State:
+                    input_type = InputType.State
+                case DeviceType.Osc:
+                    input_type = InputType.OpenSoundControl
+                case DeviceType.Midi:
+                    input_type = InputType.Midi
+                case DeviceType.State:
+                    input_type = InputType.State
+                case DeviceType.Keyboard:
+                    input_type = InputType.KeyboardLatched
+                case _:
+                    raise ValueError(f"Unsupported source type: {value}")
+        else:
+            raise ValueError(f"Unsupported source type: {value}")
+
+        assert isinstance(input_type, InputType), "Invalid input type"
+        self._input_type = input_type
+
+    @property
+    def input_type(self) -> InputType:
+        """gets the input type"""
+        return self._input_type
+
+    @input_type.setter
+    def input_type(self, value: InputType):
+        self.setInputType(value)
 
     def setDeviceType(self, value: DeviceType):
         self._device_type = value
@@ -452,6 +489,10 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
             raise ValueError("Input id is readonly")
         if self._input_id_callback:
             raise ValueError("Input id is readonly (callback)")
+        if value is None:
+            self._input_id = None
+            return
+        
         if __debug__ and self._device_guid:
             from gremlin.types import DeviceType
 
@@ -465,14 +506,6 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
             self._input_id = value
 
-    @property
-    def input_type(self) -> InputType:
-        """input type"""
-        return self._input_type
-
-    # @input_type.setter
-    # def input_type(self, value: InputType):
-    #     self._input_type = value
 
     @property
     def device_guid(self):

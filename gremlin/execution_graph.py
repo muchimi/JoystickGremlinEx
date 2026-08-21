@@ -1313,6 +1313,7 @@ class ExecutionContext:
         if callback_key not in self._latch_map:
             self._latch_map[callback_key] = {}
         self._latch_map[callback_key][input_id] = node
+        syslog.info(f"EXEC: registerInputItemLatchedNode: input item: [{input_item}] input id: [{input_id}] node: [{node.description}]")
 
     def getInputItemLatchedNodes(self, input_item: gremlin.input_item.InputItem) -> list:
         """gets the list of execution nodes for a given input item including latched data - tuples of (input_id, node)"""
