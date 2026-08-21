@@ -2518,17 +2518,28 @@ class EventHandler(QtCore.QObject):
             syslog.info(f"Match input: looking for device [{device_name}] input_type: [{input_type.name}/{input_type}] magic: [{magic}]")
 
         if device_guid in self.input_item_map:
-            if mode in self.input_item_map[device_guid]:
-                if input_type in self.input_item_map[device_guid][mode]:
-                    if magic in self.input_item_map[device_guid][mode][input_type]:
+            # walk the mode inheritance chain: a child mode inherits its
+            # parent's input items unless it defines its own. input_item_map is
+            # only populated for the mode where an input is declared, so we must
+            # fall back to parent modes here (mirrors build_event_lookup, which
+            # only propagates inheritance into the callbacks maps, not this one).
+            lookup_mode = mode
+            profile = gremlin.shared_state.current_profile
+            visited = set()
+            while lookup_mode and lookup_mode not in visited:
+                visited.add(lookup_mode)
+                mode_map = self.input_item_map[device_guid].get(lookup_mode)
+                if mode_map and input_type in mode_map:
+                    if magic in mode_map[input_type]:
                         if verbose:
-                            syslog.info(f"Match Input: input item : magic: {magic}")
-                        return self.input_item_map[device_guid][mode][input_type][magic]
-                    else:
-                        if verbose:
-                            syslog.info("available magic values for this input are: ")
-                            for magic in self.input_item_map[device_guid][mode][input_type]:
-                                syslog.info(f"\t{magic}")
+                            syslog.info(f"Match Input: input item : magic: {magic} (mode: {lookup_mode})")
+                        return mode_map[input_type][magic]
+                    elif verbose:
+                        syslog.info("available magic values for this input are: ")
+                        for m in mode_map[input_type]:
+                            syslog.info(f"\t{m}")
+                # ascend to the parent mode, if any
+                lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None else None
 
         # check latched inputs (these are not real inputs but registered)
         if device_guid in self.latched_functors:
