@@ -340,17 +340,24 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
                 if self.timer:
                     self.timer.cancel()
                     self.timer = None
-                thread = threading.Thread(
-                    target=lambda: self._short_press(
-                        self.event_press,  # send a press event to the functors
-                        self.value_press,
-                        event,
-                        value,
-                    ),
-                    daemon=False,
-                )
-                thread.name = "TEMPO short"
-                thread.start()
+                # Only fire the short press if we actually recorded the matching
+                # press on this functor instance. After a mode switch a new tempo
+                # instance can receive a release whose press was handled by the
+                # previous mode's instance, leaving event_press as None; firing
+                # then sends None events downstream (crashes in execute_node /
+                # play_sound with 'NoneType' has no attribute ...).
+                if self.event_press is not None:
+                    thread = threading.Thread(
+                        target=lambda: self._short_press(
+                            self.event_press,  # send a press event to the functors
+                            self.value_press,
+                            event,
+                            value,
+                        ),
+                        daemon=False,
+                    )
+                    thread.name = "TEMPO short"
+                    thread.start()
 
             self.trigger_mode = None
 
