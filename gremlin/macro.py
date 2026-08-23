@@ -390,10 +390,18 @@ class MacroManager(QtCore.QObject):
 
         self._is_running = True
         self._clear_queue()
-        if self._run_scheduler_thread is None:
+        # A threading.Thread can only be started once, and a thread object left
+        # over from a previous run (possibly not alive, or torn down by a race
+        # during stop) must not be reused. Discard any non-live thread and its
+        # potentially inconsistent internal state, then create a fresh one.
+        thread = self._run_scheduler_thread
+        if thread is None or not thread.is_alive():
+            # reset the wake-up event so the fresh thread starts from a clean
+            # state (avoids waiting on a half-torn-down primitive)
+            self._schedule_event = Event()
             self._run_scheduler_thread = Thread(target=self._run_scheduler)
             self._run_scheduler_thread.setName("Macro scheduler")
-        if not self._run_scheduler_thread.is_alive():
+            self._run_scheduler_thread.daemon = True
             self._run_scheduler_thread.start()
 
     def stop(self):
@@ -406,10 +414,14 @@ class MacroManager(QtCore.QObject):
             eh.unregisterModeChangeHook(self.id)
             self._hook_mode_change = False
 
-        if self._run_scheduler_thread is not None and self._run_scheduler_thread.is_alive():
-            # Terminate the scheduler
+        if self._run_scheduler_thread is not None:
+            # Terminate the scheduler. Wake it so it can observe _is_running
+            # being False and exit its wait loop, then join if it is still alive.
             self._schedule_event.set()
-            self._run_scheduler_thread.join()
+            if self._run_scheduler_thread.is_alive():
+                self._run_scheduler_thread.join()
+            # Always drop the reference, even if the thread had already exited,
+            # so start() never sees a stale/terminated thread object.
             self._run_scheduler_thread = None
 
             # Terminate any macro that is still active
