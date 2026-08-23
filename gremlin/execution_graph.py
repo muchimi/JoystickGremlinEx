@@ -1924,7 +1924,7 @@ class ExecutionContext:
             logTabs = gremlin.shared_state.logTabs()
 
             # abort if the mode changed and the event was fired in a different mode
-            if event.mode and event.mode not in (gremlin.shared_state.runtime_mode, gremlin.shared_state.master_mode):
+            if event is not None and event.mode and event.mode not in (gremlin.shared_state.runtime_mode, gremlin.shared_state.master_mode):
                 if verbose_exec:
                     syslog.info(
                         f"{logTabs}EXEC:[{node.id}] [{node.nodeType.name}] {node.description} - ignoring event due to wrong mode {event.mode} current runtime: {gremlin.shared_state.runtime_mode} "
