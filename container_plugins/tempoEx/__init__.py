@@ -600,7 +600,20 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.verbose = gremlin.config.Configuration().verbose_mode_container
 
 
-        assert len(self.container.action_sets) == 3, "TempoEx container must have exactly 3 action sets: short, long, and double."
+        # A TempoEx container needs exactly 3 action sets (short, long, double).
+        # A container that is still being configured in the editor may not have
+        # them all yet; that is a normal transient state, not a fatal error.
+        # Disable this container for the run instead of raising (a bare assert
+        # here propagates through the profile_started signal emission and aborts
+        # the whole profile launch, taking the UI down with it).
+        if len(self.container.action_sets) != 3:
+            syslog.warning(
+                f"TEMPOEX: Disabled: container needs exactly 3 action sets "
+                f"(short, long, double), found {len(self.container.action_sets)} "
+                f"- container is likely still being configured. id: [{self.container.id}]"
+            )
+            self.valid = False
+            return
 
 
         self.last_trigger = None
