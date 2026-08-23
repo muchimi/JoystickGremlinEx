@@ -2729,7 +2729,14 @@ class TriggerDict(collections.UserDict):
         if isinstance(source, dict):
             new_dict = TriggerDict()
             for key, value in source.items():
-                new_dict[key] = copy.deepcopy(value) if deep else copy.copy(value)
+                # Reference the value by default rather than copy.copy()-ing it.
+                # These maps hold model items that own Qt widgets/signals; copying
+                # an item whose widget has already been torn down raises
+                # "RuntimeError: Signal source has been deleted" (e.g. during
+                # container deletion). Index maps must preserve item identity, so
+                # a shallow reference is what we actually want. deep=True still
+                # deep-copies for the rare caller that needs an independent copy.
+                new_dict[key] = copy.deepcopy(value) if deep else value
             return new_dict
 
         if deep:
