@@ -3199,7 +3199,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.inputItemListView.item_edit.disconnect(self._edit_item_cb)
         self.inputItemListView.item_closed.disconnect(self._close_item_cb)
 
-    def _handle_model_changed_cb(self):
+    def _handle_model_changed_cb(self, data = None, force : bool = False):
         """called when the model changes"""
         self._filter_widget.updateCounts()
 
@@ -3464,7 +3464,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         widget = InputItemWidget(
             input_item=identifier.input_item,
             populate_ui_callback=self._populate_input_widget_ui,
-            update_callback=self._update_input_widget,
+            mapping_changed_callback=self._update_input_widget,
             confirm_delete_callback=self._handle_confirm_delete,
             config_external=True,
             parent=parent,

@@ -528,6 +528,7 @@ class ExecutionContext:
         self._last_hash = None
         self._condition_map = {}  # map of node ID to conditions that have conditions
         self._functor_map = {}  # map of node ID to action nodes to execute for condition checking
+        self._action_functor_map = {}  # map of action IDs to functors
         self._node_map = {}  # map of node ID to node
         self._exec_map = {}  # map of node ID to the computed entry node for execution graph
         self._latch_map = {}  # map of latched data - input ID -> functor
@@ -549,6 +550,11 @@ class ExecutionContext:
     def functor_map(self) -> dict:
         """map of container condition functors"""
         return self._functor_map
+
+    @property
+    def action_functor_map(self) -> dict:
+        """ map of action IDs to their corresponding functors """
+        return self._action_functor_map
 
     @property
     def node_map(self) -> dict:
@@ -813,7 +819,7 @@ class ExecutionContext:
         """returns the list of defined modes in the execution tree"""
         return [node.mode for node in anytree.PreOrderIter(self.graph) if node.nodeType == ExecutionGraphNodeType.Mode and node.mode]
 
-    def getCallbacks(self, callbacks, key, mode):
+    def getCallbacks(self, callback_map : dict, key, mode):
         callback_list = []
         verbose = gremlin.config.Configuration().verbose_mode_inputs
         # syslog = logging.getLogger("system")
@@ -828,7 +834,7 @@ class ExecutionContext:
                     break
                 if verbose:
                     syslog.info(f"CONTEXT: Search callbacks for mode: [{mode}] key: [{key}]")
-                callback_list = callbacks.get(mode, {}).get(key, [])
+                callback_list = callback_map.get(mode, {}).get(key, [])
                 if callback_list:
                     if verbose:
                         syslog.info(f"\tFound callbacks for mode: [{mode}] key: [{key}]")
@@ -1264,6 +1270,8 @@ class ExecutionContext:
 
         functor: gremlin.base_profile.AbstractFunctor = action.functor(action, node)
 
+        self._action_functor_map[action.id] = functor # update the map of the action to its functor instance
+
         extra_inputs = functor.latch_extra_inputs(container_condition_node, action_condition_node)
         if extra_inputs:
             verbose = gremlin.config.Configuration().verbose_mode_exec
@@ -1650,6 +1658,7 @@ class ExecutionContext:
 
         profile = gremlin.shared_state.current_profile
         self._functor_map.clear()  # map of functor ID to functors
+        self._action_functor_map.clear()  # map of action IDs to functors
         self._node_map.clear()
         self._exec_map.clear()  # map of node id to the node's execution entry node
         verbose = gremlin.config.Configuration().verbose_mode_exec
@@ -2054,11 +2063,20 @@ class ExecutionContext:
             else:
                 # action node - if in manual mode - run the children of that node directly
                 # any other node - execute the functor list - first one that fails fails the complete branch to this point
-                functor_list = node.getActionFunctors()
+                functor_list = []
+                if "action_data" in extra_data:
+                    # latching override functor list if we have the action data
+                    # this is because the node we get may be the wrong one when in latching mode because we are not following the usual activation path
+                    # we get the correct functor type, but not necessarily the correct functor for the action that was triggered so we remap here
+                    action_data = extra_data["action_data"]
+                    if action_data.id in self.action_functor_map:
+                        functor = self.action_functor_map[action_data.id]
+                        functor_list = [functor]
+
+                if not functor_list:
+                    functor_list = node.getActionFunctors()
                 if functor_list:
                     for functor in functor_list:
-                        # if functor.__class__.__name__ == "GatedAxisFunctor":
-                        #     pass
                         action_result = self.process_functor(functor, event, value, extra_data, manual)
                         description = str(functor.action_data)
                         if verbose_exec:
@@ -2211,6 +2229,7 @@ class ContainerCallback:
             InputType.OpenSoundControl,
             InputType.StreamDeck,
             InputType.Keyboard,
+            InputType.KeyboardLatched,
             InputType.Mouse,
             InputType.VirtualButton,
             InputType.ModeControl,
@@ -2261,6 +2280,8 @@ class ContainerCallback:
                     extra_data = event.extra_data
                 else:
                     extra_data.update(event.extra_data)
+                if event.identifier == 23:
+                    pass
                 ec.execute_node(node, event, shared_value, extra_data)
 
 

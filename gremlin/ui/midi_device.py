@@ -540,14 +540,14 @@ class MidiInputItem(gremlin.input_item.InputItemMessage):
 
 
 class MidiInputItemWidget(gremlin.input_item.InputItemWidget):
-    def __init__(self, input_item: MidiInputItem, populate_ui_callback, update_callback, config_external=False, data=None, parent=None):
+    def __init__(self, input_item: MidiInputItem, populate_ui_callback, mapping_changed_callback, config_external=False, data=None, parent=None):
         get_state_callback = self._handle_get_state
         super().__init__(
             input_item = input_item,
             populate_ui_callback = populate_ui_callback,
             populate_name_callback = None,
             selection_changed_callback = None,
-            update_callback = update_callback,
+            mapping_changed_callback = mapping_changed_callback,
             confirm_delete_callback = None,
             get_state_callback = get_state_callback,
             config_external = config_external,
@@ -2030,7 +2030,7 @@ class MidiDeviceTabWidget(BaseDeviceTabWidget):
             input_item=input_item,
             identifier=identifier,
             populate_ui_callback=self._populate_input_widget_ui,
-            update_callback=self._update_input_widget,
+            mapping_changed_callback=self._update_input_widget,
             config_external=True,
             parent=parent,
             data=data,

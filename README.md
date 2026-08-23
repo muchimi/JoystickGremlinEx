@@ -48,6 +48,18 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T33)
+- Fix: UI: Mapping visuals not displaying due to API changes resulting in undetected model changes.
+- Fix: API: Latching events could call an incorrect mapping instance.
+- Fix: VJoy Remap action: some stepped visual may be visible when not in stepped mode.
+
+Known issue:
+- UI gated axis have abnormal action/condition tab sizes due to QT layout behaviors - will resolve soon (tm).
+
+### (m77T32)
+- Fix: UI: determine current active device tab fails disabling input highlight.
+- Fix: UI: input list excessively redraws or does not redraw when it should.
+
 ### (m77T31)
 - New: Map to Vjoy action: stepped axis mode (button to axis): gains a new encoder mode.  This mode uses an acceleration curve and pulse time to step (modify) the axis output based on pulse frequency and direction.  This is used for inputs such as rotary encoders that generate a pulse trigger.  The mode supports a latching input to handle the reverse pulse input, enabling a single mapping to handle both rotary directions.  The encoder calculation is direction aware to speed up or slow down the rate of change and direction of rotation.  The encoder uses acceleration measuring pulses per second and can increase/decrease the rate of change based on how fast you pulse the input (rotate the encoder).  
 - New: Map to VJoy action: ability to latch keyboard input for reverse motion (previously only supported joystick buttons).

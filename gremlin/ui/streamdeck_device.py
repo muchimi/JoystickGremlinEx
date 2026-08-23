@@ -1434,7 +1434,7 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         widget = gremlin.input_item.InputItemWidget(
             input_item=identifier.input_item if hasattr(identifier, "input_item") else identifier,
             populate_ui_callback=self._populate_input_widget_ui,
-            update_callback=self._update_input_widget,
+            mapping_changed_callback=self._update_input_widget,
             config_external=True,
             parent=parent,
             data=data,

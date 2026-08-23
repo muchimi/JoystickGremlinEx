@@ -741,6 +741,8 @@ class Color:
             background-color: {selected_tab_color};
         }}
 
+
+
         """
 
         return css
@@ -3955,7 +3957,7 @@ class InputListenerWidget(QBoxFrame):
 
         # syslog = logging.getLogger("system")
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
-        verbose = True
+
         if verbose:
             syslog.info(f"LISTEN: Keyboard event: {event} {key}")
 
@@ -4548,12 +4550,14 @@ class QDataWidget(QWidget):
 class QDataLabel(QtWidgets.QLabel):
     """data enabled label widget"""
 
-    def __init__(self, label: str = None, label_width: int = None, min_width: int = 100, data: object = None, parent=None):
+    def __init__(self, label: str = None, label_width: int = None, min_width: int = 100, data: object = None, tooltip : str = None, parent=None):
         super().__init__(parent)
         self._data = data
         self._text = None
         if label:
             self.setText(label, label_width=label_width, min_width=min_width)
+        if tooltip:
+            self.setToolTip(tooltip)
 
     def setText(self, text: str = None, label_width: int = None, min_width: int = 100):
         self._text = text

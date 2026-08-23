@@ -492,7 +492,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
         if value is None:
             self._input_id = None
             return
-        
+
         if __debug__ and self._device_guid:
             from gremlin.types import DeviceType
 
@@ -1026,7 +1026,7 @@ class AbstractCallbackModel(AbstractModel):
         if change_callback:
             self.addCallback(change_callback)
 
-    def setItemAt(self, index: int, item):
+    def setItemAt(self, index: int, item, emit = True):
         """sets the item for the specific index"""
         # ensure the item is hashable
         assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
@@ -1036,7 +1036,7 @@ class AbstractCallbackModel(AbstractModel):
 
         self._index_map[index] = item
         self._item_map[item] = index
-        self.applyFilter()
+        self.applyFilter(emit)
         self.onItemChanged(self, index, item, old_item, "setItemAt")
         self.markDirty()
 
@@ -1418,10 +1418,11 @@ class AbstractCallbackModel(AbstractModel):
             self._filtered_item_map = TriggerDict.copyFrom(self._item_map)
             force = True
 
-        # resort the data
-        self.applySort(False)
-
-        if force and emit:
+        current_hash = self.hashKey()
+        self.applySort(emit = False)
+        new_hash = self.hashKey()
+        if current_hash != new_hash:
+            # sort changed the order
             self._fireChanged(force)
 
     def setItemFiltered(self, item: object, value: bool, emit=True) -> int:
@@ -1609,6 +1610,10 @@ class AbstractCallbackModel(AbstractModel):
             self._filtered_item_map.popSuspend(reset)
             self._fireChanged(force=self._change_pending, emit=emit)
 
+    def hashKey(self):
+        """returns a hash key representing the current state of the model"""
+        return hash(tuple(self._filtered_item_map.keys()))
+
     def resetChanges(self):
         """resets any changes to the model"""
         self._suspend_stack = 0
@@ -1616,12 +1621,21 @@ class AbstractCallbackModel(AbstractModel):
 
     def addCallback(self, callback: Callable):
         """adds a change callback to be called when the model data changes"""
-        if __debug__ and callback is not None and not callable(callback):
-            raise TypeError("Callback must be callable")
+        if __debug__:
+            if callback is not None and not callable(callback):
+                raise TypeError("Callback must be callable")
+            # ensure the callback has the correct signature
+            import inspect
+            sig = inspect.signature(callback)
+            if len(sig.parameters) != 2:
+                raise TypeError("Callback must accept exactly two parameters: data and force")
+
+
         if callback not in self._data_changed_callbacks:
             self._data_changed_callbacks.append(callback)
 
     def addOnItemChangedCallback(self, callback: Callable):
+        """ adds a OnitemChanged callback that includes the operation and the old value, and new value as parameters"""
         if callback not in self._item_changed_callbacks:
             self._item_changed_callbacks.append(callback)
 
@@ -1691,7 +1705,7 @@ class AbstractCallbackModel(AbstractModel):
             self._old_hash = new_hash
 
             for callback in self._data_changed_callbacks:
-                callback(self._extra_data)
+                callback(self._extra_data, force = force)
 
             if emit:
                 self.data_changed.emit()  # indicate the model changed

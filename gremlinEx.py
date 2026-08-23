@@ -416,7 +416,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         self.ui.update_toolbar()
         self._update_status_bar()
-        el.config_option_changed.connect(self._config_option_changed)
+        el.config_option_changed.connect(self._config_options_changed)
         el.device_change_event.connect(self._handle_devices_changed)
         el.ui_initialized.connect(self._update_start_tab)
 
@@ -791,7 +791,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         tab_device_guid = gremlin.shared_state.current_tab_device_guid
         if tab_device_guid is None:
             tab_device_guid = self._tab_index_map.get(self.ui.devices_tab_header_widget.currentIndex())
-        if tab_device_guid is not None:
+        if tab_device_guid is None:
             return None
 
         assert isinstance(tab_device_guid, dinput.GUID), "current tab device guid is not a dinput.GUID"
@@ -3703,8 +3703,13 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             case "show_input_axis":
                 self.refresh()
 
-    def _config_option_changed(self):
+    def _config_options_changed(self):
         self._update_highlight_toolbar_enabled()
+
+        # update other tracked configuration options
+        self._button_highlighting_enabled = self.config.highlight_input_buttons  # true if highlighting on buttons
+        self._axis_highlighting_enabled = self.config.highlight_input_axis  # true if highligthing on axes
+        self._input_highlighting_enabled = self.config.highlight_enabled  # on/off global
 
     def _select_input_handler(
         self,
@@ -3936,6 +3941,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         # not found
                         input_item = self._get_input_item(device_guid, 0)
 
+                        if not input_item:
+                            if verbose:
+                                syslog.info(f"SELECT INPUT: no input item found for device {device_guid} input type {input_type} input ID {input_id}")
+                            return None
+
                     if input_item:
                         input_type = input_item.input_type
                         input_id = input_item.input_id
@@ -4011,11 +4021,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                                 # widget.select_item(index)
                                 widget.setContentWidget(input_type, input_id)
-
-                                input_item_widget = widget.inputItemListView.widget(index)
+                                list_view = widget.inputItemListView
+                                input_item_widget = list_view.widget(index)
                                 if input_item_widget:
                                     if not input_item_widget.selected:
                                         input_item_widget.setSelected(True, emit=False)
+                                        # ensure the item is visible
+                                if self._input_highlighting_enabled:
+                                    list_view.scrollToInput(input_item)
 
                                     # input_widget.ensureStyle()
 
@@ -5335,7 +5348,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # update UI post load
             self.refresh()
-            pass
+
 
     def refresh(self):
         gremlin.util.InvokeUiMethod(self._refresh_ui)
@@ -5375,8 +5388,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 ["cmd", "/c", f"timeout /t 5 /nobreak >nul & taskkill /F /PID {pid}"],
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
-        except Exception:
-            pass
+        except Exception as ex:
+            syslog.error(f"Failed to force close process {pid}: {ex}")
+
 
     def _get_device_profile(self, device):
         """Returns a profile for the given device.

@@ -2812,9 +2812,14 @@ def hashDict(d: dict):
 def toUrl(fname: str):
     """converts a file name to a URL link format"""
     import pathlib
-
     url = pathlib.Path(fname)
-    return url.as_uri()
+    try:
+        url = url.resolve()
+        return url.as_uri()
+    except Exception as ex:
+        syslog.error(f"URL: Failed to resolve path [{fname}]: {ex}")
+        return fname
+
 
 
 def getWidgetPositionInHierarchy(widget: QtWidgets.QWidget, relative_to: QtWidgets.QWidget = None):

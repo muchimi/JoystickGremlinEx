@@ -2945,7 +2945,6 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         # joystick latch mode ----------------------------
 
         device_items = []
-        buttom_items = []
 
         devices = sorted(joystick_handling.button_input_devices(), key=lambda x: x.name)
         self.stepped_device_map = {}  # holds the device information keyed by device_id (str)
@@ -3162,7 +3161,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
         self.step_value_container_widget = QtWidgets.QWidget()
         self.step_value_container_layout = QtWidgets.QHBoxLayout(self.step_value_container_widget)
 
-        self.step_start_index_widget = gremlin.ui.ui_common.QIntLineEdit()
+        self.step_start_index_widget = gremlin.ui.ui_common.QIntLineEdit(tooltip="Initial step when profile starts")
         self.step_count_widget = gremlin.ui.ui_common.QIntLineEdit()
         self.step_count_widget.setRange(0, 100)
         self.step_count_widget.valueChanged.connect(self._step_count_changed)
@@ -3230,7 +3229,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
 
         # self.step_value_container_layout.addWidget(self.grab_widget)
         self.step_value_container_layout.addWidget(self.add_step_widget)
-        self.step_value_container_layout.addWidget(QtWidgets.QLabel("Start index:"))
+        self.step_value_container_layout.addWidget(gremlin.ui.ui_common.QDataLabel("Start index:", tooltip="Initial step when profile starts"))
         self.step_value_container_layout.addWidget(self.step_start_index_widget)
         self.step_value_container_layout.addWidget(QtWidgets.QLabel("Start value:"))
         self.step_value_container_layout.addWidget(self.step_start_value_widget)
@@ -4105,11 +4104,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             output_range_visible = action == VjoyAction.VJoyRangeAxis
             sync_on_start_visible = True
             pulse_visible = action in (VjoyAction.VJoyPulse, VjoyAction.VJoyHatPulse)
-            # _start_visible = action in (
-            #     VjoyAction.VJoyButton,
-            #     VjoyAction.VJoyButtonPress,
-            #     VjoyAction.VJoyButtonRelease,
-            # )
+
             if action in (
                 VjoyAction.VJoyPulse,
                 VjoyAction.VJoyButtonPress,
@@ -4147,6 +4142,8 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             options_visible = True
 
         output_selector_visible = True
+
+        self.step_container.setVisible(self.action_data.action_mode == VjoyAction.VJoySetAxisStepped)
 
         match action:
             case VjoyAction.VJoyAxis:
@@ -4819,6 +4816,12 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             VjoyAction.VJoyHatPulse,
         ):
             self.vjoy_input_id = action_data.vjoy_hat_id
+
+        syslog.info(f"Initializing VJoyRemapFunctor for action_data id: {action_data.id}")
+        syslog.info(f"\tAction mode: {self.action_data.action_mode.name}")
+        syslog.info(f"\tInput item: {self.action_data.input_item.display_name if self.action_data.input_item else 'None'}")
+
+        self.action_data = action_data
         self.input_type = action_data.get_input_type()
         self.axis_scaling = action_data.axis_scaling
         self.action_mode = action_data.action_mode
@@ -5040,7 +5043,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         import gremlin.keyboard
                         import gremlin.ui.keyboard_device
 
-                        verbose = True
+                        # verbose = True
                         primary_key: gremlin.keyboard.Key
 
                         keys = self.action_data.latched_keys
@@ -5768,6 +5771,15 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         #     # merged axis data is handled by the internal hook - ignore
         #     return True
 
+        if extra_data and "action_data" in extra_data:
+            new_action_data = extra_data["action_data"]
+        else:
+            new_action_data = None
+        syslog.info(f"Process VJoyRemapFunctor for action_data id: [{self.action_data.id}]  new action data: [{new_action_data.id if new_action_data else 'None'}]")
+        syslog.info(f"\tAction mode: {self.action_data.action_mode.name}")
+        syslog.info(f"\tInput item: {self.action_data.input_item.display_name if self.action_data.input_item else 'None'}")
+
+
         # check the event is ours for latching input scenarios
         if extra_data and "input_item" in extra_data:
             input_item = extra_data["input_item"]
@@ -5854,7 +5866,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         is_local, is_remote = self.action_data.sendFlags()
 
         verbose = self.verbose
-        # verbose = True
+        #verbose = True
         verbose_extra = self.verbose_extra
 
         # syslog = logging.getLogger("system")
@@ -7226,6 +7238,7 @@ Supports axis merging, curved output, command, hat and button mappings.
 
     @property
     def target_step_start_index(self) -> int:
+        """initial step when profile starts"""
         return self._target_step_start_index
 
     @target_step_start_index.setter

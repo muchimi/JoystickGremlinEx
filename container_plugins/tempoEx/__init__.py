@@ -1164,7 +1164,7 @@ More than one action per short press or long press can be added."""
         if verbose:
             syslog.info(f"TempoEx: action set count: {len(self.action_sets)}")
 
-    def _action_set_changed(self, data):
+    def _action_set_changed(self, data, force: bool = False):
         """Callback for when the action sets change."""
         pass
 

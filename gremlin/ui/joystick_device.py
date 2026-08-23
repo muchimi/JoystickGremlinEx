@@ -949,7 +949,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         self.update_stats_display(refresh=True)
 
-    def _handle_model_changed(self, data):
+    def _handle_model_changed(self, data, force : bool = False):
         """called when the input model changes to update the display of stats and filter status"""
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
