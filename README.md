@@ -50,8 +50,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 ### (m77T33)
 - Fix: UI: Mapping visuals not displaying due to API changes resulting in undetected model changes.
-- Fix: API: Latching events could call an incorrect mapping instance.
+- Fix: API: Latching events could call an incorrect mapping instance.  This involved more refactor of the latching API and how it functions, and now adds an override to the functor execution logic.
 - Fix: VJoy Remap action: some stepped visual may be visible when not in stepped mode.
+- Fix: Tempo (legacy) container: exception on missing components.  Courtesy RazOrLegend.
+- Fix: Macro (legacy) action: profile restart behavior - reset scheduler.  Courtesy RazOrLegend.
+
 
 Known issue:
 - UI gated axis have abnormal action/condition tab sizes due to QT layout behaviors - will resolve soon (tm).

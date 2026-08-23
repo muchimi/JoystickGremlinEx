@@ -665,20 +665,6 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
             if len(self.action_set_nodes) > 2:
                 self.dtap_nodes.append(self.action_set_nodes[2])
 
-
-        # for node in action_set_nodes:
-        #     if node.has_actions:
-        #         for action in node.action_set:
-        #             match action.data:
-        #                 case "short":
-        #                     self.short_nodes.append(node)
-        #                 case "long":
-        #                     self.long_nodes.append(node)
-        #                 case "double":
-        #                     self.dtap_nodes.append(node)
-
-        # true if double tap enabled if we have double tap nodes to execute and not running in release mode
-
         active_nodes = self.short_nodes + self.long_nodes + self.dtap_nodes
         if not active_nodes:
             syslog.warning(f"TEMPOEX: warning: no action nodes found to execute for container [{self.container.id}].")
@@ -1146,6 +1132,7 @@ More than one action per short press or long press can be added."""
         self.short_action_set = gremlin.input_item.ActionSet(model_description = "short press actions")
         self.long_action_set = gremlin.input_item.ActionSet(model_description = "long press actions")
         self.double_action_set = gremlin.input_item.ActionSet(model_description = "double press actions")
+
         self.delay = 0.5  # default long press delay in seconds
         self.doubletap_delay = 0.25  # default double tap delay in seconds
         self.autorelease_delay = 0.25  # autorelease in seconds
@@ -1154,15 +1141,22 @@ More than one action per short press or long press can be added."""
         self.chain_short = True
         self.chain_long = True
         self.chain_double = True
-        self.action_sets.clear()
-        self.action_sets.add(self.short_action_set, 0) # 0
-        self.action_sets.add(self.long_action_set, 1) # 1
-        self.action_sets.add(self.double_action_set, 2) # 2
+        self._ensure_action_sets()
         self.action_sets.addCallback(self._action_set_changed)
+
+
         assert len(self.action_sets) == 3, f"TempoEx container must have exactly 3 action sets: short, long, and double. got {len(self.action_sets)}"
         verbose = gremlin.config.Configuration().verbose_mode_container
         if verbose:
             syslog.info(f"TempoEx: action set count: {len(self.action_sets)}")
+
+    def _ensure_action_sets(self):
+        """Ensures that the container has exactly 3 action sets: short, long, and double."""
+        self.action_sets.clear()
+        self.action_sets.add(self.short_action_set, 0) # 0
+        self.action_sets.add(self.long_action_set, 1) # 1
+        self.action_sets.add(self.double_action_set, 2) # 2
+
 
     def _action_set_changed(self, data, force: bool = False):
         """Callback for when the action sets change."""
@@ -1204,8 +1198,7 @@ More than one action per short press or long press can be added."""
                     self._parse_action_xml(as_node, self.double_action_set, input_item, extra_data, "double")
 
 
-        # self.dumpActionSets(self.action_sets)
-        # pass
+        self._ensure_action_sets()
 
 
 

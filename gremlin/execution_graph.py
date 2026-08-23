@@ -21,6 +21,7 @@ from abc import abstractmethod, ABC
 import copy
 import logging
 import time
+import traceback
 
 
 import gremlin.base_buttons
@@ -1925,6 +1926,11 @@ class ExecutionContext:
         verbose_exec = self._verbose_exec
         verbose_detailed = self._verbose_detailed
         verbose_condition = self._verbose_condition
+
+        if not event:
+            syslog.error(f"EXEC: Executing node [{node.id}] has no event passed.")
+            syslog.error(traceback.format_exc())
+            return False
 
         result = False  # assume fails
         node.data = event  # last event
