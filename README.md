@@ -56,9 +56,6 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: Macro (legacy) action: profile restart behavior - reset scheduler.  Courtesy RazOrLegend.
 
 
-Known issue:
-- UI gated axis have abnormal action/condition tab sizes due to QT layout behaviors - will resolve soon (tm).
-
 ### (m77T32)
 - Fix: UI: determine current active device tab fails disabling input highlight.
 - Fix: UI: input list excessively redraws or does not redraw when it should.

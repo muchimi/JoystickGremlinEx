@@ -7970,9 +7970,8 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # Create tab widget to display various UI controls in
         self.dock_tabs = gremlin.ui.ui_common.QDataTab()
-        self.dock_tabs.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
-        # tab_bar = self.dock_tabs.tabBar()
-        # tab_bar.setMaximumWidth(30)
+        self.dock_tabs.setStyleSheet(gremlin.ui.ui_common.Color.cssVerticalTab())
+
 
         background_color = gremlin.ui.ui_common.Color.selectedDockTabBackgroundColor()
         self.setStyleSheet = f"QDockWidget: {{ background-color: {background_color}; }}"
@@ -9433,6 +9432,8 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self._input_item = input_item
         self._input_type = input_type
         self._container_model = input_item.containerModel
+        self._container_model.addOnItemChangedCallback(self.onContainerModelChanged)
+
         self._last_container_hash = None # hash for the container model to determine if we need to redraw or not
 
         # self.setObjectName(object_name if object_name else "(object name not provided)")
@@ -9463,6 +9464,11 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self._drawn_once = False
 
         self._show_blank()
+
+    def onContainerModelChanged(self, model : AbstractCallbackModel, index : int, old_value : object, new_value : object, operation : str):
+        """callback for when an input item changes"""
+        if operation in ("add", "update"):
+            self.refresh()
 
     def fromParams(self, params) -> InputItemMappingWidget:  # noqa: F405
         """recreates the widget from self"""
@@ -9685,7 +9691,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self._show_blank()
 
     def _add_action(self, action_name):
-        """Adds a new action to the input item.
+        """Adds a new action to the input item.   add button
 
         :param action_name name of the action to be added
         """

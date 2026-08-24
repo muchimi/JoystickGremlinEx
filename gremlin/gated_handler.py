@@ -1368,7 +1368,7 @@ class GateData:
         # self.updateRanges()
         self._update_ranges()
 
-    def getOverrideInputType(self, condition : GateConditionType) -> InputType:
+    def getOverrideInputType(self, condition: GateConditionType) -> InputType:
         """gets the override input type for the given condition"""
         assert isinstance(condition, GateConditionType), "invalid condition"
         match condition:
@@ -1722,10 +1722,8 @@ class GateData:
         triggers = self.process_triggers(input_value)
         trigger: TriggerData
 
-        # if triggers and gremlin.shared_state.is_running:
-        #     pass
-
         verbose = gremlin.config.Configuration().verbose_mode_gate
+        # verbose = True
 
         # if verbose:
         #     syslog.info(f"Trigger: raw value: {input_value}  trigger value: {value}")
@@ -1754,9 +1752,6 @@ class GateData:
                 if not trigger_event.extra_data:
                     trigger_event.extra_data = {}
                 trigger_event.extra_data["trigger"] = trigger
-
-                if trigger.mode == TriggerMode.RangeHold:
-                    pass
 
                 delay = trigger.delay
                 if verbose_extra:
@@ -1851,7 +1846,7 @@ class GateData:
                     # profile is running - trigger the execution node for the containers
                     # the extra data contains the trigger condition type so the correct execution path is taken
                     if verbose:
-                        syslog.info(f"GATED AXIS TRIGGER:{stub}  {trigger.mode.name} range: [{trigger.to_display()}]")
+                        syslog.info(f"GATED AXIS TRIGGER: {trigger.mode.name} range: [{trigger.to_display()}]")
                     extra_data = {}
                     extra_data["condition_type"] = trigger.condition
                     extra_data["trigger"] = trigger
@@ -3275,7 +3270,7 @@ class GateData:
     def _find_input_item(self):
         return gremlin.input_item._get_input_item(self._action_data)
 
-    def _new_input_item(self, source_input_item : InputItem = None, is_action=True):
+    def _new_input_item(self, source_input_item: InputItem = None, is_action=True):
         """creates a new item data from the existing one"""
 
         if source_input_item is None:
@@ -3283,10 +3278,10 @@ class GateData:
 
         input_item = gremlin.input_item.InputItem(
             mode_node=source_input_item.parent,
-            input_type =source_input_item._input_type,
+            input_type=source_input_item._input_type,
             device_guid=source_input_item._device_guid,
-            input_id = source_input_item._input_id,
-            )
+            input_id=source_input_item._input_id,
+        )
 
         # indicate the input item is for a action and not a direct hardware mapping - such as gated axis
         input_item._is_action = is_action
@@ -3478,7 +3473,6 @@ class GateData:
         gate_id_map = {}  # holds gate id map to new ID if the ID was changed
         self._gates = []  # remove all gates
         self._ranges = []  # remove all ranges
-
 
         input_item = self._find_input_item()
         for node_range in node_gates:
@@ -4292,8 +4286,6 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
 
         super().__init__(self.__class__.__name__, parent=parent)
 
-
-
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self._id = gremlin.util.get_guid()
 
@@ -4328,7 +4320,7 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
         self.container_condition_layout.setContentsMargins(0, 0, 0, 0)
         self.container_condition_layout.addWidget(self._condition_tab)
 
-        self.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
+        # self.setStyleSheet(gremlin.ui.ui_common.Color.cssTab())
 
         self._icon_enabled = gremlin.util.load_icon(
             "mdi.checkbox-blank-circle",
@@ -4728,27 +4720,30 @@ class GateConditionEditorDialog(gremlin.ui.ui_common.QRememberDialog):
                     input_type = InputType.JoystickAxis
                 # condition_container_layout.addWidget(QtWidgets.QLabel("TEST 2"))
 
-                item_data = self._range_info.itemData(condition) if self._is_range else self._gate_info.itemData(condition)
-                container_widget = self._cache.retrieve_by_data(item_data)
+                input_item = self._range_info.itemData(condition) if self._is_range else self._gate_info.itemData(condition)
+                # container_widget = self._cache.retrieve_by_data(item_data)
 
                 stack_widget = QtWidgets.QStackedWidget()
-                #stack_widget.setProperty("class", "hack")
+                # stack_widget.setProperty("class", "hack")
 
                 # if not container_widget:
                 # create the container, cache it
 
-                container_widget = gremlin.input_item.InputItemMappingWidget(
-                    item_data,
+                mapping_widget = gremlin.input_item.InputItemMappingWidget(
+                    input_item,
                     input_type=input_type,
-                    object_name=f"Gate: {item_data.display_name}",
+                    object_name=f"Gate: {input_item.display_name}",
                     spacer_height=4,
                 )
-                container_widget.redraw()  # load the data
+
+                stack_widget.addWidget(mapping_widget)
+                mapping_widget.redraw()  # load the data
+                input_item.setMappingWidget(mapping_widget)  # keep a reference
 
                 # self._cache.register(item_data, container_widget)
 
-                stack_widget.addWidget(container_widget)
                 condition_container_layout.addWidget(stack_widget)
+                stack_widget.setCurrentWidget(mapping_widget)
 
             # pick the last used condition and set the tab to that
             config = gremlin.config.Configuration()

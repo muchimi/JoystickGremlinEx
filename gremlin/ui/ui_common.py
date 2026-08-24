@@ -744,6 +744,56 @@ class Color:
 
 
         """
+        return css
+
+    @staticmethod
+    def cssVerticalTab():
+        background_color = gremlin.ui.ui_common.Color.backgroundColor()
+        tab_color = gremlin.ui.ui_common.Color.tabBackgroundColor()
+        selected_tab_color = gremlin.ui.ui_common.Color.tabSelectedBackgroundColor()
+        border_color = gremlin.ui.ui_common.Color.borderColor()
+        text_color = gremlin.ui.ui_common.Color.tabTextColor()
+        select_text_color = gremlin.ui.ui_common.Color.tabSelectedTextColor()
+        hover_color = gremlin.ui.ui_common.Color.tabHoverColor()
+
+        css = f"""
+
+
+        QTabWidget {{
+            background-color: {background_color};
+        }}
+
+        QTabBar::tab {{
+            background-color: {tab_color};
+            border: 1px solid {border_color};
+            border-top-left-radius: 4px;
+            border-top-right-radius: 12px;
+            padding: 6px 4px;
+            min-height: 80px;
+            max-width: 34px;
+            color: {text_color};
+            }}
+
+        QTabBar::tab:selected {{
+            background-color: {selected_tab_color};
+            border: 0px;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 12px;
+            border-bottom: none;
+            color: {select_text_color};
+            }}
+
+        QTabBar::tab:hover {{
+            background: {hover_color};
+        }}
+
+        QTabWidget::pane {{
+            background-color: {selected_tab_color};
+        }}
+
+
+
+        """
 
         return css
 
@@ -1577,10 +1627,8 @@ class Buttons:
 
     @staticmethod
     def getAddWidget(label: str = "Add", tooltip: str = "Add", callback: Callable = None, no_keyboard: bool = True, data: object = None):
+        """add button"""
         button = Buttons._template(label=label, icon_source="ri.add-line", tooltip=tooltip, callback=callback, no_keyboard=no_keyboard, data=data)
-        # button.setMinimumHeight(24)
-        # button.setFixedWidth(get_text_width(label)*1.3)
-        # button.setStyleSheet(f" QPushButton {{margin-left: none;}}")
         return button
 
     @staticmethod
@@ -4550,7 +4598,7 @@ class QDataWidget(QWidget):
 class QDataLabel(QtWidgets.QLabel):
     """data enabled label widget"""
 
-    def __init__(self, label: str = None, label_width: int = None, min_width: int = 100, data: object = None, tooltip : str = None, parent=None):
+    def __init__(self, label: str = None, label_width: int = None, min_width: int = 100, data: object = None, tooltip: str = None, parent=None):
         super().__init__(parent)
         self._data = data
         self._text = None
