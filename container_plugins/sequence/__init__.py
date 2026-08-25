@@ -1034,7 +1034,7 @@ class SequenceContainerFunctor(gremlin.base_profile.AbstractSelfTriggerFunctor):
         config = gremlin.config.Configuration()
         self._verbose = config.verbose_mode_container or config.verbose_mode_sequence
         self._verbose_extra = self._verbose and config.verbose_mode_extra
-        self._verbose = True
+        # self._verbose = True
 
         self._hook_mode_change = False
         self.action_data._thread = None

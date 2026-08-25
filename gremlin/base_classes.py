@@ -1295,6 +1295,12 @@ class AbstractCallbackModel(AbstractModel):
         """returns the index of the item (filtered model), -1 if not found"""
         if item in self._filtered_item_map:
             return self._filtered_item_map[item]
+        if __debug__:
+            syslog.info(f"Item not found in filtered item map: {item}")
+            syslog.info(f"Filtered item map contents: item count: {len(self._filtered_item_map)}")
+            for key in self._filtered_item_map:
+                syslog.info(f"\tmodel [{key}]: {self._filtered_item_map[key]}")
+
         return -1
 
     def pop(self, index: int):
@@ -1306,8 +1312,8 @@ class AbstractCallbackModel(AbstractModel):
         return None
 
     def push(self, item):
-        """adds the item to the model and returns its index"""
-        index = len(self._index_map)
+        """adds the item to the model and returns its zero based index"""
+        index = len(self._index_map)-1
         self._index_map[index] = item
         self._item_map[item] = index
         self._filtered_index_map[index] = item
@@ -1446,7 +1452,7 @@ class AbstractCallbackModel(AbstractModel):
                 if item in self._filtered_item_map:
                     return self._filtered_item_map[item]  # already filtered
 
-                index = len(self._filtered_index_map)
+                index = len(self._filtered_index_map)-1 # zero based
                 self.pushSuspend()
 
                 self._filtered_index_map[index] = item

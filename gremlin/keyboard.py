@@ -270,12 +270,6 @@ class Key:
     def sequence(self):
         """returns a list of (scan_code, extended) tuples for all latched keys in this sequence"""
         sequence = [lk.index_tuple() for lk in self._latched_keys]
-
-        # sequence = [self.index_tuple()]
-        # lk: Key
-        # for lk in self._latched_keys:
-        #     sequence.append(lk.index_tuple())
-
         return sequence
 
     @property
@@ -284,13 +278,16 @@ class Key:
         return self._mouse_button
 
     @mouse_button.setter
-    def mouse_button(self, button):
+    def mouse_button(self, button : MouseButton):
         """sets a mouse button"""
         scan_code = button.value + 0x1000
         self._mouse_button = button
         self._is_mouse = True
-        self.scan_code = scan_code
+        self._scan_code = scan_code
+        self._virtual_code = scan_code
         self._update()
+
+
 
     def _update(self):
 

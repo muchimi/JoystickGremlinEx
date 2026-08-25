@@ -304,6 +304,7 @@ class AbstractView(QtWidgets.QWidget):
             self._redraw_pending = False
             self.redraw()
 
+
     def onItemChanged(self, model, index: int, new_item, old_item, operation):
         pass  # override in derived classes
 
@@ -457,7 +458,14 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         if self._custom_input_id_handler is not None and input_id is not None:
             raise ValueError("input_id should not be provided when a custom input id handler is set")
 
-        super().__init__(mode_node.name, device_guid=device_guid, input_type=input_type)
+        if isinstance(mode_node, str):
+            # convert to a mode object
+            profile = gremlin.shared_state.current_profile
+            assert device_guid is not None, "device_guid must be provided if mode provided as a name"
+            mode_node = profile.getModeNode(device_guid, mode_node)
+            assert mode_node is not None, "mode_node could not be resolved from the provided name"
+
+        super().__init__(mode_node, device_guid=device_guid, input_type=input_type)
 
         self.parent = mode_node  # mode object
         self.extra_data = extra_data if extra_data else {}
@@ -2444,7 +2452,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             # refresh the mapping container
             self.updateMappingContent()
 
-
     def update_curve_icon(self, enabled: bool):
         """enables or disables curve buttons"""
         if self.is_axis:
@@ -2464,7 +2471,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     @property
     def index(self):
-        """assigned index"""
+        """assigned index 0 based index (internal use)"""
         return self._index
 
     @index.setter
@@ -2624,12 +2631,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             self._mapping_changed_callbacks.remove(callback)
 
     def updateMappingContent(self, operation: str = "update"):
-        """ indicates the mapping content has changed and should be updated """
+        """indicates the mapping content has changed and should be updated"""
         if self._mapping_changed_callbacks:
             for callback in self._mapping_changed_callbacks:
                 callback(self, operation)
-
-
 
     @property
     def selected(self) -> bool:
@@ -3266,7 +3271,7 @@ class InputItemListModel(AbstractCallbackModel):
             self.trigger()
 
     def indexOfInputItem(self, input_item: InputItem):
-        """gets the index of the input item in the model (unfiltered)"""
+        """gets the zero based index of the input item in the model (unfiltered)"""
         return self.indexOf(input_item)
 
     def indexOfUnfilteredInputItem(self, input_item: InputItem):
@@ -3424,7 +3429,7 @@ class InputItemListView(AbstractView):
         self.custom_widget_handler = custom_widget_handler
         self.mapping_changed_handler = mapping_changed_handler
         self._selection_change_callbacks = []
-        self._model_hash = None # model hash key
+        self._model_hash = None  # model hash key
 
         self._last_selected_widget: InputItemWidget = None  # holds a reference to the last widget selected in the list
 
@@ -3471,6 +3476,7 @@ class InputItemListView(AbstractView):
         self._drawn_once = False  # true if the list has been redrawn at least once
         self._redraw_lock = False
         self._suspend_stack = 0
+        self._redraw_selected_index = -1 # index of the item to select on redraw (ignored if -1)
 
         self._widget_map = {}  # map of input item to input widget [model index : int] -> inputitemwidget
         self._input_item_map = {}  # map of input item to input widget [input_item] -> inputitemwidget
@@ -3501,6 +3507,10 @@ class InputItemListView(AbstractView):
 
         # load data and update
         self.popSuspended(emit=False)
+
+    def setRedrawSelectedIndex(self, index: int):
+        """sets the index of the item to select on redraw (ignored if -1)"""
+        self._redraw_selected_index = index
 
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""
@@ -3668,6 +3678,14 @@ class InputItemListView(AbstractView):
         if index != -1:
             if index in self._widget_map:
                 return self._widget_map[index]
+
+        if __debug__:
+            if index != -1:
+                syslog.warning(f"InputItemListView: widget not found for index {index}")
+                syslog.warning("Valid indices:")
+                for valid_index in self._widget_map.keys():
+                    syslog.warning(f"  {valid_index}  {self._widget_map[valid_index]}")
+                pass
         return None
 
     def getWidgetForInputItem(self, input_item: InputItem):
@@ -3800,8 +3818,6 @@ class InputItemListView(AbstractView):
                                     selection_changed_callback=self._handle_widget_selection_changed,
                                     model_index=model_index,
                                     mapping_changed_callback=self._handle_mapping_changed,
-
-
                                 )
                                 if input_item.input_type == InputType.JoystickAxis:
                                     prefix = "dark_" if gremlin.shared_state.is_dark_theme else ""
@@ -3891,15 +3907,17 @@ class InputItemListView(AbstractView):
                     index = self._current_index
                 if index == -1:
                     index = 0
-                self._select_item_ui(index, emit=False)
-
+                selected_input_item = self._widget_map.get(index, None)
         finally:
-            if selected_input_item is not None:
+            if selected_input_item:
                 # select the old input that was previously selected before the update if it's still there
-                index = self.indexOf(selected_input_item)
-                if index != -1:
-                    if self._current_index != index:
-                        self.selectItemAt(index)
+                index =selected_input_item.index
+            if index == -1 and self._widget_map:
+                index = 0
+
+            if index != -1:
+                if self._current_index != index:
+                    self.selectItemAt(index)
 
     def onItemChanged(self, model, index: int, new_item, old_item, operation):
         """override by derived classes as needed"""
@@ -3908,9 +3926,8 @@ class InputItemListView(AbstractView):
             case "add":
                 # handle add operation
                 self._redraw_pending = True
-                self._redraw_force = True  # force a complete redraw on next redraw cycle
-
-
+                self._redraw_force = True  # force a complete redraw on next redraw cycle when drawing is allowed again
+        self.redraw()  # update if needed
 
     def redraw(self, force: bool = False):
         # assert inspect.stack()[1].function == "_fireChanged", "redraw should only be called due to a model trigger"
@@ -3932,7 +3949,7 @@ class InputItemListView(AbstractView):
 
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_ui
-        #verbose = True
+        # verbose = True
 
         force = force or self._redraw_force
         if verbose and force:
@@ -3978,8 +3995,12 @@ class InputItemListView(AbstractView):
 
             model_count = len(self.model)
 
-            if self.current_index == -1 and model_count > 0:
-                self.setCurrentIndex(0)  # pick the first item if nothing is selected now
+            if self._redraw_selected_index != -1 and self._redraw_selected_index < model_count:
+                self.setCurrentIndex(self._redraw_selected_index)
+                self._redraw_selected_index = -1
+            else:
+                if self.current_index == -1 and model_count > 0:
+                    self.setCurrentIndex(0)  # pick the first item if nothing is selected now
 
             # reselect input and make visible
             widget = self.widget(self.current_index)
@@ -4146,10 +4167,9 @@ class InputItemListView(AbstractView):
             wm.submit(callback=self._handle_widget_selection_changed_worker, args=widget)
 
     def _handle_mapping_changed(self, widget: InputItemWidget, operation: str = "update"):
-        """ called when the input item widget reports a mapping change for its associated input item """
+        """called when the input item widget reports a mapping change for its associated input item"""
         if self.mapping_changed_handler:
             self.mapping_changed_handler(widget.input_item, operation)
-
 
     def _handle_widget_selection_changed_worker(self, args):
         """called when a widget in the list changes selection state (selected or unselected)"""
@@ -4271,7 +4291,7 @@ class InputItemListView(AbstractView):
                 # select the first one
                 widget = self.widget(0)
             if widget:
-                index = widget.index
+                index = widget.index # index is 1 based, widget index is 0 based
 
         if not model.isIndexVisible(index):
             if verbose:
@@ -4286,7 +4306,7 @@ class InputItemListView(AbstractView):
             if not widget:
                 widget = self.widget(index)
 
-            assert widget is not None, "widget not found in list"
+            assert widget is not None, f"widget [{index}] not found in list - check index"
             widget._set_selected_ui(True, emit=False)  # this fires the updates and callbacks via the _handle_widget_selection_changed callback
             self._current_index = index
             self._requested_selected_index = -1  # indicate no more request
@@ -6880,7 +6900,7 @@ class ActionSetView(AbstractView):
 
         self._interact_callback = interact_callback
         self._has_interactions = bool(container.interaction_types)
-        self._last_action_hash = None # hash of action model to detect changes
+        self._last_action_hash = None  # hash of action model to detect changes
 
         self._index = index  # index of the action set
 
@@ -7096,11 +7116,11 @@ class ActionSetView(AbstractView):
         """display details for the mapped input"""
         return f"[device [{self.container.hardware_device_name}] type: [{self.container.hardware_input_type.name} input: [{self.container.hardware_input_id}] container: [{self.container.name}] id: [{self.container.id}]"
 
-    def redraw(self, force = False):
+    def redraw(self, force=False):
         # assert inspect.stack()[1].function == "_fireChanged","redraw should only be called due to a model trigger"
         gremlin.util.InvokeUiMethod(self._redraw_ui, force)  # ensure on UI thread
 
-    def _redraw_ui(self, force = False):
+    def _redraw_ui(self, force=False):
         """Redraws the entire view.  must be on UI thread"""
         import gremlin.clipboard
 
@@ -7113,8 +7133,6 @@ class ActionSetView(AbstractView):
 
         hash_key = self.model.hashKey()
         force = force or hash_key != self._last_action_hash
-
-
 
         if not self._drawn_once or force or self.modelChanged() or widget_count != model_count:
             # redraw if first time, no container layout created, or model size is different
@@ -7971,7 +7989,6 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
         # Create tab widget to display various UI controls in
         self.dock_tabs = gremlin.ui.ui_common.QDataTab()
         self.dock_tabs.setStyleSheet(gremlin.ui.ui_common.Color.cssVerticalTab())
-
 
         background_color = gremlin.ui.ui_common.Color.selectedDockTabBackgroundColor()
         self.setStyleSheet = f"QDockWidget: {{ background-color: {background_color}; }}"
@@ -9434,7 +9451,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         self._container_model = input_item.containerModel
         self._container_model.addOnItemChangedCallback(self.onContainerModelChanged)
 
-        self._last_container_hash = None # hash for the container model to determine if we need to redraw or not
+        self._last_container_hash = None  # hash for the container model to determine if we need to redraw or not
 
         # self.setObjectName(object_name if object_name else "(object name not provided)")
         self.id = gremlin.util.get_guid()
@@ -9465,7 +9482,7 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         self._show_blank()
 
-    def onContainerModelChanged(self, model : AbstractCallbackModel, index : int, old_value : object, new_value : object, operation : str):
+    def onContainerModelChanged(self, model: AbstractCallbackModel, index: int, old_value: object, new_value: object, operation: str):
         """callback for when an input item changes"""
         if operation in ("add", "update"):
             self.refresh()
@@ -9504,8 +9521,6 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         """refreshes the current content with any changes"""
         if self._container_view:
             self.redraw()
-
-
 
     @property
     def input_item(self) -> InputItem:
@@ -9607,11 +9622,10 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         container_layout.addWidget(QtWidgets.QLabel("Content Area"))
         container_layout.addWidget(container_view_widget)
 
-
         container_view_widget.setContentsMargins(0, 0, 0, 0)
 
         # add to the stacked widget
-        self._stacked_widget.addWidget(container_widget) # index 2
+        self._stacked_widget.addWidget(container_widget)  # index 2
         index = self._stacked_widget.indexOf(container_widget)
         if verbose:
             syslog.info(f"InputItemMappingWidget: display widget index [{index}] container view for [{container_view_widget.input_item.display_name}]")
@@ -9664,7 +9678,6 @@ class InputItemMappingWidget(QtWidgets.QWidget):
 
         container_hash = self._input_item.containers.hashKey()
         force = container_hash != self._last_container_hash
-
 
         if force or not self._drawn_once or self._container_view is None:
             if self._input_item is not None:
@@ -11168,6 +11181,16 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         self.addLeftPanelWidget(self.listview_container)
         self._blank_input()
 
+    def pushSuspended(self):
+        """pushes the input item list view into a suspended state"""
+        if self._input_item_list_view is not None:
+            self._input_item_list_view.pushSuspended()
+
+    def popSuspended(self, reset: bool = False):
+        """pops the input item list view from a suspended state"""
+        if self._input_item_list_view is not None:
+            self._input_item_list_view.popSuspended(reset)
+
     def itemAt(self, index: int):
         """gets the input item as the specified index, None if the index is invalid or the model isn't set"""
         if self._input_item_list_model is not None:
@@ -11437,13 +11460,10 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if self._input_item_list_model is not None:
             self._input_item_list_model.addOnItemChangedCallback(self.onInputItemChange)
 
-
-    def onInputItemChange(self, model : AbstractCallbackModel, index : int, old_value : object, new_value : object, operation : str):
+    def onInputItemChange(self, model: AbstractCallbackModel, index: int, old_value: object, new_value: object, operation: str):
         """callback for when an input item changes"""
         if operation in ("add", "update"):
             self.updateMappingContent(new_value)
-
-
 
     @property
     def inputItemListView(self) -> InputItemListView:
@@ -11535,13 +11555,12 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """updates the mapping content for the given input item or all input items if none is specified"""
         if input_item:
             key = self.getInputItemWidgetKey(input_item)
-            mapping_widget : InputItemMappingWidget = self.getRegisteredWidget(key)
+            mapping_widget: InputItemMappingWidget = self.getRegisteredWidget(key)
             if mapping_widget:
                 index = self._right_panel_stacked_widget.indexOf(mapping_widget)
                 if index != -1:
                     self._right_panel_stacked_widget.setCurrentIndex(index)
                 mapping_widget.refresh()
-
 
     def getInputItemMappingWidget(self, input_item: InputItem) -> InputItemMappingWidget:
         """gets the mapping widget associated with the input item - the widget is created if needed"""
@@ -11669,7 +11688,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
                 syslog.info("DeviceTabWidget: select input index - nothing to select")
 
     def _handle_mapping_changed(self, widget: InputItemWidget, operation: str):
-        """ called when the input item widget reports a mapping change for its associated input item """
+        """called when the input item widget reports a mapping change for its associated input item"""
         if operation == "update":
             self.updateMappingContent(widget.input_item)
 

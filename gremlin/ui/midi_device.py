@@ -2070,27 +2070,32 @@ class MidiDeviceTabWidget(BaseDeviceTabWidget):
     def _dialog_ok_cb(self):
         """called when the ok button is pressed on the edit dialog"""
 
-        message = self._edit_dialog.midi_message
-        index = self._edit_dialog.index
-        port = self._edit_dialog.port
-        mode = self._edit_dialog.mode
-        input_item: MidiInputItem = self.inputItemListModel.itemAt(index)
+        try:
+            self.pushSuspended()
 
-        # input_item: MidiInputItem = self.inputItemListModel.itemAt(index)
-        input_item.setPort(port)
-        input_item.message = message
-        input_item.setMode(mode)
-        input_item._update()
-        self.inputItemListView.update_item(index)
+            message = self._edit_dialog.midi_message
+            index = self._edit_dialog.index
+            port = self._edit_dialog.port
+            mode = self._edit_dialog.mode
+            input_item: MidiInputItem = self.inputItemListModel.itemAt(index)
 
-        self._last_selected_port = port
-        self._last_selected_mode = mode
-        self._last_selected_message = message
+            # input_item: MidiInputItem = self.inputItemListModel.itemAt(index)
+            input_item.setPort(port)
+            input_item.message = message
+            input_item.setMode(mode)
+            input_item._update()
+            self.inputItemListView.update_item(index)
+
+            self._last_selected_port = port
+            self._last_selected_mode = mode
+            self._last_selected_message = message
 
 
-        el = gremlin.event_handler.EventListener()
-        el.device_mapping_changed.emit(self._device_id)
-        el.request_action_list_refresh.emit()  # ask action lists to refresh
+            el = gremlin.event_handler.EventListener()
+            el.device_mapping_changed.emit(self._device_id)
+            el.request_action_list_refresh.emit()  # ask action lists to refresh
+        finally:
+            self.popSuspended()
 
     def _dialog_rejected_cb(self):
         index = self._edit_dialog.index

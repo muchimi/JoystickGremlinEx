@@ -371,7 +371,7 @@ class KeyboardInputItem(InputItem):
 
     @property
     def display_name(self) -> str:
-        #return f"{self._display_name} {self.message_key}"
+        # return f"{self._display_name} {self.message_key}"
         return self._display_name
 
     def duplicate(self) -> KeyboardInputItem:  # noqa: F821
@@ -704,6 +704,7 @@ class KeyboardInputItemModel(gremlin.input_item.InputItemListModel):
         custom_load_handler: Callable = None,
         custom_remove_handler: Callable = None,
         custom_filter_handler: Callable = None,
+        custom_change_handler: Callable = None,
     ):
         """creates a new model for keyboard input items
         :param profile: the profile data for the device this model represents
@@ -712,6 +713,8 @@ class KeyboardInputItemModel(gremlin.input_item.InputItemListModel):
         :param custom_remove_handler: a custom handler for removing items
         :param custom_filter_handler: a custom handler for filtering items
         """
+
+        self.custom_change_handler = custom_change_handler
         super().__init__(
             profile=profile,
             device_guid=KeyboardDeviceTabWidget.device_guid,
@@ -728,6 +731,8 @@ class KeyboardInputItemModel(gremlin.input_item.InputItemListModel):
             self._profile.removeInputItem(old_item)
             el = gremlin.event_handler.EventListener()
             el.input_deleted.emit(old_item)
+        if self.custom_change_handler:
+            self.custom_change_handler(model, index, new_item, old_item, operation)
 
 
 class KeyboardInputItemWidget(gremlin.input_item.InputItemWidget):
@@ -796,11 +801,10 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             mode=mode,
             custom_load_handler=self._load_handler,
             custom_filter_handler=self._filter_data,
+
         )
 
         self.setInputItemListModel(model)
-
-
 
         # lock widget
         lock_widget = gremlin.ui.ui_common.QInputLockWidget(data=self.device_guid)
@@ -1027,21 +1031,27 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _dialog_ok_cb(self):
         """called when the add/edit key dialog completes"""
 
-        # grab a new data index as this is a new entry
-        index = self._keyboard_dialog.index
-        keys = self._keyboard_dialog.keys
-        latched_key = self._keyboard_dialog.latched_key
-        self._process_input_keys(keys, index, latched_key)
+        try:
+            self.pushSuspended()
 
-        self._keyboard_dialog.deleteLater()
-        self._keyboard_dialog = None
+            # grab a new data index as this is a new entry
+            index = self._keyboard_dialog.index
+            keys = self._keyboard_dialog.keys
+            latched_key = self._keyboard_dialog.latched_key
+            self._process_input_keys(keys, index, latched_key)
 
-        el = gremlin.event_handler.EventListener()
-        el.device_mapping_changed.emit(self._device_id)
+            self._keyboard_dialog.deleteLater()
+            self._keyboard_dialog = None
 
-        widget = self.inputItemListView.widget(index)
-        if widget:
-            self._update_input_widget(widget, None)
+            el = gremlin.event_handler.EventListener()
+            el.device_mapping_changed.emit(self._device_id)
+
+            widget = self.inputItemListView.widget(index)
+            if widget:
+                self._update_input_widget(widget, None)
+
+        finally:
+            self.popSuspended()
 
     def _process_input_keys(self, keys, index, root_key=None):
         """processes input keys
@@ -1065,8 +1075,6 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
             self.inputItemListModel.add(input_item)
 
-
-
         input_item.setOverrideInputType(InputType.JoystickButton)
 
         # creates the item in the profile if needed
@@ -1077,7 +1085,9 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         registry.sync()
 
         index = self.inputItemListModel.indexOfInputItem(input_item)
-        self.inputItemListView.selectItemAt(index, force=True)
+        input_item.index = index
+        self.inputItemListView.setRedrawSelectedIndex(index)
+
 
         verbose = gremlin.config.Configuration().verbose_mode_keyboard
         if verbose:

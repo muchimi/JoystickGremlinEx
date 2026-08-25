@@ -3687,6 +3687,7 @@ class OscInputItemModel(gremlin.input_item.InputItemListModel):
         custom_load_handler: Callable = None,
         custom_remove_handler: Callable = None,
         custom_filter_handler: Callable = None,
+        custom_change_handler: Callable = None,
     ):
         """initializes the model
         :param profile: the profile containing the data
@@ -3694,6 +3695,7 @@ class OscInputItemModel(gremlin.input_item.InputItemListModel):
         :param custom_filter_handler: optional function to filter items, takes an OscInputItem
 
         """
+        self.custom_change_handler = custom_change_handler
         super().__init__(
             profile=profile,
             device_guid=OscDeviceTabWidget.device_guid,
@@ -3708,6 +3710,10 @@ class OscInputItemModel(gremlin.input_item.InputItemListModel):
             """called when an item in the model changes"""
             if operation in ("remove"):
                 self._profile.removeInputItem(old_item)
+                el = gremlin.event_handler.EventListener()
+                el.input_deleted.emit(old_item)
+            if self.custom_change_handler:
+                self.custom_change_handler(model, index, new_item, old_item, operation)
 
 
 class OscDeviceTabWidget(BaseDeviceTabWidget):
@@ -3753,7 +3759,6 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             profile=self.profile,
             mode=mode,
             custom_load_handler=self._load_handler,
-            # custom_remove_handler=self._remove_handler,
             custom_filter_handler=self._handle_filter_data,
         )
 
@@ -3991,22 +3996,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         self._blank_input()
 
-    @QtCore.Slot()
-    def _add_input_cb(self):
-        """Adds a new input to the inputs list"""
-        profile: gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        device_node = profile.getDeviceNode(self._device_guid)
-        mode_node = device_node.getModeNode(gremlin.shared_state.current_mode)
-        input_item = OscInputItem(mode_node)
-        input_item.input_type_changed.connect(self._refresh_mappings)
 
-        mode_node.addInputItem(input_item)
-
-        self.inputItemListModel.refresh()
-        index = self.inputItemListModel.indexOf(input_item)
-        self.inputItemListView.selectItemAt(index)
-
-        self._edit_item_cb(None, index, input_item)
 
     @QtCore.Slot()
     def _handle_bulk_load(self):
@@ -4300,9 +4290,28 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         layout.addWidget(status_widget)
         self._update_input_widget(input_widget, container_widget)
 
+    @QtCore.Slot()
+    def _add_input_cb(self):
+        """Adds a new input to the inputs list"""
+        self.pushSuspended() # prevent updates
+        profile: gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        device_node = profile.getDeviceNode(self._device_guid)
+        mode_node = device_node.getModeNode(gremlin.shared_state.current_mode)
+        input_item = OscInputItem(mode_node)
+        input_item.input_type_changed.connect(self._refresh_mappings)
+        self.inputItemListModel.add(input_item)
+        mode_node.addInputItem(input_item)
+
+        # self.inputItemListModel.refresh()
+        index = self.inputItemListModel.indexOf(input_item)
+        # self.inputItemListView.selectItemAt(index)
+
+        self._edit_item_cb(None, index = index, data = input_item)
+
     def _edit_item_cb(self, widget, index, data):
         """called when the edit button is clicked"""
         current_mode = gremlin.shared_state.edit_mode
+        self.pushSuspended()
         self._edit_dialog = OscInputConfigDialog(current_mode, index, data, parent=self)
         self._edit_dialog.accepted.connect(self._dialog_ok_cb)
         self._edit_dialog.rejected.connect(self._dialog_rejected_cb)
@@ -4312,33 +4321,34 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
     def _dialog_ok_cb(self):
         """called when the ok button is pressed on the edit dialog"""
-        message = self._edit_dialog.command
-        data = self._edit_dialog.data
-        index = self._edit_dialog.index
-        mode = self._edit_dialog.mode
-        command_mode = self._edit_dialog.command_mode
-        min_range = self._edit_dialog.min_range
-        max_range = self._edit_dialog.max_range
-        autorelease = self._edit_dialog._trigger_autorelease
-        autorelease_delay = self._edit_dialog._pulse_delay
 
-        input_item: OscInputItem = self.inputItemListModel.itemAt(index)
-        input_item._message = message  # OSC command message as text
-        input_item._message_data = data  # arguments as a list
-        input_item.setMode(mode)
-        input_item._command_mode = command_mode
-        input_item._min_range = min_range
-        input_item._max_range = max_range
-        input_item._trigger_autorelease = autorelease
-        input_item._autorelease_delay = autorelease_delay
-        input_item._source_index = self._edit_dialog.source_index
+        try:
+            self.pushSuspended()
 
-        input_item._update()  # refresh other properties
-        self.inputItemListView.update_item(index)
+            message = self._edit_dialog.command
+            data = self._edit_dialog.data
 
-        el = gremlin.event_handler.EventListener()
-        el.device_mapping_changed.emit(self._device_id)
-        el.request_action_list_refresh.emit()  # ask action lists to refresh
+            mode = self._edit_dialog.mode
+            command_mode = self._edit_dialog.command_mode
+            min_range = self._edit_dialog.min_range
+            max_range = self._edit_dialog.max_range
+            autorelease = self._edit_dialog._trigger_autorelease
+            autorelease_delay = self._edit_dialog._pulse_delay
+
+            input_item: OscInputItem = self._edit_dialog.input_item
+            input_item._message = message  # OSC command message as text
+            input_item._message_data = data  # arguments as a list
+            input_item.setMode(mode)
+            input_item._command_mode = command_mode
+            input_item._min_range = min_range
+            input_item._max_range = max_range
+            input_item._trigger_autorelease = autorelease
+            input_item._autorelease_delay = autorelease_delay
+            input_item._source_index = self._edit_dialog.source_index
+
+            input_item._update()  # refresh other properties
+        finally:
+            self.popSuspended(True) # redraws the list view and creates the new entry
 
     def _dialog_rejected_cb(self):
         index = self._edit_dialog.index

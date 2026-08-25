@@ -372,8 +372,7 @@ class StateInputItem(InputItem):
         autorelease_delay=1,
         autorelease_mode="toggle",
         autorelease_trigger_mode="on",
-        data = None,
-
+        data=None,
     ):
         master_mode = gremlin.shared_state.master_mode
 
@@ -387,7 +386,12 @@ class StateInputItem(InputItem):
         )
         mode_object = device_modes.ensure_mode_exists(master_mode)
         self._key = key  # ok if None (blank)
-        super().__init__(mode_node=mode_object, device_guid=StateDeviceTabWidget.device_guid, input_type=InputType.State, custom_input_id_handler = self._handle_input_id_callback)
+        super().__init__(
+            mode_node=mode_object,
+            device_guid=StateDeviceTabWidget.device_guid,
+            input_type=InputType.State,
+            custom_input_id_handler=self._handle_input_id_callback,
+        )
         self._category = category  # category (StateCategory)
         self._default_value = default_value
         self._last_value = None
@@ -1289,13 +1293,11 @@ class StateInputItem(InputItem):
         return table.to_html()
 
 
-
-
 class BaseStateCondition(BaseAbstractCondition):
     """state condition"""
 
-    def __init__(self, extra_data : dict = None, target : AbstractContainer | AbstractAction = None):
-        super().__init__(extra_data, target = target)
+    def __init__(self, extra_data: dict = None, target: AbstractContainer | AbstractAction = None):
+        super().__init__(extra_data, target=target)
 
         self.key = None
         self.description = None
@@ -1361,7 +1363,7 @@ class StateConditionWidget(AbstractConditionWidget):
         super().__init__(condition, parent)
         self.setTitle("State Condition")
 
-    def _create_ui(self, extra_data : dict = None):
+    def _create_ui(self, extra_data: dict = None):
         if not Shiboken.isValid(self):
             return
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
@@ -1747,8 +1749,9 @@ class StateData:
         return used
 
     def filterData(self, state: StateInputItem | str, filter: str) -> bool:
-        """ applies a filter to a state """
+        """applies a filter to a state"""
         import fnmatch
+
         if isinstance(state, str):
             key = state.casefold().strip()
         else:
@@ -1757,10 +1760,6 @@ class StateData:
         if filter in key.casefold():
             return True
         return fnmatch.fnmatch(key, filter)
-
-
-
-
 
     def clear(self):
         """clears all data"""
@@ -2933,7 +2932,6 @@ class StateInputItemModel(gremlin.input_item.InputItemListModel):
         )
 
 
-
 class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     """Widget used to configure state change actions"""
 
@@ -3076,9 +3074,10 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         def randomName(min_len=5, max_len=15):
             import string
+
             length = random.randint(min_len, max_len)
             letters = string.ascii_letters + string.digits
-            return ''.join(random.choices(letters, k=length))
+            return "".join(random.choices(letters, k=length))
 
         sd = self.profile.state
         count = 70
@@ -3086,10 +3085,9 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         for i in range(count):  # add 50 random states
             key = randomName()
             state = sd.register(key)
-            input_item = StateInputItem(key, data = state)
+            input_item = StateInputItem(key, data=state)
             self.inputItemListModel.add(input_item)
         self.inputItemListModel.popSuspend()
-
 
     def _load_handler(self, model: StateInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
@@ -3187,8 +3185,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             return True
         return fnmatch.fnmatch(key, self._filter)
 
-
-
     def onInputListViewCreated(self):
         """called when list view is created"""
         self.inputItemListView.item_edit.connect(self._edit_item_cb)
@@ -3199,7 +3195,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.inputItemListView.item_edit.disconnect(self._edit_item_cb)
         self.inputItemListView.item_closed.disconnect(self._close_item_cb)
 
-    def _handle_model_changed_cb(self, data = None, force : bool = False):
+    def _handle_model_changed_cb(self, data=None, force: bool = False):
         """called when the model changes"""
         self._filter_widget.updateCounts()
 
@@ -3553,7 +3549,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """called when the widget has to update itself on a data change"""
         pass
 
-    def _populate_input_widget_ui(self, input_widget, container_widget, data = None):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data=None):
         """called when a button is created for custom content"""
         layout = QtWidgets.QVBoxLayout(container_widget)
         status_widget = gremlin.ui.ui_common.QIconLabel()

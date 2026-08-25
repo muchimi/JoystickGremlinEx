@@ -1156,7 +1156,7 @@ class Settings:
         """enables a vjoy device as an input device"""
         self._vjoy_as_input[vid] = enabled
         syslog.info(f"Set vjoy as input: device [{vid}] enabled [{enabled}]")
-        el= gremlin.event_handler.EventListener()
+        el = gremlin.event_handler.EventListener()
         el.vjoy_as_input_changed.emit(vid, enabled)
 
     def getVjoyAsInput(self, vid) -> bool:
@@ -1165,11 +1165,9 @@ class Settings:
             return self._vjoy_as_input[vid]
         return False
 
-
     def getVjoyAsInputList(self) -> list[int]:
         """returns a list of vjoy device IDs that are configured as input devices"""
         return list(vid for vid, enabled in self._vjoy_as_input.items() if enabled)
-
 
     def get_vjoy_axis_enabled(self, vid, aid) -> bool:
         """true if the value is enabled for this axis"""

@@ -27,6 +27,8 @@ import time
 import shutil
 import uuid
 import json
+
+
 import dinput
 import win32api
 import win32con
@@ -2770,6 +2772,7 @@ class TriggerDict(collections.UserDict):
         """clears any change callbacks"""
         self._on_change_callbacks.clear()
 
+    
     def __setitem__(self, key, value):
         old_value = self.data.get(key)
         super().__setitem__(key, value)

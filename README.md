@@ -48,6 +48,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T34)
+- Fix: UI: keyboard/OSC/MIDI input visuals not displaying due to API changes resulting in undetected model changes.
+- Fix: API: use zero based internal indexing for models (vs 1 based for DINPUT)
+- Fix: API: handle keyboard/mouse releases broken in T31 due to logic changes.
+
 ### (m77T33)
 - Fix: UI: Mapping visuals not displaying due to API changes resulting in undetected model changes.
 - Fix: API: Latching events could call an incorrect mapping instance.  This involved more refactor of the latching API and how it functions, and now adds an override to the functor execution logic.

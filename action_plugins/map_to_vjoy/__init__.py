@@ -5865,6 +5865,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         """runs when a joystick even occurs like a button press or axis movement when a profile is running"""
         is_local, is_remote = self.action_data.sendFlags()
 
+
+
         verbose = self.verbose
         #verbose = True
         verbose_extra = self.verbose_extra
@@ -6185,8 +6187,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             trigger = False
             fire_event = (self.action_data.exec_on_release and not is_pressed) or (self.action_data.exec_on_press and is_pressed)
 
-            # if self.vjoy_input_id == 2:
-            #     syslog.info(f"=============================================================== button 2 set pressed {is_pressed}")
+
+
+            syslog.info(f"=============================================================== button set pressed {is_pressed}")
 
             match self.action_mode:
                 case VjoyAction.VJoyButton | VjoyAction.VJoyButtonInverted:
