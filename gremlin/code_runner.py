@@ -412,6 +412,8 @@ class CodeRunner:
                     event = gremlin.event_handler.Event(
                         event_type=InputType.State, device_guid=state_device_guid, identifier=input_item.input_id, extra_data={"input_item": input_item}
                     )
+                    magic = event.identifier
+                    self.event_handler.registerMappedInput(state_device_guid, master_mode, InputType.State, magic, input_item)
                     self.event_handler.addCallback(state_device_guid, master_mode, event, cb_data.callback, input_item.always_execute)
 
 

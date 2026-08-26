@@ -22,6 +22,8 @@ import random
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtCore import QModelIndex
 import threading
+
+
 import gremlin.config
 import gremlin.event_handler
 from gremlin.types import DeviceType
@@ -30,6 +32,7 @@ import gremlin.shared_state
 
 from gremlin.singleton_decorator import SingletonDecorator
 import re
+from gremlin.ui.osc_device import OscInputItem
 import gremlin.ui.ui_common
 from lxml import etree as ElementTree
 import gremlin.util
@@ -1768,8 +1771,12 @@ class StateData:
             self._id_map.clear()
             self.crud.emit()
 
-    def remove(self, key: str):
-        key = key.casefold().strip()
+    def remove(self, state : StateInputItem | str):
+
+        if isinstance(state, str):
+            key = state.casefold().strip()
+        else:
+            key = state.key
         if key in self._data:
             data = self._data[key]
             data.unhook()
@@ -2917,19 +2924,24 @@ class StateInputItemModel(gremlin.input_item.InputItemListModel):
         self,
         profile: gremlin.base_profile.Profile,
         custom_load_handler: Callable = None,
-        custom_remove_handler: Callable = None,
         custom_filter_handler: Callable = None,
+        custom_change_handler: Callable = None,
+        item_changed_handler: Callable = None,
     ):
+
         super().__init__(
             profile=profile,
             device_guid=StateDeviceTabWidget.device_guid,
             mode=gremlin.shared_state.master_mode,
             allowed_types=[InputType.State],
             custom_load_handler=custom_load_handler,
-            custom_remove_handler=custom_remove_handler,
+            custom_change_handler=custom_change_handler,
             custom_filter_handler=custom_filter_handler,
             show_master_mode=True,
         )
+
+        if item_changed_handler:
+            self.addOnItemChangedCallback(item_changed_handler)
 
 
 class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
@@ -3003,8 +3015,8 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         model = StateInputItemModel(
             profile,
             custom_load_handler=self._load_handler,
-            custom_remove_handler=self._remove_handler,
             custom_filter_handler=self._filter_data,
+            item_changed_handler=self.onItemChanged,
         )
 
         self.setInputItemListModel(model)
@@ -3066,6 +3078,20 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
         el.find_next.connect(self._handle_find_next)
+
+    def onItemChanged(self, model, index, new_item, old_item, operation):
+        redraw = False
+        sd = StateData()
+        match operation:
+            case "add":
+                # handle add operation
+                sd.add(new_item)
+                redraw = True
+            case "remove":
+                sd.remove(old_item)
+                redraw = True
+        if redraw:
+            self.inputItemListView.redraw()  # tell the list it needs to update on add/remove operations
 
     def _test_input_cb(self):
         """called when the test button is pressed"""
@@ -3134,39 +3160,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if changed and emit:
             model.trigger()  # causes an update
         return changed
-
-    def _remove_handler(self, model: StateInputItemModel, index, emit_change=True):
-        """clears a single index"""
-
-        sd = StateData()
-
-        if index in model._index_map:
-            del model._index_map[index]
-            item = next((key for key, data in model._item_map.items() if data == index), None)
-            if item:
-                del model._item_map[item]
-
-            # source items
-            source_index = next(
-                (i for i, data in model._source_index_map.items() if data.input_id == item),
-                -1,
-            )
-            if source_index != -1:
-                del model._source_index_map[source_index]
-                item = next(
-                    (key for key, data in model._source_item_map.items() if data == source_index),
-                    None,
-                )
-                if item:
-                    del model._source_item_map[item]
-
-            model._update_filter()
-
-            key = item.key
-            sd = StateData()
-            sd.remove(key)
-            self._load_handler(model, emit_change)
-            self._filter_widget.updateCounts()
 
     def _filter_data(self, input_item) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
@@ -3362,6 +3355,7 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         finally:
             self._edit_dialog.deleteLater()
             self._edit_dialog = None
+            self.inputItemListView.redraw()
 
     def _sort_input_cb(self):
         """sorts states by key name"""

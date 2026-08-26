@@ -2286,8 +2286,8 @@ class ContainerCallback:
                     extra_data = event.extra_data
                 else:
                     extra_data.update(event.extra_data)
-                if event.identifier == 23:
-                    pass
+                # if event.identifier == 23:
+                #     pass
                 ec.execute_node(node, event, shared_value, extra_data)
 
 

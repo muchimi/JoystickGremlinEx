@@ -2509,6 +2509,17 @@ class EventHandler(QtCore.QObject):
             extra_data={"container": container, "input_item": input_item, "latched": True, "action_data": functor.action_data},
         )
 
+    def registerMappedInput(self, device_guid, mode, input_type, magic, input_item):
+        """Registers a mapped input item for the given device, mode, input type, and magic value"""
+        if device_guid not in self.input_item_map:
+            self.input_item_map[device_guid] = {}
+        if mode not in self.input_item_map[device_guid]:
+            self.input_item_map[device_guid][mode] = {}
+        if input_type not in self.input_item_map[device_guid][mode]:
+            self.input_item_map[device_guid][mode][input_type] = {}
+
+        self.input_item_map[device_guid][mode][input_type][magic] = input_item
+
     def triggerContainerCallback(self, container, event):
         """Creates a callback for the given container - this allows latched inputs to issue a trigger at the container node level so conditions are handled"""
         callback = container.extra_data.get("callback", None)
@@ -2562,8 +2573,12 @@ class EventHandler(QtCore.QObject):
 
             case InputType.KeyboardLatched:
                 magic = json.dumps(event.identifier)
+            case InputType.State:
+                mode = gremlin.shared_state.master_mode # states use master mode
+                magic = event.identifier
             case _:
                 magic = event.identifier
+
 
         key = event.callbackKey
         # verbose = True
@@ -3396,6 +3411,7 @@ class EventHandler(QtCore.QObject):
 
             input_item: gremlin.input_item.InputItem = None
             callback: Callable = None
+
             data = self._matching_input_item(mode, event)
             if isinstance(data, LatchedCallbackData):
                 input_item, callback = data.input_item, data.callback

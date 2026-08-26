@@ -1,6 +1,6 @@
 # -*- coding: utf-8; -*-
 
-# Copyright (c) 2024 EMCS
+# Based in part on original Joystick Gremlin work by Lionel Ott and other contributors - Gremlin Ex is (C) EMCS 2026
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,11 +14,10 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# this code is build on Gremlin work by Lionel Ott
 
 import logging
 import threading
+
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore
@@ -47,7 +46,7 @@ class ButtonContainerWidget(AbstractContainerWidget):
 
     """
 
-    def __init__(self, input_item : gremlin.input_item.AbstractInputItem, container : "ButtonContainer", parent=None):  # noqa: F821
+    def __init__(self, input_item: gremlin.input_item.AbstractInputItem, container: "ButtonContainer", parent=None):  # noqa: F821
         """Creates a new instance.
 
         :param input_item the input item represented by this widget
@@ -156,7 +155,10 @@ class ButtonContainerWidget(AbstractContainerWidget):
         widget = gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
         layout.addWidget(widget)
 
-        widget = self._create_action_set_widget(action_set=self.container.action_sets[index], view_type=view_type)
+        action_set = self.container.action_sets[index]
+        # syslog.info(f"Action count for index [{index}] {len(action_set) if action_set is not None else 0}")
+
+        widget = self._create_action_set_widget(action_set=action_set, view_type=view_type)
         layout.addWidget(widget)
         widget.redraw()
         widget.model.data_changed.connect(self._handle_container_changed)
@@ -306,40 +308,63 @@ and another action on trigger release in a single container."""
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(parent, node, extra_data=extra_data)
+        super().__init__(parent, node, extra_data=extra_data, custom_action_sets=True, custom_parse_callback=self._parse_actionset_xml)  # indicate we use custom action sets
         self.delay = 0.5
         self.activate_on = "release"
         self.autorelease = True
         self.autorelease_delay = 250  # delay for autorelease trigger if in autorelease mode
         # self.actionsetCustomParseCallback = self._parse_action_xml
-        self.press_action_set = gremlin.input_item.ActionSet(model_description = "press actions")
-        self.release_action_set = gremlin.input_item.ActionSet(model_description = "release actions")
+        self.press_action_set = gremlin.input_item.ActionSet(model_description="press actions")
+        # self.press_action_set.addOnItemChangedCallback(self.OnPressActionSetChanged)
+        self.release_action_set = gremlin.input_item.ActionSet(model_description="release actions")
+        # self.release_action_set.addOnItemChangedCallback(self.OnReleaseActionSetChanged)
+        self._ensure_action_sets()
+
+    # def OnPressActionSetChanged(self, model, index: int, new_item, old_item, operation):
+    #     syslog.info(f"Press action set changed: [{len(model)}] operation: {operation}")
+    #     pass
+
+    # def OnReleaseActionSetChanged(self, model, index: int, new_item, old_item, operation):
+    #     syslog.info(f"Release action set changed: [{len(model)}] operation: {operation}")
+    #     pass
+
+
+    def _ensure_action_sets(self):
         self.action_sets.clear()
-        self.action_sets.add(self.press_action_set) # 0
-        self.action_sets.add(self.release_action_set) # 1
-
-
+        self.action_sets.add(self.press_action_set, 0)  # 0
+        self.action_sets.add(self.release_action_set, 1)  # 1
 
     def resetActionSets(self):
         """resets actions sets - override in derived class if the action set default should be different"""
         self.press_action_set.clear()
         self.release_action_set.clear()
 
+    def _parse_actionset_xml(self, node, action_set, extra_data=None):
+        """ read custom action sets """
+        self.resetActionSets()
+        as_nodes = node.xpath(".//action-set")
+        for index, as_node in enumerate(as_nodes):
+            if index == 0:
+                self._parse_action_xml(as_node, self.press_action_set, extra_data=extra_data)
+            elif index == 1:
+                self._parse_action_xml(as_node, self.release_action_set, extra_data=extra_data)
 
+        # syslog.info(f"press action set: [{len(self.press_action_set)}] release action set: [{len(self.release_action_set)}]")
+        # pass
 
-
-    def _parse_xml(self, node, data=None, extra_data=None):
+    def _parse_xml(self, node, input_item=None, extra_data=None):
         """Populates the container with the XML node's contents.
 
         :param node the XML node with which to populate the container
         """
-        self.resetActionSets()
-        super()._parse_xml(node, data)
+
+
+        super()._parse_xml(node, input_item)
         if "autorelease" in node.attrib:
             self.autorelease = safe_read(node, "autorelease", bool, True)
         if "delay" in node.attrib:
             self.autorelease_delay = safe_read(node, "delay", int, 250)
-
+        syslog.info(f"press action set: [{len(self.press_action_set)}] release action set: [{len(self.release_action_set)}]")
 
 
     def _generate_xml(self):
@@ -353,7 +378,6 @@ and another action on trigger release in a single container."""
         node.set("delay", safe_format(self.autorelease_delay, int))
 
         return node
-
 
     def _is_container_valid(self):
         """Returns whether or not this container is configured properly.

@@ -86,12 +86,6 @@ class KeyboardInputItem(InputItem):
             return self._key.message_key
         return super().identifier
 
-    # override description property to provide custom tooltip for this input item
-
-    @property
-    def description(self) -> str:
-        return None
-
     def _handle_get_sort_key(self, input_item: KeyboardInputItem):
         """sorting key for this input item"""
         if not self._key.name:

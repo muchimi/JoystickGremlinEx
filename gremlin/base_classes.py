@@ -274,14 +274,12 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
     input_type_change = Signal(object)  # fires when an input item needs to refresh the output mapping due to input type changed
 
-    def __init__(self, mode: str | object, device_guid : dinput.GUID | str, input_type: InputType):
-
+    def __init__(self, mode: str | object, device_guid: dinput.GUID | str, input_type: InputType):
 
         super().__init__()
 
         self._id = uuid.uuid4()  # GUID (unique) if loaded from XML - will reload that one
         self._guid = str(self.id).replace("-", "")
-
 
         self._device_guid = device_guid
         self._device_type = DeviceType.NotSet
@@ -310,8 +308,6 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
             self._profile_mode = mode.name
         self._sort_index: int = None  # sorting index (int)
         self._input_id_callback = None  # optional callback
-
-
 
     def setInputIdCallback(self, callback: Callable):
         """callback to use (optional) to get the input id"""
@@ -506,7 +502,6 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 
             self._input_id = value
 
-
     @property
     def device_guid(self):
         """device guid"""
@@ -562,7 +557,7 @@ class AbstractInputItem(QtCore.QObject, metaclass=ABCMetaQObject):
 class SpecialInputItem(AbstractInputItem):
     """specialized input item"""
 
-    def __init__(self, name : str, mode, device_guid):
+    def __init__(self, name: str, mode, device_guid):
         super().__init__(mode, device_guid)
         self._display_name = name
         self._description = "Special Virtual Input"
@@ -654,7 +649,7 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
     configuration and to easily load and store them.
     """
 
-    def __init__(self, parent, extra_data : dict = None):
+    def __init__(self, parent, extra_data: dict = None):
         """Creates a new instance.
 
         :param: parent the parent item of this instance in the profile tree (type: InputItem)
@@ -680,9 +675,6 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
         else:
             self.override_input_type = None
             self.override_input_id = None
-
-
-
 
     def icon(self):
         """gets the default icon"""
@@ -807,8 +799,8 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
             return profile.devices[device_guid]
         return None
 
-    def setHardwareInputIdCallback(self, callback : Callable):
-        """Sets a callback to be invoked when a hardware input id is needed """
+    def setHardwareInputIdCallback(self, callback: Callable):
+        """Sets a callback to be invoked when a hardware input id is needed"""
         self._hardware_input_id_callback = callback
 
     def getHardwareInputIdCallback(self):
@@ -971,6 +963,7 @@ class AbstractCallbackModel(AbstractModel):
         removed_callback: Callable = None,
         allowed_types: tuple = None,
         model_description: str = None,
+        item_changed_callback: Callable = None,
         data=None,
     ):
         """callback enabled model
@@ -979,23 +972,30 @@ class AbstractCallbackModel(AbstractModel):
         :param sort_callback: optional sorting callback for models that need sorted data - sends the list of items in the model and the return should be a list of indices for each item in the order of appearance
         :param added_callback: optional callback when an item is added to the model (unfiltered) - returns (item, unfiltered index, filtered index) - index is -1 if not found
         :param removed_callback: optional callback when an item is removed from the model (unfiltered)
-        :param allowable types: optiona list of allowable types in the model
+        :param allowable types: optional list of allowable types in the model
+        :param data_changed_callback: optional callback when the model data changes (onItemChanged (model, index, new_item, old_item, operation))
+        :param data: optional initial data for the model
 
         """
         super().__init__()
         self._old_hash = None  # last change hash
-        self._data_changed_callbacks = []
         self._item_changed_callbacks = [self.onItemChanged]
+        self._data_changed_callbacks = []
+
+        if change_callback:
+            self._data_changed_callbacks.append(change_callback)
+
+        if item_changed_callback:
+            self._item_changed_callbacks.append(item_changed_callback)
 
         self._index_map = TriggerDict()  # map of input_id to index
         self._index_map.addCallback(self._handle_data_changed)  # only track one of the two maps as a change in one also changes the other
         self._item_map = TriggerDict()  # map of input_id to index
         self._extra_data = data
 
-
         # assume no filters
-        self._filtered_index_map = TriggerDict() # map of index : int to item : object
-        self._filtered_item_map = TriggerDict() # map of item : object to index : int
+        self._filtered_index_map = TriggerDict()  # map of index : int to item : object
+        self._filtered_item_map = TriggerDict()  # map of item : object to index : int
 
         self._filtered_callback: Callable = None
         self._sort_callback: Callable = None
@@ -1026,7 +1026,7 @@ class AbstractCallbackModel(AbstractModel):
         if change_callback:
             self.addCallback(change_callback)
 
-    def setItemAt(self, index: int, item, emit = True):
+    def setItemAt(self, index: int, item, emit=True):
         """sets the item for the specific index"""
         # ensure the item is hashable
         assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
@@ -1102,10 +1102,9 @@ class AbstractCallbackModel(AbstractModel):
         if item is None:
             return -1
 
-        items =  item if isinstance(item, list) else [item]
+        items = item if isinstance(item, list) else [item]
 
         for item in items:
-
             if self._allowed_types:
                 if not isinstance(item, self._allowed_types):
                     raise ValueError(f"invalid data type for model - got [{type(item).__name__}] - expected one of {self._allowed_types}")
@@ -1132,11 +1131,8 @@ class AbstractCallbackModel(AbstractModel):
         for callback in self._item_changed_callbacks:
             callback(model, index, new_item, old_item, operation)
 
-
-
     def onItemChanged(self, model, index: int, new_item, old_item, operation):
         pass
-
 
     def insert(self, i, item, emit=True):
         """inserts an item
@@ -1192,19 +1188,16 @@ class AbstractCallbackModel(AbstractModel):
         for new_index, item in enumerate(self._index_map.values()):
             self._item_map[item] = new_index
         self._index_map = TriggerDict.copyFrom({new_index: item for new_index, item in enumerate(self._index_map.values())})
-        self.applyFilter(emit=False) # update filtered data as well
+        self.applyFilter(emit=False)  # update filtered data as well
         verbose = gremlin.config.Configuration().verbose_mode_execution
         if verbose:
             syslog.info("Reindex results:")
             for index, item in self._filtered_index_map.items():
                 syslog.info(f"Filtered index [{index}] maps to item [{item}]")
 
-
-
     def remove(self, item, emit=True):
         """Removes the given entry from the model."""
         if item in self._item_map:
-
             # syslog.info(f"removing item {item.id} from model {self.id} current count: {self.count()}")
             index = self._item_map[item]
             if hasattr(item, "_cleanup"):
@@ -1218,6 +1211,9 @@ class AbstractCallbackModel(AbstractModel):
             if emit:
                 self._fireChanged()
             self._onItemChanged(self, index, None, item, "remove")
+        else:
+            if __debug__:
+                syslog.info(f"MODEL: Item not found in remove: {item}")
 
     def removeAt(self, index: int, emit=True):
         """removes the entry at the given filteredmodel index"""
@@ -1232,6 +1228,9 @@ class AbstractCallbackModel(AbstractModel):
             if emit:
                 self._fireChanged()
             self._onItemChanged(self, index, None, item, "remove")
+        else:
+            if __debug__:
+                syslog.info(f"MODEL: Index not found in removeAt: {index}")
 
     def removeRow(self, index: int, emit=True):
         """removes the entry at the given model index"""
@@ -1258,7 +1257,6 @@ class AbstractCallbackModel(AbstractModel):
             return self._index_map[index]
         return None
 
-
     @property
     def extraData(self):
         """returns the item stored at the given index, None if not found (same as data)"""
@@ -1268,8 +1266,6 @@ class AbstractCallbackModel(AbstractModel):
     def extraData(self, value):
         """sets the extra data for the model"""
         self._extra_data = value
-
-
 
     def itemAt(self, index: int):
         """gets the filtered item at the given index if it exists"""
@@ -1296,10 +1292,10 @@ class AbstractCallbackModel(AbstractModel):
         if item in self._filtered_item_map:
             return self._filtered_item_map[item]
         if __debug__:
-            syslog.info(f"Item not found in filtered item map: {item}")
-            syslog.info(f"Filtered item map contents: item count: {len(self._filtered_item_map)}")
+            syslog.info(f"MODEL: Item not found in filtered item map: {item}")
+            syslog.info(f"\tFiltered item map contents: item count: {len(self._filtered_item_map)}")
             for key in self._filtered_item_map:
-                syslog.info(f"\tmodel [{key}]: {self._filtered_item_map[key]}")
+                syslog.info(f"\t\t[{key}]: {self._filtered_item_map[key]}")
 
         return -1
 
@@ -1313,7 +1309,7 @@ class AbstractCallbackModel(AbstractModel):
 
     def push(self, item):
         """adds the item to the model and returns its zero based index"""
-        index = len(self._index_map)-1
+        index = len(self._index_map) - 1
         self._index_map[index] = item
         self._item_map[item] = index
         self._filtered_index_map[index] = item
@@ -1425,7 +1421,7 @@ class AbstractCallbackModel(AbstractModel):
             force = True
 
         current_hash = self.hashKey()
-        self.applySort(emit = False)
+        self.applySort(emit=False)
         new_hash = self.hashKey()
         if current_hash != new_hash:
             # sort changed the order
@@ -1452,7 +1448,7 @@ class AbstractCallbackModel(AbstractModel):
                 if item in self._filtered_item_map:
                     return self._filtered_item_map[item]  # already filtered
 
-                index = len(self._filtered_index_map)-1 # zero based
+                index = len(self._filtered_index_map) - 1  # zero based
                 self.pushSuspend()
 
                 self._filtered_index_map[index] = item
@@ -1570,13 +1566,12 @@ class AbstractCallbackModel(AbstractModel):
         """returns the list of unfiltered items"""
         return self._index_map.values()
 
-    def getSequentialItemIndex(self, index : int):
-        """returns the item by sequential index in the filtered list """
+    def getSequentialItemIndex(self, index: int):
+        """returns the item by sequential index in the filtered list"""
         items = list(self._filtered_index_map.values())
         if index >= 0 and index < len(items):
             return items[index]
         return None
-
 
     def getFilteredMap(self):
         """gets index,input_item tuples for all filtered items in the model"""
@@ -1632,16 +1627,16 @@ class AbstractCallbackModel(AbstractModel):
                 raise TypeError("Callback must be callable")
             # ensure the callback has the correct signature
             import inspect
+
             sig = inspect.signature(callback)
             if len(sig.parameters) != 2:
                 raise TypeError("Callback must accept exactly two parameters: data and force")
-
 
         if callback not in self._data_changed_callbacks:
             self._data_changed_callbacks.append(callback)
 
     def addOnItemChangedCallback(self, callback: Callable):
-        """ adds a OnitemChanged callback that includes the operation and the old value, and new value as parameters"""
+        """adds a OnitemChanged callback that includes the operation and the old value, and new value as parameters"""
         if callback not in self._item_changed_callbacks:
             self._item_changed_callbacks.append(callback)
 
@@ -1691,6 +1686,7 @@ class AbstractCallbackModel(AbstractModel):
     def _fireChanged(self, force=False, emit=False):
         """fires a data changed signal if the data has changed or if force is true"""
         import gremlin.shared_state
+
         if self._suspend_stack and self._change_pending and not force:
             return
         if gremlin.shared_state.is_running:
@@ -1711,7 +1707,7 @@ class AbstractCallbackModel(AbstractModel):
             self._old_hash = new_hash
 
             for callback in self._data_changed_callbacks:
-                callback(self._extra_data, force = force)
+                callback(self._extra_data, force=force)
 
             if emit:
                 self.data_changed.emit()  # indicate the model changed
@@ -1721,9 +1717,6 @@ class AbstractCallbackModel(AbstractModel):
     def __hash__(self):
         """unique hash value of model contents"""
         return hash((self.id, frozenset(self._index_map.values())))
-
-
-
 
 
 # class FastQueueOld:
@@ -1998,7 +1991,7 @@ class FastQueue(Generic[T]):
     class Empty(Exception):
         """Raised when an item cannot be retrieved because the queue is empty."""
 
-    def __init__(self, maxsize: int = 0, name : str = None) -> None:
+    def __init__(self, maxsize: int = 0, name: str = None) -> None:
         if maxsize < 0:
             raise ValueError("maxsize must be non-negative")
         self.name = name
@@ -2061,7 +2054,7 @@ class FastQueue(Generic[T]):
         if not available:
             raise self.Full("Queue is full (timeout)")
 
-    def put(self,item: T, block: bool = True, timeout: float | None = None) -> bool:
+    def put(self, item: T, block: bool = True, timeout: float | None = None) -> bool:
         """Add an item to the back of the queue."""
 
         with self._condition:
@@ -2157,7 +2150,7 @@ class FastQueue(Generic[T]):
 
         return self.get(block, timeout)
 
-    def getbatch( self,  max_batch_size: int,  block: bool = True,  timeout: float | None = None) -> list[T]:
+    def getbatch(self, max_batch_size: int, block: bool = True, timeout: float | None = None) -> list[T]:
         """Remove and return up to max_batch_size items from the front."""
 
         if max_batch_size <= 0:
@@ -2167,10 +2160,7 @@ class FastQueue(Generic[T]):
             self._wait_for_item(block, timeout)
 
             batch_size = min(max_batch_size, len(self._queue))
-            batch = [
-                self._queue.popleft()
-                for _ in range(batch_size)
-            ]
+            batch = [self._queue.popleft() for _ in range(batch_size)]
 
             # Multiple producers may now be able to continue.
             self._condition.notify_all()
@@ -2263,10 +2253,7 @@ class FastQueue(Generic[T]):
         """Return True when the bounded queue is full."""
 
         with self._condition:
-            return (
-                self.maxsize > 0
-                and len(self._queue) >= self.maxsize
-            )
+            return self.maxsize > 0 and len(self._queue) >= self.maxsize
 
     def snapshot(self) -> list[T]:
         """Return a point-in-time list of queued items."""
@@ -2303,8 +2290,4 @@ class FastQueue(Generic[T]):
 
     def __repr__(self) -> str:
         with self._condition:
-            return (
-                f"{type(self).__name__}("
-                f"maxsize={self.maxsize}, "
-                f"items={list(self._queue)!r})"
-            )
+            return f"{type(self).__name__}(maxsize={self.maxsize}, items={list(self._queue)!r})"

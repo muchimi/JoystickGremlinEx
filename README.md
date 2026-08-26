@@ -49,9 +49,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 # Change log
 
 ### (m77T34)
+- Change: UI: added view model behavior to input visuals to simplify UI update logic where possible.
 - Fix: UI: keyboard/OSC/MIDI input visuals not displaying due to API changes resulting in undetected model changes.
+- Fix: UI: OSC inputs not displaying input information.
 - Fix: API: use zero based internal indexing for models (vs 1 based for DINPUT)
 - Fix: API: handle keyboard/mouse releases broken in T31 due to logic changes.
+- Fix: API: state device trigger - register inputs for new execution logic
+- Fix: UI: state device - state list does not update after add/remove
+- Fix: Press/Release (button container): mappings could reset after loading causing blank displays even if mappings are loaded.
 
 ### (m77T33)
 - Fix: UI: Mapping visuals not displaying due to API changes resulting in undetected model changes.

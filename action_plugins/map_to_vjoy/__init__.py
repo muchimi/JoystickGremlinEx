@@ -5771,13 +5771,13 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         #     # merged axis data is handled by the internal hook - ignore
         #     return True
 
-        if extra_data and "action_data" in extra_data:
-            new_action_data = extra_data["action_data"]
-        else:
-            new_action_data = None
-        syslog.info(f"Process VJoyRemapFunctor for action_data id: [{self.action_data.id}]  new action data: [{new_action_data.id if new_action_data else 'None'}]")
-        syslog.info(f"\tAction mode: {self.action_data.action_mode.name}")
-        syslog.info(f"\tInput item: {self.action_data.input_item.display_name if self.action_data.input_item else 'None'}")
+        # if extra_data and "action_data" in extra_data:
+        #     new_action_data = extra_data["action_data"]
+        # else:
+        #     new_action_data = None
+        # syslog.info(f"Process VJoyRemapFunctor for action_data id: [{self.action_data.id}]  new action data: [{new_action_data.id if new_action_data else 'None'}]")
+        # syslog.info(f"\tAction mode: {self.action_data.action_mode.name}")
+        # syslog.info(f"\tInput item: {self.action_data.input_item.display_name if self.action_data.input_item else 'None'}")
 
 
         # check the event is ours for latching input scenarios
