@@ -1197,9 +1197,17 @@ class AbstractCallbackModel(AbstractModel):
 
     def remove(self, item, emit=True):
         """Removes the given entry from the model."""
-        if item in self._item_map:
-            # syslog.info(f"removing item {item.id} from model {self.id} current count: {self.count()}")
+
+        if item in self._index_map:
+            index = item
+            item = self._index_map[index]
+        elif item in self._item_map:
             index = self._item_map[item]
+        else:
+            index = -1
+
+        if index != -1:
+            # syslog.info(f"removing item {item.id} from model {self.id} current count: {self.count()}")
             if hasattr(item, "_cleanup"):
                 item._cleanup()
             del self._item_map[item]
@@ -1213,7 +1221,14 @@ class AbstractCallbackModel(AbstractModel):
             self._onItemChanged(self, index, None, item, "remove")
         else:
             if __debug__:
-                syslog.info(f"MODEL: Item not found in remove: {item}")
+                syslog.info(f"MODEL: Item not found in remove: {item} hash[{hash(item)}]")
+                syslog.info(f"  Current item map: model size: {len(self._item_map)}")
+                index = 0
+                for key, item in self._item_map.items():
+                    syslog.info(f"  [{index}] Item map key [{str(key)}] hash[{hash(key)}] maps to item [{str(item)}]")
+                    index +=1
+                pass
+
 
     def removeAt(self, index: int, emit=True):
         """removes the entry at the given filteredmodel index"""

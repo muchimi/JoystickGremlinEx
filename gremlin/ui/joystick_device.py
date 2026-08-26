@@ -39,7 +39,7 @@ from shiboken6 import Shiboken
 from psygnal import Signal
 import gremlin.util
 from gremlin.util import parse_bool, safe_read, safe_format, parse_guid, write_guid, load_icon
-from gremlin.input_item import InputItem, BaseAbstractCondition, AbstractConditionWidget, AbstractContainer, AbstractAction
+from gremlin.input_item import InputItem, BaseAbstractCondition, AbstractConditionWidget, AbstractContainer, AbstractAction, AbstractCondition
 import dinput
 
 
@@ -148,14 +148,14 @@ class BaseJoystickCondition(BaseAbstractCondition):
 class JoystickConditionWidget(AbstractConditionWidget):
     """Widget allowing the configuration of a joystick based condition."""
 
-    def __init__(self, condition, parent=None):
-        """Creates a new widget.
+    def __init__(self,
+                condition: AbstractCondition | BaseAbstractCondition,
+                remove_callback : Callable = None,
+                extra_data: dict = None,
+                parent=None):
 
-        :param condition_data the data to be represented by the widget
-        :param parent the parent of this widget
-        """
+        super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
         self.input_event = None
-        super().__init__(condition, parent)
         self.setTitle("Joystick Condition")
 
     def _create_ui(self, extra_data: dict = None):
@@ -170,7 +170,7 @@ class JoystickConditionWidget(AbstractConditionWidget):
 
         self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label="Listen", callback=self._request_user_input)
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
-            callback=lambda: self.deleted.emit(self.condition),
+            callback=self.handle_remove,
             tooltip="Delete condition",
         )
 

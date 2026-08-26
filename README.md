@@ -48,6 +48,16 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T35)
+- Change: API: keyboard condition supports latched keys
+- Fix: Play Sound Action: selecting TTS legacy mode causes an exception.
+- Fix: UI: condition list not refreshing when a condition is added or removed.
+- Fix: UI: compound actions not refreshing when a new container section is added or removed.
+- Fix: UI: condition count not refreshing when a condition is added or removed.
+- Fix: UI: keyboard/mouse listener displays pressed keys/mouse buttons in multi-key mode
+- Fix: Keyboard condition: listen button functionality (single and multikey)
+- Fix: Map to KeyboardEx action: listen button functionality (single and multikey)
+
 ### (m77T34)
 - Change: UI: added view model behavior to input visuals to simplify UI update logic where possible.
 - Fix: UI: keyboard/OSC/MIDI input visuals not displaying due to API changes resulting in undetected model changes.

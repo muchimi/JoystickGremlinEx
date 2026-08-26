@@ -118,7 +118,7 @@ class KeyboardCondition(AbstractCondition):
         :param is_extended whether or not the key code is extended
         :param comparison the comparison operation to perform when evaluated
         """
-        assert isinstance(input_item, gremlin.ui.keyboard_device.KeyboardInputItem), "invalid input_item for keyboard condition"
+        assert isinstance(input_item, gremlin.keyboard.Key), "invalid input_item for keyboard condition"
         super().__init__(comparison, container_condition)
         self.input_item = input_item
 
@@ -134,13 +134,20 @@ class KeyboardCondition(AbstractCondition):
         :return True if the condition is satisfied, False otherwise
         """
         # key_pressed = gremlin.input_devices.Keyboard().is_pressed(self.key)
-        verbose = gremlin.config.Configuration().verbose_mode_condition
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_condition or config.verbose_mode_execution
         syslog = logging.getLogger("system")
+        # verbose = True
 
         if verbose:
             logtabs = gremlin.shared_state.logTabs(True)
 
-        key_pressed = self.input_item.latched
+        key = self.input_item
+        if not key:
+            return True # no key = pass
+
+
+        key_pressed = key.latched
         if self.comparison == "pressed":
             state = key_pressed
         else:

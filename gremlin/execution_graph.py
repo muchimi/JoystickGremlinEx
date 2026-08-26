@@ -1047,7 +1047,7 @@ class ExecutionContext:
             else:
                 conditions.append(self._convert_condition(condition))
 
-        return gremlin.input_item.BaseActivationCondition(conditions, activation_condition.rule)
+        return gremlin.input_item.BaseActivationCondition(target=target, conditions = conditions, rule=activation_condition.rule)
 
     def _get_condition_node(self, owner, parent=None):
         """gets a condition node"""

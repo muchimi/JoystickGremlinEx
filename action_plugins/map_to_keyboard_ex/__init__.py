@@ -284,35 +284,13 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
     def _update_keys(self, keys):
         gremlin.util.InvokeUiMethod(self._update_keys_ui, keys)
 
-    def _update_keys_ui(self, keys):
+    def _update_keys_ui(self, key_list: list[Key]):
         """Updates the storage with a new set of keys.
 
-        :param keys the keys to use in the key combination
+        :param key_list the keys to use in the key combination
         """
-
-        if isinstance(keys, gremlin.windows_event_hook.MouseEvent):
-            # if not keys.is_pressed:
-            #     return # ignore releases
-            # mouse input
-            key = gremlin.keyboard.key_from_mousebutton(keys.button_id)
-            syslog.info(f"keyboard <- mouse: {keys.button_id}")
-            if not key:
-                return
-            keys = [key]
-
-        data = []
-        for code in keys:
-            if isinstance(code, tuple):
-                key = gremlin.keyboard.KeyMap.find(code[0], code[1])
-            elif isinstance(code, int):
-                key = gremlin.keyboard.KeyMap.find_virtual(code)
-            elif isinstance(code, Key):
-                key = code
-            else:
-                assert True, f"Don't know how to handle: {code}"
-            data.append(key)
-
-        self.action_data.setKeys(sort_keys(data))
+        
+        self.action_data.setKeys(sort_keys(key_list))
         gremlin.util.InvokeUiMethod(self._populate_ui)  # reload new keys
 
         self.action_modified.emit()
@@ -418,8 +396,10 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
 
     def _record_keys_ui(self, multi_keys):
         """Prompts the user to press the desired key combination. - runs on UI thread"""
-
-        button_press_dialog = gremlin.ui.ui_common.InputListenerWidget([InputType.Keyboard], return_kb_event=False, multi_keys=multi_keys)
+        gremlin.shared_state.push_suspend_highlighting()
+        button_press_dialog = gremlin.ui.ui_common.InputListenerWidget([InputType.Keyboard, InputType.Mouse],
+                                                                        return_kb_event=False,
+                                                                        multi_keys=multi_keys)
 
         button_press_dialog.item_selected.connect(self._update_keys)
         button_press_dialog.keyInput.connect(self._handle_key_input)
@@ -445,6 +425,7 @@ class MapToKeyboardExWidget(gremlin.input_item.AbstractActionWidget):
             keys = self.action_data.keys
 
         self._update_keys_ui(keys)
+        gremlin.shared_state.pop_suspend_highlighting()
 
 
 class MapToKeyboardExFunctor(gremlin.base_profile.AbstractFunctor):
@@ -1256,17 +1237,19 @@ Can also send mouse buttons, mouse wheel events."""
                 assert True, f"Don't know how to handle: {code}"
 
             if key.name:
-                comment = (
-                    f"virtual: {key.name} 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
-                )
-                key_node = ElementTree.Element("key")
-                key_node.set("virtual-code", str(virtual_code))
-                key_node.set("scan-code", str(scan_code))
-                key_node.set("extended", str(is_extended))
-                # useful for xml readability purposes = what scan code is this
-                key_node.set("description", key.name)
-                node_comment = etree.Comment(comment)
-                node.append(node_comment)
+                key_node = key.to_xml()
+                # comment = (
+                #     f"virtual: {key.name} 0x{key.virtual_code:x}/{key.virtual_code} scan code: 0x{key.scan_code:x}/{key.scan_code} extended: {key.is_extended}"
+                # )
+
+                # key_node = ElementTree.Element("key")
+                # key_node.set("virtual-code", str(virtual_code))
+                # key_node.set("scan-code", str(scan_code))
+                # key_node.set("extended", str(is_extended))
+                # # useful for xml readability purposes = what scan code is this
+                # key_node.set("description", key.name)
+                # node_comment = etree.Comment(comment)
+                # node.append(node_comment)
                 node.append(key_node)
 
         node.set("sync-mode", safe_format(self.sync_mode, int))

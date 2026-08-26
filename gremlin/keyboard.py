@@ -27,6 +27,8 @@ import gremlin.sendinput
 import win32gui
 import win32process
 import time
+from lxml import etree
+from gremlin.util import parse_bool, safe_format, safe_read
 
 # from gremlin.base_classes import TraceableList
 
@@ -143,6 +145,7 @@ class Key:
                         mouse_button = MouseButton.DoubleLeft
 
             self._mouse_button = mouse_button
+            self._lookup_name = MouseButton.to_lookup_string(mouse_button)
 
         self._name = name
         self._is_mouse = is_mouse
@@ -225,9 +228,10 @@ class Key:
                 raise ValueError(f"Don't know how to handle mouse button name: {name}")
             scan_code = mouse_button.value + 0x1000  # makes it unique in the tuple
             virtual_code = scan_code
-            name = MouseButton.to_string(mouse_button)
-            self._lookup_name = name
 
+            self._lookup_name = MouseButton.to_lookup_string(mouse_button)
+
+            name = MouseButton.to_string(mouse_button)
             if name and len(name) == 1:
                 name = name.upper()
             self._name = name
@@ -259,10 +263,9 @@ class Key:
         self._update()
 
     # duplicate
-    def duplicate(self):
+    def duplicate(self) -> Key:
         """' creates a copy of this key"""
         import copy
-
         new_key = copy.deepcopy(self)
         return new_key
 
@@ -278,7 +281,7 @@ class Key:
         return self._mouse_button
 
     @mouse_button.setter
-    def mouse_button(self, button : MouseButton):
+    def mouse_button(self, button: MouseButton):
         """sets a mouse button"""
         scan_code = button.value + 0x1000
         self._mouse_button = button
@@ -286,8 +289,6 @@ class Key:
         self._scan_code = scan_code
         self._virtual_code = scan_code
         self._update()
-
-
 
     def _update(self):
 
@@ -297,7 +298,7 @@ class Key:
                 keys.append(self)
 
             keys.extend(self._latched_keys)
-            keys = set(keys) # unique
+            keys = set(keys)  # unique
             # order the key by modifier
             keys = sort_keys(keys)
             result = ""
@@ -348,15 +349,8 @@ class Key:
 
         el = EventListener()
         # assume the current key is pressed
-        latched = el.get_key_state(self)
-        if latched and len(self._latched_keys) > 0:
-            # check the latched keys
-            for key in self._latched_keys:
-                if not el.get_key_state(key):
-                    # one key isn't pressed = not latched
-                    return False
-
-        # syslog.info(f"latch check: key {self.name} latched: {latched}")
+        latched_keys = self.getKeys()
+        latched = all(el.get_key_state(key) for key in latched_keys)
         return latched
 
     @property
@@ -392,10 +386,6 @@ class Key:
         data = tuple(data)
         return hash(data)
 
-        # if self._is_extended:
-        #     return (0x0E << 8) + self._scan_code
-        # else:
-        #     return self._scan_code
 
     def __lt__(self, other):
         return self.name < other.name
@@ -430,7 +420,14 @@ class Key:
                 self._latched_keys.append(key)
         self._update()
 
-    def getKeys(self):
+    def addLatchedKey(self, key: Key):
+        """adds a key to the list of latched keys"""
+        assert isinstance(key, Key), f"Expected a Key object, got {type(key)}"
+        if key.name and key not in self._latched_keys:
+            self._latched_keys.append(key)
+        self._update()
+
+    def getKeys(self) -> list[Key]:
         """returns a list of latched keys including the primary key"""
         keys = set(self._latched_keys)
         if self not in keys:
@@ -498,6 +495,60 @@ class Key:
         # no clue
         return -1
 
+    def to_xml(self, latched_tag = "key") -> etree.Element:
+        """Returns an XML element representing the key."""
+
+        comment = etree.Comment(f"Key: {self.name} 0x{self.virtual_code:x}/{self.virtual_code} scan code: 0x{self.scan_code:x}/{self.scan_code} extended: {self.is_extended}")
+        node = etree.Element("key")
+        node.addprevious(comment)
+
+        node.set("scan-code", str(self._scan_code))
+        node.set("extended", str(self._is_extended))
+        node.set("virtual-code", str(self._virtual_code))
+        if self.is_latched:
+            for latched_key in self._latched_keys:
+                latched_node = etree.SubElement(node, latched_tag)
+                latched_node.set("scan-code", str(latched_key._scan_code))
+                latched_node.set("extended", str(latched_key._is_extended))
+        return node
+
+    def from_xml(self, node: etree.Element, latched_tag = "key"):
+        """Populates the key object from an XML element."""
+        assert node.tag in ("key", "latched"), "Expected an XML element with tag 'key' or 'latched'"
+
+
+        virtual_code = safe_read(node, "virtual-code", int, 0)
+        if virtual_code > 0:
+            key = KeyMap.find_virtual(virtual_code)
+            self._scan_code = key.scan_code
+            self._is_extended = key.is_extended
+            self._virtual_code = key.virtual_code
+        else:
+            self._scan_code = int(node.get("scan-code", 0))
+            self._is_extended = parse_bool(node.get("extended", ""))
+            self._virtual_code = KeyMap.key_to_virtual(self._scan_code, self._is_extended)
+
+        self._latched_keys = []
+        latched_nodes = node.xpath(f".//{latched_tag}")
+        for latched_node in latched_nodes:
+            latched_virtual_code = safe_read(latched_node, "virtual-code", int, 0)
+            if latched_virtual_code > 0:
+                latched_key = KeyMap.find_virtual(latched_virtual_code)
+            else:
+                latched_scan_code = int(latched_node.get("scan-code", 0))
+                latched_is_extended = parse_bool(latched_node.get("extended", ""))
+                latched_key = Key(scan_code=latched_scan_code, is_extended=latched_is_extended)
+            self._latched_keys.append(latched_key)
+
+        self._update()
+
+    @staticmethod
+    def fromXml(node: etree.Element):
+        """ reads a key from XML"""
+        key = Key()
+        key.from_xml(node)
+        return key
+
 
 def key_from_mousebutton(button_id):
     """maps a mouse button to a key"""
@@ -528,6 +579,21 @@ def key_from_mousebutton(button_id):
     if map_key:
         return key_from_name(map_key)
     return None
+
+
+def key_from_list(keys: list[Key]):
+    """converts a list of keys to a latched key sequence"""
+    if not keys:
+        return None
+    primary_key = None
+    key: Key
+    for key in keys:
+        if not primary_key:
+            primary_key = key.duplicate()
+            continue
+        primary_key.addLatchedKey(key.duplicate())
+
+    return primary_key
 
 
 def getInnerWindows(whndl, as_list: bool = True):

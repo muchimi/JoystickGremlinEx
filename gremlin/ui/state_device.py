@@ -41,7 +41,7 @@ from gremlin.util import safe_format, safe_read, write_guid, read_guid
 import gremlin.base_profile
 from psygnal import Signal
 import gremlin.input_item
-from gremlin.input_item import InputItemWidget, BaseAbstractCondition, AbstractConditionWidget, InputItem, AbstractContainer, AbstractAction
+from gremlin.input_item import AbstractCondition, InputItemWidget, BaseAbstractCondition, AbstractConditionWidget, InputItem, AbstractContainer, AbstractAction
 from shiboken6 import Shiboken
 import html
 from typing import Callable
@@ -1362,15 +1362,21 @@ class BaseStateCondition(BaseAbstractCondition):
 class StateConditionWidget(AbstractConditionWidget):
     """state condition UI"""
 
-    def __init__(self, condition, parent=None):
-        super().__init__(condition, parent)
+    def __init__(self,
+                condition: AbstractCondition | BaseAbstractCondition,
+                remove_callback : Callable = None,
+                extra_data: dict = None,
+                parent=None):
+
+        super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
+        self.input_event = None
         self.setTitle("State Condition")
 
     def _create_ui(self, extra_data: dict = None):
         if not Shiboken.isValid(self):
             return
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
-            callback=lambda: self.deleted.emit(self.condition),
+            callback=self.handle_remove,
             tooltip="Delete condition",
         )
         widget = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True, widget_only=True)

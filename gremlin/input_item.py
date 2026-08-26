@@ -20,6 +20,7 @@ from abc import abstractmethod, ABCMeta
 
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtCore import QThread
+
 from lxml import etree
 import os
 import uuid
@@ -6041,7 +6042,9 @@ class BaseAbstractCondition:
         """
         return self._comparison != ""
 
-
+    def __hash__(self):
+        # hash on the condition ID
+        return hash(self.id)
 @SingletonDecorator
 class ConditionTracker:
     """tracks conditions"""
@@ -6225,6 +6228,10 @@ class AbstractCondition(metaclass=ABCMeta):
 
     def condition_name(self) -> str:
         return "condition_name() member not implemented: Condition not set"
+
+    def __hash__(self):
+        # hash on the condition ID
+        return hash(self.id)
 
 
 class ABCMetaQObject(ABCMeta, type(QtCore.QObject)):
@@ -6780,6 +6787,7 @@ class ActionSetsView(AbstractView):
         self._widget_map = {}  # map of action sets to action set view widgets
         self._mode = view_mode
         self.main_layout = QtWidgets.QVBoxLayout(self)
+        self._hash_key = None  # last model hash to determine if a redraw is necessary
 
         self._interaction_callback = interaction_callback
         self._add_callback = add_callback
@@ -6961,8 +6969,11 @@ class ActionSetsView(AbstractView):
         if gremlin.shared_state.is_redraw_suspended():
             return  # don't redraw
 
-        changed = force or self.modelChanged
-        if changed:
+        hash_key = self._model.hashKey()
+        changed = hash_key != self._hash_key or self._model.modelChanged
+
+        if force or changed:
+            self._hash_key = hash_key
             self._create_ui()
 
 
@@ -10444,7 +10455,11 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
     # deleted = Signal(base_classes.AbstractCondition)
     deleted = Signal(object)
 
-    def __init__(self, condition: AbstractCondition | BaseAbstractCondition, extra_data: dict = None, parent=None):
+    def __init__(self,
+                condition: AbstractCondition | BaseAbstractCondition,
+                remove_callback : Callable = None,
+                extra_data: dict = None,
+                parent=None):
         """Creates a new widget.
 
         :param condition_data the data to be represented by the widget
@@ -10458,6 +10473,7 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
 
         # attached input item for the condition - this is the trigger input item
         self.attached_input_item = extra_data.get("input_item") if extra_data else None
+        self._remove_callback = remove_callback
 
         self._create(extra_data)
 
@@ -10471,6 +10487,7 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
         """Creates the configuration UI for this widget."""
         pass
 
+
     @QtCore.Slot()
     def _copy_condition(self):
         helper = ConditionHelper()
@@ -10482,12 +10499,25 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
         helper = ConditionHelper()
         helper.paste_condition(self.condition.owner.container, clipboard.data)
 
+    def handle_remove(self):
+        if self._remove_callback:
+            self._remove_callback(self.condition)
+        else:
+            self.deleted.emit(self.condition)
+
+
+
 
 class ModeConditionWidget(AbstractConditionWidget):
     """mode condition UI"""
 
-    def __init__(self, condition, parent=None):
-        super().__init__(condition, parent)
+    def __init__(self,
+                condition: AbstractCondition | BaseAbstractCondition,
+                remove_callback : Callable = None,
+                extra_data: dict = None,
+                parent=None):
+
+        super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
         self.setTitle("Mode Condition")
 
     def _create_ui(self, extra_data: dict = None):
@@ -10495,7 +10525,7 @@ class ModeConditionWidget(AbstractConditionWidget):
             return
 
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
-            callback=lambda: self.deleted.emit(self.condition),
+            callback=self.handle_remove,
             tooltip="Delete condition",
         )
         widget = gremlin.ui.ui_common.getHContainer(self.delete_button_widget, left_stretch=True, widget_only=True)
@@ -10563,18 +10593,14 @@ class ModeConditionWidget(AbstractConditionWidget):
 class VJoyConditionWidget(AbstractConditionWidget):
     """Widget allowing the configuration of a vJoy based condition."""
 
-    def __init__(self, condition, parent=None):
-        """Creates a new widget.
+    def __init__(self,
+                condition: AbstractCondition | BaseAbstractCondition,
+                remove_callback : Callable = None,
+                extra_data: dict = None,
+                parent=None):
 
-        Parameters
-        ==========
-        condition_data : VJoyCondition
-            data to be represented by the widget
-        parent : QObject
-            parent of this widget
-        """
         self.input_event = None
-        super().__init__(condition, parent)
+        super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
         self.setTitle("vJoy Condition")
 
         # Initialize UI fully
@@ -10600,7 +10626,7 @@ class VJoyConditionWidget(AbstractConditionWidget):
 
         self.record_button_widget = gremlin.ui.ui_common.Buttons.getEditWidget(label="Listen", callback=self._request_user_input)
         self.delete_button_widget = gremlin.ui.ui_common.Buttons.getDeleteWidget(
-            callback=lambda: self.deleted.emit(self.condition),
+            callback=self.handle_remove,
             tooltip="Delete condition",
         )
 
@@ -10855,14 +10881,15 @@ class VJoyConditionWidget(AbstractConditionWidget):
 class InputActionConditionWidget(AbstractConditionWidget):
     """Creates the UI needed to configure an input action based condition."""
 
-    def __init__(self, condition_data, parent=None):
-        """Creates a new widget.
-
-        :param condition_data the data to be represented by the widget
-        :param parent the parent of this widget
-        """
-        super().__init__(condition_data, parent)
+    def __init__(self,
+                condition: AbstractCondition | BaseAbstractCondition,
+                remove_callback : Callable = None,
+                extra_data: dict = None,
+                parent=None):
+        self.input_event = None
+        super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
         self.setTitle("Action Condition")
+
 
     def _create_ui(self, extra_data: dict = None):
         """Creates the configuration UI for this widget."""
@@ -10949,6 +10976,7 @@ class ConditionView(AbstractView):
         self._container = container
         self._input_item = container.input_item
         self._draw_once = False
+        self._hash_key = None # last model hash to determine if a redraw is necessary
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
@@ -11031,9 +11059,7 @@ class ConditionView(AbstractView):
         config = gremlin.config.Configuration()
         config.condition_selector = self.condition_selector.currentText()
 
-    def redraw(self, force=False):
-        # assert inspect.stack()[1].function == "_fireChanged","redraw should only be called due to a model trigger"
-        gremlin.util.InvokeUiMethod(self._redraw_ui, force)  # ensure on UI thread
+
 
     def _create_ui(self, extra_data: dict = None):
         """recreates the UI based on the model"""
@@ -11050,18 +11076,33 @@ class ConditionView(AbstractView):
         condition: AbstractCondition
         extra_data = {"input_item": self.input_item, "container": self._container}
         for condition in self.model:
-            condition_widget = lookup[type(condition)](condition, extra_data)
-            condition_widget.deleted.connect(lambda local_data: self.model.remove(local_data))
+            condition_widget = lookup[type(condition)](condition, remove_callback=self._handle_remove, extra_data=extra_data)
             self.conditions_layout.addWidget(condition_widget)
+
+        self._update_count_ui()
+
+
+    def _handle_remove(self, condition):
+        self.model.remove(condition)
+        self.redraw()
+
+    def redraw(self, force=False):
+        # assert inspect.stack()[1].function == "_fireChanged","redraw should only be called due to a model trigger"
+        gremlin.util.InvokeUiMethod(self._redraw_ui, force)  # ensure on UI thread
 
     def _redraw_ui(self, force=False):
         """Redraws the entire view.  must be on UI thread"""
 
+        hash_key = self._model.hashKey()
+        changed = hash_key != self._hash_key or self._model.modelChanged
+
         # syslog.info("condition view: redraw")
-        if force or not self._draw_once or self._model.modelChanged:
+        if force or not self._draw_once or changed:
             # only update the UI on model change
+            self._hash_key = hash_key
             self._create_ui()
             self._draw_once = True  # indicate drawn
+
 
     def _add_condition(self):
         """Adds a condition to the view's model."""
@@ -11070,6 +11111,7 @@ class ConditionView(AbstractView):
         condition = data_type(extra_data, target=self._container)
         syslog.info(f"adding condition to model: {self.model.id}")
         self._model.add(condition)
+        self.redraw()
 
     def _rule_changed_cb(self, text):
         """Updates the rule of the model.

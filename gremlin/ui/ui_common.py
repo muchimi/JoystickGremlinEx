@@ -3856,7 +3856,7 @@ class InputListenerWidget(QBoxFrame):
         self._aborting = False
         self._closing = False
         self._abort_timer = threading.Timer(1.0, self._abort_request)
-        self._multi_key_storage = []
+        self._multi_key_storage = set() # keys must be unique
         self._callback = callback
         self._accepted = False  # true if the input is accepted
         self._virtual_only = virtual_only  # only listen to virtual devices if set
@@ -3887,8 +3887,13 @@ class InputListenerWidget(QBoxFrame):
             )
             self.main_layout.addWidget(self.repeater_container_widget)
 
+
+        self.key_widget = QKeyboardKeysWidget() # holds the pressed keys
+        self.main_layout.addWidget(getHContainer(["||",self.key_widget,"||"], widget_only=True)) # center
+
         label = QtWidgets.QLabel()
         self.main_layout.addWidget(label)
+
 
         if self._multi_keys:
             self.cancel_widget = Buttons.getCancelWidget(callback=self._cancel)
@@ -4025,10 +4030,10 @@ class InputListenerWidget(QBoxFrame):
 
         if not self._multi_keys:
             # single key mode
-            if event.is_pressed and key == self._esc_key:
+            if key == self._esc_key:
                 if not self._abort_timer.is_alive():
                     self._abort_timer.start()
-            elif not event.is_pressed and valid:
+            else:
                 if not self._return_kb_event:
                     self.item_selected.emit([key])
                 else:
@@ -4043,18 +4048,21 @@ class InputListenerWidget(QBoxFrame):
                 self._abort_timer.cancel()
                 self._abort_timer = threading.Timer(1.0, self._abort_request)
 
-        # Record all key presses and return on the first key release
+
         else:
             # multi-key mode
 
             if valid:
                 if not self._return_kb_event:
-                    self._multi_key_storage.append(key)
+                    self._multi_key_storage.add(key)
                 else:
-                    self._multi_key_storage.append(event)
+                    self._multi_key_storage.add(event) # mouse event
                 self.keyInput.emit(self._multi_key_storage)  # notify a key was pressed
-                self._echo_key(key)
-                self.selection = self._multi_key_storage
+                selection = list(self._multi_key_storage)
+                gremlin.keyboard.sort_keys(selection)
+                self.selection = selection
+                self._update_keys_ui() # uses the selection
+
                 if verbose:
                     syslog.info(f"multi-key storage: {self._multi_key_storage}")
 
@@ -4073,10 +4081,10 @@ class InputListenerWidget(QBoxFrame):
                 widget = QtWidgets.QApplication.widgetAt(pos)
                 if widget and isinstance(widget, QtWidgets.QPushButton):
                     return  # ignore if click is on the button
-                self._multi_key_storage.append(key)
-                self.keyInput.emit(self._multi_key_storage)  # notify a key was pressed
-                self.selection = self._multi_key_storage
-                self._echo_key(key)
+                self._multi_key_storage.add(key)
+                self.selection = list(self._multi_key_storage)
+                self.keyInput.emit(self.selection)  # notify a key was pressed
+                self._update_keys_ui()
             else:
                 # not listening to multiple keys
                 self.keyInput.emit([key])  # notify a key was pressed
@@ -4085,36 +4093,20 @@ class InputListenerWidget(QBoxFrame):
                 self._accepted = True
                 self.close()
 
-    def _echo_key(self, key):
+    def _update_keys(self):
         """echoes the last keypress"""
         if self._multi_keys:
-            gremlin.util.InvokeUiMethod(self._echo_key_ui, key)
+            gremlin.util.InvokeUiMethod(self._update_keys_ui)
 
-    def _echo_key_ui(self, key):
-        import gremlin.ui.virtual_keyboard
+    def _update_keys_ui(self):
+        self.key_widget.setKeys(self.selection)
 
-        widget = gremlin.ui.virtual_keyboard.QKeyWidget()
-        icon = gremlin.keyboard.KeyMap.icon(key)
-        name = gremlin.keyboard.KeyMap.get_name(key)
-        tooltip = gremlin.keyboard.KeyMap.get_description(key)
-        if icon:
-            widget.setIcon(icon)
-        if name:
-            widget.setText(name)
-        if tooltip:
-            widget.setToolTip(tooltip)
-        widget.keySize = 2
-        widget.autoSize = True
-        gremlin.util.clear_layout(self.repeater_container_layout)
-        self.repeater_container_layout.addStretch()
-        self.repeater_container_layout.addWidget(widget)
-        self.repeater_container_layout.addStretch()
 
     def _accept(self):
         # multi key accept mode
         if self._abort_timer:
             self._abort_timer.cancel()
-        self.item_selected.emit(self._multi_key_storage)
+        self.item_selected.emit(list(self._multi_key_storage))
         self.close()
 
     def _cancel(self):
@@ -16486,3 +16478,59 @@ class QSideBarContainer(QWidget):
         if self.content_widget.layout():
             QWidget().setLayout(self.content_widget.layout())
         self.content_widget.setLayout(layout)
+
+
+class QKeyboardKeysWidget(QWidget):
+    """ widget that displays keyboard keys """
+    def __init__(self, keys : list[gremlin.keyboard.Key] = None, parent=None):
+        super().__init__(parent)
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self._widget_map = {} # list of widgets in the container
+        self.keys = keys if keys is not None else []
+        self._update_keys_ui()
+
+    def setKeys(self, keys: list[gremlin.keyboard.Key]):
+        self.keys = keys if keys is not None else []
+        self._update_keys()
+
+    def _update_keys(self):
+        gremlin.util.InvokeUiMethod(self._update_keys_ui)
+
+    def _update_keys_ui(self):
+        if not hasattr(self, "_widget_map"):
+            self._widget_map = {}
+        for widget in self._widget_map.values():
+            self.layout.removeWidget(widget)
+            widget.deleteLater()
+        self._widget_map.clear()
+
+
+        key_list = self.keys
+        if not key_list:
+            widget = QtWidgets.QLabel("(no keys selected)")
+            self.layout.addWidget(widget)
+            self._widget_map["no_keys"] = widget
+            return
+
+        # visual display should be sorted
+        gremlin.keyboard.sort_keys(key_list)
+        for key in key_list:
+            if not key.name:
+                continue
+            widget = gremlin.ui.virtual_keyboard.QKeyWidget()
+            icon = gremlin.keyboard.KeyMap.icon(key)
+            name = gremlin.keyboard.KeyMap.get_name(key)
+            tooltip = gremlin.keyboard.KeyMap.get_description(key, True)
+            if icon:
+                widget.setIcon(icon)
+            if name:
+                widget.setText(name)
+            if tooltip:
+                widget.setToolTip(tooltip)
+            widget.keySize = 2
+            widget.autoSize = True
+            widget.setFixedHeight(28)
+            widget.setReadOnly(True)
+            self.layout.addWidget(widget)
+            self._widget_map[key] = widget

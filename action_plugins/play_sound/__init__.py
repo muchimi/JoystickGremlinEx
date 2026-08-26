@@ -1063,7 +1063,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                 else:
                     speaker = self.ptts_speaker_widget.currentText()
                     config.ai_tts_last_speaker = speaker
-                    self.action_data.speaker = speaker
+                    self.action_data.setSpeaker(speaker, PlayMode.PyTTS)
 
         self.ptts_speaker_widget.setEnabled(voices is not None)
         self.ptts_speaker_widget.updateGeometry()
@@ -1390,6 +1390,15 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 return self._pytts_speaker
             case _:
                 return None
+
+    def setSpeaker(self, speaker: str, mode: PlayMode):
+        match mode:
+            case PlayMode.EdgeAI:
+                self._etts_speaker = speaker
+            case PlayMode.PyTTS:
+                self._pytts_speaker = speaker
+            case _:
+                raise ValueError(f"Unknown play mode: [{mode}]")
 
     @property
     def sound_file(self) -> str:

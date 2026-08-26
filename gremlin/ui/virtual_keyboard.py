@@ -783,7 +783,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         # Disable ui input selection on joystick input
         gremlin.shared_state.push_suspend_highlighting()
 
-        # self._sequence = InputKeyboardModel(sequence=sequence)
+
         main_layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("Keyboard & Mouse Input Mapper")
         self._select_single = select_single
@@ -889,7 +889,7 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         ''' loads a given key sequence into the virtual keyboard '''
 
         if sequence:
-            # the action keeps a list of keys in the format (scancode, extended_flag)
+            # the action keeps a list of keys in the format (scancode, extended_flag) or a Key object
             # convert that to a key from it and selected it if the key is mapped
             for widget in self._key_widget_map.values():
                 widget.selected = False
@@ -952,6 +952,8 @@ class InputKeyboardDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         Asks the user to press the key they wish to add bindings for.
         """
+
+        
         from gremlin.ui.ui_common import InputListenerWidget
         self.button_press_dialog = InputListenerWidget(
             [InputType.Keyboard, InputType.Mouse],
