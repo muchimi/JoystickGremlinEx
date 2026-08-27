@@ -1359,6 +1359,7 @@ class ExecutionContext:
             verbose = config.verbose_mode_exec
 
             if not container.is_valid():
+                check = container.is_valid()
                 syslog.warning(f"Incomplete container ignored: container id: [{container.id}] returned validation FAIL")
                 if config.allow_exec_tree_container_validation_fail:
                     syslog.warning("\tOverride allowed - build continuing...")

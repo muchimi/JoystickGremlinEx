@@ -765,6 +765,9 @@ class DeviceSummary:
 
 
         """
+        if index is None:
+            return "N/A"
+        
         assert isinstance(index, int) and index > 0,f"invalid index: {index} - should be a 1 based integer"
         if is_linear:
             input_id = self.getAxisLinearId(index)

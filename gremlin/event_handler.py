@@ -836,7 +836,7 @@ class EventListener(QtCore.QObject):
 
         self._running = True
 
-        self._process_device_change_lock = False
+        self._process_device_change_lock = threading.Lock()
 
         # keyboard input handling buffer
         self._keyboard_state = {}
@@ -1930,11 +1930,8 @@ class EventListener(QtCore.QObject):
         self._process_device_change.emit()
 
     def _process_device_change_cb(self):
-
-        if self._process_device_change_lock:
+        if not self._process_device_change_lock.acquire(blocking=False):
             return
-
-        self._process_device_change_lock = True
         # syslog = logging.getLogger("system")
 
         try:
@@ -1952,7 +1949,7 @@ class EventListener(QtCore.QObject):
             gremlin.joystick_handling.reset_devices()
 
         finally:
-            self._process_device_change_lock = False
+            self._process_device_change_lock.release()
 
     def _keyboard_handler(self, event):
         """low level handler for callback for keyboard events.
@@ -3626,7 +3623,8 @@ class EventHandler(QtCore.QObject):
                 InputType.OctaviIfr1,
                 InputType.ModeControl,
             ):
-                syslog.info(f"EVENT: [Joystick] processing input item: {input_item.display_name}")
+                if verbose:
+                    syslog.info(f"EVENT: [Joystick] processing input item: {input_item.display_name}")
 
                 if callback:
                     # already have a callback

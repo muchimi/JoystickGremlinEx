@@ -30,6 +30,7 @@ from PySide6.QtGui import QColor
 from lxml import etree
 import os
 import logging
+import threading
 import gremlin.singleton_decorator
 import gremlin.ui.ui_common
 from shiboken6 import Shiboken
@@ -935,7 +936,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
 
         assert isinstance(input_item, InputItem), "invalid input item"
 
-        self._lock = False
+        self._lock = threading.Lock()
         self._calibrating = False  # true if calibrating
         self._device_guid = input_item.device_guid
         self._input_id = input_item.input_id
@@ -1178,7 +1179,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
             return
         if event.identifier != self._input_id:
             return
-        if self._lock:
+        if self._lock.locked():
             return
         if self._calibrating:
             # ignore while calibrating
@@ -1209,9 +1210,14 @@ class CalibrationDialogEx(QtWidgets.QDialog):
     @QtCore.Slot()
     def _handle_save_global(self, widget):
         """saves the global calibration data and close"""
-        self._lock = True
-        self.mgr.saveCalibration(self.action_data, to_global=True, to_local=False, callback=self._handle_global_result)
-        self.action_data = self.source_data
+        if not self._lock.acquire(blocking=False):
+            return
+        try:
+            self.mgr.saveCalibration(self.action_data, to_global=True, to_local=False, callback=self._handle_global_result)
+            self.action_data = self.source_data
+        except Exception:
+            self._lock.release()
+            raise
 
     def _handle_global_result(self, result: bool):
         try:
@@ -1220,14 +1226,20 @@ class CalibrationDialogEx(QtWidgets.QDialog):
                 self._status_widget.setText("Saved to global calibration data")
                 self.close()
         finally:
-            self._lock = False
+            if self._lock.locked():
+                self._lock.release()
 
     @QtCore.Slot()
     def _handle_save_profile(self, widget):
         """saves the calibration to the current profile and close"""
-        self._lock = True
-        self.mgr.saveCalibration(self.action_data, to_global=False, to_local=True, callback=self._handle_local_result)
-        self.action_data = self.source_data
+        if not self._lock.acquire(blocking=False):
+            return
+        try:
+            self.mgr.saveCalibration(self.action_data, to_global=False, to_local=True, callback=self._handle_local_result)
+            self.action_data = self.source_data
+        except Exception:
+            self._lock.release()
+            raise
 
     def _handle_local_result(self, result: bool):
 
@@ -1237,7 +1249,8 @@ class CalibrationDialogEx(QtWidgets.QDialog):
                 self._status_widget.setText("Saved to profile calibration data")
                 self.close()
         finally:
-            self._lock = False
+            if self._lock.locked():
+                self._lock.release()
 
     def closeEvent(self, event):
         """save data on dialog close"""
@@ -1430,7 +1443,7 @@ class CalibrationDialogEx(QtWidgets.QDialog):
         """updates the data"""
         if self._closing:
             return
-        if self._lock:
+        if self._lock.locked():
             return
         is_centered = self.action_data.centered
         auto_calibrate = self._auto_calibrate_widget.isChecked()

@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
+import threading
 from PySide6 import QtWidgets, QtCore  # QtWebEngineWidgets
 from gremlin.ui import ui_common
 from gremlin.ui.qsliderwidget import QSliderWidget
@@ -67,7 +68,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         super().__init__(parent)
         self.profile_data = profile_data
         self.main_layout = QtWidgets.QGridLayout(self)
-        self.event_lock = False
+        self.event_lock = threading.Lock()
         self._centered = False
 
         # Create the two sliders for centered deadzones
@@ -121,14 +122,14 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.right_upper.setValue(1)
 
         # Hook up all the required callbacks
-        self.slider.valueChanged.connect(self._update_center)
-        self.left_slider.valueChanged.connect(self._update_left)
-        self.right_slider.valueChanged.connect(self._update_right)
+        self.slider.valueChanged.connect(self._update_center_ui)
+        self.left_slider.valueChanged.connect(self._update_left_ui)
+        self.right_slider.valueChanged.connect(self._update_right_ui)
 
-        self.left_lower.valueChanged.connect(lambda value: self._update_from_spinner(value, 0))
-        self.left_upper.valueChanged.connect(lambda value: self._update_from_spinner(value, 1))
-        self.right_lower.valueChanged.connect(lambda value: self._update_from_spinner(value, 2))
-        self.right_upper.valueChanged.connect(lambda value: self._update_from_spinner(value, 3))
+        self.left_lower.valueChanged.connect(lambda value: self._update_from_spinner_ui(value, 0))
+        self.left_upper.valueChanged.connect(lambda value: self._update_from_spinner_ui(value, 1))
+        self.right_lower.valueChanged.connect(lambda value: self._update_from_spinner_ui(value, 2))
+        self.right_upper.valueChanged.connect(lambda value: self._update_from_spinner_ui(value, 3))
 
         self.container_preset_widget = QtWidgets.QWidget()
         self.container_preset_layout = QtWidgets.QHBoxLayout(self.container_preset_widget)
@@ -191,7 +192,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         self.main_layout.addWidget(widget, row, 3)
 
-        self._update()
+        self._update_ui()
 
     def unhook(self):
         """called when the widget is destroyed"""
@@ -248,7 +249,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
                 d_right = 0
                 d_end = 1
 
-        self._update_deadzone([d_start, d_left, d_right, d_end])
+        self._update_deadzone_ui([d_start, d_left, d_right, d_end])
 
     @property
     def isCentered(self) -> bool:
@@ -256,9 +257,13 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
     @isCentered.setter
     def isCentered(self, value: bool):
+        gremlin.util.InvokeUiMethod(self._set_centered_ui, value)
+
+    def _set_centered_ui(self, value: bool):
+        gremlin.util.assert_ui_thread()
         if value != self._centered:
             self._centered = value
-            self._update()
+            self._update_ui()
 
     def setValues(self, values, emit=False):
         gremlin.util.InvokeUiMethod(self._setValues_ui, values, emit)  # ensure on UI thread
@@ -268,6 +273,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
 
         :param values the new deadzone values [min, min center, max center, max]
         """
+        gremlin.util.assert_ui_thread()
 
         if len(values) == 2:
             # has enpoints only
@@ -293,7 +299,7 @@ class DeadzoneWidget(QtWidgets.QWidget):
         with QtCore.QSignalBlocker(self.slider):
             self.slider.setValue((v1, v4))
 
-        self._update()
+        self._update_ui()
 
         if emit:
             self.changed.emit()
@@ -317,10 +323,12 @@ class DeadzoneWidget(QtWidgets.QWidget):
     def get_center_right(self) -> float:
         return self.right_lower.value()
 
-    def _update_center(self, handle, value):
+    def _update_center_ui(self, handle, value):
         """updates the main slider when in non centered mode"""
-        if not self.event_lock:
-            self.event_lock = True
+        gremlin.util.assert_ui_thread()
+        if not self.event_lock.acquire(blocking=False):
+            return
+        try:
             if handle == 0:
                 self.left_lower.setValue(value)
                 self.profile_data.deadzone[0] = value
@@ -329,16 +337,19 @@ class DeadzoneWidget(QtWidgets.QWidget):
                 self.profile_data.deadzone[-1] = value
 
             self.changed.emit()
-            self.event_lock = False
+        finally:
+            self.event_lock.release()
 
-    def _update_left(self, handle, value):
+    def _update_left_ui(self, handle, value):
         """Updates the left spin boxes.
 
         :param handle the handle which was moved
         :param value the new value
         """
-        if not self.event_lock:
-            self.event_lock = True
+        gremlin.util.assert_ui_thread()
+        if not self.event_lock.acquire(blocking=False):
+            return
+        try:
             if handle == 0:
                 self.left_lower.setValue(value)
                 self.profile_data.deadzone[0] = value
@@ -347,16 +358,19 @@ class DeadzoneWidget(QtWidgets.QWidget):
                 self.profile_data.deadzone[1] = value
 
             self.changed.emit()
-            self.event_lock = False
+        finally:
+            self.event_lock.release()
 
-    def _update_right(self, handle, value):
+    def _update_right_ui(self, handle, value):
         """Updates the right spin boxes.
 
         :param handle the handle which was moved
         :param value the new value
         """
-        if not self.event_lock:
-            self.event_lock = True
+        gremlin.util.assert_ui_thread()
+        if not self.event_lock.acquire(blocking=False):
+            return
+        try:
             if handle == 0:
                 self.right_lower.setValue(value)
                 self.profile_data.deadzone[2] = value
@@ -365,15 +379,17 @@ class DeadzoneWidget(QtWidgets.QWidget):
                 self.profile_data.deadzone[3] = value
 
             self.changed.emit()
-            self.event_lock = False
+        finally:
+            self.event_lock.release()
 
-    def _update_from_spinner(self, value, index):
+    def _update_from_spinner_ui(self, value, index):
         """Updates the slider position.
 
         :param value the new value
         :param handle the handle to move 0 to 3
         :param widget which slider widget to update
         """
+        gremlin.util.assert_ui_thread()
 
         values = self.values()
         if len(values) == 2:
@@ -385,8 +401,9 @@ class DeadzoneWidget(QtWidgets.QWidget):
         # print (f"index {index} value: {value} Values: {values}  left range: {self.left_slider.values} {self.left_slider.range()}  right range: {self.right_slider.values} {self.right_slider.range()}")
         self.changed.emit()
 
-    def _update_deadzone(self, data: list):
+    def _update_deadzone_ui(self, data: list):
         """updates the deadzone text values"""
+        gremlin.util.assert_ui_thread()
         if len(data) == 2:
             v1, v4 = data
             data = [v1, 0.0, 0.0, v4]
@@ -394,7 +411,8 @@ class DeadzoneWidget(QtWidgets.QWidget):
         self.profile_data.deadzone = data
         self.changed.emit()  # notify we changed
 
-    def _update(self):
+    def _update_ui(self):
+        gremlin.util.assert_ui_thread()
         is_centered = self._centered
         if is_centered:
             self.slider.setVisible(False)

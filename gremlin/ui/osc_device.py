@@ -3385,7 +3385,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         gremlin.util.assert_ui_thread()
         _config = gremlin.config.Configuration()
-        self.listener_dialog = OscInputListenerWidget(self._capture_message)
+        self.listener_dialog = OscInputListenerWidget(self._capture_message_ui)
 
         # Display the dialog centered in the middle of the UI
         root = self
@@ -3401,7 +3401,7 @@ class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         )
         self.listener_dialog.show()
 
-    def _capture_message(self, command, data):
+    def _capture_message_ui(self, command, data):
         """called when an OSC message is captured"""
         gremlin.util.assert_ui_thread()
         self._command = command

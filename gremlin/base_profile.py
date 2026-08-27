@@ -1155,7 +1155,9 @@ class Settings:
     def setVjoyAsInput(self, vid, enabled=True):
         """enables a vjoy device as an input device"""
         self._vjoy_as_input[vid] = enabled
-        syslog.info(f"Set vjoy as input: device [{vid}] enabled [{enabled}]")
+        verbose = gremlin.config.Configuration().verbose_mode_joystick
+        if verbose and enabled:
+            syslog.info(f"Set vjoy as input: device [{vid}] enabled [{enabled}]")
         el = gremlin.event_handler.EventListener()
         el.vjoy_as_input_changed.emit(vid, enabled)
 
@@ -3718,11 +3720,10 @@ class Profile:
                     if verbose:
                         syslog.info(f"Profile: CREATE device node: [{str(device_node)}] profile id: [{self.id}]")
                     return device_node
-                elif disconnected:
+                else:
                     device_node = ProfileDeviceNode(self)
                     device_node.device = dinput.DeviceSummary()
-                    device_node.device.connected = False
-
+                    device_node.device.setConnected(False)
                     self.devices[device_guid] = device_node
 
                     if verbose:
@@ -3730,6 +3731,7 @@ class Profile:
                     return device_node
             return None
 
+        assert device_guid in self.devices, f"Device GUID {device_guid} not found in profile devices - logic error"
         return self.devices[device_guid]
 
     def readDeviceNode(self, node: etree.Element) -> ProfileDeviceNode:
@@ -4185,6 +4187,10 @@ class Profile:
 
             if add_device:
                 new_device = self.getDeviceNode(dev.device_guid, autocreate=True)
+                if __debug__ and new_device is None:
+                    new_device = self.getDeviceNode(dev.device_guid, autocreate=True)
+
+
 
                 if new_device.virtual:
                     self.vjoy_devices[dev.device_guid] = new_device

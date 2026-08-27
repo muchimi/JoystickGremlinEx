@@ -3304,9 +3304,9 @@ class LogWindowUi(ui_common.BaseDialogUi):
 
         self._ui_elements = {}
         log_path = gremlin.shared_state.system_log
-        self._create_log_display(log_path, "System")
+        self._create_log_display_ui(log_path, "System")
         user_path = gremlin.shared_state.user_log
-        self._create_log_display(user_path, "User")
+        self._create_log_display_ui(user_path, "User")
         self.watcher = gremlin.util.FileWatcher([log_path, user_path])
         self.watcher.file_changed.connect(self._reload)
 
@@ -3318,7 +3318,7 @@ class LogWindowUi(ui_common.BaseDialogUi):
         self.watcher.stop()
         return super().closeEvent(event)
 
-    def _create_log_display(self, fname, title):
+    def _create_log_display_ui(self, fname, title):
         """Creates a new tab displaying log file contents.
 
         :param fname path to the file whose content to display

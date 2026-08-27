@@ -20,6 +20,8 @@ import collections
 import time
 import threading
 from abc import abstractmethod, ABCMeta
+import inspect
+
 from PySide6 import QtCore
 from typing import Callable, List, Any, Generic, TypeVar, Iterator
 from gremlin.input_types import InputType
@@ -676,6 +678,10 @@ class BaseProfileData(QtCore.QObject, metaclass=ABCMetaQObject):
             self.override_input_type = None
             self.override_input_id = None
 
+    def notifyContentChanged(self, extra_data: dict = None, force: bool = False):
+        if self._input_item:
+            self._input_item.notifyContentChanged(extra_data=extra_data, force=force)
+
     def icon(self):
         """gets the default icon"""
         from gremlin.util import get_generic_icon
@@ -961,6 +967,7 @@ class AbstractCallbackModel(AbstractModel):
         sort_callback: Callable = None,
         added_callback: Callable = None,
         removed_callback: Callable = None,
+        content_callback: Callable = None,
         allowed_types: tuple = None,
         model_description: str = None,
         item_changed_callback: Callable = None,
@@ -972,6 +979,7 @@ class AbstractCallbackModel(AbstractModel):
         :param sort_callback: optional sorting callback for models that need sorted data - sends the list of items in the model and the return should be a list of indices for each item in the order of appearance
         :param added_callback: optional callback when an item is added to the model (unfiltered) - returns (item, unfiltered index, filtered index) - index is -1 if not found
         :param removed_callback: optional callback when an item is removed from the model (unfiltered)
+        :param content_callback: optional callback when the content of the model changes
         :param allowable types: optional list of allowable types in the model
         :param data_changed_callback: optional callback when the model data changes (onItemChanged (model, index, new_item, old_item, operation))
         :param data: optional initial data for the model
@@ -981,12 +989,10 @@ class AbstractCallbackModel(AbstractModel):
         self._old_hash = None  # last change hash
         self._item_changed_callbacks = [self.onItemChanged]
         self._data_changed_callbacks = []
+        self._content_callback = None
 
-        if change_callback:
-            self._data_changed_callbacks.append(change_callback)
 
-        if item_changed_callback:
-            self._item_changed_callbacks.append(item_changed_callback)
+
 
         self._index_map = TriggerDict()  # map of input_id to index
         self._index_map.addCallback(self._handle_data_changed)  # only track one of the two maps as a change in one also changes the other
@@ -1026,7 +1032,53 @@ class AbstractCallbackModel(AbstractModel):
         if change_callback:
             self.addCallback(change_callback)
 
+        if item_changed_callback:
+            self.addOnItemChangedCallback(item_changed_callback)
+
+        self.setContentCallback(content_callback)
+
+    def setContentCallback(self, callback: Callable):
+        """sets the content changed callback for this model"""
+        if __debug__:
+
+            if callback:
+                assert isinstance(callback, Callable), "invalid callback"
+                sig = inspect.signature(callback)
+                if len(sig.parameters) != 3:
+                    raise TypeError("Content callback must accept exactly three parameters: data, force, and operation")
+
+        current_callback = self._content_callback
+        if current_callback != callback:
+            # remove the old
+            if current_callback is not None:
+                self.removeCallback(current_callback)
+        if not callback:
+            pass
+        self._content_callback = callback
+
+        # propagate
+        model_list = [item for item in self._item_map if hasattr(item, "setContentCallback")]
+        for item in model_list:
+            item.setContentCallback(callback)
+
+    def _register_content(self, item):
+        """registers the content for the item"""
+        if hasattr(item, "setContentCallback"):
+            item.setContentCallback(self._content_callback)
+
+    def _unregister_content(self, item):
+        """unregisters the content for the item"""
+        if hasattr(item, "setContentCallback"):
+            item.setContentCallback(None)
+
+    def _notify_changed(self, data = None, force : bool = False, operation : str = "update"):
+        if self._content_callback:
+            self._content_callback(data, force, operation)
+
     def setItemAt(self, index: int, item, emit=True):
+        self._set_item_at(index, item, emit, "setItemAt")
+
+    def _set_item_at(self, index: int, item, emit=True, operation : str = "add"):
         """sets the item for the specific index"""
         # ensure the item is hashable
         assert isinstance(item, _collections_abc.Hashable), "item must be hashable"
@@ -1036,9 +1088,14 @@ class AbstractCallbackModel(AbstractModel):
 
         self._index_map[index] = item
         self._item_map[item] = index
+        self._register_content(item)
         self.applyFilter(emit)
-        self.onItemChanged(self, index, item, old_item, "setItemAt")
+        self._fireChanged()
+        self._notify_changed(data=item, operation=operation)
+        self.onItemChanged(self, index, item, old_item, operation)
         self.markDirty()
+
+
 
     def setSortCallback(self, callback):
         """changes or clears the sort callback"""
@@ -1078,7 +1135,7 @@ class AbstractCallbackModel(AbstractModel):
 
     def __setitem__(self, index: int, item):
         """sets an item at the specified index"""
-        self.setItemAt(index, item)
+        self._set_item_at(index, item, emit=True, operation="setItemAt")
 
     def __delitem__(self, index: int):
         """deletes an item at the specified index"""
@@ -1092,7 +1149,7 @@ class AbstractCallbackModel(AbstractModel):
         """
         return self.add(item)
 
-    def add(self, item: object, index=-1) -> int:
+    def add(self, item: object, index=-1, emit = True) -> int:
         """
         Adds (appends) a new entry to the model, returns the position inserted
         :param item: the item to append to the model
@@ -1117,12 +1174,9 @@ class AbstractCallbackModel(AbstractModel):
                     index = 0
                     while index in self._index_map:
                         index += 1
-                old_item = self.itemAt(index)
-                self.setItemAt(index, item)
-                self._onItemChanged(self, index, item, old_item, "add")
+                self._set_item_at(index, item, emit=emit, operation="add")
 
-            self.applyFilter()
-            self._fireChanged()
+
             return index
         return -1  # if the item was not added
 
@@ -1157,6 +1211,9 @@ class AbstractCallbackModel(AbstractModel):
         self._index_map[i] = item
         self._item_map[item] = i
 
+        self._register_content(item)
+        self._notify_changed(data = item, operation="insert")
+
         self._onItemChanged(self, i, item, old_item, "insert")
 
         self.applyFilter(emit=emit)
@@ -1176,14 +1233,18 @@ class AbstractCallbackModel(AbstractModel):
 
         self._index_map[index] = item
         self._item_map[item] = index
+
+        self._register_content(item)
+
         if apply_filter:
             self.applyFilter(emit=emit)
         if emit:
             self._fireChanged()
+            self._notify_changed(data = item, operation="place")
 
         self._onItemChanged(self, index, item, old_item, "place")
 
-    def _reindex(self):
+    def _reindex(self, emit = True):
         """reorders the indices in the model to be consecutive starting from 0"""
         for new_index, item in enumerate(self._index_map.values()):
             self._item_map[item] = new_index
@@ -1194,6 +1255,10 @@ class AbstractCallbackModel(AbstractModel):
             syslog.info("Reindex results:")
             for index, item in self._filtered_index_map.items():
                 syslog.info(f"Filtered index [{index}] maps to item [{item}]")
+
+        if emit:
+            self._fireChanged()
+            self._notify_changed(data = self, operation="reindex")
 
     def remove(self, item, emit=True):
         """Removes the given entry from the model."""
@@ -1208,16 +1273,19 @@ class AbstractCallbackModel(AbstractModel):
 
         if index != -1:
             # syslog.info(f"removing item {item.id} from model {self.id} current count: {self.count()}")
+
             if hasattr(item, "_cleanup"):
                 item._cleanup()
             del self._item_map[item]
             del self._index_map[index]
             # reorder indices
-            self._reindex()
+            self._reindex(False)
             assert item not in self._item_map, "item not removed from model"
             # syslog.info(f"item {item.id} removed from model {self.id} new count: {self.count()}")
             if emit:
                 self._fireChanged()
+            self._notify_changed(data = item, operation="remove")
+            self._unregister_content(item)
             self._onItemChanged(self, index, None, item, "remove")
         else:
             if __debug__:
@@ -1226,19 +1294,20 @@ class AbstractCallbackModel(AbstractModel):
                 index = 0
                 for key, item in self._item_map.items():
                     syslog.info(f"  [{index}] Item map key [{str(key)}] hash[{hash(key)}] maps to item [{str(item)}]")
-                    index +=1
+                    index += 1
                 pass
-
 
     def removeAt(self, index: int, emit=True):
         """removes the entry at the given filteredmodel index"""
         if index in self._index_map:
             item = self._index_map[index]
+            self._unregister_content(item)
             if hasattr(item, "_cleanup"):
                 item._cleanup()
             del self._item_map[item]
             del self._index_map[index]
-            self._reindex()
+            self._reindex(False)
+            self._notify_changed(data = item, operation="remove")
 
             if emit:
                 self._fireChanged()
@@ -1255,6 +1324,8 @@ class AbstractCallbackModel(AbstractModel):
         """Removes all the given entry from the model."""
         if self._item_map:
             self.pushSuspend()
+            for item in self._item_map:
+                self._unregister_content(item)
             self._item_map.clear()
             self._index_map.clear()
             self._filtered_index_map.clear()
@@ -1643,16 +1714,30 @@ class AbstractCallbackModel(AbstractModel):
             # ensure the callback has the correct signature
             import inspect
 
-            sig = inspect.signature(callback)
-            if len(sig.parameters) != 2:
-                raise TypeError("Callback must accept exactly two parameters: data and force")
+            if callback:
+                sig = inspect.signature(callback)
+                if len(sig.parameters) != 2:
+                    raise TypeError("Callback must accept exactly two parameters: data and force")
 
-        if callback not in self._data_changed_callbacks:
+        if callback and callback not in self._data_changed_callbacks:
             self._data_changed_callbacks.append(callback)
 
     def addOnItemChangedCallback(self, callback: Callable):
         """adds a OnitemChanged callback that includes the operation and the old value, and new value as parameters"""
-        if callback not in self._item_changed_callbacks:
+
+        if __debug__:
+            if callback is not None and not callable(callback):
+                raise TypeError("Callback must be callable")
+            # ensure the callback has the correct signature
+            import inspect
+
+            if callback:
+                sig = inspect.signature(callback)
+                if len(sig.parameters) != 5:
+                    raise TypeError("Callback must accept exactly five parameters: source, index, old_value, new_value, and operation")
+
+
+        if callback and callback not in self._item_changed_callbacks:
             self._item_changed_callbacks.append(callback)
 
     def removeOnItemChangedCallback(self, callback: Callable):

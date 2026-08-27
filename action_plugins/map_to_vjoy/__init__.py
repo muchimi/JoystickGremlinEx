@@ -4818,9 +4818,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         ):
             self.vjoy_input_id = action_data.vjoy_hat_id
 
-        syslog.info(f"Initializing VJoyRemapFunctor for action_data id: {action_data.id}")
-        syslog.info(f"\tAction mode: {self.action_data.action_mode.name}")
-        syslog.info(f"\tInput item: {self.action_data.input_item.display_name if self.action_data.input_item else 'None'}")
+        if self.verbose:
+            syslog.info(f"Initializing VJoyRemapFunctor for action_data id: {action_data.id}")
+            syslog.info(f"\tAction mode: {self.action_data.action_mode.name}")
+            syslog.info(f"\tInput item: {self.action_data.input_item.display_name if self.action_data.input_item else 'None'}")
 
         self.action_data = action_data
         self.input_type = action_data.get_input_type()
@@ -5780,7 +5781,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         # syslog.info(f"\tAction mode: {self.action_data.action_mode.name}")
         # syslog.info(f"\tInput item: {self.action_data.input_item.display_name if self.action_data.input_item else 'None'}")
 
-
         # check the event is ours for latching input scenarios
         if extra_data and "input_item" in extra_data:
             input_item = extra_data["input_item"]
@@ -5866,10 +5866,8 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
         """runs when a joystick even occurs like a button press or axis movement when a profile is running"""
         is_local, is_remote = self.action_data.sendFlags()
 
-
-
         verbose = self.verbose
-        #verbose = True
+        # verbose = True
         verbose_extra = self.verbose_extra
 
         # syslog = logging.getLogger("system")
@@ -6187,10 +6185,6 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
             is_pressed = event.is_pressed
             trigger = False
             fire_event = (self.action_data.exec_on_release and not is_pressed) or (self.action_data.exec_on_press and is_pressed)
-
-
-
-            syslog.info(f"=============================================================== button set pressed {is_pressed}")
 
             match self.action_mode:
                 case VjoyAction.VJoyButton | VjoyAction.VJoyButtonInverted:

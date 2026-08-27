@@ -48,11 +48,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m77T36)
+### (m77T36) - experimental
 - Change: hardening for QT behaviors to validate for QT memory model and threading.
 - Change: hardening of sound API for cross-threading and to guard against possible race conditions.
+- Change: hardening of joystick API against out of band device changes
+- Change: API: optionally propagate view model changes for nested models (a model that contains other models)
 - Fix: API: condition parameter propagation for all conditions/actions
-- 
+- Fix: API: fixed an issue where loading a device from an older profile that no longer exists or is not connected could prevent a device node from being created causing a downstream exception and logic errors.
+- Fix: UI: input icons may not always update when mappings change
 
 ### (m77T35)
 - Change: API: keyboard condition supports latched keys

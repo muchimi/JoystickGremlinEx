@@ -3837,8 +3837,8 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
 
         self.display_index = 0  # display index for ordering
         self.warning_visible = False  # flag for warning label/icon
-        self._lock = False
-        self._set_value_lock = False
+        self._lock = threading.Lock()
+        self._set_value_lock = threading.Lock()
 
         self._create_widget(gate, delete_enabled, parent=self)
 
@@ -4024,16 +4024,15 @@ class GateInfoWidget(gremlin.ui.ui_common.QDataWidget):
 
     def setValue(self, value: float, emit=True):
         """sets the gate value on the widget"""
-        if self._set_value_lock:
+        if not self._set_value_lock.acquire(blocking=False):
             return
-        self._set_value_lock = True
         try:
             if value != self.value_widget.value():
                 with QtCore.QSignalBlocker(self.value_widget):
                     self.value_widget.setValue(value)
             self.gate.setValue(value, emit=False)
-        except Exception:
-            self._set_value_lock = False
+        finally:
+            self._set_value_lock.release()
 
     def setUsed(self, value: bool):
         """sets the used state of the widget and associated gate"""

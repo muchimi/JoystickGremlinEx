@@ -516,7 +516,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         if custom_mode_name_handler is not None:
             assert callable(custom_mode_name_handler), "Mode name handler must be callable "
         self._profile_mode_callback = custom_mode_name_handler  # special callback to use to get the profile mode for this item (if special)
-        self._containers = ContainerModel(self)  # holds the containers for this input
+        self._containers = ContainerModel(self, content_callback=self._handle_content_changed)  # holds the containers for this input
         self._selected = False  # true if the item is selected
         self._is_action = False  # true if the object is a sub-item for a sub-action (GateHandler for example)
 
@@ -566,6 +566,16 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         el.reload_axis_state.connect(self._handle_axis_state_request)
 
         self._initialized = True
+
+    def notifyContentChanged(self, extra_data : dict = None, force : bool = False, operation : str = None):
+        """notifies that the content has changed"""
+        self._handle_content_changed(extra_data=extra_data, force=force, operation=operation)
+
+    def _handle_content_changed(self, extra_data : dict = None, force : bool = False, operation : str = None):
+        """ called when the containers or container contents change """
+        if self._input_widget:
+            self._input_widget.updateActionIcons(force=True)
+
 
     def registerLatchedInput(self, input_id):
         """registers an additional latched input for this input item - this is called on profile start when the excution tree is being built"""
@@ -1205,6 +1215,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             container_plugins.set_container_data(self, entry)
 
         self._containers.popSuspend()  # allow updates
+        self._containers.setContentCallback(self._handle_content_changed)
+        self._handle_content_changed()
 
     def is_valid_for_save(self) -> bool:
         """true if the item has something to save to a profile"""
@@ -1287,35 +1299,38 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
     @property
     def display_name(self):
         """gets a display name for this input"""
-        if self.is_action:
-            return "this action"
-        if self._input_id is None:
-            return f"{self._input_type.name}"
+        device = gremlin.joystick_handling.getDevice(self.device_guid)
+        if device:
+            device_name = device.name
+        else:
+            device_name = "Unknown Device"
 
         match self._input_type:
             case InputType.JoystickAxis:
                 device = gremlin.joystick_handling.getDevice(self.device_guid)
-                return f"{device.get_axis_name(self._input_id)}"
+                stub = f"{device.get_axis_name(self._input_id)}"
             case InputType.JoystickButton:
-                return f"Button {self._input_id}"
+                stub = f"Button {self._input_id}"
             case InputType.JoystickHat:
-                return f"Hat {self._input_id}"
+                stub = f"Hat {self._input_id}"
             case InputType.Keyboard | InputType.KeyboardLatched:
-                return f"Key {self._input_id.display_name}"
+                stub = f"Key {self._input_id.display_name}"
             case InputType.OpenSoundControl:
-                return f"OSC {self._input_id.display_name}"
+                stub = f"OSC {self._input_id.display_name}"
             case InputType.Midi:
-                return f"Midi {self._input_id.display_name}"
+                stub = f"Midi {self._input_id.display_name}"
             case InputType.ModeControl:
-                return f"{gremlin.ui.mode_device.ModeInputModeType.to_display_name(self._input_id)}"
+                stub = f"{gremlin.ui.mode_device.ModeInputModeType.to_display_name(self._input_id)}"
             case InputType.State:
-                return f"State: {self._input_id}"
+                stub = f"State: {self._input_id}"
             case InputType.OctaviIfr1:
-                return f"IFR1: {self._input_id.name}"
+                stub = f"IFR1: {self._input_id.name}"
             case InputType.ModeControl:
-                return f"ModeControl: {self._input_id}"
+                stub = f"ModeControl: {self._input_id}"
+            case _:
+                stub = f"[unknown input type: {self._input_type}]"
 
-        return f"Unknown input: {self._input_type}"
+        return f"{device_name}: {stub}"
 
     def save_container_to_template(self, fname: str):
         if fname:
@@ -2083,7 +2098,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             container = action.container
             input_item = container.input_item
             if input_item == self._input_item:
-                self._update_action_icons()
+                self.updateActionIcons(force=True)
 
     def _handle_remove_unused_actions(self):
         input_item = self._input_item
@@ -2510,14 +2525,14 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             else:
                 self._calibration_button_widget.setIcon(self._calibration_icon_inactive)
 
-    def _update_action_icons(self):
+    def updateActionIcons(self, force = False):
         """updates the input item's action icon list"""
-        gremlin.util.InvokeUiMethod(self._update_action_icons_ui)
+        gremlin.util.InvokeUiMethod(self._update_action_icons_ui, force)
 
-    def _update_action_icons_ui(self):
+    def _update_action_icons_ui(self, force : bool = False):
         # update mapping icons
         # syslog.info(f"update action icons for input item: {self.input_item.display_name}")
-        self.create_action_icons(self.input_item)
+        self.create_action_icons(self.input_item, force=force)
 
     def _icon_changed_cb(self, event: gremlin.event_handler.DeviceChangeEvent):
         gremlin.util.InvokeUiMethod(self._icon_changed_cb_ui, event)
@@ -2916,12 +2931,12 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             self._title_icon_layout.removeWidget(self._edit_button_widget)
             self._edit_button_widget = None
 
-    def create_action_icons(self, input_item: InputItem):
+    def create_action_icons(self, input_item: InputItem, force : bool = False):
         """creates the action icons for mapped actions associated with the input item
         :param input_item: the InputItem instance for which to create action icons
         """
 
-        if not self._icons_dirty:
+        if not self._icons_dirty and not force:
             return
 
         self._icons_dirty = False
@@ -4588,6 +4603,7 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         custom_parse_callback: Callable = None,
         custom_generate_callback: Callable = None,
         custom_action_sets: bool = False,
+        content_callback: Callable = None,
         extra_data: dict = None,
     ):
         """Creates a new instance.
@@ -4605,13 +4621,14 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         # must exist before parent call
         self._conditions = ConditionModel(self)
         self._activation_condition = BaseActivationCondition(self, ActivationRule.All)  # conditions
+        self._content_callback = content_callback
 
         super().__init__(parent, extra_data=extra_data)
 
         self.parent = parent
 
         self._abstract_container_generating_xml = False  # true if generating
-        self._action_sets = ActionSets(self)  # containers contain one or more action sets, each action sets contains a list of action set object
+        self._action_sets = ActionSets(self, content_callback=content_callback)  # containers contain one or more action sets, each action sets contains a list of action set object
         # self._action_sets.addOnItemChangedCallback(self._on_action_sets_changed)
 
         self.custom_action_sets = custom_action_sets  # true if the container uses custom action sets (need a converter to produce action_sets)
@@ -4662,18 +4679,15 @@ class AbstractContainer(BaseProfileData, ConditionContainer):
         self.device = gremlin.joystick_handling.getDevice(self.device_guid)
         self.extra_data = extra_data or {}
 
-    # def _on_action_sets_changed(self, model, index, new_item, old_item, operation):
-    #     pass
+    def setContentCallback(self, callback: Callable):
+        """sets the content changed callback for this container"""
+        self._content_callback = callback
+        self.action_sets.setContentCallback(callback)
+
+
 
     def hasOutput(self) -> bool:
         """returns True if this container has output, meaning it contains an action that has output"""
-        # if self._input_item:
-        # device_guid = self._input_item.device_guid
-        # device = gremlin.joystick_handling.getDevice(device_guid)
-        # if "left" in device.name.casefold() and self._input_item.input_type == InputType.JoystickButton and self._input_item.input_id == 12:
-        #     self.dumpActionSets()
-        #     pass
-
         for action_set in self._action_sets:
             for action in action_set:
                 if action.hasOutput():
@@ -5419,6 +5433,7 @@ class AbstractAction(BaseProfileData):
         el.profile_unhook.connect(self.unhook)
         el.profile_unload.connect(self._cleanup)
 
+
     @property
     def debug_name(self) -> str:
         """friendly display name"""
@@ -5669,6 +5684,7 @@ class AbstractAction(BaseProfileData):
     def fireIconChanged(self):
         """fires the icon changed event"""
         self.icon_changed.emit()
+        self.notifyContentChanged() # tell input to update icons as needed
 
     def from_xml(self, node, data=None, extra_data=None):
         """Populates the instance with data from the given XML node.
@@ -5794,11 +5810,14 @@ class AbstractAction(BaseProfileData):
 class ActionSet(AbstractCallbackModel):
     """holds action set data with a data and ID attribute - each action set contains a list of AbstractActions"""
 
-    def __init__(self, data=None, model_description: str = None):
+    def __init__(self, data=None, content_callback=None, model_description: str = None):
         super().__init__(
             allowed_types=(AbstractAction,),
             model_description=f"Action Set Model: [{model_description or 'n/a'}]",
+            content_callback=content_callback,
         )
+        if not content_callback:
+            pass
         self._data = data  # any special tag to identify the action set
         self.description: str = None  # description of the action set (optional)
 
@@ -6475,6 +6494,7 @@ class ConditionModel(AbstractCallbackModel):
     def __init__(
         self,
         container: AbstractContainer | AbstractAction | ConditionContainer,
+        content_callback: Callable = None,
         # condition_data: BaseActivationCondition = None,  # noqa: F405
     ):
         """Creates a new model to store condition data.
@@ -6490,7 +6510,9 @@ class ConditionModel(AbstractCallbackModel):
             allowed_types=(
                 BaseAbstractCondition,
                 AbstractCondition,
+
             ),
+            content_callback=content_callback,
             model_description="ConditionModel",
         )
 
@@ -6662,22 +6684,26 @@ class MultiModeAbstractAction(AbstractAction):
 class ActionSets(AbstractCallbackModel):
     """contains ActionSet objects for a container"""
 
-    def __init__(self, container: AbstractContainer, description: str = None, data=None):
+    def __init__(self, container: AbstractContainer, description: str = None, data=None, content_callback : Callable =None):
         assert isinstance(container, AbstractContainer), "Invalid container object"
 
-        super().__init__(allowed_types=(ActionSet,), model_description=f"ActionSets model for container: [{container.debug_name}]", data=container)
+        super().__init__(allowed_types=(ActionSet,),
+                         model_description=f"ActionSets model for container: [{container.debug_name}]",
+                         content_callback=content_callback,
+                         data=container)
 
         self._container = container
         self._input_item = self._container.input_item
         self._description = description
         self._data = data
 
+
         # add at least one action set object
         # load from container
 
         if self.count() == 0:
             # create at least one action set
-            self.setItemAt(0, ActionSet())
+            self.setItemAt(0, ActionSet(content_callback=content_callback))
         assert self.count()
         assert isinstance(self._input_item, InputItem), "Invalid input item for container"
 
@@ -6697,7 +6723,7 @@ class ActionSets(AbstractCallbackModel):
         """ensures the actions sets has at least count action set object"""
         if count > 0:
             while self.count() < count:
-                self.append(ActionSet())
+                self.append(ActionSet(content_callback=self._content_callback))
 
     def clear(self):
         """clears all the actions"""
@@ -9242,10 +9268,11 @@ class ConditionActionWrapperWidget(AbstractActionWrapper):
 class ContainerModel(AbstractCallbackModel):
     """container model for input mapping widget"""
 
-    def __init__(self, input_item, parent=None):
+    def __init__(self, input_item, content_callback: Callable = None, parent=None):
         """Creates a new instance.
 
         :param input_item:  the input item owning the container
+        :param content_callback: the callback to invoke when the container or actions in containers change
         :param input_item_widget: the mapping widget displaying all containers
         :param input_type: the override input type if different from the input item configuration
         :param parent: the parent of this widget
@@ -9255,6 +9282,7 @@ class ContainerModel(AbstractCallbackModel):
             allowed_types=(AbstractContainer,),
             model_description=f"ContainerModel for input: [{input_item.device_name} {input_item.display_name}]",
             data=input_item,
+            content_callback=content_callback
         )
 
         self._input_item = input_item
@@ -9274,6 +9302,7 @@ class ContainerModel(AbstractCallbackModel):
 
         :param container the container instance to be added
         """
+        container.setContentCallback(self._content_callback)
 
         self.add(container)
 

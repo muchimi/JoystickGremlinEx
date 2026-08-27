@@ -5116,9 +5116,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
         if verbose:
-            syslog.info("Profile: worker: start loading")
-
-        syslog.info(f"Profile: worker: loading profile {gremlin.util.toUrl(source_xml)}")
+            syslog.info(f"Profile: worker: loading profile {gremlin.util.toUrl(source_xml)}")
 
         # trap recursive call
         if self._profile_load_stack:

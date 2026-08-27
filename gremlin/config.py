@@ -17,6 +17,7 @@
 
 import json
 import logging
+import threading
 import time
 import os
 import shutil
@@ -73,7 +74,7 @@ class Configuration(QtCore.QObject):
 
         super().__init__()
 
-        self._lock = False
+        self._lock = threading.Lock()
         self._data = {}  # gremlin items - version specific
         self._profile_data = {}  # profile specific options
         self._profile_loaded = False
@@ -346,6 +347,7 @@ class Configuration(QtCore.QObject):
 
         return True
 
+
     def _reload(self):
         """Loads the configuration file's content.  flag = global or local (version specific) config"""
 
@@ -458,7 +460,7 @@ class Configuration(QtCore.QObject):
 
     def _save_ui(self, fname: str = None, save_profile: bool = False):
         """Writes the version specific configuration file to disk."""
-        if self._lock:
+        if not self._lock.acquire(blocking=False):
             # ignore concurrent save requests (technically not necessary due to UI thread placement)
             return
         self.ensureProfilePath()
@@ -469,7 +471,6 @@ class Configuration(QtCore.QObject):
         tmp = self.getTemporaryFile(".json")
         is_error = False
         try:
-            self._lock = True
             if not fname:
                 fname = self.get_config()
             # get a temp file name
@@ -502,7 +503,7 @@ class Configuration(QtCore.QObject):
                     syslog.error(f"CONFIG: unable to overwrite file: {fname}")
                     syslog.error(ex)
 
-            self._lock = False
+            self._lock.release()
 
         if save_profile:
             self._save_profile_ui()
@@ -521,11 +522,10 @@ class Configuration(QtCore.QObject):
 
     def _save_profile_ui(self):
         """saves to the profile specific config file"""
-        if self._lock:
+        if not self._lock.acquire(blocking=False):
             # ignore concurrent save requests (technically not necessary due to UI thread placement)
             return
         try:
-            self._lock = True
             fname = self._profile_config_fname
             if fname:
                 tmp = gremlin.util.getTemporaryFile(".json")
@@ -540,7 +540,7 @@ class Configuration(QtCore.QObject):
             syslog.error(f"CONFIG: unable to save profile: {fname}")
             syslog.error(ex)
         finally:
-            self._lock = False
+            self._lock.release()
 
     @property
     def is_debug(self):

@@ -40,7 +40,7 @@ from psygnal import Signal
 import gremlin.util
 from gremlin.util import parse_bool, safe_read, safe_format, parse_guid, write_guid, load_icon
 from gremlin.input_item import InputItem, BaseAbstractCondition, AbstractConditionWidget, AbstractContainer, AbstractAction, AbstractCondition
-import dinput
+
 
 
 syslog = logging.getLogger("system")

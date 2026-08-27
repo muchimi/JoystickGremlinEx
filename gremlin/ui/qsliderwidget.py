@@ -195,9 +195,9 @@ class QSliderWidget(QtWidgets.QWidget):
         self.update()
 
     def setTickCount(self, value: int):
-        gremlin.util.InvokeUiMethod(self._set_tick_count, value)
+        gremlin.util.InvokeUiMethod(self._set_tick_count_ui, value)
 
-    def _set_tick_count(self, value: int):
+    def _set_tick_count_ui(self, value: int):
         """sets the number of ticks"""
         gremlin.util.assert_ui_thread()
         value = gremlin.util.clamp(value, 0, 50)
