@@ -1,6 +1,5 @@
 # implements a custom multi-gate slider widget
 from __future__ import annotations  # deprecated with python 3.14+
-import threading
 import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 import gremlin.config
@@ -17,6 +16,7 @@ from PySide6.QtGui import (
     QMouseEvent,
     QCursor,
 )
+from shiboken6 import Shiboken
 
 from itertools import pairwise
 
@@ -45,7 +45,6 @@ class QSliderWidget(QtWidgets.QWidget):
     valueChanged = QtCore.Signal(int, float)  # called when a gate value changes via dragging (index of handle, updated value)
     handleDragStart = QtCore.Signal(int)  # called when a handle is being dragged (handle index)
     handleDragStop = QtCore.Signal(int)  # called when a handle stops being dragged (handle index)
-
 
     def __init__(self, object_name=None, parent=None):
         import gremlin.ui.ui_common
@@ -115,7 +114,10 @@ class QSliderWidget(QtWidgets.QWidget):
         self._hover_range_handle_pair = None  # hover index pairs
         self._hover_lock = False  # true when a drag operation is in process to keep the hover as-is
 
-        self._tooltip_timer = None  # tooltip delay timer
+        self._tooltip_timer = QtCore.QTimer(self)  # tooltip delay timer (Qt event loop)
+        self._tooltip_timer.setSingleShot(True)
+        self._tooltip_timer.timeout.connect(self._handle_show_tooltip_ui)
+        self._tooltip_message = None
         self._tooltip_handle_map = {}  # tooltips to display for the given handle, key is the index of the handle, 0 based
         self._tooltip_range_map = {}  # tooltips for a given range, the key is a tuple of the index two bounding gates (a,b)
         self._desired_height = 32
@@ -144,7 +146,8 @@ class QSliderWidget(QtWidgets.QWidget):
         """cleanup"""
         self.setMouseTracking(False)
         if self._tooltip_timer:
-            self._tooltip_timer.cancel()
+            self._tooltip_timer.stop()
+        self._tooltip_message = None
 
     @property
     def desired_height(self) -> int:
@@ -155,6 +158,7 @@ class QSliderWidget(QtWidgets.QWidget):
         gremlin.util.InvokeUiMethod(self._set_desired_height_ui, value)
 
     def _set_desired_height_ui(self, value: int):
+        gremlin.util.assert_ui_thread()
         self._desired_height = value
         self.resize(self.minimumSizeHint())
 
@@ -185,6 +189,7 @@ class QSliderWidget(QtWidgets.QWidget):
             gremlin.util.InvokeUiMethod(self._set_single_range_ui, value)
 
     def _set_single_range_ui(self, value):
+        gremlin.util.assert_ui_thread()
         self._single_range = value
         self._update_offsets_ui()
         self.update()
@@ -194,6 +199,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_tick_count(self, value: int):
         """sets the number of ticks"""
+        gremlin.util.assert_ui_thread()
         value = gremlin.util.clamp(value, 0, 50)
         if self._tick_count != value:
             self._tick_count = value
@@ -204,6 +210,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_tick_marks_ui(self, value: int):
         """sets the tick marks for the axis as set values"""
+        gremlin.util.assert_ui_thread()
         if value:
             self._tick_marks = value
             self._tick_count = len(value)
@@ -217,6 +224,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_draw_handles_ui(self, value: bool):
         """enable/disables the drawing of handles"""
+        gremlin.util.assert_ui_thread()
         self._draw_handles = value
         self.update()
 
@@ -233,6 +241,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
         """
 
+        gremlin.util.assert_ui_thread()
         if icon is None:
             # clear the entry
             if index in self._handle_icons:
@@ -263,7 +272,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
         """
         key = (a, b)
-        if message is None and key in self._tooltip_handle_map:
+        if message is None and key in self._tooltip_range_map:
             del self._tooltip_range_map[key]
         else:
             self._tooltip_range_map[key] = message
@@ -273,6 +282,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_value_index_ui(self, index: int, value: int | float):
         """sets a specific value by index"""
+        gremlin.util.assert_ui_thread()
 
         value = gremlin.util.clamp(value, self._minimum, self._maximum)
         try:
@@ -288,12 +298,10 @@ class QSliderWidget(QtWidgets.QWidget):
     def _set_value_ui(self, value: int | float | list | tuple):
         """input values expected to be -1 to +1 floating point"""
         try:
+            gremlin.util.assert_ui_thread()
             if self._value_lock:
                 return
             self._value_lock = True
-            verbose = gremlin.config.Configuration().verbose
-            if verbose:
-                gremlin.util.assert_ui_thread()
             values = None
             if isinstance(value, float):
                 value = gremlin.util.clamp(value, self._minimum, self._maximum)
@@ -333,6 +341,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_marker_visible_ui(self, value: bool):
         """toggle marker visibility"""
+        gremlin.util.assert_ui_thread()
         self._marker_visible = value
         self.update()
 
@@ -347,12 +356,17 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_marker_size_ui(self, value):
         """sets the relative size of the marker"""
+        gremlin.util.assert_ui_thread()
         self._marker_size = value
         self._update_pixmaps()
         self._update_marker_offsets_ui()
         self.update()
 
     def setReadOnly(self, value: bool):
+        gremlin.util.InvokeUiMethod(self._set_read_only_ui, value)
+
+    def _set_read_only_ui(self, value: bool):
+        gremlin.util.assert_ui_thread()
         self._readOnly = value
 
     def readOnly(self) -> bool:
@@ -360,6 +374,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _update_offsets_ui(self):
         """recomputes pixel offsets based on gate values"""
+        gremlin.util.assert_ui_thread()
         size = self.size()
         widget_width = size.width()
         widget_height = size.height()
@@ -436,6 +451,9 @@ class QSliderWidget(QtWidgets.QWidget):
             # compute marker positions
             source_min = self._minimum
             source_max = self._maximum
+            if source_max == source_min:
+                self._int_marker_pos = [self._usable_left for _ in self._marker_pos]
+                return
             target_min = self._usable_left  # self._to_qinteger_space(self._range_left)
             target_max = self._usable_right  # self._to_qinteger_space(self._range_right)
             self._int_marker_pos = [((v - source_min) * (target_max - target_min)) / (source_max - source_min) + target_min for v in self._marker_pos]
@@ -451,6 +469,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_marker_value_ui(self, value):
         """sets the marker(s) value - single float is one marker, passing a tuple creates multiple markers"""
+        gremlin.util.assert_ui_thread()
         # if self._lock:
         #     return
         # try:
@@ -482,6 +501,7 @@ class QSliderWidget(QtWidgets.QWidget):
         gremlin.util.InvokeUiMethod(self._set_minimum_ui, value)
 
     def _set_minimum_ui(self, value: float):
+        gremlin.util.assert_ui_thread()
         self._minimum = value
         if self._maximum < self._minimum:
             self._maximum, self._minimum = self._minimum, self._maximum
@@ -497,6 +517,7 @@ class QSliderWidget(QtWidgets.QWidget):
 
     def _set_maximum_ui(self, value: float) -> None:
         """sets the slider's maximum value"""
+        gremlin.util.assert_ui_thread()
         self._maximum = value
         if self._maximum < self._minimum:
             self._maximum, self._minimum = self._minimum, self._maximum
@@ -513,6 +534,7 @@ class QSliderWidget(QtWidgets.QWidget):
         :param range_max: max range (float)
 
         """
+        gremlin.util.assert_ui_thread()
         if range_min > range_max:
             # swap
             range_max, range_min = range_min, range_max
@@ -786,6 +808,12 @@ class QSliderWidget(QtWidgets.QWidget):
                         painter.drawLine(p1, p2)
             else:
                 # equally spaced
+                if count == 1:
+                    p1 = QPoint(x1 + (width * 0.5), y1)
+                    p2 = QPoint(x1 + (width * 0.5), y2)
+                    painter.drawLine(p1, p2)
+                    return
+
                 interval = width / (count - 1)
                 x = x1
                 for _ in range(self._tick_count + 1):
@@ -864,20 +892,16 @@ class QSliderWidget(QtWidgets.QWidget):
         gremlin.util.InvokeUiMethod(self._show_tooltip_ui, message)
 
     def _show_tooltip_ui(self, message: str):
+        gremlin.util.assert_ui_thread()
+        self._tooltip_message = message
         if self._tooltip_timer is not None:
-            self._tooltip_timer.cancel()
+            self._tooltip_timer.stop()
+            self._tooltip_timer.start(1000)
 
-        self._tooltip_timer = threading.Timer(1, self._create_tooltip_callback(message))
-        self._tooltip_timer.start()
-
-    def _create_tooltip_callback(self, message):
-        return lambda: self._handle_show_tooltip(message)
-
-    def _handle_show_tooltip(self, message):
-        gremlin.util.InvokeUiMethod(self._handle_show_tooltip_ui, message)
-
-    def _handle_show_tooltip_ui(self, message):
-        QToolTip.showText(QCursor.pos(), message, self)
+    def _handle_show_tooltip_ui(self):
+        if Shiboken.isValid(self) and self._tooltip_message:
+            gremlin.util.assert_ui_thread()
+            QToolTip.showText(QCursor.pos(), self._tooltip_message, self)
 
     def _hover_update(self, event: QMouseEvent):
         """updates the hover state"""
@@ -925,6 +949,9 @@ class QSliderWidget(QtWidgets.QWidget):
             if not is_hover:
                 hover_changed = hover_changed or self._hover_exit_handle()
                 hover_changed = hover_changed or self._hover_exit_range()
+                self._tooltip_message = None
+                if self._tooltip_timer is not None:
+                    self._tooltip_timer.stop()
                 QToolTip.hideText()
 
         return hover_changed

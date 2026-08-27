@@ -352,7 +352,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.button_state_change.connect(self._button_state_change)
         el.axis_state_change.connect(self._axis_state_change)
         el.input_selection_changed.connect(self._input_changed_handler)
-        el.remote_control_changed(self._remote_control_changed)
+        el.remote_control_changed.connect(self._remote_control_changed)
 
         # hook input selection
         el.select_input.connect(self._select_input_handler)
@@ -486,10 +486,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _update_start_tab(self):
         """forces a tab index reload on init"""
         tab_index = self.ui.devices_tab_header_widget.currentIndex()
-        self._tab_selected(tab_index)
+        gremlin.util.InvokeUiMethod(self._tab_selected, tab_index)
 
     def _update_toolbar(self):
         """updates the toolbar when the toolbar changes"""
+        gremlin.util.InvokeUiMethod(self._update_toolbar_ui)
+
+    def _update_toolbar_ui(self):
+        gremlin.util.assert_ui_thread()
         self.ui.update_toolbar()
 
     def registerTemporaryProfileLoadFile(self, xml_file: str):
@@ -2106,6 +2110,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     @QtCore.Slot()
     def _profile_start(self):
+        gremlin.util.InvokeUiMethod(self._profile_start_ui)
+
+    def _profile_start_ui(self):
+        gremlin.util.assert_ui_thread()
         self.setUiMode()
         self._update_status_bar_active(True)
         self._update_status_bar_modules_ui()
@@ -2113,6 +2121,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     @QtCore.Slot()
     def _profile_stop(self):
+        gremlin.util.InvokeUiMethod(self._profile_stop_ui)
+
+    def _profile_stop_ui(self):
+        gremlin.util.assert_ui_thread()
         self.setUiMode()
         self._update_status_bar_active(False)
         self._update_highlight_toolbar_enabled()
@@ -2133,7 +2145,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             label, value, callback = self._status_bar_module_states[key]
             if value != state:
                 self._status_bar_module_states[key] = (label, state, callback)
-                self._update_status_bar_modules_ui()
+                self._update_status_bar_modules()
 
     def _update_status_bar_modules(self):
         gremlin.util.InvokeUiMethod(self._update_status_bar_modules_ui)  # ensure on UI thread
@@ -2209,7 +2221,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             syslog.info(f"Toggle axis highlight: {enabled}")
         eh.toggle_highlight.emit(None, enabled, None)
 
-    @QtCore.Slot()
+    @QtCore.Slot(bool)
     def _toggle_button_highlight(self, checked: bool):
         eh = gremlin.event_handler.EventListener()
 
@@ -2222,7 +2234,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             syslog.info(f"Toggle button highlight: {enabled}")
         eh.toggle_highlight.emit(None, None, enabled)
 
-    @QtCore.Slot()
+    @QtCore.Slot(bool)
     def _toggle_highlight_enabled(self, checked: bool):
         self.config.highlight_enabled = not self.config.highlight_enabled
         el = gremlin.event_handler.EventListener()
@@ -4409,6 +4421,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _device_change_ui(self):
         """Handles addition and removal of joystick devices."""
+        gremlin.util.assert_ui_thread()
 
         if not gremlin.joystick_handling.joystick_initialized():
             # not initialized yet
@@ -4738,6 +4751,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         :param is_active True if the system is active, False otherwise
         """
+        gremlin.util.assert_ui_thread()
         Color = gremlin.ui.ui_common.Color
         try:
             if self._is_active:
@@ -4789,7 +4803,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             log_sys_error(f"Unable to update status bar event: {event}")
             syslog.error(f"{err}\n{traceback.format_exc()}")
 
-    @QtCore.Slot()
+    @QtCore.Slot(object)
     def _update_mode_change(self, new_mode):
         self._update_ui_mode(new_mode)
 
@@ -4798,6 +4812,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _update_mode_status_bar_ui(self, mode: str = None):
         """updates the mode status bar with current runtime and edit modes"""
+        gremlin.util.assert_ui_thread()
         try:
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_mode
@@ -5355,6 +5370,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _refresh_ui(self):
         """refresh the UI"""
+        gremlin.util.assert_ui_thread()
 
         # save selection
         current_device_guid = gremlin.shared_state.current_tab_device_guid

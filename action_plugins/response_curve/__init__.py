@@ -984,6 +984,7 @@ class ResponseCurveWidget(gremlin.input_item.AbstractActionWidget):
 
     def _update_value(self, value):
         """updates dot on the curve based on the value -1 to +1"""
+        gremlin.util.assert_ui_thread()
         curve_value = gremlin.joystick_handling.scale_to_range(value, target_min=-g_scene_size, target_max=+g_scene_size + 1)  # value on the curve by pixel x
 
         """ draw the current value on the curve """

@@ -752,10 +752,11 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.set_mode(mode)
 
     def _mode_name_changed(self, name):
-        gremlin.util.InvokeUiMethod(self._mode_name_changed_ui)  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._mode_name_changed_ui, name)  # ensure on UI thread
 
     def _mode_name_changed_ui(self, name):
         """occurs when there's a mode name change"""
+        gremlin.util.assert_ui_thread()
         self.inputItemListModel.refresh()
 
     def _config_changed_cb(self):
@@ -835,7 +836,7 @@ class OctaviDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         input_widget.setInputDescription(None)
         input_widget.setToolTip(tooltip)
 
-    def _populate_input_widget_ui(self, input_widget, container_widget, data = None):
+    def _populate_input_widget_ui(self, input_widget, container_widget, data=None):
         """called when a button is created for custom content"""
         layout = QtWidgets.QVBoxLayout(container_widget)
         status_widget = gremlin.ui.ui_common.QIconLabel()

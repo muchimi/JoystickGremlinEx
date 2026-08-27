@@ -1018,6 +1018,10 @@ class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         self.set_mode(mode)
 
     def _config_changed_cb(self):
+        gremlin.util.InvokeUiMethod(self._config_changed_ui)
+
+    def _config_changed_ui(self):
+        gremlin.util.assert_ui_thread()
         self.inputItemListModel.refresh()
 
     @property

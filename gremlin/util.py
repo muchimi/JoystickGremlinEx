@@ -65,13 +65,10 @@ syslog = logging.getLogger("system")
 
 
 def debug_only(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        if not __debug__:
-            return None
-        return func(*args, **kwargs)
-
-    return wrapper
+    """ decorator to mark a call as a no-op in production mode (when __debug__ is False)"""
+    if not __debug__:
+        return lambda *args, **kwargs: None
+    return func
 
 
 class FileWatcher(QtCore.QObject):
@@ -2772,7 +2769,7 @@ class TriggerDict(collections.UserDict):
         """clears any change callbacks"""
         self._on_change_callbacks.clear()
 
-    
+
     def __setitem__(self, key, value):
         old_value = self.data.get(key)
         super().__setitem__(key, value)

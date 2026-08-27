@@ -99,36 +99,64 @@ class _TimerEx:
         self._is_running = False
         self._one_shot = False
         self._name = None
+        self._lock = threading.RLock()
+        self._generation = 0
 
-    def _run(self):
-        self._is_running = False
-        self.start()
-        syslog.info(f"timer trigger: {self._name if self._name else ''}")
+    def _arm_timer_locked(self, generation: int):
+        self._timer = threading.Timer(self._interval, self._run, args=(generation,))
+        self._timer.start()
+
+    def _run(self, generation: int):
+        with self._lock:
+            # Ignore stale firings from timers that were canceled/restarted.
+            if generation != self._generation or not self._is_running:
+                return
+
+            one_shot = self._one_shot
+            name = self._name
+            if one_shot:
+                self._is_running = False
+                self._timer = None
+            else:
+                self._arm_timer_locked(generation)
+
+        syslog.info(f"timer trigger: {name if name else ''}")
         self._callback(*self._args, **self._kwargs)
 
-        if self._one_shot:
-            self._timer.cancel()
-
     def setName(self, name: str):
-        self._name = name
+        with self._lock:
+            self._name = name
 
     def start(self, oneshot=False):
         """starts the timer, if oneshot is set, the timer runs once and stops when it lapses, if not set, runs until canceled"""
-        if not self._is_running:
-            self._timer = threading.Timer(self._interval, self._run)
+        with self._lock:
+            if self._is_running:
+                return
+
             self._is_running = True
             self._one_shot = oneshot
-            self._timer.start()
+            self._generation += 1
+            generation = self._generation
+            self._arm_timer_locked(generation)
             syslog.info(f"timer start {self._name if self._name else ''}")
 
     def isRunning(self) -> bool:
-        return self._is_running
+        with self._lock:
+            return self._is_running
 
     def cancel(self):
-        if self._is_running:
-            self._timer.cancel()
+        with self._lock:
+            timer = self._timer
+            was_running = self._is_running
+            self._timer = None
             self._is_running = False
-            syslog.info(f"timer cancel {self._name if self._name else ''}")
+            self._generation += 1
+            name = self._name
+
+        if timer is not None:
+            timer.cancel()
+        if was_running or timer is not None:
+            syslog.info(f"timer cancel {name if name else ''}")
 
     def reset(self, oneshot=False):
         syslog.info(f"timer reset {self._name if self._name else ''}")

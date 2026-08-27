@@ -1142,7 +1142,11 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             self.inputItemListView.deleteLater()
 
     def _edit_curve_item_cb(self, index: int, input_item: InputItem):
+        gremlin.util.InvokeUiMethod(self._edit_curve_item_ui, index, input_item)
+
+    def _edit_curve_item_ui(self, index: int, input_item: InputItem):
         """edit curve request"""
+        gremlin.util.assert_ui_thread()
         import gremlin.curve_handler
         import gremlin.event_handler
 
@@ -1218,7 +1222,11 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         pass
 
     def _delete_curve_item_cb(self, index: int, input_item):
+        gremlin.util.InvokeUiMethod(self._delete_curve_item_ui, index, input_item)
+
+    def _delete_curve_item_ui(self, index: int, input_item):
         """delete curve request"""
+        gremlin.util.assert_ui_thread()
 
         if not Shiboken.isValid(self):
             return
@@ -1274,6 +1282,10 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                 widget.update_display()
 
     def _config_changed_cb(self):
+        gremlin.util.InvokeUiMethod(self._config_changed_ui)
+
+    def _config_changed_ui(self):
+        gremlin.util.assert_ui_thread()
         if self.inputItemListView:  # check for delay load
             self.inputItemListModel.refresh()
 
@@ -1734,7 +1746,11 @@ class JoystickFilterDialog(gremlin.ui.ui_common.QRememberDialog):
         super().closeEvent(event)
 
     def _joystick_event_handler(self, event):
+        gremlin.util.InvokeUiMethod(self._joystick_event_handler_ui, event)
+
+    def _joystick_event_handler_ui(self, event):
         """handles joystick events in the UI (functor handles the output when profile is running) so we see the output at design time"""
+        gremlin.util.assert_ui_thread()
         if event.device_guid != self.device_guid:
             # not an event we care about
             return

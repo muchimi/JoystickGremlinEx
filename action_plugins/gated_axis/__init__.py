@@ -358,13 +358,18 @@ making changes that impact the order of gates or ranges."""
         config.gated_axis_display_events = checked
 
     def _update_event_ui(self):
+        gremlin.util.assert_ui_thread()
         visible = self._option_display_events
         if Shiboken.isValid(self):
             self.container_options_widget.setVisible(visible)
             self.container_output_widget.setVisible(visible)
 
     def _options_changed(self):
+        gremlin.util.InvokeUiMethod(self._options_changed_ui)
+
+    def _options_changed_ui(self):
         """options were changed"""
+        gremlin.util.assert_ui_thread()
         config = gremlin.config.Configuration()
         self._option_display_events = config.gated_axis_display_events
         self._update_event_ui()

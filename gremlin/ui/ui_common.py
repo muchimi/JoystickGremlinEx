@@ -2044,6 +2044,10 @@ class StateTracker:
                     del self._axis_cache[device_guid][input_type][key]
 
     def _button_state_change(self, event: gremlin.event_handler.Event):
+        gremlin.util.InvokeUiMethod(self._button_state_change_ui, event)
+
+    def _button_state_change_ui(self, event: gremlin.event_handler.Event):
+        gremlin.util.assert_ui_thread()
 
         if gremlin.shared_state.is_running:
             # do not update while profile is running
@@ -2101,6 +2105,8 @@ class StateTracker:
     def _update_widget(self, device_guid, input_type, input_id, state):
         """updates the state of the widget"""
 
+        gremlin.util.assert_ui_thread()
+
         from shiboken6 import Shiboken
 
         if not isinstance(device_guid, str):
@@ -2150,6 +2156,10 @@ class StateTracker:
         return None
 
     def _axis_state_change(self, event: gremlin.event_handler.Event):
+        gremlin.util.InvokeUiMethod(self._axis_state_change_ui, event)
+
+    def _axis_state_change_ui(self, event: gremlin.event_handler.Event):
+        gremlin.util.assert_ui_thread()
         if gremlin.shared_state.is_running:
             # do not update while profile is running
             return
@@ -2168,7 +2178,7 @@ class StateTracker:
                 if key in self._axis_cache[device_guid][input_type]:
                     widget = self._axis_cache[device_guid][input_type][key]
                     try:
-                        if widget.enabled:
+                        if Shiboken.isValid(widget) and widget.enabled and hasattr(widget, "_update_value"):
                             widget._update_value(value)
                     except Exception:
                         # discarded by QT - ignore
@@ -2200,6 +2210,10 @@ class StateTracker:
 
     @QtCore.Slot(object, object, object)
     def _select_input_completed(self, device_guid, input_type, input_id):
+        gremlin.util.InvokeUiMethod(self._select_input_completed_ui, device_guid, input_type, input_id)
+
+    def _select_input_completed_ui(self, device_guid, input_type, input_id):
+        gremlin.util.assert_ui_thread()
         state = self._get_state(device_guid, input_type, input_id)
         # device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
         # print (f"Completed: {device_name} {InputType.to_display_name(input_type)} {input_id} state: {state}")
@@ -2208,6 +2222,10 @@ class StateTracker:
 
     @QtCore.Slot(object)
     def _update_input_state(self, device_guid):
+        gremlin.util.InvokeUiMethod(self._update_input_state_ui, device_guid)
+
+    def _update_input_state_ui(self, device_guid):
+        gremlin.util.assert_ui_thread()
         """updates all the state widgets related to a single device based on stored state"""
         if not isinstance(device_guid, str):
             device_guid = gremlin.util.normalize_guid(device_guid)
@@ -2216,6 +2234,8 @@ class StateTracker:
             for input_type in self._button_cache[device_guid]:
                 for key in self._button_cache[device_guid][input_type]:
                     widget = self._button_cache[device_guid][input_type][key]
+                    if not Shiboken.isValid(widget):
+                        continue
                     input_id = widget.input_id
                     # get the current state
                     state = self._get_device_state(device_guid, input_type, input_id)
@@ -2226,6 +2246,8 @@ class StateTracker:
             for input_type in self._axis_cache[device_guid]:
                 for key in self._axis_cache[device_guid][input_type]:
                     widget = self._axis_cache[device_guid][input_type][key]
+                    if not Shiboken.isValid(widget):
+                        continue
                     input_id = widget.input_id
                     # get the current state
                     state = self._get_device_state(device_guid, input_type, input_id)
@@ -3449,7 +3471,7 @@ class ModeSelectorWidget(QWidget):
 
     def refresh(self, mode_to_select: str = None):
         """refresh"""
-        gremlin.util.InvokeUiMethod(self._refresh_modes(mode_to_select))
+        gremlin.util.InvokeUiMethod(self._refresh_modes, mode_to_select)
 
     def _refresh_modes(self, mode_to_select: str = None):
 
@@ -3856,7 +3878,7 @@ class InputListenerWidget(QBoxFrame):
         self._aborting = False
         self._closing = False
         self._abort_timer = threading.Timer(1.0, self._abort_request)
-        self._multi_key_storage = set() # keys must be unique
+        self._multi_key_storage = set()  # keys must be unique
         self._callback = callback
         self._accepted = False  # true if the input is accepted
         self._virtual_only = virtual_only  # only listen to virtual devices if set
@@ -3887,13 +3909,11 @@ class InputListenerWidget(QBoxFrame):
             )
             self.main_layout.addWidget(self.repeater_container_widget)
 
-
-        self.key_widget = QKeyboardKeysWidget() # holds the pressed keys
-        self.main_layout.addWidget(getHContainer(["||",self.key_widget,"||"], widget_only=True)) # center
+        self.key_widget = QKeyboardKeysWidget()  # holds the pressed keys
+        self.main_layout.addWidget(getHContainer(["||", self.key_widget, "||"], widget_only=True))  # center
 
         label = QtWidgets.QLabel()
         self.main_layout.addWidget(label)
-
 
         if self._multi_keys:
             self.cancel_widget = Buttons.getCancelWidget(callback=self._cancel)
@@ -4048,7 +4068,6 @@ class InputListenerWidget(QBoxFrame):
                 self._abort_timer.cancel()
                 self._abort_timer = threading.Timer(1.0, self._abort_request)
 
-
         else:
             # multi-key mode
 
@@ -4056,12 +4075,12 @@ class InputListenerWidget(QBoxFrame):
                 if not self._return_kb_event:
                     self._multi_key_storage.add(key)
                 else:
-                    self._multi_key_storage.add(event) # mouse event
+                    self._multi_key_storage.add(event)  # mouse event
                 self.keyInput.emit(self._multi_key_storage)  # notify a key was pressed
                 selection = list(self._multi_key_storage)
                 gremlin.keyboard.sort_keys(selection)
                 self.selection = selection
-                self._update_keys_ui() # uses the selection
+                self._update_keys_ui()  # uses the selection
 
                 if verbose:
                     syslog.info(f"multi-key storage: {self._multi_key_storage}")
@@ -4100,7 +4119,6 @@ class InputListenerWidget(QBoxFrame):
 
     def _update_keys_ui(self):
         self.key_widget.setKeys(self.selection)
-
 
     def _accept(self):
         # multi key accept mode
@@ -10209,7 +10227,7 @@ class QSplitTabWidget(QDataWidget):
             self._filtered = value
             self.update_used_filter(value)
 
-    def updateContainerViewBlankMessage(
+    def _update_container_view_blank_message_ui(
         self,
         input_item,
         suffix: str = "",
@@ -16481,12 +16499,13 @@ class QSideBarContainer(QWidget):
 
 
 class QKeyboardKeysWidget(QWidget):
-    """ widget that displays keyboard keys """
-    def __init__(self, keys : list[gremlin.keyboard.Key] = None, parent=None):
+    """widget that displays keyboard keys"""
+
+    def __init__(self, keys: list[gremlin.keyboard.Key] = None, parent=None):
         super().__init__(parent)
         self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
-        self._widget_map = {} # list of widgets in the container
+        self._widget_map = {}  # list of widgets in the container
         self.keys = keys if keys is not None else []
         self._update_keys_ui()
 
@@ -16504,7 +16523,6 @@ class QKeyboardKeysWidget(QWidget):
             self.layout.removeWidget(widget)
             widget.deleteLater()
         self._widget_map.clear()
-
 
         key_list = self.keys
         if not key_list:

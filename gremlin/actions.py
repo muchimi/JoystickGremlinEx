@@ -119,7 +119,7 @@ class KeyboardCondition(AbstractCondition):
         :param comparison the comparison operation to perform when evaluated
         """
         assert isinstance(input_item, gremlin.keyboard.Key), "invalid input_item for keyboard condition"
-        super().__init__(comparison, container_condition)
+        super().__init__(comparison, container_condition, target=target)
         self.input_item = input_item
 
     def __call__(self, event, value, extra_data=None):
@@ -235,14 +235,14 @@ class StateCondition(AbstractCondition):
 class ModeCondition(AbstractCondition):
     """Condition verifying a runtime mode"""
 
-    def __init__(self, condition, container_condition=False):
+    def __init__(self, condition, container_condition=False, target: AbstractContainer | AbstractAction = None):
         """Creates a new instance.
 
         :param key: name of the state
         :param is_extended whether or not the key code is extended
         :param comparison the comparison operation to perform when evaluated
         """
-        super().__init__(condition.comparison, container_condition)
+        super().__init__(condition.comparison, container_condition, target=target)
         self.mode = condition.mode
         self.ignore_release = condition.ignore_release
 
@@ -302,12 +302,12 @@ class JoystickCondition(AbstractCondition):
     one of eight possible directions.
     """
 
-    def __init__(self, condition, container_condition=False):
+    def __init__(self, condition, container_condition=False, target: AbstractContainer | AbstractAction = None):
         """Creates a new instance.
 
         :param condition the condition to check against
         """
-        super().__init__(condition.comparison, container_condition)
+        super().__init__(condition.comparison, container_condition, target=target)
         self.device_guid = condition.device_guid
         self.input_type = condition.input_type
         self.input_id = condition.input_id
@@ -458,12 +458,12 @@ class VJoyCondition(AbstractCondition):
     one of eight possible directions.
     """
 
-    def __init__(self, condition, container_condition=False):
+    def __init__(self, condition, container_condition=False, target: AbstractContainer | AbstractAction = None):
         """Creates a new instance.
 
         :param condition the condition to check against
         """
-        super().__init__(condition.comparison, container_condition)
+        super().__init__(condition.comparison, container_condition, target=target)
 
         self.vjoy_id = condition.vjoy_id
         self.device_guid = None
@@ -644,12 +644,12 @@ class InputActionCondition(AbstractCondition):
     place.
     """
 
-    def __init__(self, comparison):
+    def __init__(self, comparison, container_condition=False, target: AbstractContainer | AbstractAction = None):
         """Creates a new instance.
 
         :param comparison the comparison operation to perform when evaluated
         """
-        super().__init__(comparison)
+        super().__init__(comparison, container_condition, target=target)
 
     def __call__(self, event, value, extra_data=None):
         # default call

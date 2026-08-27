@@ -313,6 +313,12 @@ class AbstractView(QtWidgets.QWidget):
     def _handle_model_changed(self, data=None, force=False):
         """Handles changes in the model."""
 
+        if not gremlin.util.is_ui_thread():
+            # Model callbacks can be fired from worker threads; always marshal
+            # widget-related processing back to the UI thread.
+            gremlin.util.InvokeUiMethod(self._handle_model_changed, data, force)
+            return
+
         # syslog.info("model change detected")
         if not Shiboken.isValid(self):
             # widget was destroyed - self unhook
@@ -2022,15 +2028,6 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
     def input_item(self, value: InputItem):
         self.setInputItem(value)
 
-    def setInputItem(self, input_item: InputItem):
-        if self._input_item != input_item:
-            if self._input_item:
-                self._input_item.fieldChanged.disconnect(self._handle_input_item_field_changed)
-        self._input_item = input_item
-        if self._input_item:
-            self._input_item.fieldChanged.connect(self._handle_input_item_field_changed)
-        self.update_display()
-
     def _handle_input_item_field_changed(self, field_name, input_item):
         """processes input item changes and updates to the widget UI elements"""
         match field_name:
@@ -2117,6 +2114,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self.widget_height = size.height()
 
     def setInputItem(self, input_item: InputItem):
+        gremlin.util.InvokeUiMethod(self._set_input_item_ui, input_item)  # ensure on UI thread
+
+    def _set_input_item_ui(self, input_item: InputItem):
         """sets the input item for this widget"""
         assert isinstance(input_item, InputItem), "invalid input item"
         if input_item == self._input_item:
@@ -2125,10 +2125,12 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         old_input_item = self._input_item
         if old_input_item:
             old_input_item.containers.removeCallback(self.handleMappingChanged)
+            old_input_item.fieldChanged.disconnect(self._handle_input_item_field_changed)
 
         self._input_item = input_item
 
         self._input_item.containers.addCallback(self.handleMappingChanged)
+        self._input_item.fieldChanged.connect(self._handle_input_item_field_changed)
 
         self._input_id = input_item.input_id
         self._device_guid = input_item.device_guid
@@ -2137,7 +2139,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             self.setToolTip(input_item.tooltip)
 
         # refresh IDs
-        self._update_container_id()
+        self._update_display_ui()
 
     def handleMappingChanged(self, input_item: InputItem, force: bool = False):
         """called when the input item changes"""
@@ -2309,8 +2311,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         # el.action_changed.connect(self._action_changed_cb)
         el.mapping_changed.connect(self._mapping_changed_cb)
         el.icon_changed.connect(self._icon_changed_cb)
-        el.update_input_icons.connect(self._update_axis_icons_ui)
-        el.profile_loaded.connect(self._update_axis_icons_ui)
+        el.update_input_icons.connect(self._update_axis_icons)
+        el.profile_loaded.connect(self._update_axis_icons)
 
     def _disconnect_events(self):
         el = gremlin.event_handler.EventListener()
@@ -2321,8 +2323,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         # el.action_changed.disconnect(self._action_changed_cb)
         el.mapping_changed.disconnect(self._mapping_changed_cb)
         el.icon_changed.disconnect(self._icon_changed_cb)
-        el.update_input_icons.disconnect(self._update_axis_icons_ui)
-        el.profile_loaded.disconnect(self._update_axis_icons_ui)
+        el.update_input_icons.disconnect(self._update_axis_icons)
+        el.profile_loaded.disconnect(self._update_axis_icons)
 
     def _cleanup_ui(self):
         """called when widget is removed"""
@@ -2483,13 +2485,14 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             else:
                 self._input_button_widget.setIcon(self._input_icon_inactive)
 
-    def _update_axis_icons_ui(self):
+    def _update_axis_icons(self):
         if not self._ui_loaded or not self.is_axis:
             return
         gremlin.util.InvokeUiMethod(self._update_axis_icons_ui)
 
     def _update_axis_icons_ui(self):
         """update titlebar icons - UI thread"""
+        gremlin.util.assert_ui_thread()
         is_curve = self._input_item.is_curve
         if self._curve_button_widget is not None and Shiboken.isValid(self._curve_button_widget):
             if is_curve:
@@ -2650,6 +2653,9 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
             self._custom_container_widget.setWidget(container)
 
     def setInputDescription(self, description: str | None):
+        gremlin.util.InvokeUiMethod(self._set_input_description_ui, description)
+
+    def _set_input_description_ui(self, description: str | None):
         """sets the input description for an input widget (optional)"""
         verbose = gremlin.config.Configuration().verbose_mode_ui_level(2)
         if description is not None:
@@ -2723,7 +2729,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
                     self._input_button_widget = None
 
             # description field
-            self.setDescription(self.input_item.description)
+            self._set_input_description_ui(self.input_item.description)
             self._update_display_name_ui()
 
             self._update_axis_icons_ui()
@@ -2736,6 +2742,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
             # update repeater for this widget
             self._update_repeater()
+
+            self._update_container_id()
 
     def addUpdateCallback(self, callback: Callable):
         """adds a callback to be called when the mapping content is updated"""
@@ -6045,6 +6053,8 @@ class BaseAbstractCondition:
     def __hash__(self):
         # hash on the condition ID
         return hash(self.id)
+
+
 @SingletonDecorator
 class ConditionTracker:
     """tracks conditions"""
@@ -7955,7 +7965,7 @@ class ConditionStateTracker:
         self._cache[device_guid][mode][input_id][container.id] = info
 
         enabled = info.input_item.hasConditions()
-        self.set_condition_tab_state(dock_tab, enabled)
+        gremlin.util.InvokeUiMethod(self.set_condition_tab_state, dock_tab, enabled)
 
     def unregister(self, input_item, container):
         """unregisters a condition tracker"""
@@ -7973,6 +7983,10 @@ class ConditionStateTracker:
 
     @QtCore.Slot(object)
     def _condition_state_changed(self, container):
+        gremlin.util.InvokeUiMethod(self._condition_state_changed_ui, container)
+
+    def _condition_state_changed_ui(self, container):
+        gremlin.util.assert_ui_thread()
         if not isinstance(container, AbstractContainer):
             return
         device_guid = container.hardware_device_guid
@@ -7990,6 +8004,12 @@ class ConditionStateTracker:
 
     @QtCore.Slot(object)
     def _condition_changed(self, container):
+        gremlin.util.InvokeUiMethod(self._condition_changed_ui, container)
+
+    def _condition_changed_ui(self, container):
+        gremlin.util.assert_ui_thread()
+        if not isinstance(container, AbstractContainer):
+            return
         device_guid = container.hardware_device_guid
         input_id = container.hardware_input_id
         mode = gremlin.shared_state.current_mode
@@ -7999,7 +8019,8 @@ class ConditionStateTracker:
                     if container.id in self._cache[device_guid][mode][input_id]:
                         info = self._cache[device_guid][mode][input_id][container.id]
                         container_widget: AbstractContainerWidget = info.containerWidget
-                        container_widget._update_condition_ui(container)
+                        if container_widget is not None and Shiboken.isValid(container_widget):
+                            container_widget._update_condition_ui(container)
                         enabled = info.input_item.hasConditions()
                         dock_tabs = info.dock_tabs
                         self.set_condition_tab_state(dock_tabs, enabled)
@@ -8017,7 +8038,8 @@ class ConditionStateTracker:
 
     def set_condition_tab_state(self, dock_tabs: QtWidgets.QTabWidget, enabled: bool):
         """marks the condition tab used or not"""
-        if Shiboken.isValid(dock_tabs):
+        gremlin.util.assert_ui_thread()
+        if dock_tabs is not None and Shiboken.isValid(dock_tabs):
             try:
                 for i in range(dock_tabs.count()):
                     if dock_tabs.tabText(i) == "Conditions":
@@ -8162,7 +8184,7 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
 
         # this is for CONTAINER CONDITIONS only (Action conditions are handled elsewhere) - this hooks the condition state tab to the conditions added to the container
         el = gremlin.event_handler.EventListener()
-        el.condition_state_changed.connect(self._update_container_ui)
+        el.condition_state_changed.connect(self._update_container)
 
         # self.activation_count_widget = None
 
@@ -8259,6 +8281,10 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             self._container_changed_callbacks.remove(callback)
 
     def _handle_container_changed(self, container):
+        gremlin.util.InvokeUiMethod(self._handle_container_changed_ui, container)
+
+    def _handle_container_changed_ui(self, container):
+        gremlin.util.assert_ui_thread()
         """handles a change in a container"""
         self._fireChangeCallbacks()
         self.redrawActionSets()
@@ -8364,9 +8390,15 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
                 return False
             return True
 
+    def _update_container(self, container):
+        if not Shiboken.isValid(self):
+            return
+        gremlin.util.InvokeUiMethod(self._update_container_ui, container)
+
     @QtCore.Slot(object)
     def _update_container_ui(self, container):
         """update the condition icon in the RIGHT PANEL tab"""
+        gremlin.util.assert_ui_thread()
         if not Shiboken.isValid(self.dock_tabs):
             return
         dock_tabs = self.dock_tabs
@@ -8397,14 +8429,22 @@ class AbstractContainerWidget(QtWidgets.QDockWidget):
             # self._update_counts()
             self.activation_condition_widget._update_conditions_ui()
 
-    @QtCore.Slot(object, object)
+    @QtCore.Slot(object)
     def _condition_changed(self, container):
+        gremlin.util.InvokeUiMethod(self._condition_changed_ui, container)
+
+    def _condition_changed_ui(self, container):
+        gremlin.util.assert_ui_thread()
         """called when conditions change"""
         if container.id == self.container.id and self.activation_condition_widget:
             self.activation_condition_widget._update_conditions_ui()
 
-    @QtCore.Slot()
+    @QtCore.Slot(object)
     def _condition_redraw(self, data):
+        gremlin.util.InvokeUiMethod(self._condition_redraw_ui, data)
+
+    def _condition_redraw_ui(self, data):
+        gremlin.util.assert_ui_thread()
         """occurs when a condition redraws"""
 
         if self.container == data:
@@ -8733,6 +8773,12 @@ class AbstractActionWidget(QtWidgets.QFrame):
 
     @QtCore.Slot(object)
     def _action_delete(self, action):
+        if not Shiboken.isValid(self):
+            return
+        gremlin.util.InvokeUiMethod(self._action_delete_ui, action)
+
+    def _action_delete_ui(self, action):
+        gremlin.util.assert_ui_thread()
         if self.action_data == action and hasattr(self, "_cleanup_ui"):
             self._cleanup_ui()
 
@@ -9388,20 +9434,10 @@ class ContainerView(AbstractView):
             else:
                 self._show_blank()
 
-    # def _handle_container_modified(self, container_id = None):
-    #     """handles the container modified signal"""
-    #     widget = None
-    #     if not container_id:
-    #         widget = self.sender()
-    #         if widget not in self._widget_map.values():
-    #             return # not ours
-    #     else:
-    #         widget = self._widget_map.get(container_id, None)
-
-    #     if widget:
-    #         widget.redraw()
-
     def ensureActionVisible(self, action: AbstractAction):
+        gremlin.util.InvokeUiMethod(self._ensure_action_visible_ui, action)
+
+    def _ensure_action_visible_ui(self, action: AbstractAction):
         """ensures the given action is visible in the UI"""
         container: AbstractContainer = action.parent_container
         # find the container widget
@@ -10455,11 +10491,7 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
     # deleted = Signal(base_classes.AbstractCondition)
     deleted = Signal(object)
 
-    def __init__(self,
-                condition: AbstractCondition | BaseAbstractCondition,
-                remove_callback : Callable = None,
-                extra_data: dict = None,
-                parent=None):
+    def __init__(self, condition: AbstractCondition | BaseAbstractCondition, remove_callback: Callable = None, extra_data: dict = None, parent=None):
         """Creates a new widget.
 
         :param condition_data the data to be represented by the widget
@@ -10487,7 +10519,6 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
         """Creates the configuration UI for this widget."""
         pass
 
-
     @QtCore.Slot()
     def _copy_condition(self):
         helper = ConditionHelper()
@@ -10506,16 +10537,10 @@ class AbstractConditionWidget(QtWidgets.QGroupBox):
             self.deleted.emit(self.condition)
 
 
-
-
 class ModeConditionWidget(AbstractConditionWidget):
     """mode condition UI"""
 
-    def __init__(self,
-                condition: AbstractCondition | BaseAbstractCondition,
-                remove_callback : Callable = None,
-                extra_data: dict = None,
-                parent=None):
+    def __init__(self, condition: AbstractCondition | BaseAbstractCondition, remove_callback: Callable = None, extra_data: dict = None, parent=None):
 
         super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
         self.setTitle("Mode Condition")
@@ -10593,11 +10618,7 @@ class ModeConditionWidget(AbstractConditionWidget):
 class VJoyConditionWidget(AbstractConditionWidget):
     """Widget allowing the configuration of a vJoy based condition."""
 
-    def __init__(self,
-                condition: AbstractCondition | BaseAbstractCondition,
-                remove_callback : Callable = None,
-                extra_data: dict = None,
-                parent=None):
+    def __init__(self, condition: AbstractCondition | BaseAbstractCondition, remove_callback: Callable = None, extra_data: dict = None, parent=None):
 
         self.input_event = None
         super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
@@ -10881,15 +10902,10 @@ class VJoyConditionWidget(AbstractConditionWidget):
 class InputActionConditionWidget(AbstractConditionWidget):
     """Creates the UI needed to configure an input action based condition."""
 
-    def __init__(self,
-                condition: AbstractCondition | BaseAbstractCondition,
-                remove_callback : Callable = None,
-                extra_data: dict = None,
-                parent=None):
+    def __init__(self, condition: AbstractCondition | BaseAbstractCondition, remove_callback: Callable = None, extra_data: dict = None, parent=None):
         self.input_event = None
         super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
         self.setTitle("Action Condition")
-
 
     def _create_ui(self, extra_data: dict = None):
         """Creates the configuration UI for this widget."""
@@ -10976,7 +10992,7 @@ class ConditionView(AbstractView):
         self._container = container
         self._input_item = container.input_item
         self._draw_once = False
-        self._hash_key = None # last model hash to determine if a redraw is necessary
+        self._hash_key = None  # last model hash to determine if a redraw is necessary
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
 
@@ -11059,8 +11075,6 @@ class ConditionView(AbstractView):
         config = gremlin.config.Configuration()
         config.condition_selector = self.condition_selector.currentText()
 
-
-
     def _create_ui(self, extra_data: dict = None):
         """recreates the UI based on the model"""
         if not Shiboken.isValid(self):
@@ -11080,7 +11094,6 @@ class ConditionView(AbstractView):
             self.conditions_layout.addWidget(condition_widget)
 
         self._update_count_ui()
-
 
     def _handle_remove(self, condition):
         self.model.remove(condition)
@@ -11102,7 +11115,6 @@ class ConditionView(AbstractView):
             self._hash_key = hash_key
             self._create_ui()
             self._draw_once = True  # indicate drawn
-
 
     def _add_condition(self):
         """Adds a condition to the view's model."""
@@ -11397,6 +11409,12 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         el.input_deleted.disconnect(self._handle_input_deleted)
 
     def _handle_input_deleted(self, input_item: InputItem):
+        if not Shiboken.isValid(self):
+            return
+        gremlin.util.InvokeUiMethod(self._handle_input_deleted_ui, input_item)
+
+    def _handle_input_deleted_ui(self, input_item: InputItem):
+        gremlin.util.assert_ui_thread()
         """handles the input_deleted event"""
         if input_item:
             self.clearInputItemMappingWidget(input_item)
@@ -11782,7 +11800,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """gets the input item at the specified postion - unfiltered"""
         return self._input_item_list_model.getInputItemAt(index)
 
-    def selectInputItemMappingWidget(self, input_item: InputItem) -> InputItemMappingWidget:
+    def _select_input_item_mapping_widget_ui(self, input_item: InputItem) -> InputItemMappingWidget:
         """activates the mapping widget for the given input item
         the widget is created if it doesn't exist or needs to be recreated
         """
@@ -11907,9 +11925,9 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
             self._debug_widget.setText(f"Contents for : {input_item.debug_name}")
 
         # make the mapping widget visible and redraw if needed
-        self.selectInputItemMappingWidget(input_item)
+        self._select_input_item_mapping_widget_ui(input_item)
         # update container display if blank
-        self.updateContainerViewBlankMessage(input_item)
+        self._update_container_view_blank_message_ui(input_item)
 
         # remember the last selection
         self._last_selected_input_item = input_item  # update selection

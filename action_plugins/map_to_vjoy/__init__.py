@@ -291,6 +291,7 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
 
     def updateDevices(self):
         """updates the merge device list with the current device selection"""
+        gremlin.util.assert_ui_thread()
         if not Shiboken.isValid(self) or not Shiboken.isValid(self.merge_selector_device_widget):
             return
 

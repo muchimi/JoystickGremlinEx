@@ -362,11 +362,19 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.unlock_inputs.connect(self._handle_unlock_inputs)
 
     def _handle_new_profile(self):
+        gremlin.util.InvokeUiMethod(self._handle_new_profile_ui)
+
+    def _handle_new_profile_ui(self):
         """new profile"""
+        gremlin.util.assert_ui_thread()
         self.profile: gremlin.base_profile.Profile = gremlin.shared_state.current_profile
-        self._handle_profile_mode_changed(gremlin.shared_state.edit_mode)
+        self._handle_profile_mode_changed_ui(gremlin.shared_state.edit_mode)
 
     def _handle_profile_mode_changed(self, new_mode: str):
+        gremlin.util.InvokeUiMethod(self._handle_profile_mode_changed_ui, new_mode)
+
+    def _handle_profile_mode_changed_ui(self, new_mode: str):
+        gremlin.util.assert_ui_thread()
         self.current_mode = new_mode
         ensureModeInputItems(self.profile, new_mode)
 
@@ -465,6 +473,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _handle_lock_inputs_ui(self, data):
         """lock all inputs event"""
+        gremlin.util.assert_ui_thread()
         if Shiboken.isValid(self) and data == self.device_guid:
             # ours
             self.setUpdatesEnabled(False)
@@ -474,6 +483,7 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
     def _handle_unlock_inputs_ui(self, data):
         """unlock all inputs event"""
+        gremlin.util.assert_ui_thread()
         if Shiboken.isValid(self) and data == self.device_guid:
             # ours
             self.setUpdatesEnabled(False)
@@ -482,14 +492,19 @@ class ModeDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             self.setUpdatesEnabled(True)
 
     def _mode_name_changed(self, name):
-        gremlin.util.InvokeUiMethod(self._mode_name_changed_ui)  # ensure on UI thread
+        gremlin.util.InvokeUiMethod(self._mode_name_changed_ui, name)  # ensure on UI thread
 
     def _mode_name_changed_ui(self, name):
         """occurs when there's a mode name change"""
+        gremlin.util.assert_ui_thread()
         self.inputItemListModel.refresh()
 
     def _config_changed_cb(self):
+        gremlin.util.InvokeUiMethod(self._config_changed_ui)
+
+    def _config_changed_ui(self):
         """called when configuraition has changed"""
+        gremlin.util.assert_ui_thread()
         self.refresh()
 
     def _custom_name_handler(self, input_item):

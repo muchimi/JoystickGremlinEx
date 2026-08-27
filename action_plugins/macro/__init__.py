@@ -1483,6 +1483,10 @@ class MacroWidget(gremlin.input_item.AbstractActionWidget):
         self.list_view.clicked.emit(self.list_view.currentIndex())
 
     def _create_joystick_action(self, event):
+        gremlin.util.InvokeUiMethod(self._create_joystick_action_ui, event)
+
+    def _create_joystick_action_ui(self, event):
+        gremlin.util.assert_ui_thread()
         # Check whether or not to record a specific type of input
         if event.event_type == InputType.JoystickAxis and not self.record_axis.isChecked():
             return
@@ -1516,6 +1520,10 @@ class MacroWidget(gremlin.input_item.AbstractActionWidget):
             self._append_entry(action)
 
     def _create_key_action(self, event):
+        gremlin.util.InvokeUiMethod(self._create_key_action_ui, event)
+
+    def _create_key_action_ui(self, event):
+        gremlin.util.assert_ui_thread()
         """Creates a new macro.KeyAction instance from the given event.
 
         :param event the event for which to create a KeyAction object
@@ -1531,6 +1539,10 @@ class MacroWidget(gremlin.input_item.AbstractActionWidget):
         self._append_entry(action)
 
     def _create_mouse_action(self, event):
+        gremlin.util.InvokeUiMethod(self._create_mouse_action_ui, event)
+
+    def _create_mouse_action_ui(self, event):
+        gremlin.util.assert_ui_thread()
         # Abort if we should not record mouse inputs
         if not self.record_mouse.isChecked():
             return

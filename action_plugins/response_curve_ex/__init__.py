@@ -28,6 +28,7 @@ import gremlin.input_item
 import gremlin.ui.ui_common
 import gremlin.shared_state
 import gremlin.curve_handler
+import gremlin.util
 from shiboken6 import Shiboken
 
 syslog = logging.getLogger("system")
@@ -105,7 +106,12 @@ class ResponseCurveExWidget(gremlin.input_item.AbstractActionWidget):
             # ignore if a different input axis on the input device
             return
 
-        self.curve_widget.update_value(event.value)
+        gremlin.util.InvokeUiMethod(self._update_curve_value_ui, event.value)
+
+    def _update_curve_value_ui(self, value: float):
+        gremlin.util.assert_ui_thread()
+        if Shiboken.isValid(self.curve_widget):
+            self.curve_widget.update_value(value)
 
 
 class ResponseCurveExFunctor(gremlin.base_profile.AbstractFunctor):

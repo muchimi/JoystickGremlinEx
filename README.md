@@ -48,6 +48,12 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T36)
+- Change: hardening for QT behaviors to validate for QT memory model and threading.
+- Change: hardening of sound API for cross-threading and to guard against possible race conditions.
+- Fix: API: condition parameter propagation for all conditions/actions
+- 
+
 ### (m77T35)
 - Change: API: keyboard condition supports latched keys
 - Fix: Play Sound Action: selecting TTS legacy mode causes an exception.

@@ -152,10 +152,14 @@ class CalibrationUi(gremlin.ui.ui_common.BaseDialogUi):
             self.axes_layout.addWidget(self.axes[-1])
 
     def _handle_event(self, event):
+        gremlin.util.InvokeUiMethod(self._handle_event_ui, event)
+
+    def _handle_event_ui(self, event):
         """Process a single joystick event.
 
         :param event the event to process
         """
+        gremlin.util.assert_ui_thread()
         if event.device_guid == self.devices[self.current_selection_id].device_guid and event.event_type == InputType.JoystickAxis:
             axis_id = gremlin.joystick_handling.linear_axis_index(self.devices[self.current_selection_id].axismap_list, event.identifier)
             self.axes[axis_id - 1].set_current(event.raw_value)
@@ -876,6 +880,7 @@ class CalibrationListenerWidget(QtWidgets.QFrame):
         return super().closeEvent(event)
 
     def _kb_event_ui(self, event):
+        gremlin.util.assert_ui_thread()
         from gremlin.keyboard import key_from_code, key_from_name
 
         key = key_from_code(event.identifier[0], event.identifier[1])
@@ -883,6 +888,10 @@ class CalibrationListenerWidget(QtWidgets.QFrame):
             self.reject()
 
     def joystick_event_handler(self, event):
+        gremlin.util.InvokeUiMethod(self._joystick_event_handler_ui, event)
+
+    def _joystick_event_handler_ui(self, event):
+        gremlin.util.assert_ui_thread()
 
         if event.device_guid != self.device_guid:
             return

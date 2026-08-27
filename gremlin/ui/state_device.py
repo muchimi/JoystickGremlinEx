@@ -1362,11 +1362,7 @@ class BaseStateCondition(BaseAbstractCondition):
 class StateConditionWidget(AbstractConditionWidget):
     """state condition UI"""
 
-    def __init__(self,
-                condition: AbstractCondition | BaseAbstractCondition,
-                remove_callback : Callable = None,
-                extra_data: dict = None,
-                parent=None):
+    def __init__(self, condition: AbstractCondition | BaseAbstractCondition, remove_callback: Callable = None, extra_data: dict = None, parent=None):
 
         super().__init__(condition, remove_callback=remove_callback, extra_data=extra_data, parent=parent)
         self.input_event = None
@@ -1777,7 +1773,7 @@ class StateData:
             self._id_map.clear()
             self.crud.emit()
 
-    def remove(self, state : StateInputItem | str):
+    def remove(self, state: StateInputItem | str):
 
         if isinstance(state, str):
             key = state.casefold().strip()
@@ -3244,7 +3240,11 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         return self.inputItemListModel.rows() > 0
 
     def _config_changed_cb(self):
+        gremlin.util.InvokeUiMethod(self._config_changed_ui)
+
+    def _config_changed_ui(self):
         """called when configuraition has changed"""
+        gremlin.util.assert_ui_thread()
         self.refresh()
 
     @QtCore.Slot(bool)

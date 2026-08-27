@@ -140,9 +140,10 @@ class TickContainerWidget(AbstractContainerWidget):
 
         value = event.value
 
-        self._update_axis_widget(value)
+        gremlin.util.InvokeUiMethod(self._update_axis_widget, value)
 
     def _update_axis_widget(self, value: float = None):
+        gremlin.util.assert_ui_thread()
         self.slider_widget.setMarkerValue(value)
 
     @QtCore.Slot()

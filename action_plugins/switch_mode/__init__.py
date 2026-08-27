@@ -86,6 +86,7 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
 
     def _update_modes_ui(self):
         """called when mode list needs to be updated"""
+        gremlin.util.assert_ui_thread()
         # update the list of available modes
         if not Shiboken.isValid(self.mode_selector_widget):
             return
@@ -120,6 +121,7 @@ class SwitchModeWidget(gremlin.input_item.AbstractActionWidget):
 
     def _update_context_modes_ui(self):
         """called when mode list needs to be updated"""
+        gremlin.util.assert_ui_thread()
         # update the list of available modes
         if not Shiboken.isValid(self.mode_selector_widget):
             return

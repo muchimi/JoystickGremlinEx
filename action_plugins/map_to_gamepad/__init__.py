@@ -86,6 +86,7 @@ class MapToGamepadWidget(gremlin.input_item.AbstractActionWidget):
 
     def _populate_ui(self):
         """Populates the UI components."""
+        gremlin.util.assert_ui_thread()
         if not Shiboken.isValid(self.output_widget):
             return
         devices = gremlin.gamepad_handling.gamepadDevices()
@@ -141,7 +142,7 @@ class MapToGamepadWidget(gremlin.input_item.AbstractActionWidget):
     @QtCore.Slot()
     def _gamepad_count_changed(self):
         """number of devices changed"""
-        self._populate_ui()
+        gremlin.util.InvokeUiMethod(self._populate_ui)
 
     @QtCore.Slot()
     def _output_mode_changed(self):

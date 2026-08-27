@@ -2744,15 +2744,11 @@ class OscInputItemWidget(gremlin.input_item.InputItemWidget):
         return self.input_item.getState()
 
     def _handle_get_title(self):
-        """ callback to set the title of the input widget"""
+        """callback to set the title of the input widget"""
         if self.input_item:
             return f"OSC {self.input_item.display_name}"
         else:
             return "OSC Input (not configured)"
-
-
-
-
 
 
 class OscInputListenerWidget(QtWidgets.QFrame):
@@ -2854,14 +2850,13 @@ class OscInputListenerWidget(QtWidgets.QFrame):
 class OscInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     """dialog showing the OSC input configuration options"""
 
-    def __init__(self, current_mode, input_item : OscInputItem, extra_data :dict = {}, parent = None):
+    def __init__(self, current_mode, input_item: OscInputItem, extra_data: dict = {}, parent=None):
         """
         :param index - the input item index zero based
         :param identifier - the input item identifier
         """
 
         super().__init__(self.__class__.__name__, parent=parent)
-
 
         # Disable ui input selection on joystick input
         gremlin.shared_state.push_suspend_highlighting()
@@ -3472,7 +3467,7 @@ class OscFilterWidget(QtWidgets.QWidget):
     changed = Signal(str)  # fires when the filter is changed (passes the filter)
     select = Signal(object)  # request to select an item
 
-    def __init__(self, model : OscInputItemModel, parent=None):
+    def __init__(self, model: OscInputItemModel, parent=None):
         super().__init__(parent)
         assert isinstance(model, OscInputItemModel), "model must be an instance of OscInputItemModel"
 
@@ -3486,7 +3481,7 @@ class OscFilterWidget(QtWidgets.QWidget):
         current_filter = self._config.osc_filter
 
         self._filter_widget = gremlin.ui.ui_common.QDataLineEdit(text=current_filter, tooltip="Enter filter text")
-        self._filter_widget.enterPressed.connect(self._apply_filter) # apply the filter
+        self._filter_widget.enterPressed.connect(self._apply_filter)  # apply the filter
 
         self._find_widget = gremlin.ui.ui_common.Buttons.getSearchWidget(callback=self._find_entry, tooltip="Search (F3)")
 
@@ -3573,7 +3568,6 @@ class OscFilterWidget(QtWidgets.QWidget):
                 index = index_list[last_index]
                 input_item = data[index]
 
-
                 self._last_search_term = search_term
                 self._last_search_index = last_index + 1  # next search index
 
@@ -3616,7 +3610,6 @@ class OscFilterWidget(QtWidgets.QWidget):
         value = self._filter_widget.text()
         self._config.osc_filter = value
         self.changed.emit(value)
-
 
     def clearFilter(self):
         """clears the filter"""
@@ -3713,13 +3706,13 @@ class OscInputItemModel(gremlin.input_item.InputItemListModel):
         )
 
     def onItemChanged(self, model, index, new_item, old_item, operation):
-            """called when an item in the model changes"""
-            if operation in ("remove"):
-                self._profile.removeInputItem(old_item)
-                el = gremlin.event_handler.EventListener()
-                el.input_deleted.emit(old_item)
-            if self.custom_change_handler:
-                self.custom_change_handler(model, index, new_item, old_item, operation)
+        """called when an item in the model changes"""
+        if operation in ("remove"):
+            self._profile.removeInputItem(old_item)
+            el = gremlin.event_handler.EventListener()
+            el.input_deleted.emit(old_item)
+        if self.custom_change_handler:
+            self.custom_change_handler(model, index, new_item, old_item, operation)
 
 
 class OscDeviceTabWidget(BaseDeviceTabWidget):
@@ -3873,7 +3866,6 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             model.trigger()  # causes an update
         return True
 
-
     def _handle_filter_data(self, input_item) -> bool:
         """custom filter handler - true if the data is included in the filter, false otherwise"""
         import fnmatch
@@ -3947,8 +3939,6 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             if term:
                 gremlin.util.InvokeUiMethod(self._filter_widget.find_next, term)
 
-
-
     def _filter_changed(self, filter):
         """called when the filter changes"""
         self._filter = gremlin.util.decorate_filter(filter)
@@ -3983,7 +3973,11 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         self.set_mode(mode)
 
     def _config_changed_cb(self):
+        gremlin.util.InvokeUiMethod(self._config_changed_ui)
+
+    def _config_changed_ui(self):
         """called when configuraition has changed"""
+        gremlin.util.assert_ui_thread()
         self.refresh()
 
     def display_name(self, input_id):
@@ -4000,8 +3994,6 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
         # add a blank input configuration if nothing is selected - the configuration widget is always the second widget of the main layout
         self._blank_input()
-
-
 
     @QtCore.Slot()
     def _handle_bulk_load(self):
@@ -4180,7 +4172,7 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
 
         input_item = identifier.input_item
         widget = OscInputItemWidget(
-            input_item = input_item,
+            input_item=input_item,
             populate_ui_callback=self._populate_input_widget_ui,
             mapping_changed_callback=self._update_input_widget,
             config_external=True,
@@ -4194,7 +4186,6 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         widget.enable_edit()
         widget.setIcon("mdi.surround-sound")
         input_item.setInputWidget(widget)
-
 
         # remember what widget is at what index
         widget.index = index
@@ -4301,21 +4292,20 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
     @QtCore.Slot()
     def _add_input_cb(self):
         """Adds a new input to the inputs list"""
-        self.pushSuspended() # prevent updates
+        self.pushSuspended()  # prevent updates
         profile: gremlin.base_profile.Profile = gremlin.shared_state.current_profile
         device_node = profile.getDeviceNode(self._device_guid)
         mode_node = device_node.getModeNode(gremlin.shared_state.current_mode)
         input_item = OscInputItem(mode_node)
         input_item.input_type_changed.connect(self._refresh_mappings)
         extra_data = {"input_item": input_item, "mode_node": mode_node, "operation": "add", "index": -1}
-        self._handle_item_changed(input_item = input_item, extra_data=extra_data)
+        self._handle_item_changed(input_item=input_item, extra_data=extra_data)
 
     def _edit_item_cb(self, widget, index, input_item):
-        extra_data = {"input_item": input_item, "operation": "edit", "widget": widget,"index": index}
+        extra_data = {"input_item": input_item, "operation": "edit", "widget": widget, "index": index}
         self._handle_item_changed(input_item, extra_data=extra_data)
 
-
-    def _handle_item_changed(self, input_item : OscInputItem, extra_data : dict = None):
+    def _handle_item_changed(self, input_item: OscInputItem, extra_data: dict = None):
         """called when the edit button is clicked"""
         current_mode = gremlin.shared_state.edit_mode
         self.pushSuspended()
@@ -4324,7 +4314,6 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         self._edit_dialog.rejected.connect(self._dialog_rejected_cb)
         gremlin.util.centerDialog(self._edit_dialog)
         self._edit_dialog.showNormal()
-
 
     def _dialog_ok_cb(self):
         """called when the ok button is pressed on the edit dialog"""
@@ -4365,9 +4354,8 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
                 self.inputItemListModel.add(input_item)
                 mode_node.addInputItem(input_item)
 
-
         finally:
-            self.popSuspended(True) # redraws the list view and creates the new entry
+            self.popSuspended(True)  # redraws the list view and creates the new entry
 
     def _dialog_rejected_cb(self):
         index = self._edit_dialog.index
@@ -4662,7 +4650,7 @@ class InputOscClient(QtCore.QObject):
                         is_virtual=True,  # indicate we are not a hardware input
                         is_axis=True,
                         extra_data={"input_item": input_item},
-                        source = EventSourceType.OSC,
+                        source=EventSourceType.OSC,
                     )
 
                     self._state_data[input_item.message_key] = normalized_args  # this can have multiple axis values returned
