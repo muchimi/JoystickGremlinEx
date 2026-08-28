@@ -270,12 +270,19 @@ class PhraseData:
             assert value.startswith(folder), f"Sound file [{value}] is not in the expected folder [{folder}]"
         return value
 
+    @property
+    def key(self) -> str:
+        return self._hash_key()
+
     def _update_key(self):
+        self._key = self._hash_key()
+
+    def _hash_key(self):
         if self._engine:
             hash_string = f"{self._version}{self._text}{self._engine.name}{self._voice}{self._rate:0.3f}{self._pitch}{self._volume:0.3f}"
         else:
             hash_string = f"{self._version}{self._text}{self._voice}{self._rate:0.3f}{self._pitch}{self._volume:0.3f}"
-        self._key = hashString(hash_string)
+        return hashString(hash_string)
 
     @property
     def text(self) -> str:
@@ -330,12 +337,6 @@ class PhraseData:
     def volume(self, value: float):
         self._volume = value
         self._update_key()
-
-    @property
-    def key(self) -> str:
-        if self._key is None:
-            self._update_key()
-        return self._key
 
     def to_xml(self) -> etree.Element:
         """stores phrase data to an XML element"""

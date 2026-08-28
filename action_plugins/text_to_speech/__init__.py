@@ -330,7 +330,7 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
         self.exec_on_press = True  # true if trigger should execute on input press event
         self.exec_on_release = False  # true if trigger should execute on input release event
         self.override_suppress = False  # override suppression flag
-        self._tts_suppress_duplicate = False
+        self._tts_suppress_duplicate = config.tts_suppress_duplicate
         self._tts_suppress_cooldown = 0
         self.sound = Sound()
 
@@ -341,8 +341,6 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
     @tts_suppress_duplicate.setter
     def tts_suppress_duplicate(self, value: bool):
         self._tts_suppress_duplicate = value
-        config = gremlin.config.Configuration()
-        config.tts_suppress_enabled = value
 
     @property
     def tts_suppress_cooldown(self) -> int:

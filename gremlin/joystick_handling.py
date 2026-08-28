@@ -19,6 +19,7 @@
 import logging
 import threading
 
+
 import dinput
 from dinput import DeviceSummary
 import time
@@ -565,13 +566,16 @@ def set_button(device_guid: str | dinput.GUID | int, index: int, is_pressed: boo
     sd = gremlin.event_handler.JoystickState()
     if isinstance(device_guid, int):
         # convert to guid from vjoy ID
-        device_guid = getVjoyDeviceGuid(device_guid)
-    device = get_device(device_guid)
+        device = getDeviceFromVjoyId(device_guid)
+    else:
+        device = getDevice(device_guid)
     if not device:
         syslog.error(f"VJOY SET BUTTON: Don't know device [{device_guid}]")
         return
+    if not device.connected or not device.is_virtual:
+        return
 
-    if not device.is_virtual and sd.outputIgnored(device_guid):
+    if sd.outputIgnored(device_guid):
         # output ignored
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose:
@@ -598,43 +602,53 @@ def set_axis(device_guid, index: int, value: float, update_remote: bool = False)
 
     if isinstance(device_guid, int):
         # convert to guid from vjoy ID
-        device_guid = getVjoyDeviceGuid(device_guid)
-    sd = gremlin.event_handler.JoystickState()
-    device = get_device(device_guid)
+        device = getDeviceFromVjoyId(device_guid)
+    else:
+        device = getDevice(device_guid)
     if not device:
         syslog.error(f"VJOY SET AXIS: Don't know device [{device_guid}]")
         return
-    if not device.is_virtual and sd.outputIgnored(device_guid):
+    if not device.connected or not device.is_virtual:
+        return
+
+    sd = gremlin.event_handler.JoystickState()
+
+
+    if sd.outputIgnored(device_guid):
         # output ignored
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if verbose:
             syslog.info(f"VJOY SET AXIS: {device.name} output ignored [{index}] value: {value: 0.3f}")
         return
 
-    if device and device.is_virtual:
-        vjoy_id = device.vjoy_id
-        if 0 < index <= device.axis_count:
-            proxy = gremlin.joystick_handling.VJoyProxy()
-            proxy[vjoy_id].axis(index).value = value
+    vjoy_id = device.vjoy_id
+    if 0 < index <= device.axis_count:
+        proxy = gremlin.joystick_handling.VJoyProxy()
+        proxy[vjoy_id].axis(index).value = value
 
-            if update_remote:
-                (_, is_remote) = gremlin.remote.remote_control.state
-                if is_remote:
-                    remote_client = gremlin.remote.remote_client
-                    remote_client.send_axis(vjoy_id, index, value)
+        if update_remote:
+            (_, is_remote) = gremlin.remote.remote_control.state
+            if is_remote:
+                remote_client = gremlin.remote.remote_client
+                remote_client.send_axis(vjoy_id, index, value)
 
 
 def set_hat(device_guid: str | dinput.GUID | int, index: int, direction: tuple):
     """sets the device hat"""
     if isinstance(device_guid, int):
         # convert to guid from vjoy ID
-        device_guid = getVjoyDeviceGuid(device_guid)
-    device = get_device(device_guid)
-    if device and device.is_virtual:
-        vjoy_id = device.vjoy_id
-        if 0 < index < device.hat_count:
-            proxy = gremlin.joystick_handling.VJoyProxy()
-            proxy[vjoy_id].hat(index).direction = direction
+        device = getDeviceFromVjoyId(device_guid)
+    else:
+        device = getDevice(device_guid)
+    if not device:
+        syslog.error(f"VJOY SET HAT: Don't know device [{device_guid}]")
+        return
+    if not device.connected or not device.is_virtual:
+        return
+    vjoy_id = device.vjoy_id
+    if 0 < index < device.hat_count:
+        proxy = gremlin.joystick_handling.VJoyProxy()
+        proxy[vjoy_id].hat(index).direction = direction
 
 
 def physical_devices():
@@ -2366,45 +2380,46 @@ class VjoyStart:
         self._axis_data = {}  # map of start profile values indexed by [vjoyid][axis] = float
         self._button_data = {}  # map of start profile buttons indexed by [vjoyid][axis] = bool
         self._connected = False  # tracks event hook (we don't hook on init because of possible python import issue and load order)
+        self._device: DeviceSummary = None  # vjoy device info
+
+    def _ensure_device(self, device_id):
+        import gremlin.event_handler
+
+        if not self._device:
+            if isinstance(device_id, int):
+                # vjoy ID
+                device = getDeviceFromVjoyId(device_id)
+            else:
+                device = getDevice(device_id)
+            if device:
+                self._device = device
+                self._connected = self._device.connected
+                self._vjoy_id = self._device.vjoy_id
+                if self._connected:
+                    # trap profile started event
+                    el = gremlin.event_handler.EventListener()
+                    el.profile_started.connect(self.apply)
 
     def setStartValue(self, device_id, id: int, value: float):
         """registers an axis start value"""
-        import gremlin.event_handler
 
-        if not isinstance(device_id, int):
-            vjoy_id = vjoy_id_from_guid(device_id)
-        else:
-            vjoy_id = device_id  # integer ID
-
-        if vjoy_id is None:
-            syslog.error(f"VJOY SET START: : vjoy device [{device_id}] not available")
+        self._ensure_device(device_id)
+        if not self._device:
             return
 
-        if not self._connected:
-            # trap profile started event
-            el = gremlin.event_handler.EventListener()
-            el.profile_started.connect(self.apply)
-            self._connected = True
-
+        vjoy_id = self._vjoy_id
         if vjoy_id not in self._axis_data:
             self._axis_data[vjoy_id] = {}
         self._axis_data[vjoy_id][id] = value
 
     def setStartState(self, device_id, id: int, state: bool):
         """registers a button start value"""
-        import gremlin.event_handler
 
-        vjoy_id = vjoy_id_from_guid(device_id)
-        if vjoy_id is None:
-            syslog.warning(f"Register VJOY start value: unknown device {device_id}")
+        self._ensure_device(device_id)
+        if not self._device:
             return
 
-        if not self._connected:
-            # trap profile started event
-            el = gremlin.event_handler.EventListener()
-            el.profile_started.connect(self.apply)
-            self._connected = True
-
+        vjoy_id = self._vjoy_id
         if vjoy_id not in self._button_data:
             self._button_data[vjoy_id] = {}
         self._button_data[vjoy_id][id] = state
@@ -2421,6 +2436,9 @@ class VjoyStart:
     def apply(self):
         """applies the startup data"""
         import gremlin.input_devices
+
+        if not self._device:
+            return
 
         remote_client = gremlin.remote.remote_client
         for vjoy_id in self._axis_data:

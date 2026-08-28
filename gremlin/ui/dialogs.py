@@ -1525,10 +1525,10 @@ There should only be one GremlinEx master server on the subnet.
         )
 
         self.suppress_duplicate_widget = gremlin.ui.ui_common.QDataCheckbox(
-            "Suppress duplicate TTS speech",
+            "Suppress duplicate TTS speech by default",
             value=self.config.tts_suppress_duplicate,
             callback=self._tts_suppress_changed,
-            tooltip="When enabled, TTS will ignore duplicate sequential messages.",
+            tooltip="This option set the default value of new text to speech actions related to duplicate TTS speech.",
         )
 
         self.generate_on_load_widget = gremlin.ui.ui_common.QDataCheckbox(
@@ -1849,7 +1849,6 @@ This setting is also available on a profile by profile basis on the profile tab,
 
         modes = [mode for mode in gremlin.types.VerboseMode]
         modes.sort(key=lambda x: x.name.casefold())
-
 
         width = 0
 
@@ -2521,7 +2520,7 @@ Note that firewall rules must allow traffic on the selected IP addresses/ports f
         # for widget in self._verbose_mode_widgets.values():
         #     widget.setEnabled(checked)
 
-    def _verbose_set_cb(self, widget, checked : bool):
+    def _verbose_set_cb(self, widget, checked: bool):
         # is_checked = self._verbose_mode_widgets[mode].isChecked()
         mode = widget.data
         self.config.verbose_set_mode(mode, checked)

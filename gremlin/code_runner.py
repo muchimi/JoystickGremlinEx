@@ -433,7 +433,11 @@ class CodeRunner:
             # set vjoy from profile defaults
             vjoy_devices = gremlin.joystick_handling.virtual_devices()
             for device_node in vjoy_devices:
+                if not device_node.enabled or not device_node.connected:
+                    continue
+
                 device_id = device_node.device_id
+
 
                 # set axes
                 for id in range(1, device_node.axis_count + 1):

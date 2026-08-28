@@ -347,7 +347,6 @@ class Configuration(QtCore.QObject):
 
         return True
 
-
     def _reload(self):
         """Loads the configuration file's content.  flag = global or local (version specific) config"""
 
@@ -698,7 +697,7 @@ class Configuration(QtCore.QObject):
 
     @property
     def tts_suppress_duplicate(self) -> bool:
-        return self._get_data("tts_suppress_duplicate", True)
+        return self._get_data("tts_suppress_duplicate", False)  # off by default
 
     @tts_suppress_duplicate.setter
     def tts_suppress_duplicate(self, value: bool):
@@ -3468,7 +3467,15 @@ class Configuration(QtCore.QObject):
     @property
     def last_reorder_file(self) -> str:
         """last reorder file used for device tabs"""
-        return self._get_data("last_reorder_file", "")
+        fname = self._get_data("last_reorder_file", "")
+        if not fname:
+            # look for the order.json file
+            order_fname = os.path.join(self.data_path(), "order.json")
+            if os.path.isfile(order_fname):
+                self._set_data("last_reorder_file", order_fname)
+                fname = order_fname
+
+        return fname
 
     @last_reorder_file.setter
     def last_reorder_file(self, value: str):

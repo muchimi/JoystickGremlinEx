@@ -1420,8 +1420,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
     @tts_suppress_duplicate.setter
     def tts_suppress_duplicate(self, value: bool):
         self._tts_suppress_duplicate = value
-        config = gremlin.config.Configuration()
-        config.tts_suppress_enabled = value
+
 
     @property
     def tts_suppress_cooldown(self) -> int:
@@ -1662,7 +1661,11 @@ class PlaySound(gremlin.input_item.AbstractAction):
             return None
 
         if self.tts_suppress_duplicate:
-            key = phrase.key if phrase else None
+            if phrase:
+                hash_key = phrase.key if phrase else None
+            syslog.info(f"phrase text: {phrase.text}  hash: {hash_key}")
+            key = hash_key
+
             if self.last_phrase_key:
                 last_key, last_time = self.last_phrase_key
                 if key == last_key:

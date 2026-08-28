@@ -48,6 +48,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T37)
+- Change: UI: Display order dialog will look for a file in the profile folder called order.json and use that if present as the "load last" button.
+- Change: API: duplicate sound playback suppression is now off by default in global options.  This governs the default state of TTS duplication for the play sound and legacy TTS actions.
+- Change: Play Sound Action/Legacy TTS action: duplicate suppression no longer changes the global option when toggled.
+- Fix: Play Sound Action/Legacy TTS action: when duplicate suppression is enabled, it does not evaluate action configuration changes to determine if the sound is a duplicate or not. NOTE: suppression is profile wide and applies to any TTS action in the profile.  This is by design.
+- Fix: API: skip ghost VJOY devices when setting profile startup values (ghost devices are VJOY devices that are not configured on the local system).
+- Fix: API: ignore disconnected devices when setting virtual axis/button/hat 
+
 ### (m77T36)
 - Change: hardening for QT behaviors to validate for QT memory model and threading.
 - Change: hardening of sound API for cross-threading and to guard against possible race conditions.
