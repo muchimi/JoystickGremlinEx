@@ -11496,6 +11496,8 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """load the list view for the joystick device if not loaded yet"""
         # if there are no inputs in the model, pick the default filter for the devices
         assert not self._ui_created, "_create_ui should only be called once per widget life"
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self.listview_container):
+            return
 
         if not isinstance(self._input_item_list_model, InputItemListModel):
             raise ValueError(f"DeviceWidget: CreateUi() - invalid model - got [{type(self._input_item_list_model)}]")

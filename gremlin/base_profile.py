@@ -1964,6 +1964,7 @@ class Settings:
                 except Exception as ex:
                     # read error
                     syslog.error(f"Error loading device defaults: {ex}")
+                    syslog.error(traceback.format_exc())
                     return False
 
             else:
@@ -2041,6 +2042,7 @@ class Settings:
             except Exception as ex:
                 # read error
                 syslog.error(f"Error saving device defaults: {ex}")
+                syslog.error(traceback.format_exc())
                 return False
 
             return True

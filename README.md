@@ -48,6 +48,10 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T37A)
+- Fix: Additional guard for QT C++ check in device UI based object. 
+- Change: Add traceback on filter default read or write errors so log file is more specific as to what the error is, and what led to that error.
+
 ### (m77T37)
 - Change: UI: Display order dialog will look for a file in the profile folder called order.json and use that if present as the "load last" button.
 - Change: API: duplicate sound playback suppression is now off by default in global options.  This governs the default state of TTS duplication for the play sound and legacy TTS actions.
