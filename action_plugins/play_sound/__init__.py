@@ -503,6 +503,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.main_layout.addWidget(self.body_container)
 
         self._update_speakers()  # update voice lists
+        self._sync_etts_locale() # sync locale with selected speaker
 
         self._update_ui()
 
@@ -994,8 +995,31 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                     self.etts_locale_widget.setCurrentIndex(index)
             else:
                 if locales:
-                    config.ai_etts_last_locale = locales[0][1]
-                    self.etts_locale_widget.setCurrentIndex(0)
+                    self._sync_etts_locale()
+
+
+    def _sync_etts_locale(self):
+        """syncs the ETTS locale with the current speaker """
+        gremlin.util.assert_ui_thread()
+        config = gremlin.config.Configuration()
+        speaker = self.action_data.etts_speaker
+        if not speaker:
+            speaker = config.ai_etts_last_speaker
+        if not speaker:
+            speaker = list(self._get_etts_filtered_voices().values())[0].short_name
+        if speaker:
+            if speaker != self.action_data.etts_speaker:
+                self.action_data.etts_speaker = speaker
+            etts = gremlin.sound.EdgeTTS()
+            voice = etts.getVoice(self.action_data.etts_speaker)
+            if voice and voice.locale != self.action_data.etts_locale:
+                # synchronize
+                self.action_data.etts_locale = voice.locale
+                index = self.etts_locale_widget.findData(self.action_data.etts_locale)
+                if index != -1:
+                    with QtCore.QSignalBlocker(self.etts_locale_widget):
+                        self.etts_locale_widget.setCurrentIndex(index)
+
 
     def _get_etts_filtered_voices(self) -> dict[str, EdgeTTSVoice]:
         """gets a list of filtered voices by locale"""

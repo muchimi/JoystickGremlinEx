@@ -25,6 +25,7 @@ m77 update: migrate to the play engine and phrase system to avoid legacy API pro
 
 
 """
+
 import os
 import logging
 import time
@@ -38,7 +39,8 @@ import gremlin.util as util
 import pyttsx3
 import pythoncom
 import gremlin.singleton_decorator
-#import queue
+
+# import queue
 from gremlin.base_classes import FastQueue
 import gremlin.util
 from gremlin.sound import Sound, PlaybackOptions, PhraseData
@@ -56,17 +58,18 @@ class TextToSpeech:
     def __init__(self):
         """Creates a new instance."""
         # syslog = logging.getLogger("system")
+        gremlin.util.assert_ui_thread()
         self.valid = False
         self.voices = None
         self.default_voice = None
-        el = gremlin.event_handler.EventListener()
-        el.tts_change.connect(self._tts_changed)
-        el.shutdown.connect(self.end)
-        el.profile_start.connect(self.profile_start)
-        el.profile_stop.connect(self.profile_stop)
+        # el = gremlin.event_handler.EventListener()
+        # el.tts_change.connect(self._tts_changed)
+        # el.shutdown.connect(self.end)
+        # el.profile_start.connect(self.profile_start)
+        # el.profile_stop.connect(self.profile_stop)
 
         self._current_rate = 100  # default rate (global)
-        self._current_voice = None # voice to use
+        self._current_voice = None  # voice to use
         self._last_hash = None
 
         config = gremlin.config.Configuration()
@@ -74,30 +77,31 @@ class TextToSpeech:
         self._started = False
         self._tts_thread = None
         self._queue_thread = None
-        self._queue = FastQueue() # queue.Queue()
+        self._queue = FastQueue()  # queue.Queue()
         self._engine_lock = threading.Lock()  # pyttsx3/SAPI5 is not thread-safe; serialize access
         self.valid = config.tts_enabled
         try:
-            self.engine = pyttsx3.init()
-            self.voices = self.engine.getProperty("voices")
-            self.default_voice = next(
-                (voice for voice in self.voices if "David Desktop" in voice.name), None
-            )
+            pythoncom.CoInitialize()
+            engine = pyttsx3.init()
+            self.voices = engine.getProperty("voices")
+            self.default_voice = next((voice for voice in self.voices if "David Desktop" in voice.name), None)
 
             if verbose:
                 syslog.info("TTS voice listing:")
                 for voice in self.voices:
                     syslog.info(f"\t{voice.name}  (id: {voice.id})")
                 if self.default_voice:
-                    syslog.info(
-                        f"TTS default voice: {self.default_voice.name}  (id: {self.default_voice.id})"
-                    )
+                    syslog.info(f"TTS default voice: {self.default_voice.name}  (id: {self.default_voice.id})")
 
-            if self.valid:
-                self.start()
+            engine.stop()
+            # if self.valid:
+            #     self.start()
 
         except Exception as err:
             syslog.error(f"TTS: unable to initialize TTS: {err}")
+        finally:
+            engine.stop()
+            pythoncom.CoUninitialize()
 
     def profile_start(self):
         """called on profile start"""
@@ -120,6 +124,7 @@ class TextToSpeech:
 
     def getVoices(self):
         """gets a list of defined voices"""
+
         if self.valid and self.voices:
             return self.voices
         return []
@@ -127,27 +132,7 @@ class TextToSpeech:
     def set_voice(self, voice):
         pass
 
-    # def set_voice(self, voice):
-    #     """sets the voice"""
-    #     gremlin.util.InvokeUiMethod(self._set_voice_ui, voice)
 
-    # def _set_voice_ui(self, voice):
-    #     """sets the voice"""
-    #     if not self.valid:
-    #         return
-    #     try:
-    #         self.engine.setProperty("voice", voice.id)
-    #         self._current_voice = voice
-    #     except Exception:
-    #         # syslog = logging.getLogger("system")
-    #         syslog.warning(f"TTS: unable to select voice {voice.name}")
-    #         if self.default_voice:
-    #             try:
-    #                 self.engine.setProperty("voice", self.default_voice.id)
-    #                 self._current_voice = self.default_voice
-    #                 syslog.warning(f"TTS: selecting default voice {self.default_voice.name}")
-    #             except Exception as err:
-    #                 syslog.error(f"TTS: unable to activate TTS: {err}")
 
     def speak(
         self,
@@ -156,297 +141,11 @@ class TextToSpeech:
         clear: bool = False,
         override_suppress: bool = False,
     ):
-        #m77T13 - use the play engine to speak the text + cache
+        # m77T13 - use the play engine to speak the text + cache
         sound = Sound()
         sound.playPyTTS(text, voice=self._current_voice.name if self._current_voice else self.default_voice.name, rate=rate, timed_random=self._timed_random)
 
 
-
-    # def speak(
-    #     self,
-    #     text: str,
-    #     rate: int = 100,
-    #     clear: bool = False,
-    #     override_suppress: bool = False,
-    # ):
-    #     gremlin.util.InvokeUiMethod(
-    #         self._speak_ui, text, rate, clear, override_suppress
-    #     )  # ensure on UI thread
-
-    # def _speak_ui(self, text, rate=100, clear=False, override_suppress: bool = False):
-    #     if not self.valid:
-    #         return
-    #     # syslog = logging.getLogger("system")
-
-    #     if text:
-    #         config = gremlin.config.Configuration()
-    #         verbose = config.verbose_mode_tts
-
-    #         if config.tts_suppress_duplicate and not override_suppress:
-    #             h = hash(text)
-    #             if h == self._last_hash:
-    #                 if verbose:
-    #                     syslog.info(f"TTS: SUPRESS duplicate: {text}")
-    #                 return
-    #             self._last_hash = h
-
-    #         if verbose:
-    #             syslog.info(f"TTS: SPEAK add to queue: {text}")
-
-    #         if clear or not text:
-    #             # clear on no message.
-    #             self._clear_queue()
-    #         if text:
-    #             self._queue.put(lambda: self._speak(text, rate))
-
-    # def _clear_queue(self):
-    #     """clears the queue"""
-    #     while not self._queue.empty():
-    #         self._queue.get()
-    #         # self._queue.task_done()
-
-    # def _speak(self, text, rate=None):
-    #     self._speak_single(text, rate)
-
-    # def _speak(self, text, rate=None):
-    #     """speaks the text"""
-
-    #     try:
-    #         if text:
-    #             text = self.text_substitution(text)
-    #             if rate is None:
-    #                 rate = self._current_rate
-    #             new_rate = self.rate_playback + int(
-    #                 util.clamp(rate, self.rate_offset_min, self.rate_offset_max)
-    #             )
-    #             self.engine.setProperty("rate", new_rate)
-    #             self.engine.say(text)
-
-    #     except Exception as err:
-    #         logging.getLogger("system").error(f"Error in TTS: {err}")
-
-
-
-    # def speak_single(self, text, rate=None, clear=False, threaded=True):
-    #    gremlin.util.InvokeUiMethod(self._speak_single_ui, text, rate, clear, threaded)
-
-    # def _speak_single_ui(self, text, rate=None, clear=False, threaded=True):
-    #     if text and self.valid:
-    #         if not self._started:
-    #             self._start_ui()
-    #         # syslog = logging.getLogger("system")
-    #         verbose = gremlin.config.Configuration().verbose_mode_tts
-    #         if verbose:
-    #             syslog.info(f"TTS: SPEAK SINGLE add to queue: {text}")
-    #         if clear:
-    #             self._clear_queue()
-    #         self._queue.put(lambda: self._speak_single_ui(text, rate))
-
-    # def _speak_single_ui(self, text, rate=None):
-    #     """speaks the test as a single event (don't use this inside an event loop)"""
-    #     if not self.valid:
-    #         return
-    #     try:
-    #         self.engine.stop()
-    #         text = self.text_substitution(text)
-    #         if rate is None:
-    #             rate = self._current_rate
-
-    #         new_rate = self.rate_playback + int(
-    #             util.clamp(rate, self.rate_offset_min, self.rate_offset_max)
-    #         )
-    #         self.engine.setProperty("rate", new_rate)
-    #         self.engine.say(text)
-
-    #         verbose = gremlin.config.Configuration().verbose_mode_tts
-    #         if verbose:
-    #             syslog.info(f"TTS: Engine speech requested: {text}")
-
-    #         try:
-    #             if not self.engine._inLoop:
-    #                 self.engine.runAndWait()
-    #                 self.engine.stop()
-    #         except Exception:
-    #             pass
-
-    #     except Exception as err:
-    #         syslog.error(f"Error in TTS: {err}")
-
-
-    def speak_single(self, text, rate=None, clear=False, threaded=True):
-        """ uses play engine to speak the text """
-        sound = Sound()
-        voice = self._current_voice if self._current_voice else self.default_voice
-        sound.playPyTTS(text, voice=voice.name, rate=rate)
-
-    def stop(self):
-        pass
-
-    def start(self):
-        pass
-
-    def abort(self):
-        pass
-
-    def end(self):
-        pass
-
-    def set_rate(self, value):
-        pass
-
-    def set_volume(self, value):
-        pass
-
-
-    # def abort(self):
-    #     gremlin.util.InvokeUiMethod(self._abort_ui)  # ensure on UI thread
-
-    # def _abort_ui(self):
-    #     """aborts current speech and resets the queue"""
-    #     self.engine.stop()
-    #     self._clear_queue()
-
-    # def stop(self):
-    #     if self._started:
-    #         gremlin.util.InvokeUiMethod(self._stop_ui)  # ensure on UI thread
-
-    # def _stop_ui(self):
-    #     """stops any speech"""
-
-    #     try:
-    #         syslog.info("TTS: stop")
-    #         if self._queue_thread and self._queue_thread.is_alive():
-    #             self._queue_thread.stop()
-    #             self._queue_thread.join()
-    #         self._queue_thread = None
-
-    #         if self._tts_thread and self._tts_thread.is_alive():
-    #             self._tts_thread.stop()
-    #             self._tts_thread.join()
-    #         self._tts_thread = None
-
-    #         self.engine.stop()
-
-    #         self._clear_queue()
-    #         self._started = False
-
-    #     except Exception as err:
-    #         syslog.error(f"Error in TTS: {err}")
-
-    # def start(self):
-    #     if not self._started:
-    #         gremlin.util.InvokeUiMethod(self._start_ui)  # ensure on UI thread
-
-    # def _start_ui(self):
-    #     """starts the loop"""
-    #     if not self.valid:
-    #         return
-    #     if not self._started:
-    #         syslog.info("TTS: start")
-    #         self._tts_thread = gremlin.threading.AbortableThread(
-    #             target=self._tts_runner
-    #         )
-    #         self._tts_thread.name = "TTS engine"
-    #         self._tts_thread.start()
-    #         self._queue_thread = gremlin.threading.AbortableThread(
-    #             target=self._queue_runner
-    #         )
-    #         self._queue_thread.name = "TTS queue"
-    #         self._queue_thread.start()
-    #         self._started = True
-
-    # def _tts_runner(self):
-    #     """runner thread for the TTS engine"""
-    #     if not self.valid:
-    #         return
-    #     threading.current_thread().reset()
-    #     self.engine.startLoop(False)
-    #     try:
-    #         while not self._tts_thread.stopped():
-    #             self.engine.iterate()
-    #             time.sleep(0)
-    #     except Exception:
-    #         pass # ignore
-    #     finally:
-    #         self.engine.endLoop()
-
-    # def _queue_runner(self):
-    #     """processes the speech queue"""
-    #     # syslog = logging.getLogger("system")
-    #     threading.current_thread().reset()
-    #     verbose = gremlin.config.Configuration().verbose_mode_tts
-    #     while not self._queue_thread.stopped():
-    #         if not self._queue.empty():
-    #             functor = self._queue.get()
-    #             if verbose:
-    #                 syslog.info("TTS: POP queue")
-    #             gremlin.util.InvokeUiMethod(functor)
-    #             # self._queue.task_done()
-    #         time.sleep(0.05)
-
-    #     # terminate any remaining queue items
-    #     self._clear_queue()
-
-    # def end(self):
-    #     gremlin.util.InvokeUiMethod(self._end_ui)  # ensure on UI thread
-
-    # def _end_ui(self):
-    #     """ends the loop"""
-
-    #     if not self.valid:
-    #         return
-
-    #     if self._started:
-    #         # syslog = logging.getLogger("system")
-    #         syslog.info("TTS: shutdown")
-
-    #         self._queue_thread.stop()
-    #         self._queue_thread.join()
-    #         self._queue_thread = None
-
-    #         self._tts_thread.stop()
-    #         self._tts_thread.join()
-    #         self._tts_thread = None
-    #         try:
-    #             self.engine.stop()
-    #         except Exception:
-    #             pass
-    #         self._started = False
-
-    # def set_volume(self, value):
-    #     gremlin.util.InvokeUiMethod(self._set_volume_ui, value)  # ensure on UI thread
-
-    # def _set_volume_ui(self, value):
-    #     """Sets the volume anywhere between 0 and 100.
-
-    #     :param value the new volume value
-    #     """
-    #     if not self.valid:
-    #         return
-    #     volume = int(util.clamp(value, 0, 100))
-    #     self.engine.setProperty(
-    #         "volume", volume / 100
-    #     )  # value is 0 to 1 floating point
-
-    # def set_rate(self, value):
-    #     gremlin.util.InvokeUiMethod(self._set_rate_ui, value)  # ensure on UI thread
-
-    # def _set_rate_ui(self, value):
-    #     """Sets the speaking speed between -10 and 10.
-
-    #     Negative values slow speech down while positive values speed
-    #     it up.
-
-    #     :param value the new speaking rate
-    #     """
-    #     # default is 200 words per minute
-    #     if not self.valid:
-    #         return
-    #     rate = self.rate_playback + int(
-    #         util.clamp(value, self.rate_offset_min, self.rate_offset_max)
-    #     )
-    #     self._current_rate = rate
-    #     self.engine.setProperty("rate", rate)
 
     def text_substitution(self, text):
         """Returns the provided text after running text substitution on it.
@@ -457,48 +156,61 @@ class TextToSpeech:
         text = text.replace("${current_mode}", gremlin.shared_state.current_mode)
         return text
 
-    def generateActionWav(self, phrase : PhraseData, voice: str = None, rate: float = 1.0, pitch: float = 0.0, volume: float = 100) -> str:
-        """generates a wav file from the current action """
+    def generateActionWav(self, phrase: PhraseData, voice: str = None, rate: float = 1.0, pitch: float = 0.0, volume: float = 100) -> str:
+
+        self._result = None
+        gremlin.util.InvokeUiMethod(self._generate_action_wav_ui, phrase, voice, rate, pitch, volume)
+        while self._result is None:
+            time.sleep(0.01)  # wait for the UI thread to finish
+        return self._result
+
+    def _generate_action_wav_ui(self, phrase: PhraseData, voice: str = None, rate: float = 1.0, pitch: float = 0.0, volume: float = 100) -> str:
+        """generates a wav file from the current action"""
+        gremlin.util.assert_ui_thread()
         tts_file = phrase.getSoundFile()
-        rate = phrase.rate # floating point value 1.0 is normal
+        rate = phrase.rate  # floating point value 1.0 is normal
         speaker = voice
         text = phrase.text
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_sound or config.verbose_mode_tts
         try:
-            with self._engine_lock:
-                # pyttsx3/SAPI5 uses a COM object tied to the thread that
-                # created it. Reusing a shared engine from a different thread
-                # (input execution thread on button press, or the autostart
-                # thread) can hang indefinitely. Create a fresh engine on the
-                # calling thread, and initialize COM there first (threads that
-                # never touched COM can otherwise hang on the first call).
-                com_initialized_here = False
-                try:
-                    pythoncom.CoInitialize()
-                    com_initialized_here = True
-                except Exception:
-                    pass
-                try:
-                    engine = pyttsx3.init()
-                    try:
-                        engine.setProperty("rate", rate)
-                        engine.setProperty("voice", speaker)
-                        engine.save_to_file(text, tts_file)  # generates wav files by itself
-                        engine.runAndWait()
-                    finally:
-                        try:
-                            engine.stop()
-                        except Exception:
-                            pass
-                finally:
-                    if com_initialized_here:
-                        try:
-                            pythoncom.CoUninitialize()
-                        except Exception:
-                            pass
+            pythoncom.CoInitialize()
+            engine = pyttsx3.init(debug=True)
+            try:
+                voices = engine.getProperty("voices")
+                index = next((i for i, v in enumerate(voices) if v.name.casefold() == speaker.casefold()), 0)
 
-            return os.path.isfile(tts_file)
+                engine.setProperty("rate", rate)
+                engine.setProperty("voice", voices[index].id)
+
+                # ensure the folder exists
+                os.makedirs(os.path.dirname(tts_file), exist_ok=True)
+                if os.path.isfile(tts_file):
+                    # file cannot exist before being created
+                    os.remove(tts_file)
+
+                engine.save_to_file(text, tts_file)  # generates wav files by itself
+
+                # m77 - run manual loop or it will kill itself
+                engine.startLoop(False)
+                while engine.isBusy():
+                    time.sleep(0.01)
+                    engine.iterate()
+                engine.endLoop()
+            except Exception as e:
+                syslog.error(f"TTS: Error during TTS generation: {e}")
+            finally:
+                engine = None
+                pythoncom.CoUninitialize()
+
+            self._result = os.path.isfile(tts_file)
+            if not self._result:
+                syslog.error(f"TTS: Failed to generate wav file: {tts_file}")
+            else:
+                if verbose:
+                    syslog.info(f"TTS: Successfully generated wav file: {tts_file}")
+            return self._result
         except Exception as e:
             syslog.error(f"TTS: Error generating wav for action: {e}")
-        return False
 
-
+        return self._result

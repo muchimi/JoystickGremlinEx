@@ -243,12 +243,6 @@ class TextToSpeechWidget(gremlin.input_item.AbstractActionWidget):
         sound = gremlin.sound.Sound()
         sound.playPyTTS(self.action_data.text, voice=self.action_data.voice_name, rate=self.action_data.rate, timed_random=self.action_data._timed_random)
 
-        # tts = gremlin.tts.TextToSpeech()
-        # voice = tts.getVoices()[self.action_data.voice_index]
-        # tts.set_voice(voice)
-        # tts.set_volume(self.action_data.volume)
-        # tts.speak_single(self.action_data.text, self.action_data.rate)
-
 
 class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
     tts = gremlin.tts.TextToSpeech()

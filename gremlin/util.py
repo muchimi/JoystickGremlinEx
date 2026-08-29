@@ -2933,3 +2933,17 @@ def getSafeFilename(s):
     s = s.replace(' ', '_')
     s = re.sub(r'(?u)[^-\w.]', '', s)
     return s[:255]
+
+
+def clearFolder(folder_path: str):
+    """Clears all files in the specified folder."""
+    if os.path.exists(folder_path):
+         try:
+            shutil.rmtree(folder_path)
+            os.makedirs(folder_path, exist_ok=True)
+            return True
+         except Exception as ex:
+            syslog.error(f"Unable to clear folder: {folder_path} - {str(ex)}")
+    return False
+
+

@@ -1915,6 +1915,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self.ui.actionReorderDevices.triggered.connect(self._reorder_tabs)
 
         self.ui.actionCheatsheet.triggered.connect(lambda: self._create_cheatsheet())
+        self.ui.actionClearManagedSound.triggered.connect(self._clear_managed_sound)
         # self.ui.actionViewInput.triggered.connect(lambda: self._view_input_map())
         self.ui.actionOptions.triggered.connect(self.options_dialog)
         self.ui.actionLogDisplay.triggered.connect(self.log_window)
@@ -4985,6 +4986,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         dialog = gremlin.ui.dialogs.CreateReportDialog(parent=self)
         dialog.exec()
+
+    def _clear_managed_sound(self):
+        """Clears all managed sound files"""
+        import gremlin.sound
+        result = gremlin.ui.ui_common.ConfirmBox("Clear all managed sound files?\nThis will force GEX to regenerate them.?")
+        if result:
+            pdm = gremlin.sound.PhraseDataManager()
+            pdm.purgeManagedSoundFiles()
 
     def _reorder_tabs(self):
         """opens a dialog to reorder tabs"""

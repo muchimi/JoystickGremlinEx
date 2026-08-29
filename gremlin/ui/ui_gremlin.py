@@ -171,6 +171,10 @@ class Ui_Gremlin(object):
         # self.actionViewInput.setCheckable(True)
         # self.actionViewInput.setEnabled(False)
 
+        self.actionClearManagedSound = QtGui.QAction(main_window)
+        self.actionClearManagedSound.setObjectName("actionClearManagedSound")
+        self.actionClearManagedSound.setToolTip("Clears all managed sound files")
+
         self.actionExit = QtGui.QAction(main_window)
         self.actionExit.setObjectName("actionExit")
         self.actionOptions = QtGui.QAction(main_window)
@@ -257,6 +261,7 @@ class Ui_Gremlin(object):
         self.menuTools.addSeparator()
         # self.menuTools.addAction(self.actionViewInput)
         self.menuTools.addAction(self.actionCheatsheet)
+        self.menuTools.addAction(self.actionClearManagedSound)
         self.menuTools.addAction(self.actionConvertLegacy)
         self.menuTools.addAction(self.actionConvertTTS)
         self.menuTools.addAction(self.actionGenerateTTS)
@@ -433,6 +438,9 @@ class Ui_Gremlin(object):
         self.actionManageModes.setText(_translate("GremlinEx", "Manage Modes"))
         self.actionHTMLCheatsheet.setText(_translate("GremlinEx", "HTML Cheatsheet"))
         self.actionCheatsheet.setText(_translate("GremlinEx", "Profile Visualization"))
+
+        self.actionClearManagedSound.setText(_translate("GremlinEx", "Clear Managed Sound Files"))
+
         # self.actionViewInput.setText(_translate("GremlinEx","View Input Map"))
         self.actionExit.setText(_translate("GremlinEx", "E&xit"))
         self.actionOptions.setText(_translate("GremlinEx", "&Options"))

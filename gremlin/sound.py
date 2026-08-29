@@ -16,16 +16,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
+import hashlib
 import os
 import html
 import sys
 from lxml import etree
 from PySide6 import QtCore, QtMultimedia, QtWidgets
 import gremlin.util
-from gremlin.util import hashString, safe_format, safe_read, TimedRandomInt
+from gremlin.util import hashString, safe_format, safe_read, TimedRandomInt, hashString
 import gremlin.event_handler
 import asyncio
-import edge_tts
+
 from typing import Any, Dict, List
 import io
 import os
@@ -37,6 +38,8 @@ import random
 import gremlin.ui.ui_common
 import threading
 import pycountry
+import edge_tts
+import traceback
 
 import logging
 
@@ -242,6 +245,8 @@ class PhraseData:
 
     @property
     def sound_file(self) -> str:
+        if not self._sound_file:
+            self._ensure_sound_file()
         return self._sound_file
 
     @sound_file.setter
@@ -270,6 +275,32 @@ class PhraseData:
             assert value.startswith(folder), f"Sound file [{value}] is not in the expected folder [{folder}]"
         return value
 
+    def _ensure_sound_file(self):
+        if self.managed:
+            # GUID based sound file
+            try:
+                verbose = gremlin.config.Configuration().verbose_mode_tts
+                sound_file = self._sound_file
+                if not sound_file:
+                    voice_folder = hashString(self.voice)
+                    pm = PhraseDataManager()
+                    sound_folder = pm.getSoundFolder()
+                    # new m77T38 - further separate by voice
+                    voice_folder = os.path.join(sound_folder, voice_folder)
+                    if not os.path.exists(voice_folder):
+                        os.makedirs(voice_folder)
+                    # create a unique file for this phrase
+                    # file_name = f"{phrase.key}.wav"
+                    file_name = f"{self.id}.wav"
+                    sound_file = os.path.join(voice_folder, file_name)
+                    if verbose:
+                        syslog.info(f"Phrase: update sound file: {self}")
+                    self._sound_file = sound_file
+
+            except Exception as e:
+                syslog.error(f"Error ensuring sound file for phrase {self}: {e}")
+                syslog.error(traceback.format_exc())
+
     @property
     def key(self) -> str:
         return self._hash_key()
@@ -282,6 +313,7 @@ class PhraseData:
             hash_string = f"{self._version}{self._text}{self._engine.name}{self._voice}{self._rate:0.3f}{self._pitch}{self._volume:0.3f}"
         else:
             hash_string = f"{self._version}{self._text}{self._voice}{self._rate:0.3f}{self._pitch}{self._volume:0.3f}"
+
         return hashString(hash_string)
 
     @property
@@ -297,6 +329,11 @@ class PhraseData:
     def engine(self) -> PlayMode:
         return self._engine
 
+    @property
+    def managed(self) -> bool:
+        """true if the phrase soundfile is managed by GEX"""
+        return self._engine in (PlayMode.EdgeAI, PlayMode.CoquiAI, PlayMode.EdgeAI, PlayMode.PyTTS)
+
     @engine.setter
     def engine(self, value: PlayMode):
         self._engine = value
@@ -304,7 +341,7 @@ class PhraseData:
 
     @property
     def voice(self) -> str:
-        return self._voice
+        return self._voice or "default"
 
     @voice.setter
     def voice(self, value: str):
@@ -432,7 +469,10 @@ class PhraseDataManager:
     def writeConfig(self):
         tree = etree.ElementTree(self.to_xml())
         tree.write(self._config_file, encoding="utf-8", xml_declaration=True, pretty_print=True)
-        syslog.info(f"Phrases: save configuration [{gremlin.util.toUrl(self._config_file)}]")
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_sound or config.verbose_mode_tts
+        if verbose:
+            syslog.info(f"Phrases: save configuration [{gremlin.util.toUrl(self._config_file)}]")
 
     def getPhraseDataByKey(self, key: str) -> PhraseData:
         """gets cached phrase data by key, None if not found"""
@@ -442,31 +482,17 @@ class PhraseDataManager:
     def ensureSoundFile(self, phrase: PhraseData):
         """ensures the phrase has a sound file associated with it"""
         with self._lock:
-            if phrase:
-                if phrase.text:
-                    # GUID based sound file
-                    verbose = gremlin.config.Configuration().verbose_mode_tts
-                    sound_file = phrase.sound_file
-                    if not sound_file:
-                        # create a unique file for this phrase
-                        # file_name = f"{phrase.key}.wav"
-                        file_name = f"{phrase.id}.wav"
-                        sound_file = os.path.join(self.getSoundFolder(), file_name)
-                        if verbose:
-                            syslog.info(f"Phrase: update sound file: {phrase}")
-                        phrase.sound_file = sound_file
-                    key = phrase.key
-                    if key not in self._sound_map:
-                        self._sound_map[key] = sound_file
+            sound_file = phrase.sound_file
+            key = phrase.key
+            if key not in self._sound_map:
+                self._sound_map[key] = sound_file
+            return sound_file
 
-                if __debug__:
-                    for k, v in self._sound_map.items():
-                        if v == sound_file and k != key:
-                            conflict_phrase = self.phrases[k]
-                            assert False, f"Sound file conflict: {sound_file} is already associated with key {k} (phrase text: [{conflict_phrase.text}])"
-
-                return sound_file
-        return None
+    def purgeManagedSoundFiles(self):
+        """remove all wav files that are tracked by this manager"""
+        with self._lock:
+            sound_folder = self.getSoundFolder()
+            gremlin.util.clearFolder(sound_folder)
 
     def purgeData(self):
         """remove all wav files that are not tracked by this manager - if the manager is empty, all files will be removed"""
@@ -911,7 +937,8 @@ class Sound:
                 # playback is not enabled
                 return
 
-            self._task_trim()  # cleanup prior tasks
+            with self._tasks_lock:
+                self._task_trim()  # cleanup prior tasks
 
             device_name = options.device  # playback device name
             loops = options.loops  # number of loops to play
@@ -1009,8 +1036,8 @@ class Sound:
             if filename not in self.running_data:
                 self.running_data[filename] = {}
 
-            task = self.pool.submit(self._play_runner, data, device_id, loops)
             with self._tasks_lock:
+                task = self.pool.submit(self._play_runner, data, device_id, loops)
                 self._sound_tasks.append(task)
             if blocking:
                 task.result()  # wait for the task to complete if blocking
@@ -1252,6 +1279,7 @@ class Sound:
             sound_file = self.getSoundFile(key)
             assert sound_file is not None, "invalid sound file - phrase not registered properly"
             if force and os.path.isfile(sound_file):
+                # delete the existing file if a forced regen is requested
                 os.unlink(sound_file)
             if force or not os.path.isfile(sound_file):
                 # does not exist, create

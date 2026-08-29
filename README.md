@@ -48,6 +48,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T38)
+- New: UI: Tool menu option to clear managed sound file folder.
+- Change: TTS API: managed TTS sound files are now arranged internally by speaker.
+- Fix: Play Sound Action: synchronize locale with currently selected speaker on initial load.
+- Fix: TTS API: voice selection for pyttsx3 broken by m77.
+- Fix: TTS API: legacy (pyttsx3) TTS - switch to manual loop handling to avoid an internal library deadlock.
+
+
 ### (m77T37A)
 - Fix: Additional guard for QT C++ check in device UI based object. 
 - Change: Add traceback on filter default read or write errors so log file is more specific as to what the error is, and what led to that error.
