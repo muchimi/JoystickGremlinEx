@@ -5168,23 +5168,30 @@ class QIconPushButton(QDataPushButton):
 
     def setIcon(self, icon):
         import gremlin.util
-
-        icon: QIcon = gremlin.util.load_icon(icon)
+        icon: QIcon = gremlin.util.load_icon(icon) if icon else QIcon()
         super().setIcon(icon)
+        if not icon:
+            syslog.warning(f"Icon not found: {icon}")
+            icon = Icons.questionIcon()
+        try:
+            self.icon = icon
+            icon_size = self.iconSize()
+            base_pixmap = icon.pixmap(icon_size)
+            offset = QPoint(2, 2)
+            offset_pixmap = QPixmap(base_pixmap.size() + QSize(offset.x(), offset.y()))
+            offset_pixmap.fill(Qt.transparent)  # Ensure background is clear
 
-        self.icon = icon
-        icon_size = self.iconSize()
-        base_pixmap = icon.pixmap(icon_size)
-        offset = QPoint(2, 2)
-        offset_pixmap = QPixmap(base_pixmap.size() + QSize(offset.x(), offset.y()))
-        offset_pixmap.fill(Qt.transparent)  # Ensure background is clear
+            painter = QPainter(offset_pixmap)
+            painter.drawPixmap(offset, base_pixmap)
+            painter.end()
+            self._icon_pressed = QIcon(offset_pixmap)
 
-        painter = QPainter(offset_pixmap)
-        painter.drawPixmap(offset, base_pixmap)
-        painter.end()
-        self._icon_pressed = QIcon(offset_pixmap)
-
-        self._icon_default = icon
+            self._icon_default = icon
+        except Exception as e:
+            import traceback
+            syslog.error(f"Error setting icon: {icon}")
+            syslog.error(f"Exception: {e}")
+            syslog.error(traceback.format_exc())
 
     def on_press(self):
         """override when mouse is pressed"""

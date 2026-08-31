@@ -2033,6 +2033,7 @@ class Settings:
                 if os.path.isfile(fname):
                     # blitz existing
                     os.unlink(fname)
+                tree = etree.ElementTree(root)
                 tree.write(
                     fname,
                     pretty_print=True,

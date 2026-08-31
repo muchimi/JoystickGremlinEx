@@ -492,7 +492,7 @@ class DeviceSummary:
         self.linear_id_map = {}  # map of linear ID to axis ID
         self.usage_page = 0  # HID usage page
         self.usage = 0  # HID usage
-        self.axis_names = []
+        self.axis_names = {}
         self.axismap_list = []
         self.axis_id_map = {}  # map of axis ID to linear ID
         self.input_enabled = False
@@ -557,7 +557,7 @@ class DeviceSummary:
 
                 axis_map = AxisMap(am)
                 self.axismap_list.append(axis_map)
-                axis_name = axis_map.getName()
+                axis_name = self.get_axis_name(am.axis_index)
                 self.axis_id_map[am.axis_index] = am.linear_index
                 self.linear_id_map[am.linear_index] = am.axis_index
 
@@ -568,7 +568,7 @@ class DeviceSummary:
                     logical_count += 1
 
                 # syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
-                self.axis_names.append(axis_name)
+                self.axis_names[am.axis_index] = axis_name
 
             # auto disable invalid joystick devices that are not in spec
             self._hard_disabled = self.axis_count > 8 or self.button_count > 128 or self.hat_count > 4
@@ -767,7 +767,7 @@ class DeviceSummary:
         """
         if index is None:
             return "N/A"
-        
+
         assert isinstance(index, int) and index > 0,f"invalid index: {index} - should be a 1 based integer"
         if is_linear:
             input_id = self.getAxisLinearId(index)

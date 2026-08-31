@@ -39,6 +39,7 @@ import gremlin.util as util
 import pyttsx3
 import pythoncom
 import gremlin.singleton_decorator
+import traceback
 
 # import queue
 from gremlin.base_classes import FastQueue
@@ -169,8 +170,18 @@ class TextToSpeech:
         gremlin.util.assert_ui_thread()
         tts_file = phrase.getSoundFile()
         rate = phrase.rate  # floating point value 1.0 is normal
-        speaker = voice
+        speaker = voice if voice else phrase.speaker
+        if not speaker:
+            if not self.default_voice:
+                syslog.error(f"Voice: [{voice}] not found and no default voice was found - unable to proceed with voice generation")
+                return False
+
+            speaker = self.default_voice.name
+
         text = phrase.text
+        if not text:
+            syslog.error("TTS: No text provided for voice generation")
+            return False
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_sound or config.verbose_mode_tts
         try:
@@ -199,6 +210,7 @@ class TextToSpeech:
                 engine.endLoop()
             except Exception as e:
                 syslog.error(f"TTS: Error during TTS generation: {e}")
+                syslog.error(traceback.format_exc())
             finally:
                 engine = None
                 pythoncom.CoUninitialize()

@@ -3889,7 +3889,7 @@ class VJoyRemapWidget(gremlin.input_item.AbstractActionWidget):
             ):
                 count = device.axis_count
                 for id in range(1, count + 1):
-                    axis_name = device.axis_names[id - 1]
+                    axis_name = device.get_axis_name(id)
                     self.virtual_output_selector_widget.addItem(f"Axis {axis_name}", id)
 
                 output_index = self.virtual_output_selector_widget.findData(self.action_data.vjoy_input_id)

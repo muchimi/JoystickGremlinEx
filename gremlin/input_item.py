@@ -1298,6 +1298,14 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     @property
     def display_name(self):
+        return self.getDisplayName()
+
+    @property
+    def short_display_name(self):
+        return self.getDisplayName(include_device_name=False)
+
+
+    def getDisplayName(self, include_device_name : bool =True):
         """gets a display name for this input"""
         device = gremlin.joystick_handling.getDevice(self.device_guid)
         if device:
@@ -1330,7 +1338,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             case _:
                 stub = f"[unknown input type: {self._input_type}]"
 
-        return f"{device_name}: {stub}"
+        if include_device_name:
+            return f"{device_name}: {stub}"
+        return stub
 
     def save_container_to_template(self, fname: str):
         if fname:
@@ -2031,7 +2041,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         if self._title_callback:
             self.setTitle(self._title_callback())
         elif self._input_item:
-            self.setTitle(self._input_item.display_name)
+            self.setTitle(self._input_item.getDisplayName(False))
         else:
             self.setTitle("N/A")
 

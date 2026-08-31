@@ -213,6 +213,14 @@ class Event:
         new_event.is_pressed = True
         return new_event
 
+    @property
+    def event_pressed(self):
+        """ gets the pressed value for a button or hat """
+        if self.event_type == InputType.JoystickHat:
+            return self.value != (0,0)
+        return self.is_pressed
+
+
     def set_extra_data(self, key: str, value: any):
         if not self.extra_data:
             self.extra_data = {}

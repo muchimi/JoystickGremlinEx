@@ -48,6 +48,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T39)
+- Change: UI: do not include full device name for inputs (these appeared recently due to the change in API)
+- Fix: TTS API: for legacy TTS, use a default voice if the selected voice no longer exists.
+- Fix: TTS API: for legacy TTS, check for non-empty phrase if there is no text to convert.
+- Fix: API: pull axis name correctly when device uses non-linear axis indexing or does not start at the first axis.
+- Fix: UI: provide a default icon to IconButton if icon not found.
+- Fix: Double Tap container: behavior updated for m77 API and resolved a few outstanding issues with this container.  The new behavior has an automatic release enabled, as with tempoEx, meaning that when it gets triggered, an automatic release is also triggered after the delay has lapsed.  The release is based on what was triggered (single/double) based on the first delay. Unlike TempoEx (which also has a double trigger mechanism), the double trigger container monitoring works on presses or releases as the initial trigger.
+
 ### (m77T38)
 - New: UI: Tool menu option to clear managed sound file folder.
 - Change: TTS API: managed TTS sound files are now arranged internally by speaker.
