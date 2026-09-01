@@ -52,7 +52,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Change: TTS conversion: conversion of older TTS engine to Edge AI TTS.  This will replace the old legacy TTS action, and also change any PlaySound actions that use the old engine to the new Edge AI system.  The conversion saves to a new profile.  This will automate changing to the high quality voices.  The conversion will retain male/female voicing based on the SAPI names. 
 - Change: TTS Action (legacy): add speaker name to XML
 - Fix: TTS API: provide suitable voice defaults for all TTS modes
-- Fix: TTS API: incorrect volume could generate audio with zero volume to be generated (causing no sound output).  
+- Fix: TTS API: incorrect volume could generate audio with zero volume (causing no sound output).
 
 Note: due to this change you may need to clear your managed audio file cache to force GEX to regen the audio.
 
