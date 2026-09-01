@@ -39,6 +39,7 @@ from uuid import UUID
 from PySide6 import QtCore
 from frozendict import frozendict
 from gremlin.input_item import ActionSet, ActionSets
+import gremlin.sound
 
 
 import gremlin.ui.mode_device
@@ -5165,7 +5166,7 @@ class Profile:
 
         return count
 
-    def convertTTSToPlaySound(self):
+    def convertTTSToPlaySound(self, use_edge = True):
         """converts profile TTS entries to playsound entries - prompt the user and saves to a new profile"""
         fname = self.profile_file
         if not fname or not os.path.isfile(fname):
@@ -5248,21 +5249,26 @@ class Profile:
             fadeout_ms = 0
             stop_previous = False
             playback_mode = PlaybackMode.RoundRobin
-            mode = PlayMode.PyTTS
+
             auto_generate = True
 
-            node.attrib.clear()
+            node.attrib.clear() # blitz all attributes and repladce
+
+
+            mode = PlayMode.EdgeAI if use_edge else PlayMode.PyTTS
+
+
+
+
 
             node.tag = "play-sound"
             node.set("mode", PlayMode.to_string(mode))
             node.set("type", "playsound")
             node.set("randomize", safe_format(randomize_sound_file, bool))
 
-            node.set("speaker", speaker)
             node.set("volume", safe_format(volume, int))
             node.set("text", html.escape(text))
-            node.set("ptts_speed", safe_format(ptts_speed, int))
-            node.set("ptts_volume", safe_format(ptts_volume, int))
+
             node.set("exec_on_press", safe_format(exec_on_press, bool))
             node.set("exec_on_release", safe_format(exec_on_release, bool))
             node.set("loops", safe_format(loops, int))
@@ -5273,6 +5279,54 @@ class Profile:
             node.set("stop-previous", safe_format(stop_previous, bool))
             node.set("playback-mode", safe_format(playback_mode.name, str))
             node.set("auto-generate", safe_format(auto_generate, bool))
+
+            if use_edge:
+                etts_speed = max(0, min(200, rate)) - 100  # clamp
+                etts_volume = volume - 100 # volume offset
+                speaker = gremlin.sound.DEFAULT_ETTS_SPEAKER
+
+                # voice conversions
+                if "david" in speaker.casefold():
+                    speaker = gremlin.sound.DEFAULT_ETTS_MALE
+                node.set("etts_speed", safe_format(etts_speed, int))
+                node.set("etts_volume", safe_format(etts_volume, int))
+
+            else:
+                node.set("ptts_speed", safe_format(ptts_speed, int))
+                node.set("ptts_volume", safe_format(ptts_volume, int))
+
+
+            node.set("speaker", speaker)
+
+
+        # convert the playsound mode from pyTTS to edge TTS
+        if use_edge:
+            nodes = list(root.xpath("//play-sound"))
+            for node in nodes:
+                if "mode" in node.attrib and node.get("mode") == PlayMode.to_string(PlayMode.PyTTS):
+                    node.set("mode", PlayMode.to_string(PlayMode.EdgeAI))
+                    speaker = node.get("speaker")
+                    # SAPI female voices
+                    female_voices = ["anna", "mary", "zira", "hazel", "lili", "hortense", "julie", "hakura", "hedda","ayumi"]
+                    pytts_speaker = speaker.casefold()
+                    speaker = gremlin.sound.DEFAULT_ETTS_MALE
+                    # look for female voices used
+                    for voice in female_voices:
+                        if voice in pytts_speaker:
+                            speaker = gremlin.sound.DEFAULT_ETTS_SPEAKER
+                            break
+
+                    node.set("speaker", speaker)
+                    # remove the pytts specific attributes
+                    if "ptts_speed" in node.attrib:
+                        del node.attrib["ptts_speed"]
+                    if "ptts_volume" in node.attrib:
+                        del node.attrib["ptts_volume"]
+                    if "ptts_voice" in node.attrib:
+                        del node.attrib["ptts_voice"]
+
+
+
 
         tree.write(save_fname, encoding="utf-8", xml_declaration=True, pretty_print=True)
 

@@ -60,6 +60,10 @@ USE_QT = False  # use QT for playback
 USE_PG = False  # use pygame for playback
 PHRASE_VERSION = 1
 
+DEFAULT_ETTS_SPEAKER = "en-US-JennyNeural"  # default Edge TTS speaker
+DEFAULT_ETTS_MALE = "en-US-GuyNeural"  # default Edge TTS male speaker
+DEFAULT_PYTTS_SPEAKER = "Microsoft David Desktop - English (United States)"  # default PyTTS speaker
+
 if USE_PG:
     import pygame
 
@@ -961,7 +965,7 @@ class Sound:
                 channels = f.channels  # 1 for mono, 2 for stereo (usual)
 
             rate = options.rate  # playback rate (pitch corrected)
-            volume = options.volume  # volume to apply
+            volume = options.volume  # volume to apply 0 to 200 percent
             fade_in = options.fadein_ms  # fade in duration
             fade_out = options.fadeout_ms  # fade out duration
             duration = options.playback_ms  # max duration of the sample to play back
@@ -986,6 +990,15 @@ class Sound:
 
             total_frames = len(data)
 
+            # modify the playback volume
+            # XXX disabled for now
+            if volume is not None and volume >= 0:
+                # data = data * (volume / 100)  # convert percent to volume.  50% = 0.5 = half volume
+                multiplier = volume / 100  # convert percent to volume.  50% = 0.5 = half volume
+                int16_data = (data * 32767.0).astype(np.int16)
+                scaled_data = (int16_data * multiplier).astype(np.int16)
+                data = scaled_data.astype(np.float32) / 32767.0
+
             # modify the playback rate if requested maintaining the pitch (this is approximate)
             if rate is not None and rate != 1.0:
                 # this maintains pitch using pyrubberband
@@ -998,10 +1011,6 @@ class Sound:
                 if total_frames > frame_count:
                     # trim needed
                     data = data[:frame_count]
-
-            # modify the playback volume
-            if volume is not None and volume >= 0:
-                data = data * (volume / 100)  # convert percent to volume.  50% = 0.5 = half volume
 
             # apply a fade in ramp if requested
             if fade_in is not None and fade_in > 0:
@@ -1064,7 +1073,7 @@ class Sound:
                         event.set()
                     current_frame += chunksize
 
-                stream = sd.OutputStream(callback=callback, device=device_id, finished_callback=event.set, channels=data.ndim)
+                stream = sd.OutputStream(callback=callback, device=device_id, finished_callback=event.set, channels=data.ndim, dtype=data.dtype)
                 with stream:
                     event.wait()  # wait until playback is finished
 
@@ -2149,7 +2158,8 @@ class EdgeTTS:
         # convert to an edge tts rate
         edge_rate = f"{int(rate):+}%"
         edge_pitch = f"{pitch:+}Hz"
-        edge_volume = f"{int(volume * 100):+}%"
+        # edge_volume = f"{int(volume):+}%"
+        edge_volume = "+0%" # change volume on playback
 
         return self.generateWav(tts_file=tts_file, text=phrase.text, voice=voice, rate=edge_rate, pitch=edge_pitch, volume=edge_volume)
 

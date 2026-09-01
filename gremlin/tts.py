@@ -130,6 +130,12 @@ class TextToSpeech:
             return self.voices
         return []
 
+    def getVoicesMap(self) -> dict[int, str]:
+        """gets a mapping of voice indices to voice names"""
+        if self.valid and self.voices:
+            return {i: voice.name for i, voice in enumerate(self.voices)}
+        return {}
+
     def set_voice(self, voice):
         pass
 
@@ -170,7 +176,7 @@ class TextToSpeech:
         gremlin.util.assert_ui_thread()
         tts_file = phrase.getSoundFile()
         rate = phrase.rate  # floating point value 1.0 is normal
-        speaker = voice if voice else phrase.speaker
+        speaker = voice if voice else phrase.voice
         if not speaker:
             if not self.default_voice:
                 syslog.error(f"Voice: [{voice}] not found and no default voice was found - unable to proceed with voice generation")

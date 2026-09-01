@@ -18,6 +18,7 @@
 
 from PySide6 import QtWidgets, QtCore
 from lxml import etree as ElementTree
+import html
 import gremlin.base_profile
 from gremlin.input_types import InputType
 import gremlin.input_item
@@ -254,27 +255,6 @@ class TextToSpeechFunctor(gremlin.base_profile.AbstractFunctor):
     def _speak(self):
         self.action_data.play()
 
-        # if self.tts is not None:
-        #     if self.action_data.abort:
-        #         self.tts.abort()
-        #     else:
-        #         voice = self.tts.getVoices()[self.action_data.voice_index]
-        #         self.tts.set_voice(voice)
-        #         self.tts.set_volume(self.action_data.volume)
-        #         self.tts.speak(
-        #             self.action_data.text,
-        #             self.action_data.rate,
-        #             self.action_data.clearQueue,
-        #             self.action_data.override_suppress,
-        #         )
-
-    # def profile_start(self):
-    #     if self.action_data.enabled:
-    #         self.tts.start()
-
-    # def profile_stop(self):
-    #     self.tts.abort()
-
     def process_event(self, event, value, extra_data=None):
         if not self.action_data.enabled:
             return True
@@ -294,6 +274,8 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
     name = "(legacy) Text to Speech"
     tag = "text-to-speech"
     hint = "Converts a text string to voice using the TTS API."
+    DEFAULT_PYTTS_SPEAKER = "Microsoft David Desktop - English (United States)"  # default PyTTS speaker
+
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
@@ -315,10 +297,18 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
         self._text = ""
         self.volume = config.initial_volume_tts  # default volume set in options
         self.rate = config.initial_load_rate_tts  # default wpm set in options
-        self.voice_index = config.TTSDefaultVoiceIndex  # default voice index
+        tts = gremlin.tts.TextToSpeech()
+        voices = tts.getVoicesMap()
+        assert voices, "No TTS voices available"
+        index = config.TTSDefaultVoiceIndex
+        if index not in voices:
+            index = 0
+
+        self._voice_index = index
+        self._voice_name = voices[index]
         self._timed_random = TimedRandomInt(0, 10, 10)
         self._last_phrase = None  # last spoken phrase
-        self._voice_name = ""
+
         self._abort = False  # true if the action aborts any current TTS
         self.clearQueue = True  # true if pending items are cleared when new voice items are queued
         self.exec_on_press = True  # true if trigger should execute on input press event
@@ -368,6 +358,20 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
             self._voice_name = value
 
     @property
+    def voice_index(self) -> int:
+        return self._voice_index
+
+    @voice_index.setter
+    def voice_index(self, value: int):
+        if value != self._voice_index:
+            tts = gremlin.tts.TextToSpeech()
+            voices = tts.getVoicesMap()
+            if value not in voices:
+                raise ValueError(f"Voice index {value} not found in available voices.")
+            self._voice_name = voices[value]
+            self._voice_index = value
+
+    @property
     def text(self):
         return self._text
 
@@ -398,9 +402,13 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
             else:
                 voice_id = 0
 
-            voices = tts.getVoices()
-            if voices and voice_id < len(voices):
-                self.voice_name = voices[voice_id].name
+            voices = tts.getVoicesMap()
+            if voices and voice_id in voices:
+                self.voice_name = voices[voice_id]
+            else:
+                voice_id = 0
+
+            self.voice_name = voices[voice_id]
             self.voice_index = voice_id
 
         if "volume" in node.attrib:
@@ -432,6 +440,8 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))
         node.set("override-suppress", safe_format(self.override_suppress, bool))
+        node.set("speaker", html.escape(self.voice_name))
+
 
         return node
 
@@ -447,6 +457,7 @@ class TextToSpeech(gremlin.input_item.AbstractAction):
         obj.volume = self.volume
         obj.rate = self.rate
         obj.voice_index = self.voice_index
+        obj.voice_name = self.voice_name
         obj.setId(gremlin.util.get_guid())
         return obj
 

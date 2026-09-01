@@ -855,15 +855,26 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self._update_ptts_speakers()
 
     def _handle_ptts_speaker_changed(self, value):
-        self.action_data.speaker = value
+
+
+        if hasattr(value, "name"):
+            value = value.name
+        elif not isinstance(value, str):
+            raise ValueError(f"Invalid value for PTTS speaker: {value}")
+
+        self.action_data.pytts_speaker = value
         gremlin.config.Configuration().ai_tts_last_speaker = value
 
+
+
     def _handle_ktts_speaker_changed(self, value):
-        self.action_data.speaker = value
+        assert isinstance(value, str), f"Invalid value for KTTS speaker: {value}"
+        self.action_data.ktts_speaker = value
         gremlin.config.Configuration().ai_ktts_last_speaker = value
 
     def _handle_etts_speaker_changed(self, value):
-        self.action_data.speaker = value
+        assert isinstance(value, str), f"Invalid value for ETTS speaker: {value}"
+        self.action_data.etts_speaker = value
         gremlin.config.Configuration().ai_etts_last_speaker = value
 
     def _handle_etts_locale_changed(self, value):
@@ -1297,6 +1308,7 @@ class PlaySoundFunctor(gremlin.base_profile.AbstractFunctor):
             # not tolerate being called in that context well).
             case PlayMode.PyTTS | PlayMode.EdgeAI:
                 try:
+                    assert self.action_data.speaker, "Speaker cannot be None"
                     self.action_data.generate(force=False)
                 except Exception as e:
                     syslog.warning(f"PLAY SOUND: pre-generation failed for [{self.action_data.text}]: {e}")
@@ -1328,7 +1340,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
     tag = "play-sound"
     hint = "Play a sound."
 
-    DEFAULT_ETTS_SPEAKER = "en-US-JennyNeural"  # default Edge TTS speaker
+
 
     # trigger condition (trigger_on_press, trigger_on_release)
     default_button_activation = (True, False)
@@ -1356,13 +1368,14 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self.mode = PlayMode.AudioFile
         self.auto_generate = True  # automatically generate AI voice when text changes (valid for some modes only)
         self.text = None  # text to speech for AI mode
-        self._pytts_speaker = None  # speaker for PyTTS
+        self._pytts_speaker = gremlin.sound.DEFAULT_PYTTS_SPEAKER  # speaker for PyTTS
+        self._etts_speaker = gremlin.sound.DEFAULT_ETTS_SPEAKER  # speaker for Edge TTS
         self._sound_file = None  # the sound file to play in audio mode
         self._sound_files = []  # list of sound files to pick from if in folder mode
         self.blocking = False  # whether playback should block until finished
         self._tts_file = None  # sound file for TTS
-        self.ptts_speed: int = 100  # words per minute, 100 is the default
-        self.ptts_volume: int = 100  # volume, 0 to 100
+        self.pytts_speed: int = 100  # words per minute, 100 is the default
+        self.pytts_volume: int = 100  # volume, 0 to 100
         self.etts_speed: int = 0  # speed factor for Edge TTS as a whole percentage, e.g., 10 means +10%
         self.ktts_speed = 1.0  # speed factor for KTTS
 
@@ -1409,20 +1422,44 @@ class PlaySound(gremlin.input_item.AbstractAction):
     def speaker(self) -> str:
         match self.mode:
             case PlayMode.EdgeAI:
-                return self._etts_speaker
+                speaker = self.etts_speaker
             case PlayMode.PyTTS:
-                return self._pytts_speaker
+                speaker = self.pytts_speaker
             case _:
-                return None
+                syslog.error(f"TTS: engine {self.mode} not supported")
+                speaker = None
+        assert speaker is not None, "Speaker cannot be None"
+        return speaker
+
 
     def setSpeaker(self, speaker: str, mode: PlayMode):
+        assert speaker is not None, "Speaker cannot be None"
+        assert mode is not None, "Mode cannot be None"
         match mode:
             case PlayMode.EdgeAI:
-                self._etts_speaker = speaker
+                self.etts_speaker = speaker
             case PlayMode.PyTTS:
-                self._pytts_speaker = speaker
+                self.pytts_speaker = speaker
             case _:
                 raise ValueError(f"Unknown play mode: [{mode}]")
+
+    @property
+    def pytts_speaker(self) -> str:
+        return self._pytts_speaker
+
+    @pytts_speaker.setter
+    def pytts_speaker(self, value: str):
+        assert isinstance(value, str), "PYTTS speaker must be a string"
+        self._pytts_speaker = value
+
+    @property
+    def etts_speaker(self) -> str:
+        return self._etts_speaker
+
+    @etts_speaker.setter
+    def etts_speaker(self, value: str):
+        assert isinstance(value, str), "ETTS speaker must be a string"
+        self._etts_speaker = value
 
     @property
     def sound_file(self) -> str:
@@ -1824,25 +1861,43 @@ class PlaySound(gremlin.input_item.AbstractAction):
         config = gremlin.config.Configuration()
         mode = safe_read(node, "mode", str, "")
         self.mode = PlayMode.from_string(mode)
+        self.blocking = safe_read(node, "blocking", bool, False)
+
+
+        self._pytts_speaker = gremlin.sound.DEFAULT_PYTTS_SPEAKER  # speaker for PyTTS
+        self._etts_speaker = gremlin.sound.DEFAULT_ETTS_SPEAKER  # speaker for Edge TTS
 
         speaker = None
         if "speaker" in node.attrib:
             speaker = node.get("speaker")
 
-        self.blocking = safe_read(node, "blocking", bool, False)
-
         # auto convert CoquiAI text to EdgeTTS as Coqui is deprecated
         if self.mode == PlayMode.CoquiAI:
             self.mode = PlayMode.EdgeAI
             # convert speaker to default
-            speaker = PlaySound.DEFAULT_ETTS_SPEAKER
+            speaker = gremlin.sound.DEFAULT_ETTS_SPEAKER
+
 
         match self.mode:
             case PlayMode.EdgeAI:
-                self._etts_speaker = speaker
+                self.etts_speaker = speaker or gremlin.sound.DEFAULT_ETTS_SPEAKER
             case PlayMode.PyTTS:
-                self._pytts_speaker = speaker
+                # match the speaker to a valid voice
+                voices = gremlin.tts.TextToSpeech().getVoicesMap()
+                for index, voice in voices.items():
+                    if voice.casefold() == speaker.casefold():
+                        speaker = voice
+                        break
 
+                self.pytts_speaker = speaker or gremlin.sound.DEFAULT_PYTTS_SPEAKER
+            case PlayMode.CoquiAI:
+                self._coqui_speaker = speaker
+            case _:
+                syslog.warning(f"Unknown play mode: {self.mode}")
+                self.mode = PlayMode.EdgeAI
+                self._etts_speaker = gremlin.sound.DEFAULT_ETTS_SPEAKER
+
+        # syslog.info(f"Speaker: {self.speaker}, ETTS Speaker: {self.etts_speaker}, PyTTS Speaker: {self.pytts_speaker}")
 
         self.text = None
         if "text" in node.attrib:
@@ -1920,8 +1975,10 @@ class PlaySound(gremlin.input_item.AbstractAction):
         if self.tts_file:
             node.set("tts_file", self.tts_file)
 
-        if self.speaker:
-            node.set("speaker", self.speaker)
+
+        assert self.speaker is not None, "Speaker cannot be None"
+
+        node.set("speaker", self.speaker)
         node.set("volume", str(self.playback_volume))
         if self.text:
             node.set("text", html.escape(self.text))
