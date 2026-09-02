@@ -48,6 +48,14 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T41)
+- Fix: UI: input name retrieval may fail for keyboard/mouse input
+- Fix: UI: input name retrieval for an axis may fail for unknown devices (will now output an error message to the log file showing which device failed retrieval) and will display (unknown device) for the impacted input.
+- Fix: UI: possible C++ exception on QT when refreshing a device view depending on UI events if QT has already discarded the items but the Python engine is not yet aware.
+- Fix: API: QT C++ serialization of a Python set causing a conversion error in the QT library.
+- Fix: API: added additional instrumentation to validate hardware tracking data structures to get to the bottom of missing devices.  Will output missing items in the log file.
+
+
 ### (m77T40)
 - Change: TTS conversion: conversion of older TTS engine to Edge AI TTS.  This will replace the old legacy TTS action, and also change any PlaySound actions that use the old engine to the new Edge AI system.  The conversion saves to a new profile.  This will automate changing to the high quality voices.  The conversion will retain male/female voicing based on the SAPI names. 
 - Change: TTS Action (legacy): add speaker name to XML

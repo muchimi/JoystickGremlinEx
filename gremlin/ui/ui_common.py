@@ -3830,7 +3830,7 @@ class QBoxFrameLayout(QBoxFrame):
 
 class InputListenerWidget(QBoxFrame):
     """Widget overlaying the main gui while waiting for the user
-    to press a key or a joystick button"""
+    to press a key or a joystick button   - input listener """
 
     item_selected = QtCore.Signal(object)  # called when the items are selected
     keyInput = QtCore.Signal(list)  # called when a keyboard input is made - the parameter will be a key if mouse/keyboard input
@@ -4076,8 +4076,9 @@ class InputListenerWidget(QBoxFrame):
                     self._multi_key_storage.add(key)
                 else:
                     self._multi_key_storage.add(event)  # mouse event
-                self.keyInput.emit(self._multi_key_storage)  # notify a key was pressed
                 selection = list(self._multi_key_storage)
+                self.keyInput.emit(selection)  # notify a key was pressed
+
                 gremlin.keyboard.sort_keys(selection)
                 self.selection = selection
                 self._update_keys_ui()  # uses the selection
@@ -4103,6 +4104,7 @@ class InputListenerWidget(QBoxFrame):
                 self._multi_key_storage.add(key)
                 self.selection = list(self._multi_key_storage)
                 self.keyInput.emit(self.selection)  # notify a key was pressed
+
                 self._update_keys_ui()
             else:
                 # not listening to multiple keys
@@ -4119,6 +4121,7 @@ class InputListenerWidget(QBoxFrame):
 
     def _update_keys_ui(self):
         self.key_widget.setKeys(self.selection)
+
 
     def _accept(self):
         # multi key accept mode

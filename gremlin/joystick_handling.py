@@ -932,6 +932,9 @@ def getDevice(device_guid: int | str | dinput.GUID, show_error=False) -> DeviceS
                 device_guid = gremlin.util.to_guid(device_guid)  # ensure a dinput.GUID
             if device_guid in _all_devices_map:
                 return _all_devices_map[device_guid]
+            verbose = gremlin.config.Configuration().verbose_mode_joystick
+            if verbose:
+                syslog.warning(f"Device not found for GUID: [{device_guid}]")
     return None
 
 
@@ -1543,6 +1546,9 @@ def joystick_devices_initialization():
                 device = _all_vjoy_devices_map[vjoy_index]
                 device.button_count = count  # update unique button count for disconnected devices
                 device.name = f"Vjoy {device.axis_count}/{device.button_count}/{device.hat_count} ({vjoy_index})"
+                if device.device_guid not in _all_devices_map:
+                    _all_devices_map[device.device_guid] = device
+
 
             for vjoy_index in range(1, 17):  # list all possible vjoy devices index 1 up to 16
                 is_connected, axis_count, button_count, hat_count = config_map[vjoy_index]
@@ -1652,8 +1658,29 @@ def joystick_devices_initialization():
             for dev in maestro_devices_list:
                 syslog.info(f"\tDevice: (maestro) {str(dev)}")
 
+
+            # validate all devices in all tracking structures are in the list
+            for dev in _joystick_devices:
+                assert dev.device_guid in _all_devices_map, f"Device {dev} is in _joystick_devices but not in _all_joystick_devices"
+                syslog.warning(f"JOYSTICK: Device [{dev}] is in _joystick_devices but not in _all_devices_map")
+            for dev in _vjoy_devices:
+                assert dev.device_guid in _all_devices_map, f"Device {dev} is in _vjoy_devices but not in _all_devices_map"
+                syslog.warning(f"JOYSTICK: Device [{dev}] is in _vjoy_devices but not in _all_devices_map")
+            for dev in _maestro_devices:
+                assert dev.device_guid in _all_devices_map  , f"Device {dev} is in _maestro_devices but not in _all_devices_map"
+                syslog.warning(f"JOYSTICK: Device [{dev}] is in _maestro_devices but not in _all_devices_map")
+            for dev in _disconnected_devices:
+                assert dev.device_guid in _all_devices_map, f"Device {dev} is in _disconnected_devices but not in _all_devices_map"
+                syslog.warning(f"JOYSTICK: Device [{dev}] is in _disconnected_devices but not in _all_devices_map")
+            for dev in _special_devices:
+                assert dev.device_guid in _all_devices_map, f"Device {dev} is in _special_devices but not in _all_devices_map"
+                syslog.warning(f"JOYSTICK: Device [{dev}] is in _special_devices but not in _all_devices_map")
+
+
             _joystick_initialized = True
             syslog.info("Joystick input initialized")
+
+
 
             # update calibration on initial joystick device load
             mgr = gremlin.ui.axis_calibration.CalibrationManager()
@@ -2272,9 +2299,20 @@ class VirtualDeviceUsageState:
     def used_button_list(self, device_guid) -> list[int]:
         """gets the list of used buttons for a given output device"""
         assert isinstance(device_guid, dinput.GUID), "invalid device GUID"
-        device = gremlin.joystick_handling.getDevice(device_guid)
+        device : DeviceSummary = getDevice(device_guid)
+
         assert device is not None, "invalid device GUID"
         assert device.is_virtual, "device is not virtual"
+
+        if device is None:
+            syslog.error(f"JOYSTICK USAGE: Device not found for GUID: [{device_guid}]")
+
+            return []
+        if not device.is_virtual:
+            syslog.error(f"JOYSTICK USAGE: Device is not virtual for GUID: [{device_guid}]")
+            return []
+
+
         device_type = device.device_type
         virtual_id = device.virtual_id
         return self._used_button_list(device_type, virtual_id)

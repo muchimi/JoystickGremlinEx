@@ -1316,17 +1316,21 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         match self._input_type:
             case InputType.JoystickAxis:
                 device = gremlin.joystick_handling.getDevice(self.device_guid)
-                stub = f"{device.get_axis_name(self._input_id)}"
+                if not device:
+                    stub = f"(Unknown device) Axis [{self._input_id}]"
+                    syslog.error(f"INTERNAL ERROR: Unable to retrieve device axis name for device: {self.device_guid}  axis [{self._input_id}] - the device is not found in the current device list")
+                else:
+                    stub = f"{device.get_axis_name(self._input_id)}"
             case InputType.JoystickButton:
                 stub = f"Button {self._input_id}"
             case InputType.JoystickHat:
                 stub = f"Hat {self._input_id}"
             case InputType.Keyboard | InputType.KeyboardLatched:
-                stub = f"Key {self._input_id.display_name}"
+                stub = f"Key {self.display_name}"
             case InputType.OpenSoundControl:
-                stub = f"OSC {self._input_id.display_name}"
+                stub = f"OSC {self.display_name}"
             case InputType.Midi:
-                stub = f"Midi {self._input_id.display_name}"
+                stub = f"Midi {self.display_name}"
             case InputType.ModeControl:
                 stub = f"{gremlin.ui.mode_device.ModeInputModeType.to_display_name(self._input_id)}"
             case InputType.State:
@@ -11476,7 +11480,7 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _ensureLoaded_ui(self):
         """ensures the data is loaded into the widget - runs on UI thread"""
-        if not Shiboken.isValid(self):
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self._input_item_list_view):
             return
         if self._input_item_list_view is None:
             self._create_ui()
