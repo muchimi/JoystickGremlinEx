@@ -163,27 +163,27 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         self.tts_file_rename_widget = gremlin.ui.ui_common.QDataPushButton("Rename", callback=self._handle_file_rename, tooltip="Rename the audio file")
 
         # speaker selection for pytts
-        self.ptts_speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip="Selected speaker for AI voice generation.")
-        self.ptts_speaker_widget.setCallback(self._handle_ptts_speaker_changed)
+        self.pytts_speaker_widget = gremlin.ui.ui_common.QDataComboBox(auto_adjust=True, tooltip="Selected speaker for AI voice generation.")
+        self.pytts_speaker_widget.setCallback(self._handle_pytts_speaker_changed)
 
         tts = gremlin.tts.TextToSpeech()
-        self.ptts_speed_widget = gremlin.ui.ui_common.QIntLineEdit(
+        self.pytts_speed_widget = gremlin.ui.ui_common.QIntLineEdit(
             min_range=tts.rate_offset_min,
             max_range=tts.rate_offset_max,
-            value=self.action_data.ptts_speed,
-            callback=self._handle_ptts_speed_changed,
+            value=self.action_data.pytts_speed,
+            callback=self._handle_pytts_speed_changed,
             tooltip="Words per minute (wpm) rate modifier for the generated audio.\n100 is the normal rate.",
         )
-        self.ptts_speed_widget.doubleClick.connect(self._handle_ptts_speed_reset)  # double click = reset
+        self.pytts_speed_widget.doubleClick.connect(self._handle_pytts_speed_reset)  # double click = reset
 
-        self.ptts_volume_widget = gremlin.ui.ui_common.QIntLineEdit(
+        self.pytts_volume_widget = gremlin.ui.ui_common.QIntLineEdit(
             min_range=0,
             max_range=100,
-            value=self.action_data.ptts_volume,
-            callback=self._handle_ptts_volume_changed,
+            value=self.action_data.pytts_volume,
+            callback=self._handle_pytts_volume_changed,
             tooltip="Playback volume for the generated audio as a percentage 0 to 100.",
         )
-        self.ptts_volume_widget.doubleClick.connect(self._handle_ptts_volume_reset)
+        self.pytts_volume_widget.doubleClick.connect(self._handle_pytts_volume_reset)
 
         # speaker selection for ktts
         if ktts_enabled:
@@ -219,8 +219,8 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             label=None, callback=self._handle_refresh_etts_speakers, tooltip="Refresh available AI speakers"
         )
 
-        ptts_refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(
-            label=None, callback=self._handle_refresh_ptts_speakers, tooltip="Refresh available AI speakers"
+        pytts_refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(
+            label=None, callback=self._handle_refresh_pytts_speakers, tooltip="Refresh available AI speakers"
         )
 
         icon = gremlin.ui.ui_common.load_icon("ri.voiceprint-fill")
@@ -282,22 +282,22 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
 
         widgets = [
-            "PTTS Generation Options:",
+            "pytts Generation Options:",
             gremlin.ui.ui_common.getHContainer(
                 [
                     "Voice:",
-                    self.ptts_speaker_widget,
-                    ptts_refresh_speaker_widget,
+                    self.pytts_speaker_widget,
+                    pytts_refresh_speaker_widget,
                     "Rate (wpm):",
-                    self.ptts_speed_widget,
+                    self.pytts_speed_widget,
                     "Volume (gen):",
-                    self.ptts_volume_widget,
+                    self.pytts_volume_widget,
                 ],
                 widget_only=True,
             ),
         ]
 
-        self.ptts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        self.pytts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
         if ktts_enabled:
             widgets = [
@@ -478,7 +478,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
         self.stack_widget.addWidget(widget)  # index 0 - blank
         self.stack_widget.addWidget(self.etts_container)  # index 1 ETTS
-        self.stack_widget.addWidget(self.ptts_container)  # index 2 PyTTS
+        self.stack_widget.addWidget(self.pytts_container)  # index 2 PyTTS
         if ktts_enabled:
             self.stack_widget.addWidget(self.ktts_container)  # index 3 KTTS
 
@@ -702,16 +702,16 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
             mode = widget.data
             self.action_data.playback_mode = mode
 
-    def _handle_ptts_volume_reset(self):
-        self.action_data.ptts_volume = 100
-        self.ptts_volume_widget.setValue(100)
+    def _handle_pytts_volume_reset(self):
+        self.action_data.pytts_volume = 100
+        self.pytts_volume_widget.setValue(100)
 
-    def _handle_ptts_speed_reset(self):
-        self.action_data.ptts_speed = 100
-        self.ptts_speed_widget.setValue(100)
+    def _handle_pytts_speed_reset(self):
+        self.action_data.pytts_speed = 100
+        self.pytts_speed_widget.setValue(100)
 
-    def _handle_ptts_volume_changed(self, value: int):
-        self.action_data.ptts_volume = value
+    def _handle_pytts_volume_changed(self, value: int):
+        self.action_data.pytts_volume = value
 
     def _update_ui(self):
 
@@ -817,8 +817,8 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.action_data.save_on_generate = checked
 
     def _handle_tts_speed_changed(self, value: float):
-        self.action_data.ptts_speed = value
-        self._update_status_ui(f"PTTS speed changed to {value}", "info")
+        self.action_data.pytts_speed = value
+        self._update_status_ui(f"pytts speed changed to {value}", "info")
 
     def _handle_etts_pitch_changed(self, value: float):
         self.action_data.etts_pitch = value
@@ -836,9 +836,9 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.action_data.etts_speed = value
         self._update_status_ui(f"ETTS speed changed to {value}", "info")
 
-    def _handle_ptts_speed_changed(self, value: float):
-        self.action_data.ptts_speed = value
-        self._update_status_ui(f"PTTS speed changed to {value}", "info")
+    def _handle_pytts_speed_changed(self, value: float):
+        self.action_data.pytts_speed = value
+        self._update_status_ui(f"pytts speed changed to {value}", "info")
 
     def _handle_refresh_ktts_speakers(self):
         """refresh the list of available KTTS speakers"""
@@ -850,17 +850,17 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         voices = self.action_data.getEttsVoices()
         self._update_status_ui(f"{len(voices)} voices found.", "info")
 
-    def _handle_refresh_ptts_speakers(self):
-        """refresh the list of available PTTS speakers"""
-        self._update_ptts_speakers()
+    def _handle_refresh_pytts_speakers(self):
+        """refresh the list of available pytts speakers"""
+        self._update_pytts_speakers()
 
-    def _handle_ptts_speaker_changed(self, value):
+    def _handle_pytts_speaker_changed(self, value):
 
 
         if hasattr(value, "name"):
             value = value.name
         elif not isinstance(value, str):
-            raise ValueError(f"Invalid value for PTTS speaker: {value}")
+            raise ValueError(f"Invalid value for pytts speaker: {value}")
 
         self.action_data.pytts_speaker = value
         gremlin.config.Configuration().ai_tts_last_speaker = value
@@ -924,7 +924,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                 self._update_etts_speakers()
 
             case PlayMode.PyTTS:
-                self._update_ptts_speakers()
+                self._update_pytts_speakers()
 
     def _update_ktts_speakers(self, initialize=False):
         ktts = gremlin.ktts.KTTS()
@@ -1076,32 +1076,32 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         finally:
             self._updating_etts_speakers = False
 
-    def _update_ptts_speakers(self, initialize=False):
-        ptts = gremlin.tts.TextToSpeech()
+    def _update_pytts_speakers(self, initialize=False):
+        pytts = gremlin.tts.TextToSpeech()
 
-        voices = ptts.voices
+        voices = pytts.voices
         config = gremlin.config.Configuration()
 
-        with QtCore.QSignalBlocker(self.ptts_speaker_widget):
-            self.ptts_speaker_widget.clear()
+        with QtCore.QSignalBlocker(self.pytts_speaker_widget):
+            self.pytts_speaker_widget.clear()
             if voices:
                 for voice in voices:
-                    self.ptts_speaker_widget.addItem(voice.name, voice)
+                    self.pytts_speaker_widget.addItem(voice.name, voice)
                 if self.action_data.speaker:
                     speaker = self.action_data.speaker
                 else:
                     speaker = config.ai_tts_last_speaker
                 if speaker:
-                    index = self.ptts_speaker_widget.findText(speaker)
+                    index = self.pytts_speaker_widget.findText(speaker)
                     if index != -1:
-                        self.ptts_speaker_widget.setCurrentIndex(index)
+                        self.pytts_speaker_widget.setCurrentIndex(index)
                 else:
-                    speaker = self.ptts_speaker_widget.currentText()
+                    speaker = self.pytts_speaker_widget.currentText()
                     config.ai_tts_last_speaker = speaker
                     self.action_data.setSpeaker(speaker, PlayMode.PyTTS)
 
-        self.ptts_speaker_widget.setEnabled(voices is not None)
-        self.ptts_speaker_widget.updateGeometry()
+        self.pytts_speaker_widget.setEnabled(voices is not None)
+        self.pytts_speaker_widget.updateGeometry()
 
     def _handle_generate(self, widget):
         if self.action_data.text:
@@ -1425,6 +1425,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 speaker = self.etts_speaker
             case PlayMode.PyTTS:
                 speaker = self.pytts_speaker
+            case PlayMode.AudioFile:
+                speaker = "Default"
             case _:
                 syslog.error(f"TTS: engine {self.mode} not supported")
                 speaker = None
@@ -1528,7 +1530,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
     @property
     def etts_speaker(self) -> str:
         if not self._etts_speaker:
-            self._etts_speaker = PlaySound.DEFAULT_ETTS_SPEAKER
+            self._etts_speaker = gremlin.sound.DEFAULT_ETTS_SPEAKER
         return self._etts_speaker
 
     @etts_speaker.setter
@@ -1620,8 +1622,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 rate = self.etts_speed
             case PlayMode.PyTTS:
                 pitch = 0
-                volume = self.ptts_volume
-                rate = self.ptts_speed
+                volume = self.pytts_volume
+                rate = self.pytts_speed
 
         phrase = self.sound.generate(
             text=self.text,
@@ -1680,8 +1682,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
 
         match self.mode:
             case PlayMode.PyTTS:
-                rate = self.ptts_speed
-                volume = self.ptts_volume
+                rate = self.pytts_speed
+                volume = self.pytts_volume
                 pitch = 0
             case PlayMode.EdgeAI:
                 rate = self.etts_speed
@@ -1932,8 +1934,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self.randomize_sound_file = safe_read(node, "randomize", bool, False)
         self._sound_files.clear()
 
-        self.ptts_speed = safe_read(node, "ptts_speed", int, 100)
-        self.ptts_volume = safe_read(node, "ptts_volume", int, 100)
+        self.pytts_speed = safe_read(node, "pytts_speed", int, 100)
+        self.pytts_volume = safe_read(node, "pytts_volume", int, 100)
         self.etts_speed = safe_read(node, "etts_speed", int, 0)
         self.etts_volume = safe_read(node, "etts_volume", float, 1.0)
 
@@ -1982,8 +1984,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
         node.set("volume", str(self.playback_volume))
         if self.text:
             node.set("text", html.escape(self.text))
-        node.set("ptts_speed", safe_format(self.ptts_speed, int))
-        node.set("ptts_volume", safe_format(self.ptts_volume, int))
+        node.set("pytts_speed", safe_format(self.pytts_speed, int))
+        node.set("pytts_volume", safe_format(self.pytts_volume, int))
         node.set("etts_speed", safe_format(self.etts_speed, int))
         node.set("etts_volume", safe_format(self.etts_volume, float))
         if self.etts_locale:
@@ -2053,8 +2055,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 text = self.text
                 text = html.escape(text) if text else ""
                 table.addField("Play (PyTTS)", text)
-                table.addField("Speed", f"{self.ptts_speed} WPM")
-                table.addField("Volume", f"{self.ptts_volume}%")
+                table.addField("Speed", f"{self.pytts_speed} WPM")
+                table.addField("Volume", f"{self.pytts_volume}%")
 
         table.addField("Volume", f"{self.playback_volume}")
 

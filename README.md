@@ -48,7 +48,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
-### (m77T41)
+### (m77T41A)
 - Fix: UI: input name retrieval may fail for keyboard/mouse input
 - Fix: UI: input name retrieval for an axis may fail for unknown devices (will now output an error message to the log file showing which device failed retrieval) and will display (unknown device) for the impacted input.
 - Fix: UI: possible C++ exception on QT when refreshing a device view depending on UI events if QT has already discarded the items but the Python engine is not yet aware.

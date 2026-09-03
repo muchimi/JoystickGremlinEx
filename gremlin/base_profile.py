@@ -5240,8 +5240,8 @@ class Profile:
             # replace with new play sound node
 
             randomize_sound_file = True
-            ptts_speed = rate
-            ptts_volume = volume
+            pytts_speed = rate
+            pytts_volume = volume
             loops = 1
             playback_ms = 0
             playback_rate = 1.0
@@ -5292,8 +5292,8 @@ class Profile:
                 node.set("etts_volume", safe_format(etts_volume, int))
 
             else:
-                node.set("ptts_speed", safe_format(ptts_speed, int))
-                node.set("ptts_volume", safe_format(ptts_volume, int))
+                node.set("ptts_speed", safe_format(pytts_speed, int))
+                node.set("ptts_volume", safe_format(pytts_volume, int))
 
 
             node.set("speaker", speaker)
