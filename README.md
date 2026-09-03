@@ -52,6 +52,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: Macro Action: generic icon used for macro steps due to re-arranging of icons.
 - Change: UI: additional diagnostics instrumentation around device selector to track down an exception on device selector drop downs.
 - Fix: Play Sound Action: incorrect mode selected on profile reload.
+- Fix: Input viewer VJoy enumeration (courtesy Lolo350)
 
 ### (m77T41A)
 - Fix: UI: input name retrieval may fail for keyboard/mouse input
