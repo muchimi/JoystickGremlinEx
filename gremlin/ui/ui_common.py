@@ -3287,7 +3287,7 @@ class AbstractInputSelector(QWidget):
                         input_id = i + 1
                         if input_type == InputType.JoystickAxis:
                             input_id = device.axismap_list[i].axis_index
-                            s_ui = f"Axis {device.axis_names[i]}"
+                            s_ui = f"Axis {device.axis_names.get(input_id, input_id)}"
                         else:
                             s_ui = gremlin.common.input_to_ui_string(input_type, input_id)
                         selection_widget.addItem(s_ui, (input_type, input_id))
@@ -7301,7 +7301,7 @@ class AxesTimeline(QtWidgets.QGroupBox):
         colors = Color.PenColors()
         for i in range(device.axis_count):
             index = device.axismap_list[i].axis_index
-            axis_name = device.axis_names[i]
+            axis_name = device.axis_names.get(index, f"Axis {index}")
             label = QtWidgets.QLabel(f"Axis {axis_name}")
             css = f"QLabel {{ color: {colors.get(index, '#000000')}; font-weight: bold }}"
             label.setStyleSheet(css)
@@ -12869,7 +12869,8 @@ class QAxisSourceSelector(QWidget):
                 count = device.axis_count
                 self._axis_selector_widget.clear()
                 for id in range(1, count + 1):
-                    axis_name = device.axis_names[id - 1]
+                    axis_index = device.linear_id_map.get(id, id)
+                    axis_name = device.axis_names.get(axis_index, f"Axis {id}")
                     self._axis_selector_widget.addItem(f"Axis {axis_name}", id)
 
             if input_id is not None:

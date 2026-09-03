@@ -237,7 +237,7 @@ class OscArg(QtCore.QObject):
             if self._source_device_id and self._source_axis_id is not None:
                 device = gremlin.joystick_handling.getDevice(self._source_device_id)
                 if device:
-                    axis_name = device.axis_names[self._source_axis_id - 1]
+                    axis_name = device.axis_names.get(self._source_axis_id, f"Axis {self._source_axis_id}")
                 else:
                     axis_name = f"unknown device [{self._source_device_id}] Source Axis: [{self._source_axis_id - 1}]"
                 comment_node = ElementTree.Comment(f" Source device: {device.name} Source axis: {axis_name} ")

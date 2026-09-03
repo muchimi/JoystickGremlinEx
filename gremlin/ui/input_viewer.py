@@ -34,7 +34,7 @@ import gremlin.util
 from gremlin.util import safe_read
 from gremlinEx import DeviceSummary
 from . import ui_common
-from gremlin.types import VisualizationType
+from gremlin.types import DeviceType, VisualizationType
 import os
 from lxml import etree
 import gremlin.singleton_decorator
@@ -1093,6 +1093,9 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         for device in devices:
             if device.disabled:
+                continue
+            # Unconfigured vJoy slots (13-16 when only 1-12 exist) are internal placeholders.
+            if device.device_type == DeviceType.VJoy and not device.connected:
                 continue
             if verbose:
                 syslog.info(

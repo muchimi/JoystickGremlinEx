@@ -1289,7 +1289,7 @@ def _create_vjoy_device(vjoy_index: int):
     device.axismap_list = []
     device.usage_page = None
     device.usage = None
-    device.axis_names = []
+    device.axis_names = {}
     return device
 
 
@@ -1488,6 +1488,7 @@ def joystick_devices_initialization():
             vjoy_proxy = VJoyProxy()
             config_map = {}
             disconnected_list = []
+            unconfigured_indices = set()
             used_counts = []
 
             for vjoy_index in range(1, 17):  # index 1 up to 16
@@ -1517,8 +1518,7 @@ def joystick_devices_initialization():
 
                     else:
                         device: DeviceSummary = dinput_vjoy_device_map[dinput_key]
-                        device.vjoy_id = vjoy_index
-                        device.virtual_id = vjoy_index
+                        device.set_vjoy_id(vjoy_index)
                         device.setConnected(True)  # connected means the VJOY device is not only shown in the API but also with DINPUT.
                         syslog.info(f"VJOY device [{vjoy_index}] matched to DINPUT device [{device.device_id}]")
                         _all_vjoy_devices_map[vjoy_index] = device
@@ -1526,12 +1526,13 @@ def joystick_devices_initialization():
                         _joystick_device_guid_map[device.device_guid] = device  # key by GUID
                         _all_devices_map[device.device_guid] = device  # key by GUID
                 else:
-                    # device reports as not available from the vjoy interface
+                    # slot exists in the vJoy range (1-16) but is not configured in vJoyConf
                     disconnected_list.append(vjoy_index)
+                    unconfigured_indices.add(vjoy_index)
                     device = _create_vjoy_device(vjoy_index)
                     _all_vjoy_devices_map[vjoy_index] = device
                     _joystick_device_guid_map[device.device_guid] = device  # key by GUID
-                    _all_devices_map[device.device_guid] = device
+                    # keep unconfigured placeholders out of the UI device list
 
                     if verbose:
                         syslog.warning(f"VJOY device [{vjoy_index}] is not detected or not enabled in the VJOY API. This VJOY will be disabled.")
@@ -1546,7 +1547,8 @@ def joystick_devices_initialization():
                 device = _all_vjoy_devices_map[vjoy_index]
                 device.button_count = count  # update unique button count for disconnected devices
                 device.name = f"Vjoy {device.axis_count}/{device.button_count}/{device.hat_count} ({vjoy_index})"
-                if device.device_guid not in _all_devices_map:
+                # unconfigured slots stay internal-only; HIDHide / missing-DINPUT devices remain listed
+                if vjoy_index not in unconfigured_indices and device.device_guid not in _all_devices_map:
                     _all_devices_map[device.device_guid] = device
 
 
@@ -1611,7 +1613,7 @@ def joystick_devices_initialization():
                         axis_name = f"({i + 1})"
                     else:
                         logical_count += 1
-                    dev.axis_names.append(axis_name)
+                    dev.axis_names[axis_map.axis_index] = axis_name
 
                 vjoy_lookup[hash_value] = dev
                 _all_joystick_devices.append(dev)
