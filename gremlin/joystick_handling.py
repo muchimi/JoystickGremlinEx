@@ -942,6 +942,9 @@ def getDeviceName(device_guid: int | str | dinput.GUID):
     """gets the device name"""
     device = getDevice(device_guid)
     if device:
+        if device.device_type == DeviceType.VJoy:
+            return f"VJoy {device.axis_count}/{device.button_count}/{device.hat_count} ({device.vjoy_id})"
+            # vjoy device name
         return device.name
     return f"unknown: {str(device_guid)}"
 

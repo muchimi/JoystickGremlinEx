@@ -659,11 +659,11 @@ class DeviceSummary:
         assert index in self.linear_id_map, "invalid index"
         return self.linear_id_map[index]  # to axis
 
-    def axis_sequence_to_input_id(self, index: int):
+    def axis_sequence_to_input_id(self, zerobased_index: int):
         """zero based index to input ID for axes
-        :param index: zero based index to convert to an input ID
+        :param zerobased_index: zero based index to convert to an input ID
         """
-        linear_id = index + 1 # linear is 1 based
+        linear_id = zerobased_index + 1 # linear is 1 based
         if self.is_virtual:
             # vjoy devices
             return linear_id

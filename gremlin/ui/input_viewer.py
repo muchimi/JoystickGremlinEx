@@ -250,7 +250,10 @@ class VisualizationSelector(QtWidgets.QWidget):
         self.unfocus_icon = unfocus_icon or gremlin.ui.ui_common.Icons.circleArrowLeft()
         self.focus_icon_size = focus_icon_size
 
-        devices = gremlin.joystick_handling.getVisibleJoystickDevices()
+        devices = gremlin.joystick_handling.all_joystick_devices()
+        # joystick visualizers
+        # filter disconnected/disabled
+        devices = [device for device in devices if device.connected and not device.disabled]
 
         self.viewer = viewer
         self._selector_widgets = {}  # created input checkbox widgets by key - if not in this list or None, not created
@@ -264,6 +267,7 @@ class VisualizationSelector(QtWidgets.QWidget):
         tab_ids = list(tab_map.keys())
         d_list = []
         max_index = len(devices)
+        dev : dinput.DeviceSummary
         for dev in devices:
             if dev.disabled:
                 continue
@@ -322,10 +326,6 @@ class VisualizationSelector(QtWidgets.QWidget):
 
         device: dinput.DeviceSummary
         for device in self._devices:
-            if device.disabled:
-                continue  # skip disabled devices
-
-
 
             device_name = gremlin.joystick_handling.getDeviceName(device.device_guid)
             box = QtWidgets.QGroupBox(device_name)
@@ -1089,11 +1089,13 @@ States can be toggled by clicking on the state button.  Expression states will u
 
         # joystic visualizers
         devices = gremlin.joystick_handling.all_joystick_devices()
+
+        # filter disconnected/disabled
+        devices = [device for device in devices if device.connected and not device.disabled]
         verbose = False
 
+        device : DeviceSummary
         for device in devices:
-            if device.disabled:
-                continue
             if verbose:
                 syslog.info(
                     f"INPUT VIEWER: load_viewer_widgets - device {device.name} ({device.device_id}) axes: {device.axis_count} buttons: {device.button_count} hats: {device.hat_count}"

@@ -3216,7 +3216,7 @@ class AbstractInputSelector(QWidget):
                 self.device_dropdown.setCurrentIndex(index)
             else:
                 syslog.error(f"INPUT SELECTOR: device not found in dropdown: {device_id}")
-                
+
 
             for entry in self.input_item_dropdowns:
                 with QtCore.QSignalBlocker(entry):
@@ -3294,11 +3294,12 @@ class AbstractInputSelector(QWidget):
                     for input_type in self.valid_types:
                         item_count = count_map[input_type](device)
                         for i in range(item_count):
-                            input_id = i + 1
                             if input_type == InputType.JoystickAxis:
-                                input_id = device.axismap_list[i].axis_index
-                                s_ui = f"Axis {device.axis_names[i]}"
+                                # translate 0 based to actual axis index
+                                input_id = device.axis_sequence_to_input_id(i)
+                                s_ui = device.get_axis_name(input_id)
                             else:
+                                input_id = i + 1
                                 s_ui = gremlin.common.input_to_ui_string(input_type, input_id)
                             selection_widget.addItem(s_ui, (input_type, input_id))
 
@@ -7323,10 +7324,12 @@ class AxesTimeline(QtWidgets.QGroupBox):
 
         colors = Color.PenColors()
         for i in range(device.axis_count):
-            index = device.axismap_list[i].axis_index
-            axis_name = device.axis_names[i]
+            # convert linear to axis input id
+            input_id = device.axis_sequence_to_input_id(i)
+            axis_name = device.get_axis_name(input_id)
             label = QtWidgets.QLabel(f"Axis {axis_name}")
-            css = f"QLabel {{ color: {colors.get(index, '#000000')}; font-weight: bold }}"
+            # color index is 1 to 8 with 0 as black/clear
+            css = f"QLabel {{ color: {colors.get(input_id, '#000000')}; font-weight: bold }}"
             label.setStyleSheet(css)
             self.legend_layout.addWidget(label)
 
@@ -12891,9 +12894,10 @@ class QAxisSourceSelector(QWidget):
                 device = self._device_selector_widget.currentData()
                 count = device.axis_count
                 self._axis_selector_widget.clear()
-                for id in range(1, count + 1):
-                    axis_name = device.axis_names[id - 1]
-                    self._axis_selector_widget.addItem(f"Axis {axis_name}", id)
+                for i in range(count):
+                    input_id = device.axis_sequence_to_input_id(i)
+                    axis_name = device.get_axis_name(input_id)
+                    self._axis_selector_widget.addItem(f"Axis {axis_name}", input_id)
 
             if input_id is not None:
                 index = self._axis_selector_widget.findData(input_id)

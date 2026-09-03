@@ -209,21 +209,21 @@ class OscArg(QtCore.QObject):
         value_release = self._value_on_release
         is_number = False
         data_type = type(value) if value is not None else self._data_type
-        if data_type == str:
+        if data_type is str:
             node.set("value-press", value)
             node.set("type", "str")
             node.set("value-release", value_release)
-        elif data_type == float:
+        elif data_type is float:
             node.set("value-press", safe_format(value, float))
             node.set("type", "float")
             node.set("value-release", safe_format(value_release, float))
             is_number = True
-        elif data_type == int:
+        elif data_type is int:
             node.set("value-press", safe_format(value, int))
             node.set("type", "int")
             node.set("value-release", safe_format(value_release, int))
             is_number = True
-        elif data_type == bool:
+        elif data_type is bool:
             node.set("value-press", safe_format(value, bool))
             node.set("type", "bool")
             node.set("value-release", safe_format(value_release, bool))
@@ -237,9 +237,9 @@ class OscArg(QtCore.QObject):
             if self._source_device_id and self._source_axis_id is not None:
                 device = gremlin.joystick_handling.getDevice(self._source_device_id)
                 if device:
-                    axis_name = device.axis_names[self._source_axis_id - 1]
+                    axis_name = device.get_axis_name(self._source_axis_id)
                 else:
-                    axis_name = f"unknown device [{self._source_device_id}] Source Axis: [{self._source_axis_id - 1}]"
+                    axis_name = f"unknown device [{self._source_device_id}] Source Axis: [{self._source_axis_id}]"
                 comment_node = ElementTree.Comment(f" Source device: {device.name} Source axis: {axis_name} ")
                 node.append(comment_node)
                 node.set("device-guid", self._source_device_id)

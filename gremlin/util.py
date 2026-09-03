@@ -1046,7 +1046,7 @@ def load_icon(*paths, use_qta=False, qta_color=None):
     import gremlin.ui.ui_common
 
     verbose = gremlin.config.Configuration().verbose_mode_details
-    verbose = True
+    # verbose = True
 
     is_dark = gremlin.shared_state.is_dark_theme
 
