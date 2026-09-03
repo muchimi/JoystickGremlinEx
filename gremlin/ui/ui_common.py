@@ -27,7 +27,7 @@ from PySide6.QtCore import QCoreApplication, Qt, QTimer, QEvent, QSize
 from PySide6.QtGui import QPixmap, QPainter, QIcon, QResizeEvent
 import collections
 from typing import Callable, Any, Iterable
-
+import traceback
 
 import gremlin.config
 import gremlin.error
@@ -3156,6 +3156,8 @@ class AbstractInputSelector(QWidget):
         self._create_device_dropdown()
         self._create_input_dropdown()
 
+
+
     def get_selection(self):
         device_id = None
         input_id = None
@@ -3209,7 +3211,12 @@ class AbstractInputSelector(QWidget):
 
         # Select and display correct combo boxes and entries within
         with QtCore.QSignalBlocker(self.device_dropdown):
-            self.device_dropdown.setCurrentIndex(dev_id)
+            index = self.device_dropdown.findData(device_id)
+            if index != -1:
+                self.device_dropdown.setCurrentIndex(index)
+            else:
+                syslog.error(f"INPUT SELECTOR: device not found in dropdown: {device_id}")
+                
 
             for entry in self.input_item_dropdowns:
                 with QtCore.QSignalBlocker(entry):
@@ -3249,7 +3256,7 @@ class AbstractInputSelector(QWidget):
     def _create_device_dropdown(self):
         self.device_dropdown = QDataComboBox(self)
         for device in self.device_list:
-            self.device_dropdown.addItem(self._format_device_name(device))
+            self.device_dropdown.addItem(self._format_device_name(device), device.device_guid) # name, data = device_guid
             self._device_id_registry.append(self._device_identifier(device))
         self.grid_layout.addWidget(QtWidgets.QLabel("Device:"), 0, 0)
         self.grid_layout.addWidget(self.device_dropdown, 0, 1)
@@ -3257,56 +3264,70 @@ class AbstractInputSelector(QWidget):
         self.device_dropdown.currentIndexChanged.connect(self._update_device)
 
     def _create_input_dropdown(self):
-        count_map = {
-            InputType.JoystickAxis: lambda x: x.axis_count,
-            InputType.JoystickButton: lambda x: x.button_count,
-            InputType.JoystickHat: lambda x: x.hat_count,
-        }
 
-        self.input_item_dropdowns = []
-        self._input_type_registry = []
 
-        # Create input item selections for the devices. Each selection
-        # will be invisible unless it is selected as the active device
-        for device in self.device_list:
-            selection_widget = QDataComboBox(self)
-            # limit drop down size
-            selection_widget.setMaxVisibleItems(20)
-            selection_widget.setStyleSheet("QComboBox { combobox-popup: 0; }")
-            self._input_type_registry.append([])
-            self.selection_widget = selection_widget
-            selection_widget.currentIndexChanged.connect(self._input_changed)
+        try:
+            count_map = {
+                InputType.JoystickAxis: lambda x: x.axis_count,
+                InputType.JoystickButton: lambda x: x.button_count,
+                InputType.JoystickHat: lambda x: x.hat_count,
+            }
 
-            # Add items based on the input type
-            _max_col = 32
+            self.input_item_dropdowns = []
+            self._input_type_registry = []
 
-            with QtCore.QSignalBlocker(selection_widget):
-                for input_type in self.valid_types:
-                    item_count = count_map[input_type](device)
-                    for i in range(item_count):
-                        input_id = i + 1
-                        if input_type == InputType.JoystickAxis:
-                            input_id = device.axismap_list[i].axis_index
-                            s_ui = f"Axis {device.axis_names[i]}"
-                        else:
-                            s_ui = gremlin.common.input_to_ui_string(input_type, input_id)
-                        selection_widget.addItem(s_ui, (input_type, input_id))
+            # Create input item selections for the devices. Each selection
+            # will be invisible unless it is selected as the active device
+            for device in self.device_list:
+                selection_widget = QDataComboBox(self)
+                # limit drop down size
+                selection_widget.setMaxVisibleItems(20)
+                selection_widget.setStyleSheet("QComboBox { combobox-popup: 0; }")
+                self._input_type_registry.append([])
+                self.selection_widget = selection_widget
+                selection_widget.currentIndexChanged.connect(self._input_changed)
 
-                        self._input_type_registry[-1].append(input_type)
+                # Add items based on the input type
+                _max_col = 32
 
-            # Add the selection and hide it
-            selection_widget.setVisible(False)
-            selection_widget.activated.connect(self._execute_callback)
-            self.grid_layout.addWidget(QtWidgets.QLabel("Input:"), 1, 0)
-            self.grid_layout.addWidget(selection_widget, 1, 1)
+                with QtCore.QSignalBlocker(selection_widget):
+                    for input_type in self.valid_types:
+                        item_count = count_map[input_type](device)
+                        for i in range(item_count):
+                            input_id = i + 1
+                            if input_type == InputType.JoystickAxis:
+                                input_id = device.axismap_list[i].axis_index
+                                s_ui = f"Axis {device.axis_names[i]}"
+                            else:
+                                s_ui = gremlin.common.input_to_ui_string(input_type, input_id)
+                            selection_widget.addItem(s_ui, (input_type, input_id))
 
-            self.input_item_dropdowns.append(selection_widget)
+                            self._input_type_registry[-1].append(input_type)
 
-            selection_widget.currentIndexChanged.connect(self._execute_callback)
+                # Add the selection and hide it
+                selection_widget.setVisible(False)
+                selection_widget.activated.connect(self._execute_callback)
+                self.grid_layout.addWidget(QtWidgets.QLabel("Input:"), 1, 0)
+                self.grid_layout.addWidget(selection_widget, 1, 1)
 
-        # Show the first entry by default
-        if len(self.input_item_dropdowns) > 0:
-            self.input_item_dropdowns[0].setVisible(True)
+                self.input_item_dropdowns.append(selection_widget)
+
+                selection_widget.currentIndexChanged.connect(self._execute_callback)
+
+            # Show the first entry by default
+            if len(self.input_item_dropdowns) > 0:
+                self.input_item_dropdowns[0].setVisible(True)
+
+
+        except Exception as e:
+            syslog.error("InputSelector: Failed to create input dropdown")
+            syslog.error(f"Device list: count: [{len(self.device_list)}]")
+            for index, device in enumerate(self.device_list):
+                syslog.error(f"Device {index}: {str(device)}")
+
+            syslog.error(f"Error: {e}")
+            syslog.error(traceback.format_exc())
+
 
     @QtCore.Slot()
     def _input_changed(self):
@@ -3357,6 +3378,8 @@ class JoystickSelector(AbstractInputSelector):
             key=lambda x: (x.name, x.device_guid),
         )
         for dev in potential_devices:
+            if dev.disabled:
+                continue
             input_counts = {
                 InputType.JoystickAxis: dev.axis_count,
                 InputType.JoystickButton: dev.button_count,

@@ -65,7 +65,7 @@ syslog = logging.getLogger("system")
 
 
 def debug_only(func):
-    """ decorator to mark a call as a no-op in production mode (when __debug__ is False)"""
+    """decorator to mark a call as a no-op in production mode (when __debug__ is False)"""
     if not __debug__:
         return lambda *args, **kwargs: None
     return func
@@ -198,10 +198,8 @@ def script_path():
     return get_root_folder()
 
 
+_user_profile_path: str = None
 
-
-
-_user_profile_path : str = None
 
 def userprofile_path():
     """Returns the path to the user's profile folder, %userprofile%."""
@@ -211,8 +209,9 @@ def userprofile_path():
         return _user_profile_path
 
     import gremlin.config
+
     config = gremlin.config.Configuration()
-    path =  config.data_path()
+    path = config.data_path()
 
     _user_profile_path = path
 
@@ -242,8 +241,7 @@ def userprofile_path():
     return os.path.normcase(path)
 
 
-
-def copy_tree_if_newer(src : str, dst: str):
+def copy_tree_if_newer(src: str, dst: str):
     """Copies a directory tree from src to dst, only if the source files
     are newer than the destination files or if the destination file does not exist.
     """
@@ -269,7 +267,6 @@ def resource_path(relative_path: str):
     """
     base_path = script_path()
     return os.path.normcase(os.path.join(base_path, relative_path))
-
 
 
 def display_error(msg):
@@ -722,7 +719,6 @@ def find_files(root_folder, source_pattern="*") -> list:
         return []
 
     try:
-
         wd = os.getcwd()
         os.chdir(root_folder)
         process = subprocess.Popen(
@@ -793,6 +789,19 @@ def find_icon(icon_file):
             new_icon_file = os.path.join(full_folder, icon_file)
             if os.path.isfile(new_icon_file):
                 return new_icon_file
+
+    # not found - look in the action or container gfx folders
+    import gremlin.plugin_manager
+
+    pm_list = [gremlin.plugin_manager.ActionPlugins(), gremlin.plugin_manager.ContainerPlugins()]
+    for pm in pm_list:
+        folder_list = pm.getPluginFolderMap().values()
+        for folder in folder_list:
+            full_folder = os.path.join(folder, "gfx")
+            if os.path.isdir(full_folder):
+                new_icon_file = os.path.join(full_folder, icon_file)
+                if os.path.isfile(new_icon_file):
+                    return new_icon_file
 
     return None
 
@@ -1037,6 +1046,7 @@ def load_icon(*paths, use_qta=False, qta_color=None):
     import gremlin.ui.ui_common
 
     verbose = gremlin.config.Configuration().verbose_mode_details
+    verbose = True
 
     is_dark = gremlin.shared_state.is_dark_theme
 
@@ -1052,6 +1062,7 @@ def load_icon(*paths, use_qta=False, qta_color=None):
         if not os.path.isfile(the_path):
             new_path = find_icon(the_path)
             if not new_path:
+                syslog.warning(f"ICON: unable to find icon: [{the_path}], using generic.")
                 return get_generic_icon()
             the_path = new_path
 
@@ -1086,7 +1097,7 @@ def load_icon(*paths, use_qta=False, qta_color=None):
         icon = QtGui.QIcon()
         icon.addPixmap(pixmap, QtGui.QIcon.Normal)
         if verbose:
-            syslog.info(f"LoadIcon() found icon: {paths}")
+            syslog.info(f"LoadIcon() found icon: {paths}  path: {toUrl(the_path)}")
     return icon
 
 
@@ -1885,7 +1896,6 @@ class InvokeUiMethod(QtCore.QObject):
         # keep an object reference to the parameters so they don't get garbage collected before the execution is scheduled
         instance = QtWidgets.QApplication.instance()
 
-
         ui_thread = QtWidgets.QApplication.instance().thread()  # QT thread
 
         if current_thread != ui_thread:
@@ -2112,11 +2122,13 @@ def to_byte_string(source) -> tuple:
 
 class CallbackEvent(QtCore.QEvent):
     """Custom event designed to pass a Python function across threads."""
+
     EVENT_TYPE = QtCore.QEvent.Type(QtCore.QEvent.registerEventType())
 
     def __init__(self, callback: Callable[[], None]):
         super().__init__(self.EVENT_TYPE)
         self.callback = callback
+
 
 class SingleShotInvoker(QtCore.QObject):
     def event(self, event: QtCore.QEvent) -> bool:
@@ -2125,8 +2137,10 @@ class SingleShotInvoker(QtCore.QObject):
             return True
         return super().event(event)
 
+
 # Global invoker lazily initialized to ensure QApplication exists
 _single_shot_invoker = None
+
 
 def singleShot(callback: Callable[[], None]):
     # syslog.info("single shot util")
@@ -2434,9 +2448,10 @@ def compare_guid(id1, id2) -> bool:
 
 
 def getTemporaryFile(ext=None):
-    """gets a temporary file - the temporary file location is in the user folder """
+    """gets a temporary file - the temporary file location is in the user folder"""
     config = gremlin.config.Configuration()
     return config.getTemporaryFile(ext)
+
 
 def compare_float_lists(l1: list, l2: list):
     """compares two lists of floats - returns True if the lists are different"""
@@ -2724,6 +2739,7 @@ class TriggerDict(collections.UserDict):
     @staticmethod
     def copyFrom(source: dict, deep=False):
         import copy
+
         assert isinstance(source, (dict, TriggerDict)), "Source must be a dictionary"
         if isinstance(source, dict):
             new_dict = TriggerDict()
@@ -2768,7 +2784,6 @@ class TriggerDict(collections.UserDict):
     def clearCallbacks(self):
         """clears any change callbacks"""
         self._on_change_callbacks.clear()
-
 
     def __setitem__(self, key, value):
         old_value = self.data.get(key)
@@ -2819,6 +2834,7 @@ def hashDict(d: dict):
 def toUrl(fname: str):
     """converts a file name to a URL link format"""
     import pathlib
+
     url = pathlib.Path(fname)
     try:
         url = url.resolve()
@@ -2826,7 +2842,6 @@ def toUrl(fname: str):
     except Exception as ex:
         syslog.error(f"URL: Failed to resolve path [{fname}]: {ex}")
         return fname
-
 
 
 def getWidgetPositionInHierarchy(widget: QtWidgets.QWidget, relative_to: QtWidgets.QWidget = None):
@@ -2864,12 +2879,12 @@ def isHashable(obj):
     except TypeError:
         return False
 
-def hashString(text : str):
-    """ generate a unique key from a string """
-    hash_object = hashlib.sha256(text.encode('utf-8'))
+
+def hashString(text: str):
+    """generate a unique key from a string"""
+    hash_object = hashlib.sha256(text.encode("utf-8"))
     # Return the hexadecimal representation of the hash
     return hash_object.hexdigest()
-
 
 
 class TimedRandomInt:
@@ -2887,11 +2902,11 @@ class TimedRandomInt:
 
     def setMin(self, value: int):
         self.min_val = value
-        self.used_numbers.clear() # reset
+        self.used_numbers.clear()  # reset
 
     def setMax(self, value: int):
         self.max_val = value
-        self.used_numbers.clear() # reset
+        self.used_numbers.clear()  # reset
 
     def _cleanup_used_numbers(self):
         """Removes numbers from the used list if their cooldown period has passed."""
@@ -2930,20 +2945,18 @@ class TimedRandomInt:
 def getSafeFilename(s):
     """Generates a safe filename by removing unsafe characters and truncating to 255 characters."""
     s = s.strip()
-    s = s.replace(' ', '_')
-    s = re.sub(r'(?u)[^-\w.]', '', s)
+    s = s.replace(" ", "_")
+    s = re.sub(r"(?u)[^-\w.]", "", s)
     return s[:255]
 
 
 def clearFolder(folder_path: str):
     """Clears all files in the specified folder."""
     if os.path.exists(folder_path):
-         try:
+        try:
             shutil.rmtree(folder_path)
             os.makedirs(folder_path, exist_ok=True)
             return True
-         except Exception as ex:
+        except Exception as ex:
             syslog.error(f"Unable to clear folder: {folder_path} - {str(ex)}")
     return False
-
-

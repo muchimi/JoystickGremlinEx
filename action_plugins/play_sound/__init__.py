@@ -211,9 +211,9 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         self.tts_save_widget = gremlin.ui.ui_common.Buttons.getSaveWidget(callback=self._handle_file_save, tooltip="Save the audio file(s)")
 
-        ktts_refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(
-            label=None, callback=self._handle_refresh_ktts_speakers, tooltip="Refresh available AI speakers"
-        )
+        # ktts_refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(
+        #     label=None, callback=self._handle_refresh_ktts_speakers, tooltip="Refresh available AI speakers"
+        # )
 
         etts_refresh_speaker_widget = gremlin.ui.ui_common.Buttons.getRefreshWidget(
             label=None, callback=self._handle_refresh_etts_speakers, tooltip="Refresh available AI speakers"
@@ -299,14 +299,14 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
 
         self.pytts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
-        if ktts_enabled:
-            widgets = [
-                "KTTS Generation Options:",
-                gremlin.ui.ui_common.getHContainer(["Voice:", self.ktts_speaker_widget, ktts_refresh_speaker_widget], widget_only=True),
-                gremlin.ui.ui_common.getHContainer(["KTTS speed:", self.ktts_speed_widget], widget_only=True),
-            ]
+        # if ktts_enabled:
+        #     widgets = [
+        #         "KTTS Generation Options:",
+        #         gremlin.ui.ui_common.getHContainer(["Voice:", self.ktts_speaker_widget, ktts_refresh_speaker_widget], widget_only=True),
+        #         gremlin.ui.ui_common.getHContainer(["KTTS speed:", self.ktts_speed_widget], widget_only=True),
+        #     ]
 
-            self.ktts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
+        #     self.ktts_container = gremlin.ui.ui_common.getVContainer(widgets, widget_only=True)
 
         widgets = [
             "ETTS Generation Options:",
@@ -840,9 +840,9 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.action_data.pytts_speed = value
         self._update_status_ui(f"pytts speed changed to {value}", "info")
 
-    def _handle_refresh_ktts_speakers(self):
-        """refresh the list of available KTTS speakers"""
-        self._update_ktts_speakers()
+    # def _handle_refresh_ktts_speakers(self):
+    #     """refresh the list of available KTTS speakers"""
+    #     self._update_ktts_speakers()
 
     def _handle_refresh_etts_speakers(self):
         """refresh the list of available ETTS speakers"""
@@ -926,35 +926,35 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
             case PlayMode.PyTTS:
                 self._update_pytts_speakers()
 
-    def _update_ktts_speakers(self, initialize=False):
-        ktts = gremlin.ktts.KTTS()
-        config = gremlin.config.Configuration()
-        speakers = ktts.getSpeakers(initialize=initialize)
-        with QtCore.QSignalBlocker(self.ktts_speaker_widget):
-            self.ktts_speaker_widget.clear()
-        if speakers:
-            # we have a list of speakers
-            for speaker in speakers:
-                self.ktts_speaker_widget.addItem(speaker, speaker)
-            if self.action_data.speaker:
-                speaker = self.action_data.speaker
-            else:
-                speaker = config.ai_ktts_last_speaker
-            if speaker:
-                index = self.ktts_speaker_widget.findText(speaker)
-                if index != -1:
-                    self.ktts_speaker_widget.setCurrentIndex(index)
-            else:
-                speaker = self.ktts_speaker_widget.currentText()
-                config.ai_ktts_last_speaker = speaker
-                self.action_data.speaker = speaker
-        else:
-            if self.action_data.speaker:
-                speaker = self.action_data.speaker
-                self.ktts_speaker_widget.addItem(speaker, speaker)
+    # def _update_ktts_speakers(self, initialize=False):
+    #     ktts = gremlin.ktts.KTTS()
+    #     config = gremlin.config.Configuration()
+    #     speakers = ktts.getSpeakers(initialize=initialize)
+    #     with QtCore.QSignalBlocker(self.ktts_speaker_widget):
+    #         self.ktts_speaker_widget.clear()
+    #     if speakers:
+    #         # we have a list of speakers
+    #         for speaker in speakers:
+    #             self.ktts_speaker_widget.addItem(speaker, speaker)
+    #         if self.action_data.speaker:
+    #             speaker = self.action_data.speaker
+    #         else:
+    #             speaker = config.ai_ktts_last_speaker
+    #         if speaker:
+    #             index = self.ktts_speaker_widget.findText(speaker)
+    #             if index != -1:
+    #                 self.ktts_speaker_widget.setCurrentIndex(index)
+    #         else:
+    #             speaker = self.ktts_speaker_widget.currentText()
+    #             config.ai_ktts_last_speaker = speaker
+    #             self.action_data. = speaker
+    #     else:
+    #         if self.action_data.speaker:
+    #             speaker = self.action_data.speaker
+    #             self.ktts_speaker_widget.addItem(speaker, speaker)
 
-        self.ktts_speaker_widget.setEnabled(speakers is not None)
-        self.ktts_speaker_widget.updateGeometry()
+    #     self.ktts_speaker_widget.setEnabled(speakers is not None)
+    #     self.ktts_speaker_widget.updateGeometry()
 
     def _update_etts_ui(self):
         """called when the ETTS data change"""
@@ -1068,7 +1068,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
                         self.etts_speaker_widget.setCurrentIndex(index)
                     else:
                         config.ai_etts_last_speaker = speaker
-                        self.action_data.speaker = self.etts_speaker_widget.currentText()
+                        self.action_data.etts_speaker = self.etts_speaker_widget.currentText()
 
                 self.etts_speaker_widget.setEnabled(bool(voices))
             self.etts_speaker_widget.updateGeometry()
@@ -1894,6 +1894,9 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 self.pytts_speaker = speaker or gremlin.sound.DEFAULT_PYTTS_SPEAKER
             case PlayMode.CoquiAI:
                 self._coqui_speaker = speaker
+            case PlayMode.AudioFile:
+                # no speaker in audio mode
+                pass
             case _:
                 syslog.warning(f"Unknown play mode: {self.mode}")
                 self.mode = PlayMode.EdgeAI

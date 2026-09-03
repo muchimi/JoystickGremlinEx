@@ -37,7 +37,9 @@ class ContainerPlugins:
     def reset(self):
         """resets the plugins"""
         self._plugins = {}
+        self._plugins_folder_map = {} # map of plugin names to the folder
         self._discover_plugins()
+
 
         self._tag_to_type_map = {}
         self._name_to_type_map = {}
@@ -144,6 +146,7 @@ class ContainerPlugins:
                     plugin = importlib.import_module(f"container_plugins.{module}")
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
+                        self._plugins_folder_map[plugin.name] = root
                         syslog.info(f"\tFound: {plugin.name}")
                         loaded_count += 1
                     else:
@@ -154,6 +157,10 @@ class ContainerPlugins:
                     syslog.warning(f"\tLoading container_plugins '{fname}' failed due to: {e}")
 
         syslog.info(f"\tLoaded {loaded_count} container plugins")
+
+    def getPluginFolderMap(self):
+        """Returns a mapping from plugin names to their folder paths."""
+        return self._plugins_folder_map
 
     def _create_maps(self):
         """Creates a lookup table from container tag to container object."""
@@ -200,6 +207,7 @@ class ActionPlugins:
     def reset(self):
         """resets the plugins"""
         self._plugins = {}
+        self._plugins_folder_map = {} # map of plugin names to the folder
         self._type_to_action_map = {}
         self._type_to_name_map = {}
         self._name_to_type_map = {}
@@ -274,6 +282,11 @@ class ActionPlugins:
             self._name_to_type_map[entry.name] = entry
             self._tag_to_type_map[entry.tag] = entry
 
+    def getPluginFolderMap(self):
+        """Returns a mapping from plugin names to their folder paths."""
+        return self._plugins_folder_map
+
+
     def _discover_plugins(self):
         """Processes known plugin folders for action plugins."""
         import gremlin.shared_state
@@ -299,6 +312,7 @@ class ActionPlugins:
                     plugin = importlib.import_module(f"action_plugins.{module}")
                     if "version" in plugin.__dict__:
                         self._plugins[plugin.name] = plugin.create
+                        self._plugins_folder_map[plugin.name] = root
                         syslog.info(f"\tFound: {plugin.name}")
                         plugin_count += 1
 
