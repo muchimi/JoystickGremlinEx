@@ -19,6 +19,7 @@ from __future__ import annotations  # deprecated with python 3.14+
 
 from PySide6 import QtWidgets
 
+
 import gremlin.config
 import gremlin.event_handler
 from typing import Callable
@@ -213,10 +214,6 @@ class ModeInputItem(gremlin.input_item.InputItem):
         assert self.input_id is not None, "ModeInputItem: input id load failed"
         assert self.input_id != ModeInputModeType.DelayLoad, "invalid input read from XML data"
 
-        # syslog.info(
-        #     f"loaded xml for ModeInput id {Ansi.YELLOW}[{self.id}]{Ansi.RESET}  input id: {Ansi.GREEN}[{self.input_id.name}]{Ansi.RESET} container count: [{self.containers.count()}]"
-        # )
-
         self.setInputIdReadOnly(True)  # ensure it cannot be changed
 
     def parse_xml(self, node: ElementTree.Element, data=None, extra_data: dict = None):
@@ -226,7 +223,16 @@ class ModeInputItem(gremlin.input_item.InputItem):
                 # version 0
                 if "id" in node.attrib:
                     # old style
-                    self.input_id = ModeInputModeType(safe_read(node, "id", int, 0))
+                    mode_id = safe_read(node, "id", int, 0)
+                    match mode_id:
+                        case 0:
+                            mode_type = ModeInputModeType.ModeEnter
+                        case 1:
+                            mode_type = ModeInputModeType.ModeExit
+                        case _:
+                            # assume enter
+                            mode_type = ModeInputModeType.ModeEnter
+                    self.input_id = mode_type
                 else:
                     raise ValueError(f"ModeControl: invalid XML, expected 'id' attribute - offending line: {node.sourceline}")
             case "mode-control":
@@ -235,7 +241,12 @@ class ModeInputItem(gremlin.input_item.InputItem):
                     self.setId(read_guid(node, "guid"))
 
                 if "type" in node.attrib:
-                    self.input_id = ModeInputModeType.from_name(node.get("type"))
+                    mode_type = ModeInputModeType.from_name(node.get("type"))
+                    if mode_type == ModeInputModeType.NotSet:
+                        # m76 "not-set" = "enter" in m77
+                        mode_type = ModeInputModeType.ModeEnter
+                    self.input_id = mode_type
+
                 if "description" in node.attrib:
                     self.description = html.unescape(node.get("description"))
 

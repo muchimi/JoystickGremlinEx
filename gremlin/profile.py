@@ -167,7 +167,9 @@ class ProfileConverter:
     """Handle converting and checking profiles."""
 
     # Current profile version number
-    current_version = 16
+    # 16 = m76
+    # 17 = m77
+    current_version = 17
 
     def __init__(self):
         pass
@@ -237,7 +239,8 @@ class ProfileConverter:
             13: self._convert_from_v13,
             14: self._convert_from_v14,
             15: self._convert_from_v15,
-            16: None,
+            16: self._convert_from_v16,
+            17: None,
         }
 
         # Create a backup of the outdated profile
@@ -1105,6 +1108,32 @@ class ProfileConverter:
                     new_value = "release"
             if new_value:
                 node.set("value", new_value)
+
+        return root
+
+    def _convert_from_v16(self, root, fname=None):
+        """convert from V16 to V17 - placeholder for any necessary changes"""
+        root.attrib["version"] = "17"  # change version
+        from gremlin.ui.mode_device import ModeInputModeType
+        import gremlin.util
+
+        syslog.info("PROFILE CONVERT: V17")
+
+        # convert mode device entries to new format
+        nodes = root.xpath("//devices/device/mode/modecontrol")
+        for node in nodes:
+            node.tag = "mode-control"
+            mode_id = safe_read(node, "id", int, 0)
+            match mode_id:
+                case 0:
+                    mode_type = ModeInputModeType.ModeEnter
+                case 1:
+                    mode_type = ModeInputModeType.ModeExit
+            del node.attrib["id"]
+            # replace with the new type
+            node.set("guid", str(gremlin.util.get_guid()))
+            node.set("type", ModeInputModeType.to_name(mode_type))
+
 
         return root
 
