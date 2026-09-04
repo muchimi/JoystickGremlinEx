@@ -51,7 +51,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 ### (m77T43)
 - Change: new profile version 17 to support mode device profile changes.
 - Fix: Mode Device: m76 profiles may not load mode device mappings in m77 due to profile data changes.
-
+- Fix: Vjoy as input device tab names (courtesy Lolo)
 
 ### (m77T42)
 - Fix: Macro Action: generic icon used for macro steps due to re-arranging of icons.
