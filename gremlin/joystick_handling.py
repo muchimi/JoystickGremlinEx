@@ -1520,8 +1520,7 @@ def joystick_devices_initialization():
 
                     else:
                         device: DeviceSummary = dinput_vjoy_device_map[dinput_key]
-                        device.vjoy_id = vjoy_index
-                        device.virtual_id = vjoy_index
+                        device.set_vjoy_id(vjoy_index)
                         device.setConnected(True)  # connected means the VJOY device is not only shown in the API but also with DINPUT.
                         syslog.info(f"VJOY device [{vjoy_index}] matched to DINPUT device [{device.device_id}]")
                         _all_vjoy_devices_map[vjoy_index] = device

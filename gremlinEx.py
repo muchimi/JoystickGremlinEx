@@ -541,10 +541,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
     def _get_device_name(self, device_guid):
         """gets the name of a device"""
-        device = self._get_device(device_guid)
-        if device:
-            return device.name
-        return None
+        return gremlin.joystick_handling.getDeviceName(device_guid)
 
     def _add_tab(self, device_guid, tab_type, index=None, override_name=None) -> int:
         """adds a tab to the tab header
@@ -558,7 +555,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if not device:
             syslog.error(f"Unknown device GUID found in tabs: {device_guid}")
             return
-        device_name = device.name
+        device_name = gremlin.joystick_handling.getDeviceName(device_guid)
 
         # ensure the device tab does not already exist
         if device_guid in self._tab_device_map:
@@ -3053,7 +3050,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     # Create vJoy as input device tabs
 
                     device_guid = gremlin.util.normalize_guid(device.device_guid)
-                    device_name = device.name
+                    device_name = gremlin.joystick_handling.getDeviceName(device.device_guid)
                     input_enabled = self.profile.settings._vjoy_as_input.get(device.vjoy_id, False)
 
                     if not input_enabled:
