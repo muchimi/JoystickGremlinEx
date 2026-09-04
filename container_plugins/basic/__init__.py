@@ -116,7 +116,7 @@ class BasicContainer(AbstractContainer):
 
         :return True if the container is configured properly, False otherwise
         """
-        return len(self.action_sets) == 1
+        return self.action_sets is not None
 
 
 # Plugin definitions

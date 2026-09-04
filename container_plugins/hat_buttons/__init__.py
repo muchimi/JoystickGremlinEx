@@ -319,7 +319,7 @@ class HatButtonsContainer(AbstractContainer):
 
         :param parent the InputItem this container is linked to
         """
-        super().__init__(container, node, extra_data=extra_data, custom_action_sets=True, custom_generate_callback = self._generate_action_set_xml)
+        super().__init__(container, node, extra_data=extra_data, custom_action_sets=True,  custom_generate_callback = self._generate_action_set_xml)
         self.button_count = 8
         self.sticky = True  # true if hat only releases in the center position
 
@@ -336,7 +336,6 @@ class HatButtonsContainer(AbstractContainer):
             self.action_sets.add(action_set)
             action_set.extraData = position # index in the data field
             self.action_set_position_map[position] = action_set
-
 
     def getActionSet(self, position):
         """gets an action set for a specific position

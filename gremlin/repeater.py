@@ -390,7 +390,7 @@ class AcceleratedEncoder:
         if not 0.0 <= direction_change_speed_retention <= 1.0:
             raise ValueError("direction_change_speed_retention must be in range 0..1")
 
-        if frequency_timeout <= 0:
+        if frequency_timeout < 0:
             raise ValueError("frequency_timeout must be greater than zero")
 
         self.min_value = min_value

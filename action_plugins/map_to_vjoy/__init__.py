@@ -6567,9 +6567,10 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
 
                         case StepMode.Encoder:
                             # encoder mode - use a timer to determine the rate of change
-                            # verbose = True
+                            verbose = self.verbose
+                            verbose = True
 
-                            if fire_event or latched:
+                            if event.is_pressed and (fire_event or latched):
                                 identifier = self.action_data.input_item.identifier
                                 primary = event.device_guid == self.hardware_device_guid and event.identifier == identifier
 
@@ -6585,9 +6586,9 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                                 value = self.encoder.pulse(direction, now)
 
                                 # new position
-                                if self.verbose:
+                                if verbose:
                                     syslog.info(
-                                        f"PULSE ENCODER: latched: [{latched}] direction [{direction}]  new value: {value:0.4f}  delay: {now - self._last_time:0.4f}  vjoy_id: {self.vjoy_id} axis_id: {self.vjoy_input_id}"
+                                        f"PULSE ENCODER: pressed: [{event.is_pressed}] latched: [{latched}] direction [{direction}]  new value: {value:0.4f}  delay: {now - self._last_time:0.4f}  vjoy_id: {self.vjoy_id} axis_id: {self.vjoy_input_id}"
                                     )
                                 self._set_axis(self.vjoy_id, self.vjoy_input_id, value)
                                 self._last_time = now
@@ -7024,7 +7025,7 @@ Supports axis merging, curved output, command, hat and button mappings.
         self.encoder_accel_full_hz = 30.0  # default encoder acceleration full frequency (pulses per second)
         self.encoder_frequency_filter = 0.0  # default encoder frequency filter
         self.encoder_direction_change_speed_retention = 0.0  # default encoder direction change speed retention
-        self.encoder_frequency_timeout = 0.0  # default encoder frequency timeout
+        self.encoder_frequency_timeout = 250  # default encoder frequency timeout (ms)
         self.encoder_spring_timeout = 1000.0  # default delay (ms) after last pulse to spring back to zero if the encoder is in spring mode
         self.encoder_min_step = 0.005  # minimum step for the encoder at min speed
         self.encoder_max_step = 0.1  # maximum step for the encoder at full speed

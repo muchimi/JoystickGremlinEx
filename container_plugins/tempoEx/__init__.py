@@ -1150,6 +1150,12 @@ More than one action per short press or long press can be added."""
         if verbose:
             syslog.info(f"TempoEx: action set count: {len(self.action_sets)}")
 
+    def resetActionSets(self):
+        """Resets all action sets in the container."""
+        self.short_action_set.clear()
+        self.long_action_set.clear()
+        self.double_action_set.clear()
+
     def _ensure_action_sets(self):
         """Ensures that the container has exactly 3 action sets: short, long, and double."""
         self.action_sets.clear()
@@ -1188,6 +1194,9 @@ More than one action per short press or long press can be added."""
         self.chain_double = safe_read(node, "chain_double", bool, False)
         self.timeout = float(node.get("timeout", 0.0))
 
+        self._ensure_action_sets()
+        self.resetActionSets()
+
         for as_node in node:
             match as_node.tag:
                 case "short-action-set":
@@ -1198,7 +1207,7 @@ More than one action per short press or long press can be added."""
                     self._parse_action_xml(as_node, self.double_action_set, input_item, extra_data, "double")
 
 
-        self._ensure_action_sets()
+
 
 
 
