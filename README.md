@@ -53,7 +53,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: Input Viewer: guard against QT C++ when updating viewer after a visualizer was removed while UI events are still updating.
 - Fix: TempoEx Container: resolved an issue where the first defined action would map to the first blank entry, so a long actions would move to short if no short actions defined, and double would move to long, or short if no long actions defined.  This is due to the new action model tracking in m77.
 - Fix: Play sound action: playback button is disabled in audio file mode even if a file has been selected.
-
+- Fix: API: exception in profile execute due to unknown package import.
 
 ### (m77T43/A)
 - Change: new profile version 17 to support mode device profile changes.
