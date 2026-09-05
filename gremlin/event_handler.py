@@ -2440,11 +2440,13 @@ class EventHandler(QtCore.QObject):
     def add_latched_functor(self, device_guid, mode, event, functor):
         """registers an extra latched functor on inputs if a functor uses multiple inputs"""
         # regular event
+        import gremlin.util
+        import gremlin.input_item
         if isinstance(device_guid, str):
             # convert to GUID
             device_guid = gremlin.util.parse_guid(device_guid)
 
-        import gremlin.input_item
+
 
         input_type = event.event_type
 

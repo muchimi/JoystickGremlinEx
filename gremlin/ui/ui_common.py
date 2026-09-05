@@ -3182,10 +3182,15 @@ class AbstractInputSelector(QWidget):
         return {"device_id": device_id, "input_id": input_id, "input_type": input_type}
 
     def set_selection(self, input_type, device_id, input_id, emit=False):
-        if isinstance(device_id, str):
-            device_id = gremlin.util.parse_guid(device_id)  # ensure a GUID
-        if device_id not in self._device_id_registry:
-            syslog.error(f"INPUT SELECTOR: device not found: {device_id}")
+        if isinstance(device_id, int):
+            # vjoy device provided as the device number
+            device_guid = gremlin.joystick_handling.getVjoyDeviceGuid(device_id)
+        elif isinstance(device_id, str):
+            device_guid = gremlin.util.parse_guid(device_id)  # ensure a GUID
+        else:
+            device_guid = device_id
+        if device_guid is None or device_guid not in self._device_id_registry:
+            syslog.error(f"INPUT SELECTOR: device not found: {device_guid}")
             syslog.info("Valid values are:")
             for value in self._device_id_registry:
                 syslog.info(f"\t{value}")
@@ -3193,7 +3198,7 @@ class AbstractInputSelector(QWidget):
             return
 
         # Get the index of the combo box associated with this device
-        dev_id = self._device_id_registry.index(device_id)
+        dev_id = self._device_id_registry.index(device_guid)
 
         # input_name = gremlin.common.input_to_ui_string(input_type, input_id)
         # entry_id = self.input_item_dropdowns[dev_id].findText(input_name)
@@ -3211,11 +3216,11 @@ class AbstractInputSelector(QWidget):
 
         # Select and display correct combo boxes and entries within
         with QtCore.QSignalBlocker(self.device_dropdown):
-            index = self.device_dropdown.findData(device_id)
+            index = self.device_dropdown.findData(device_guid)
             if index != -1:
                 self.device_dropdown.setCurrentIndex(index)
             else:
-                syslog.error(f"INPUT SELECTOR: device not found in dropdown: {device_id}")
+                syslog.error(f"INPUT SELECTOR: device not found in dropdown: derived id: [{device_guid}] input id: [{device_id}]")
 
 
             for entry in self.input_item_dropdowns:

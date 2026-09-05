@@ -427,9 +427,19 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
         info_widget = gremlin.ui.ui_common.QInfoBox(msg, hide_key="play-sound")
 
-        widgets = ["Playback device:", self.audio_device_selector, self.default_widget, self.sync_widget]
+        self.playback_default_widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Use system default playback device",
+            value=self.action_data.playback_default,
+            callback=self._handle_playback_default_changed,
+            tooltip="If enabled, the playback device will always be the current system default.",
+        )
 
-        audio_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+        widget = [self.playback_default_widget, self.sync_widget]
+        self.playback_sync_container = gremlin.ui.ui_common.getHContainer(widget, widget_only=True)
+
+        widgets = ["Playback device:", self.audio_device_selector, self.default_widget]
+
+        self.audio_container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
 
         widget = gremlin.ui.ui_common.QDataCheckbox(
             "Randomize from folder",
@@ -482,7 +492,8 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         if ktts_enabled:
             self.stack_widget.addWidget(self.ktts_container)  # index 3 KTTS
 
-        container_widgets.append(audio_container)
+        container_widgets.append(self.playback_sync_container)
+        container_widgets.append(self.audio_container)
         container_widgets.append(self.playback_file_container)
 
         # holds the combined tts options - text, mode options, file options
@@ -507,6 +518,14 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
         self._update_ui()
 
+    def _handle_playback_default_changed(self, value: bool):
+        self.action_data.playback_default = value
+        if value:
+            el = gremlin.event_handler.EventListener()
+            is_control = el.get_control_shift_state()
+            self._select_default_device(is_control)
+
+        self._update_ui()
 
     def _handle_tag_callback(self, action: PlaySound, extra_data: dict):  # noqa: F821
         # Implement the logic to handle tag callback
@@ -714,6 +733,10 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.action_data.pytts_volume = value
 
     def _update_ui(self):
+
+
+        device_enabled = not self.action_data.playback_default
+        self.audio_container.setVisible(device_enabled)
 
         options_visible = self.action_data.mode != PlayMode.Stop
         self.body_container.setVisible(options_visible)
@@ -1169,13 +1192,16 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
     @QtCore.Slot()
     def _handle_select_default(self, widget, is_control: bool, is_shift: bool, is_alt: bool, is_right: bool):
         """selects the default playback device"""
+        self._select_default_device(is_control)
 
+
+    def _select_default_device(self, all: bool = False):
         default_index = self.action_data.getDefaultAudioDeviceIndex()
         index = self.audio_device_selector.findData(default_index)
         if index != -1:
             self.audio_device_selector.setCurrentIndex(index)
 
-        if is_control:
+        if all:
             default_device = self.action_data.getDefaultAudioDevice()
             name = default_device.description()
             profile = gremlin.shared_state.current_profile
@@ -1408,6 +1434,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
 
         default_audio_device = QtMultimedia.QAudioDevice()
         self._audio_device = default_audio_device.description()
+        self._playback_default = True # true if the playback device should be the current system default
         self._last_phrase = None  # last played phrase for multiple choice phrases
         self._last_tts_key = None  # (text, voice, rate) of the last spoken phrase, for duplicate suppression
 
@@ -1498,6 +1525,14 @@ class PlaySound(gremlin.input_item.AbstractAction):
     @property
     def save_on_generate(self) -> bool:
         return gremlin.config.Configuration().ai_tts_save_on_generate
+
+    @property
+    def playback_default(self) -> bool:
+        return self._playback_default
+
+    @playback_default.setter
+    def playback_default(self, value: bool):
+        self._playback_default = value
 
     @property
     def audio_device(self) -> str:
@@ -1755,6 +1790,11 @@ class PlaySound(gremlin.input_item.AbstractAction):
             )
 
         # playback
+        if self.playback_default:
+            playback_device = self.getDefaultAudioDevice()
+        else:
+            playback_device = self.audio_device
+
         if sound_file and os.path.isfile(sound_file):
             # verbose = gremlin.config.Configuration().verbose_mode_sound
             actions = []
@@ -1763,13 +1803,13 @@ class PlaySound(gremlin.input_item.AbstractAction):
                 # pg needs volume to be set
                 action = SoundEvent.SetVolumeAction(key, self.playback_volume)
                 actions.append(action)
-                action = SoundEvent.ChangeDeviceAction(self.audio_device)
+                action = SoundEvent.ChangeDeviceAction(playback_device)
                 actions.append(action)
 
             action = SoundEvent.PlayAction(
                 key=key,
                 sound_file=sound_file,
-                device=self.audio_device,
+                device=playback_device,
                 loops=self.loops,
                 volume=self.playback_volume,
                 playback_ms=self.playback_ms,
@@ -1832,7 +1872,10 @@ class PlaySound(gremlin.input_item.AbstractAction):
         return device
 
     def getDefaultAudioDevice(self):
-        return QtMultimedia.QMediaDevices.defaultAudioOutput()
+        """ gets the current operating system default device name """
+        device_name = self.sound.getDefaultAudioDeviceName()
+        syslog.info(f"Default audio device is: {device_name}")
+        return device_name
 
     def getDefaultAudioDeviceIndex(self):
         index = next((i for i, d in self.device_map.items() if d.isDefault()), None)
@@ -1958,6 +2001,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
         pbm = safe_read(node, "playback-mode", str, PlaybackMode.RoundRobin.name)
         self.playback_mode = PlaybackMode[pbm]
 
+        self._playback_default = safe_read(node, "playback-default", bool, True)
+
         if self.mode in (PlayMode.CoquiAI, PlayMode.EdgeAI, PlayMode.EdgeAI):
             generate_on_load = gremlin.config.Configuration().tts_generate_on_load
             if generate_on_load:
@@ -2006,6 +2051,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         node.set("stop-previous", safe_format(self.stop_previous, bool))
         if self.audio_device:
             node.set("audio-device", self.audio_device)
+        node.set("playback-default", safe_format(self._playback_default, bool))
         node.set("playback-mode", safe_format(self.playback_mode.name, str))
         node.set("auto-generate", safe_format(self.auto_generate, bool))
         return node

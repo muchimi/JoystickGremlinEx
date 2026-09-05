@@ -1139,10 +1139,18 @@ States can be toggled by clicking on the state button.  Expression states will u
         else:
             width = self.views.width()
 
+
+
         if self._state_visualizer_widget:
+            if not Shiboken.isValid(self._state_visualizer_widget):
+                return
             self._state_visualizer_widget.setFixedWidth(width)
+
         if self._keyboard_visualizer_widget:
+            if not Shiboken.isValid(self._keyboard_visualizer_widget):
+                return
             self._keyboard_visualizer_widget.setFixedWidth(width)
+            
         for widget in self._viewer_widget_map.values():
             sub_widget = widget.widget
             # widget.setFixedWidth(width)

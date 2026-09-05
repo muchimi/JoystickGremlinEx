@@ -20,6 +20,7 @@ import hashlib
 import os
 import html
 import sys
+
 from lxml import etree
 from PySide6 import QtCore, QtMultimedia, QtWidgets
 import gremlin.util
@@ -27,7 +28,7 @@ from gremlin.util import hashString, safe_format, safe_read, TimedRandomInt, has
 import gremlin.event_handler
 import asyncio
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Callable
 import io
 import os
 import shutil
@@ -602,7 +603,6 @@ class PhraseDataManager:
                     continue
                 self.add_phrase(phrase)
 
-
 @gremlin.singleton_decorator.SingletonDecorator
 class Sound:
     """wrapper class to play sounds via pygame and QT multimedia"""
@@ -627,37 +627,21 @@ class Sound:
         self._last_phrase_key = None
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_tts or config.verbose_mode_sound
+        self._initialized = False
 
         if USE_SD:
             # use sound device library
+
             self.device_map = {}
             self.device_name_to_id_map = {}
             self.device_sample_rate_map = {}
+
             self.running_data = {}  # data for running audio streams
             self._playback_enabled = True  # enable playback
             self._sound_tasks = []  # tracks sound tasks
             self._last_phrase = None
 
-            device_list = sd.query_devices()
-
-            for device in device_list:
-                if device["max_output_channels"] > 0:
-                    name = device["name"]
-                    index = device["index"]
-                    api_id = device["hostapi"]
-                    api = sd.query_hostapis(device["hostapi"])
-                    api_name = api["name"]
-                    samplerate = device["default_samplerate"]
-
-                    if verbose:
-                        syslog.info(f"API: [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
-                    if api_name == "Windows WASAPI":
-                        # only use wasapi as that has the lowest latency
-                        # other choices are 'MME'
-                        # 'Windows DirectSound'
-                        self.device_map[index] = name
-                        self.device_name_to_id_map[name] = index
-                        self.device_sample_rate_map[index] = samplerate
+            self._update_devices()
 
             # get the default device
             device = sd.query_devices(kind="output")
@@ -693,6 +677,7 @@ class Sound:
         self._is_paused = False  # true if queue processing is paused
         self._next_key = 0  # next key to use for each registered sound
 
+
         if USE_PG:
             pygame.init()
             pygame.mixer.init()
@@ -702,6 +687,46 @@ class Sound:
 
         # read the configuration
         el.shutdown.connect(self._handle_shutdown)
+
+        self._initialized = True
+
+
+    def _update_devices(self):
+        """ updates the sound devices list """
+        verbose = gremlin.config.Configuration().verbose_mode_sound
+        # verbose = True
+        # force an update
+        if self._initialized:
+            # re-init
+            sd._terminate()
+            sd._initialize()
+            self.device_map.clear()
+            self.device_name_to_id_map.clear()
+            self.device_sample_rate_map.clear()
+
+        device_list = sd.query_devices()
+
+        for device in device_list:
+            if device["max_output_channels"] > 0:
+                name = device["name"]
+                index = device["index"]
+                api_id = device["hostapi"]
+                api = sd.query_hostapis(device["hostapi"])
+                api_name = api["name"]
+                samplerate = device["default_samplerate"]
+
+                if verbose:
+                    syslog.info(f"API: index: [{index}] [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
+                if api_name == "Windows WASAPI":
+                    # only use wasapi as that has the lowest latency
+                    # other choices are 'MME'
+                    # 'Windows DirectSound'
+                    self.device_map[index] = name
+                    self.device_name_to_id_map[name] = index
+                    self.device_sample_rate_map[index] = samplerate
+
+
+
 
     @property
     def soundFolder(self) -> str:
@@ -763,6 +788,7 @@ class Sound:
         return True
 
     def _handle_shutdown(self):
+
         self.stop()  # stop the runner
         self.soundStop()
         self.device_map.clear()
@@ -778,6 +804,7 @@ class Sound:
             except Exception as ex:
                 syslog.error(f"Unable to remove temporary sound file {temp_file}: {str(ex)}")
         self._temporary_files.clear()
+        self._initialized = False
 
     @property
     def audio_device(self) -> str:
@@ -834,13 +861,31 @@ class Sound:
 
     def getDefaultAudioDevice(self) -> str:
         if USE_SD:
-            return sd.default.device
+            # force a rescan if the audio has changed
+            self._update_devices()
+            _, index = sd.default.device
+            default_output_obj = sd.query_devices(index) # this is not the WASAPI device so that needs to be checked later
+            return default_output_obj
 
         return QtMultimedia.QMediaDevices.defaultAudioOutput()
 
     def getDefaultAudioDeviceIndex(self):
         index = next((i for i, d in self.device_map.items() if d.isDefault()), None)
         return index
+
+    def getDefaultAudioDeviceName(self) -> str:
+        """gets the name of the default audio device"""
+
+        if USE_SD:
+            self._update_devices()
+            _, index = sd.default.device
+            # match by name because the host API may be different and we're looking for WASAPI devices specifically
+            default_device_name = sd.query_devices(index).get('name')
+            device_name = self._ensure_device(default_device_name)
+            return device_name
+        else:
+            default_device = QtMultimedia.QMediaDevices.defaultAudioOutput()
+            return default_device.description()
 
     def getAudioDeviceIndex(self):
         """gets the index of the selected device"""
@@ -875,6 +920,9 @@ class Sound:
         device = self.getDefaultAudioDevice()
         if USE_PG:
             self.setPlaybackDevice(device.description())
+        if USE_SD:
+            device = sd.query_devices(kind='output')
+            self.setPlaybackDevice(device.name)
 
     def soundStart(self):
         # reset the mixer
@@ -934,6 +982,16 @@ class Sound:
         with self._tasks_lock:
             return self._playback_enabled
 
+    def _ensure_device(self, device_name: str):
+        """finds a device by its name"""
+        if device_name not in self.device_name_to_id_map:
+            matched_device = next((name for name in self.device_name_to_id_map if name.startswith(device_name)), None)
+            if matched_device:
+                device_id = self.device_name_to_id_map[matched_device]
+                self.device_name_to_id_map[device_name] = device_id # add the partial name to the device list if truncated
+                return matched_device
+        return device_name # unchanged
+
     def play(self, filename: str, options: PlaybackOptions, blocking: bool = False):
         """plays a sound file via SD low level library"""
         try:
@@ -951,6 +1009,22 @@ class Sound:
                 if device_name in self.device_name_to_id_map:
                     device_id = self.device_name_to_id_map[device_name]
                     device_samplerate = self.device_sample_rate_map[device_id]
+                else:
+                    # partial match
+                    matched_device = next((name for name in self.device_name_to_id_map if name.startswith(device_name)), None)
+                    if matched_device:
+                        device_id = self.device_name_to_id_map[matched_device]
+                        device_samplerate = self.device_sample_rate_map[device_id]
+                        self.device_name_to_id_map[device_name] = device_id # add the partial name to the device list if truncated
+                    else:
+                        # grab the default device
+                        syslog.warn(f"SOUND: Device '{device_name}' not found, using default device")
+                        device = sd.query_devices(kind="output")
+                        device_id = device["index"]
+                        device_samplerate = device["default_samplerate"]
+                        device_name = device["name"]
+
+
             else:
                 # get the current default device
                 device = sd.query_devices(kind="output")
