@@ -52,6 +52,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - New: Play Sound action: a new checkbox for "default audio device" is now available to have GEX output audio to the current OS default audio device, even if it changes at runtime.  This is helpful if you want the profile device agnostic for audio output, or if the default device changes at runtime.
 - Fix: Input Viewer: guard against QT C++ when updating viewer after a visualizer was removed while UI events are still updating.
 - Fix: TempoEx Container: resolved an issue where the first defined action would map to the first blank entry, so a long actions would move to short if no short actions defined, and double would move to long, or short if no long actions defined.  This is due to the new action model tracking in m77.
+- Fix: Play sound action: playback button is disabled in audio file mode even if a file has been selected.
 
 
 ### (m77T43/A)

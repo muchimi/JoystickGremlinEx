@@ -754,8 +754,9 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
             self.generate_widget.setEnabled(playback_enabled)
             self.generate_play_widget.setEnabled(playback_enabled)
         else:
-            playback_enabled = bool(self.action_data.sound_file)
+            playback_enabled = bool(self.action_data.sound_file) and os.path.isfile(self.action_data.sound_file)
             self.play_widget.setEnabled(playback_enabled)
+            self.generate_play_widget.setEnabled(playback_enabled)
 
         generate_visible = mode in (PlayMode.CoquiAI, PlayMode.EdgeAI, PlayMode.PyTTS)
         self.generate_widget.setVisible(generate_visible)
@@ -1236,6 +1237,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.volume_widget.setValue(self.action_data.playback_volume)
         self._file_changed()
         self._update_status_ui("Ready", "info")
+        self._update_ui()
 
     def _volume_changed(self, value):
         self.action_data.playback_volume = value
@@ -1791,7 +1793,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
 
         # playback
         if self.playback_default:
-            playback_device = self.getDefaultAudioDevice()
+            playback_device = self.getDefaultAudioDeviceName()
         else:
             playback_device = self.audio_device
 
@@ -1871,10 +1873,13 @@ class PlaySound(gremlin.input_item.AbstractAction):
             device = default_audio_device
         return device
 
-    def getDefaultAudioDevice(self):
+
+    def getDefaultAudioDeviceName(self):
         """ gets the current operating system default device name """
         device_name = self.sound.getDefaultAudioDeviceName()
-        syslog.info(f"Default audio device is: {device_name}")
+        verbose = gremlin.config.Configuration().verbose_mode_sound
+        if verbose:
+            syslog.info(f"Default audio device is: {device_name}")
         return device_name
 
     def getDefaultAudioDeviceIndex(self):
@@ -1886,8 +1891,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         if self.audio_device == DEFAULT_AUDIO_DEVICE_MARKER:
             return DEFAULT_AUDIO_DEVICE_INDEX
         if not self.audio_device:
-            device = self.getDefaultAudioDevice()
-            self.audio_device = device.description()
+            self.audio_device = self.getDefaultAudioDeviceName()
         index = next((i for i, d in self.device_map.items() if d.description() == self.audio_device), None)
         return index
 
