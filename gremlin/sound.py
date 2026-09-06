@@ -691,15 +691,36 @@ class Sound:
         self._initialized = True
 
 
+    def _has_active_audio(self) -> bool:
+        """true if any audio stream is currently playing"""
+        if not USE_SD:
+            return False
+        self._task_trim()
+        with self._tasks_lock:
+            return bool(self._sound_tasks)
+
     def _update_devices(self):
         """ updates the sound devices list """
         verbose = gremlin.config.Configuration().verbose_mode_sound
         # verbose = True
         # force an update
         if self._initialized:
-            # re-init
-            sd._terminate()
-            sd._initialize()
+            # Re-initializing PortAudio tears down its global library state,
+            # including any live output stream. Doing that while audio is
+            # playing kills the process at the native level with no Python
+            # traceback. This is hit whenever a TTS or sound action is
+            # triggered again before the previous one has finished playing,
+            # because the default-device lookup on the playback path calls
+            # this method. Only re-initialize when nothing is playing;
+            # refreshing the device list on its own is safe.
+            if self._has_active_audio():
+                if verbose:
+                    syslog.info(
+                        "AUDIO: playback in progress - skipping device re-initialization"
+                    )
+            else:
+                sd._terminate()
+                sd._initialize()
             self.device_map.clear()
             self.device_name_to_id_map.clear()
             self.device_sample_rate_map.clear()
