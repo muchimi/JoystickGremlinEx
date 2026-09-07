@@ -1211,8 +1211,10 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._dialog_substitute = None
 
     def _reload(self):
-        """reloads the ui"""
-        self.setTabsDirty(True)
+        """reloads the current profile """
+        current_profile = gremlin.shared_state.current_profile
+        self._do_load_profile(current_profile.profile_file)
+
 
     @QtCore.Slot(str, bool)
     def _reload_profile(self, source_xml: str, as_new_profile: bool):
@@ -2758,6 +2760,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                 id_list.append(device.device_id)
                 sorted_devices.append((device.device_id, device.name, device))
+                if device.device_category not in category_map:
+                    category_map[device.device_category] = []
                 category_map[device.device_category].append(device)
                 if verbose:
                     syslog.info(f"from saved tabs: add index [{index}] [{device.device_name}]")
@@ -2856,13 +2860,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_device or config.verbose_mode_ui
             verbose_l1 = verbose and config.verbose_mode_l1
-            # verbose_l1 = True
+            verbose = True
+            verbose_l1 = True
             verbose_detailed = verbose and config.verbose_mode_extra
 
             if verbose_l1:
                 syslog.info("CREATE TAB: start")
-
-            # if verbose_detailed: syslog.info("CREATE TAB: start")
 
             device: DeviceSummary
             device_guid = None
@@ -2948,7 +2951,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             data = self._get_sorted_tab_map()
             sorted_devices = data["sorted"]
             physical_devices = data["physical"]
+            # add missing devices so they show as disconnected
+            physical_devices += missing_phys_devices
+
             vjoy_devices = data["vjoy"]
+
             maestro_devices = data["maestro"]
             special_devices = data["special"]
             config_devices = data["config"]
@@ -2982,6 +2989,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     if verbose_l1:
                         syslog.info(f"\tdevice [{device_name}] is disabled - skipping tab")
                     continue
+                if not device.connected:
+                    pass
                 visible = visible_map.get(device.device_guid, True) # visible_map.get[device_id] if device_id in visible_map else True
                 device.visible = visible
                 if not visible:
@@ -4423,79 +4432,33 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """Handles addition and removal of joystick devices."""
         gremlin.util.assert_ui_thread()
 
+        if self.device_change_locked:
+            return # nested call
+
         if not gremlin.joystick_handling.joystick_initialized():
             # not initialized yet
             return
 
-        # record the device change
-        self._device_change_queue += 1
-        # print (f"device change detected {self._device_change_queue}")
+        self.device_change_locked = True
 
-        if not self.device_change_locked:
-            config = gremlin.config.Configuration()
-            verbose = config.verbose_mode_device
-            verbose_detailed = config.verbose_mode_details
+        # force a re-read of DINPUT data
+        syslog.info("DILL: Device change reported by DINPUT - updating enumeration data:")
 
-            self.device_change_locked = True
+        dinput.DILL.reset() # force a re-int of DILL
 
-            # force a re-read of DINPUT data
-            syslog.warning("DILL: Device change reported by DINPUT - updating enumeration data:")
-            dinput.DILL.reset()
+        # update joysticks
+        gremlin.joystick_handling.refresh_devices()
 
-            while self._device_change_queue > 0:
-                try:
-                    # syslog =syslog
-                    if verbose:
-                        syslog.info("Device change begin")
+        # request a profile reload
+        el = gremlin.event_handler.EventListener()
+        el.request_reload.emit()
 
-                    # list which device is different
-                    old_devices = [(device.device_guid, device.name) for device in self._active_devices]
-                    detected_devices = gremlin.joystick_handling.joystick_devices()
-                    new_devices = [(device.device_guid, device.name) for device in detected_devices]
-                    added_devices = [item for item in new_devices if item not in old_devices]
-                    removed_devices = [item for item in old_devices if item not in new_devices]
-                    if verbose:
-                        if added_devices:
-                            syslog.info("\tDevice added detected:")
-                            for device_guid, device_name in added_devices:
-                                syslog.info(f"\t\t{device_name} {device_guid}")
-                        if removed_devices:
-                            syslog.info("\tDevice removed detected:")
-                            for device_guid, device_name in removed_devices:
-                                syslog.info(f"\t\t{device_name} {device_guid}")
-                                assert isinstance(device_guid, dinput.GUID), "invalid device guid format"
-                                if gremlin.shared_state.current_tab_device_guid == device_guid:
-                                    # select a different tab
-                                    self.unregisterWidget(device_guid)
-                                    gremlin.shared_state.current_tab_device_guid = None
-                                    gremlin.shared_state.current_tab_device_id = None
-                                    # self._current_tab_widget = None
+        self.device_change_locked = False
 
-                    # recreate the tabs
-                    self.setTabsDirty()
 
-                    # Stop Gremlin execution
 
-                    self.ui.actionActivate.setChecked(False)
-                    restart = self.runner.is_running()
-                    if restart:
-                        syslog.info("Profile restart due to device change")
 
-                    el = gremlin.event_handler.EventListener()
-                    el.request_activate.emit(restart)
 
-                finally:
-                    if verbose_detailed:
-                        syslog.info("Device change end")
-                    self.device_change_locked = False
-
-                    # update joysticks
-                    gremlin.joystick_handling.refresh_devices()
-
-                    self._create_tabs()
-
-                # mark items processed
-                self._device_change_queue = 0
 
     @QtCore.Slot()
     def _device_input_changed_cb(self, device_guid, input_type, input_id):
@@ -5037,7 +5000,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._profile_load_stack = []
 
         # clear list of disconnected devices from any prior profile
-        gremlin.joystick_handling.clearDisconnectedDevices()
+        # gremlin.joystick_handling.clearDisconnectedDevices()
 
         if not source_xml:
             # invalid file
@@ -5916,6 +5879,7 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     msg = "Uncaught exception:\n"
     msg += " ".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
     syslog.critical(msg)
+
     gremlin.util.display_error(msg)
 
 

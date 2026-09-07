@@ -625,7 +625,7 @@ class EventListener(QtCore.QObject):
 
     request_profile_stop = Signal(str)  # request the profile to stop (message to display: str)
     request_profile_reload = Signal(str, bool)  # request a profile to load (str = profile file, bool = as new profile flag)
-    request_reload = Signal()  # request a reload of the current profile data
+    request_reload = Signal()  # request a reload of the profile
     request_ui_refresh = Signal()  # request a UI refresh
 
     process_monitor_changed = Signal()  # process monitor options changed

@@ -107,7 +107,6 @@ class ProfileDeviceNode:
         self._modes = TriggerDict()  # map of ProfileMode objects keyed by mode name (case sensitive)
         # self._modes.addCallback(self._handle_mode_node_changed)
         self._name: str = None
-        self._device_guid: dinput.GUID = None
         self.masterMode = {}  # master mode
 
     def _handle_mode_node_changed(self, data_map, key, old_value: ProfileModeNode, new_value: ProfileModeNode):
@@ -143,6 +142,10 @@ class ProfileDeviceNode:
             return self._device.device_guid
         return None
 
+    @device_guid.setter
+    def device_guid(self, value: dinput.GUID):
+        raise ValueError("DeviceNode: device_guid attribute is readonly - set device instead")
+
     @property
     def name(self) -> str:
         if self._name:
@@ -176,15 +179,6 @@ class ProfileDeviceNode:
         """device type"""
         return self.device_type
 
-    @device_guid.setter
-    def device_guid(self, value: dinput.GUID):
-        if not isinstance(value, dinput.GUID):
-            value = dinput.GUID(value)
-        assert isinstance(value, dinput.GUID) if value is not None else True
-        self._device_guid = value
-        device = gremlin.joystick_handling.getDevice(value)
-        self._device = device
-
     @property
     def device_id(self) -> str:
         """device ID a a string"""
@@ -200,14 +194,10 @@ class ProfileDeviceNode:
         """
         if mode in self.modes:
             mode_node = self.modes[mode]
-            # syslog.info(f"DeviceNode: found mode [{mode}] mode node id: [{mode_node.id}] device id: [{self.id}] profile id: [{self.profile.id}]")
             return mode_node
         if autocreate:
             mode_node = ProfileModeNode(name=mode, parent=self, system=system)
             self.modes[mode] = mode_node
-            # syslog.info(
-            #     f"ModeNode: CREATE mode [{mode}] mode node id: [{mode_node.id}] device id: [{self.id}] profile id: [{self.profile.id}] device: [{str(self)}]"
-            # )
             return mode_node
         return None
 
@@ -1709,7 +1699,9 @@ class Settings:
         :returns bool: True if the item is visible in the model
         """
         device = gremlin.joystick_handling.getDevice(device_guid)
-        assert device is not None, "invalid device"
+        if device is None:
+            # device disconnected
+            return False
         if device.disabled:
             # disabled devices
             return False
@@ -2654,12 +2646,19 @@ class Profile:
                                         input_list.append(input_item)
                                         continue
                                     case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
-                                        input_item = InputItem(mode_node=mode_node, input_type=input_type)
+                                        device = gremlin.joystick_handling.getDevice(device_guid)
+                                        if not device:
+                                            raise ValueError(f"Device with GUID [{device_guid}] could not be found in system device list")
+                                        input_item = InputItem(mode_node=mode_node, input_type=input_type, device_guid=device_guid)
+                                        if input_item.device_guid is None:
+                                            input_item = InputItem(mode_node=mode_node, input_type=input_type, device_guid=device_guid)
+
                                     case InputType.ModeControl:
                                         input_item = gremlin.ui.mode_device.ModeInputItem(self)
                                     case _:
                                         raise ValueError(f"don't know how to handle input type: [{input_type}]")
 
+                                assert input_item.device_guid is not None, "input_item.device_guid should not be None"
                                 input_item.setInputId(input_id)
                                 mode_node.config[input_type][input_id] = input_item
                             input_list.append(input_item)
@@ -2939,7 +2938,11 @@ class Profile:
         device_type = DeviceType.Keyboard
         new_device = ProfileDeviceNode(self)
         new_device.name = DeviceType.to_display_name(device_type)
-        new_device.device_guid = device_guid
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device:
+            raise ValueError(f"Keyboard device with GUID {device_guid} not found")
+        new_device.device = device
+
         self.devices[device_guid] = new_device
 
         # MIDI
@@ -2947,7 +2950,10 @@ class Profile:
         device_type = DeviceType.Midi
         new_device = ProfileDeviceNode(self)
         new_device.name = DeviceType.to_display_name(device_type)
-        new_device.device_guid = device_guid
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device:
+            raise ValueError(f"MIDI device with GUID {device_guid} not found")
+        new_device.device = device
         self.devices[device_guid] = new_device
 
         # OSC
@@ -2955,7 +2961,10 @@ class Profile:
         device_type = DeviceType.Osc
         new_device = ProfileDeviceNode(self)
         new_device.name = DeviceType.to_display_name(device_type)
-        new_device.device_guid = device_guid
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device:
+            raise ValueError(f"OSC device with GUID {device_guid} not found")
+        new_device.device = device
         self.devices[device_guid] = new_device
 
         # mode control
@@ -2963,7 +2972,11 @@ class Profile:
         device_type = DeviceType.ModeControl
         new_device = ProfileDeviceNode(self)
         new_device.name = DeviceType.to_display_name(device_type)
-        new_device.device_guid = device_guid
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device:
+            raise ValueError(f"Mode Control device with GUID {device_guid} not found")
+        new_device.device = device
+
         self.devices[device_guid] = new_device
 
         # state data
@@ -2972,7 +2985,11 @@ class Profile:
         device_type = DeviceType.State
         new_device = ProfileDeviceNode(self)
         new_device.name = DeviceType.to_display_name(device_type)
-        new_device.device_guid = device_guid
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device:
+            raise ValueError(f"State device with GUID {device_guid} not found")
+        new_device.device = device
+
         self.devices[device_guid] = new_device
 
     def modeTree(self) -> Node:
@@ -3001,8 +3018,6 @@ class Profile:
 
     def get_mode_display_list(self) -> list:
         """gets a pairs (display_name, mode)"""
-
-        mode_list = []
 
         hide_default_mode = gremlin.config.Configuration().hide_default_mode
         if hide_default_mode:
@@ -3033,15 +3048,17 @@ class Profile:
         display_names = [n[1] for n in labels]
 
         # Add properly arranged mode names to the drop down list
+        mode_set = set()
         master_mode = gremlin.shared_state.master_mode
         for display_name, mode_name in zip(display_names, mode_names):
             if hide_default_mode and mode_name == "Default":
                 continue
             if mode_name == master_mode:
                 continue  # special mode
-            mode_list.append((display_name, mode_name))
+            mode_set.add((display_name, mode_name))
 
-        return mode_list
+
+        return list(mode_set)
 
     def _ensure_mode_tree(self, reset: bool = False):
 
@@ -4075,6 +4092,8 @@ class Profile:
                 device_node = self.readDeviceNode(child)
                 self.devices[device_guid] = device_node
 
+
+
             if device_node is None:
                 syslog.warning(f"XML: unrecognized device id [{str(device_guid)}] line : {child.sourceline} - skipping this entry")
                 continue
@@ -4086,7 +4105,7 @@ class Profile:
             dd: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_node.device_guid)
             if not dd:
                 name = safe_read(child, "name", str, "n/a")
-                syslog.warning(f"Profile: unable to find device [{device_node.device_guid}] - name: [{name}] - XML source line: {child.sourceline}")
+                syslog.warning(f"Profile: unable to find device [{device_guid}] - name: [{name}] - XML source line: {child.sourceline}")
             elif dd.is_virtual:
                 # vjoy as input
                 self.settings.setVjoyAsInput(dd.vjoy_id, True)
@@ -5670,7 +5689,7 @@ class ProfileModeNode:
                         item = StreamDeckInputItem(self)
                         item.setOverrideInputType(InputType.JoystickButton)
                     case InputType.JoystickAxis | InputType.JoystickButton | InputType.JoystickHat:
-                        item = InputItem(mode_node=self, input_type=input_type)
+                        item = InputItem(mode_node=self, input_type=input_type, device_guid=device_guid)
                     case InputType.ModeControl:
                         item = gremlin.ui.mode_device.ModeInputItem(self)
                         # syslog.info(

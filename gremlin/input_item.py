@@ -468,6 +468,9 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         if not device_guid:
             # grab the device from the mode object
             device_guid = mode_node.parent.device_guid
+            if not device_guid:
+                raise ValueError("device_guid could not be derived from the mode object and must be provided")
+
 
         self._custom_input_id_handler = custom_input_id_handler  # custom handler for input id
         if self._custom_input_id_handler is not None and input_id is not None:
@@ -500,10 +503,13 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
             mode_node = profile.getModeNode(device_guid, mode_node)
 
         device = gremlin.joystick_handling.getDevice(device_guid)
-        self._device_guid = device.device_guid if device else None  # hardware input ID
-        self._device_id = device.device_id if device else None  # hardware input ID as a string
-        self._device_name = device.name if device else f"Unknownd device: [{device_guid}]"
-        self._device_type = device.device_type if device else DeviceType.NotSet
+        if not device:
+            raise ValueError(f"Device with GUID [{device_guid}] could not be found in system device list")
+
+        self._device_guid = device.device_guid
+        self._device_id = device.device_id
+        self._device_name = device.name
+        self._device_type = device.device_type
 
         self._name = None  # device name
         self._input_name = None  # input name of the hardware (axis name if an axis)
@@ -539,20 +545,20 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         # self._profile_mode = None
         self._enabled = True  # enabled flag
-        if mode_node is not None:
-            # find the missing properties from the parenting hierarchy
-            item = mode_node
-            while True:
-                # if isinstance(item, Mode):
-                #    self._profile_mode = item.name
-                if isinstance(item, gremlin.base_profile.ProfileDeviceNode):
-                    self._device_type = item.device_type
-                    self._device_name = item.name
-                    self._device_guid = gremlin.util.to_guid(item.device_guid)
-                    self._device_id = item.device_id
-                if not hasattr(item, "parent"):
-                    break
-                item = item.parent
+        # if mode_node is not None:
+        #     # find the missing properties from the parenting hierarchy
+        #     item = mode_node
+        #     while True:
+        #         # if isinstance(item, Mode):
+        #         #    self._profile_mode = item.name
+        #         if isinstance(item, gremlin.base_profile.ProfileDeviceNode):
+        #             # self._device_type = item.device_type
+        #             # self._device_name = item.name
+        #             # self._device_guid = gremlin.util.to_guid(item.device_guid)
+        #             # self._device_id = item.device_id
+        #         if not hasattr(item, "parent"):
+        #             break
+        #         item = item.parent
 
         self._message_key = None  # message key for this input (device_guid, input_type, input_id)
 
@@ -958,6 +964,8 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     @device_guid.setter
     def device_guid(self, value: dinput.GUID | uuid.UUID | str = None):  # noqa: F405
+        if value is None:
+            pass
         if gremlin.util.compare_guid(self._device_guid, value):
             device = gremlin.joystick_handling.getDevice(value)
             assert device is not None, f"device not found for device GUID: [{value}]"
@@ -2875,7 +2883,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         # update container
         self._update_container_id()
-        QtWidgets.QApplication.processEvents()  # update style changes now
+        # QtWidgets.QApplication.processEvents()  # update style changes now
 
     def _default_style(self):
         """sets the default style"""
@@ -11483,7 +11491,10 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         if not Shiboken.isValid(self) or not Shiboken.isValid(self._input_item_list_view):
             return
         if self._input_item_list_view is None:
-            self._create_ui()
+            result = self._create_ui()
+            if not result:
+                # create failed - happens if QT discarded objects already
+                return
 
         assert self._input_item_list_model is not None, "invalid model"
         assert self._input_item_list_view is not None, "invalid view"
@@ -11510,66 +11521,78 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """load the list view for the joystick device if not loaded yet"""
         # if there are no inputs in the model, pick the default filter for the devices
         assert not self._ui_created, "_create_ui should only be called once per widget life"
-        if not Shiboken.isValid(self) or not Shiboken.isValid(self.listview_container):
-            return
+        if not Shiboken.isValid(self) or not Shiboken.isValid(self.listview_container) or not Shiboken.isValid(self._input_item_list_view):
+            return False
 
         if not isinstance(self._input_item_list_model, InputItemListModel):
             raise ValueError(f"DeviceWidget: CreateUi() - invalid model - got [{type(self._input_item_list_model)}]")
 
-        if self._input_item_list_model.count() == 0:
-            # no inputs in the model
-            if self._input_item_list_model.rows():
-                # device has inputs
-                model = self._input_item_list_model
-                input_filter = self.getDefaultFilter()
-                input_items = model.getUnfilteredItems()
-                for device_guid in input_filter:
-                    for input_type in input_filter[device_guid]:
-                        for input_id in input_filter[device_guid][input_type]:
-                            input_item: gremlin.input_item.InputItem
-                            input_item = next(
-                                (
-                                    item
-                                    for item in input_items
-                                    if item.device_guid == device_guid and item.input_type == input_type and item.input_id == input_id
-                                ),
-                                None,
-                            )
-                            if input_item:
-                                model.setItemFiltered(input_item, True, False)
+        try:
 
-                    device = gremlin.joystick_handling.getDevice(device_guid)
-                    syslog.info(f"JOYSTICK: load defaults for device [{device.name}]")
+            if self._input_item_list_model.count() == 0:
+                # no inputs in the model
+                if self._input_item_list_model.rows():
+                    # device has inputs
+                    model = self._input_item_list_model
+                    input_filter = self.getDefaultFilter()
+                    input_items = model.getUnfilteredItems()
+                    for device_guid in input_filter:
+                        for input_type in input_filter[device_guid]:
+                            for input_id in input_filter[device_guid][input_type]:
+                                input_item: gremlin.input_item.InputItem
+                                input_item = next(
+                                    (
+                                        item
+                                        for item in input_items
+                                        if item.device_guid == device_guid and item.input_type == input_type and item.input_id == input_id
+                                    ),
+                                    None,
+                                )
+                                if input_item:
+                                    model.setItemFiltered(input_item, True, False)
 
-        if self._input_item_list_view is None:
-            device = self.device
-            # view that displays all the inputs in the model, which can be filtered
-            widget = InputItemListView(
-                name=device.name,
-                custom_widget_handler=self._custom_widget_handler,  # called when an input widget has to be created in the list view
-                selection_changed_handler=self._handle_input_item_selected,  # called when the selected input changes
-                mapping_changed_handler=self._handle_mapping_changed,
-                device_guid=device.device_id,
-                model=self._input_item_list_model,
-                blank_message=self._input_item_blank_message,
-            )
+                        device = gremlin.joystick_handling.getDevice(device_guid)
+                        syslog.info(f"JOYSTICK: load defaults for device [{device.name}]")
 
-            self.setInputItemListView(widget)  # registers handlers
+            if self._input_item_list_view is None:
+                device = self.device
+                # view that displays all the inputs in the model, which can be filtered
+                widget = InputItemListView(
+                    name=device.name,
+                    custom_widget_handler=self._custom_widget_handler,  # called when an input widget has to be created in the list view
+                    selection_changed_handler=self._handle_input_item_selected,  # called when the selected input changes
+                    mapping_changed_handler=self._handle_mapping_changed,
+                    device_guid=device.device_id,
+                    model=self._input_item_list_model,
+                    blank_message=self._input_item_blank_message,
+                )
 
-            self.listview_container.setCurrentIndex(1)  # display the list view in the stack widget
+                self.setInputItemListView(widget)  # registers handlers
 
-            # update the selection if nothing is selected
-            selected_index = widget.currentIndex()
-            if selected_index is not None and selected_index != -1:
-                self.selectInputItemIndex(selected_index)
+                if Shiboken.isValid(self.listview_container):
+                    self.listview_container.setCurrentIndex(1)  # display the list view in the stack widget
 
-        # indicate created
-        self._ui_created = True
 
-        new_widget = self._input_item_list_view.getSelectedWidget()
-        if new_widget:
-            # a selection was found
-            self._handle_input_item_selected_ui(None, new_widget)
+                # update the selection if nothing is selected
+                selected_index = widget.currentIndex()
+                if selected_index is not None and selected_index != -1:
+                    self.selectInputItemIndex(selected_index)
+
+            # indicate created
+            self._ui_created = True
+
+            new_widget = self._input_item_list_view.getSelectedWidget()
+            if new_widget:
+                # a selection was found
+                self._handle_input_item_selected_ui(None, new_widget)
+        except Exception as e:
+            if __debug__:
+                syslog.error(f"BaseDevice: failed to create input item widget: {e}")
+                syslog.error(traceback.format_exc())
+            return False
+
+        return True
+
 
     def _handle_create_widget(self, input_item: InputItem):
 
@@ -11876,6 +11899,9 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
 
     def _refresh_ui(self, force=False, emit=False):
         """Refreshes the current selection, ensuring proper synchronization. - ensure on UI thread"""
+
+        if not self.isInputListViewCreated():
+            return
 
         self.inputItemListModel.refresh()
 

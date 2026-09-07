@@ -737,8 +737,6 @@ class StateInputItem(InputItem):
         if self._is_expression:
             if not self._expression_stack:
                 self.evaluate()
-
-            pass
         return False
 
     def _state_name_change(self, old_name, new_name, state):

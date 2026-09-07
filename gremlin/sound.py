@@ -618,6 +618,48 @@ class PhraseDataManager:
 
 
 
+class SoundMonitor(QtCore.QObject):
+    """ monitoring object to detect audio output device changes including change in default device """
+    DeviceChanged = QtCore.Signal() # fires when the default audio output device changes
+    def __init__(self):
+        super().__init__()
+        self.media_devices = None
+        self.media_default = None
+
+
+    def start(self):
+        gremlin.util.InvokeUiMethod(self._start_ui)
+
+
+    def _start_ui(self):
+        # ensure on UI thread to avoid an issue with QT
+        if not self.media_devices:
+            self.media_devices = QMediaDevices()
+            self.media_default = self.media_devices.defaultAudioOutput()
+            syslog.info(f"AUDIO MONITOR: default audio output: {self.media_default.description()}")
+            self.media_devices.audioOutputsChanged.connect(self._handle_audio_outputs_changed)
+
+    def stop(self):
+        gremlin.util.InvokeUiMethod(self._stop_ui)
+
+    def _stop_ui(self):
+        # ensure on UI thread to avoid an issue with QT
+        if self.media_devices:
+            self.media_devices.audioOutputsChanged.disconnect(self._handle_audio_outputs_changed)
+            self.media_devices = None
+            self.media_default = None
+
+
+    def _handle_audio_outputs_changed(self):
+        """ called when audio configuration has changed """
+        new_default = self.media_devices.defaultAudioOutput()
+        if new_default != self.media_default:
+            # new default output device detected - abort all current playback tasks and update device list
+            self.media_default = new_default
+            syslog.info(f"AUDIO MONITOR: new default audio: {new_default.description()}")
+
+            self.DeviceChanged.emit()
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Sound:
@@ -627,13 +669,14 @@ class Sound:
         self._state_lock = threading.RLock()
         self._tasks_lock = threading.RLock()
 
-        self.media_devices = QMediaDevices()
 
 
 
-        self.media_default = self.media_devices.defaultAudioOutput()
-        self.media_devices.audioOutputsChanged.connect(self._handle_audio_outputs_changed)
-        syslog.info(f"AUDIO: default audio output: {self.media_default.description()}")
+
+        self.monitor = SoundMonitor()
+        self.monitor.DeviceChanged.connect(self._handle_device_changed)
+        self.monitor.start()
+
 
         self._active_sounds = 0 # number of active sounds
 
@@ -721,6 +764,10 @@ class Sound:
 
         self._initialized = True
 
+    def _handle_device_changed(self):
+        """ called when the default audio output device changes """
+        self._update_devices()
+
     def pushPlaybackEnabled(self):
         with self._tasks_lock:
             self._playback_enabled_stack += 1
@@ -744,7 +791,9 @@ class Sound:
             self.media_default = new_default
             syslog.info(f"AUDIO: new default audio: {new_default.description()}")
 
-            self._update_devices()
+            self._update_devices
+
+
 
 
     def _update_devices(self):
@@ -863,6 +912,7 @@ class Sound:
 
     def _handle_shutdown(self):
 
+        self.monitor.stop()
         self.stop()  # stop the runner
         self.soundStop()
         self.device_map.clear()

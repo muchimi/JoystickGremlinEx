@@ -1060,7 +1060,7 @@ class DILL:
     @staticmethod
     def dumpDevices():
         """reload devices if count was 0"""
-        syslog = logging.getLogger("system")
+        
         device_count = DILL.get_device_count()
         syslog.info("DILL: device detection summary")
         for index in range(device_count):

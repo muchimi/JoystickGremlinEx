@@ -46,7 +46,6 @@ class ModeInputModeType(enum.IntEnum):
     """possible input modes"""
 
     NotSet = 0 # not set
-    ModeEnter = 8  # executes on mode enter
     ModeExit = 1  # executes on mode exit
     ModeGlobalEnter = 2  # executes on any mode change (activate)
     ModeGlobalExit = 3  # executes on any mode change (deactivate)
@@ -54,6 +53,7 @@ class ModeInputModeType(enum.IntEnum):
     ModeProfileStart = 5  # executes on profile start
     ModeProfileStop = 6  # executes on profile stop
     DelayLoad = 7  # delay load
+    ModeEnter = 8  # executes on mode enter
 
     @staticmethod
     def to_display_name(value):
@@ -76,6 +76,30 @@ class ModeInputModeType(enum.IntEnum):
                 return "Delay Load"
 
         return f"Unknown mode: {value}"
+
+    @staticmethod
+    def from_value(value: int) -> ModeInputModeType:
+        match value:
+            case 0:
+                return ModeInputModeType.NotSet
+            case 1:
+                return ModeInputModeType.ModeExit
+            case 2:
+                return ModeInputModeType.ModeGlobalEnter
+            case 3:
+                return ModeInputModeType.ModeGlobalExit
+            case 4:
+                return ModeInputModeType.ModeProfileLoad
+            case 5:
+                return ModeInputModeType.ModeProfileStart
+            case 6:
+                return ModeInputModeType.ModeProfileStop
+            case 7:
+                return ModeInputModeType.DelayLoad
+            case 8:
+                return ModeInputModeType.ModeEnter
+
+        raise ValueError(f"ModeInputModeType: don't know to handle [{value}]")
 
     @staticmethod
     def from_name(value: str) -> ModeInputModeType:
@@ -224,14 +248,10 @@ class ModeInputItem(gremlin.input_item.InputItem):
                 if "id" in node.attrib:
                     # old style
                     mode_id = safe_read(node, "id", int, 0)
-                    match mode_id:
-                        case 0:
-                            mode_type = ModeInputModeType.ModeEnter
-                        case 1:
-                            mode_type = ModeInputModeType.ModeExit
-                        case _:
-                            # assume enter
-                            mode_type = ModeInputModeType.ModeEnter
+                    mode_type = ModeInputModeType.from_value(mode_id)
+                    if mode_type == ModeInputModeType.NotSet:
+                        # assume enter
+                        mode_type = ModeInputModeType.ModeEnter
                     self.input_id = mode_type
                 else:
                     raise ValueError(f"ModeControl: invalid XML, expected 'id' attribute - offending line: {node.sourceline}")

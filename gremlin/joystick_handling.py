@@ -1661,22 +1661,27 @@ def joystick_devices_initialization():
                 syslog.info(f"\tDevice: (maestro) {str(dev)}")
 
 
-            # validate all devices in all tracking structures are in the list
+            # m77 - validate all devices in all tracking structures are in the list
             for dev in _joystick_devices:
-                assert dev.device_guid in _all_devices_map, f"Device {dev} is in _joystick_devices but not in _all_joystick_devices"
-                syslog.warning(f"JOYSTICK: Device [{dev}] is in _joystick_devices but not in _all_devices_map")
+                if dev.device_guid not in _all_devices_map:
+                    syslog.warning(f"JOYSTICK: Device [{dev}] is in _joystick_devices but not in _all_devices_map")
+                    _all_devices_map[dev.device_guid] = dev
             for dev in _vjoy_devices:
-                assert dev.device_guid in _all_devices_map, f"Device {dev} is in _vjoy_devices but not in _all_devices_map"
-                syslog.warning(f"JOYSTICK: Device [{dev}] is in _vjoy_devices but not in _all_devices_map")
+                if dev.device_guid not in _all_devices_map:
+                    syslog.warning(f"JOYSTICK: Device [{dev}] is in _vjoy_devices but not in _all_devices_map")
+                    _all_devices_map[dev.device_guid] = dev
             for dev in _maestro_devices:
-                assert dev.device_guid in _all_devices_map  , f"Device {dev} is in _maestro_devices but not in _all_devices_map"
-                syslog.warning(f"JOYSTICK: Device [{dev}] is in _maestro_devices but not in _all_devices_map")
+                if dev.device_guid not in _all_devices_map:
+                    syslog.warning(f"JOYSTICK: Device [{dev}] is in _maestro_devices but not in _all_devices_map")
+                    _all_devices_map[dev.device_guid] = dev
             for dev in _disconnected_devices:
-                assert dev.device_guid in _all_devices_map, f"Device {dev} is in _disconnected_devices but not in _all_devices_map"
-                syslog.warning(f"JOYSTICK: Device [{dev}] is in _disconnected_devices but not in _all_devices_map")
+                if dev.device_guid not in _all_devices_map:
+                    syslog.warning(f"JOYSTICK: Device [{dev}] is in _disconnected_devices but not in _all_devices_map")
+                    _all_devices_map[dev.device_guid] = dev
             for dev in _special_devices:
-                assert dev.device_guid in _all_devices_map, f"Device {dev} is in _special_devices but not in _all_devices_map"
-                syslog.warning(f"JOYSTICK: Device [{dev}] is in _special_devices but not in _all_devices_map")
+                if dev.device_guid not in _all_devices_map:
+                    syslog.warning(f"JOYSTICK: Device [{dev}] is in _special_devices but not in _all_devices_map")
+                    _all_devices_map[dev.device_guid] = dev
 
 
             _joystick_initialized = True

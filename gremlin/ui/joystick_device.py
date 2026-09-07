@@ -908,6 +908,7 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         if len(input_list) > 0:
             input_list.sort(key=lambda x: x.sortKey)
             for index, input_item in enumerate(input_list):
+                assert input_item.device_guid is not None, "input_item.device_guid should not be None"
                 model.setItemAt(index, input_item)
 
             # filter the inputs
