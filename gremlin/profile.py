@@ -1124,11 +1124,7 @@ class ProfileConverter:
         for node in nodes:
             node.tag = "mode-control"
             mode_id = safe_read(node, "id", int, 0)
-            match mode_id:
-                case 0:
-                    mode_type = ModeInputModeType.ModeEnter
-                case 1:
-                    mode_type = ModeInputModeType.ModeExit
+            mode_type = ModeInputModeType.from_value(mode_id)
             del node.attrib["id"]
             # replace with the new type
             node.set("guid", str(gremlin.util.get_guid()))
