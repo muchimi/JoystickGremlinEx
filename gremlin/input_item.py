@@ -11851,17 +11851,18 @@ class BaseDeviceTabWidget(gremlin.ui.ui_common.QSplitTabWidget):
         """
         if input_item:
             widget = self.getInputItemMappingWidget(input_item)
-            assert widget is not None, f"failed to get a widget for [{input_item.display_name}]"
-            result = self.selectRegisteredWidget(widget)
-            if not result:
-                widget = self.getInputItemMappingWidget(input_item)
+            if widget:
+                assert widget is not None, f"failed to get a widget for [{input_item.display_name}]"
                 result = self.selectRegisteredWidget(widget)
-                pass
+                if not result:
+                    widget = self.getInputItemMappingWidget(input_item)
+                    result = self.selectRegisteredWidget(widget)
+                    pass
 
-            self.setLastSelectedInputItem(input_item)
-            self.setLastSelectedWidget(widget)
-            widget.redraw()  # update if needed
-            self._input_item_mapping_widget = widget
+                self.setLastSelectedInputItem(input_item)
+                self.setLastSelectedWidget(widget)
+                widget.redraw()  # update if needed
+                self._input_item_mapping_widget = widget
 
         return self._last_selected_widget
 

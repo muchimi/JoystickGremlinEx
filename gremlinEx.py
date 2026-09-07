@@ -4123,7 +4123,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         if tabdata:
             current_tab_device_guid = tabdata.device_guid
             widget: gremlin.ui.ui_common.QSplitTabWidget = self.getRegisteredWidget(current_tab_device_guid)
-            assert widget is not None, f"SELECT: sync issue: no widget found for the given device: {current_tab_device_guid}"
+            if widget is None:
+                syslog.warning(f"SELECT: no UI widget found for the given device: {current_tab_device_guid}")
+                return
             widget.ensureLoaded()
         else:
             syslog.warning(f"Tab: ensureTabLoaded(): [{position}] not found")

@@ -21,6 +21,7 @@ import os
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
 
+
 from lxml import etree as ElementTree
 import html
 from typing import Callable
@@ -201,6 +202,9 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         # gender filter
         self.etts_gender_widget = gremlin.ui.ui_common.QDataComboBox(tooltip="Gender filter for Edge TTS.")
         self.etts_gender_widget.setCallback(self._handle_etts_gender_changed)
+
+        # etts voice hash to see if voice list has changed
+        self.etts_voice_hash = None
 
         self.status_widget = gremlin.ui.ui_common.QIconLabel()
         self.__extra_status_widgets = []
@@ -871,8 +875,7 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
     def _handle_refresh_etts_speakers(self):
         """refresh the list of available ETTS speakers"""
         self._update_etts_speakers()
-        voices = self.action_data.getEttsVoices()
-        self._update_status_ui(f"{len(voices)} voices found.", "info")
+
 
     def _handle_refresh_pytts_speakers(self):
         """refresh the list of available pytts speakers"""
@@ -1061,44 +1064,110 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         etts = gremlin.sound.EdgeTTS()
         return etts.getFilteredVoices(locale=self.action_data.etts_locale, gender=self.action_data.etts_gender)
 
+    def _get_etts_voices(self) -> dict[str, EdgeTTSVoice]:
+        """gets a list of all available ETTS voices"""
+        etts = gremlin.sound.EdgeTTS()
+        return etts.getVoiceList()
+
     def _update_etts_speakers(self):
         if self._updating_etts_speakers:
             return
         self._updating_etts_speakers = True
+
+        voices: dict[str, EdgeTTSVoice] = self._get_etts_filtered_voices()
+
         try:
             config = gremlin.config.Configuration()
-            voices: dict[str, EdgeTTSVoice] = self._get_etts_filtered_voices()
+
             etts = gremlin.sound.EdgeTTS()
-            current_voice = etts.getVoice(self.action_data.etts_speaker)
+
+            hash_value = hash(frozenset(voices.keys()))
+            voice_changed = self.etts_voice_hash != hash_value
+
+            if self.etts_speaker_widget.count():
+                # grab the current voice
+                current_speaker = self.etts_speaker_widget.currentText()
+            else:
+                current_speaker = self.action_data.etts_speaker
+            current_voice = etts.getVoice(current_speaker)
             if current_voice:
-                if current_voice.gender != self.action_data.etts_gender or current_voice.locale != self.action_data.etts_locale:
+                if current_voice.gender != self.action_data.etts_gender:
+                    self.action_data.etts_gender = current_voice.gender
+                if current_voice.locale != self.action_data.etts_locale:
+                    self.action_data.etts_locale = current_voice.locale
+                if current_voice.short_name != self.action_data.etts_speaker:
+                    self.action_data.etts_speaker = current_voice.short_name
+                    config.ai_etts_last_speaker = current_voice.short_name
+            else:
+                # pick a default
+                if voices:
                     voice = list(voices.values())[0]
                     self.action_data.etts_speaker = voice.short_name
-                    self.action_data.etts_speaker = voice.short_name
+                    self.action_data.etts_gender = voice.gender
+                    self.action_data.etts_locale = voice.locale
 
-            with QtCore.QSignalBlocker(self.etts_speaker_widget):
-                self.etts_speaker_widget.clear()
+            if voice_changed:
+                self.etts_voice_hash = hash_value # update with last hash
+                with QtCore.QSignalBlocker(self.etts_speaker_widget):
+                    self.etts_speaker_widget.clear()
+                    if voices:
+                        voice: EdgeTTSVoice
+                        for voice in voices.values():
+                            speaker = voice.short_name
+                            self.etts_speaker_widget.addItem(speaker, speaker)
+
+            # sync the selected speaker with the widget
+            index = self.etts_speaker_widget.findData(current_speaker)
+            if index == -1:
+                # not found in the new list, pick the default
                 if voices:
-                    voice: EdgeTTSVoice
-                    for voice in voices.values():
-                        speaker = voice.short_name
-                        self.etts_speaker_widget.addItem(speaker, speaker)
-                    if self.action_data.etts_speaker:
-                        speaker = self.action_data.etts_speaker
-                    else:
-                        speaker = config.ai_etts_last_speaker
-                    index = self.etts_speaker_widget.findText(speaker)
-                    if index != -1:
-                        self.etts_speaker_widget.setCurrentIndex(index)
-                    else:
-                        config.ai_etts_last_speaker = speaker
-                        self.action_data.etts_speaker = self.etts_speaker_widget.currentText()
+                    # has voices, pick the first one as default
+                    index = 0
+                    voice = list(voices.values())[0]
+                    config.ai_etts_last_speaker = voice.short_name
+                    self.action_data.etts_speaker = voice.short_name
+                    self.action_data.etts_gender = voice.gender
+                    self.action_data.etts_locale = voice.locale
+                    config.ai_etts_last_speaker = voice.short_name
+                else:
+                    # no voices available, clear the selection
+                    index = -1
+                    self.action_data.etts_speaker = ""
+                    self.action_data.etts_gender = ""
+                    self.action_data.etts_locale = ""
 
-                self.etts_speaker_widget.setEnabled(bool(voices))
+            if index != -1:
+                with QtCore.QSignalBlocker(self.etts_speaker_widget):
+                    self.etts_speaker_widget.setCurrentIndex(index)
+
+            if self.action_data.etts_gender != self.etts_gender_widget.currentData():
+                # sync gender
+                with QtCore.QSignalBlocker(self.etts_gender_widget):
+                    if not self.etts_gender_widget.count():
+                        # not loaded yet
+                        self._update_etts_genders()
+                    index = self.etts_gender_widget.findData(self.action_data.etts_gender)
+                    if index != -1:
+                        self.etts_gender_widget.setCurrentIndex(index)
+
+
+            if self.action_data.etts_locale != self.etts_locale_widget.currentData():
+                # sync locale
+                with QtCore.QSignalBlocker(self.etts_locale_widget):
+                    if not self.etts_locale_widget.count():
+                        # not loaded yet
+                        self._update_etts_locales()
+
+                    index = self.etts_locale_widget.findData(self.action_data.etts_locale)
+                    if index != -1:
+                        self.etts_locale_widget.setCurrentIndex(index)
+
             self.etts_speaker_widget.updateGeometry()
 
         finally:
             self._updating_etts_speakers = False
+            all_voices = self._get_etts_voices()
+            self._update_status_ui(f"{len(voices)} voices out of {len(all_voices)}.", "info")
 
     def _update_pytts_speakers(self, initialize=False):
         pytts = gremlin.tts.TextToSpeech()
@@ -1610,7 +1679,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
 
     def getEttsVoices(self):
         etts = gremlin.sound.EdgeTTS()
-        return etts.getVoices()
+        return etts.getVoiceList()
 
     @etts_locale.setter
     def etts_locale(self, value: str):

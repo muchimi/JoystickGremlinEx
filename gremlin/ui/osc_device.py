@@ -3848,6 +3848,32 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
         # re-apply filters after config is loaded
         self.inputItemListModel.applyFilter()
 
+    def getDefaultFilter(self) -> dict:
+        """gets the default filter for the given device"""
+
+        device_guid = self.device_guid
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        profile: gremlin.base_profile.Profile = gremlin.shared_state.current_profile
+        settings: gremlin.base_profile.Settings = profile.settings
+
+        if settings.hasFilterDefinition(device_guid):
+            item_list = settings.getVisibleInputCounts(device_guid, [InputType.OpenSoundControl], as_list=True)
+            if item_list:
+                for device_guid, input_type, input_id in item_list:
+                    input_filter = settings.getInputVisible(device_guid, input_type, input_id)  # example, adjust as needed
+                    return input_filter
+
+        input_filter = {}
+        input_filter[device.device_id] = {}
+
+        for input_item in self.inputItemListModel.unfilteredItems():
+            input_filter[device.device_id][input_item.input_id] = True
+
+        # save the defaults to the settings
+        settings.applyFilter(input_filter)
+
+        return input_filter
+
     def _load_handler(self, model: OscInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
 
@@ -4358,8 +4384,9 @@ class OscDeviceTabWidget(BaseDeviceTabWidget):
             self.popSuspended(True)  # redraws the list view and creates the new entry
 
     def _dialog_rejected_cb(self):
-        index = self._edit_dialog.index
-        self.inputItemListView.update_item(index)
+        # input_item = self._edit_dialog.input_item
+        # self.inputItemListView.update_item(input_item)
+        pass
 
     def _index_for_key(self, input_id):
         """returns the index of the selected input id"""

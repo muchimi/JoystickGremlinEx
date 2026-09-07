@@ -48,6 +48,15 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T45)
+- Change: Sound API: detect default device change and remap sound to that new device. Currently playing sounds will stop. In T44, the default device was checked at every playback for a change.  In T45, the change only occurs when the default device is changed at runtime (after GEX has started or while a profile is running).
+- Change: PlaySound Action: optimize voice reloading in UI if voice set has not changed.
+- Fix: PlaySound Action: resolve possible exception on voice refresh.
+- Fix: Sound API: ensure active streams are set closed after sound playback.
+- Fix: Sound API: guard against deadlock when swapping audio devices in the middle of playback.
+- Fix: OSC Device: exception on input dialog cancel.
+- Fix: OSC Device: exception on filtering.
+
 ### (m77T44)
 - New: Play Sound action: a new checkbox for "default audio device" is now available to have GEX output audio to the current OS default audio device, even if it changes at runtime.  This is helpful if you want the profile device agnostic for audio output, or if the default device changes at runtime.
 - Fix: Input Viewer: guard against QT C++ when updating viewer after a visualizer was removed while UI events are still updating.

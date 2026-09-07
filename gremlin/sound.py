@@ -20,6 +20,7 @@ import hashlib
 import os
 import html
 import sys
+import gc
 
 from lxml import etree
 from PySide6 import QtCore, QtMultimedia, QtWidgets
@@ -52,6 +53,18 @@ import enum
 import time
 from psygnal import Signal
 from gremlin.types import PlaybackMode, PlayMode
+
+from PySide6.QtMultimedia import QMediaDevices, QAudioOutput
+
+
+# EDataFlow enumeration
+E_RENDER = 0   # Playback
+E_CAPTURE = 1  # Recording
+
+# ERole enumeration
+E_CONSOLE = 0       # Games, system sounds, desktop apps
+E_MULTIMEDIA = 1    # Music, movies
+E_COMMUNICATIONS = 2 # Voice calls, Skype, Teams
 
 
 syslog = logging.getLogger("system")
@@ -603,6 +616,9 @@ class PhraseDataManager:
                     continue
                 self.add_phrase(phrase)
 
+
+
+
 @gremlin.singleton_decorator.SingletonDecorator
 class Sound:
     """wrapper class to play sounds via pygame and QT multimedia"""
@@ -610,6 +626,18 @@ class Sound:
     def __init__(self):
         self._state_lock = threading.RLock()
         self._tasks_lock = threading.RLock()
+
+        self.media_devices = QMediaDevices()
+
+
+
+        self.media_default = self.media_devices.defaultAudioOutput()
+        self.media_devices.audioOutputsChanged.connect(self._handle_audio_outputs_changed)
+        syslog.info(f"AUDIO: default audio output: {self.media_default.description()}")
+
+        self._active_sounds = 0 # number of active sounds
+
+
 
         # If running in a PyInstaller bundle, add the temporary folder to the PATH
         if hasattr(sys, "_MEIPASS"):
@@ -624,6 +652,7 @@ class Sound:
         self._ffmpeg_exe = None
         self._sound_files = []  # list of sound files for multiple audio playback
         self._playback_device_name = None
+
         self._last_phrase_key = None
         config = gremlin.config.Configuration()
         verbose = config.verbose_mode_tts or config.verbose_mode_sound
@@ -637,7 +666,8 @@ class Sound:
             self.device_sample_rate_map = {}
 
             self.running_data = {}  # data for running audio streams
-            self._playback_enabled = True  # enable playback
+            self._playback_enabled_stack = 0
+
             self._sound_tasks = []  # tracks sound tasks
             self._last_phrase = None
 
@@ -678,6 +708,7 @@ class Sound:
         self._next_key = 0  # next key to use for each registered sound
 
 
+
         if USE_PG:
             pygame.init()
             pygame.mixer.init()
@@ -690,42 +721,85 @@ class Sound:
 
         self._initialized = True
 
+    def pushPlaybackEnabled(self):
+        with self._tasks_lock:
+            self._playback_enabled_stack += 1
+
+
+    def popPlaybackEnabled(self):
+        if self._playback_enabled_stack > 0:
+            with self._tasks_lock:
+                self._playback_enabled_stack -= 1
+
+    @property
+    def playback_enabled(self):
+        """ true if playback is enabled"""
+        return self._playback_enabled_stack == 0
+
+    def _handle_audio_outputs_changed(self):
+        """ called when audio configuration has changed """
+        new_default = self.media_devices.defaultAudioOutput()
+        if new_default != self.media_default:
+            # new default output device detected - abort all current playback tasks and update device list
+            self.media_default = new_default
+            syslog.info(f"AUDIO: new default audio: {new_default.description()}")
+
+            self._update_devices()
+
 
     def _update_devices(self):
         """ updates the sound devices list """
         verbose = gremlin.config.Configuration().verbose_mode_sound
         # verbose = True
         # force an update
-        if self._initialized:
-            # re-init
-            sd._terminate()
-            sd._initialize()
-            self.device_map.clear()
-            self.device_name_to_id_map.clear()
-            self.device_sample_rate_map.clear()
+        self.pushPlaybackEnabled()
+        try:
+            if self._initialized:
+                # re-init
+                # abort current playback threads
+                self.soundStop()
+                if self._sound_tasks:
+                    # there are current streams playing - stop them
+                    for task in self._sound_tasks:
+                        task.cancel()
 
-        device_list = sd.query_devices()
+                while self._active_sounds > 0:
+                    # wait for tasks to complete
+                    time.sleep(0.1)
 
-        for device in device_list:
-            if device["max_output_channels"] > 0:
-                name = device["name"]
-                index = device["index"]
-                api_id = device["hostapi"]
-                api = sd.query_hostapis(device["hostapi"])
-                api_name = api["name"]
-                samplerate = device["default_samplerate"]
+                self._sound_tasks.clear()
+                gc.collect() # forcibly terminate any dangling streams to avoid deadlocks on sd re-init
+                sd._terminate()
+                sd._initialize()
+                self.device_map.clear()
+                self.device_name_to_id_map.clear()
+                self.device_sample_rate_map.clear()
 
-                if verbose:
-                    syslog.info(f"API: index: [{index}] [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
-                if api_name == "Windows WASAPI":
-                    # only use wasapi as that has the lowest latency
-                    # other choices are 'MME'
-                    # 'Windows DirectSound'
-                    self.device_map[index] = name
-                    self.device_name_to_id_map[name] = index
-                    self.device_sample_rate_map[index] = samplerate
+            device_list = sd.query_devices()
+
+            for device in device_list:
+                if device["max_output_channels"] > 0:
+                    name = device["name"]
+                    index = device["index"]
+                    api_id = device["hostapi"]
+                    api = sd.query_hostapis(device["hostapi"])
+                    api_name = api["name"]
+                    samplerate = device["default_samplerate"]
+
+                    if verbose:
+                        syslog.info(f"API: index: [{index}] [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
+                    if api_name == "Windows WASAPI":
+                        # only use wasapi as that has the lowest latency
+                        # other choices are 'MME'
+                        # 'Windows DirectSound'
+                        self.device_map[index] = name
+                        self.device_name_to_id_map[name] = index
+                        self.device_sample_rate_map[index] = samplerate
 
 
+
+        finally:
+            self.popPlaybackEnabled()
 
 
     @property
@@ -877,7 +951,7 @@ class Sound:
         """gets the name of the default audio device"""
 
         if USE_SD:
-            self._update_devices()
+            #self._update_devices()
             _, index = sd.default.device
             # match by name because the host API may be different and we're looking for WASAPI devices specifically
             default_device_name = sd.query_devices(index).get('name')
@@ -926,13 +1000,11 @@ class Sound:
 
     def soundStart(self):
         # reset the mixer
+        self.soundStop()
         if USE_PG:
-            self.soundStop()
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
-        elif USE_SD:
-            with self._tasks_lock:
-                self._playback_enabled = True
+
 
     def soundStop(self):
         """terminate any active playbacks"""
@@ -942,8 +1014,8 @@ class Sound:
                 pygame.mixer.quit()  # we will re-init the mixer later
         elif USE_SD:
             # terminate the thread pools
-            with self._tasks_lock:
-                self._playback_enabled = False  # stop all streams
+
+
             # Wait for active tasks to finish, but bound the wait so a stream
             # that never completes (e.g. a stalled device) cannot hang the
             # caller indefinitely. Previously this was an unbounded
@@ -968,8 +1040,8 @@ class Sound:
                     t.cancel()
                 with self._tasks_lock:
                     self._sound_tasks = []
-            with self._tasks_lock:
-                self._playback_enabled = True  # renable once all streams are done
+
+
 
     def _task_trim(self):
         """trims the task list of completed tasks"""
@@ -979,8 +1051,7 @@ class Sound:
                 self._sound_tasks = [t for t in self._sound_tasks if t not in done_list]
 
     def _is_playback_enabled(self) -> bool:
-        with self._tasks_lock:
-            return self._playback_enabled
+        return self.playback_enabled
 
     def _ensure_device(self, device_name: str):
         """finds a device by its name"""
@@ -995,7 +1066,7 @@ class Sound:
     def play(self, filename: str, options: PlaybackOptions, blocking: bool = False):
         """plays a sound file via SD low level library"""
         try:
-            if not self._is_playback_enabled():
+            if not self.playback_enabled:
                 # playback is not enabled
                 return
 
@@ -1131,6 +1202,9 @@ class Sound:
     def _play_runner(self, data, device_id, loops):
 
         try:
+            stream = None
+            with self._tasks_lock:
+                self._active_sounds += 1
             for _ in range(loops):
                 event = threading.Event()
                 current_frame = 0
@@ -1147,16 +1221,29 @@ class Sound:
                         event.set()
                     current_frame += chunksize
 
+
                 stream = sd.OutputStream(callback=callback, device=device_id, finished_callback=event.set, channels=data.ndim, dtype=data.dtype)
                 with stream:
                     event.wait()  # wait until playback is finished
 
-            # syslog.info(f"playback done")
+
+
+
 
         except sd.CallbackStop:
             event.set()
         except Exception as e:
             syslog.error(f"SOUND: PLAY: An error occurred: {e}")
+        finally:
+            try:
+                # forcibly close stream on exit
+                if stream:
+                    stream.stop()
+                    stream.close()
+            except Exception:
+                pass
+            with self._tasks_lock:
+                self._active_sounds -= 1
 
     def addPhrase(self, phrase: PhraseData) -> PhraseData:
         """registers a single phrase - ignored if already registered - returns the cached phrase if the phrase already exists"""
