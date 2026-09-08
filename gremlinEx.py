@@ -2860,8 +2860,8 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             config = gremlin.config.Configuration()
             verbose = config.verbose_mode_device or config.verbose_mode_ui
             verbose_l1 = verbose and config.verbose_mode_l1
-            verbose = True
-            verbose_l1 = True
+            # verbose = True
+            # verbose_l1 = True
             verbose_detailed = verbose and config.verbose_mode_extra
 
             if verbose_l1:

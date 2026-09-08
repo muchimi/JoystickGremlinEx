@@ -789,9 +789,11 @@ def unregisterSpecialDevice(device_guid):
 
 def registerDisconnectedDevice(dev):
     """adds a disconnected device to the tracking list"""
-    global _disconnected_devices_map, _all_devices_map, _disconnected_devices
+    global _disconnected_devices_map, _all_devices_map, _disconnected_devices, _joystick_devices
     with _device_registry_lock:
         _all_devices_map[dev.device_guid] = dev
+        if dev.device_type in (DeviceType.Maestro, DeviceType.Joystick, DeviceType.VJoy):
+            _joystick_devices.append(dev)
         _disconnected_devices_map[dev.device_guid] = dev
         _disconnected_devices.append(dev)
 
@@ -799,13 +801,17 @@ def registerDisconnectedDevice(dev):
 
 
 def unregisterDisconnectedDevice(dev):
-    global _joystick_devices, _disconnected_devices_map, _all_devices_map
+    global _joystick_devices, _disconnected_devices_map, _all_devices_map, _disconnected_devices
     device_guid = dev.device_guid
     with _device_registry_lock:
         if dev in _joystick_devices:
             _joystick_devices.remove(dev)
         if device_guid in _all_devices_map:
             del _all_devices_map[device_guid]
+        if device_guid in _disconnected_devices_map:
+            del _disconnected_devices_map[device_guid]
+        if dev in _disconnected_devices:
+            _disconnected_devices.remove(dev)
 
 
 def clearDisconnectedDevices():
@@ -1292,7 +1298,7 @@ def _create_vjoy_device(vjoy_index: int):
     device.axismap_list = []
     device.usage_page = None
     device.usage = None
-    device.axis_names = []
+    device.axis_names = {}
     return device
 
 
@@ -1613,7 +1619,9 @@ def joystick_devices_initialization():
                         axis_name = f"({i + 1})"
                     else:
                         logical_count += 1
-                    dev.axis_names.append(axis_name)
+                    dev.axis_names[i] = axis_name
+                    dev.axismap_list.append(axis_name)
+
 
                 vjoy_lookup[hash_value] = dev
                 _all_joystick_devices.append(dev)

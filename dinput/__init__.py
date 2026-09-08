@@ -492,7 +492,7 @@ class DeviceSummary:
         self.linear_id_map = {}  # map of linear ID to axis ID
         self.usage_page = 0  # HID usage page
         self.usage = 0  # HID usage
-        self.axis_names = {}
+        self.axis_names = {}  # map of axis ID to axis name
         self.axismap_list = []
         self.axis_id_map = {}  # map of axis ID to linear ID
         self.input_enabled = False
@@ -569,7 +569,7 @@ class DeviceSummary:
 
                 # syslog.info(f"\tAxis [{am.linear_index}] -> {axis_name}")
                 self.axis_names[am.axis_index] = axis_name
-
+               
             # auto disable invalid joystick devices that are not in spec
             self._hard_disabled = self.axis_count > 8 or self.button_count > 128 or self.hat_count > 4
             if self._hard_disabled:
@@ -1060,7 +1060,7 @@ class DILL:
     @staticmethod
     def dumpDevices():
         """reload devices if count was 0"""
-        
+
         device_count = DILL.get_device_count()
         syslog.info("DILL: device detection summary")
         for index in range(device_count):

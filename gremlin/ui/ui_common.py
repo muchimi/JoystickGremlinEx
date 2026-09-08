@@ -3422,7 +3422,7 @@ class VJoySelector(AbstractInputSelector):
         super().__init__(selected_callback=change_cb, valid_types=valid_types, parent=parent)
 
     def _initialize(self):
-        potential_devices = sorted(gremlin.joystick_handling.virtual_devices(), key=lambda x: x.vjoy_id)
+        potential_devices = sorted(gremlin.joystick_handling.vjoy_devices(connected=False), key=lambda x: x.vjoy_id)
         for dev in potential_devices:
             input_counts = {
                 InputType.JoystickAxis: dev.axis_count,

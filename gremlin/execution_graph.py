@@ -2094,9 +2094,9 @@ class ExecutionContext:
 
             # execute children nodes
             if node.children and (node.nodeType != ExecutionGraphNodeType.Action or manual):
+
+                # XXX check exec order
                 for child in node.children:
-                    # if child.nodeType == ExecutionGraphNodeType.ActionSet:
-                    #     continue # skip activation sets as the actions are in the container node already
                     result = self.execute_node(child, event, value, extra_data, manual, visited)
                     if not result:
                         break  # FAIL
@@ -2560,7 +2560,9 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
 
         ec = ExecutionContext()
 
-        verbose = gremlin.config.Configuration().verbose_mode_details
+        config = gremlin.config.Configuration()
+        verbose = config.verbose_mode_exec
+        # verbose = True
 
         sequence = []
 
@@ -2578,10 +2580,12 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             action_set_node = ExecutionGraphActionSetNode()
             action_set_node.parent = parent
 
-            # if not isinstance(action, action_plugins.remap.Remap):
-            priority = 0
+
+            priority = 0 # default priority
             if hasattr(action, "priority"):
-                priority = action.priority
+                priority = gremlin.util.clamp(action.priority, 0, 1000) # unique action priority
+
+
             ordered_action_set.append((priority, action))
             if verbose:
                 syslog.info(f"\tadding action: {type(action)} priority: {priority} data: {str(action)}")
@@ -2594,17 +2598,21 @@ class ActionSetExecutionGraph(AbstractExecutionGraph):
             node.priority = priority
             nodes[action] = node
 
-        if len(ordered_action_set) > 1:
+        # sort by priority
+        count = len(ordered_action_set)
+        if count:
+            # more than one, sort by priority, 0 to 1000
             ordered_action_set.sort(key=lambda x: x[0])
-        ordered_action_set = [x[1] for x in ordered_action_set]
+            ordered_action_set = [x[1] for x in ordered_action_set]
 
-        if verbose:
-            syslog.info("Action order:")
-            for index, action in enumerate(ordered_action_set):
-                input_item = action.input_item  # get_input_item()
-                input_id = input_item.input_id
-                input_stub = str(input_id)
-                syslog.info(f"\t{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")
+            if verbose:
+                syslog.info("Action order:")
+                for index, action in enumerate(ordered_action_set):
+                    input_item = action.input_item  # get_input_item()
+                    input_id = input_item.input_id
+                    input_stub = str(input_id)
+                    syslog.info(f"\t{index}: input type: {input_item.input_type} {input_stub} action: {type(action)}  data: {str(action)} ")
+                pass
 
         # Create functors
         for action in ordered_action_set:

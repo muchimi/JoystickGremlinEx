@@ -241,6 +241,7 @@ To change the mode temporarily, use the temporary mode switch action."""
     ]
 
     def __init__(self, parent, extra_data: dict = None):
+
         super().__init__(parent, extra_data=extra_data)
         self.parent = parent
         self.setPriority(999)
@@ -257,6 +258,7 @@ To change the mode temporarily, use the temporary mode switch action."""
         self.exec_on_press = True  # true if the mode should execute on input press
         self.exec_on_release = False  # true if the mode should execute on input release
         self._mode = mode
+
 
     @property
     def mode(self) -> str:

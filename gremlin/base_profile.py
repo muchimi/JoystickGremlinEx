@@ -42,7 +42,7 @@ from PySide6 import QtCore
 from frozendict import frozendict
 from gremlin.input_item import ActionSet, ActionSets
 import gremlin.sound
-
+from dinput import DeviceSummary
 
 import gremlin.ui.mode_device
 import gremlin.util
@@ -258,6 +258,15 @@ class ProfileDeviceNode:
                 device.device_id = device_id
                 # for disconnectd devices, assume maximum axis and buttons to avoid problems
                 device.axis_count = 8
+                # axis names
+                for axis_id in range(1, device.axis_count + 1):
+                    device.linear_id_map[axis_id] = axis_id
+                    device.axis_id_map[axis_id] = axis_id
+                    am = dinput.AxisMap()
+                    am.linear_index = axis_id
+                    am.axis_index = axis_id
+                    device.axismap_list.append(am)
+                    device.axis_names[axis_id] = am.getName()
                 device.device_category = DeviceCategory.Physical  # assume physical device if in a profile not under virtual sticks
                 device_type_str = safe_read(node, "type", str, "")
                 device_type = DeviceType.to_enum(device_type_str)
@@ -273,15 +282,7 @@ class ProfileDeviceNode:
                     device.vjoy_id = vjoy_id
                     device.virtual_id = device.vjoy_id
 
-                # assume linear axis mapping for disconnected devices
-                for axis_id in range(1, device.axis_count + 1):
-                    device.linear_id_map[axis_id] = axis_id
-                    device.axis_id_map[axis_id] = axis_id
-                    am = dinput.AxisMap()
-                    am.linear_index = axis_id
-                    am.axis_index = axis_id
-                    device.axismap_list.append(am)
-                    device.axis_names.append(am.getName())
+
 
                 device.button_count = 128
                 device.hat_count = 4
@@ -4062,25 +4063,22 @@ class Profile:
         self.settings.from_xml(root.find("settings"), data, extra_data)
 
         # state data - read first because states can be referenced by nodes
-        mode_nodes = root.xpath("//states")
-        if not mode_nodes:
+        state_nodes = root.xpath("//states")
+        if not state_nodes:
             # not found
             self.state.clear()
-        for node in mode_nodes:
+        for node in state_nodes:
             self.state.from_xml(node)
 
         # removed devices
         self._removed_devices.clear()
 
-        # moved to display options
-        # removed_nodes = root.xpath("//removed-devices/device")
-        # for node in removed_nodes:
-        #     id = node.get("id")
-        #     self._removed_devices.append(id)
-
         # Parse each device into separate DeviceConfiguration objects
-        device_nodes = root.xpath("//profile/devices/device")
+        device_nodes = root.xpath("/profile/devices//device")
+        verbose = True
         for child in device_nodes:
+            if verbose:
+                syslog.info(f"XML: parsing device [{child.get('name')}] type: [{child.get('type')}] line : {child.sourceline}")
             if "type" in child.attrib:
                 device_type = DeviceType.to_enum(child.get("type"))
                 if device_type == DeviceType.OctaviIFR1:
@@ -4113,11 +4111,14 @@ class Profile:
                 syslog.warning(f"XML: unrecognized device id [{str(device_guid)}] line : {child.sourceline} - skipping this entry")
                 continue
             extra_data["device_node"] = device_node
-            if device_node.connected():
-                # disconnected nodes are already read
-                device_node.from_xml(child, data, extra_data)
 
-            dd: dinput.DeviceSummary = gremlin.joystick_handling.getDevice(device_node.device_guid)
+            # disconnected nodes are already read
+            device_node.from_xml(child, data, extra_data)
+
+            dd: DeviceSummary = gremlin.joystick_handling.getDevice(device_node.device_guid)
+            if not dd:
+                # device not found in current connected list
+                dd = device_node.device
             if not dd:
                 name = safe_read(child, "name", str, "n/a")
                 syslog.warning(f"Profile: unable to find device [{device_guid}] - name: [{name}] - XML source line: {child.sourceline}")

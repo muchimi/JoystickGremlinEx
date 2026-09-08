@@ -20,6 +20,7 @@ import copy
 import logging
 import threading
 import time
+
 from lxml import etree as ElementTree
 
 from PySide6 import QtWidgets, QtCore
@@ -271,17 +272,42 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
         group_node = container_node.children[0]  # group node is the only child of the container node
         self.action_set_nodes = [
-            node for node in group_node.children if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet and node.action_set
+            node
+            for node in group_node.children
+            if node.nodeType == gremlin.execution_graph.ExecutionGraphNodeType.ActionSet
         ]
+
+        action_set_node_count = len(self.action_set_nodes)
+        assert action_set_node_count == 2,  f"TEMPO: Logic error: Expected 2 action set nodes in the group node - found [{action_set_node_count}]"
 
         self.short_nodes = []
         self.long_nodes = []
-        if self.action_set_nodes:
-            self.short_nodes.append(self.action_set_nodes[0])
-            if len(self.action_set_nodes) == 2:
-                self.long_nodes.append(self.action_set_nodes[1])
+
+        self.short_enabled = False
+        self.long_enabled = False
+        self.dtap_enabled = False
+
+        node = self.action_set_nodes[0]
+        if node.has_actions:
+            self.short_enabled = True
+            self.short_nodes.append(node)
+
+
+        node = self.action_set_nodes[1]
+        if node.has_actions:
+            self.long_enabled = True
+            self.long_nodes.append(node)
+
+
+        active_nodes = self.short_nodes + self.long_nodes
+        self.has_actions = bool(active_nodes)
 
         self.trigger_mode = None
+
+        if self.verbose:
+            syslog.info("TEMPO: profile start node counts:")
+            syslog.info(f"\tShort nodes: {len(self.short_nodes)}")
+            syslog.info(f"\tLong nodes: {len(self.long_nodes)}")
 
     def profile_mode_changed(self, mode: str):
         """called when the runtime mode changes"""
@@ -296,7 +322,7 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
         # syslog.info(f"execute short press {self.short_index}")
         ec = gremlin.execution_graph.ExecutionContext()
-        if self.short_nodes:
+        if self.short_enabled:
             for node in self.short_nodes:
                 ec.execute_node(node, event, value, extra_data)
         else:
@@ -306,7 +332,7 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         """triggers a long press"""
         # syslog.info(f"execute long press {self.long_index}")
         ec = gremlin.execution_graph.ExecutionContext()
-        if self.long_nodes:
+        if self.long_enabled:
             for node in self.long_nodes:
                 ec.execute_node(node, event, value, extra_data)
         else:

@@ -6568,7 +6568,7 @@ class VJoyRemapFunctor(gremlin.base_profile.AbstractFunctor):
                         case StepMode.Encoder:
                             # encoder mode - use a timer to determine the rate of change
                             verbose = self.verbose
-                            verbose = True
+                            # verbose = True
 
                             if event.is_pressed and (fire_event or latched):
                                 identifier = self.action_data.input_item.identifier

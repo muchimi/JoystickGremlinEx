@@ -30,6 +30,7 @@ from threading import Thread, Timer
 from typing import Callable
 import math
 import itertools
+from dinput import DeviceSummary
 
 
 import gremlin.base_classes
@@ -2153,18 +2154,17 @@ class EventListener(QtCore.QObject):
         for dev_info in gremlin.joystick_handling.joystick_devices():
             self._load_calibrations(dev_info)
 
-    def _load_calibrations(self, device_info):
+    def _load_calibrations(self, device : DeviceSummary):
         """Loads the calibration data for the given joystick.
-
-        :param device_info information about the device
+        :param device: DeviceSummary object representing the joystick device.
         """
 
         from gremlin.util import create_calibration_function
 
         cfg = gremlin.config.Configuration()
-        for entry in device_info.axismap_list:
-            limits = cfg.get_calibration(device_info.device_guid, entry.axis_index)
-            self._calibrations[(device_info.device_guid, entry.axis_index)] = create_calibration_function(limits[0], limits[1], limits[2])
+        for axis_index in device.axis_id_map:
+            limits = cfg.get_calibration(device.device_guid, axis_index)
+            self._calibrations[(device.device_guid, axis_index)] = create_calibration_function(limits[0], limits[1], limits[2])
 
     def _get_calibration_key(self, event: Event) -> tuple:
         """gets the calibration key for an event"""

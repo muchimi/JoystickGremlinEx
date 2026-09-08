@@ -5416,9 +5416,12 @@ class AbstractAction(BaseProfileData):
         """
         super().__init__(parent, extra_data)
         self.container = None
+        self._priority_callback = None
         if extra_data:
             if "container" in extra_data:
                 self.container = extra_data["container"]
+            if "priority_callback" in extra_data:
+                self._priority_callback = extra_data["priority_callback"]
         else:
             if isinstance(parent, AbstractContainer):
                 self.container = parent
@@ -5572,10 +5575,13 @@ class AbstractAction(BaseProfileData):
 
     @property
     def priority(self):
+        if self._priority_callback:
+            # custom callback for priority
+            return self._priority_callback()
         return self._priority
 
     def setPriority(self, value: int):
-        """sets the priority of the action, numeric"""
+        """sets the priority of the action, numeric, lower priority executes before higher priority """
         value = gremlin.util.clamp(value, 0, 1000)
         self._priority = value
 

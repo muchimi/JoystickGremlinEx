@@ -268,6 +268,9 @@ class ProfileConverter:
             if new_root is not None:
                 # Save converted version
                 tree = etree.ElementTree(new_root)
+                nodes = new_root.xpath("//devices/device")
+                for node in nodes:
+                    syslog.info(f"Converted device: {etree.tostring(node)}")
                 tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
             else:
                 raise error.ProfileError("Failed to convert profile")

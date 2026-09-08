@@ -53,6 +53,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Change: API: added a profile integrity check feature, for the moment, checking state data integrity due to reported ID changes.  This will restore integrity in the profile automatically while the root cause is investigated.  More integrity checks will be added especially to check proper XML formatting for profiles to help identify errors, especially when profiles are manually edited.
 - Change: API: added additional diagnostics code to track down a mode issue - this will dump the actual data at the time the error occurs to provide specific context.
 
+
 ### (m77T45)
 - Change: Platform (Python): Update to Python 3.14.7 maintenance release.
 - Change: Platform (QT): Update to Pyside6 6.11.2, Shiboken6 6.11.2. maintenance releases.
