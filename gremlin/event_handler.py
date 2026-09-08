@@ -2710,9 +2710,11 @@ class EventHandler(QtCore.QObject):
                 self.latched_callbacks[device_guid][mode] = {}
             if key not in self.latched_callbacks[device_guid][mode]:
                 self.latched_callbacks[device_guid][mode][key] = {}
+            # Nest by input_item so multiple merge/latch actions on the same primary
+            # input (e.g. local + remote VJoyMergeAxis) each keep their callbacks.
             if input_item not in self.latched_callbacks[device_guid][mode][key]:
-                self.latched_callbacks[device_guid][mode][key] = []
-            data = self.latched_callbacks[device_guid][mode][key]
+                self.latched_callbacks[device_guid][mode][key][input_item] = []
+            data = self.latched_callbacks[device_guid][mode][key][input_item]
             data.append((self._install_plugins(callback), permanent))
 
             # setup the latched input list
@@ -2721,8 +2723,19 @@ class EventHandler(QtCore.QObject):
             if mode not in self.latched_input_map[device_guid]:
                 self.latched_input_map[device_guid][mode] = {}
             if key in self.latched_input_map[device_guid][mode]:
-                assert False, f"Input item {input_item.display_name} already latched for device {device_guid}, mode {mode}, key {key}"
-            self.latched_input_map[device_guid][mode][key] = LatchedCallbackData(input_item, event.event_type, callback, action_data=action_data)
+                existing = self.latched_input_map[device_guid][mode][key]
+                # Same primary input registering another merge/latch action is valid
+                # (e.g. local + remote VJoyMergeAxis containers sharing one trim axis).
+                if existing.input_item is not input_item:
+                    assert False, (
+                        f"Input item {input_item.display_name} already latched for device "
+                        f"{device_guid}, mode {mode}, key {key} "
+                        f"(owned by {existing.input_item.display_name})"
+                    )
+            else:
+                self.latched_input_map[device_guid][mode][key] = LatchedCallbackData(
+                    input_item, event.event_type, callback, action_data=action_data
+                )
 
             if verbose:
                 device = gremlin.joystick_handling.getDevice(device_guid)
