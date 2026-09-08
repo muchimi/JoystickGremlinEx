@@ -1502,7 +1502,7 @@ class EventListener(QtCore.QObject):
         vjoy_id = vjoyevent.vjoy_id
         verbose = self._verbose_vjoy
         # verbose = True # debug mode - force output for diagnostics regardless of user settings
-        if self._profile_started and self.js.vjoyAsInput(vjoy_id):
+        if self._profile_started and self.js.getVjoyAsInput(vjoy_id):
             # profile is running and started, and the vjoy device is a loopback device (used as input)
             input_type = vjoyevent.input_type
             input_id = vjoyevent.input_id

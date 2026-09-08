@@ -278,6 +278,16 @@ class Axis:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
+        # Synthetic loopback for "vJoy as input". DINPUT often does not echo our
+        # own SetAxis back into GEX; vjoy_event feeds EventListener._handle_vjoy_event
+        # which queues a real input event for mappings on this device.
+        axis_input_id = self.axis_id - 0x30 + 1
+        el.vjoy_event.emit(
+            gremlin.event_handler.VjoyEvent(
+                self.vjoy_id, InputType.JoystickAxis, axis_input_id, self._value
+            )
+        )
+
 
 
 
@@ -370,10 +380,14 @@ class Button:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-
-
-
-class Hat:
+        # Synthetic loopback for "vJoy as input". UI output events alone do not
+        # drive profile mappings; emit vjoy_event so _handle_vjoy_event can
+        # queue input when this device is used as input.
+        el.vjoy_event.emit(
+            gremlin.event_handler.VjoyEvent(
+                self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed
+            )
+        )
     """Represents a discrete hat in vJoy, allows setting the direction
     of the hat."""
 
@@ -555,9 +569,12 @@ class Hat:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-
-
-        vjm = VJoyMonitor()
+        # Synthetic loopback for "vJoy as input" (same path as axis/button).
+        el.vjoy_event.emit(
+            gremlin.event_handler.VjoyEvent(
+                self.vjoy_id, InputType.JoystickHat, self.hat_id, direction
+            )
+        )
         vjm.ensure_ownership(self.vjoy_id)
 
         if self.hat_type == HatType.Discrete:
