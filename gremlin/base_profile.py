@@ -4075,7 +4075,7 @@ class Profile:
 
         # Parse each device into separate DeviceConfiguration objects
         device_nodes = root.xpath("/profile/devices//device")
-        verbose = True
+        # verbose = True
         for child in device_nodes:
             if verbose:
                 syslog.info(f"XML: parsing device [{child.get('name')}] type: [{child.get('type')}] line : {child.sourceline}")
