@@ -278,9 +278,6 @@ class Axis:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-        # Do not emit vjoy_event for axes (m76T185 / T139+). High-rate axis
-        # samples flooding the loopback path cause severe input lag.
-
 
 
 
@@ -373,14 +370,21 @@ class Button:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-        # Synthetic loopback for "vJoy as input". m76T185 only emitted
-        # vjoy_output_event (UI) for buttons; DINPUT echo is unreliable, so emit
-        # vjoy_event for buttons (low rate) so mappings on this device fire.
-        el.vjoy_event.emit(
-            gremlin.event_handler.VjoyEvent(
-                self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed
+        # Loopback only for "vJoy as input" devices (button chaining). Not emitted
+        # for normal output-only vJoy writes.
+        import gremlin.shared_state
+        profile = gremlin.shared_state.current_profile
+        if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
+            el.vjoy_event.emit(
+                gremlin.event_handler.VjoyEvent(
+                    self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed
+                )
             )
-        )
+
+
+
+
+class Hat:
     """Represents a discrete hat in vJoy, allows setting the direction
     of the hat."""
 
@@ -562,12 +566,19 @@ class Button:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-        # Synthetic loopback for "vJoy as input" (m76T185 hat path).
-        el.vjoy_event.emit(
-            gremlin.event_handler.VjoyEvent(
-                self.vjoy_id, InputType.JoystickHat, self.hat_id, direction
+        # m76T185 hat loopback, gated to vJoy-as-input devices only.
+        import gremlin.shared_state
+        profile = gremlin.shared_state.current_profile
+        if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
+            el.vjoy_event.emit(
+                gremlin.event_handler.VjoyEvent(
+                    self.vjoy_id, InputType.JoystickHat, self.hat_id, direction
+                )
             )
-        )
+
+
+
+        vjm = VJoyMonitor()
         vjm.ensure_ownership(self.vjoy_id)
 
         if self.hat_type == HatType.Discrete:
