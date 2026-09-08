@@ -1237,6 +1237,9 @@ class ExecutionContext:
                         if condition and container:
                             if isinstance(condition, gremlin.input_item.BaseActivationCondition):
                                 functor = self._create_activation_condition(condition, container, True)
+                            elif isinstance(condition, gremlin.actions.AbstractCondition):
+                                # Already a runtime functor (e.g. VirtualButtonCondition)
+                                functor = condition
                             else:
                                 functor = self._convert_condition(condition)
                             logtabs = gremlin.shared_state.logTabs()

@@ -922,6 +922,12 @@ def convert_condition(condition):
     import gremlin.ui.state_device
     import gremlin.actions
     import gremlin.input_item
+
+    # Already a runtime condition (e.g. VirtualButtonCondition created during
+    # tree build) — converting again would fail the type checks below.
+    if isinstance(condition, AbstractCondition):
+        return condition
+
     if isinstance(condition, gremlin.ui.keyboard_device.BaseKeyboardCondition):
         return gremlin.actions.KeyboardCondition(condition.scan_code, condition.is_extended, condition.comparison, input_item = condition.input_item, target = condition.target)
 
