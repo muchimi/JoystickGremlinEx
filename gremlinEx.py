@@ -1211,10 +1211,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         self._dialog_substitute = None
 
     def _reload(self):
-        """reloads the current profile """
+        """reloads the current profile"""
         current_profile = gremlin.shared_state.current_profile
         self._do_load_profile(current_profile.profile_file)
-
 
     @QtCore.Slot(str, bool)
     def _reload_profile(self, source_xml: str, as_new_profile: bool):
@@ -2991,7 +2990,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     continue
                 if not device.connected:
                     pass
-                visible = visible_map.get(device.device_guid, True) # visible_map.get[device_id] if device_id in visible_map else True
+                visible = visible_map.get(device.device_guid, True) or not device.connected  # show disconnected devices
                 device.visible = visible
                 if not visible:
                     if verbose_l1:
@@ -4433,7 +4432,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         gremlin.util.assert_ui_thread()
 
         if self.device_change_locked:
-            return # nested call
+            return  # nested call
 
         if not gremlin.joystick_handling.joystick_initialized():
             # not initialized yet
@@ -4444,7 +4443,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # force a re-read of DINPUT data
         syslog.info("DILL: Device change reported by DINPUT - updating enumeration data:")
 
-        dinput.DILL.reset() # force a re-int of DILL
+        dinput.DILL.reset()  # force a re-int of DILL
 
         # update joysticks
         gremlin.joystick_handling.refresh_devices()
@@ -4454,11 +4453,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         el.request_reload.emit()
 
         self.device_change_locked = False
-
-
-
-
-
 
     @QtCore.Slot()
     def _device_input_changed_cb(self, device_guid, input_type, input_id):
@@ -4952,6 +4946,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     def _clear_managed_sound(self):
         """Clears all managed sound files"""
         import gremlin.sound
+
         result = gremlin.ui.ui_common.ConfirmBox("Clear all managed sound files?\nThis will force GEX to regenerate them.?")
         if result:
             pdm = gremlin.sound.PhraseDataManager()
@@ -5333,7 +5328,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             # update UI post load
             self.refresh()
 
-
     def refresh(self):
         gremlin.util.InvokeUiMethod(self._refresh_ui)
 
@@ -5375,7 +5369,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             )
         except Exception as ex:
             syslog.error(f"Failed to force close process {pid}: {ex}")
-
 
     def _get_device_profile(self, device):
         """Returns a profile for the given device.
