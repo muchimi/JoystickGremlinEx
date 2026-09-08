@@ -278,15 +278,8 @@ class Axis:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-        # Synthetic loopback for "vJoy as input". DINPUT often does not echo our
-        # own SetAxis back into GEX; vjoy_event feeds EventListener._handle_vjoy_event
-        # which queues a real input event for mappings on this device.
-        axis_input_id = self.axis_id - 0x30 + 1
-        el.vjoy_event.emit(
-            gremlin.event_handler.VjoyEvent(
-                self.vjoy_id, InputType.JoystickAxis, axis_input_id, self._value
-            )
-        )
+        # Do not emit vjoy_event for axes (m76T185 / T139+). High-rate axis
+        # samples flooding the loopback path cause severe input lag.
 
 
 
@@ -380,9 +373,9 @@ class Button:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-        # Synthetic loopback for "vJoy as input". UI output events alone do not
-        # drive profile mappings; emit vjoy_event so _handle_vjoy_event can
-        # queue input when this device is used as input.
+        # Synthetic loopback for "vJoy as input". m76T185 only emitted
+        # vjoy_output_event (UI) for buttons; DINPUT echo is unreliable, so emit
+        # vjoy_event for buttons (low rate) so mappings on this device fire.
         el.vjoy_event.emit(
             gremlin.event_handler.VjoyEvent(
                 self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed
@@ -569,7 +562,7 @@ class Button:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-        # Synthetic loopback for "vJoy as input" (same path as axis/button).
+        # Synthetic loopback for "vJoy as input" (m76T185 hat path).
         el.vjoy_event.emit(
             gremlin.event_handler.VjoyEvent(
                 self.vjoy_id, InputType.JoystickHat, self.hat_id, direction
