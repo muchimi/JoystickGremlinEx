@@ -661,6 +661,7 @@ class SoundMonitor(QtCore.QObject):
             self.DeviceChanged.emit()
 
 
+
 @gremlin.singleton_decorator.SingletonDecorator
 class Sound:
     """wrapper class to play sounds via pygame and QT multimedia"""
@@ -716,26 +717,17 @@ class Sound:
 
             self._update_devices()
 
-            # get the default device
-            device = sd.query_devices(kind="output")
-            name = device["name"]
-            if name not in self.device_name_to_id_map:
-                # different API - match by starting name
-                for device_name in self.device_name_to_id_map:
-                    if device_name.startswith(name):
-                        name = device_name
-                        break
-
-            self._playback_device_name = name
+            self._playback_device_name = self.getDefaultAudioDeviceName()
 
             self.pool = concurrent.futures.ThreadPoolExecutor()  # supports mutliple concurrent audio threads
 
         else:
             # list of devices from QT multimedia
+
             devices = QtMultimedia.QMediaDevices.audioOutputs()
             self.device_map = {index: device for index, device in enumerate(devices)}
             # flip the device map
-            self.device_name_to_id_map = {id: name for id, name in self.device_map.items()}
+            self.device_name_to_id_map = {device.description(): index for index, device in self.device_map.items()}
 
         self.pm = PhraseDataManager()
 
@@ -983,12 +975,23 @@ class Sound:
             device = default_audio_device
         return device
 
-    def getDefaultAudioDevice(self) -> str:
+    def getDefaultAudioDevice(self):
         if USE_SD:
             # force a rescan if the audio has changed
             self._update_devices()
             _, index = sd.default.device
-            default_output_obj = sd.query_devices(index) # this is not the WASAPI device so that needs to be checked later
+            # device attributes:
+            # 'name': name,
+            # 'index': device,
+            # 'hostapi': info.hostApi,
+            # 'max_input_channels': info.maxInputChannels,
+            # 'max_output_channels': info.maxOutputChannels,
+            # 'default_low_input_latency': info.defaultLowInputLatency,
+            # 'default_low_output_latency': info.defaultLowOutputLatency,
+            # 'default_high_input_latency': info.defaultHighInputLatency,
+            # 'default_high_output_latency': info.defaultHighOutputLatency,
+            # 'default_samplerate': info.defaultSampleRate
+            default_output_obj = sd.query_devices(index)
             return default_output_obj
 
         return QtMultimedia.QMediaDevices.defaultAudioOutput()
@@ -1017,6 +1020,11 @@ class Sound:
             device = self.getDefaultAudioDevice()
             self.audio_device = device.description()
         index = next((i for i, d in self.device_map.items() if d.description() == self.audio_device), None)
+        return index
+
+    def getAudioDeviceIndexFor(self, name : str):
+        """ gets the index of the audio device with the given name """
+        index = next((i for i, d in self.device_map.items() if d.description() == name), None)
         return index
 
     def setPlaybackDevice(self, name: str):

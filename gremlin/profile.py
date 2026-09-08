@@ -28,7 +28,6 @@ from lxml import etree
 import time
 
 
-
 from PySide6 import QtCore
 
 import dinput
@@ -268,10 +267,12 @@ class ProfileConverter:
         if converted:
             if new_root is not None:
                 # Save converted version
-                tree  = etree.ElementTree(new_root)
+                tree = etree.ElementTree(new_root)
                 tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
             else:
                 raise error.ProfileError("Failed to convert profile")
+
+
 
     def _determine_version(self, root):
         """Returns the version of the provided profile.
@@ -1111,7 +1112,7 @@ class ProfileConverter:
 
         return root
 
-    def _convert_from_v16(self, root, fname=None):
+    def _convert_from_v16(self, root, fname: str = None):
         """convert from V16 to V17 - placeholder for any necessary changes"""
         root.attrib["version"] = "17"  # change version
         from gremlin.ui.mode_device import ModeInputModeType
@@ -1130,202 +1131,64 @@ class ProfileConverter:
             node.set("guid", str(gremlin.util.get_guid()))
             node.set("type", ModeInputModeType.to_name(mode_type))
 
-
         return root
 
-    # def convert_tts(self, fname: str, speaker=None, tts_speed: float = 1.0, generate=True) -> bool:
-    #     """ convert legacy TTS to Playsound TTS - optionally changes the engine to edge AI """
+    def run_integrity_check(self, root, fname: str):
+        """performs an integrity check on the converted profile"""
+        # placeholder for integrity check logic
 
-    #     import gremlin.util
-    #     import gremlin.ui.ui_common
-    #     import gremlin.config
-    #     import gremlin.shared_state
+        syslog.info("PROFILE: integrity check...")
 
-    #     config = gremlin.config.Configuration()
-    #     if not speaker:
-    #         speaker = config.ai_tts_last_speaker  # use the last speaker if none provided
+        # check for state IDs maching map to state IDs
+        key_map = {}
 
-    #     ui = gremlin.shared_state.ui
+        changed = False
 
-    #     if not fname or not os.path.isfile(fname):
-    #         gremlin.ui.ui_common.MessageBoxWarning(prompt="Invalid profile file.\nEnsure profile is saved.")
-    #         return False
+        # build a map of map to state entries by key and ID
+        map_to_state_nodes = root.xpath("//map_to_state")
+        for node in map_to_state_nodes:
+            id = safe_read(node, "state-id", str, "")
+            key = safe_read(node, "key", str, "")
+            if key not in key_map:
+                key_map[key] = []
+            key_map[key].append((node, id))
 
-    #     if generate:
+        if key_map:
+            # only process if the state has state mappings
+            state_nodes = root.xpath("//states/state")
+            for node in state_nodes:
+                id = safe_read(node, "id", str, "")
+                key = safe_read(node, "key", str, "")
+                if not id:
+                    syslog.warning(f"Integrity Check: Found state definition with empty ID: key: [{key}] line: [{node.sourceline}]")
+                    continue
+                if not key:
+                    syslog.warning(f"Integrity Check: Found state definition with empty key: id: [{id}] line: [{node.sourceline}]")
+                    continue
 
-    #         # display dialog
-    #         dialog = TTSDialog(speaker, tts_speed, parent=ui)
-    #         result = dialog.exec()
-    #         if result != QtWidgets.QDialog.Accepted:
-    #             return False
+                if key in key_map:
+                    for map_node, map_id in key_map[key]:
+                        if map_id != id:
+                            # found a matching map_to_state for this state
+                            syslog.warning(
+                                f"Integrity Check: Found state ID mismatch: state: [{id}] key: [{key}] map to state: [{map_id}] line: [{map_node.sourceline}]"
+                            )
+                            map_node.set("state-id", id)
+                            changed = True
 
+        if changed:
+            # Save converted version
+            try:
+                syslog.info(f"Integrity Check: Saving converted profile to: {gremlin.util.toUrl(fname)}")
+                tree = etree.ElementTree(root)
+                tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
+            except Exception as e:
+                raise error.ProfileError(f"Integrity check: Failed to save converted profile: {e}")
 
-    #     try:
-    #         parser = etree.XMLParser(remove_blank_text=True)
-    #         root = etree.parse(fname, parser)
+        else:
+            syslog.info("Integrity Check: pass")
 
-    #         nodes = root.xpath("//text-to-speech")
-    #         count = len(nodes)
-
-    #         progress_dialog = QtWidgets.QProgressDialog("Operation in progress...", "Cancel", 0, count, parent=ui)
-    #         progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
-    #         progress_dialog.setAutoClose(True)
-    #         progress_dialog.setMinimumDuration(0)  # Show immediately
-    #         time.sleep(0.05)
-    #         QtWidgets.QApplication.processEvents()  # Process events to keep the UI responsive
-
-    #         canceled = False
-    #         index = 1
-    #         for node in nodes:
-    #             # read attributes
-
-    #             if "text" in node.attrib:
-    #                 text = node.get("text")
-    #                 if not text:
-    #                     continue  # no text
-    #             else:
-    #                 continue  # no text
-
-    #             progress_dialog.setLabelText(f"Processing {index} out of {count}...")
-    #             progress_dialog.setValue(index)
-    #             time.sleep(0.05)
-    #             QtWidgets.QApplication.processEvents()  # Process events to keep the UI responsive
-
-    #             if progress_dialog.wasCanceled():
-    #                 canceled = True
-    #                 break
-    #             volume = safe_read(node, "volume", int, 50)
-    #             volume = gremlin.util.clamp(volume, 0, 100)
-    #             rate = safe_read(node, "rate", int, 100)
-    #             if rate == 0:
-    #                 rate = 100  # default
-
-    #             clearQueue = safe_read(node, "clear-queue", bool, False)
-    #             _abort = safe_read(node, "abort", bool, False)
-    #             exec_on_press = safe_read(node, "exec_on_press", bool, True)
-    #             exec_on_release = safe_read(node, "exec_on_release", bool, False)
-
-    #             playback_ms = 0
-    #             save_on_generate = True
-    #             loops = 1
-    #             fadein_ms = 0
-    #             fadeout_ms = 0
-    #             stop_previous = clearQueue
-    #             mode = "ktts"
-
-    #             # remove attribs
-    #             node.attrib.clear()
-
-    #             # convert the node in place
-    #             node.tag = "play-sound"
-
-    #             node.set("action_id", gremlin.util.get_guid())
-    #             node.set("text", text)
-    #             if speaker:
-    #                 node.set("speaker", speaker)
-
-    #             node.set("mode", mode)
-    #             node.set("tts_speed", safe_format(tts_speed, float))
-    #             node.set("save", safe_format(save_on_generate, bool))
-    #             node.set("exec_on_press", safe_format(exec_on_press, bool))
-    #             node.set("exec_on_release", safe_format(exec_on_release, bool))
-    #             node.set("loops", safe_format(loops, int))
-    #             node.set("playback-ms", safe_format(playback_ms, int))
-    #             node.set("fadein-ms", safe_format(fadein_ms, int))
-    #             node.set("fadeout-ms", safe_format(fadeout_ms, int))
-    #             node.set("stop-previous", safe_format(stop_previous, bool))
-
-    #             if generate:
-    #                 # generate the wav file
-    #                 progress_dialog.setLabelText(f"Generate voice file {index} out of {count}...")
-
-    #                 wav = ktts.getNewWav()
-    #                 if config.ai_tts_use_word_filenames:
-    #                     # use a word based file name based on the TTS text (which presumably is unique)
-    #                     ext = gremlin.util.get_ext(wav)
-    #                     suggested_name = gremlin.util.textWordsToUnderscore(text)
-    #                     dir = os.path.dirname(wav)
-    #                     suggested_file = os.path.join(dir, suggested_name)
-    #                     suggested_file = gremlin.util.swap_ext(suggested_file, ext)
-
-    #                     if os.path.isfile(suggested_file):
-    #                         # word file already exists
-    #                         if config.ai_tts_overwrite_filenames:
-    #                             # re-use the same file - delete current
-    #                             target_file = suggested_file
-    #                             try:
-    #                                 os.unlink(suggested_file)
-    #                             except Exception as e:
-    #                                 syslog.error(f"CONVERT: unable to remove file {suggested_file}")
-    #                                 syslog.error(f"\tError: {str(e)}")
-    #                                 return False
-    #                         else:
-    #                             # don't reuse, find a unique file name by sequencing
-    #                             index = 1
-    #                             fname = gremlin.util.swap_ext(suggested_file, suffix=f"_{index}")
-    #                             while os.path.isfile(fname):
-    #                                 index += 1
-    #                                 fname = gremlin.util.swap_ext(suggested_file, suffix=f"_{index}")
-
-    #                             target_file = fname
-    #                     else:
-    #                         # use the generated file name
-    #                         target_file = suggested_file
-
-    #                 # generate on a temporary file
-    #                 wav = ktts.generateWav(tts_file=wav, text=text, speaker=speaker, tts_speed=tts_speed)
-    #                 if wav:
-    #                     # file was generated ok
-    #                     if target_file != wav:
-    #                         # rename or overwrite the file
-    #                         if os.path.isfile(target_file):
-    #                             try:
-    #                                 os.unlink(target_file)
-    #                             except Exception as e:
-    #                                 syslog.error(f"CONVERT: unable to remove file [{wav}] to [{target_file}]")
-    #                                 syslog.error(f"\tError: {str(e)}")
-    #                                 target_file = wav  # do not rename
-
-    #                         # rename the generated file
-    #                         try:
-    #                             shutil.copy(wav, target_file)
-    #                             os.unlink(wav)
-    #                         except Exception as e:
-    #                             syslog.error(f"CONVERT: unable to save file [{wav}] to [{target_file}]")
-    #                             syslog.error(f"\tError: {str(e)}")
-    #                             target_file = wav  # do not rename
-
-    #                     node.set("tts_file", target_file)
-
-    #             time.sleep(0.05)
-    #             QtWidgets.QApplication.processEvents()  # Process events to keep the UI responsive
-
-    #             index += 1
-
-    #         if canceled:
-    #             return False
-
-    #         # Save converted version
-    #         tree = root
-    #         if os.path.isfile(fname):
-    #             try:
-    #                 os.unlink(fname)
-    #             except Exception as e:
-    #                 syslog.error(f"CONVERT TTS: unable to delete existing profile file: {str(e)}")
-    #                 return False
-    #         tree.write(fname, pretty_print=True, xml_declaration=True, encoding="utf-8")
-    #         syslog.info(f"CONVERT TTS: saved data to : {fname}")
-
-    #         gremlin.ui.ui_common.MessageBoxInfo(
-    #             prompt=f"Converted {count} TTS nodes\nProfile will now reload.",
-    #             parent=ui,
-    #         )
-
-    #     except Exception as e:
-    #         syslog.error(f"CONVERT TTS: unable to convert file: {str(e)}")
-    #         return False
-
-    #     return True
+        return root
 
     def _p3_extract_map_to_keyboard(self, input_item):
         """Converts an old macro setup to a map to keyboard action.
@@ -1734,5 +1597,3 @@ def parse_guid(value):
     from gremlin.util import parse_guid
 
     return parse_guid(value)
-
-

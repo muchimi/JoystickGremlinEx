@@ -1532,6 +1532,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
         return speaker
 
 
+
+
     def setSpeaker(self, speaker: str, mode: PlayMode):
         assert speaker is not None, "Speaker cannot be None"
         assert mode is not None, "Mode cannot be None"
@@ -1616,11 +1618,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         if index is None:
             # no longer valid, switch to the new default device
             self.device = self.getDefaultAudioDevice()
-            if self.device:
-                name = self.device.description()
-            else:
-                name = None
-            self._audio_device = name
+            self._audio_device = self.getDefaultAudioDeviceName()
             init_mixer = True
         else:
             if self._audio_device != name:
@@ -1942,6 +1940,9 @@ class PlaySound(gremlin.input_item.AbstractAction):
             device = default_audio_device
         return device
 
+
+    def getDefaultAudioDevice(self):
+        return self.sound.getDefaultAudioDevice()
 
     def getDefaultAudioDeviceName(self):
         """ gets the current operating system default device name """

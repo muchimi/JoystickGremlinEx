@@ -333,6 +333,8 @@ class MacroManager(QtCore.QObject):
         self._max_concurrent = config.max_concurrent_macro
         self._mode_affinity = config.macro_mode_affinity
         self._hook_mode_change = False  # true if mode change allowed hook enabled
+        self.verbose = gremlin.config.Configuration().verbose_mode_macro
+        # self.verbose = True
 
     @QtCore.Slot()
     def _profile_stop(self):
@@ -351,7 +353,7 @@ class MacroManager(QtCore.QObject):
     def _handle_mode_changed(self, mode: str):
         """called when the runtime mode has changed"""
         if self._mode_affinity:
-            verbose = gremlin.config.Configuration().verbose_mode_macro
+            verbose = self.verbose
             with self._queue_lock:
                 # remove any queued macros that do not match the new runtime mode
                 remove_list = [m.macro for m in self._queue if m.mode != mode]
@@ -400,9 +402,11 @@ class MacroManager(QtCore.QObject):
             # state (avoids waiting on a half-torn-down primitive)
             self._schedule_event = Event()
             self._run_scheduler_thread = Thread(target=self._run_scheduler)
-            self._run_scheduler_thread.setName("Macro scheduler")
+            self._run_scheduler_thread.name = "Macro scheduler"
             self._run_scheduler_thread.daemon = True
             self._run_scheduler_thread.start()
+            if self.verbose:
+                syslog.info("Macro scheduler thread started")
 
     def stop(self):
         """Stops the scheduler."""
@@ -429,6 +433,9 @@ class MacroManager(QtCore.QObject):
                 for key, value in self._flags.items():
                     self._flags[key] = False
 
+            if self.verbose:
+                syslog.info("Macro scheduler thread stopped")
+
     def queue_macro(
         self,
         macro: Macro,
@@ -445,7 +452,6 @@ class MacroManager(QtCore.QObject):
         :returns id: a unique ID for the macro step
         """
 
-        verbose = gremlin.config.Configuration().verbose_mode_macro
         mode = gremlin.shared_state.current_mode  # current profile mode
 
         if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
@@ -453,19 +459,20 @@ class MacroManager(QtCore.QObject):
             return
 
         if macro.state != MacroState.Idle:
-            if verbose:
+            if self.verbose:
                 syslog.info(f"MACRO: QUEUE: skipping queuing of macro [{macro.id}] owner: [{macro.ownerId}] because the state [{macro.state.name} is not idle.")
             return
 
         macro.state = MacroState.Scheduled
 
-        # syslog = logging.getLogger("system")
 
-        if verbose:
+
+        if self.verbose:
             syslog.info(f"MACRO: queue macro ID [{macro.id}]")
             action: MacroAbstractAction
             for action in macro.sequence:
-                syslog.info(f"\t{str(action)}")
+                if self.verbose:
+                    syslog.info(f"\t{str(action)}")
 
         if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
             self.terminate_macro(macro)
@@ -474,7 +481,8 @@ class MacroManager(QtCore.QObject):
             if self._max_concurrent:
                 count = len(self._queue)
                 if count > self._max_concurrent:
-                    syslog.error(f"MACRO: exceeded concurrent macro: {self._max_concurrent}")
+                    if self.verbose:
+                        syslog.error(f"MACRO: exceeded concurrent macro: {self._max_concurrent}")
                     return None
 
             # Preprocess macro to contain pauses as necessary
@@ -485,16 +493,20 @@ class MacroManager(QtCore.QObject):
 
             self._preprocess_macro(macro)
             with self._queue_lock:
-                self._queue.append(MacroEntry(macro, True, is_local, is_remote, mode, client_list=client_list))
+                entry = MacroEntry(macro, True, is_local, is_remote, mode, client_list=client_list)
+                if self.verbose:
+                    syslog.info(f"MACRO: created macro entry [{entry.macro.id}]")
+                self._queue.append(entry)
             self._schedule_event.set()
 
         return macro.id
 
     def clear_queue(self):
         """clears the current macro queue"""
-        # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_macro
-        if verbose:
+        if self.verbose:
+            syslog.info("MACRO: clear queue")
+
+        if self.verbose:
             syslog.info("MACRO: clear queue")
         with self._queue_lock:
             self._queue.clear()
@@ -505,23 +517,23 @@ class MacroManager(QtCore.QObject):
 
         :param macro the macro to terminate
         """
-        # syslog = logging.getLogger("system")
-        verbose = gremlin.config.Configuration().verbose_mode_macro
-        if verbose:
+        if self.verbose:
             syslog.info(f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminate requested.")
 
         with self._queue_lock:
             mode = gremlin.shared_state.current_mode
-            self._queue.append(
-                MacroEntry(
-                    macro,
-                    False,
-                    macro.is_local,
-                    macro.is_remote,
-                    mode,
-                    client_list=client_list,
-                )
+
+            entry = MacroEntry(
+                macro,
+                False,
+                macro.is_local,
+                macro.is_remote,
+                mode,
+                client_list=client_list,
             )
+            self._queue.append(entry)
+            if self.verbose:
+                syslog.info(f"MACRO: queue macro [{entry.macro.id}]")
             macro.abort()  # abort the macro
         self._schedule_event.set()
 
@@ -530,7 +542,7 @@ class MacroManager(QtCore.QObject):
             time.sleep(0)
 
         # mark it terminated
-        if verbose:
+        if self.verbose:
             syslog.info(f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminated.")
         macro.state = MacroState.Idle
 
@@ -570,6 +582,8 @@ class MacroManager(QtCore.QObject):
                     elif entry.macro.exclusive:
                         has_exclusive = True
                         if len(self._active) == 0:
+                            if self.verbose:
+                                syslog.info(f"MACRO: dispatching macro ID [{entry.macro.id}] (exclusive mode)")
                             if self._dispatch_macro(
                                 entry.macro,
                                 entry.is_local,
@@ -580,6 +594,8 @@ class MacroManager(QtCore.QObject):
                                 entries_to_remove.append(entry)
                     # Start a queued up macro
                     elif not has_exclusive and not self._is_executing_exclusive:
+                        if self.verbose:
+                            syslog.info(f"MACRO: dispatching macro ID [{entry.macro.id}]")
                         if self._dispatch_macro(
                             entry.macro,
                             entry.is_local,
@@ -591,6 +607,8 @@ class MacroManager(QtCore.QObject):
                 # Remove all entries we've processed
                 for entry in entries_to_remove:
                     if entry in self._queue:
+                        if self.verbose:
+                            syslog.info(f"MACRO: remove entrymacro ID [{entry.macro.id}]")
                         self._queue.remove(entry)
 
     def _dispatch_macro(

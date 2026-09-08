@@ -30,6 +30,8 @@ import time
 
 from typing import Callable
 
+from torch import mode
+
 import container_plugins
 import gremlin.keyboard
 import gremlin.profile
@@ -3805,9 +3807,18 @@ class Profile:
         """finds a mode by name or value"""
         self._ensure_mode_tree()
         if self._mode_tree is not None:
-            node = anytree.find(self._mode_tree, lambda node: self._compare_mode(node, mode))
+            try:
+                node = anytree.find(self._mode_tree, lambda node: self._compare_mode(node, mode))
+            except Exception as e:
+                syslog.error(f"Error finding mode '{mode}': {e}")
+                syslog.error(traceback.format_exc())
+                syslog.error("----------- start mode tree -----------")
+                syslog.error(anytree.RenderTree(self._mode_tree))
+                syslog.error("----------- end mode tree -----------")
+                node = None
             if node:
                 return node.name
+
         return None  # not found
 
     def find_mode_node(self, mode: str) -> ModeNode:
@@ -4010,8 +4021,12 @@ class Profile:
                 syslog.warning("Outdated profile, converting")
                 profile_converter.convert_profile(fname)
                 profile_was_updated = True
+
+            # run integrity checks
             tree = etree.parse(fname)
             root = tree.getroot()
+
+            profile_converter.run_integrity_check(root, fname)
 
         if verbose:
             syslog.info(f"XML: parsing profile [{gremlin.util.toUrl(fname)}]")
