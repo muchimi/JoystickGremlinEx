@@ -638,6 +638,13 @@ class VirpilButtonWidget(QtWidgets.QWidget):
 
     def _pick_color(self, current_rgb: int, title: str) -> int | None:
         color = QColor.fromRgb(current_rgb)
+        # Qt keeps the custom color palette in process-global state, so it has to be
+        # restored before the dialog opens and harvested after it closes.
+        config = gremlin.config.Configuration()
+        slot_count = QColorDialog.customCount()
+        for index, rgb in enumerate(config.custom_colors[:slot_count]):
+            QColorDialog.setCustomColor(index, QColor.fromRgb(rgb))
+
         # Use Qt's dialog, not the Windows native one. Native "Add to Custom Colors"
         # always overwrites the selected (usually first) custom slot.
         selected = QColorDialog.getColor(
@@ -646,6 +653,9 @@ class VirpilButtonWidget(QtWidgets.QWidget):
             title=title,
             options=QColorDialog.ColorDialogOption.DontUseNativeDialog,
         )
+
+        config.custom_colors = [QColorDialog.customColor(index).rgb() for index in range(slot_count)]
+
         if selected.isValid():
             return selected.rgb()
         return None
