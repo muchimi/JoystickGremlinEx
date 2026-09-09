@@ -1079,19 +1079,27 @@ class Sound:
             # terminate the thread pools
 
 
-            # Wait for active tasks to finish, but bound the wait so a stream
-            # that never completes (e.g. a stalled device) cannot hang the
-            # caller indefinitely. Previously this was an unbounded
-            # 'while self._sound_tasks' loop, which could freeze profile stop
-            # and 'stop previous audio' for minutes if a task got stuck.
-            deadline = time.time() + 2.0  # seconds
-            while True:
-                with self._tasks_lock:
-                    has_tasks = bool(self._sound_tasks)
-                if not has_tasks or time.time() >= deadline:
-                    break
-                self._task_trim()
-                time.sleep(0.01)
+            # Signal running streams to stop, then wait briefly for them to
+            # notice. The playback callback checks _is_playback_enabled() on
+            # every buffer, so disabling playback makes an active stream end at
+            # its next callback (a few milliseconds) instead of playing to
+            # completion. Without this signal the loop below simply waited for
+            # the current sound to finish, which made 'stop previous audio' do
+            # the opposite of what it promises and serialised the sound queue:
+            # each queued sound had to wait out the whole previous one.
+            self.pushPlaybackEnabled()
+            try:
+                deadline = time.time() + 0.5  # seconds - streams stop quickly once signalled
+                while True:
+                    with self._tasks_lock:
+                        has_tasks = bool(self._sound_tasks)
+                    if not has_tasks or time.time() >= deadline:
+                        break
+                    self._task_trim()
+                    time.sleep(0.005)
+            finally:
+                # re-enable playback so the caller can start the new sound
+                self.popPlaybackEnabled()
             with self._tasks_lock:
                 pending_tasks = list(self._sound_tasks)
             if pending_tasks:

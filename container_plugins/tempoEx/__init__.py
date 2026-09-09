@@ -731,6 +731,11 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
     def _trigger_double_press(self, event, value, extra_data: dict = None):
         """called on double tap trigger"""
 
+        if event is None:
+            # can happen if a queued timer/thread callback fires after a mode
+            # change already cleared the pending event reference
+            return
+
         is_pressed = event.is_pressed
 
 
@@ -765,6 +770,11 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
     def _trigger_short_press(self, event, value, extra_data: dict = None):
         """triggers a short press"""
 
+        if event is None:
+            # can happen if a queued timer/thread callback fires after a mode
+            # change already cleared the pending event reference
+            return
+
         is_pressed = event.is_pressed
         if is_pressed:
             if self.last_trigger:
@@ -797,6 +807,11 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
     def _trigger_long_press(self, event, value, extra_data: dict = None):
         """triggers a long press"""
+
+        if event is None:
+            # can happen if a queued timer/thread callback fires after a mode
+            # change already cleared the pending event reference
+            return
 
         is_pressed = event.is_pressed
 

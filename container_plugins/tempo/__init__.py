@@ -324,6 +324,11 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
     def _trigger_short_press(self, event, value, extra_data: dict = None):
         """triggers a short press"""
 
+        if event is None:
+            # can happen if a queued timer/thread callback fires after a mode
+            # change already cleared the pending event reference
+            return
+
         # syslog.info(f"execute short press {self.short_index}")
         ec = gremlin.execution_graph.ExecutionContext()
         if self.short_enabled:
@@ -334,6 +339,12 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
     def _trigger_long_press(self, event, value, extra_data: dict = None):
         """triggers a long press"""
+
+        if event is None:
+            # can happen if a queued timer/thread callback fires after a mode
+            # change already cleared the pending event reference
+            return
+
         # syslog.info(f"execute long press {self.long_index}")
         ec = gremlin.execution_graph.ExecutionContext()
         if self.long_enabled:
