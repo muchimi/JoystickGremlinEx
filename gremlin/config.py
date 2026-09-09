@@ -721,6 +721,16 @@ class Configuration(QtCore.QObject):
     def reset_mode_on_process_activate(self, value):
         self._set_data("reset_mode_on_process_activate", value)
 
+    @property
+    def custom_colors(self) -> list[int]:
+        """custom color palette shared by the color pickers, as RGB integers"""
+        data = self._get_data("custom_colors", [])
+        return [int(rgb) for rgb in data] if data else []
+
+    @custom_colors.setter
+    def custom_colors(self, value: list[int]):
+        self._set_data("custom_colors", [int(rgb) for rgb in value])
+
     def set_calibration(self, dev_id, limits):
         """Sets the calibration data for all axes of a device.
 
