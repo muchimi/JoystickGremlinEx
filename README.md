@@ -53,6 +53,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Change: API: added a profile integrity check feature, for the moment, checking state data integrity due to reported ID changes.  This will restore integrity in the profile automatically while the root cause is investigated.  More integrity checks will be added especially to check proper XML formatting for profiles to help identify errors, especially when profiles are manually edited.
 - Change: API: added additional diagnostics code to track down a mode issue - this will dump the actual data at the time the error occurs to provide specific context.
 - Fix: API: disconnected devices read on profile read.
+- Fix: Virpil LED plugin fixes (courtesy Lolo350)
+- Fix: gated vjoy as input loopback (courtesy Lolo350)
+- Fix: double-conversion of certain runtime activation conditions (courtesy Lolo350)  
+- Fix: VJOY merge latching (courtesy Lolo350)
+- Fix: Guard against unknown device (courtesy RazOrLegend)
+- Fix: TempoEx Container: double tap action could, depending on timing, get triggered by single click after initial trigger (not reset properly)
+- Fix: Tempo Container: adopted changes in T44/T45 to Tempo container for execution node setup.
 
 
 ### (m77T45)
