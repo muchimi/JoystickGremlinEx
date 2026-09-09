@@ -2446,18 +2446,18 @@ class EventHandler(QtCore.QObject):
             # convert to GUID
             device_guid = gremlin.util.parse_guid(device_guid)
 
-
-
         input_type = event.event_type
 
         # derive the input item from the functor
         input_item = functor.input_item
 
         magic_list = []
+        is_keyboard = False
 
         if input_type == InputType.Keyboard:
             input_type = InputType.KeyboardLatched
         if input_type == InputType.KeyboardLatched:
+            is_keyboard = True
             key: gremlin.keyboard.Key = event.identifier
             assert isinstance(key, gremlin.keyboard.Key), "invalid identifier for keyboard event"
             magic_list = [json.dumps(pairs) for pairs in key.sequence]
@@ -2477,20 +2477,19 @@ class EventHandler(QtCore.QObject):
 
         verbose = gremlin.config.Configuration().verbose_mode_exec
 
-        if device_guid not in self.input_item_map:
-            self.input_item_map[device_guid] = {}
-        if mode not in self.input_item_map[device_guid]:
-            self.input_item_map[device_guid][mode] = {}
-        if input_type not in self.input_item_map[device_guid][mode]:
-            self.input_item_map[device_guid][mode][input_type] = {}
-
-        device_name = gremlin.joystick_handling.getDeviceName(device_guid)
-        syslog.info(f"Add Latched Functor: input item: [{input_item.display_name}]")
-
-        for magic in magic_list:
-            # multiple magic depending on the event type
-            syslog.info(f"\tmagic: device [{device_name}] input_type: [{input_type.name}/{input_type}] magic: [{magic}]")
-            self.input_item_map[device_guid][mode][input_type][magic] = input_item
+        # Keyboard latching still needs input_item_map entries for key resolution.
+        # Joystick merge latches must NOT overwrite the secondary device's map with the
+        # primary input_item (m76T185): that broke matching and forced the T33+
+        # latched_input_map / unique-owner assert path.
+        if is_keyboard:
+            if device_guid not in self.input_item_map:
+                self.input_item_map[device_guid] = {}
+            if mode not in self.input_item_map[device_guid]:
+                self.input_item_map[device_guid][mode] = {}
+            if input_type not in self.input_item_map[device_guid][mode]:
+                self.input_item_map[device_guid][mode][input_type] = {}
+            for magic in magic_list:
+                self.input_item_map[device_guid][mode][input_type][magic] = input_item
 
         key = event.callbackKey
         if key not in self.latched_functors[device_guid][mode]:
@@ -2501,20 +2500,29 @@ class EventHandler(QtCore.QObject):
             assert not isinstance(functor, gremlin.input_item.InputItem), "invalid functor type"
             self.latched_functors[device_guid][mode][key].append(functor)
             if verbose:
-                device_name = gremlin.joystick_handling.device_name_from_guid(device_guid)
-                syslog.info(f"Added latched functor: {device_name} mode: {mode} key: [{key}] input: [{input_item.display_name}] event: [{str(event)}]")
-                pass
+                device_name = gremlin.joystick_handling.getDeviceName(device_guid)
+                syslog.info(
+                    f"Added latched functor: {device_name} mode: {mode} key: [{key}] "
+                    f"input: [{input_item.display_name}] event: [{str(event)}]"
+                )
 
-        # add the callback for the functor
-        container = functor.action_data.container
-
-        self.addCallback(
-            device_guid,
-            mode,
-            event,
-            lambda e: self.triggerContainerCallback(container, e),
-            extra_data={"container": container, "input_item": input_item, "latched": True, "action_data": functor.action_data},
-        )
+        # m76T185-style joystick merge latch: functors list only. Do not call
+        # addCallback(latched=True) — that path owns latched_input_map and asserts
+        # when multiple merges share one secondary axis (unplayable / no activate).
+        if is_keyboard:
+            container = functor.action_data.container
+            self.addCallback(
+                device_guid,
+                mode,
+                event,
+                lambda e: self.triggerContainerCallback(container, e),
+                extra_data={
+                    "container": container,
+                    "input_item": input_item,
+                    "latched": True,
+                    "action_data": functor.action_data,
+                },
+            )
 
     def registerMappedInput(self, device_guid, mode, input_type, magic, input_item):
         """Registers a mapped input item for the given device, mode, input type, and magic value"""
@@ -3437,7 +3445,18 @@ class EventHandler(QtCore.QObject):
                 )
 
             if input_item is None:
-                # no matching input item found - ignore inputs that aren't registered or could not be found (latched keys for example)
+                # m76T185: secondary axes used only as merge latches often have no
+                # native mapping. Still run latched functors for joystick events.
+                if event.event_type in (
+                    InputType.JoystickAxis,
+                    InputType.JoystickButton,
+                    InputType.JoystickHat,
+                ):
+                    f_list = self._matching_functors(event)
+                    if f_list:
+                        if not skip_execute:
+                            self._execute_callbacks(event, [], f_list)
+                        return [], f_list
                 if verbose:
                     syslog.info(f"Event: input not registered {str(event)}")
                 return None, None
