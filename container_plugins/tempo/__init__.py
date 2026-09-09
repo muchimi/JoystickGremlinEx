@@ -26,6 +26,7 @@ from lxml import etree as ElementTree
 from PySide6 import QtWidgets, QtCore
 
 import gremlin
+import gremlin.config
 import gremlin.ui.ui_common
 from gremlin.input_item import AbstractContainer, AbstractContainerWidget, ActionSelector, ActionSet, InputItem
 from gremlin.input_types import InputType
@@ -253,6 +254,10 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.short_nodes = []
         self.trigger_mode = None
         self._thread = None
+        # profile_started() logs node counts under this flag; it was read
+        # but never initialized, so starting a profile containing a Tempo
+        # container raised AttributeError. Mirrors the TempoEx functor.
+        self.verbose = gremlin.config.Configuration().verbose_mode_container
 
     def profile_started(self):
         # reset any prior values before start
