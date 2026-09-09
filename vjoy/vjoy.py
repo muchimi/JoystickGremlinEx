@@ -278,8 +278,20 @@ class Axis:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
-
-
+        # Loopback only for "vJoy as input" devices. Needed so mappings on the
+        # vJoy tab (e.g. Map to OSC Ex) fire when GEX writes the axis — DINPUT
+        # echo is unreliable. Gated to avoid flooding normal output-only devices.
+        import gremlin.shared_state
+        profile = gremlin.shared_state.current_profile
+        if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
+            el.vjoy_event.emit(
+                gremlin.event_handler.VjoyEvent(
+                    self.vjoy_id,
+                    InputType.JoystickAxis,
+                    self.axis_id - 0x30 + 1,
+                    self._value,
+                )
+            )
 
     def set_absolute_value(self, value):
         """Sets the position of the axis based on a value between [-1, 1].
