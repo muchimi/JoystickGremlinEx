@@ -370,6 +370,17 @@ class Button:
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
 
+        # Loopback only for "vJoy as input" devices (button chaining). Not emitted
+        # for normal output-only vJoy writes.
+        import gremlin.shared_state
+        profile = gremlin.shared_state.current_profile
+        if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
+            el.vjoy_event.emit(
+                gremlin.event_handler.VjoyEvent(
+                    self.vjoy_id, InputType.JoystickButton, self.button_id, is_pressed
+                )
+            )
+
 
 
 
@@ -554,6 +565,16 @@ class Hat:
         )
         el.vjoy_output_event.emit(event)
         el.vjoy_output_event_ui.emit(event)
+
+        # m76T185 hat loopback, gated to vJoy-as-input devices only.
+        import gremlin.shared_state
+        profile = gremlin.shared_state.current_profile
+        if profile is not None and profile.settings.getVjoyAsInput(self.vjoy_id):
+            el.vjoy_event.emit(
+                gremlin.event_handler.VjoyEvent(
+                    self.vjoy_id, InputType.JoystickHat, self.hat_id, direction
+                )
+            )
 
 
 
