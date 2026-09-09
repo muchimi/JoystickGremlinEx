@@ -4055,13 +4055,17 @@ class JoystickState:
     def setInputEnabled(self, device_guid, enabled: bool):
         """marks a device as input ingnored"""
         import gremlin.config
+        import gremlin.joystick_handling
 
         verbose = gremlin.config.Configuration().verbose_mode_vjoy
         if not isinstance(device_guid, str):
             device_guid = gremlin.util.normalize_guid(device_guid)
         if verbose:
-            device = gremlin.joystick_handling.getDevice(device_guid)
-            syslog.info(f"VJOY: {device.name} input: {'off' if enabled else 'on'}")
+            # getDevice() returns None when the guid is not in the device
+            # registry; getDeviceName() handles that and reports the guid
+            # instead, so verbose logging can never crash profile load.
+            device_name = gremlin.joystick_handling.getDeviceName(device_guid)
+            syslog.info(f"VJOY: {device_name} input: {'off' if enabled else 'on'}")
         self._input_ignored_device_list[device_guid] = not enabled
         if verbose:
             syslog.info("VJOY ")
@@ -4075,9 +4079,11 @@ class JoystickState:
         if not isinstance(device_guid, str):
             device_guid = gremlin.util.normalize_guid(device_guid)
         self._output_ignored_device_list[device_guid] = not enabled
-        device = gremlin.joystick_handling.getDevice(device_guid)
         if verbose:
-            syslog.info(f"VJOY: {device.name} output: {'off' if enabled else 'on'}")
+            # getDevice() can return None for an unknown guid - use the
+            # name helper which reports the guid instead of raising.
+            device_name = gremlin.joystick_handling.getDeviceName(device_guid)
+            syslog.info(f"VJOY: {device_name} output: {'off' if enabled else 'on'}")
 
     def _vjoy_as_input_changed(self, vjoy_id: int, enabled: bool):
         dev = gremlin.joystick_handling.vjoy_info_from_vjoy_id(vjoy_id)
