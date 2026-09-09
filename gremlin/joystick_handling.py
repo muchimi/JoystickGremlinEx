@@ -746,7 +746,7 @@ def registerSpecialDevice(dev):
         _special_devices_map[dev.device_guid] = dev
         _special_devices.append(dev)
 
-    syslog.info(f"\tid: [{dev.device_id}] type: [{dev.device_type.name}] name: [{dev.name}]")
+    # syslog.info(f"\tid: [{dev.device_id}] type: [{dev.device_type.name}] name: [{dev.name}]")
 
 
 def upsertSpecialDevice(dev):
