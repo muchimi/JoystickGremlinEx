@@ -57,6 +57,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Change: API: refactor device tab filtering data to incorporate disconnected data.
 - Change: API: when loading a VJOY as input from a profile, GEX will attempt to map it to the same VJOY ID based on configuration data in case the VJOY ID changed (this helps with porting profiles from one machine to another if VJOY IDs are different)
 - Fix: API: reset disconnected device references from a prior profile on profile reload.
+- Fix: Gated Axis Action: vjoy as input loopback
 
 
 ### (m77T46)
