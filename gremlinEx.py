@@ -86,7 +86,7 @@ import gremlin.macro_handler  # reference needed for packaging
 import gremlin.ui.octavi_device
 import gremlin.ui.virpil_device
 import gremlin.sound
-import gremlin.ktts
+# import gremlin.ktts
 from gremlin.worker import WorkManager
 import gremlin.maestro
 
@@ -543,19 +543,14 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """gets the name of a device"""
         return gremlin.joystick_handling.getDeviceName(device_guid)
 
-    def _add_tab(self, device_guid, tab_type, index=None, override_name=None) -> int:
+    def _add_tab(self, device: DeviceSummary, tab_type, index=None, override_name=None) -> int:
         """adds a tab to the tab header
-        :param device_guid: the device guid of the device to add
+        :param device: the device to add
         :param index: optiona, if specified, the index to add
         :returns int: the index of the tab added
         """
-        device_guid = gremlin.util.to_guid(device_guid)
-
-        device: dinput.DeviceSummary = self._get_device(device_guid)
-        if not device:
-            syslog.error(f"Unknown device GUID found in tabs: {device_guid}")
-            return
-        device_name = gremlin.joystick_handling.getDeviceName(device_guid)
+        device_guid = device.device_guid
+        device_name = device.name
 
         # ensure the device tab does not already exist
         if device_guid in self._tab_device_map:
@@ -585,10 +580,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
         verbose = gremlin.config.Configuration().verbose_mode_device
 
+
         if verbose:
             syslog.info(f"Add tab: index [{position}]  [{device_name}] data: {self.ui.devices_tab_header_widget.tabData(position)}")
 
-        self._update_tab(device_guid)
+        self._update_tab(device)
 
         return position
 
@@ -2592,44 +2588,45 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """refresh the UI on container visibility changed"""
         self.refresh()
 
-    def _update_tab(self, device_id: str):
-        gremlin.util.InvokeUiMethod(self._update_tab_ui, device_id)
+    def _update_tab(self, device: DeviceSummary):
+        gremlin.util.InvokeUiMethod(self._update_tab_ui, device)
 
-    def _update_tab_ui(self, device_id: str):
+    def _update_tab_ui(self, device: DeviceSummary):
         """updates the given tab for mapping and connection status - sets tab color and icons based on the device"""
+        if not device:
+            return
+        device_id = device.device_id
         position = self.getTabIndexForDevice(device_id)
 
         if position is not None:
             # determine the status
-            device = gremlin.joystick_handling.getDevice(device_id)
-            if device:
-                device.update()  # update connection state
-                if not device.connected:
-                    # indicate device is disconnected
-                    color = gremlin.ui.ui_common.Color.tabMissingForegroundColor()
-                    icon = gremlin.ui.ui_common.Icons.disconnectedIcon()  # .load_icon("mdi.power-plug-off", qta_color = color)
-                    self.ui.devices_tab_header_widget.setTabIcon(position, icon)
-                    self.ui.devices_tab_header_widget.setTabTextColor(position, color)
+            # device.update()  # update connection state
+            if not device.connected:
+                # indicate device is disconnected
+                color = gremlin.ui.ui_common.Color.tabMissingForegroundColor()
+                icon = gremlin.ui.ui_common.Icons.disconnectedIcon()  # .load_icon("mdi.power-plug-off", qta_color = color)
+                self.ui.devices_tab_header_widget.setTabIcon(position, icon)
+                self.ui.devices_tab_header_widget.setTabTextColor(position, color)
+            else:
+                # tab color based on mapping
+                mode_map = self._get_mappings(device_id)
+                edit_mode = gremlin.shared_state.edit_mode
+                has_active_map = edit_mode in mode_map and mode_map[edit_mode]
+                has_map = False
+                if has_active_map:
+                    color = gremlin.ui.ui_common.Color.tabUsedForegroundColor()
+                    icon = gremlin.ui.ui_common.Icons.mappedIcon(qta_color=color)
                 else:
-                    # tab color based on mapping
-                    mode_map = self._get_mappings(device_id)
-                    edit_mode = gremlin.shared_state.edit_mode
-                    has_active_map = edit_mode in mode_map and mode_map[edit_mode]
-                    has_map = False
-                    if has_active_map:
-                        color = gremlin.ui.ui_common.Color.tabUsedForegroundColor()
-                        icon = gremlin.ui.ui_common.Icons.mappedIcon(qta_color=color)
+                    has_map = sum(mode_map.values()) > 0
+                    if has_map:
+                        color = gremlin.ui.ui_common.Color.tabUsedOtherForegroundColor()
+                        icon = gremlin.ui.ui_common.Icons.mappedOtherIcon(qta_color=color)
                     else:
-                        has_map = sum(mode_map.values()) > 0
-                        if has_map:
-                            color = gremlin.ui.ui_common.Color.tabUsedOtherForegroundColor()
-                            icon = gremlin.ui.ui_common.Icons.mappedOtherIcon(qta_color=color)
-                        else:
-                            color = gremlin.ui.ui_common.Color.tabForegroundColor()
-                            icon = QtGui.QIcon()
+                        color = gremlin.ui.ui_common.Color.tabForegroundColor()
+                        icon = QtGui.QIcon()
 
-                    self.ui.devices_tab_header_widget.setTabTextColor(position, color)
-                    self.ui.devices_tab_header_widget.setTabIcon(position, icon)  # clear the icon
+                self.ui.devices_tab_header_widget.setTabTextColor(position, color)
+                self.ui.devices_tab_header_widget.setTabIcon(position, icon)  # clear the icon
 
     def _handle_feature_changed(self, feature):
         """called when a feature changes"""
@@ -2690,9 +2687,24 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         verbose = self.config.verbose_mode_ui_level(1)
         verbose_detailed = self.config.verbose_mode_ui_level(2)
         tab_map = self.config.tab_list
+        #verbose = True
 
-        # physical joysticks
-        physical_devices = [dev for dev in gremlin.joystick_handling.all_joystick_devices() if dev.device_category == DeviceCategory.Physical]
+        all_joystick_devices = gremlin.joystick_handling.all_joystick_devices()
+
+        # physical connected
+        physical_devices = [dev for dev in all_joystick_devices if dev.device_category == DeviceCategory.Physical and dev.connected]
+
+
+        # if vjoy devices, only include the disconnected ones referenced as input in the profile
+        vjoy_as_input = self.profile.settings.getVjoyAsInputList()
+
+
+        sorted_devices = [] # list of devices, sorted in tab appearance
+        sorted_device_tuples = [] # list of (device_id, device_name, device) triplets, sorted in tab appearance
+        disconnected_devices = [] # list of disconnected devices - these are devices in the profile but not found on the current machine
+        disconnected_vjoy_devices = [] # list of disconnected vjoy devices - these are vjoy devices in the profile but not found on the current machine
+
+
 
         # add vjoy input devices
         vjoy_devices = [dev for dev in gremlin.joystick_handling.all_vjoy_devices() if self._get_vjoy_input_enabled(dev)]
@@ -2706,12 +2718,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         cd = gremlin.joystick_handling.getConfigDevices()
         config_devices = list(cd)
 
-        section_map = {
-            DeviceCategory.Physical: physical_devices,
-            DeviceCategory.Virtual: vjoy_devices + maestro_devices,
-            DeviceCategory.Special: special_devices,
-            DeviceCategory.Config: config_devices,
-        }
 
         if not reset and tab_map:
             # existing device order configuration data saved
@@ -2723,10 +2729,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 DeviceCategory.Virtual: [],
                 DeviceCategory.Special: [],
                 DeviceCategory.Config: [],
+                DeviceCategory.Disconnected: [],
             }
 
             # build the tab list using existing tab order or default tab order if an existing isn't set
-            sorted_devices = []
+
             id_list = []
             data: TabData
             # sort the tab map by index
@@ -2737,8 +2744,17 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 item_list = [(int(index), gremlin.joystick_handling.getDevice(device_id), True) for index, device_id in tab_map.items()]
             item_list.sort(key=lambda x: x[0])
             invisible_list = []
+
+            if verbose:
+                syslog.info("UI: stored device order ----------")
+                for index, device, visible in item_list:
+                    if device:
+                        syslog.info(f"\t[{index}] [{device.device_name}] [{device.device_id}] visible: {visible}")
+                    else:
+                        syslog.info(f"\t[{index}] [<missing>] [<missing>] visible: {visible}")
+
             for index, device, visible in item_list:
-                if not device:
+                if not device or not device.connected:
                     # skip if disconnected
                     continue
                 if device.device_id in id_list:
@@ -2749,16 +2765,18 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     continue
                 if not visible:
                     # skip hidden devices
+
                     invisible_list.append(device)
-                    continue
                 if device.is_virtual:
                     # skip devices if the VJOY device is not setup as input
-                    input_enabled = self.profile.settings._vjoy_as_input.get(device.vjoy_id, False)
+                    input_enabled = device.vjoy_id in vjoy_as_input
                     if not input_enabled:
                         continue
 
+                device.visible = visible
                 id_list.append(device.device_id)
-                sorted_devices.append((device.device_id, device.name, device))
+                sorted_device_tuples.append((device.device_id, device.name, device))
+                sorted_devices.append(device)
                 if device.device_category not in category_map:
                     category_map[device.device_category] = []
                 category_map[device.device_category].append(device)
@@ -2766,38 +2784,75 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     syslog.info(f"from saved tabs: add index [{index}] [{device.device_name}]")
 
             # add any missing devices connected but not in the tab map
+            all_devices = gremlin.joystick_handling.getAllDevices()
 
-            for category, section in section_map.items():
-                missing_devices = [dev for dev in section if dev not in category_map[category]]
-                # index of the last item per section
+
+
+
+            missing_devices = [dev for dev in all_devices if dev.device_id not in id_list]
+
+            # dump all devices
+            if verbose:
+                gremlin.joystick_handling.dumpDevices()
+                syslog.info(f"Missing devices: {len(missing_devices)}")
                 for device in missing_devices:
-                    # next index
-                    if device.disabled:
-                        # skip
-                        continue
-                    if device in invisible_list:
-                        # skip
-                        continue
-                    sorted_devices.append((device.device_id, device.name, device))
+                    syslog.info(f"\tMissing device: {device.device_id}: {device.name} type: {device.device_type.name} category: {device.device_category.name} connected: {device.connected} enabled: {device.enabled} virtual: {device.is_virtual} guid: {device.device_guid}")
+
+            # index of the last item per section
+            for device in missing_devices:
+                syslog.info(f"Missing device: {device}")
+                if device.is_virtual and device.vjoy_id not in vjoy_as_input:
+                    # skip vjoy devices not setup as input
+                    disconnected_vjoy_devices.append(device)
+                elif device.device_category == DeviceCategory.Physical:
+                    disconnected_devices.append(device)
+                sorted_device_tuples.append((device.device_id, device.name, device))
+                sorted_devices.append(device)
+
+
+
+
 
         else:
             # setup default sorting order is by name (index 1 of id, name, dev triplets)
             # default is sort by physical, vjoy, special and config and by name within these categories
+
+            disconnected_devices = [dev for dev in all_joystick_devices if not dev.connected and dev.device_category == DeviceCategory.Physical]
+            disconnected_vjoy_devices = [dev for dev in gremlin.joystick_handling.all_vjoy_devices() if not dev.connected and dev.vjoy_id in vjoy_as_input]
+            disconnected_devices.extend(disconnected_vjoy_devices)
+
             physical_devices.sort(key=lambda x: x.name)
             special_devices.sort(key=lambda x: x.name)
             config_devices.sort(key=lambda x: x.name)
             vjoy_devices.sort(key=lambda x: x.name)
             maestro_devices.sort(key=lambda x: x.name)
-            sorted_devices = [
-                (device.device_id, device.name, device) for device in physical_devices + vjoy_devices + maestro_devices + special_devices + config_devices
+            disconnected_devices.sort(key=lambda x: x.name)
+
+            invisible_list = [] # nothing invisible
+
+            # display order:
+            # physical devices (connected)
+            # vjoy as input devices (connected)
+            # maestro devices (connected)
+            # disconnected devices (physical and vjoy)
+            # special devices (keyboard, osc, midi, mode, etc)
+            # configuration devices
+
+            all_sorted_devices = physical_devices + vjoy_devices + maestro_devices + disconnected_devices + disconnected_vjoy_devices + special_devices + config_devices
+            sorted_device_tuples = [
+                (device.device_id, device.name, device) for device in all_sorted_devices
             ]
+            sorted_devices = all_sorted_devices
+
+
+        sorted_devices_map = {device.device_id: device for device in sorted_devices}
 
         index = 0
 
         # update new tab map
         tab_map = {}
-        for id, name, device in sorted_devices:
-            tab_map[index] = id
+        for device in sorted_devices:
+            tab_map[index] = device.device_id
             index += 1
 
         if verbose_detailed:
@@ -2805,29 +2860,41 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             self._dump_tab_map(tab_map)
 
         indexed_map = {}
-        for index, triplet in enumerate(sorted_devices):
+        for index, triplet in enumerate(sorted_device_tuples):
             indexed_map[index] = triplet[0]  # index, device_id
 
         # return data block
         data = {
             "tab_map": tab_map,
             "sorted": sorted_devices,
+            "sorted_tuples" : sorted_device_tuples,
             "physical": physical_devices,
             "vjoy": vjoy_devices,
             "maestro": maestro_devices,
             "special": special_devices,
             "config": config_devices,
             "index_map": indexed_map,
+            "disconnected": disconnected_devices, # physical disconnected
+            "disconnected_vjoy": disconnected_vjoy_devices, # vjoy as input disconnected
+            "sorted_devices_map": sorted_devices_map,
+            "invisible": invisible_list, # list of invisible devices as picked by the user
+
         }
 
         # verbose = True
         if verbose:
             syslog.info("Derived sorted device list:")
             index = 0
-            for id, name, dev in sorted_devices:
+            for key, device_list in data.items():
+                syslog.info(f"\t[{key}] -----------------")
+                if isinstance(device_list, list):
+                    for dev in device_list:
+                        syslog.info(f"\t\t{str(dev)}")
+            syslog.info("-"*40)
+            for id, name, dev in sorted_device_tuples:
                 syslog.info(f"\t[{index}] [{dev.device_category.name}] [{name}] [{id}] ")
                 index += 1
-            pass
+
 
         return data
 
@@ -2889,77 +2956,32 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             gremlin.shared_state.is_tab_loading = True
 
-            # clear the widget map as it's recreated here
-            # gremlin.shared_state.device_widget_map.clear()
+            # device map
+            data = self._get_sorted_tab_map()
 
-            # update device lists
-            phys_devices = gremlin.joystick_handling.physical_devices()
-            # if verbose_l1:
-            #     syslog.info(f"Physical Devices: {len(phys_devices)}")
-            #     for dev in phys_devices:
-            #         syslog.info(f"\t{str(dev)}")
 
-            vjoy_devices = gremlin.joystick_handling.all_vjoy_devices()
-            maestro_devices = gremlin.joystick_handling.all_maestro_devices()
             self._active_devices = gremlin.joystick_handling.all_joystick_devices()
 
-            # get list of devices in the profile that do not exist or are not connected
-            graph: gremlin.profile_graph.ProfileGraph = gremlin.shared_state.current_profile.graph
 
-            graph_devices = graph.joystick_devices()
 
-            # derive missing devices found in the profile, but not currently connected
-            missing_phys_devices = [
-                dev
-                for dev in graph_devices
-                if dev.device_guid not in [d.device_guid for d in phys_devices] and dev.device_type == gremlin.types.DeviceType.Joystick
-            ]
-            missing_vjoy_devices = [
-                dev
-                for dev in graph_devices
-                if dev.device_guid not in [d.device_guid for d in vjoy_devices] and dev.device_type == gremlin.types.DeviceType.VJoy
-            ]
-            missing_maestro_devices = [
-                dev
-                for dev in graph_devices
-                if dev.device_guid not in [d.device_guid for d in maestro_devices] and dev.device_type == gremlin.types.DeviceType.Maestro
-            ]
+            self._all_devices_map = data["sorted_devices_map"]
 
-            self._missing_phys_devices = missing_phys_devices
-            self._missing_vjoy_devices = missing_vjoy_devices
-            self._missing_maestro_devices = missing_maestro_devices
 
-            for device in self._missing_phys_devices + self._missing_vjoy_devices + self._missing_maestro_devices:
-                gremlin.joystick_handling.registerSpecialDevice(device)
-
-            if verbose:
-                for device in self._missing_phys_devices:
-                    syslog.warning(f"Missing device: {str(device)}")
-
-            all_phys_devices = missing_phys_devices + phys_devices
-            all_vjoy_devices = missing_vjoy_devices + vjoy_devices
-            all_maestro_devices = missing_maestro_devices + maestro_devices
-
-            self._all_devices_map = {}
-            for device in all_phys_devices + all_vjoy_devices + all_maestro_devices:
-                self._all_devices_map[device.device_id] = device
 
             # index of the current tab being addded
             index = 0
 
-            data = self._get_sorted_tab_map()
-            sorted_devices = data["sorted"]
-            physical_devices = data["physical"]
-            # add missing devices so they show as disconnected
-            physical_devices += missing_phys_devices
-
             vjoy_devices = data["vjoy"]
-
+            physical_devices = data["physical"]
+            sorted_devices = data["sorted"]
             maestro_devices = data["maestro"]
             special_devices = data["special"]
             config_devices = data["config"]
             self._tab_map = data["tab_map"]
-            gremlin.shared_state.tab_devices = {id: dev for id, _, dev in sorted_devices}
+            disconnected_devices = data["disconnected"]
+            # disconnected_vjoy_devices = data["disconnected_vjoy"]
+
+            gremlin.shared_state.tab_devices = self._all_devices_map
 
             self._vjoy_input_device_guids = [dev.device_guid for dev in vjoy_devices]
 
@@ -2969,30 +2991,32 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             if not active_device:
                 # not found - pick the first one by tab order
 
-                _, _, active_device = sorted_devices[0]
+                active_device = sorted_devices[0]
                 active_device_guid = active_device.device_guid
                 gremlin.shared_state.setActiveDeviceGuid(active_device_guid)
 
             if verbose_l1:
                 syslog.info(f"TABS: active device: [{active_device.name}] id: [{active_device.device_id}]")
 
-            visible_map = config.device_visible_map
+            # visible_map = config.device_visible_map
+            # add disconnected devices to the visible list so they show up in the tabs
+
 
             # reset tab selector
             self._clear_tabs_ui()
 
             tab_device_list = []
 
-            for device_id, device_name, device in sorted_devices:
+            for device in sorted_devices:
+                device_id = device.device_id
+                device_name = device.name
+
                 if device.disabled:
                     if verbose_l1:
                         syslog.info(f"\tdevice [{device_name}] is disabled - skipping tab")
                     continue
-                if not device.connected:
-                    pass
-                visible = visible_map.get(device.device_guid, True) or not device.connected  # show disconnected devices
-                device.visible = visible
-                if not visible:
+
+                if not device.visible:
                     if verbose_l1:
                         syslog.info(f"\tdevice [{device_name}] is hidden - skipping tab")
                     continue
@@ -3004,7 +3028,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                 if verbose:
                     syslog.info(f"TAB: [{index}] processing device [{device_name}]  [{device_id}]")
 
-                if device in physical_devices:
+                if device in physical_devices or device in disconnected_devices:
                     device_profile = self.profile.get_device_modes(device.device_guid, DeviceType.Joystick, device.name)
 
                     # this needs to be registered before widgets are created because widgets may need this data
@@ -3047,7 +3071,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                     # add tab header for this device
                     if device not in tab_device_list:
-                        self._add_tab(device.device_guid, TabDeviceType.Joystick)
+                        self._add_tab(device, TabDeviceType.Joystick)
                         tab_device_list.append(device)
                         index += 1
 
@@ -3091,7 +3115,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     widget.data = (TabDeviceType.VjoyInput, device_guid, index)
                     # add tab header for this device
                     if device not in tab_device_list:
-                        self._add_tab(device.device_guid, TabDeviceType.VjoyInput)
+                        self._add_tab(device, TabDeviceType.VjoyInput)
                         tab_device_list.append(device)
                         index += 1
                         if verbose_l1:
@@ -3134,7 +3158,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                     widget.data = (TabDeviceType.MaestroInput, device_guid, index)
                     # add tab header for this device
                     if device not in tab_device_list:
-                        self._add_tab(device.device_guid, TabDeviceType.MaestroInput)
+                        self._add_tab(device, TabDeviceType.MaestroInput)
                         tab_device_list.append(device)
                         index += 1
                         if verbose_l1:
@@ -3175,7 +3199,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                             # add tab header for this device
                             if device not in tab_device_list:
                                 self._add_tab(
-                                    device.device_guid,
+                                    device,
                                     TabDeviceType.Keyboard,
                                     override_name="Keyboard/Mouse",
                                 )
@@ -3207,7 +3231,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     )
                                 # add tab header for this device
                                 if device not in tab_device_list:
-                                    self._add_tab(device.device_guid, TabDeviceType.Midi)
+                                    self._add_tab(device, TabDeviceType.Midi)
                                     tab_device_list.append(device)
                                     index += 1
 
@@ -3235,7 +3259,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     )
                                 # add tab header for this device
                                 if device not in tab_device_list:
-                                    self._add_tab(device.device_guid, TabDeviceType.Osc)
+                                    self._add_tab(device, TabDeviceType.Osc)
                                     tab_device_list.append(device)
                                     index += 1
 
@@ -3262,7 +3286,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
                                 # add tab header for this device
                                 if device not in tab_device_list:
-                                    self._add_tab(device.device_guid, TabDeviceType.OctaviIFR1)
+                                    self._add_tab(device, TabDeviceType.OctaviIFR1)
                                     tab_device_list.append(device)
                                     gremlin.shared_state.device_type_map[device_guid] = device_type
                                     index += 1
@@ -3294,7 +3318,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                         index,
                                     )
                                 if device not in tab_device_list:
-                                    self._add_tab(device.device_guid, TabDeviceType.StreamDeck, override_name=device.name)
+                                    self._add_tab(device, TabDeviceType.StreamDeck, override_name=device.name)
                                     tab_device_list.append(device)
                                     index += 1
 
@@ -3318,7 +3342,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 )
                             # add tab header for this device
                             if device not in tab_device_list:
-                                self._add_tab(device.device_guid, TabDeviceType.ModeControl)
+                                self._add_tab(device, TabDeviceType.ModeControl)
                                 tab_device_list.append(device)
                                 index += 1
 
@@ -3337,7 +3361,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 widget.data = (TabDeviceType.State, device_guid, index)
                             # add tab header for this device
                             if device not in tab_device_list:
-                                self._add_tab(device.device_guid, TabDeviceType.State)
+                                self._add_tab(device, TabDeviceType.State)
                                 tab_device_list.append(device)
                                 index += 1
 
@@ -3366,7 +3390,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 )
                             # add tab header for this device
                             if device not in tab_device_list:
-                                self._add_tab(device_guid, TabDeviceType.Settings)
+                                self._add_tab(device, TabDeviceType.Settings)
                                 tab_device_list.append(device)
                                 index += 1
 
@@ -3391,7 +3415,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 )
                             # add tab header for this device
                             if device not in tab_device_list:
-                                self._add_tab(device_guid, TabDeviceType.Plugins)
+                                self._add_tab(device, TabDeviceType.Plugins)
                                 tab_device_list.append(device)
                                 index += 1
 
@@ -4292,7 +4316,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             QThread.sleep(0)
         for index, (device_guid, device_name, device_type, tab_index) in enumerate(guid_list):
             data = tab_data[index]
-            self._add_tab(device_guid, data.tab_type, index)
+            device = gremlin.joystick_handling.getDevice(device_guid)
+            if device:
+                self._add_tab(device, data.tab_type, index)
 
         tab_map = self._get_tab_map()
         if self.config.verbose:
@@ -5123,9 +5149,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
             sd = gremlin.event_handler.JoystickState()
             sd.reset()
 
-            # reset event processor
-            # jap = gremlin.event_handler.JoystickEventProcessor()
-            # jap.reset()
+            # clear disconnected devices from prior profile
+            gremlin.joystick_handling.clearDisconnectedDevices()
+
 
             if emit:
                 el.request_activate.emit(False)

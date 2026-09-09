@@ -37,7 +37,7 @@ import logging
 import gremlin.sound
 from gremlin.sound import Sound, PhraseData, EdgeTTSVoice, SoundEvent
 import enum
-import gremlin.ktts
+# import gremlin.ktts
 import gremlin.tts
 import gremlin.shared_state
 import random
@@ -82,7 +82,7 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         self._updating_etts_speakers = False
 
         container_widgets = []
-        ktts_enabled = gremlin.ktts.KTTS_ENABLED
+        #ktts_enabled = gremlin.ktts.KTTS_ENABLED
 
         self.icon_widget = QtWidgets.QLabel()
         self.file_path_widget = QtWidgets.QLineEdit()
@@ -115,10 +115,10 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             ("AI (Edge-TTS)", PlayMode.EdgeAI, "Generates an audio file from text via AI (requires Edge-TTS installation), dynamic generation supported."),
             ("Stop Playback", PlayMode.Stop, "Stops any currently playing (queued) audio."),
         ]
-        if ktts_enabled:
-            options.append(
-                ("AI (Coqui-TTS)", PlayMode.CoquiAI, "Generates an audio file from text via AI (requires Coqui-TTS installation)"),
-            )
+        # if ktts_enabled:
+        #     options.append(
+        #         ("AI (Coqui-TTS)", PlayMode.CoquiAI, "Generates an audio file from text via AI (requires Coqui-TTS installation)"),
+        #     )
 
         widgets = ["Mode:"]
         for name, data, tooltip in options:
@@ -187,9 +187,9 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
         self.pytts_volume_widget.doubleClick.connect(self._handle_pytts_volume_reset)
 
         # speaker selection for ktts
-        if ktts_enabled:
-            self.ktts_speaker_widget = gremlin.ui.ui_common.QDataComboBox(tooltip="Selected speaker for AI voice generation.")
-            self.ktts_speaker_widget.setCallback(self._handle_ktts_speaker_changed)
+        # if ktts_enabled:
+        #     self.ktts_speaker_widget = gremlin.ui.ui_common.QDataComboBox(tooltip="Selected speaker for AI voice generation.")
+        #     self.ktts_speaker_widget.setCallback(self._handle_ktts_speaker_changed)
 
         # speaker selection for edge tts
         self.etts_speaker_widget = gremlin.ui.ui_common.QDataComboBox(tooltip="Selected speaker for AI voice generation.")
@@ -248,14 +248,14 @@ class PlaySoundWidget(gremlin.input_item.AbstractActionWidget):
             tooltip="Speed rate modifier for the generated audio.\n0is the normal rate.  Half speed, -50, twice the speed +100",
         )
 
-        if ktts_enabled:
-            self.ktts_speed_widget = gremlin.ui.ui_common.QFloatLineEdit(
-                min_range=0.1,
-                max_range=10.0,
-                value=self.action_data.ktts_speed,
-                callback=self._handle_ktts_speed_changed,
-                tooltip="Speed rate modifier for the generated audio.\n1.0 is the normal rate.",
-            )
+        # if ktts_enabled:
+        #     self.ktts_speed_widget = gremlin.ui.ui_common.QFloatLineEdit(
+        #         min_range=0.1,
+        #         max_range=10.0,
+        #         value=self.action_data.ktts_speed,
+        #         callback=self._handle_ktts_speed_changed,
+        #         tooltip="Speed rate modifier for the generated audio.\n1.0 is the normal rate.",
+        #     )
 
         self.etts_pitch_widget = gremlin.ui.ui_common.QIntLineEdit(
             min_range=-500,
@@ -487,14 +487,14 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self._stack_map[PlayMode.Blank] = 0  # index 0 - blank
         self._stack_map[PlayMode.EdgeAI] = 1  # index 1 - ETTS
         self._stack_map[PlayMode.PyTTS] = 2  # index 2  - PyTTS
-        if ktts_enabled:
-            self._stack_map[PlayMode.CoquiAI] = 3  # index 2 - KTTS
+        # if ktts_enabled:
+        #     self._stack_map[PlayMode.CoquiAI] = 3  # index 2 - KTTS
 
         self.stack_widget.addWidget(widget)  # index 0 - blank
         self.stack_widget.addWidget(self.etts_container)  # index 1 ETTS
         self.stack_widget.addWidget(self.pytts_container)  # index 2 PyTTS
-        if ktts_enabled:
-            self.stack_widget.addWidget(self.ktts_container)  # index 3 KTTS
+        # if ktts_enabled:
+        #     self.stack_widget.addWidget(self.ktts_container)  # index 3 KTTS
 
         container_widgets.append(self.playback_sync_container)
         container_widgets.append(self.audio_container)
@@ -767,40 +767,40 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.auto_generate_widget.setVisible(generate_visible)
 
         match mode:
-            case PlayMode.CoquiAI:
-                if not self.action_data.ktts_enabled:
-                    return
-                ktts = gremlin.ktts.KTTS()
+            # case PlayMode.CoquiAI:
+            #     if not self.action_data.ktts_enabled:
+            #         return
+            #     ktts = gremlin.ktts.KTTS()
 
-                generate_enabled = ktts.is_available() and self.action_data.text is not None and self.action_data.text != ""
+            #     generate_enabled = ktts.is_available() and self.action_data.text is not None and self.action_data.text != ""
 
-                wav = self.action_data.tts_file
-                play_enabled = wav is not None and os.path.isfile(wav)
+            #     wav = self.action_data.tts_file
+            #     play_enabled = wav is not None and os.path.isfile(wav)
 
-                speed_visible = ktts.is_speed_available()
-                delete_enabled = play_enabled
+            #     speed_visible = ktts.is_speed_available()
+            #     delete_enabled = play_enabled
 
-                if wav is not None and os.path.isfile(wav):
-                    self.tts_file_widget.setText(wav)
-                else:
-                    self.tts_file_widget.setText("not generated")
+            #     if wav is not None and os.path.isfile(wav):
+            #         self.tts_file_widget.setText(wav)
+            #     else:
+            #         self.tts_file_widget.setText("not generated")
 
-                self.etts_speed_widget.setEnabled(speed_visible)
-                self.generate_widget.setEnabled(generate_enabled)
-                self.tts_file_delete_widget.setEnabled(delete_enabled)
+            #     self.etts_speed_widget.setEnabled(speed_visible)
+            #     self.generate_widget.setEnabled(generate_enabled)
+            #     self.tts_file_delete_widget.setEnabled(delete_enabled)
 
-                # ktts status
-                if ktts.is_loaded():
-                    icon = self.icon_loaded
-                    label = "Ready"
-                elif ktts.is_available():
-                    icon = self.icon_available
-                    label = "Available"
-                else:
-                    label = "Unavailable"
-                    icon = self.icon_unavailable
-                self.aitts_state_widget.setText(label)
-                self.aitts_state_widget.setIcon(icon)
+            #     # ktts status
+            #     if ktts.is_loaded():
+            #         icon = self.icon_loaded
+            #         label = "Ready"
+            #     elif ktts.is_available():
+            #         icon = self.icon_available
+            #         label = "Available"
+            #     else:
+            #         label = "Unavailable"
+            #         icon = self.icon_unavailable
+            #     self.aitts_state_widget.setText(label)
+            #     self.aitts_state_widget.setIcon(icon)
 
             case PlayMode.EdgeAI:
                 etts = gremlin.sound.EdgeTTS()
@@ -856,9 +856,9 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
         self.action_data.etts_volume = value
         self._update_status_ui(f"ETTS volume changed to {value}", "info")
 
-    def _handle_ktts_speed_changed(self, value: float):
-        self.action_data.ktts_speed = value
-        self._update_status_ui(f"KTTS speed changed to {value}", "info")
+    # def _handle_ktts_speed_changed(self, value: float):
+    #     self.action_data.ktts_speed = value
+    #     self._update_status_ui(f"KTTS speed changed to {value}", "info")
 
     def _handle_etts_speed_changed(self, value: int):
         self.action_data.etts_speed = value
@@ -894,10 +894,10 @@ For text to speech (tts) modes, multiple samples can be provided by separating t
 
 
 
-    def _handle_ktts_speaker_changed(self, value):
-        assert isinstance(value, str), f"Invalid value for KTTS speaker: {value}"
-        self.action_data.ktts_speaker = value
-        gremlin.config.Configuration().ai_ktts_last_speaker = value
+    # def _handle_ktts_speaker_changed(self, value):
+    #     assert isinstance(value, str), f"Invalid value for KTTS speaker: {value}"
+    #     self.action_data.ktts_speaker = value
+    #     gremlin.config.Configuration().ai_ktts_last_speaker = value
 
     def _handle_etts_speaker_changed(self, value):
         assert isinstance(value, str), f"Invalid value for ETTS speaker: {value}"
@@ -1474,7 +1474,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self.pytts_speed: int = 100  # words per minute, 100 is the default
         self.pytts_volume: int = 100  # volume, 0 to 100
         self.etts_speed: int = 0  # speed factor for Edge TTS as a whole percentage, e.g., 10 means +10%
-        self.ktts_speed = 1.0  # speed factor for KTTS
+        # self.ktts_speed = 1.0  # speed factor for KTTS
 
         self._tts_suppress_duplicate = config.tts_suppress_enabled  # whether to suppress duplicate TTS playback
         self._tts_suppress_cooldown = config.tts_suppress_cooldown  # cooldown time in seconds to suppress duplicate TTS playback
@@ -1965,15 +1965,15 @@ class PlaySound(gremlin.input_item.AbstractAction):
         index = next((i for i, d in self.device_map.items() if d.description() == self.audio_device), None)
         return index
 
-    def getWave(self):
-        """gets the TTS wave file"""
-        ktts = gremlin.ktts.KTTS()
-        return ktts.getActionWaveFile()
+    # def getWave(self):
+    #     """gets the TTS wave file"""
+    #     ktts = gremlin.ktts.KTTS()
+    #     return ktts.getActionWaveFile()
 
-    def isWave(self):
-        """true if the TTS wave file exists"""
-        wav = self.getWave()
-        return os.path.isfile(wav)
+    # def isWave(self):
+    #     """true if the TTS wave file exists"""
+    #     wav = self.getWave()
+    #     return os.path.isfile(wav)
 
     def _parse_xml(self, node, data=None, extra_data=None):
         """loads data from xml"""
@@ -2059,8 +2059,8 @@ class PlaySound(gremlin.input_item.AbstractAction):
         self.etts_speed = safe_read(node, "etts_speed", int, 0)
         self.etts_volume = safe_read(node, "etts_volume", float, 1.0)
 
-        self.ktts_enabled = gremlin.ktts.KTTS_ENABLED
-        self.ktts_speed = safe_read(node, "ktts_speed", float, 1.0)
+        # self.ktts_enabled = gremlin.ktts.KTTS_ENABLED
+        # self.ktts_speed = safe_read(node, "ktts_speed", float, 1.0)
         self.playback_rate = safe_read(node, "playback-rate", float, 1.0)
         self.playback_volume = int(node.get("volume", 50))
         self.exec_on_press = safe_read(node, "exec_on_press", bool, True)
@@ -2114,7 +2114,7 @@ class PlaySound(gremlin.input_item.AbstractAction):
             node.set("etts_locale", self.etts_locale)
         if self.etts_gender:
             node.set("etts_gender", self.etts_gender)
-        node.set("ktts_speed", safe_format(self.ktts_speed, float))
+        # node.set("ktts_speed", safe_format(self.ktts_speed, float))
         node.set("exec_on_press", safe_format(self.exec_on_press, bool))
         node.set("exec_on_release", safe_format(self.exec_on_release, bool))
         node.set("loops", safe_format(self.loops, int))
@@ -2147,17 +2147,17 @@ class PlaySound(gremlin.input_item.AbstractAction):
             case PlayMode.AudioFile:
                 table.addField("Play", html.escape(self.sound_file))
 
-            case PlayMode.CoquiAI:
-                ktts = gremlin.sound.KTTS()
-                text = self.text
-                text = html.escape(text) if text else ""
-                table.addField("Text", text)
-                sound_file = ktts.getActionWav(self)
-                if sound_file:
-                    table.addField("Play (AI)", html.escape(sound_file))
-                else:
-                    table.addField("Play (AI)", "not found")
-                table.addField("Speaker", self.speaker if self.speaker else "n/a")
+            # case PlayMode.CoquiAI:
+            #     ktts = gremlin.sound.KTTS()
+            #     text = self.text
+            #     text = html.escape(text) if text else ""
+            #     table.addField("Text", text)
+            #     sound_file = ktts.getActionWav(self)
+            #     if sound_file:
+            #         table.addField("Play (AI)", html.escape(sound_file))
+            #     else:
+            #         table.addField("Play (AI)", "not found")
+            #     table.addField("Speaker", self.speaker if self.speaker else "n/a")
 
             case PlayMode.EdgeAI:
                 text = self.text

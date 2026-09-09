@@ -221,15 +221,15 @@ class Ui_Gremlin(object):
         self.actionConvertTTS.setToolTip("Converts the legacy Map to TTS actions to Play Sound actions and the updated audio engine")
         self.actionConvertTTS.triggered.connect(self._handle_convert_tts)
 
-        self.actionGenerateTTS = QtGui.QAction(main_window)
-        self.actionGenerateTTS.setText("Generate TTS via KTTS")
-        self.actionGenerateTTS.setToolTip("Converts bulk text to TTS audio files via KTTS if available")
-        self.actionGenerateTTS.triggered.connect(self._handle_generate_tts)
+        # self.actionGenerateTTS = QtGui.QAction(main_window)
+        # self.actionGenerateTTS.setText("Generate TTS via KTTS")
+        # self.actionGenerateTTS.setToolTip("Converts bulk text to TTS audio files via KTTS if available")
+        # self.actionGenerateTTS.triggered.connect(self._handle_generate_tts)
 
         # ktts = gremlin.ktts.KTTS()
         # enabled = ktts.is_available()
         # self.actionConvertTTS.setEnabled(enabled)
-        self.actionGenerateTTS.setEnabled(False)
+        #self.actionGenerateTTS.setEnabled(False)
 
         self.menuRecent.addAction(self.actionEmpty)
         self.menuFile.addAction(self.actionNewProfile)
@@ -264,7 +264,7 @@ class Ui_Gremlin(object):
         self.menuTools.addAction(self.actionClearManagedSound)
         self.menuTools.addAction(self.actionConvertLegacy)
         self.menuTools.addAction(self.actionConvertTTS)
-        self.menuTools.addAction(self.actionGenerateTTS)
+        #self.menuTools.addAction(self.actionGenerateTTS)
 
         self.menuTools.addSeparator()
         self.menuTools.addAction(self.actionOptions)
@@ -331,18 +331,18 @@ class Ui_Gremlin(object):
         profile = gremlin.shared_state.current_profile
         profile_converter.convert_legacy(profile.profile_file)
 
-    def _handle_generate_tts(self):
-        import gremlin.ktts
-        import gremlin.shared_state
-        import gremlin.sound
+    # def _handle_generate_tts(self):
+    #     import gremlin.ktts
+    #     import gremlin.shared_state
+    #     import gremlin.sound
 
-        ui = gremlin.shared_state.ui
-        ktts = gremlin.ktts.KTTS()
-        if not ktts.is_available():
-            return
+    #     ui = gremlin.shared_state.ui
+    #     ktts = gremlin.ktts.KTTS()
+    #     if not ktts.is_available():
+    #         return
 
-        dialog = gremlin.sound.TTSGeneratorDialog(ui)
-        dialog.exec()
+    #     dialog = gremlin.sound.TTSGeneratorDialog(ui)
+    #     dialog.exec()
 
     def _handle_convert_tts(self):
         import gremlin.util

@@ -30,7 +30,7 @@ import time
 
 from typing import Callable
 
-from torch import mode
+
 
 import container_plugins
 import gremlin.keyboard
@@ -244,6 +244,9 @@ class ProfileDeviceNode:
         if "guid" in node.attrib:
             self.id = normalize_guid(node.get("guid"))  # device node ID
 
+        # list of defined vjoy ids
+        vjoy_id_list = gremlin.joystick_handling.vjoy_id_list()
+
         if "device-guid" in node.attrib:
             device_id = normalize_guid(node.get("device-guid"))
             device_guid = gremlin.util.to_guid(device_id)
@@ -253,47 +256,75 @@ class ProfileDeviceNode:
             else:
                 # device not found (could bedisconnected)
                 syslog.info(f"DEVICE: Device with GUID [{device_guid}] not found for profile [{self.name}]")
-                device = dinput.DeviceSummary()
-                device.device_guid = device_guid
-                device.device_id = device_id
-                # for disconnectd devices, assume maximum axis and buttons to avoid problems
-                device.axis_count = 8
-                # axis names
-                for axis_id in range(1, device.axis_count + 1):
-                    device.linear_id_map[axis_id] = axis_id
-                    device.axis_id_map[axis_id] = axis_id
-                    am = dinput.AxisMap()
-                    am.linear_index = axis_id
-                    am.axis_index = axis_id
-                    device.axismap_list.append(am)
-                    device.axis_names[axis_id] = am.getName()
-                device.device_category = DeviceCategory.Physical  # assume physical device if in a profile not under virtual sticks
-                device_type_str = safe_read(node, "type", str, "")
-                device_type = DeviceType.to_enum(device_type_str)
-                device.setVirtual(device_type in (DeviceType.VJoy, DeviceType.Maestro))
-                if device_type == DeviceType.VJoy:
-                    vjoy_id = int(safe_read(node, "vjoy-id", int, -1))
-                    if vjoy_id == -1:
-                        # see if the vjoy # can be derived from the name
-                        match = re.search(r"(\d+)\D*$", self.name)
-                        if match:
-                            vjoy_id = int(match.group(1))
-
-                    device.vjoy_id = vjoy_id
-                    device.virtual_id = device.vjoy_id
 
 
+                # map to an existing vjoy if possible - match the vjoy by configuration and ID
+                pattern = r"VJoy \d+/\d+/\d+ \(\d+\)"
 
-                device.button_count = 128
-                device.hat_count = 4
-                device.name = safe_read(node, "name", str, "unknown")
-                device.setConnected(False)
+                if re.match(pattern, self.name):
+                    stats = re.findall(r"\d+", self.name)
+                    axis_count, button_count, hat_count, vjoy_id = map(int, stats[:4])
+                    if vjoy_id in vjoy_id_list:
+                        vjoy_device = gremlin.joystick_handling.getDeviceFromVjoyId(vjoy_id)
+                        if vjoy_device.axis_count == axis_count and vjoy_device.button_count == button_count and vjoy_device.hat_count == hat_count:
+                            device = vjoy_device
+
+                            settings = self.profile.settings
+                            settings.setVjoyAsInput(device.vjoy_id, True)
+
+                        # not a matching device, treat as a regular
+
+                if not device:
+                    # create a disconnected device for this entry
+
+                    device = dinput.DeviceSummary()
+                    device.device_guid = device_guid
+                    device.device_id = device_id
+                    # for disconnectd devices, assume maximum axis and buttons to avoid problems
+                    device.axis_count = 8
+                    # axis names
+                    for axis_id in range(1, device.axis_count + 1):
+                        device.linear_id_map[axis_id] = axis_id
+                        device.axis_id_map[axis_id] = axis_id
+                        am = dinput.AxisMap()
+                        am.linear_index = axis_id
+                        am.axis_index = axis_id
+                        device.axismap_list.append(am)
+                        device.axis_names[axis_id] = am.getName()
+                    device.device_category = DeviceCategory.Physical  # assume physical device if in a profile not under virtual sticks
+                    device_type_str = safe_read(node, "type", str, "")
+                    device_type = DeviceType.to_enum(device_type_str)
+                    device.setVirtual(device_type in (DeviceType.VJoy, DeviceType.Maestro))
+                    if device_type == DeviceType.VJoy:
+                        vjoy_id = int(safe_read(node, "vjoy-id", int, -1))
+                        if vjoy_id == -1:
+                            # see if the vjoy # can be derived from the name
+                            match = re.search(r"(\d+)\D*$", self.name)
+                            if match:
+                                vjoy_id = int(match.group(1))
+
+                        device.vjoy_id = vjoy_id
+                        device.virtual_id = device.vjoy_id
+
+
+
+                    device.button_count = 128
+                    device.hat_count = 4
+                    device.name = safe_read(node, "name", str, "unknown")
+                    device.setConnected(False)
+
+
+                    if "type" in node.attrib:
+                        dt = safe_read(node, "type", str, "")
+                        device.device_type = DeviceType.to_enum(dt)
+                    else:
+                        device.device_type = DeviceType.NotSet
+
+
+
+                # register disconnected device in the tracking data 
                 gremlin.joystick_handling.registerDisconnectedDevice(device)
-                if "type" in node.attrib:
-                    dt = safe_read(node, "type", str, "")
-                    device.device_type = DeviceType.to_enum(dt)
-                else:
-                    device.device_type = DeviceType.NotSet
+
                 self._device = device
 
         self.label = safe_read(node, "label", str, self.name)
@@ -339,6 +370,7 @@ class ProfileDeviceNode:
             node.set("guid", write_guid(self.id))  # node ID
 
             node.set("type", DeviceType.to_string(self.device_type))
+            node.set("virtual", safe_format(self.device.is_virtual, bool))
 
             mode_list = sorted(self.modes.values(), key=lambda x: x.name)
             for mode in mode_list:

@@ -34,6 +34,7 @@ import gremlin.execution_graph
 import gremlin.base_profile
 from shiboken6 import Shiboken
 from gremlin.types import ContainerViewTypes, Interactions
+import gremlin.config
 
 
 syslog = logging.getLogger("system")
@@ -253,6 +254,7 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.short_nodes = []
         self.trigger_mode = None
         self._thread = None
+        self.verbose = gremlin.config.Configuration().verbose_mode_container
 
     def profile_started(self):
         # reset any prior values before start
@@ -260,6 +262,8 @@ class TempoContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
         self.timer = None
         self.value_press = None
         self.event_press = None
+        self.verbose = gremlin.config.Configuration().verbose_mode_container
+
 
         ec = gremlin.execution_graph.ExecutionContext()
         container_node = ec.find(self.action_data, gremlin.execution_graph.ExecutionGraphNodeType.Container)

@@ -421,7 +421,7 @@ Use Vjoy Remap instead."""
     def _on_id_changed(self, old_id: str, new_id: str):
         """called when the id changes"""
         state = gremlin.joystick_handling.VirtualDeviceUsageState()
-        syslog.info(f"Action ID changed from [{old_id}] to [{new_id}]")
+        # syslog.info(f"Action ID changed from [{old_id}] to [{new_id}]")
         state.unregisterAction(old_id)
         state.registerAction(new_id)
         self.update_button_used()

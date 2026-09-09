@@ -48,6 +48,17 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T47)
+- Change: Sound API: removed KTTS as an option as this experimental TTS generation method is not practical for GEX due to dependencies and significant complexity installing, and significant footprint for mediocre results compared to EdgeTTS.
+- Fix: remove spurious Torch library breaking packaged mode in T46 (this was an automated "feature" that was not requested and uncaught for T46 - my bad)
+- Fix: Tempo Container: verbose mode exception.
+- Change: API: scanning of disconnected devices is changed to work with new display filters and will distinguish between vjoy devices and physical devices.
+- Fix: UI: incorporate display of disconnected devices as tabs outside of device filter settings.
+- Change: API: refactor device tab filtering data to incorporate disconnected data.
+- Change: API: when loading a VJOY as input from a profile, GEX will attempt to map it to the same VJOY ID based on configuration data in case the VJOY ID changed (this helps with porting profiles from one machine to another if VJOY IDs are different)
+- Fix: API: reset disconnected device references from a prior profile on profile reload.
+
+
 ### (m77T46)
 - Fix: Playsound Action: missing call
 - Change: API: added a profile integrity check feature, for the moment, checking state data integrity due to reported ID changes.  This will restore integrity in the profile automatically while the root cause is investigated.  More integrity checks will be added especially to check proper XML formatting for profiles to help identify errors, especially when profiles are manually edited.

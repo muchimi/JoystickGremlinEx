@@ -241,6 +241,7 @@ class DeviceCategory(IntEnum):
     Virtual = 2  # VIrtual device
     Special = 3  # special devices that are not joysticks (like keyboard)
     Config = 4  # configuration device like settings
+    Disconnected = 5 # disconnected device (not currently connected, but was previously connected or referenced in a profile)
 
     @staticmethod
     def to_string(value):
@@ -257,6 +258,7 @@ _device_category_from_string = {
     "virtual": DeviceCategory.Virtual,
     "special": DeviceCategory.Special,
     "config": DeviceCategory.Config,
+    "disconnected": DeviceCategory.Disconnected,
 }
 
 _device_category_to_string = {
@@ -265,6 +267,7 @@ _device_category_to_string = {
     DeviceCategory.Virtual: "virtual",
     DeviceCategory.Special: "special",
     DeviceCategory.Config: "config",
+    DeviceCategory.Disconnected: "disconnected",
 }
 
 

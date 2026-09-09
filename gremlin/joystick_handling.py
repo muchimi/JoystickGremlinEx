@@ -76,6 +76,22 @@ def getAllDevicesMap():
     global _all_devices_map
     return _all_devices_map
 
+def getAllDevices() -> list:
+    """gets a list of all devices"""
+    global _all_devices_map
+    with _device_registry_lock:
+        return list(_all_devices_map.values())
+
+def dumpDevices():
+    """dumps the list of all devices to the log"""
+    global _all_devices_map
+    with _device_registry_lock:
+        device_list = list(_all_devices_map.values())
+        device_list.sort(key = lambda d: d.name.casefold())
+        syslog.info(f"All devices: {len(_all_devices_map)}")
+        for device in device_list:
+            syslog.info(f"\t{device.device_id}: {device.name} type: {device.device_type.name} category: {device.device_category.name} connected: {device.connected} enabled: {device.enabled} virtual: {device.is_virtual} guid: {device.device_guid}")
+
 
 def _handle_change(data, key, old_value, value):
     assert isinstance(key, dinput.GUID)
@@ -191,6 +207,12 @@ def vjoy_input_devices() -> list[DeviceSummary]:
     #     syslog.info(f"Vjoy as input list: {settings.getVjoyAsInputList()}")
     devices = [dev for dev in _vjoy_devices if settings.getVjoyAsInput(dev.vjoy_id)]
     return devices
+
+def vjoy_id_list(connected = True) -> list[int]:
+    """gets the list of vjoy device IDs"""
+    global _vjoy_devices
+    with _device_registry_lock:
+        return [dev.vjoy_id for dev in _vjoy_devices if dev.connected == connected]
 
 
 def vjoy_output_devices() -> list[DeviceSummary]:
@@ -814,13 +836,15 @@ def unregisterDisconnectedDevice(dev):
             _disconnected_devices.remove(dev)
 
 
+
+
 def clearDisconnectedDevices():
     """clears the list of disconnected devices"""
     global _disconnected_devices_map, _disconnected_devices
     with _device_registry_lock:
         for dev in list(_disconnected_devices):
             unregisterDisconnectedDevice(dev)
-
+    
         _disconnected_devices_map.clear()
         _disconnected_devices.clear()
 

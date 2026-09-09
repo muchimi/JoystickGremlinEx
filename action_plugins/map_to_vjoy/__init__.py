@@ -7555,9 +7555,10 @@ Supports axis merging, curved output, command, hat and button mappings.
                         # v2 is -1 to +1
                         a = scale_to_range(v2, target_min=0, target_max=1)  # scale v2 0 to 1
                         b = a - 0.5
-                        c = scale_to_range(b, source_min=0, source_max=0.5, target_min=0, target_max=1)
+                        # c = scale_to_range(b, source_min=0, source_max=0.5, target_min=0, target_max=1)
                         t = b
-                        syslog.info(f"v2: {v2:0.03f} a: {a:0.03f} b: {b:0.03f} c: {c:0.03f} t: {t:0.03f}")
+                        # if verbose:
+                        #     syslog.info(f"Trim Centered: v2: {v2:0.03f} a: {a:0.03f} b: {b:0.03f} c: {c:0.03f} t: {t:0.03f}")
                         if v1 > 0:
                             value = v2 + ((1 - t) * v1)
                         else:
