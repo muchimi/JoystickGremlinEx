@@ -538,7 +538,8 @@ class MacroActionEditor(QtWidgets.QWidget):
             if "vjoy_selector" not in self.ui_elements:
                 # vJoy input selection
                 self.ui_elements["vjoy_selector"] = gremlin.ui.ui_common.VJoySelector(
-                    self._modify_vjoy, [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat]
+                    change_cb = self._modify_vjoy,
+                    valid_types = [InputType.JoystickAxis, InputType.JoystickButton, InputType.JoystickHat]
                 )
 
             self.action_layout.addWidget(self.ui_elements["vjoy_selector"])

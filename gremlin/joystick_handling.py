@@ -844,7 +844,7 @@ def clearDisconnectedDevices():
     with _device_registry_lock:
         for dev in list(_disconnected_devices):
             unregisterDisconnectedDevice(dev)
-    
+
         _disconnected_devices_map.clear()
         _disconnected_devices.clear()
 
