@@ -22,9 +22,9 @@ from ctypes import wintypes
 import functools
 import logging
 import time
-from threading import Event, Lock, Thread
+from threading import Event, Lock, RLock, Thread
 from lxml import etree as ElementTree
-
+from gremlin.base_classes import FastQueue
 from PySide6 import QtCore, QtWidgets
 
 import win32con
@@ -44,6 +44,11 @@ import gremlin.util
 import enum
 from enum import auto
 from psygnal import Signal
+import concurrent.futures  # for thread pool
+import threading
+from typing import Callable
+
+
 
 syslog = logging.getLogger("system")
 
@@ -309,9 +314,16 @@ class MacroManager(QtCore.QObject):
         self.id = "8cdd6c7503cf40c0a8c99375489cfd51"
         self._active = {}
         self._queue = collections.deque()
+        self._macro_queue = FastQueue()
         self._flags = {}
         self._flags_lock = Lock()
         self._queue_lock = Lock()
+        self._tasks_lock = RLock()
+        self.pool = concurrent.futures.ThreadPoolExecutor()  # supports mutliple concurrent macro threads
+        self._macro_flags = {} # map of active macro abort flags by [macro id]->threading.Event
+        self._macro_map = {} # map of macro ID to macro
+        self._use_v2_mode = gremlin.config.Configuration().use_v2_macro_mode
+
 
         self.el = gremlin.event_handler.EventListener()
 
@@ -443,6 +455,26 @@ class MacroManager(QtCore.QObject):
         is_remote: bool = None,
         client_list: list = None,
     ):
+        """ queues a macro to run """
+        if self._use_v2_mode:
+            callback = self.queue_macro_v2
+        else:
+            callback = self.queue_macro_v1
+
+        return callback(
+            macro=macro,
+            is_local=is_local,
+            is_remote=is_remote,
+            client_list=client_list,
+        )
+
+    def queue_macro_v1(
+        self,
+        macro: Macro,
+        is_local: bool = None,
+        is_remote: bool = None,
+        client_list: list = None,
+    ):
         """Queues a macro in the schedule taking the repeat type into account.
 
         :param macro: the macro to add to the scheduler
@@ -501,18 +533,36 @@ class MacroManager(QtCore.QObject):
 
         return macro.id
 
-    def clear_queue(self):
-        """clears the current macro queue"""
-        if self.verbose:
-            syslog.info("MACRO: clear queue")
 
+    def clear_queue(self):
+        # clears the macro queue
+        if self._use_v2_mode:
+            self.clear_queue_v2()
+        else:
+            self.clear_queue_v1()
+
+
+    def clear_queue_v1(self):
+        """clears the current macro queue"""
         if self.verbose:
             syslog.info("MACRO: clear queue")
         with self._queue_lock:
             self._queue.clear()
             self._schedule_event.set()
 
+
+
     def terminate_macro(self, macro: Macro, client_list: list = None):
+        # return self.terminate_macro_v1(macro, client_list=client_list)
+
+        if self._use_v2_mode:
+            self.terminate_macro_v2(macro, client_list=client_list)
+        else:
+            self.terminate_macro_v1(macro, client_list=client_list)
+
+
+
+    def terminate_macro_v1(self, macro: Macro, client_list: list = None):
         """Adds a termination request for a macro to the execution queue.
 
         :param macro the macro to terminate
@@ -545,6 +595,8 @@ class MacroManager(QtCore.QObject):
         if self.verbose:
             syslog.info(f"MACRO: macro [{macro.id}] owner [{macro.ownerId}] terminated.")
         macro.state = MacroState.Idle
+
+
 
     def _run_scheduler(self):
         """Dispatches macros as required."""
@@ -641,6 +693,8 @@ class MacroManager(QtCore.QObject):
             syslog.warning(f"Attempting to dispatch an already running macro: ID: {macro.id}")
             return False
         return True
+
+
 
     def _execute_macro(
         self,
@@ -741,6 +795,222 @@ class MacroManager(QtCore.QObject):
 
         # trigger next step
         self._schedule_event.set()
+
+    def queue_macro_v2(
+            self,
+            macro: Macro,
+            is_local: bool = None,
+            is_remote: bool = None,
+            client_list: list = None,
+        ):
+            """Queues a macro using the macro thread pool taking the repeat type into account.
+
+            :param macro: the macro to add to the scheduler
+            :param is_local: local flag (leave default for local execution or set to True)
+            :param is_remote: remote flag (set to True for remote execution or set to )
+            :param client_list: list of clients to execute the macro on, optional
+
+            :returns id: a unique ID for the macro step
+            """
+
+            mode = gremlin.shared_state.current_mode  # current profile mode
+
+            if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
+                self.terminate_macro_v2(macro)
+                return
+
+            if macro.state != MacroState.Idle:
+                if self.verbose:
+                    syslog.info(f"MACRO: QUEUE: skipping queuing of macro [{macro.id}] owner: [{macro.ownerId}] because the state [{macro.state.name} is not idle.")
+                return
+
+            macro.state = MacroState.Scheduled
+
+
+
+            if self.verbose:
+                syslog.info(f"MACRO: queue macro ID [{macro.id}]")
+                action: MacroAbstractAction
+                for action in macro.sequence:
+                    if self.verbose:
+                        syslog.info(f"\t{str(action)}")
+
+            if isinstance(macro.repeat, ToggleRepeat) and macro.id in self._active:
+                self.terminate_macro_v2(macro)
+            else:
+                # ensure we are not executing too many macros
+                if self._max_concurrent:
+                    count = len(self._queue)
+                    if count > self._max_concurrent:
+                        if self.verbose:
+                            syslog.error(f"MACRO: exceeded concurrent macro: {self._max_concurrent}")
+                        return None
+
+                # Preprocess macro to contain pauses as necessary
+                if not is_local:
+                    is_local = macro.is_local
+                if not is_remote:
+                    is_remote = macro.is_remote
+
+                self._preprocess_macro(macro)
+                entry = MacroEntry(macro, True, is_local, is_remote, mode, client_list=client_list)
+                abort_flag = threading.Event()
+                self._macro_flags[macro.id] = abort_flag
+                self._macro_map[macro.id] = macro
+                with self._tasks_lock:
+                    # submit a work task
+                    task = self.pool.submit(self._execute_macro_v2,
+                                            entry.macro,
+                                            entry.is_local,
+                                            entry.is_remote,
+                                            client_list,
+                                            abort_flag,
+                                            self._handle_macro_completed)
+
+
+            return macro.id
+
+    def _handle_macro_completed(self, macro : Macro):
+        """Handles the completion of a macro."""
+        macro_id = macro.id
+        if self.verbose:
+            syslog.info(f"MACRO: macro [{macro_id}] completed.")
+        with self._tasks_lock:
+            del self._macro_flags[macro_id]
+            del self._macro_map[macro_id]
+
+    def _terminate_macro_v2(self, macro : Macro):
+        """Aborts a macro given its ID."""
+        macro_id = macro.id
+        if self.verbose:
+            syslog.info(f"MACRO: abort requested for macro [{macro_id}].")
+
+        with self._tasks_lock:
+            if macro_id in self._macro_flags:
+                self._macro_flags[macro_id].set()  # ask for termination
+
+
+    def clear_queue_v2(self):
+        """clears the current macro queue"""
+        if self.verbose:
+            syslog.info("MACRO: clear queue")
+        with self._tasks_lock:
+            for macro_id in list(self._macro_flags.keys()):
+                self._macro_flags[macro_id].set()  # ask for termination
+            while self._macro_flags:
+                # wait until it's terminated
+                time.sleep(0.01)
+
+    def terminate_macro_v2(self, macro: Macro, client_list: list = None):
+        """terminates a macro"""
+        with self._tasks_lock:
+            macro_id = macro.id
+            if macro_id in self._macro_flags:
+                self._macro_flags[macro_id].set()  # ask for termination
+                while macro_id in self._macro_flags:
+                    # wait until it's terminated
+                    time.sleep(0.01)
+
+
+    def _execute_macro_v2(
+        self,
+        macro: Macro,
+        is_local: bool = None,
+        is_remote: bool = None,
+        client_list: list = None,
+        abort_flag: threading.Event = None,
+        completion_callback : Callable = None,
+    ):
+        """Executes a given macro in a separate thread.
+
+        This method will run all provided actions and once they all have been
+        executed will remove the macro from the set of active macros and
+        inform the scheduler of the completion.
+
+        The macro flags is_local/is_remote control where the macro actions are sent
+
+        :param macro the macro object to be executed
+        :param completion_callback: Optional callback to be invoked when the macro completes.
+        """
+        verbose = gremlin.config.Configuration().verbose_mode_macro
+        if verbose:
+            syslog.info(f"MACRO: execute [{macro.id}]")
+
+        try:
+            (state_is_local, state_is_remote) = gremlin.remote.remote_control.state
+            if not is_remote:
+                is_remote = state_is_remote
+            if not is_local:
+                is_local = state_is_local
+
+            if macro.force_remote:
+                is_remote = True
+                is_local = False
+
+            if macro.repeat is not None:
+                delay = macro.repeat.delay
+
+                # mark the macro as repeating
+                with self._flags_lock:
+                    self._flags[macro.id] = True
+
+                # Handle count repeat mode
+                if isinstance(macro.repeat, CountRepeat):
+                    count = 0
+                    if verbose:
+                        syslog.info(f"\tMACRO: autorepeat id [{macro.id}]")
+                    while not abort_flag.is_set() and count < macro.repeat.count and self._flags[macro.id] and not macro.aborted:
+                        for action in macro.sequence:
+                            if macro.aborted:
+                                break
+                            if verbose:
+                                syslog.info(f"\tAction: {str(action)}")
+                            action(is_local, is_remote, client_list)
+                        count += 1
+                        time.sleep(delay)
+
+                # Handle continuous repeat modes
+                elif type(macro.repeat) in [HoldRepeat, ToggleRepeat]:
+                    while not abort_flag.is_set() and self._flags[macro.id] and not macro.aborted:
+                        for action in macro.sequence:
+                            if macro.aborted:
+                                break
+                            action(is_local, is_remote, client_list)
+                        time.sleep(delay)
+
+            # Handle simple one shot macros
+            else:
+                if verbose:
+                    msg = "".join(f"{str(a)} " for a in macro.sequence)
+                    syslog.info(f"\tMACRO: single shot: id: [{macro.id} {len(macro.sequence)} {msg}")
+                for action in macro.sequence:
+                    if macro.aborted or abort_flag.is_set():
+                        # ask to terminate received
+                        break
+                    action(is_local, is_remote, macro.force_remote)
+
+
+
+        finally:
+            # Reset the macro state to idle in case of an exception
+            macro.state = MacroState.Idle
+
+            # indicate the macro is done
+            if macro.completed_callback:
+                macro.completed_callback()
+
+            if completion_callback:
+                completion_callback(macro)
+
+            self.el.macro_step_completed.emit(macro.id)  # indicate the macro has been completed
+
+            if verbose:
+                syslog.info(f"MACRO: [{macro.id}] owner [{macro.ownerId}] completed.")
+
+
+
+
+
 
     def _preprocess_macro(self, macro):
         """Inserts pauses as necessary into the macro."""

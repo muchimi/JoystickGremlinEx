@@ -2800,7 +2800,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
 
             # index of the last item per section
             for device in missing_devices:
-                syslog.info(f"Missing device: {device}")
                 if device.is_virtual and device.vjoy_id not in vjoy_as_input:
                     # skip vjoy devices not setup as input
                     disconnected_vjoy_devices.append(device)
@@ -5228,7 +5227,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                         os.unlink(source_xml)
                         new_profile.setProfileFile(None)
 
-                    self._profile_load_stack.pop(0)
+                    if self._profile_load_stack:
+                        self._profile_load_stack.pop(0)
+
                     if verbose:
                         syslog.info("Profile: worker parse completed.")
 
@@ -5856,6 +5857,7 @@ def configure_logger(config: dict):
 
     logger = logging.getLogger(config["name"])
     logger.setLevel(config["level"])
+
     mb = config.get("megabytes", 5) * 1024 * 1024
     bc = config.get("backupCount", 1)
 
@@ -5863,7 +5865,7 @@ def configure_logger(config: dict):
     formatter = logging.Formatter(fmt, "%Y-%m-%d %H:%M:%S")
 
     # handler = logging.FileHandler(config["logfile"])
-    handler = RotatingFileHandler(config["logfile"], maxBytes=mb, backupCount=bc)
+    handler = RotatingFileHandler(config["logfile"], maxBytes=mb, backupCount=bc, encoding="utf-8")
     handler.setLevel(config["level"])
 
     handler.setFormatter(formatter)
@@ -5872,15 +5874,10 @@ def configure_logger(config: dict):
     if "faultfile" in config:
         mb = config.get("faultmegabytes", config.get("faultmegabytes", 1)) * 1024 * 1024
         bc = config.get("faultbackupCount", config.get("faultbackupCount", 3))
-        fault_handler = RotatingFileHandler(config["faultfile"], maxBytes=mb, backupCount=bc)
+        fault_handler = RotatingFileHandler(config["faultfile"], maxBytes=mb, backupCount=bc, encoding="utf-8")
         fault_handler.setLevel(logging.ERROR)
         fault_handler.setFormatter(formatter)
         logger.addHandler(fault_handler)
-
-    # logger.debug("-" * 80)
-    # logger.debug(time.strftime("%Y-%m-%d %H:%M"))
-    # logger.debug(f"Starting {gremlin.version.APPLICATION_NAME} {gremlin.version.APPLICATION_VERSION}")
-    # logger.debug("-" * 80)
 
     console = logging.StreamHandler()
     logger.addHandler(console)

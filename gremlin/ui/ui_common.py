@@ -3198,7 +3198,7 @@ class AbstractInputSelector(QWidget):
         if dev_id == -1:
             syslog.error(f"INPUT SELECTOR: device not found in dropdown: derived id: [{device_guid}] input id: [{device_id}]")
             return
-        
+
 
         # input_name = gremlin.common.input_to_ui_string(input_type, input_id)
         # entry_id = self.input_item_dropdowns[dev_id].findText(input_name)
@@ -3662,6 +3662,8 @@ class ModeWidget(QWidget):
                 if mode_name == last_edit_mode:
                     current_index = index
                 index += 1
+
+            self.edit_mode_selector.autoSize()
 
             if default_mode:
                 select_index = self.edit_mode_selector.findData(default_mode)

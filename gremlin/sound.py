@@ -2312,7 +2312,7 @@ class EdgeTTS:
     def __init__(self):
         self._speaker = "default"
         self._sound = Sound()
-
+        self.verbose = False
         self._voices_list = {}  # keyed by short name
         self.getVoiceList()  # load the default voices or from the web
 

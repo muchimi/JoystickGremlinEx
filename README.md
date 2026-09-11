@@ -48,8 +48,18 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T48)
+- Change: API (macro): (experimental) Different execution model for macros to increase performance and minimize overhead. A new runtime option enable this mode can be found on the runtime tab in global options under macro execution engine. This is off by default. The performance increase stems from eliminating the use of the scheduler and instead uses a thread pool model and is similar to the approach used in the updated sound module in m77.  At this time, exclusive mode is not supported (all macros run concurrently as triggered), one of the ways performance is gained.  If exclusive mode is required, use the older model.  The execution model is independent of profile mode changes, meaning, a macro that runs in that engine will continue running even if a profile mode change occurs as it's running.  This mode is experimental and needs further testing but is functional for standard "fire and forget" macros as triggered.
+- Fix: API: join on keyboard daemon thread from prior logic where keyboard was not a daemon thread
+- Fix: Sound API: missing verbose flag
+- Fix: API: default utf-8 encoding for log system to avoid hard crash on special characters.
+- Fix: UI: Mode selector does not fit all modes and can show modes in incorrect nesting order.
+
+
 ### (m77T47A)
 - Fix: API: incorrect parameter name in vjoy enumeration call
+
+
 
 ### (m77T47)
 - Change: Sound API: removed KTTS as an option as this experimental TTS generation method is not practical for GEX due to dependencies and significant complexity installing, and significant footprint for mediocre results compared to EdgeTTS.

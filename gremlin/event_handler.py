@@ -438,25 +438,6 @@ class Event:
         self.force_remote = state["force_remote"]
 
 
-# class JoystickEventQueue(FastQueue):
-#     """represents a unique event queue
-
-#     only one event type can be stored
-
-#     """
-
-#     def __init__(self, name: str = None):
-#         super().__init__()
-#         self.name = name
-
-#     def putData(self, data):
-#         """plain data add"""
-#         # with self._lock:
-#         self.put(data)
-
-#     def getData(self):
-#         return self.get()
-
 
 class DeviceChangeEvent:
     """sent when a new device is selected"""
@@ -518,6 +499,7 @@ class VjoyEvent:
         else:
             value_stub = f"{self.value}"
         return f"VjoyEvent: vjoy [{self.vjoy_id}] type: [{self.input_type.name}] input: [{self.input_id}] value: [{value_stub}]"
+
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -1401,7 +1383,6 @@ class EventListener(QtCore.QObject):
             self._keyboard_thread_running = True
             self._keyboard_queue: FastQueue[Event] = FastQueue(name="keyboard_queue")  # queue.Queue()
             self._keyboard_thread = threading.Thread(target=self._keyboard_runner, daemon=True)
-            # self._keyboard_thread = gremlin.threading.AbortableThread(target=self._keyboard_runner)
             self._keyboard_thread.start()
 
     def stop_key_listener(self):
@@ -1410,8 +1391,7 @@ class EventListener(QtCore.QObject):
             syslog.info("KEY THREAD: stopping...")
             self._keyboard_queue.clear()
             self._keyboard_thread_running = False
-            self._keyboard_thread.join(timeout=1)
-
+            self._keyboard_thread = None
             syslog.info(f"KEY THREAD: clearing remaining items in queue: size: {len(self._keyboard_queue)}")
 
             syslog.info("KEY THREAD: stopped")

@@ -322,7 +322,7 @@ class ProfileDeviceNode:
 
 
 
-                # register disconnected device in the tracking data 
+                # register disconnected device in the tracking data
                 gremlin.joystick_handling.registerDisconnectedDevice(device)
 
                 self._device = device
@@ -3047,12 +3047,18 @@ class Profile:
                 # pre = '' if node.parent.is_root else '└'
                 # fill = '─' * (node.depth-1)
                 if node.parent.name and show_parent:
-                    labels.append((node.name, f"{pre} {node.name} (↑{node.parent.name})"))
+                    text = f"{pre} {node.name} (↑{node.parent.name})"
+                    labels.append((node.name, text))
                 else:
-                    labels.append((node.name, f"{pre} {node.name}"))
+                    text = f"{pre} {node.name}"
+                    labels.append((node.name, text))
+                # syslog.info(text)
+
+        pass
 
     def get_mode_display_list(self) -> list:
         """gets a pairs (display_name, mode)"""
+
 
         hide_default_mode = gremlin.config.Configuration().hide_default_mode
         if hide_default_mode:
@@ -3083,17 +3089,17 @@ class Profile:
         display_names = [n[1] for n in labels]
 
         # Add properly arranged mode names to the drop down list
-        mode_set = set()
+        mode_set = []
         master_mode = gremlin.shared_state.master_mode
         for display_name, mode_name in zip(display_names, mode_names):
             if hide_default_mode and mode_name == "Default":
                 continue
             if mode_name == master_mode:
                 continue  # special mode
-            mode_set.add((display_name, mode_name))
+            mode_set.append((display_name, mode_name))
 
 
-        return list(mode_set)
+        return mode_set
 
     def _ensure_mode_tree(self, reset: bool = False):
 
@@ -3129,6 +3135,7 @@ class Profile:
     def build_inheritance_tree(self, as_tree=False):
         """returns the mode tree (new in m73)"""
         self._ensure_mode_tree()
+        # self.dumpModeTree()
         return self._mode_tree
 
     def getModeTree(self):

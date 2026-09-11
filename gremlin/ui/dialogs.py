@@ -1475,6 +1475,15 @@ There should only be one GremlinEx master server on the subnet.
 
         box.addWidget(widget)
 
+        widget = gremlin.ui.ui_common.QDataCheckbox(
+            "Enable V2 Macro Execution Engine",
+            value=self.config.use_v2_macro_mode,
+            callback=self._handle_use_v2_macro_mode_changed,
+            tooltip="When set, the application will use the V2 macro execution engine (restart required)",
+        )
+
+        box.addWidget(widget)
+
         page_layout.addWidget(box)
 
         content_widget = gremlin.ui.ui_common.QScrollableWidget(page_widget)
@@ -1491,6 +1500,9 @@ There should only be one GremlinEx master server on the subnet.
 
     def _handle_sequence_concurrent_count_changed(self, value):
         self.config.max_concurrent_sequence = value
+
+    def _handle_use_v2_macro_mode_changed(self, checked: bool):
+        self.config.use_v2_macro_mode = checked
 
     # --------------------------------------------------------------------------------------------------------------------
     def _create_tts_page(self):

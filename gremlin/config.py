@@ -3536,3 +3536,12 @@ class Configuration(QtCore.QObject):
     @virpil_led_executable.setter
     def virpil_led_executable(self, value: str):
         self._set_data("virpil_led_executable", value)
+
+    @property
+    def use_v2_macro_mode(self) -> bool:
+        """returns true if the v2 macro mode is enabled"""
+        return self._get_data("use_v2_macro_mode", False)
+
+    @use_v2_macro_mode.setter
+    def use_v2_macro_mode(self, value: bool):
+        self._set_data("use_v2_macro_mode", value)
