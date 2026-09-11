@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 import os
+from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
@@ -93,7 +94,7 @@ a = Analysis(
         "soundfile",
         "pyrubberband",
         "pydub",
-        "pycountry"],
+        "pycountry"] +  collect_submodules('encodings'),
     hookspath=None,
     runtime_hooks=None,
     excludes=["torch",

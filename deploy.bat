@@ -3,14 +3,14 @@ cd /d %0\..
 cd dist
 if exist gremlinEx\ (
  rmdir gremlinEx\ /q /s
-) 
+)
 md gremlinEx
 
 cd ..
 
 @echo "Building executable ..."
-c:\python\python314\python -m PyInstaller -y --log-level WARN --clean gremlinEx.spec
-REM c:\python\python313\python -m PyInstaller -y --log-level INFO --clean gremlinEx.spec
+REM c:\python\python314\python -m PyInstaller -y --log-level WARN --clean gremlinEx.spec
+c:\python\python314\python -m PyInstaller -y --log-level INFO --clean gremlinEx.spec
 cd dist
 
 
@@ -22,4 +22,4 @@ cd gremlinEx
 
 "C:\Program Files\7-Zip\7z" a -r ../gremlinEx.zip *
 cd ..\..
-pause
+REM pause
