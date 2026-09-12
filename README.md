@@ -52,6 +52,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 ### (m77T49)
 - Fix: Map to State Action: exception when in pulse mode on profile mode change.
 
+
 ### (m77T48M)
 - Change: Platform: updated packaging tool to 6.22.2 and forced the inclusion of the encodings Python module via the packaging configuration file.
 - Fix: 

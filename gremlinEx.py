@@ -6235,6 +6235,10 @@ if __name__ == "__main__":
         # HID maestro
         maestro = gremlin.maestro.Maestro()
 
+        # voice input
+        if gremlin.config.VOICE_INPUT_ENABLED:
+            voice = gremlin.voice.Voice()
+
         # Run UI
 
 

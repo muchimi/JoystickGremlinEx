@@ -73,6 +73,7 @@ class VoiceInputItem(InputItem):
 
         self._key = key  # ok if None (blank)
         self._text = text
+        self._phrases_map = {} # map of phrase by hash value
         self._hooked = False
         super().__init__(
             mode_node=mode_object,
@@ -134,22 +135,24 @@ class VoiceInputItem(InputItem):
 
     @property
     def display_name(self):
-        return self._key
+        return "Voice Input"
 
     @property
     def key(self) -> str:
-        return self._key
+        # the key of the input item is the id
+        return self._id
 
     @key.setter
     def key(self, value: str):
-        value = value.casefold().strip()
-        if self._key != value:
-            old_name = self._key
-            self._key = value
-            if self._emit:
-                self.key_changed.emit(self, old_name, value)
-                sd = VoiceData()
-                sd.update_key(self, old_name, value)
+        pass
+        # value = value.casefold().strip()
+        # if self._key != value:
+        #     old_name = self._key
+        #     self._key = value
+        #     if self._emit:
+        #         self.key_changed.emit(self, old_name, value)
+        #         sd = VoiceData()
+        #         sd.update_key(self, old_name, value)
 
     @property
     def message_key(self):
@@ -161,6 +164,19 @@ class VoiceInputItem(InputItem):
     @text.setter
     def text(self, value: str):
         self._text = value
+        # split into phrases
+        phrases = [phrase.strip().casefold() for phrase in value.split("|") if phrase.strip()]
+        if phrases:
+            self._phrase_map = {hash(phrase): phrase for phrase in phrases}
+        else:
+            self._phrase_map.clear()
+
+    def matchText(self, text: str) -> bool:
+        """check if the given text matches any of the stored phrases"""
+        if not text:
+            return False
+        text_hash = hash(text.strip().casefold())
+        return text_hash in self._phrase_map
 
     def to_xml(self) -> ElementTree.Element:
         """write XML voice input node"""
