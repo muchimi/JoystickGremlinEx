@@ -501,6 +501,29 @@ class VjoyEvent:
         return f"VjoyEvent: vjoy [{self.vjoy_id}] type: [{self.input_type.name}] input: [{self.input_id}] value: [{value_stub}]"
 
 
+def _axis_event_key(event) -> tuple | None:
+    """Identity for coalescing pending axis samples. Buttons/hats stay queued in order."""
+    if event is None or not getattr(event, "is_axis", False):
+        return None
+    return (str(getattr(event, "device_guid", "")), getattr(event, "identifier", None))
+
+
+def _coalesce_axis_batch(event_list: list) -> list:
+    """Keep the latest sample per axis, preserve first-seen order among other events."""
+    if not event_list:
+        return event_list
+    latest = {}
+    slots = []
+    for event in event_list:
+        key = _axis_event_key(event)
+        if key is None:
+            slots.append(("keep", event))
+            continue
+        if key not in latest:
+            slots.append(("axis", key))
+        latest[key] = event
+    return [latest[item] if kind == "axis" else item for kind, item in slots]
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class EventListener(QtCore.QObject):
@@ -932,11 +955,18 @@ class EventListener(QtCore.QObject):
         if event.device_guid in self._valid_device_map:
             if self._verbose_queue:
                 syslog.info(f"EVENTLISTEN: QUEUE event {event.id}")
-            self._event_queue.put(event)
+            self._enqueue_joystick_event(event)
 
     def queueJoystickEventList(self, event_list):
         """queues a list of joystick events"""
         for event in event_list:
+            self._enqueue_joystick_event(event)
+
+    def _enqueue_joystick_event(self, event):
+        """Keep one pending sample per axis so mapping is not a delayed replay."""
+        if getattr(event, "is_axis", False):
+            self._event_queue.put_coalesce(event, _axis_event_key)
+        else:
             self._event_queue.put(event)
 
     # @ignore_function
@@ -956,6 +986,7 @@ class EventListener(QtCore.QObject):
             if not event_list:
                 time.sleep(0)
                 continue
+            event_list = _coalesce_axis_batch(event_list)
             for event in event_list:
                 joystick_event_emit(event)
                 joystick_event_ui_emit(event)

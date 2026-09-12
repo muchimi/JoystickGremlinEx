@@ -2166,6 +2166,28 @@ class FastQueue(Generic[T]):
 
         return True
 
+    def put_coalesce(self, item: T, key_fn, block: bool = True, timeout: float | None = None) -> bool:
+        """Replace the queued item with the same key, otherwise append.
+
+        Axis HID can outrun mapping. Keeping one pending sample per axis
+        avoids replaying a second of stick history into vJoy.
+        """
+        key = key_fn(item) if key_fn is not None else None
+        with self._condition:
+            self._wait_for_space(block, timeout)
+            if key is not None:
+                for index, existing in enumerate(self._queue):
+                    try:
+                        if key_fn(existing) == key:
+                            self._queue[index] = item
+                            self._condition.notify()
+                            return True
+                    except Exception:
+                        continue
+            self._queue.append(item)
+            self._condition.notify()
+        return True
+
     def putleft(self, item: T, block: bool = True, timeout: float | None = None) -> bool:
         """Add an item to the front of the queue."""
 
