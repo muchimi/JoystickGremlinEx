@@ -1708,7 +1708,7 @@ class GateData:
                 # ignore if a different input axis on the input device
                 return False
 
-        # process curved intput
+        # process curved input
         if not event.is_virtual:
             input_value = gremlin.joystick_handling.get_curved_axis(
                 self._action_data.hardware_device_guid,
@@ -1716,6 +1716,14 @@ class GateData:
             )
         else:
             input_value = event.raw_value
+
+        if input_value is None:
+            input_value = event.value
+        else:
+            # Nested Map to vJoy prefers event.curve_value over the gated action
+            # value. Keep the event on live HID so analog output is not a replay.
+            event.value = input_value
+            event.curve_value = input_value
 
         # run mode - execute the functors with the gate data
 
@@ -1736,7 +1744,7 @@ class GateData:
             gh.fireValueChangedCallbacks(self._device_id, self._input_id, input_value)
 
         if triggers:
-            value = gremlin.actions.Value(event.value)
+            value = gremlin.actions.Value(input_value)
 
             range_event = event.clone()
             range_event.event_type = InputType.JoystickAxis  # force linear
