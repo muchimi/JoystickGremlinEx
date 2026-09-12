@@ -48,10 +48,13 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+
+### (m77T49)
+- Fix: Map to State Action: exception when in pulse mode on profile mode change.
+
 ### (m77T48M)
 - Change: Platform: updated packaging tool to 6.22.2 and forced the inclusion of the encodings Python module via the packaging configuration file.
-
-There are no other changes beyond the re-packaging to see if the missing encodings internal Python module issue is resolved.  The issue is most likely related to the addition of utf-8 encoding in the log subsystem to support special characters.
+- Fix: 
 
 ### (m77T48)
 - Change: API (macro): (experimental) Different execution model for macros to increase performance and minimize overhead. A new runtime option enable this mode can be found on the runtime tab in global options under macro execution engine. This is off by default. The performance increase stems from eliminating the use of the scheduler and instead uses a thread pool model and is similar to the approach used in the updated sound module in m77.  At this time, exclusive mode is not supported (all macros run concurrently as triggered), one of the ways performance is gained.  If exclusive mode is required, use the older model.  The execution model is independent of profile mode changes, meaning, a macro that runs in that engine will continue running even if a profile mode change occurs as it's running.  This mode is experimental and needs further testing but is functional for standard "fire and forget" macros as triggered.

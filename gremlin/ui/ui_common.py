@@ -166,6 +166,10 @@ class Color:
         return "#212121" if gremlin.shared_state.is_dark_theme else "#EEEEEE"
 
     @staticmethod
+    def backgroundLighterColor():
+        return "#505050" if gremlin.shared_state.is_dark_theme else "#C4C4C4"
+
+    @staticmethod
     def watermarkColor():
         return "#242424" if gremlin.shared_state.is_dark_theme else "#D3D3D3"
 
@@ -922,6 +926,7 @@ class Color:
             }}
             QPlainTextEdit {{
                  border: 1px solid {border_color};
+                 background-color: {Color.backgroundLighterColor()};
             }}
             QMenu::separator {{
                 border: {border_color};
@@ -3156,8 +3161,6 @@ class AbstractInputSelector(QWidget):
         self._create_device_dropdown()
         self._create_input_dropdown()
 
-
-
     def get_selection(self):
         device_id = None
         input_id = None
@@ -3199,7 +3202,6 @@ class AbstractInputSelector(QWidget):
             syslog.error(f"INPUT SELECTOR: device not found in dropdown: derived id: [{device_guid}] input id: [{device_id}]")
             return
 
-
         # input_name = gremlin.common.input_to_ui_string(input_type, input_id)
         # entry_id = self.input_item_dropdowns[dev_id].findText(input_name)
         entry_id = -1
@@ -3221,7 +3223,6 @@ class AbstractInputSelector(QWidget):
                 self.device_dropdown.setCurrentIndex(index)
             else:
                 syslog.error(f"INPUT SELECTOR: device not found in dropdown: derived id: [{device_guid}] input id: [{device_id}]")
-
 
             for entry in self.input_item_dropdowns:
                 with QtCore.QSignalBlocker(entry):
@@ -3261,7 +3262,7 @@ class AbstractInputSelector(QWidget):
     def _create_device_dropdown(self):
         self.device_dropdown = QDataComboBox(self)
         for device in self.device_list:
-            self.device_dropdown.addItem(self._format_device_name(device), device.device_guid) # name, data = device_guid
+            self.device_dropdown.addItem(self._format_device_name(device), device.device_guid)  # name, data = device_guid
             self._device_id_registry.append(self._device_identifier(device))
         self.grid_layout.addWidget(QtWidgets.QLabel("Device:"), 0, 0)
         self.grid_layout.addWidget(self.device_dropdown, 0, 1)
@@ -3269,7 +3270,6 @@ class AbstractInputSelector(QWidget):
         self.device_dropdown.currentIndexChanged.connect(self._update_device)
 
     def _create_input_dropdown(self):
-
 
         try:
             count_map = {
@@ -3324,7 +3324,6 @@ class AbstractInputSelector(QWidget):
             if len(self.input_item_dropdowns) > 0:
                 self.input_item_dropdowns[0].setVisible(True)
 
-
         except Exception as e:
             syslog.error("InputSelector: Failed to create input dropdown")
             syslog.error(f"Device list: count: [{len(self.device_list)}]")
@@ -3333,7 +3332,6 @@ class AbstractInputSelector(QWidget):
 
             syslog.error(f"Error: {e}")
             syslog.error(traceback.format_exc())
-
 
     @QtCore.Slot()
     def _input_changed(self):
@@ -3861,7 +3859,7 @@ class QBoxFrameLayout(QBoxFrame):
 
 class InputListenerWidget(QBoxFrame):
     """Widget overlaying the main gui while waiting for the user
-    to press a key or a joystick button   - input listener """
+    to press a key or a joystick button   - input listener"""
 
     item_selected = QtCore.Signal(object)  # called when the items are selected
     keyInput = QtCore.Signal(list)  # called when a keyboard input is made - the parameter will be a key if mouse/keyboard input
@@ -4152,7 +4150,6 @@ class InputListenerWidget(QBoxFrame):
 
     def _update_keys_ui(self):
         self.key_widget.setKeys(self.selection)
-
 
     def _accept(self):
         # multi key accept mode
@@ -5202,6 +5199,7 @@ class QIconPushButton(QDataPushButton):
 
     def setIcon(self, icon):
         import gremlin.util
+
         icon: QIcon = gremlin.util.load_icon(icon) if icon else QIcon()
         super().setIcon(icon)
         if not icon:
@@ -5223,6 +5221,7 @@ class QIconPushButton(QDataPushButton):
             self._icon_default = icon
         except Exception as e:
             import traceback
+
             syslog.error(f"Error setting icon: {icon}")
             syslog.error(f"Exception: {e}")
             syslog.error(traceback.format_exc())
@@ -15274,7 +15273,7 @@ class QSendModeSelector(QWidget):
             self.setToolTip(f"Send mode: {gremlin.types.SendType.to_description(self.mode)}")
 
 
-class QNoWheelPainTextEdit(QtWidgets.QPlainTextEdit):
+class QNoWheelPlainTextEdit(QtWidgets.QPlainTextEdit):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.installEventFilter(self)

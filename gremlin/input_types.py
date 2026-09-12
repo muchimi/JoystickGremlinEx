@@ -36,6 +36,7 @@ class InputType(enum.IntEnum):
     State = 11  # state input
     OctaviIfr1 = 12  # octavi IFR1
     StreamDeck = 13  # Elgato Stream Deck via plugin bridge
+    Voice = 14 # Voice input
 
 
     @staticmethod
@@ -95,6 +96,8 @@ class InputType(enum.IntEnum):
                 return "IFR1"
             case InputType.StreamDeck:
                 return "StreamDeck"
+            case InputType.Voice:
+                return "Voice"
             case _:
                 return f"Don't know how to handle {value}"
 
@@ -146,6 +149,7 @@ _InputType_to_string_lookup = {
     InputType.OctaviIfr1: "ifr1",
     InputType.StreamDeck: "streamdeck",
     InputType.Mouse: "mouse",
+    InputType.Voice: "voice",
 }
 
 _InputType_to_display_lookup = {
@@ -162,6 +166,7 @@ _InputType_to_display_lookup = {
     InputType.OctaviIfr1: "Octavi IFR1",
     InputType.StreamDeck: "Stream Deck",
     InputType.Mouse: "Mouse",
+    InputType.Voice: "Voice",
 }
 
 
@@ -194,4 +199,6 @@ _InputType_to_enum_lookup = {
     "State": InputType.State,
     "OctaviIfr1": InputType.OctaviIfr1,
     "StreamDeck": InputType.StreamDeck,
+    "voice": InputType.Voice,
+    "Voice": InputType.Voice,
 }

@@ -905,7 +905,8 @@ class MapToStateFunctor(gremlin.base_profile.AbstractFunctor):
         """called when the runtime mode changes"""
 
         # terminate any pulse
-        for key in self.pulse_worker_map:
+        keys = list(self.pulse_worker_map.keys())
+        for key in keys:
             self.pulse_stop(key)
 
     def _pulse_on(self, data):

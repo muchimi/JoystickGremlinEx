@@ -157,6 +157,10 @@ streamdeck_tab_id = gremlin.util.normalize_guid(streamdeck_tab_guid)
 fake_tab_guid = gremlin.util.parse_guid('f7cbbba2-a490-4401-b2bb-1f7f541d9e45')
 fake_tab_id = gremlin.util.normalize_guid(fake_tab_guid)
 
+# voice GUID for voice recognition device
+voice_tab_guid = gremlin.util.parse_guid('d4f5c3e2-1a2b-4c3d-8e9f-0a1b2c3d4e5f')
+voice_tab_id = gremlin.util.normalize_guid(voice_tab_guid)
+
 master_mode = str(mode_tab_guid)
 master_mode_name = "Master"
 
@@ -187,6 +191,7 @@ virtual_device_guid_type_map = [
     (osc_tab_guid, DeviceType.Osc),
     (mode_tab_guid, DeviceType.ModeControl),
     (streamdeck_tab_guid, DeviceType.StreamDeck),
+    (voice_tab_guid, DeviceType.Voice),
 ]
 
 virtual_device_guid = None

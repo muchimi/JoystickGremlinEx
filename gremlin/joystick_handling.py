@@ -1224,6 +1224,14 @@ def registerSpecialDevices():
     device.device_category = DeviceCategory.Special
     registerSpecialDevice(device)
 
+    # voice
+    device = DeviceSummary()
+    device.name = "Voice"
+    device.device_guid = gremlin.shared_state.voice_tab_guid
+    device.device_type = DeviceType.Voice
+    device.device_category = DeviceCategory.Special
+    registerSpecialDevice(device)
+
     # Re-attach any Stream Decks the bridge already knows about (after a rescan).
     try:
         from gremlin.ui import streamdeck_device as streamdeck_ui

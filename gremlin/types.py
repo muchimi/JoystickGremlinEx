@@ -287,6 +287,7 @@ class DeviceType(IntEnum):
     OctaviIFR1 = 10  # octavi IFR1 special device
     Maestro = 11  # maestro special device
     StreamDeck = 12  # Elgato Stream Deck via plugin bridge
+    Voice = 13  # voice special device
 
     @staticmethod
     def isFixedInput(value: DeviceType) -> bool:
@@ -347,6 +348,7 @@ _DeviceType_to_display_name = {
     DeviceType.OctaviIFR1: "Octavi IFR1",
     DeviceType.Maestro: "Maestro",
     DeviceType.StreamDeck: "Stream Deck",
+    DeviceType.Voice: "Voice",
 }
 
 _DeviceType_to_string_lookup = {
@@ -363,6 +365,7 @@ _DeviceType_to_string_lookup = {
     DeviceType.OctaviIFR1: "octaviifr1",
     DeviceType.Maestro: "maestro",
     DeviceType.StreamDeck: "streamdeck",
+    DeviceType.Voice: "voice",
 }
 
 
@@ -380,6 +383,7 @@ _DeviceType_to_enum_lookup = {
     "octaviifr1": DeviceType.OctaviIFR1,
     "maestro": DeviceType.Maestro,
     "streamdeck": DeviceType.StreamDeck,
+    "voice": DeviceType.Voice,
 }
 
 
@@ -1040,6 +1044,8 @@ class VerboseMode(IntFlag):
     L2 = auto()
     L3 = auto()
     Plugin = auto()
+    Voice = auto()
+
     All = (
         Keyboard
         | Joystick
@@ -1084,6 +1090,7 @@ class VerboseMode(IntFlag):
         | L2
         | L3
         | Plugin
+        | Voice
     )
 
     def __contains__(self, item):
@@ -1109,6 +1116,7 @@ class TabDeviceType(int, Enum):
     MaestroInput = 12
     MaestroOutput = 13
     StreamDeck = 14
+    Voice = 15
 
 
 class GamePadOutput(Enum):

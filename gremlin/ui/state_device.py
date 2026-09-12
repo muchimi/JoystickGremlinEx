@@ -3043,13 +3043,6 @@ class StateDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         # right align
         button_container_layout.addStretch(1)
 
-        # find key button
-        # find_button = gremlin.ui.ui_common.Buttons.getSearchWidget(callback = self._find_input_cb)
-        # icon = gremlin.ui.ui_common.Icons.findIcon()
-        # find_button.setIcon(icon)
-        # find_button.setToolTip("Find State")
-        # find_button.clicked.connect(self._find_input_cb)
-        # button_container_layout.addWidget(find_button)
 
         # sort states
         sort_button = QtWidgets.QPushButton("Sort")

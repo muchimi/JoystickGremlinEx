@@ -70,6 +70,7 @@ import gremlin.execution_graph
 import gremlin.base_profile
 import gremlin.config
 import gremlin.event_handler
+import gremlin.ui.voice_device
 from gremlin.input_item import InputItem, AbstractAction
 import dinput
 from psygnal import Signal
@@ -2461,6 +2462,8 @@ class Profile:
         self._loaded = False
         self.state = gremlin.ui.state_device.StateData()
         self.state.clear()
+        self.voice = gremlin.ui.voice_device.VoiceData()
+        self.voice.clear()
         self._start_state = {}  # profile startup output state - index by [device_id (str)][buttons/axis (str)][id (int)] = value (float or bool)
         self._removed_devices = []  # list of removed devices from the profile, list of device_id (str)
         self._save_config_enabled = False  # true if profile config saving is enabled

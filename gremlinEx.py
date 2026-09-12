@@ -19,6 +19,8 @@
 Main UI of JoystickGremlin.
 """
 
+
+
 # # ruff: disable[E401]
 from __future__ import annotations  # deprecated with python 3.14+
 
@@ -75,6 +77,7 @@ import gremlin.ui.midi_device
 import gremlin.ui.osc_device
 import gremlin.ui.mode_device
 import gremlin.ui.state_device
+import gremlin.ui.voice_device
 import gremlin.ui.theme
 import gremlin.input_item
 import gremlin.plugin_manager
@@ -87,6 +90,8 @@ import gremlin.macro_handler  # reference needed for packaging
 import gremlin.ui.octavi_device
 import gremlin.ui.virpil_device
 import gremlin.sound
+import gremlin.voice
+
 
 # import gremlin.ktts
 from gremlin.worker import WorkManager
@@ -149,7 +154,7 @@ from gremlin.tabstate import TabData
 
 from logging.handlers import RotatingFileHandler
 
-syslog = logging.getLogger("system")
+
 
 
 # Figure out the location of the code / executable and change the working
@@ -157,6 +162,7 @@ syslog = logging.getLogger("system")
 install_path = os.path.normcase(os.path.dirname(os.path.abspath(sys.argv[0])))
 os.chdir(install_path)
 
+syslog = logging.getLogger("system")
 
 class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
     """Main window of the Joystick Gremlin user interface."""
@@ -2596,6 +2602,11 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """updates the given tab for mapping and connection status - sets tab color and icons based on the device"""
         if not device:
             return
+        if isinstance(device, str):
+            # passed as a GUID
+            device = gremlin.joystick_handling.getDevice(device)
+            if not device:
+                return
         device_id = device.device_id
         position = self.getTabIndexForDevice(device_id)
 
@@ -3345,6 +3356,25 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 self._add_tab(device, TabDeviceType.State)
                                 tab_device_list.append(device)
                                 index += 1
+
+                        case DeviceType.Voice:
+                            if gremlin.config.VOICE_INPUT_ENABLED:
+                                device_guid = gremlin.util.normalize_guid(gremlin.shared_state.voice_tab_guid)
+                                device = gremlin.joystick_handling.getDevice(device_guid)
+                                widget = self.getRegisteredWidget(device_guid)
+                                if not widget:
+                                    widget = gremlin.ui.voice_device.VoiceDeviceTabWidget(profile=self.profile, mode=self.current_mode)
+                                    self.registerWidget(device_guid, widget)
+                                    self._voice_device_guid = device_guid
+
+                                    widget.data = (TabDeviceType.Voice, device_guid, index)
+
+                                # add tab header for this device
+                                if device not in tab_device_list:
+                                    self._add_tab(device, TabDeviceType.Voice)
+                                    tab_device_list.append(device)
+                                    index += 1
+
 
                 elif device in config_devices:
                     # =======================================================
@@ -6206,6 +6236,8 @@ if __name__ == "__main__":
         maestro = gremlin.maestro.Maestro()
 
         # Run UI
+
+
 
         # for some reason QT shows the window with a white background and ignores stylesheets/background color
         # workaround for now: show the window minimized so it doesnt' flash on the screen

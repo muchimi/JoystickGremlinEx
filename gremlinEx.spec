@@ -94,6 +94,7 @@ a = Analysis(
         "soundfile",
         "pyrubberband",
         "pydub",
+        "faster_whisper",
         "pycountry"] +  collect_submodules('encodings'),
     hookspath=None,
     runtime_hooks=None,

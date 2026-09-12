@@ -38,6 +38,7 @@ import gremlin.singleton_decorator
 
 syslog = logging.getLogger("system")
 
+VOICE_INPUT_ENABLED = False
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
@@ -1773,6 +1774,11 @@ class Configuration(QtCore.QObject):
     def osc_enabled(self):
         """true if osc module is enabled"""
         return self._get_data("osc_enabled", True)
+
+    @property
+    def verbose_mode_voice(self):
+        """true if verbose mode for voice"""
+        return self.verbose and VerboseMode.Voice in self.verbose_mode
 
     @osc_enabled.setter
     def osc_enabled(self, value):
