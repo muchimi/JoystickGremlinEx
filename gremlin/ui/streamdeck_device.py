@@ -2939,7 +2939,9 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             self._lcd_hint_widget = None
             self._designer_mappings_enabled = True
             # Designer needs horizontal room; don't starve it vs mapping pane.
+            # Keep Stream Deck split local so classic device-tab shares stay intact.
             try:
+                self._share_splitter_sizes = False
                 self._splitter.setChildrenCollapsible(True)
                 self._splitter.setStretchFactor(0, 3)
                 self._splitter.setStretchFactor(1, 2)
@@ -2949,7 +2951,9 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
                     scroll.setMinimumWidth(0)
                 total = max(400, self._content_widget.width() or 900)
                 left = max(280, int(total * 0.55))
-                self._splitter.setSizes([left, max(200, total - left)])
+                sizes = [left, max(200, total - left)]
+                self._splitter.setSizes(sizes)
+                self._last_sizes = list(sizes)
             except Exception:
                 pass
 

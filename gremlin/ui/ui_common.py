@@ -10235,6 +10235,10 @@ class WidgetCacheTracker:
 class QSplitTabWidget(QDataWidget):
     """tab content widget split"""
 
+    # Remember last user split across device tabs (same session). Stream Deck
+    # designer tabs opt out via _share_splitter_sizes = False.
+    _shared_splitter_sizes = None
+
     def __init__(self, object_name, device_guid, enable_filter=True, parent=None):
         """
         Creates a device split tab widget with inputs on the left and contents on the right
@@ -10259,6 +10263,8 @@ class QSplitTabWidget(QDataWidget):
 
         self._lock = False
         self._tab_data = None
+        # When True, user splitter moves are shared with other classic device tabs.
+        self._share_splitter_sizes = True
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -10408,41 +10414,73 @@ class QSplitTabWidget(QDataWidget):
     def _handle_locked_changed(self, value: bool):
         assert False, "Abstract member must be implemented in derived class"
 
+    def _default_splitter_sizes(self, width: int) -> list[int]:
+        """Left-biased default from stretch factors (classic tabs ≈ 1:4 / 200px)."""
+        if width <= 0:
+            return [200, 200]
+        try:
+            s0 = max(1, int(self._splitter.stretchFactor(0)))
+            s1 = max(1, int(self._splitter.stretchFactor(1)))
+        except Exception:
+            s0, s1 = 1, 4
+        left = int(round(width * s0 / (s0 + s1)))
+        # Match pre-scroll-area behavior for classic device tabs.
+        if s0 <= s1 and width >= 400:
+            left = max(200, left)
+        min_left = 60 if width > 160 else max(40, width // 2)
+        min_right = 60 if width > 160 else max(40, width - min_left)
+        left = max(min_left, min(left, width - min_right))
+        return [left, width - left]
+
+    def _resolve_splitter_sizes(self, width: int) -> list[int]:
+        """Scale remembered / shared / default sizes to the current tab width."""
+        sizes = self._last_sizes
+        if (
+            (not sizes or len(sizes) < 2 or sum(sizes) <= 0)
+            and self._share_splitter_sizes
+            and QSplitTabWidget._shared_splitter_sizes
+        ):
+            sizes = QSplitTabWidget._shared_splitter_sizes
+        if not sizes or len(sizes) < 2 or sum(sizes) <= 0:
+            return self._default_splitter_sizes(width)
+        total = sum(sizes)
+        left = int(round(sizes[0] * width / max(1, total)))
+        min_side = 60 if width > 160 else max(40, width // 2)
+        left = max(min_side, min(left, width - min_side))
+        return [left, width - left]
+
+    def _apply_splitter_sizes(self, width: int = None):
+        """Apply remembered split (or a left-biased default). Keeps H-scroll intact."""
+        if width is None or width <= 0:
+            width = self._content_widget.frameGeometry().width()
+        if width <= 0:
+            return
+        sizes = self._resolve_splitter_sizes(width)
+        self._splitter.setSizes(sizes)
+        self._last_sizes = list(sizes)
+
     @QtCore.Slot(int, int)
     def _splitter_moved(self, pos, index):
         sizes = self._splitter.sizes()
         if pos < 0:
             # QT bug - position should never be negative
-            if self._last_sizes:
-                sizes = self._last_sizes
-            else:
-                width = self._content_widget.frameGeometry().width()
-                sizes = [200, width - 200]
+            width = self._content_widget.frameGeometry().width()
+            sizes = self._resolve_splitter_sizes(width)
             self._splitter.setSizes(sizes)
-        self._last_sizes = sizes
+        self._last_sizes = list(sizes)
+        if self._share_splitter_sizes and sizes and sum(sizes) > 0:
+            QSplitTabWidget._shared_splitter_sizes = list(sizes)
 
     @QtCore.Slot(int, int)
     def _handle_content_resized(self, width: int, height: int):
         # resize the splitter to the container's size as it doesn't happen by itself for some reason
-        # width = self._content_widget.frameGeometry().width()
-        # height = self._content_widget.frameGeometry().height()
         if width <= 0 or height <= 0:
             return
         self._splitter.setFixedWidth(width)
         self._splitter.setFixedHeight(height)
-        # When pane minimums exceed the tab width, QSplitter grows past the fixed
-        # size and paints over siblings (bad on Stream Deck / narrow windows).
-        sizes = self._splitter.sizes()
-        if len(sizes) >= 2:
-            total = sum(sizes)
-            if total > width:
-                left = max(60, int(sizes[0] * width / max(1, total)))
-                right = max(60, width - left)
-                if left + right > width:
-                    left = max(40, width // 2)
-                    right = max(40, width - left)
-                self._splitter.setSizes([left, right])
-                self._last_sizes = [left, right]
+        # Always re-apply last/shared/default sizes. With a shrinkable right
+        # scroll pane Qt otherwise lands at ~50/50 on every device tab switch.
+        self._apply_splitter_sizes(width)
 
     @property
     def rightPanelLocked(self) -> bool:
