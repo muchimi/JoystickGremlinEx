@@ -1273,7 +1273,7 @@ def registerSpecialDevices():
     registerSpecialDevice(device)
 
 
-    # THESE SHOULD BE LAST 
+    # THESE SHOULD BE LAST
     # plugin
 
     device = DeviceSummary()

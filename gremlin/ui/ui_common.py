@@ -10232,6 +10232,20 @@ class WidgetCacheTracker:
         self._param_map.clear()
 
 
+class QSplitterWidget(QtWidgets.QSplitter):
+    def __init__(self, orientation, parent=None):
+        super().__init__(orientation, parent)
+        self._stretch_factors = {}
+
+    def setStretchFactor(self, index: int, stretch: int):
+        self._stretch_factors[index] = stretch
+        super().setStretchFactor(index, stretch)
+
+    def stretchFactor(self, index: int):
+        if index not in self._stretch_factors:
+            return 0
+        return self._stretch_factors.get(index, 0)
+
 class QSplitTabWidget(QDataWidget):
     """tab content widget split"""
 
@@ -10274,7 +10288,7 @@ class QSplitTabWidget(QDataWidget):
         self._content_widget.resized.connect(self._handle_content_resized)
         self._content_widget.setContentsMargins(0, 0, 0, 0)
 
-        self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, self._content_widget)
+        self._splitter = QSplitterWidget(QtCore.Qt.Orientation.Horizontal, self._content_widget)
         self._splitter.splitterMoved.connect(self._splitter_moved)
         self._splitter.setChildrenCollapsible(False)
         self._last_sizes = None
