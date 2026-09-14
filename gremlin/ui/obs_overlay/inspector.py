@@ -1487,10 +1487,7 @@ class OverlayInspector(QtWidgets.QWidget):
                     device_box.setCurrentIndex(i)
                     break
         else:
-            devices = gremlin.joystick_handling.physical_devices() or gremlin.joystick_handling.joystick_devices()
-            for dev in devices or []:
-                if getattr(dev, "is_virtual", False):
-                    continue
+            for dev in self._physical_joystick_devices():
                 device_box.addItem(dev.name, str(dev.device_guid))
             current = str(cond.get("device_guid") or "")
             for i in range(device_box.count()):
@@ -2586,10 +2583,7 @@ class OverlayInspector(QtWidgets.QWidget):
                     device_box.setCurrentIndex(i)
                     break
         else:
-            devices = gremlin.joystick_handling.physical_devices() or gremlin.joystick_handling.joystick_devices()
-            for dev in devices or []:
-                if getattr(dev, "is_virtual", False):
-                    continue
+            for dev in self._physical_joystick_devices():
                 device_box.addItem(dev.name, str(dev.device_guid))
             current_guid = str(series.get("device_guid") or "")
             for i in range(device_box.count()):
@@ -3267,10 +3261,7 @@ class OverlayInspector(QtWidgets.QWidget):
                     self._channel_binding(item, channel).update(payload)
                     self.scene._dirty = True
         else:
-            devices = gremlin.joystick_handling.physical_devices() or gremlin.joystick_handling.joystick_devices()
-            for dev in devices or []:
-                if getattr(dev, "is_virtual", False):
-                    continue
+            for dev in self._physical_joystick_devices():
                 device_box.addItem(dev.name, str(dev.device_guid))
             current = str(binding.get("device_guid") or "")
             for i in range(device_box.count()):
@@ -3478,6 +3469,12 @@ class OverlayInspector(QtWidgets.QWidget):
         listener = gremlin.ui.ui_common.InputListenerWidget(types, callback=_captured, parent=self)
         self._listen_dialog = listener
         listener.show()
+
+    @staticmethod
+    def _physical_joystick_devices():
+        """Physical HID joysticks only — not Keyboard/State/OSC/Stream Deck/etc."""
+        devices = gremlin.joystick_handling.getPhysicalDevices() or []
+        return sorted(devices, key=lambda d: (d.name or "").casefold())
 
     def _device_from_combo(self, device_box: QtWidgets.QComboBox, source: str):
         """Resolve a live DeviceSummary from combo itemData (guid or vjoy id)."""
