@@ -1268,6 +1268,7 @@ def registerSpecialDevices():
     device.device_category = DeviceCategory.Special
     registerSpecialDevice(device)
 
+    # THESE SHOULD BE LAST
     # plugin
 
     device = DeviceSummary()

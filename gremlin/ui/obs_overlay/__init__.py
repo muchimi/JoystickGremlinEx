@@ -22,7 +22,7 @@ import gremlin.shared_state
 import gremlin.util
 from gremlin.singleton_decorator import SingletonDecorator
 
-from .bindings import read_toggle_active
+from .bindings import binding_is_configured, read_toggle_active, toggle_follows_level
 from .designer import OverlayDesignerWidget
 from .model import OverlayScene, is_onscreen_mode, normalize_background_mode
 from .overlay_window import OverlayWindow, apply_onscreen_geometry
@@ -89,9 +89,18 @@ class OverlayManager:
         # worker thread — never touch Qt widgets / scene emits from there.
         gremlin.util.InvokeUiMethod(self._on_profile_loaded_ui)
 
+    def _flush_dirty_scene(self) -> bool:
+        """Write unsaved overlay edits (page names, etc.) before start/stop/reload."""
+        if not self.scene.dirty:
+            return True
+        try:
+            return bool(self.scene.save_owned() or self.scene.save_to_profile())
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: flush before profile event failed: {err}")
+            return False
+
     def _on_profile_loaded_ui(self):
-        if self.scene.dirty:
-            self.scene.save_owned()
+        self._flush_dirty_scene()
         self._load_current_profile_scene()
 
     def _on_profile_unloaded(self):
@@ -100,8 +109,7 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._on_profile_unloaded_ui)
 
     def _on_profile_unloaded_ui(self):
-        if self.scene.dirty:
-            self.scene.save_owned()
+        self._flush_dirty_scene()
         self._stop_runtime_toggle()
         self.hide_overlay()
         # New Profile never emits profile_loaded; drop the previous layout now
@@ -115,20 +123,32 @@ class OverlayManager:
         gremlin.util.InvokeUiMethod(self._on_profile_started_ui)
 
     def _on_profile_started_ui(self):
+        # Flush renames/edits before runtime so deactivate cannot reload stale names.
+        self._flush_dirty_scene()
         self._start_runtime_toggle()
-        auto_ids = [
-            page["id"]
-            for page in self.scene.pages
-            if page.get("visible", True) and page.get("canvas", {}).get("show_on_profile_start")
-        ]
+        auto_ids = []
+        for page in self.scene.pages:
+            if not page.get("visible", True) or not page.get("canvas", {}).get("show_on_profile_start"):
+                continue
+            binding = page.get("canvas", {}).get("toggle_binding")
+            # A released state toggle must not open the window at start.
+            if (
+                toggle_follows_level(binding)
+                and binding_is_configured(binding)
+                and not read_toggle_active(binding)
+            ):
+                continue
+            auto_ids.append(page["id"])
         if auto_ids:
             self._auto_shown = True
             QtCore.QTimer.singleShot(0, lambda ids=auto_ids: self.show_overlay(auto=True, page_ids=ids))
+        self._poll_toggle()
 
     def _on_profile_stop(self):
         gremlin.util.InvokeUiMethod(self._on_profile_stop_ui)
 
     def _on_profile_stop_ui(self):
+        self._flush_dirty_scene()
         self._release_overlay_touch()
         self._stop_runtime_toggle()
         auto = self._auto_shown or any(
@@ -139,12 +159,16 @@ class OverlayManager:
             self.hide_overlay()
 
     def _start_runtime_toggle(self):
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._start_runtime_toggle)
+            return
         self._toggle_active = {
             page["id"]: read_toggle_active(page.get("canvas", {}).get("toggle_binding"))
             for page in self.scene.pages
         }
         if self._toggle_timer is None:
-            timer = QtCore.QTimer()
+            app = QtCore.QCoreApplication.instance()
+            timer = QtCore.QTimer(app)
             timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)
             timer.setInterval(16)
             timer.timeout.connect(self._poll_toggle)
@@ -153,6 +177,9 @@ class OverlayManager:
             self._toggle_timer.start()
 
     def _stop_runtime_toggle(self):
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self._stop_runtime_toggle)
+            return
         if self._toggle_timer is not None:
             self._toggle_timer.stop()
         self._toggle_active = {}
@@ -161,12 +188,25 @@ class OverlayManager:
         for page in self.scene.pages:
             page_id = page["id"]
             binding = page.get("canvas", {}).get("toggle_binding")
+            if not binding_is_configured(binding):
+                continue
             active = read_toggle_active(binding)
-            rising = active and not self._toggle_active.get(page_id, False)
+            previous = self._toggle_active.get(page_id, False)
             self._toggle_active[page_id] = active
+            visible = self.page_is_visible(page_id)
+            if toggle_follows_level(binding):
+                # GEX states are latched: show while pressed, hide while released.
+                if active and not visible:
+                    self._auto_shown = True
+                    self.show_overlay(auto=True, page_ids=[page_id])
+                elif not active and visible:
+                    self._auto_shown = False
+                    self.hide_overlay_page(page_id)
+                continue
+            rising = active and not previous
             if not rising:
                 continue
-            if self.page_is_visible(page_id):
+            if visible:
                 self._auto_shown = False
                 self.hide_overlay_page(page_id)
             else:
@@ -176,11 +216,16 @@ class OverlayManager:
     def _ensure_current_profile_scene(self):
         if self.scene.belongs_to_profile():
             return
-        if self.scene.dirty:
-            self.scene.save_owned()
+        if self.scene.dirty and not self._flush_dirty_scene():
+            # Keep the in-memory layout rather than reloading a stale sidecar.
+            return
         self._load_current_profile_scene()
 
     def _on_scene_changed(self):
+        # scene.changed is psygnal and may fire off the UI thread after profile work.
+        gremlin.util.InvokeUiMethod(self._on_scene_changed_ui)
+
+    def _on_scene_changed_ui(self):
         live_ids = {page["id"] for page in self.scene.pages}
         for page_id in list(self._overlays):
             if page_id not in live_ids:
@@ -298,8 +343,11 @@ class OverlayManager:
 
     def _release_overlay_touch(self):
         for window in list(self._overlays.values()):
-            if window is not None and Shiboken.isValid(window):
-                window.view.release_touch()
+            if window is None or not Shiboken.isValid(window):
+                continue
+            view = getattr(window, "view", None)
+            if view is not None and Shiboken.isValid(view):
+                view.release_touch()
 
     def _emit_visibility(self):
         try:
@@ -320,8 +368,8 @@ def hide_overlay():
     OverlayManager().hide_overlay()
 
 
-def persist_for_profile(profile) -> bool:
-    """Write the in-memory overlay into the given profile if it owns the scene."""
+def persist_for_profile(profile, dest_xml: str | None = None) -> bool:
+    """Write the in-memory overlay next to the profile XML that was just saved."""
     try:
         if OverlayManager.instance is None:
             return False
@@ -329,9 +377,7 @@ def persist_for_profile(profile) -> bool:
         current = gremlin.shared_state.current_profile
         if current is not profile:
             return False
-        if scene._profile_key and not scene.belongs_to_profile(profile):
-            return False
-        return scene.save_to_profile(profile)
+        return scene.save_to_profile(profile, dest_xml=dest_xml)
     except Exception as err:
         syslog.warning(f"OBS OVERLAY: persist on profile save failed: {err}")
         return False
