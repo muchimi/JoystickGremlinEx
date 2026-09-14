@@ -1869,24 +1869,17 @@ def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
         painter.drawRoundedRect(slot_rect, r, r)
 
     on = position != "center"
-    knob_fill, knob_border = _switch_fill_colors(style, on)
+    knob_fill = _switch_fill_colors(style, on)[0]
     if position == "center":
         knob_fill = qcolor(style.get("indicator"), "#ff5a3c")
-        knob_border = qcolor(style.get("border_on") or style.get("indicator"), "#ffcc66")
     ox, oy = offsets.get(position, (0, 0))
     dist = plate.width() * 0.22
     kx = cx + ox * dist
     ky = cy + oy * dist
     radius = float(style.get("indicator_size") or 16) * 0.55
-    painter.setPen(_pen(knob_border, max(1.2, _border_w(style))))
+    painter.setPen(QtCore.Qt.NoPen)
     painter.setBrush(knob_fill)
     painter.drawEllipse(QtCore.QPointF(kx, ky), radius, radius)
-    highlight = QtGui.QColor(knob_fill)
-    highlight = highlight.lighter(140)
-    highlight.setAlpha(180)
-    painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(highlight)
-    painter.drawEllipse(QtCore.QPointF(kx - radius * 0.22, ky - radius * 0.22), radius * 0.35, radius * 0.35)
     _draw_axis_labels(painter, item, housing)
     painter.restore()
 
