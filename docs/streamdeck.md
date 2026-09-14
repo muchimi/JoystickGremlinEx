@@ -26,7 +26,8 @@ GEX identifies each mapping as `deviceId : kind : gexPage : slot` (1-based GEX p
 On a selected key:
 
 - Grid **Preview: Released | Pressed** toggle shows that state's icon/title/style on the designer keys.
-- **Released / Pressed** columns — each has icon, up to 3 title lines, and its own Style (font/align/background). Blank pressed title falls back to released.
+- **Released / Pressed** (or **State OFF / State ON**) columns — each has icon, up to 3 title lines, and its own Style (font/align/background). Blank pressed/ON title falls back to released/OFF.
+- **Appearance** driver — **Press / Release** follows the physical key hold; **GEX State** picks a named state and uses the OFF/ON looks instead.
 - **Clear cell** / right-click Delete; **Wipe page** clears the edit page.
 - Drag keys onto each other to swap; right-click Copy / Paste.
 - Mapped JG Ex keys show a **green ●** badge. Keys that are **not** JG Ex Buttons on the hardware (other Stream Deck plugins) stay visible with a **red ●**. They can still get an icon and background in the designer (for GEX / overlay); mappings stay disabled until a JG Ex Button occupies that slot. Live presses briefly highlight the cell.

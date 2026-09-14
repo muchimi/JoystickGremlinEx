@@ -9430,7 +9430,9 @@ class ContainerView(AbstractView):
 
         # Configure the widget holding the layout with all the buttons
         self._scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self._scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        # Horizontal scroll lives on the outer device-tab pane; dual H-scroll
+        # nested areas crash Qt during paste/rebuild (access violation).
+        self._scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self._scroll_widget, self._scroll_layout = gremlin.ui.ui_common.getVContainer()
         self._scroll_widget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
@@ -9559,7 +9561,13 @@ class ContainerView(AbstractView):
     def _redraw_ui(self, force=False):
         """Redraws the entire view.  must be on UI thread"""
 
+        if not Shiboken.isValid(self):
+            return
+        if self._redraw_lock:
+            return
+
         try:
+            self._redraw_lock = True
             verbose = gremlin.config.Configuration().verbose_mode_ui_level(1)
             if verbose:
                 syslog.info(f"ContainerView: redraw for [{self._input_item.display_name if self._input_item else 'no input'}]")
@@ -9614,7 +9622,9 @@ class ContainerView(AbstractView):
                     self._show_blank()
 
         finally:
-            assert len(self._widget_map) == self.model.count(), "ContainerView model and UI are not synchronized (mismatched items)"
+            self._redraw_lock = False
+            if Shiboken.isValid(self):
+                assert len(self._widget_map) == self.model.count(), "ContainerView model and UI are not synchronized (mismatched items)"
 
     def _create_closed_cb(self, widget):
         """Create callbacks to remove individual containers from the model.
@@ -9824,10 +9834,22 @@ class InputItemMappingWidget(QtWidgets.QWidget):
         # delete any existing widget and re-create
         if self._stacked_widget.count() == 2:
             widget = self._stacked_widget.widget(1)
+            old_view = self._container_view
             self._container_view = None  # free up the widget reference
-            widget.hide()
-            self._stacked_widget.removeWidget(widget)
-            widget.deleteLater()
+            if old_view is not None:
+                try:
+                    if getattr(old_view, "_model", None) is not None:
+                        old_view._model.removeCallback(old_view._handle_model_changed)
+                except Exception:
+                    pass
+                try:
+                    old_view._cleanup_ui()
+                except Exception:
+                    pass
+            if widget is not None and Shiboken.isValid(widget):
+                widget.hide()
+                self._stacked_widget.removeWidget(widget)
+                widget.deleteLater()
             input_item.setMappingWidget(None)
 
         # main widget container
@@ -10142,16 +10164,38 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             except Exception:
                 pass
             if container_list:
-                for new_container in container_list:
-                    if hasattr(new_container, "action_model"):
-                        new_container.action_model = self._container_model
-
-                        plugin_manager.set_container_data(self._input_item, new_container)
-                        self._container_model.addContainer(new_container)
-
-                _el = gremlin.event_handler.EventListener()
-                # el.mapping_changed.emit(self._input_item)
+                self._add_containers_batched(container_list, plugin_manager)
                 self.notify_changed()
+
+    def _add_containers_batched(self, container_list, plugin_manager=None):
+        """Add multiple containers with a single UI rebuild (avoids Qt UAF on paste)."""
+        if not container_list:
+            return
+        if plugin_manager is None:
+            plugin_manager = gremlin.plugin_manager.ContainerPlugins()
+
+        view = self._container_view
+        if view is not None and Shiboken.isValid(view):
+            view.pushSuspended()
+        self._container_model.pushSuspend()
+        try:
+            for new_container in container_list:
+                if hasattr(new_container, "action_model"):
+                    new_container.action_model = self._container_model
+                plugin_manager.set_container_data(self._input_item, new_container)
+                self._container_model.addContainer(new_container)
+        finally:
+            self._container_model.popSuspend(emit=False)
+            if view is not None and Shiboken.isValid(view):
+                view.popSuspended(reset=True, emit=False)
+
+        # One redraw of the existing ContainerView — avoid MappingWidget.create_ui
+        # tear-down while nested scroll/splitter layouts are still settling.
+        if self._container_view is not None and Shiboken.isValid(self._container_view):
+            self._container_view.redraw(force=True)
+            self._last_container_hash = self._input_item.containers.hashKey()
+        else:
+            self.redraw(force=True)
 
     @QtCore.Slot(object)
     def _paste_container(self, container, extra_data=None):
@@ -10232,20 +10276,9 @@ class InputItemMappingWidget(QtWidgets.QWidget):
             new_container.generateGuids()  #  get a new set of ids for the container and its children
             container_list.append(new_container)
 
-        # add the new containers to the model
         if container_list:
-            for new_container in container_list:
-                if hasattr(new_container, "action_model"):
-                    new_container.action_model = self._container_model
-
-                plugin_manager.set_container_data(self._input_item, new_container)
-                self._container_model.addContainer(new_container)
-
-            #  el.mapping_changed.emit(self._input_item)
+            self._add_containers_batched(container_list, plugin_manager)
             self.notify_changed()
-
-            # update
-            self.redraw()
 
         return container_list
 
