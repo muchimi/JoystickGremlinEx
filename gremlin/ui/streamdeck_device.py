@@ -1504,6 +1504,17 @@ class StreamDeckBridge(QtCore.QObject):
                     drop, drop_inputs = b, inputs_b
                 else:
                     drop, drop_inputs = a, inputs_a
+                # Only clear the duplicate deck when it has no custom names of its
+                # own. Never persist a wipe of real labels (Save As / reload bugs
+                # previously left only generic Page N and then overwrote JSON).
+                drop_names = self._page_names.get(drop) or {}
+                drop_custom = sum(
+                    1
+                    for page, label in drop_names.items()
+                    if label and label != f"Page {page}"
+                )
+                if drop_custom > 0:
+                    continue
                 drop_pages = sorted(drop_inputs) or [1]
                 self._page_order[drop] = list(drop_pages)
                 self._page_names[drop] = {}
