@@ -3379,6 +3379,34 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     tab_device_list.append(device)
                                     index += 1
 
+                        case DeviceType.Overlay:
+                            try:
+                                device_guid = gremlin.util.normalize_guid(gremlin.shared_state.overlay_tab_guid)
+                                device = gremlin.joystick_handling.getDevice(device_guid)
+                                widget = self.getRegisteredWidget(device_guid)
+                                if not widget:
+                                    import gremlin.ui.obs_overlay as obs_overlay
+
+                                    manager = obs_overlay.OverlayManager()
+                                    widget = obs_overlay.OverlayDesignerWidget(
+                                        manager.scene,
+                                        overlay_manager=manager,
+                                    )
+                                    self.registerWidget(device_guid, widget)
+                                    self._overlay_device_guid = device_guid
+                                    widget.data = (
+                                        TabDeviceType.Overlay,
+                                        device_guid,
+                                        index,
+                                    )
+                                if device not in tab_device_list:
+                                    self._add_tab(device, TabDeviceType.Overlay)
+                                    tab_device_list.append(device)
+                                    index += 1
+                            except Exception as err:
+                                syslog.error(f"DEVICE TABS: Overlay tab failed: {err}")
+                                syslog.error(traceback.format_exc())
+
                 elif device in config_devices:
                     # =======================================================
                     # config devices
@@ -3432,34 +3460,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 self._add_tab(device, TabDeviceType.Plugins)
                                 tab_device_list.append(device)
                                 index += 1
-
-                        case DeviceType.Overlay:
-                            try:
-                                device_guid = gremlin.util.normalize_guid(gremlin.shared_state.overlay_tab_guid)
-                                device = gremlin.joystick_handling.getDevice(device_guid)
-                                widget = self.getRegisteredWidget(device_guid)
-                                if not widget:
-                                    import gremlin.ui.obs_overlay as obs_overlay
-
-                                    manager = obs_overlay.OverlayManager()
-                                    widget = obs_overlay.OverlayDesignerWidget(
-                                        manager.scene,
-                                        overlay_manager=manager,
-                                    )
-                                    self.registerWidget(device_guid, widget)
-                                    self._overlay_device_guid = device_guid
-                                    widget.data = (
-                                        TabDeviceType.Overlay,
-                                        device_guid,
-                                        index,
-                                    )
-                                if device not in tab_device_list:
-                                    self._add_tab(device, TabDeviceType.Overlay)
-                                    tab_device_list.append(device)
-                                    index += 1
-                            except Exception as err:
-                                syslog.error(f"DEVICE TABS: Overlay tab failed: {err}")
-                                syslog.error(traceback.format_exc())
 
             self._reindex_tabs()
 
