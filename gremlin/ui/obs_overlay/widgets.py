@@ -1956,6 +1956,7 @@ def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.drawEllipse(QtCore.QPointF(cx, cy), center_r, center_r)
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     on = position != "center"
     knob_fill = _switch_fill_colors(style, on)[0]
     if position == "center":
@@ -1968,6 +1969,9 @@ def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setPen(QtCore.Qt.NoPen)
     painter.setBrush(knob_fill)
     painter.drawEllipse(QtCore.QPointF(kx, ky), radius, radius)
+=======
+    housing = QtCore.QRectF(cx - outer_r, cy - outer_r, outer_r * 2, outer_r * 2)
+>>>>>>> Stashed changes
 =======
     housing = QtCore.QRectF(cx - outer_r, cy - outer_r, outer_r * 2, outer_r * 2)
 >>>>>>> Stashed changes
