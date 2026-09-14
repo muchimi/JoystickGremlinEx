@@ -201,6 +201,9 @@ def vjoy_input_devices() -> list[DeviceSummary]:
     global _vjoy_devices
 
     profile = gremlin.shared_state.current_profile
+    if profile is None or getattr(profile, "settings", None) is None:
+        # Profile unload / mid-load: callers (e.g. map_to_vjoy.updateDevices) can race.
+        return []
     settings = profile.settings
     # verbose = gremlin.config.Configuration().verbose_mode_joystick
     # if verbose:
@@ -223,6 +226,8 @@ def vjoy_output_devices() -> list[DeviceSummary]:
     global _vjoy_devices
 
     profile = gremlin.shared_state.current_profile
+    if profile is None or getattr(profile, "settings", None) is None:
+        return []
     settings = profile.settings
     devices = [dev for dev in _vjoy_devices if not settings.getVjoyAsInput(dev.vjoy_id)]
     return devices
@@ -1263,17 +1268,6 @@ def registerSpecialDevices():
     device.device_category = DeviceCategory.Special
     registerSpecialDevice(device)
 
-
-    # overlay designer
-    device = DeviceSummary()
-    device.name = "Overlay"
-    device.device_guid = gremlin.shared_state.overlay_tab_guid
-    device.device_type = DeviceType.Overlay
-    device.device_category = DeviceCategory.Special
-    registerSpecialDevice(device)
-
-
-    # THESE SHOULD BE LAST
     # plugin
 
     device = DeviceSummary()
@@ -1291,6 +1285,13 @@ def registerSpecialDevices():
     device.device_category = DeviceCategory.Config
     registerConfigDevice(device)
 
+    # overlay designer
+    device = DeviceSummary()
+    device.name = "Overlay"
+    device.device_guid = gremlin.shared_state.overlay_tab_guid
+    device.device_type = DeviceType.Overlay
+    device.device_category = DeviceCategory.Config
+    registerConfigDevice(device)
 
 
 def getSpecialDevices() -> list:
@@ -2298,17 +2299,24 @@ class VirtualDeviceUsageState:
             )
 
         if __debug__:
+            # Snapshot keys — profile load / joystick re-init can mutate _action_map
+            # while the UI is still iterating it.
+            action_keys = list(self._action_map.keys())
             used_list = list(
                 set(
                     self._action_map.get(key, {}).get(device_type, {}).get(virtual_id, None)
-                    for key in self._action_map
+                    for key in action_keys
                     if self._action_map.get(key, {}).get(device_type, {}).get(virtual_id, None) is not None
                 )
             )
             if used:
                 assert button_id in used_list, f"button {button_id} should be in used list {used_list}"
             else:
-                action_list = [k for k in self._action_map if self._action_map.get(k, {}).get(device_type, {}).get(virtual_id, None) == button_id]
+                action_list = [
+                    k
+                    for k in action_keys
+                    if self._action_map.get(k, {}).get(device_type, {}).get(virtual_id, None) == button_id
+                ]
                 assert key not in action_list, f"action {key} should not be in action list {action_list}"
 
         if changed:
@@ -2380,10 +2388,13 @@ class VirtualDeviceUsageState:
 
     def _used_button_list(self, device_type: DeviceType, virtual_id: int) -> list[int]:
         """gets the list of used buttons for a given device"""
+        # Snapshot keys first: map_to_vjoy populates its grid on the UI thread while
+        # profile load / device refresh can still register/unregister actions.
+        action_keys = list(self._action_map.keys())
         used_list = list(
             set(
                 self._action_map.get(key, {}).get(device_type, {}).get(virtual_id, None)
-                for key in self._action_map
+                for key in action_keys
                 if self._action_map.get(key, {}).get(device_type, {}).get(virtual_id, None) is not None
             )
         )
@@ -2393,24 +2404,13 @@ class VirtualDeviceUsageState:
 
     def used_button_list(self, device_guid) -> list[int]:
         """gets the list of used buttons for a given output device"""
-        assert isinstance(device_guid, dinput.GUID), "invalid device GUID"
-        device : DeviceSummary = getDevice(device_guid)
-
-        assert device is not None, "invalid device GUID"
-        assert device.is_virtual, "device is not virtual"
-
-        if device is None:
-            syslog.error(f"JOYSTICK USAGE: Device not found for GUID: [{device_guid}]")
-
+        if not isinstance(device_guid, dinput.GUID):
             return []
-        if not device.is_virtual:
-            syslog.error(f"JOYSTICK USAGE: Device is not virtual for GUID: [{device_guid}]")
+        device: DeviceSummary = getDevice(device_guid)
+        if device is None or not device.is_virtual:
+            # Device map can be mid-rebuild during profile load / joystick refresh.
             return []
-
-
-        device_type = device.device_type
-        virtual_id = device.virtual_id
-        return self._used_button_list(device_type, virtual_id)
+        return self._used_button_list(device.device_type, device.virtual_id)
 
     @property
     def device_list(self):
