@@ -1955,26 +1955,7 @@ def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setBrush(center_fill)
     painter.drawEllipse(QtCore.QPointF(cx, cy), center_r, center_r)
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    on = position != "center"
-    knob_fill = _switch_fill_colors(style, on)[0]
-    if position == "center":
-        knob_fill = qcolor(style.get("indicator"), "#ff5a3c")
-    ox, oy = offsets.get(position, (0, 0))
-    dist = plate.width() * 0.22
-    kx = cx + ox * dist
-    ky = cy + oy * dist
-    radius = float(style.get("indicator_size") or 16) * 0.55
-    painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(knob_fill)
-    painter.drawEllipse(QtCore.QPointF(kx, ky), radius, radius)
-=======
     housing = QtCore.QRectF(cx - outer_r, cy - outer_r, outer_r * 2, outer_r * 2)
->>>>>>> Stashed changes
-=======
-    housing = QtCore.QRectF(cx - outer_r, cy - outer_r, outer_r * 2, outer_r * 2)
->>>>>>> Stashed changes
     _draw_axis_labels(painter, item, housing)
     painter.restore()
 

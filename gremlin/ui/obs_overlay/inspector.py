@@ -1256,15 +1256,6 @@ class OverlayInspector(QtWidgets.QWidget):
         if types <= {"switch_4way", "switch_2way", "switch_3way"}:
             self._style_color(look, item, "fill_on", "Active fill")
         if types <= {"switch_4way"}:
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-            self._style_color(look, item, "indicator", "Knob")
-            self._style_color(look, item, "track", "Inner fill")
-            self._style_color(look, item, "crosshair", "Direction fill")
-            self._style_float(look, item, "corner_radius", "Direction radius", 0, 80)
-=======
-=======
->>>>>>> Stashed changes
             appearance = QtWidgets.QComboBox()
             appearance.addItem("Arrows", "arrows")
             appearance.addItem("Arcs", "arcs")
@@ -1279,10 +1270,6 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style_color(look, item, "indicator", "Center")
             self._style_float(look, item, "indicator_size", "Center size", 10, 100)
             self._style_color(look, item, "fill", "Inactive")
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
         if types <= {"switch_2way", "switch_3way"}:
             self._orientation_combo(look, item)
         if types <= {"axis_bar", "axis_radio", "axis_fader"}:
