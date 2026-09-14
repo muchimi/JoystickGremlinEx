@@ -27,6 +27,7 @@ import traceback
 from PySide6 import QtCore, QtWidgets
 import gremlin.config
 import gremlin.input_types
+import filelock
 
 import gremlin.shared_state
 from gremlin.types import VerboseMode, DeviceType
@@ -38,7 +39,7 @@ import gremlin.singleton_decorator
 
 syslog = logging.getLogger("system")
 
-# VOICE_INPUT_ENABLED = True
+#VOICE_INPUT_ENABLED = True
 VOICE_INPUT_ENABLED = False # turn off for production while voice input is being tested
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -417,14 +418,19 @@ class Configuration(QtCore.QObject):
         # Attempt to load the configuration file if this fails set
         # default empty values.
         data = None
-        if os.path.isfile(fname) and os.path.getsize(fname):
-            with open(fname, "r", encoding="utf-8") as hdl:
-                try:
-                    # decoder = json.JSONDecoder()
-                    # self._profile_data = decoder.decode(hdl.read())
-                    data = json.load(hdl)
-                except ValueError:
-                    pass
+        lock1 = filelock.FileLock(f"{fname}.lock")
+        with lock1:
+            if os.path.isfile(fname) and os.path.getsize(fname):
+                with open(fname, "r", encoding="utf-8") as hdl:
+                    try:
+                        # decoder = json.JSONDecoder()
+                        # self._profile_data = decoder.decode(hdl.read())
+                        data = json.load(hdl)
+                    except ValueError as e:
+                        print(f"Error loading JSON from {fname}: {e}")
+                        data = None
+                        pass
+                    hdl.close()
 
         if data:
             self._profile_data = data
@@ -528,15 +534,22 @@ class Configuration(QtCore.QObject):
             return
         try:
             fname = self._profile_config_fname
+            tmp = gremlin.util.getTemporaryFile(".json")
+
             if fname:
-                tmp = gremlin.util.getTemporaryFile(".json")
-                with open(tmp, "w", encoding="utf-8") as hdl:
-                    encoder = json.JSONEncoder(sort_keys=True, indent=4)
-                    hdl.write(encoder.encode(self._profile_data))
-                if os.path.isfile(fname):
-                    os.unlink(fname)
-                shutil.copy(tmp, fname)
-                os.unlink(tmp)
+                lock1 = filelock.FileLock(f"{tmp}.lock")
+                lock2 = filelock.FileLock(f"{fname}.lock")
+                with lock1:
+                    with open(tmp, "w", encoding="utf-8") as hdl:
+                        encoder = json.JSONEncoder(sort_keys=True, indent=4)
+                        hdl.write(encoder.encode(self._profile_data))
+                        hdl.close()
+
+                    with lock2:
+                        if os.path.isfile(fname):
+                            os.unlink(fname)
+                        shutil.copy(tmp, fname)
+                    os.unlink(tmp)
         except Exception as ex:
             syslog.error(f"CONFIG: unable to save profile: {fname}")
             syslog.error(ex)

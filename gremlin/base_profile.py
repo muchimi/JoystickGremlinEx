@@ -3017,6 +3017,19 @@ class Profile:
 
         self.devices[device_guid] = new_device
 
+        # voice data
+        self.voice = gremlin.ui.voice_device.VoiceData()
+
+        device_guid = gremlin.shared_state.voice_tab_guid
+        device_type = DeviceType.Voice
+        new_device = ProfileDeviceNode(self)
+        new_device.name = DeviceType.to_display_name(device_type)
+        device = gremlin.joystick_handling.getDevice(device_guid)
+        if not device:
+            raise ValueError(f"Voice device with GUID {device_guid} not found")
+        new_device.device = device
+        self.devices[device_guid] = new_device
+
         # state data
         self.state = gremlin.ui.state_device.StateData()
         device_guid = gremlin.shared_state.state_tab_guid
@@ -4113,6 +4126,17 @@ class Profile:
             self.state.clear()
         for node in state_nodes:
             self.state.from_xml(node)
+            break
+
+        # voice data
+        voice_nodes = root.xpath("/profile/voices")
+        if not voice_nodes:
+            self.voice.clear()
+        else:
+            for node in voice_nodes:
+                self.voice.from_xml(node)
+                break
+
 
         # removed devices
         self._removed_devices.clear()
@@ -4560,6 +4584,10 @@ class Profile:
 
         # state data
         node = self.state.to_xml()
+        root.append(node)
+
+        # voice data
+        node = self.voice.to_xml()
         root.append(node)
 
         # Serialize XML document
@@ -5852,8 +5880,6 @@ class ProfileModeNode:
             if item_list:
                 item_list.sort(key=lambda item: item.index)  # sort by index
                 # item_list = [item for item in item_list if item.description or item.containers]
-            if item_list and input_type in (InputType.OpenSoundControl, InputType.Keyboard, InputType.KeyboardLatched):
-                pass
             for input_item in item_list:
                 # if item.is_valid_for_save():
                 item_node = input_item.to_xml()

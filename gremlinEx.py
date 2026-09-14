@@ -3403,7 +3403,7 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     self._add_tab(device, TabDeviceType.Overlay)
                                     tab_device_list.append(device)
                                     index += 1
-                                    
+
                             except Exception as err:
                                 syslog.error(f"DEVICE TABS: Overlay tab failed: {err}")
                                 syslog.error(traceback.format_exc())
@@ -6277,23 +6277,23 @@ if __name__ == "__main__":
         # HID maestro
         maestro = gremlin.maestro.Maestro()
 
-        # voice input testing
-        if gremlin.config.VOICE_INPUT_ENABLED:
-            def test_callback(command : gremlin.voice.VoiceCommand):
-                syslog.info(f"VOICE TRIGGER: {command}")
+        # # voice input testing
+        # if gremlin.config.VOICE_INPUT_ENABLED:
+        #     def test_callback(command : gremlin.voice.VoiceCommand):
+        #         syslog.info(f"VOICE TRIGGER: {command}")
 
 
-            commands = [
-                gremlin.voice.VoiceCommand("gear down", test_callback),
-                gremlin.voice.VoiceCommand("gear up", test_callback),
-                gremlin.voice.VoiceCommand("flaps down", test_callback),
-                gremlin.voice.VoiceCommand("flaps up", test_callback),
-                gremlin.voice.VoiceCommand("landing gear down", test_callback),
-                gremlin.voice.VoiceCommand("landing gear up", test_callback),
-                gremlin.voice.VoiceCommand("toggle landing gear", test_callback),
+        #     commands = [
+        #         gremlin.voice.VoiceCommand("gear down", test_callback),
+        #         gremlin.voice.VoiceCommand("gear up", test_callback),
+        #         gremlin.voice.VoiceCommand("flaps down", test_callback),
+        #         gremlin.voice.VoiceCommand("flaps up", test_callback),
+        #         gremlin.voice.VoiceCommand("landing gear down", test_callback),
+        #         gremlin.voice.VoiceCommand("landing gear up", test_callback),
+        #         gremlin.voice.VoiceCommand("toggle landing gear", test_callback),
 
-            ]
-            voice = gremlin.voice.Voice(commands=commands)
+        #     ]
+        #     voice = gremlin.voice.Voice(commands=commands)
 
         # Run UI
 

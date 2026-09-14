@@ -48,6 +48,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T51)
+- Change: API Voice: (experimental) - additional UI elements (disabled in production)
+- Fix: OBS Overlay: (experimental) - enhancements, thread safety and various fixes (courtesy Lolo350)
+- Fix: Streamdeck Device: (experimental) - polish + paste/splitter stability.
+
 ### (m77T50)
 - New: OBS Overlay: (experimental) Module courtesy Lolo350. This module allows to design and show an overlay module for OBS with chroma-key support suitable for streaming or showing inputs real-time. Many thanks to Lolo350 for including this feature in GEX.
 - New: API Voice: (experimental) API level support for voice input/speech commands.  This module while not yet in production in T50 as UI features are currently disabled in this build while the internal testing continues and includes missing features, the API includes local services for speech recognition. This will follow in the coming days with a voice input device to use natural speech as an input device.  Voice commands will trigger mappings as any other input device would in GEX.

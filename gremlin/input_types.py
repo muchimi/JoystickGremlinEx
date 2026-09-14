@@ -201,4 +201,5 @@ _InputType_to_enum_lookup = {
     "StreamDeck": InputType.StreamDeck,
     "voice": InputType.Voice,
     "Voice": InputType.Voice,
+    "voice-input": InputType.Voice
 }

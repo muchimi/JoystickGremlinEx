@@ -441,6 +441,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         description: str = None,
         description_readonly: bool = None,
         tooltip: str = None,
+        data: object = None,
         extra_data: dict = None,
     ):
         """Creates a new InputItem instance.
@@ -510,6 +511,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         self._device_id = device.device_id
         self._device_name = device.name
         self._device_type = device.device_type
+        self._data = data
 
         self._name = None  # device name
         self._input_name = None  # input name of the hardware (axis name if an axis)
@@ -545,20 +547,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
         # self._profile_mode = None
         self._enabled = True  # enabled flag
-        # if mode_node is not None:
-        #     # find the missing properties from the parenting hierarchy
-        #     item = mode_node
-        #     while True:
-        #         # if isinstance(item, Mode):
-        #         #    self._profile_mode = item.name
-        #         if isinstance(item, gremlin.base_profile.ProfileDeviceNode):
-        #             # self._device_type = item.device_type
-        #             # self._device_name = item.name
-        #             # self._device_guid = gremlin.util.to_guid(item.device_guid)
-        #             # self._device_id = item.device_id
-        #         if not hasattr(item, "parent"):
-        #             break
-        #         item = item.parent
+
 
         self._message_key = None  # message key for this input (device_guid, input_type, input_id)
 
@@ -1138,7 +1127,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
         valid = False
         parent = node.getparent()
         while parent is not None:
-            if parent.tag in ("mode", "gate", "states"):
+            if parent.tag in ("mode", "gate", "states", "voices"):
                 valid = True
                 break
             parent = parent.getparent()
@@ -1922,7 +1911,10 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._input_description_icon = None
 
         # custom widget row (used by some inputs to display custom UI elements like keyboard )
-        self._custom_container_widget = gremlin.ui.ui_common.AutoHideStackedWidget(data="custom content")
+        self._custom_container_widget = QtWidgets.QWidget()
+        self._custom_container_layout = QtWidgets.QVBoxLayout(self._custom_container_widget)
+        self._custom_container_layout.setSpacing(0)
+        self._custom_container_layout.setContentsMargins(0, 0, 0, 0)
 
         # repeater
         self.axis_repeater_widget = None  # axis repeater
@@ -2251,7 +2243,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def clearWidgets(self):
         """clears the custom container layout and hides it"""
-        self._custom_container_widget.setWidget(None)
+        gremlin.util.clear_layout(self._custom_container_layout)
 
     def _handle_input_item_lock_changed(self, input_item):
         if input_item == self._input_item:
@@ -2676,18 +2668,21 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
     def setCustomContent(self, items: QtWidgets.QWidget | list[QtWidgets.QWidget]):
         """adds custom content to the input widget (vertical container)"""
-        self._custom_container_widget.setWidget(None)
+        gremlin.util.clear_layout(self._custom_container_layout)
 
-        if not items:
-            return
 
-        widgets = items if hasattr(items, "__iter__") else [items]
-        if len(widgets) == 1:
-            self._custom_container_widget.setWidget(widgets[0])
-        else:
-            # multiple widgets
-            container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
-            self._custom_container_widget.setWidget(container)
+        if  items:
+            widgets = items if hasattr(items, "__iter__") else [items]
+            if len(widgets) == 1:
+                self._custom_container_layout.addWidget(widgets[0])
+            else:
+                # multiple widgets
+                container = gremlin.ui.ui_common.getHContainer(widgets, widget_only=True)
+                self._custom_container_layout.addWidget(container)
+
+        # hint = self._custom_container_widget.sizeHint()
+        # self._custom_container_widget.setFixedHeight(hint.height())
+
 
     def setInputDescription(self, description: str | None):
         gremlin.util.InvokeUiMethod(self._set_input_description_ui, description)

@@ -24,7 +24,7 @@ import logging
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtWidgets import QLayout, QMainWindow, QMainWindow, QVBoxLayout, QWidget, QProxyStyle, QStyle, QStyleFactory, QWidget, QHBoxLayout, QLayoutItem
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QEvent, QSize
-from PySide6.QtGui import QPixmap, QPainter, QIcon, QResizeEvent
+from PySide6.QtGui import QPixmap, QPainter, QIcon, QResizeEvent, QPen, QFont, QFontMetrics, QKeyEvent, QWheelEvent, QMouseEvent
 import collections
 from typing import Callable, Any, Iterable
 import traceback
@@ -33,6 +33,7 @@ import gremlin.config
 import gremlin.error
 import qtawesome as qta
 import inspect
+import math
 
 from gremlin.input_types import InputType
 from shiboken6 import Shiboken
@@ -112,6 +113,9 @@ class Ansi:
     ORANGE = "\033[38;5;208m"
     BOLD = "\033[1m"
     RESET = "\033[0m"
+
+
+QWIDGETSIZE_MAX = 16_777_215
 
 
 class Color:
@@ -5033,6 +5037,7 @@ class QDataPushButton(QtWidgets.QPushButton):
         height: int = None,
         width: int = None,
         icon_size: int = None,
+        checkable: bool = None,
     ):
         """custom push button
 
@@ -5079,6 +5084,8 @@ class QDataPushButton(QtWidgets.QPushButton):
             self.setEnabled(enabled)
         if clicked:
             self.clicked.connect(clicked)
+        if checkable is not None:
+            self.setCheckable(checkable)
 
         self.installEventFilter(self)
 
@@ -5094,6 +5101,7 @@ class QDataPushButton(QtWidgets.QPushButton):
                 self.setFixedHeight(height)
             elif width:
                 self.setFixedWidth(width)
+
         if icon:
             if isinstance(icon, str):
                 icon = gremlin.util.load_icon(icon)
@@ -5209,6 +5217,7 @@ class QIconPushButton(QDataPushButton):
         icon_size: int = 24,
         height: int = None,
         width: int = None,
+        checkable: bool = False,
     ):
         """custom push button
 
@@ -5242,6 +5251,7 @@ class QIconPushButton(QDataPushButton):
             enhanced=enhanced,
             height=height,
             width=width,
+            checkable=checkable,
         )
         self._icon_pressed = None
         self._icon_default = None
@@ -5281,6 +5291,8 @@ class QIconPushButton(QDataPushButton):
             syslog.error(f"Exception: {e}")
             syslog.error(traceback.format_exc())
 
+
+
     def on_press(self):
         """override when mouse is pressed"""
         super().on_press()
@@ -5312,8 +5324,24 @@ class NoKeyboardPushButton(QIconPushButton):
 
 
 class QIconButton(QIconPushButton):
-    def __init__(self, text=None, icon: str = None, icon_size=24, data=None, parent=None, tooltip=None, callback: Callable = None, callbackEx: Callable = None):
-        super().__init__(text=text, icon=icon, icon_size=icon_size, data=data, parent=parent, tooltip=tooltip, callback=callback, callbackEx=callbackEx)
+    def __init__(self, text=None,
+                  icon: str = None,
+                  icon_size=24,
+                  data=None,
+                  parent=None,
+                  tooltip=None,
+                  callback: Callable = None,
+                  callbackEx: Callable = None,
+                  checkable=False):
+        super().__init__(text=text,
+                         icon=icon,
+                         icon_size=icon_size,
+                         data=data,
+                         parent=parent,
+                         tooltip=tooltip,
+                         callback=callback,
+                         callbackEx=callbackEx,
+                         checkable = checkable)
 
 
 class QReorderToolbar(QWidget):
@@ -5465,6 +5493,9 @@ class QDataLineEdit(QtWidgets.QLineEdit):
 
     def setText(self, value):
         """sets the text"""
+        if value is not None and not isinstance(value, str):
+            value = str(value)
+            syslog.warning(f"QDataLineEdit: Value for setText is not a string: {value}, converting to string.")
         super().setText(value)
         if self.isReadOnly():
             self.home(True)  # move the cursor left to left align the box in readonly mode
@@ -16120,6 +16151,217 @@ class ResizingStackedWidget(QtWidgets.QStackedWidget):
 
 
 class AutoHideStackedWidget(QtWidgets.QStackedWidget):
+    """A stacked widget that collapses when it has no content."""
+
+    widgetChanged = QtCore.Signal()
+    sizeChanged = QtCore.Signal()
+
+    def __init__(
+        self,
+        widget: QWidget | None = None,
+        data=None,
+        name: str | None = None,
+        parent: QWidget | None = None,
+    ):
+        super().__init__(parent)
+
+        self._widget: QWidget | None = None
+        self.data = data
+        self._name = name
+        self._size_update_pending = False
+
+        if name:
+            self.setObjectName(name)
+
+        # Target only this container instead of every descendant QWidget.
+        self.setStyleSheet(
+            "AutoHideStackedWidget { background: transparent; }"
+        )
+
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Minimum,
+        )
+
+        if widget is not None:
+            self.setWidget(widget)
+        else:
+            self._updateSize()
+
+    def widget(self) -> QWidget | None:
+        return self._widget
+
+    def setWidget(self, widget: QWidget | None) -> None:
+        """Replace the current content widget."""
+        if widget is self._widget:
+            self.refreshSize()
+            return
+
+        old_widget = self._widget
+        self._widget = None
+
+        if old_widget is not None:
+            old_widget.removeEventFilter(self)
+            self.removeWidget(old_widget)
+
+        if widget is not None:
+            self._widget = widget
+            super().addWidget(widget)
+            self.setCurrentWidget(widget)
+            widget.installEventFilter(self)
+            widget.show()
+
+        if old_widget is not None:
+            gremlin.util.delete_widget(old_widget)
+
+        self._updateSize()
+        self.widgetChanged.emit()
+
+    def contentLayout(self) -> QtWidgets.QLayout:
+        """
+        Return the content widget's layout.
+
+        A container and QVBoxLayout are created when the stacked widget does
+        not currently contain a widget.
+        """
+        if self._widget is None:
+            container = QWidget()
+            layout = QtWidgets.QVBoxLayout(container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
+            self.setWidget(container)
+            return layout
+
+        layout = self._widget.layout()
+
+        if layout is None:
+            layout = QtWidgets.QVBoxLayout(self._widget)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
+
+        return layout
+
+    def hasWidget(self) -> bool:
+        return self._widget is not None
+
+    def refreshSize(self) -> None:
+        """Schedule a size recalculation after pending layout changes."""
+        if self._size_update_pending:
+            return
+
+        self._size_update_pending = True
+        QtCore.QTimer.singleShot(0, self._updateSize)
+
+    def _contentMinimumSize(self) -> QSize:
+        """Return the minimum size required by the content widget."""
+        if self._widget is None:
+            return QSize(0, 0)
+
+        self._widget.ensurePolished()
+
+        layout = self._widget.layout()
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
+
+        minimum = self._widget.minimumSizeHint()
+
+        if not minimum.isValid():
+            minimum = QSize(0, 0)
+
+        minimum = minimum.expandedTo(self._widget.minimumSize())
+
+        if layout is not None:
+            minimum = minimum.expandedTo(layout.minimumSize())
+
+        frame_size = self.frameWidth() * 2
+        return minimum + QSize(frame_size, frame_size)
+
+    def _contentSizeHint(self) -> QSize:
+        """Return the preferred size of the content widget."""
+        if self._widget is None:
+            return QSize(0, 0)
+
+        self._widget.ensurePolished()
+
+        layout = self._widget.layout()
+        if layout is not None:
+            layout.activate()
+
+        hint = self._widget.sizeHint()
+
+        if not hint.isValid():
+            hint = QSize(0, 0)
+
+        if layout is not None:
+            hint = hint.expandedTo(layout.sizeHint())
+
+        frame_size = self.frameWidth() * 2
+        hint += QSize(frame_size, frame_size)
+
+        return hint.expandedTo(self._contentMinimumSize())
+
+    def _updateSize(self) -> None:
+        """Update the container constraints from its current content."""
+        self._size_update_pending = False
+
+        if self._widget is None:
+            self.setMinimumSize(0, 0)
+            self.setMaximumHeight(0)
+            self.hide()
+        else:
+            self.show()
+
+            # Restore the maximum height used by the empty state.
+            self.setMaximumHeight(QWIDGETSIZE_MAX)
+            self.setMinimumSize(self._contentMinimumSize())
+
+        self.updateGeometry()
+
+        parent = self.parentWidget()
+        if parent is not None:
+            parent_layout = parent.layout()
+
+            if parent_layout is not None:
+                parent_layout.invalidate()
+                parent_layout.activate()
+
+        self.sizeChanged.emit()
+
+    def eventFilter(
+        self,
+        watched: QtCore.QObject,
+        event: QtCore.QEvent,
+    ) -> bool:
+        if watched is self._widget and event.type() in (
+            QtCore.QEvent.Type.LayoutRequest,
+            QtCore.QEvent.Type.Resize,
+            QtCore.QEvent.Type.Show,
+            QtCore.QEvent.Type.Hide,
+            QtCore.QEvent.Type.StyleChange,
+            QtCore.QEvent.Type.FontChange,
+        ):
+            self.refreshSize()
+
+        return super().eventFilter(watched, event)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self.sizeChanged.emit()
+
+    def sizeHint(self) -> QSize:
+        if self._widget is None:
+            return QSize(0, 0)
+
+        return self._contentSizeHint()
+
+    def minimumSizeHint(self) -> QSize:
+        return self._contentMinimumSize()
+
+    def _cleanup_ui(self) -> None:
+        self.setWidget(None)
+
+class AutoHideStackedWidgetOld(QtWidgets.QStackedWidget):
     """stacked widget that automatically hides itself if no widget is set"""
 
     widgetChanged = QtCore.Signal()
@@ -16758,3 +17000,538 @@ class QKeyboardKeysWidget(QWidget):
             widget.setReadOnly(True)
             self.layout.addWidget(widget)
             self._widget_map[key] = widget
+
+
+class QAudioLevelMeter(QWidget):
+    """
+    Vertical dBFS audio meter with:
+        - current level
+        - peak marker
+        - VAD threshold marker
+    """
+
+    def __init__(
+        self,
+        parent=None,
+        min_db=-60.0,
+        max_db=0.0,
+        warning_db=-12.0,
+        clip_db=-3.0,
+    ):
+        super().__init__(parent)
+
+        self.min_db = min_db
+        self.max_db = max_db
+
+        self.warning_db = warning_db
+        self.clip_db = clip_db
+
+        self._level_db = min_db
+        self._peak_db = min_db
+        self._threshold_db = -40.0
+
+        self._peak_decay = 0.5
+
+        self.setMinimumWidth(60)
+        self.setMinimumHeight(160)
+
+    @Slot(float)
+    def setLevel(self, level_db):
+        level_db = max(
+            self.min_db,
+            min(self.max_db, float(level_db))
+        )
+
+        self._level_db = level_db
+
+        if level_db > self._peak_db:
+            self._peak_db = level_db
+        else:
+            self._peak_db = max(
+                self.min_db,
+                self._peak_db - self._peak_decay
+            )
+
+        self.update()
+
+    @Slot(float)
+    def setThreshold(self, threshold_db):
+        self._threshold_db = max(
+            self.min_db,
+            min(self.max_db, float(threshold_db))
+        )
+
+        self.update()
+
+    @Slot(float, float)
+    def setLevels(self, level_db, threshold_db):
+        """
+        Convenience method for updating both in one signal.
+        """
+        self._threshold_db = max(
+            self.min_db,
+            min(self.max_db, float(threshold_db))
+        )
+
+        self.setLevel(level_db)
+
+    def resetPeak(self):
+        self._peak_db = self.min_db
+        self.update()
+
+    def _db_to_y(self, db, top, height):
+        normalized = (
+            db - self.min_db
+        ) / (
+            self.max_db - self.min_db
+        )
+
+        normalized = max(
+            0.0,
+            min(1.0, normalized)
+        )
+
+        return top + height * (1.0 - normalized)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+
+        painter.setRenderHint(
+            QPainter.RenderHint.Antialiasing
+        )
+
+        rect = self.rect()
+
+        label_width = 34
+
+        meter_left = 4
+        meter_top = 6
+        meter_bottom = 6
+
+        meter_width = (
+            rect.width()
+            - label_width
+            - meter_left
+            - 4
+        )
+
+        meter_height = (
+            rect.height()
+            - meter_top
+            - meter_bottom
+        )
+
+        meter_right = (
+            meter_left + meter_width
+        )
+
+
+        painter.fillRect(
+            rect,
+            self.palette().window()
+        )
+
+        painter.fillRect(
+            meter_left,
+            meter_top,
+            meter_width,
+            meter_height,
+            QColor(30, 30, 30)
+        )
+
+
+        # Current level
+        level_y = self._db_to_y(
+            self._level_db,
+            meter_top,
+            meter_height
+        )
+
+        bottom_y = self._db_to_y(
+            self.min_db,
+            meter_top,
+            meter_height
+        )
+
+        level_height = bottom_y - level_y
+
+        if self._level_db >= self.clip_db:
+            color = QColor(220, 60, 60)
+
+        elif self._level_db >= self.warning_db:
+            color = QColor(230, 190, 40)
+
+        else:
+            color = QColor(60, 200, 90)
+
+        painter.fillRect(
+            meter_left + 2,
+            int(level_y),
+            meter_width - 4,
+            int(level_height),
+            color
+        )
+
+        # VAD threshold marker
+        threshold_y = self._db_to_y(
+            self._threshold_db,
+            meter_top,
+            meter_height
+        )
+
+        threshold_pen = QPen(
+            QColor(80, 170, 255),
+            2,
+            Qt.PenStyle.DashLine,
+        )
+
+        painter.setPen(threshold_pen)
+
+        painter.drawLine(
+            meter_left,
+            int(threshold_y),
+            meter_right,
+            int(threshold_y),
+        )
+
+        # Peak marker
+        peak_y = self._db_to_y(
+            self._peak_db,
+            meter_top,
+            meter_height
+        )
+
+        painter.setPen(
+            QPen(
+                QColor(245, 245, 245),
+                2
+            )
+        )
+
+        painter.drawLine(
+            meter_left + 1,
+            int(peak_y),
+            meter_right - 1,
+            int(peak_y)
+        )
+
+        # Border
+        painter.setPen(
+            QColor(100, 100, 100)
+        )
+
+        painter.drawRect(
+            meter_left,
+            meter_top,
+            meter_width,
+            meter_height
+        )
+
+        # dB scale
+        painter.setFont(
+            QFont(
+                painter.font().family(),
+                8
+            )
+        )
+
+        painter.setPen(
+            self.palette().text().color()
+        )
+
+        scale_values = [
+            0,
+            -6,
+            -12,
+            -18,
+            -24,
+            -36,
+            -48,
+            -60,
+        ]
+
+        for db in scale_values:
+            if not (
+                self.min_db
+                <= db
+                <= self.max_db
+            ):
+                continue
+
+            y = self._db_to_y(
+                db,
+                meter_top,
+                meter_height
+            )
+
+            painter.drawLine(
+                meter_right + 2,
+                int(y),
+                meter_right + 5,
+                int(y)
+            )
+
+            painter.drawText(
+                meter_right + 7,
+                int(y + 4),
+                f"{db}"
+            )
+
+
+
+class QVolumeKnob(QWidget):
+    """A painted 0–100 volume knob
+
+    Controls:
+      * Drag up/down or left/right to adjust.
+      * Use the mouse wheel or arrow/Page Up/Page Down keys.
+      * Double-click or press M to toggle mute.
+      * Press Home/End for minimum/maximum.
+
+    """
+
+    valueChanged = QtCore.Signal(int)
+    mutedChanged = QtCore.Signal(bool)
+
+    _START_ANGLE = 225.0
+    _SWEEP_ANGLE = 270.0
+
+    def __init__(self, value : float = 50, callback : Callable[[int], None] = None, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._value = value
+        self._muted = False
+        self._saved_value = self._value
+        self._drag_origin = QPointF()
+        self._drag_value = self._value
+        self._dragging = False
+        self._step = 2
+        self._drag_pixels_per_full_range = 180.0
+
+        self.setMinimumSize(110, 130)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Drag or scroll to change volume; double-click to mute")
+        self._callback = callback
+
+    def value(self) -> int:
+        return self._value
+
+    def setValue(self, value: int) -> None:
+        value = max(0, min(100, int(value)))
+        value_changed = value != self._value
+        mute_changed = self._muted
+
+        self._value = value
+        self._muted = False
+        if value > 0:
+            self._saved_value = value
+
+        if value_changed:
+            self.valueChanged.emit(value)
+        if mute_changed:
+            self.mutedChanged.emit(False)
+        if value_changed or mute_changed:
+            self.update()
+        if self._callback and (value_changed or mute_changed):
+            self._callback(self._value)
+
+    def isMuted(self) -> bool:
+        return self._muted
+
+    def setMuted(self, muted: bool) -> None:
+        muted = bool(muted)
+        if muted == self._muted:
+            return
+        if muted and self._value > 0:
+            self._saved_value = self._value
+        self._muted = muted
+        self.mutedChanged.emit(muted)
+        self.update()
+
+    def toggleMuted(self) -> None:
+        self.setMuted(not self._muted)
+
+    def step(self) -> int:
+        return self._step
+
+    def setStep(self, step: int) -> None:
+        self._step = max(1, int(step))
+
+    def effectiveValue(self) -> int:
+        """Return the audible volume (zero while muted)."""
+        return 0 if self._muted else self._value
+
+    def sizeHint(self):  # noqa: N802 - Qt API naming
+        from PySide6.QtCore import QSize
+        return QSize(150, 170)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        del event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        side = min(self.width() - 20, self.height() - 42)
+        side = max(20, side)
+        knob = QRectF((self.width() - side) / 2, 10, side, side)
+        center = knob.center()
+        radius = side / 2
+        ring = QRectF(center.x() - radius * 0.82, center.y() - radius * 0.82,
+                      radius * 1.64, radius * 1.64)
+
+        # Outer body and subtle inner face.
+        painter.setPen(QPen(QColor("#111827"), max(2.0, side * 0.025)))
+        painter.setBrush(QColor("#252c38"))
+        painter.drawEllipse(knob)
+        inner = knob.adjusted(side * 0.08, side * 0.08, -side * 0.08, -side * 0.08)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#303947"))
+        painter.drawEllipse(inner)
+
+        # Background and active arcs. Qt's angles are counter-clockwise.
+        arc_pen = QPen(QColor("#566171"), max(4.0, side * 0.055), Qt.PenStyle.SolidLine,
+                       Qt.PenCapStyle.RoundCap)
+        painter.setPen(arc_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawArc(ring, int(-45 * 16), int(-self._SWEEP_ANGLE * 16))
+
+        shown_value = self.effectiveValue()
+        active_color = QColor("#77808c") if self._muted else QColor("#35c6f4")
+        painter.setPen(QPen(active_color, arc_pen.widthF(), Qt.PenStyle.SolidLine,
+                            Qt.PenCapStyle.RoundCap))
+        painter.drawArc(ring, int(-45 * 16), int(-self._SWEEP_ANGLE * shown_value / 100 * 16))
+
+        # Indicator line.
+        angle = math.radians(self._START_ANGLE - self._SWEEP_ANGLE * shown_value / 100)
+        line_start = QPointF(center.x() + math.cos(angle) * radius * 0.23,
+                             center.y() - math.sin(angle) * radius * 0.23)
+        line_end = QPointF(center.x() + math.cos(angle) * radius * 0.58,
+                           center.y() - math.sin(angle) * radius * 0.58)
+        painter.setPen(QPen(active_color, max(3.0, side * 0.04), Qt.PenStyle.SolidLine,
+                            Qt.PenCapStyle.RoundCap))
+        painter.drawLine(line_start, line_end)
+
+        text = "MUTED" if self._muted else f"{self._value}%"
+        painter.setPen(QColor("#e8edf4"))
+        font = painter.font()
+        font.setBold(True)
+        font.setPixelSize(max(12, int(side * 0.13)))
+        painter.setFont(font)
+        metrics = QFontMetrics(font)
+        text_rect = QRectF(0, knob.bottom() + 7, self.width(), metrics.height() + 4)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, text)
+
+        if self.hasFocus():
+            painter.setPen(QPen(QColor("#9be4fb"), 1.5, Qt.PenStyle.DashLine))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRoundedRect(self.rect().adjusted(2, 2, -2, -2), 6, 6)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self._drag_origin = event.position()
+            self._drag_value = self._value
+            self.setFocus()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if self._dragging:
+            delta = (self._drag_origin.y() - event.position().y()) + (
+                event.position().x() - self._drag_origin.x()
+            )
+            value = self._drag_value + round(delta * 100 / self._drag_pixels_per_full_range)
+            self.setValue(value)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton and self._dragging:
+            self._dragging = False
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.toggleMuted()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802
+        degrees = event.angleDelta().y() / 120
+        if degrees:
+            self.setValue(self._value + round(degrees * self._step))
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+        key = event.key()
+        if key in (Qt.Key.Key_Up, Qt.Key.Key_Right):
+            self.setValue(self._value + self._step)
+        elif key in (Qt.Key.Key_Down, Qt.Key.Key_Left):
+            self.setValue(self._value - self._step)
+        elif key == Qt.Key.Key_PageUp:
+            self.setValue(self._value + 10)
+        elif key == Qt.Key.Key_PageDown:
+            self.setValue(self._value - 10)
+        elif key == Qt.Key.Key_Home:
+            self.setValue(0)
+        elif key == Qt.Key.Key_End:
+            self.setValue(100)
+        elif key == Qt.Key.Key_M:
+            self.toggleMuted()
+        else:
+            super().keyPressEvent(event)
+            return
+        event.accept()
+
+
+class QDataRepeaterWidget(QtWidgets.QWidget):
+    def __init__(self, value : float = 0.0, decimals: int = 0, prefix: str = None, suffix : str = None, parent=None):
+        super().__init__(parent)
+        self._prefix = prefix
+        self._suffix = suffix
+        layout = QtWidgets.QHBoxLayout(self)
+        self._decimals = decimals
+        self._widget = QtWidgets.QLabel()
+        layout.addWidget(self._widget)
+        self._value = value
+
+        border_color = Color.borderColor()
+
+        css = f"""
+            .QLabel {{
+                font-size: 14px;
+                border: 1px solid {border_color};
+                padding: 4px;
+            }}
+            """
+        self.setStyleSheet(css)
+
+        self.setLayout(layout)
+        self._update_value()
+
+    def _update_value(self):
+        if self._decimals > 0:
+            self._widget.setText(f"{self._prefix or ''}{self._value:.{self._decimals}f}{self._suffix or ''}")
+        else:
+            self._widget.setText(f"{self._prefix or ''}{int(self._value)}{self._suffix or ''}")
+
+    def setSuffix(self, suffix: str):
+        self._suffix = suffix
+        self._update_value()
+
+    def setPrefix(self, prefix: str):
+        self._prefix = prefix
+        self._update_value()
+
+    def setValue(self, value: float):
+        self._value = value
+        self._update_value()
+
+    def value(self) -> float:
+        return self._value

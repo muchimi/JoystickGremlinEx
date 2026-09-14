@@ -23,6 +23,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtCore import QModelIndex
 import threading
 from lxml import etree as ElementTree
+from gremlin.ui.state_device import StateData, StateInputItem
 import gremlin.util
 from gremlin.util import safe_format, safe_read, write_guid, read_guid
 
@@ -44,6 +45,9 @@ import html
 from typing import Callable
 
 from gremlin.voice import VoiceCommand, Voice
+from gremlin.sound import Sound
+from PySide6.QtMultimedia import QMediaDevices, QAudioInput
+
 
 syslog = logging.getLogger("system")
 
@@ -66,12 +70,13 @@ class VoiceInputItem(InputItem):
         profile = gremlin.shared_state.current_profile
         # device = gremlin.joystick_handling.getDevice(StateDeviceTabWidget.device_guid)
         device_modes = profile.get_device_modes(
-            gremlin.shared_state.state_tab_guid,
-            DeviceType.State,
-            DeviceType.to_string(DeviceType.State),
+            VoiceDeviceTabWidget.device_guid,
+            DeviceType.Voice,
+            DeviceType.to_string(DeviceType.Voice),
         )
         mode_object = device_modes.ensure_mode_exists(master_mode)
 
+        assert key is None or isinstance(key, str), "key must be a string"
         self._key = key  # ok if None (blank)
         self._text = text
         self._phrases_map = {}  # map of phrase by hash value
@@ -82,7 +87,8 @@ class VoiceInputItem(InputItem):
         super().__init__(
             mode_node=mode_object,
             device_guid=VoiceDeviceTabWidget.device_guid,
-            input_type=InputType.State,
+            input_type=InputType.Voice,
+            override_input_type=InputType.JoystickButton,
             custom_input_id_handler=self._handle_input_id_callback,
         )
 
@@ -90,22 +96,23 @@ class VoiceInputItem(InputItem):
 
     @property
     def commands(self) -> list[VoiceCommand]:
-        """gets the list of voice commands in this voice input"""
+        """gets the list of voice commands in this voice input (updates based on text property)"""
         return list(self._command_map.values())
 
     def _update_commands(self):
         """builds voice commands from the input phrase if it has multiple phrases separated by '|'"""
         self._command_map.clear()
         if self._text:
-            phrases = self._text.split("|")
+            phrases = re.split(r'\||\n|\r', self.text)
+            phrases = [item for item in phrases if item]
             for phrase in phrases:
                 command = VoiceCommand(phrase=phrase, callback=self._handle_voice_trigger, owner=self)
                 self._command_map[command.key] = command
 
-
     def _handle_voice_trigger(self, vc):
+        """called when the voice triggers a command - passes the command triggered"""
         if vc.owner != self:
-            # not ours
+            # not our command
             return
         if self._emit:
             self._last_triggered_command = vc
@@ -118,17 +125,21 @@ class VoiceInputItem(InputItem):
                 identifier=self,
                 device_guid=VoiceDeviceTabWidget.device_guid,
                 override_input_type=InputType.JoystickButton,
+                extra_data={"command": vc},
             )
             config = gremlin.config.Configuration()
             el = gremlin.event_handler.EventListener()
             el.queueJoystickEvent(event)
 
-            timer = threading.Timer(config.voice_command_release_delay, self._trigger_release_event)
+            timer = threading.Timer(config.voice_command_release_delay, self._get_release_trigger_callback(vc))
             timer.start()
 
-    def _trigger_release_event(self):
+    def _get_release_trigger_callback(self, vc):
+        return lambda: self._trigger_release_event(vc)
+
+    def _trigger_release_event(self, vc: VoiceCommand):
         if self._emit:
-            syslog.info(f"VOICE: triggered [{self._key}] with phrase [{self._last_triggered_command.phrase}]")
+            syslog.info(f"VOICE: released [{self._key}] with phrase [{vc.phrase}]")
             # handle the voice command here
             event = gremlin.event_handler.Event(
                 event_type=InputType.Voice,
@@ -137,6 +148,7 @@ class VoiceInputItem(InputItem):
                 identifier=self,
                 device_guid=VoiceDeviceTabWidget.device_guid,
                 override_input_type=InputType.JoystickButton,
+                extra_data={"command": vc},
             )
             el = gremlin.event_handler.EventListener()
             el.queueJoystickEvent(event)
@@ -152,11 +164,7 @@ class VoiceInputItem(InputItem):
     def clone(self):
         """clones the input item (gives it a new ID)"""
 
-        return VoiceInputItem(
-            key=self.key,
-            text=self.text,
-            description=self.description,
-        )
+        return VoiceInputItem(key=self.key, text=self.text, description=self.description, data=self.data)
 
     def _handle_input_id_callback(self):
         """input id is self for a voice input"""
@@ -198,11 +206,14 @@ class VoiceInputItem(InputItem):
     @property
     def key(self) -> str:
         # the key of the input item is the id
-        return self._id
+        if not self._key:
+            self._key = str(self._id)
+        return self._key
 
     @key.setter
     def key(self, value: str):
-        pass
+        assert value is None or isinstance(value, str), "key must be a string"
+        self._key = value
 
     @property
     def message_key(self):
@@ -251,17 +262,21 @@ class VoiceInputItem(InputItem):
         if "id" in node.attrib:
             self.setId(read_guid(node, "id"))
 
-        description = None
-        if "description" in node.attrib:
-            description = html.unescape(node.get("description"))
-
-        self.setDescription(description)
-
         text = node.get("text")
         if text:
             text = html.unescape(text)
 
         self._text = text
+        self._update_commands()
+
+        super().from_xml(node, data, extra_data)
+
+    def __str__(self):
+        commands = self.commands
+        if commands:
+            vc = commands[0]
+            return f"Voice Input: {vc.phrase}"
+        return "Voice Input: <no command>"
 
 
 class VoiceInputItemModel(gremlin.input_item.InputItemListModel):
@@ -291,6 +306,243 @@ class VoiceInputItemModel(gremlin.input_item.InputItemListModel):
             self.addOnItemChangedCallback(item_changed_handler)
 
 
+DEFAULT_AUDIO_DEVICE_INDEX = -1
+DEFAULT_AUDIO_DEVICE_MARKER = "__default__"
+
+
+class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
+    """configuration dialog to select the voice input device and set speech recognition options"""
+
+    def __init__(self, parent=None):
+        super().__init__(self.__class__.__name__, parent=parent)
+        self.setWindowTitle("Voice Input Configuration")
+        self.setModal(True)
+
+        self.main_layout = QtWidgets.QVBoxLayout(self)
+        self.setLayout(self.main_layout)
+
+        self._sound = Sound()
+        self._voice_data = VoiceData()
+        self._voice = Voice()
+        self._started = False  # true if monitoring started
+
+        self._last_monitored_device = None
+        self._monitored_input = None
+        self._default_device_name: str = None  # name of default device when in default named entry
+
+        # view meter
+        self._view_meter = gremlin.ui.ui_common.QAudioLevelMeter()
+
+        # input selector
+        source = self._get_audio_source()
+        index = self._voice_data.getAudioDeviceIndex()
+        self._input_selector = gremlin.ui.ui_common.QDataComboBox(source=source, value=index, callback=self._handle_audio_change)
+
+        self._default_name_widget = QtWidgets.QLabel()
+
+        # monitor button
+        # self._monitor_button = gremlin.ui.ui_common.Buttons.getRecordWidget("Monitor input")
+        self._monitor_button = QtWidgets.QPushButton("Monitor Input")
+        self._monitor_button.setCheckable(True)
+        self._monitor_button.toggled.connect(self._handle_monitor_toggle)
+        self._monitor_button.setIcon(gremlin.ui.ui_common.Icons.recordIcon())
+
+        self._gain_widget = gremlin.ui.ui_common.QDataRepeaterWidget(value=0.0, decimals=0, prefix="Auto Gain: ", suffix=" dB")
+
+        view_container = gremlin.ui.ui_common.getVContainer([self._view_meter, self._gain_widget], widget_only=True)
+
+        self._volume_widget = gremlin.ui.ui_common.QVolumeKnob(value=0.0)
+        self._volume_widget.valueChanged.connect(self._handle_volume_change)
+
+        selector_container = gremlin.ui.ui_common.getVContainer([self._input_selector, self._default_name_widget, self._volume_widget], widget_only=True)
+
+        action_container = gremlin.ui.ui_common.getVContainer(self._monitor_button, widget_only=True)
+
+        widget = gremlin.ui.ui_common.getHContainer([view_container, selector_container, action_container, "||"], widget_only=True)
+
+        self.main_layout.addWidget(widget)
+
+        # computed data
+        widget = gremlin.ui.ui_common.getHContainer([self._gain_widget, "||"], widget_only=True)
+        self.main_layout.addWidget(widget)
+
+        # button bar
+        self.ok_widget = QtWidgets.QPushButton("Ok")
+        self.ok_widget.clicked.connect(self._execute_cb)
+
+        self.cancel_widget = QtWidgets.QPushButton("Cancel")
+        self.cancel_widget.clicked.connect(self._close_cb)
+
+        widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
+
+        self.main_layout.addWidget(widget)
+
+        self._update_ui()
+        self._update_volume()
+        self._update_volume_monitor()
+
+    def _update_ui(self):
+        default_visible = self._input_selector.currentData() == DEFAULT_AUDIO_DEVICE_INDEX
+        if default_visible:
+            self._default_name_widget.setText(self._voice_data.getDefaultAudioDevice())
+        self._default_name_widget.setVisible(default_visible)
+
+    @QtCore.Slot()
+    def _execute_cb(self):
+        """ok button callback"""
+        self.setResult(QtWidgets.QDialog.DialogCode.Accepted)
+        self.close()
+
+    @QtCore.Slot()
+    def _close_cb(self):
+        """cancel button callback"""
+        self.setResult(QtWidgets.QDialog.DialogCode.Rejected)
+        self.close()
+
+    def _handle_monitor_toggle(self, checked):
+        if checked:
+            self.start()
+        else:
+            self.stop()
+
+    def stop(self):
+        """stop the voice device and disconnect the monitored input"""
+        if self._started:
+            self._voice.stop()
+            self._voice.audioMonitor.disconnect(self._update_view_meter)
+            if self._monitored_input:
+                self._monitored_input.volumeChanged.disconnect(self._handle_system_volume_changed)
+                self._monitored_input = None
+            self._voice.popRecognize()
+            self._started = False
+
+            if self._monitor_button.isChecked():
+                # uncheck the monitor button if it is still checked (stop may be called externally)
+                with QtCore.QSignalBlocker(self._monitor_button):  # prevent UI updates while stopping
+                    self._monitor_button.setChecked(False)
+
+    def start(self):
+        """start the voice device and connect the monitored input"""
+        if self._started:
+            return
+        self._voice.pushRecognize()
+        self._voice.audioMonitor.connect(self._update_view_meter)
+        self._voice.start()
+        if self._monitored_input:
+            self._monitored_input.volumeChanged.connect(self._handle_system_volume_changed)
+        self._started = True
+
+    def closeEvent(self, event):
+        """handle the dialog close event"""
+        self.stop()
+        super().closeEvent(event)
+
+    def _update_view_meter(self, info: dict):
+        """update the view meter based on audio monitor info"""
+        level_db = info.get("level_db", -100.0)
+        gain_db = info.get("gain_db", 0.0)
+        # noise_db = info.get("noise_db", -100.0)
+        threshold_db = info.get("threshold_db", -100.0)
+        # is_speech = info.get("is_speech", False)
+        # speech_started = info.get("speech_started", False)
+        # speech_ended = info.get("speech_ended", False)
+
+        self._view_meter.setLevels(level_db, threshold_db)
+        self._gain_widget.setValue(gain_db)
+
+    def _handle_audio_change(self, index: int):
+        self.stop()  # ensure monitoring stopped
+        if index == DEFAULT_AUDIO_DEVICE_INDEX:
+            # follow the Windows default output device at playback time
+            if not self._default_device_name:
+                self._default_device_name = self._voice_data.getDefaultAudioDevice()
+            self._voice_data._audio_device = self._default_device_name
+            return
+        device_name = self._voice_data.getAudioDeviceFromIndex(index)
+        self._voice_data.setAudioDevice(device_name, validate=False)
+        self._update_ui()
+
+    def _update_volume_monitor(self):
+
+        target_name = self._get_target_device().casefold()
+        if self._last_monitored_device is None or self._last_monitored_device != target_name:
+            self._last_monitored_device = target_name
+
+            monitored_device = None
+            for device in QMediaDevices.audioInputs():
+                if target_name in device.description().casefold():
+                    monitored_device = device
+                    break
+
+            if self._monitored_input:
+                self._monitored_input.volumeChanged.disconnect(self.on_volume_changed)
+
+            self._monitored_input = QAudioInput(monitored_device, self)
+            self._monitored_input.volumeChanged.connect(self._handle_system_volume_changed)
+
+    def _handle_system_volume_changed(self, value: float):
+        """reflects a volume change in the system microphone volume"""
+        volume = round(value * 100)  # convert 0 to 1 to 0 to 100
+        if self._volume_widget.value() == volume:
+            return
+        with QtCore.QSignalBlocker(self._volume_widget):
+            self._volume_widget.setValue(volume)
+
+    @QtCore.Slot(int)
+    def _handle_volume_change(self, value: int):
+        # set the system microphone volume (ui thread)
+
+        target_name = self._get_target_device()
+        self._voice._set_volume_ui(value, target_name=target_name)
+
+    def _update_volume(self) -> int:
+        """gets the current device input volume as set in the operating system"""
+        target_name = self._get_target_device()
+        volume = self._voice_data.getVolume(target_name=target_name)
+        self._volume_widget.setValue(volume)
+
+    def _get_target_device(self) -> str:
+        index = self._input_selector.currentData()
+        if index == DEFAULT_AUDIO_DEVICE_INDEX:
+            if not self._default_device_name:
+                self._default_device_name = self._voice_data.getDefaultAudioDevice()
+            return self._default_device_name
+        return self._input_selector.currentText()
+
+    def _update_audio_devices(self):
+        # update the list of available audio devices
+
+        with QtCore.QSignalBlocker(self._input_selector):
+            self._input_selector.clear()
+
+            source = [("Default device", DEFAULT_AUDIO_DEVICE_INDEX)]
+            source += self._voice_data.getAudioDevicePairs()
+
+            for device, index in source:
+                self._input_selector.addItem(device, index)
+
+    def _get_audio_source(self):
+        source = [("Default device", DEFAULT_AUDIO_DEVICE_INDEX)]
+        source += self._voice_data.getAudioDevicePairs()
+        return source
+
+    def _handle_audio_change(self, value: int):
+        """device changed via selector box"""
+        try:
+            if value == DEFAULT_AUDIO_DEVICE_INDEX:
+                # follow the Windows default output device at playback time
+                self._default_device_name = self._voice_data.getDefaultAudioDevice()
+                self._voice_data._audio_device = self._default_device_name
+                return
+            device_name = self._voice_data.getAudioDeviceFromIndex(value)
+
+            if device_name is not None:
+                self._voice_data.setAudioDevice(device_name, validate=False)
+                return
+        finally:
+            self._update_ui()
+
+
 @SingletonDecorator
 class VoiceData:
     """holds voice information"""
@@ -301,9 +553,134 @@ class VoiceData:
         self._data = {}
         self._id_map = {}
 
+        self._audio_device: str = None  # name of the selected audio device
+        self._sound = Sound()
+
+        self._gain = 1.0  # default gain value
+
+        self._voice = Voice()
+
         el = gremlin.event_handler.EventListener()
         el.profile_start.connect(self._reset)
         el.profile_unloaded.connect(self._handle_profile_unload)
+
+    def getCommandsFromText(self, text: str) -> list:
+        """gets the list of commands that match the given text"""
+        if text:
+            phrases = [token.strip() for token in text.split("|")]
+            phrases = set(token.casefold() for token in phrases if token)
+            commands = [VoiceCommand(phrase) for phrase in phrases]
+            return commands
+        return []
+
+    def getCommands(self) -> list:
+        """gets the current list of commands"""
+        return self._voice.getCommands()
+
+    def _update_commands(self):
+        """updates the list of commands based on the current input items """
+        for input_item in self._data.values():
+            text = input_item.text if hasattr(input_item, "text") else ""
+            commands = self.getCommandsFromText(text)
+            self._voice.addCommands(commands)
+
+
+    def clearCommands(self):
+        """clears all commands from the matcher"""
+        self._voice.clearCommands()
+
+    def getDefaultAudioDevice(self):
+        """gets the default input device"""
+        if self._audio_device is None:
+            self._audio_device = self._sound.getDefaultInputDevice()
+        return self._audio_device
+
+    def getAudioDevices(self):
+        """gets the list of all input devices"""
+        return list(self._sound.input_device_map.values())
+
+    def getAudioDevicePairs(self) -> list[tuple[str, int]]:
+        """gets the list of all input devices as (description, index) pairs"""
+        return [(name, index) for index, name in self._sound.input_device_map.items()]
+
+    def getAudioDevice(self) -> str:
+        """gets the name of the selected audio device"""
+        if self._audio_device is None or self._audio_device == DEFAULT_AUDIO_DEVICE_MARKER:
+            # use the current system default
+            return self._sound.getDefaultInputDevice()
+        return self._audio_device
+
+    def getAudioDeviceIndex(self) -> int:
+        """gets the index of the selected audio device"""
+        if self._audio_device is None or self._audio_device == DEFAULT_AUDIO_DEVICE_MARKER:
+            # use the current system default
+            return DEFAULT_AUDIO_DEVICE_INDEX
+        name = self._audio_device.casefold()
+        for index, device in self._sound.input_device_map.items():
+            if device.description().casefold().startswith(name):
+                return index
+        return DEFAULT_AUDIO_DEVICE_INDEX
+
+    def getAudioDeviceFromIndex(self, device_index: int) -> str:
+        """gets the name of the audio device corresponding to the given index"""
+        if device_index == DEFAULT_AUDIO_DEVICE_INDEX:
+            return DEFAULT_AUDIO_DEVICE_MARKER
+        device_name = self._sound.input_device_map.get(device_index)
+        if device_name is not None:
+            return device_name
+        return DEFAULT_AUDIO_DEVICE_MARKER
+
+    def setAudioDeviceIndex(self, device_index: int):
+        device_name = self._sound.input_device_map.get(device_index)
+        if device_name is not None:
+            self._audio_device = device_name
+
+    def setAudioDevice(self, device_name: str, validate=False):
+        if device_name is not None:
+            # ensure the device name exists in the current audio stack
+            if device_name == DEFAULT_AUDIO_DEVICE_MARKER:
+                self._audio_device = None  # use the default
+                return
+            if validate:
+                # validate the device exists in the current system input devices
+                name = device_name.casefold()
+                device_name_found = next((d for d in self._sound.input_device_map.values() if d.description().casefold().startswith(name)), None)
+                if device_name_found is None:
+                    syslog.warning(f"Audio device '{device_name}' not found, using default")
+                    self._audio_device = None
+                    return
+                self._audio_device = device_name
+            else:
+                # no validation
+                self._audio_device = device_name
+        else:
+            self._audio_device = None
+
+    @property
+    def audio_device(self) -> str:
+        """gets the name of the selected audio device"""
+        return self._audio_device
+
+    @audio_device.setter
+    def audio_device(self, value: str):
+        self.setAudioDevice(value)
+
+    @property
+    def gain(self) -> float:
+        """user set gain value for the voice input (microphone)"""
+        return self._gain
+
+    @gain.setter
+    def gain(self, value: float):
+        self._gain = value
+
+    def setVolume(self, value: int, target_name: str = None):
+        """sets the volume of the current input device"""
+        self._voice.setVolume(value, target_name)
+
+    def getVolume(self, target_name: str = None) -> int:
+        """gets the volume of the current input device"""
+        return self._voice.getVolume(target_name)
 
     def _reset(self):
         """reset voices"""
@@ -355,6 +732,7 @@ class VoiceData:
         if data and data.key not in self._data:
             self._data[data.key] = data
             self._id_map[data.id] = data
+            self._update_commands()
             self._sort()
             if emit:
                 self.crud.emit()
@@ -434,7 +812,7 @@ class VoiceData:
 
     def to_xml(self):
         """persists the data to XML"""
-        verbose = gremlin.config.Configuration().verbose_mode_state
+        verbose = gremlin.config.Configuration().verbose_mode_voice
         if verbose:
             syslog.info(f"Persisting voices to XML - voice count: {len(self._data)}")
         root = ElementTree.Element("voices")
@@ -444,6 +822,12 @@ class VoiceData:
                 node = item.to_xml()
                 if node is not None:
                     root.append(node)
+
+        # persist device selection
+        if self._audio_device:
+            root.set("device", self._audio_device)
+
+        root.set("gain", safe_format(self._gain, float))
 
         return root
 
@@ -461,8 +845,12 @@ class VoiceData:
                 self._data[item.key] = item
                 self._id_map[item.id] = item
 
+        self._audio_device = safe_read(root, "audio-device", str, None)
+        self._gain = safe_read(root, "gain", float, 1.0)
+        self._update_commands()
+        self._sort()
 
-class VoiceInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
+class VoiceInputItemConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     """dialog showing the voice input configuration options"""
 
     def __init__(
@@ -481,13 +869,11 @@ class VoiceInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
         gremlin.shared_state.push_suspend_highlighting()  # prevent device highlight changes while editing a state
 
-        # self._sequence = InputKeyboardModel(sequence=sequence)
         self.setWindowTitle("Voice Input Editor")
         self.setWindowModality(QtCore.Qt.ApplicationModal)
         self._parent = parent  # list view
         self._is_edit = edit_mode  # edit mode vs new mode
-
-        el = gremlin.event_handler.EventListener()
+        self.commands = []  # returned commands
 
         main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(main_layout)
@@ -495,10 +881,6 @@ class VoiceInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._config_widget, self._config_layout = gremlin.ui.ui_common.getGridContainer()
         self.data = input_item
         self.ref_data = ref_input_item  # reference state
-
-        self._name_widget = gremlin.ui.ui_common.QDataLineEdit()
-        self._name_widget.setText(input_item.key)
-        self._name_widget.textChanged.connect(self._name_changed)
 
         self._text_widget = QtWidgets.QPlainTextEdit()
         # self._text_widget.setAcceptRichText(False)
@@ -514,15 +896,14 @@ class VoiceInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         self._description_widget.textChanged.connect(self._description_changed)
 
         # Removed autorelease widgets and containers as they are no longer needed
+        msg = "Punctuation and casing are discarded for voice commands.  Separate multiple commands with a vertical bar (|)."
+        self._info_widget = gremlin.ui.ui_common.QInfoBox(msg, hide_key="voice_input_info")
 
         self._status_widget = gremlin.ui.ui_common.QWarningWidget()
 
         row = 0
         col = 0
-        self._config_layout.addWidget(QtWidgets.QLabel("Name:"), row, col)
-        self._config_layout.addWidget(self._name_widget, row, col + 1)
 
-        row += 1
         self._config_layout.addWidget(QtWidgets.QLabel("Description:"), row, col)
         self._config_layout.addWidget(self._description_widget, row, col + 1)
 
@@ -534,6 +915,8 @@ class VoiceInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
         main_layout.addWidget(self._config_widget)
 
         main_layout.addWidget(self._status_widget)
+
+        main_layout.addWidget(self._info_widget)
 
         self.ok_widget = QtWidgets.QPushButton("Ok")
         self.ok_widget.clicked.connect(self._ok_button_cb)
@@ -601,30 +984,31 @@ class VoiceInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
 
     def _ok_button_cb(self):
         """ok button pressed"""
-        # ensure the item is unique and not already used
+        # ensure the defined phrases are unique and not already used
 
-        key = self.data.key
+        voice_data = VoiceData()
+        text = self._text_widget.toPlainText()
+        self.data.text = text
 
-        if key:
-            key_low = self.data.key.casefold().strip()
-            if key_low:
-                if not self._is_edit:
-                    # validate if not editing
-                    id = self.data.id
-                    sc = VoiceData()
-                    data = sc.getVoices()
-                    voices = [item.key for item in data.values() if item.id != id and key_low == item.key]
-                    if voices:
-                        gremlin.ui.ui_common.MessageBox(
-                            title="Voice Input Error",
-                            prompt=f"[{key}] is already defined as a voice input.\nVoice input names must be unique and are not case sensitive.",
-                        )
-                        return
+        new_commands = voice_data.getCommandsFromText(self.data.text)
+        commands = voice_data.getCommands()  # defined commands in the profile
 
-                gremlin.shared_state.pop_suspend_highlighting()
-                self.accept()
+        if not self._is_edit:
+            # validate if not editing
+            matches = [vc for vc in new_commands for item in commands if item.hashedKey == vc.hashKey]
+            if matches:
+                vc = matches[0]
+                gremlin.ui.ui_common.MessageBox(
+                    title="Voice Input Error",
+                    prompt=f"[{vc.phrase}] is already defined as a voice command.\nVoice commands must be unique and are not case sensitive.",
+                )
+                return
+
         else:
-            gremlin.ui.ui_common.MessageBox(title="Voice Input Error", prompt="A voice input name is required.")
+            gremlin.shared_state.pop_suspend_highlighting()
+            self.commands = commands
+
+        self.accept()
 
     def _cancel_button_cb(self):
         """cancel button pressed"""
@@ -634,6 +1018,11 @@ class VoiceInputConfigDialog(gremlin.ui.ui_common.QShowAtCursorDialog):
     def _update_ui(self):
         """updates the dialog controls based on options"""
 
+        text = self.data.text
+        if not text:
+            self._status_widget.setText("Please enter one or more voice commands.")
+        else:
+            self._status_widget.setText("")
         self._status_widget.setVisible(bool(self._status_widget.text()))
 
 
@@ -723,17 +1112,24 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         test_button = gremlin.ui.ui_common.QDataPushButton("Test", callback=self._test_input_cb)
         button_container_layout.addWidget(test_button)
 
+        # configure button
+        configure_widget = gremlin.ui.ui_common.QIconPushButton(
+            icon=gremlin.ui.ui_common.Icons.gearIcon(), tooltip="Audio Options", callback=self._handle_configure, height=24, width=24, icon_size=18
+        )
+
+        button_container_layout.addWidget(configure_widget)
+
         # right align
         button_container_layout.addStretch(1)
 
-        # sort states
+        # sort inputs
         sort_button = QtWidgets.QPushButton("Sort")
         icon = gremlin.ui.ui_common.Icons.sortIcon()
         sort_button.setIcon(icon)
         sort_button.clicked.connect(self._sort_input_cb)
         button_container_layout.addWidget(sort_button)
 
-        # Key add button
+        # Key add input button
         add_button = QtWidgets.QPushButton("Add")
         add_button.setToolTip("Adds a new state to the profile")
         icon = gremlin.ui.ui_common.Icons.addIcon()
@@ -753,6 +1149,11 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         el.lock_inputs.connect(self._handle_lock_inputs)
         el.unlock_inputs.connect(self._handle_unlock_inputs)
         el.find_next.connect(self._handle_find_next)
+
+    def _handle_configure(self):
+        """callback for the configure button"""
+        dialog = VoiceSettingsDialog(parent=self)
+        dialog.show()
 
     def _test_input_cb(self):
         """callback for the test input button"""
@@ -802,20 +1203,50 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
         vd = VoiceData()
 
-        title = f"State: [{input_item.key}] [{input_item.id}]" if gremlin.config.Configuration().show_container_id else f"State: [{input_item.key}]"
+        title = "Voice Input"
         widget.setTitle(title)
+
+
         widget.enable_edit()
         widget.enable_close()
         widget.clearWidgets()
-
-        if input_item.description:
-            widget.addWidget(QtWidgets.QLabel(f"{input_item.description}"))
-
         widget.setIcon("ri.user-voice-fill")
 
-        # remember what widget is at what index
-        widget.index = index
+        commands = input_item.commands
+        if commands:
+            vc : VoiceCommand
+            for vc in input_item.commands:
+                widget.addWidget(QtWidgets.QLabel(vc.phrase))
+        else:
+            widget.addWidget(QtWidgets.QLabel("No commands available"))
+
         return widget
+
+    def _populate_input_widget_ui(self, input_widget, container_widget, data=None):
+        """called when an input is created for custom content"""
+        self._update_input_widget(input_widget, container_widget)
+
+    def _update_input_widget(self, input_widget, container_widget):
+        """called when the widget has to update itself on a data change"""
+        input_item: VoiceInputItem = input_widget.input_item
+        if not input_item.commands:
+            input_widget.setCustomContent(QtWidgets.QLabel("No commands found"))
+            return
+        widgets = []
+        for command in input_item.commands:
+            widgets.append(QtWidgets.QLabel(command.phrase))
+
+        container_widget = gremlin.ui.ui_common.getVContainer(widgets, widget_only = True)
+        input_widget.setCustomContent(container_widget)
+
+
+
+
+
+    def _handle_confirm_delete(self, input_item: gremlin.input_item.InputItem):
+        """confirms if an input should be deleted"""
+        result = gremlin.ui.ui_common.ConfirmBox("Delete this input?")
+        return result
 
     def _load_handler(self, model: VoiceInputItemModel, emit=True) -> bool:
         """called when the data model for the input list needs to be updated - refreshes the model view"""
@@ -936,7 +1367,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         input_item = VoiceInputItem()
         input_item.suppressEvents()
 
-        self._edit_dialog = VoiceInputConfigDialog(input_item, None, edit_mode=False, parent=self)
+        self._edit_dialog = VoiceInputItemConfigDialog(input_item, None, edit_mode=False, parent=self)
         self._edit_dialog.accepted.connect(self._dialog_ok_confirm_cb)
         self._edit_dialog.rejected.connect(self._dialog_cancel_cb)
         gremlin.util.centerDialog(self._edit_dialog)
@@ -946,7 +1377,7 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         """edit the state"""
         tmp_input_item = input_item.clone()
         tmp_input_item.suppressEvents()
-        self._edit_dialog = VoiceInputConfigDialog(tmp_input_item, input_item, edit_mode=True, parent=self)
+        self._edit_dialog = VoiceInputItemConfigDialog(tmp_input_item, input_item, edit_mode=True, parent=self)
         self._edit_dialog.accepted.connect(self._dialog_ok_confirm_cb)
         self._edit_dialog.rejected.connect(self._dialog_cancel_cb)
         gremlin.util.centerDialog(self._edit_dialog)
@@ -965,19 +1396,19 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             edited_input_item = self._edit_dialog.data
             input_item = self._edit_dialog.ref_data if edit_mode else edited_input_item
 
-            sd = VoiceData()
+            voice_data = VoiceData()
 
             if not edit_mode:
-                # add the new state
+                # add the new entry
                 index = self.inputItemListModel.add(input_item)
                 if verbose:
                     syslog.info(f"adding id: [{input_item.id}]  key: [{input_item.key}] at index [{index}]")
 
                 # change the state
-                sd.add(edited_input_item)
+                voice_data.add(edited_input_item)
 
             else:
-                # edit an existing state
+                # edit an existing entry
 
                 index = self.inputItemListModel.indexOf(input_item)
                 assert index != -1, "Reference input is missing from model"
@@ -986,11 +1417,10 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
 
                 # copy changed data
                 input_item.enableEvents()
-                category = self._edit_dialog.category()
-                input_item.setCategory(category)
                 input_item.key = edited_input_item.key
                 input_item.setDescription(edited_input_item.description)
                 input_item.text = edited_input_item.text
+
 
                 self.inputItemListModel.refresh()
                 self._filter_widget.updateCounts()

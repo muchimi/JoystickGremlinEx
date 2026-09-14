@@ -662,6 +662,9 @@ class SoundMonitor(QtCore.QObject):
 
             self.DeviceChanged.emit()
 
+        # detect volume changes (if applicable)
+
+
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -711,6 +714,9 @@ class Sound:
             self.device_map = {}
             self.device_name_to_id_map = {}
             self.device_sample_rate_map = {}
+
+            self.input_device_map = {}
+            self.input_device_name_to_id_map = {}
 
             self.running_data = {}  # data for running audio streams
             self._playback_enabled_stack = 0
@@ -835,13 +841,29 @@ class Sound:
                     samplerate = device["default_samplerate"]
 
                     if verbose:
-                        syslog.info(f"API: index: [{index}] [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
+                        syslog.info(f"API: audio output index: [{index}] [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
                     if api_name == "Windows WASAPI":
                         # only use wasapi as that has the lowest latency
                         # other choices are 'MME'
                         # 'Windows DirectSound'
                         self.device_map[index] = name
                         self.device_name_to_id_map[name] = index
+                        self.device_sample_rate_map[index] = samplerate
+
+                if device["max_input_channels"] > 0:
+                    name = device["name"]
+                    index = device["index"]
+                    api_id = device["hostapi"]
+                    api = sd.query_hostapis(device["hostapi"])
+                    api_name = api["name"]
+                    samplerate = device["default_samplerate"]
+
+                    if verbose:
+                        syslog.info(f"API: audio input index: [{index}] [{name}] [{api_name}] id: [{api_id}] sample rate: [{samplerate}] ")
+                    if api_name == "Windows WASAPI":
+                        # only use wasapi as that has the lowest latency
+                        self.input_device_map[index] = name
+                        self.input_device_name_to_id_map[name] = index
                         self.device_sample_rate_map[index] = samplerate
 
 
@@ -933,6 +955,7 @@ class Sound:
 
     @audio_device.setter
     def audio_device(self, name: str):
+        """ playback device setter """
         index = self.findDeviceIndex(name)
         init_mixer = False
         if index is None:
@@ -954,6 +977,7 @@ class Sound:
         if init_mixer:
             self.setPlaybackDevice(name)
 
+
     def findDevice(self, index: int):
         if index in self.device_map:
             return self.device_map[index]
@@ -963,10 +987,10 @@ class Sound:
         device = next((d for d in self.device_map.values() if d.description() == description), None)
         return device
 
-    def findDeviceIndex(self, name: str):
-        """gets the device index for a specific device name"""
-        if name in self.device_name_to_id_map:
-            return self.device_name_to_id_map[name]
+    def findInputDeviceIndex(self, name: str):
+        """gets the input device index for a specific device name"""
+        if name in self.input_device_name_to_id_map:
+            return self.input_device_name_to_id_map[name]
         return None
 
     def getAudioDevice(self):
@@ -1060,6 +1084,37 @@ class Sound:
         if USE_SD:
             device = sd.query_devices(kind='output')
             self.setPlaybackDevice(device.name)
+
+
+    def getDefaultInputDevice(self):
+        """gets the default input device"""
+        if USE_PG:
+            default_device = QtMultimedia.QMediaDevices.defaultAudioInput()
+            return default_device.description()
+        if USE_SD:
+            device = sd.query_devices(kind='input')
+            if device:
+                return device['name']
+            return None 
+
+    def getDefaultInputDeviceIndex(self):
+        """gets the index of the default input device"""
+        default_device = self.getDefaultInputDevice()
+        index = next((i for i, d in self.input_device_map.items() if d == default_device), None)
+        return index
+
+    def inputDevice(self) -> str:
+        """ currently selected input device"""
+        return self._input_device
+
+
+    def getInputDeviceIndex(self):
+        """gets the index of the selected input device"""
+        if not self._input_device:
+            device = self.getDefaultInputDevice()
+            self._input_device = device
+        index = next((i for i, d in self.input_device_map.items() if d == self._input_device), None)
+        return index
 
     def soundStart(self):
         # reset the mixer

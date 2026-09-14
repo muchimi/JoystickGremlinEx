@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations  # deprecated with python 3.14+
+
+
 import hashlib
 import os
 import html
@@ -24,6 +26,7 @@ import re
 import string
 from typing import Callable, Union
 
+import comtypes
 from lxml import etree
 from PySide6 import QtCore, QtMultimedia, QtWidgets
 import gremlin.util
@@ -33,7 +36,7 @@ import queue
 import sounddevice as sd
 import numpy as np
 from faster_whisper import WhisperModel
-from PySide6.QtMultimedia import QMediaDevices, QAudioOutput
+from PySide6.QtMultimedia import QAudioInput, QMediaDevices, QAudioOutput
 import threading
 import logging
 import os
@@ -41,9 +44,29 @@ import numpy as np
 import time
 import concurrent.futures
 from rapidfuzz import process, fuzz
+from psygnal import Signal
 
 import sounddevice as sd
-from pycaw.pycaw import AudioUtilities
+from comtypes import CoInitialize, CoUninitialize, GUID
+from ctypes import cast, POINTER
+from comtypes import CLSCTX_ALL
+
+# avoid the avalanche of warnings from pycaw
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="pycaw")
+from pycaw.pycaw import DEVICE_STATE, AudioUtilities, IAudioEndpointVolume, EDataFlow, IMMEndpoint, IMMDeviceEnumerator  # noqa: E402
+from pycaw.constants import CLSID_MMDeviceEnumerator # noqa: E402
+
+class PROPERTYKEY(comtypes.Structure):
+    _fields_ = [
+        ("fmtid", GUID),
+        ("pid", comtypes.wintypes.DWORD)
+    ]
+
+PKEY_Device_FriendlyName = PROPERTYKEY(
+    GUID("{a45c254e-df1c-4efd-8020-67d146a850e0}"), 14
+)
+
 
 # usage
 
@@ -97,6 +120,8 @@ class SpeechAudioProcessor:
         - post-roll / hangover audio
     """
 
+    autoGainChanged = Signal(float)  # emits the automatic gain (current gain in dB) when it changes
+
     def __init__(
         self,
         sample_rate=16000,
@@ -128,6 +153,7 @@ class SpeechAudioProcessor:
         self.gain_release = gain_release
 
         self.gain_db = 0.0
+        self._last_gain_db = 0.0
 
         # Noise floor
         self.noise_floor_db = initial_noise_db
@@ -250,6 +276,9 @@ class SpeechAudioProcessor:
             rate = self.gain_release
 
         self.gain_db += (desired_gain - self.gain_db) * rate
+        if self._last_gain_db != self.gain_db:
+            self._last_gain_db = self.gain_db
+            self.autoGainChanged.emit(self.gain_db)
 
     # ---------------------------------------------------------
     # Main processing
@@ -581,93 +610,6 @@ class SpeechRecognizer:
             self.callback(words)
 
 
-class WindowsMicrophoneVolume:
-    def __init__(self, sounddevice_index=None):
-        if sounddevice_index is None:
-            sounddevice_index = sd.default.device[0]
-
-        self.sd_index = sounddevice_index
-        self.sd_info = sd.query_devices(sounddevice_index)
-
-        self.sounddevice_name = self.sd_info["name"]
-
-        self.device = self._find_capture_device(self.sounddevice_name)
-
-        if self.device is None:
-            raise RuntimeError(f"Could not find Windows capture endpoint for sounddevice '{self.sounddevice_name}'")
-
-        self.volume = self.device.EndpointVolume
-
-    def _find_capture_device(self, name):
-        """
-        Find the closest pycaw capture endpoint by name.
-        """
-
-        name = name.lower()
-
-        # pycaw exposes Windows audio devices here.
-        devices = AudioUtilities.GetAllDevices()
-
-        best_match = None
-
-        for device in devices:
-            friendly_name = getattr(device, "FriendlyName", "")
-
-            if not friendly_name:
-                continue
-
-            friendly_lower = friendly_name.lower()
-
-            # Simple matching strategy.
-            if name in friendly_lower or friendly_lower in name:
-                best_match = device
-                break
-
-        return best_match
-
-    def get_volume(self):
-        """
-        Return microphone volume from 0.0 to 1.0.
-        """
-        return float(self.volume.GetMasterVolumeLevelScalar())
-
-    def get_volume_percent(self):
-        return self.get_volume() * 100.0
-
-    def set_volume(self, value):
-        """
-        value: 0.0 ... 1.0
-        """
-
-        value = max(0.0, min(1.0, float(value)))
-
-        self.volume.SetMasterVolumeLevelScalar(
-            value,
-            None,
-        )
-
-    def set_volume_percent(self, percent):
-        self.set_volume(percent / 100.0)
-
-    def get_mute(self):
-        return bool(self.volume.GetMute())
-
-    def set_mute(self, muted):
-        self.volume.SetMute(
-            int(bool(muted)),
-            None,
-        )
-
-    def get_db_range(self):
-        """
-        Return:
-            minimum dB,
-            maximum dB,
-            increment
-        """
-        return self.volume.GetVolumeRange()
-
-
 DEFAULT_FILLER_WORDS = {
     # Articles / politeness
     "a",
@@ -705,9 +647,9 @@ DEFAULT_FILLER_WORDS = {
 class VoiceCommand:
     """holds voice command information including a callback called when the command is triggered"""
 
-    def __init__(self, phrase, callback=None, key = None, owner = None):
+    def __init__(self, phrase, callback=None, key=None, owner=None):
         self.key = key if key is not None else gremlin.util.get_guid()
-        self.phrase = phrase
+        self.phrase = phrase.casefold().strip() if phrase is not None else None
         self.callback = callback
         self.owner = owner
         self.meaningful_length = None
@@ -719,6 +661,13 @@ class VoiceCommand:
     @key.setter
     def key(self, value):
         self._key = value
+
+    @property
+    def hashKey(self) -> str:
+        """ unique hash for the phrase in the command """
+        if self.phrase is None:
+            return None
+        return hash(self.phrase)
 
     @property
     def phrase(self):
@@ -789,42 +738,56 @@ class CommandMatcher:
         self.swap_penalty = swap_penalty
         self.max_extra_words = max_extra_words
         self.callback = callback  # called when a command is matched
+        self._buffer = deque()
+        self._commands = []
 
         self.filler_words = {word.lower() for word in (filler_words if filler_words is not None else DEFAULT_FILLER_WORDS)}
 
         self._command_map = {}  # holds the commands
-        for command in commands:
-            if isinstance(command, VoiceCommand):
-                vc = command
-            else:
-                # command as a string
-                vc = VoiceCommand(command)
+        if commands:
+            for command in commands:
+                if isinstance(command, VoiceCommand):
+                    vc = command
+                else:
+                    # command as a string
+                    vc = VoiceCommand(command)
 
+                words = self._tokenize(vc.phrase)
 
-            words = self._tokenize(vc.phrase)
+                vc.meaningful_length = self._meaningful_length(words)
+                vc.words = words
 
-            vc.meaningful_length = self._meaningful_length(words)
-            vc.words = words
+                self._command_map[vc.key] = vc
 
-            self._command_map[vc.key] = vc
+            self._update_commands()
 
-        self._update_commands()
+    def hasCommands(self):
+        return bool(self._commands)
 
     def _update_commands(self):
         self._commands = list(self._command_map.values())
+        if self._commands:
+            # Prefer longer / more specific commands.
+            self._commands.sort(
+                key=lambda vc: vc.meaningful_length,
+                reverse=True,
+            )
 
-        # Prefer longer / more specific commands.
-        self._commands.sort(
-            key=lambda vc: vc.meaningful_length,
-            reverse=True,
-        )
+            self._max_command_words = max(len(command.words) for command in self._commands)
 
-        self._max_command_words = max(len(command.words) for command in self._commands)
+            self._buffer = deque(maxlen=self._max_command_words + self.max_extra_words)
+        else:
+            self._buffer = deque()
 
-        self._buffer = deque(maxlen=self._max_command_words + self.max_extra_words)
+    def getCommands(self) -> list:
+        return self._commands
+
+    def count(self) -> int:
+        """gets the number of commands currently in the matcher"""
+        return len(self._commands)
 
     def addCommand(self, command: Union[VoiceCommand, str]):
-        """adds a new command to the voice command list
+        """ adds a single command to the matcher - duplicates are ignored
 
         :param command: The command to add. Can be a VoiceCommand instance or a string representing the phrase.  If a voice command, callback will be called when a match occurs with the key.
         """
@@ -835,6 +798,23 @@ class CommandMatcher:
         vc.words = self._tokenize(vc.phrase)
         vc.meaningful_length = self._meaningful_length(vc.words)
         self._command_map[vc.key] = vc
+        self._update_commands()
+
+    def addCommands(self, commands: list[Union[VoiceCommand, str]]):
+        """ adds multiple commands to the matcher - duplicates are ignored """
+        for command in commands:
+            if isinstance(command, VoiceCommand):
+                vc = command
+            else:
+                vc = VoiceCommand(command)
+            vc.words = self._tokenize(vc.phrase)
+            vc.meaningful_length = self._meaningful_length(vc.words)
+            self._command_map[vc.key] = vc
+        self.addCommand(command)
+
+    def clearCommands(self):
+        """clears all commands from the matcher"""
+        self._command_map.clear()
         self._update_commands()
 
     def add_words(self, words):
@@ -1160,6 +1140,18 @@ class CommandMatcher:
 class Voice:
     """speech recognition engine"""
 
+    # info parameters sent by the audioMonitor signal:
+    # - "level_db" (float): the audio level in decibels
+    # - "gain_db" (float): the current gain applied to the audio in decibels
+    # - "noise_db" (float): the estimated background noise level in decibels
+    # - "threshold_db" (float): the threshold level in decibels for detecting significant audio events
+    # - "is_speech" (bool): indicates whether the current audio segment contains detected speech
+    # - "speech_started" (bool): indicates whether speech has started in the current audio segment
+    # - "speech_ended" (bool): indicates whether speech has ended in the current audio segment
+    # - "post_roll_remaining" (float): the remaining duration of the post-roll period in seconds
+
+    audioMonitor = Signal(dict)  # send audio monitor data
+
     def __init__(
         self,
         commands: list = None,
@@ -1172,6 +1164,7 @@ class Voice:
         self._model_size = "small"  # "base" #  possible models: "tiny", "base", "small", "medium", "large-v3"
         self._listening = False  # true if actively listening for voice input
         self._suspend_stack = 0  # > 1 if listening suspended
+        self._recognize_stack = 0  # > 1 if recognition is suspended
         self._listen_thread = None  # thread for listening to voice input
         self._abort_event = threading.Event()
         self._sample_rate = SAMPLE_RATE
@@ -1181,6 +1174,7 @@ class Voice:
         self.pool = concurrent.futures.ThreadPoolExecutor()  # supports mutliple concurrent tasks to process received words
         self._words = []  # words heard
         self._new_word = False  # flag to indicate if a new word has been added
+        self._volume = 0.0  # default volume level (system microphone level)
 
         self._rolling_matcher = CommandMatcher(commands=commands, fuzzy_match=fuzzy_match, fuzzy_threshold=fuzzy_threshold)
 
@@ -1189,8 +1183,20 @@ class Voice:
         el.profile_stop.connect(self.stop)
 
     def addCommand(self, command: VoiceCommand):
+        """ adds a single command to the matcher - duplicates are ignored """
         if command is not None:
             self._rolling_matcher.addCommand(command)
+
+    def addCommands(self, commands: list):
+        """ adds multiple commands to the matcher - duplicates are ignored """
+        self._rolling_matcher.addCommands(commands)
+
+    def getCommands(self) -> list:
+        return self._rolling_matcher.getCommands()
+
+    def clearCommands(self):
+        """clears all commands from the matcher"""
+        self._rolling_matcher.clearCommands()
 
     def pushSuspend(self):
         """increment the suspend stack to suspend listening"""
@@ -1204,6 +1210,19 @@ class Voice:
                 self._suspend_stack = 0
             elif self._suspend_stack > 0:
                 self._suspend_stack -= 1
+
+    def pushRecognize(self):
+        """increment the recognize stack to suspend recognition"""
+        with self._voice_lock:
+            self._recognize_stack += 1
+
+    def popRecognize(self, reset=False):
+        """decrement the recognize stack to resume recognition if possible"""
+        with self._voice_lock:
+            if reset:
+                self._recognize_stack = 0
+            elif self._recognize_stack > 0:
+                self._recognize_stack -= 1
 
     def test(self):
 
@@ -1259,7 +1278,7 @@ class Voice:
 
     def stop(self):
         """stop listening for voice input"""
-        if not self._listening:
+        if not self._listening and self._listen_thread is None:
             return
 
         syslog.info("Stopping voice input...")
@@ -1275,11 +1294,6 @@ class Voice:
 
         syslog.info("Voice listen runner started...")
 
-        # Callback function to collect audio blocks from sounddevice
-        def audio_callback(indata, frames, time_info, status):
-            # collect input audio data
-            self._audio_queue.put(indata.copy())
-
         def callback(indata, frames, time_info, status):
             if status:
                 syslog.info(f"Audio: {status}")
@@ -1288,14 +1302,192 @@ class Voice:
 
             output, info = self.processor.process(audio)
 
-            speech_started = info["speech_started"]
-            speech_ended = info["speech_ended"]
-            if output is not None:
-                # syslog.info(f"Audio: SPEECH DETECTED  started: {speech_started}, ended: {speech_ended}")
-                self.recognizer.add_audio(output, speech_started, speech_ended)
+            if self._recognize_stack == 0 and self._rolling_matcher.hasCommands():  # speech recognition enabled
+                # speech recognition enabled
+                speech_started = info["speech_started"]
+                speech_ended = info["speech_ended"]
+                if output is not None:
+                    # syslog.info(f"Audio: SPEECH DETECTED  started: {speech_started}, ended: {speech_ended}")
+                    self.recognizer.add_audio(output, speech_started, speech_ended)
+
+            # monitor mode
+            self.audioMonitor.emit(info)
 
         stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype=np.float32, callback=callback)
         with stream:
             # Keep the stream open until the trigger key is pressed
             while not abort_event.is_set():
                 time.sleep(0.01)  # Small sleep to prevent high CPU usage in the loop
+
+
+    def getVolume(self, target_name: str = None) -> float:
+        if gremlin.util.is_ui_thread():
+            return self._get_volume_ui(target_name=target_name)
+
+        # non UI thread
+        value = None
+        def default_callback(volume: float):
+            nonlocal value
+            value = volume
+
+        self._get_volume_ui(target_name=target_name, callback=default_callback)
+
+        while value is None:
+            time.sleep(0.01)  # Small sleep to prevent high CPU usage in the loop
+
+        return value
+
+    def _get_qmedia_device(self, target_name: str = None):
+        """gets the QMediaDevice for the given device, use None for the default device  """
+        gremlin.util.assert_ui_thread()
+
+        device = None
+        if target_name is not None:
+            target_name = target_name.casefold()
+
+            devices = QMediaDevices.audioInputs()
+            for dev in devices:
+                if target_name in dev.description().lower():
+                    device = dev
+                    break
+        else:
+            device = QMediaDevices.defaultAudioInput()
+
+        return device
+
+    def getDefaultDeviceName(self) -> str:
+        """gets the name of the default input device (microphone)"""
+        gremlin.util.assert_ui_thread()
+        default_device = QMediaDevices.defaultAudioInput()
+        if default_device is not None:
+            return default_device.description()
+        return ""
+
+
+    def _get_volume_ui(self, target_name: str = None, callback : Callable = None) -> float:
+        """gets the system volume 0 to 100 for the input device
+
+        :param target_name: The name of the target input device (microphone). If None, the default microphone is used.
+        :param update: If True, fetch the current volume from the system; otherwise, return the cached value.
+        :return: The system volume level for the input device, ranging from 0 to 100, -1 if the device is not found.
+
+        """
+        # must run in UI thread to avoid COM issues
+        gremlin.util.assert_ui_thread()
+
+        mic = None
+        percent_volume = -1
+
+        mic = self._get_qmedia_device(target_name=target_name)
+        if mic is not None:
+            audio_input = QAudioInput(mic)
+            percent_volume = audio_input.volume() * 100
+
+        if callback:
+            callback(percent_volume)
+        return percent_volume
+
+
+
+
+    def setVolume(self, percent: float, target_name: str = None):
+        """ sets the input device volume level """
+        gremlin.util.InvokeUiMethod(self._set_volume_ui, percent, target_name) # must be on UI thread to avoid COM issues
+
+
+    def _set_volume_com(self, device_name: str, volume_scalar: float) -> bool:
+        """sets the volume for the specified device using COM interfaces
+
+        :param device_name: The name of the target input device (microphone).
+        :param volume_scalar: The desired volume level as a scalar (0.0 to 1.0).
+        :return: True if the volume was successfully set, False otherwise.
+        """
+
+        # 1. Create the base Windows device enumerator
+        enumerator = comtypes.CoCreateInstance(
+            CLSID_MMDeviceEnumerator,
+            IMMDeviceEnumerator,
+            comtypes.CLSCTX_INPROC_SERVER
+        )
+
+        # 2. Get only active CAPTURE (input) devices (1 = eCapture)
+        # This prevents scanning rendering devices or disconnected endpoints
+        collection = enumerator.EnumAudioEndpoints(
+            EDataFlow.eCapture.value,
+            DEVICE_STATE.ACTIVE.value
+        )
+
+        count = collection.GetCount()
+
+        target_dev = None
+
+
+        # 3. Loop raw pointers directly (extremely fast)
+        for i in range(count):
+            dev = collection.Item(i)
+
+            # Open property store to get the string name
+            wrapped_device = AudioUtilities.CreateDevice(dev)
+            friendly_name = wrapped_device.FriendlyName
+
+            if device_name.lower() in friendly_name.lower():
+                target_dev = dev
+                break
+
+        if not target_dev:
+            print(f"Device matching '{device_name}' not found.")
+            return False
+
+        # 4. Activate volume control interface directly
+        interface = target_dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+        volume = cast(interface, POINTER(IAudioEndpointVolume))
+
+        volume.SetMasterVolumeLevelScalar(volume_scalar, None)
+        return True
+
+    def _set_volume_ui(self, percent: float, target_name: str = None):
+        """sets the input device volume level
+
+        :param percent: The desired volume level as a percentage (0 to 100) (clamped if out of range)
+        :param target_name: The name of the target input device (microphone). If None, the default microphone is used.
+
+        """
+        percent = max(0, min(100, percent))  # Clamp the value between 0 and 100
+
+        # 1. Initialize COM apartment for THIS thread
+        CoInitialize()
+
+        try:
+            if target_name is None:
+                target_name = self.getDefaultDeviceName()
+            target_name = target_name.casefold()
+            level_scalar = percent / 100
+
+            syslog.info(f"VOICE: Setting microphone volume to {percent}% for target device: {target_name}")
+
+            self._set_volume_com(target_name, level_scalar)
+
+            # microphone = None
+            # devices = AudioUtilities.GetAllDevices()
+            # for device in devices:
+            #     if device.id.startswith("{0.0.1.00000000}"):  # input device
+            #         # if not is_input_device(device):
+            #         #     continue
+            #         name = device.FriendlyName
+            #         if not name:
+            #             continue
+            #         if target_name in name.casefold():
+            #             microphone = device
+            #             break
+
+            # if microphone is not None:
+            #     interface = microphone._dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+            #     volume = cast(interface, POINTER(IAudioEndpointVolume))
+            #     volume.SetMasterVolumeLevelScalar(level_scalar, None)
+            # syslog.info(f"VOICE: Microphone volume set to {percent}%  device: {target_name}")
+
+        except Exception as e:
+            syslog.error(f"VOICE: An error occurred setting the microphone volume: {e}")
+        finally:
+            # 2. Always uninitialize to prevent memory leaking
+            CoUninitialize()

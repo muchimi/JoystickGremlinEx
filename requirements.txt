@@ -28,8 +28,8 @@ edge-tts
 audioop-lts
 pydub
 pycountry
-pycaw
 faster_whisper>=0.7.0
+filelock>=3.12.0
 # ffmpeg is included in the distro under ffmpeg
 
 
