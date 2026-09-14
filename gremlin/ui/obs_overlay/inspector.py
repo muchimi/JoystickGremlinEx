@@ -48,6 +48,7 @@ from .model import (
     normalize_overlay_keys,
     normalize_series_range_mode,
     normalize_stat_series,
+    normalize_switch_appearance,
     normalize_toggle_binding,
     normalize_visibility,
     serialize_overlay_key,
@@ -1154,13 +1155,21 @@ class OverlayInspector(QtWidgets.QWidget):
                 self._grid_appearance(look, item)
                 self._crosshair_appearance(look, item)
         elif widget_type == "switch_4way":
-            self._style_color(look, item, "fill", "Housing")
-            self._style_color(look, item, "track", "Inner fill")
-            self._style_color(look, item, "crosshair", "Direction fill")
-            self._style_color(look, item, "fill_on", "Active fill")
-            self._style_color(look, item, "indicator", "Knob")
-            self._style_float(look, item, "indicator_size", "Knob size", 6, 80)
-            self._style_float(look, item, "corner_radius", "Direction radius", 0, 80)
+            appearance = QtWidgets.QComboBox()
+            appearance.addItem("Arrows", "arrows")
+            appearance.addItem("Arcs", "arcs")
+            current = normalize_switch_appearance(item["style"].get("switch_appearance"))
+            appearance.setCurrentIndex(0 if current == "arrows" else 1)
+            appearance.currentIndexChanged.connect(
+                lambda _i, wid=item["id"], box=appearance: self._style(
+                    wid, switch_appearance=str(box.currentData() or "arrows"), rebuild=True
+                )
+            )
+            look.addRow("Style", appearance)
+            self._style_color(look, item, "fill", "Inactive")
+            self._style_color(look, item, "fill_on", "Active")
+            self._style_color(look, item, "indicator", "Center")
+            self._style_float(look, item, "indicator_size", "Center size", 10, 100)
         elif widget_type in ("switch_2way", "switch_3way"):
             self._orientation_combo(look, item)
             self._style_color(look, item, "fill", "Housing")
@@ -1247,10 +1256,27 @@ class OverlayInspector(QtWidgets.QWidget):
         if types <= {"switch_4way", "switch_2way", "switch_3way"}:
             self._style_color(look, item, "fill_on", "Active fill")
         if types <= {"switch_4way"}:
+<<<<<<< Updated upstream
             self._style_color(look, item, "indicator", "Knob")
             self._style_color(look, item, "track", "Inner fill")
             self._style_color(look, item, "crosshair", "Direction fill")
             self._style_float(look, item, "corner_radius", "Direction radius", 0, 80)
+=======
+            appearance = QtWidgets.QComboBox()
+            appearance.addItem("Arrows", "arrows")
+            appearance.addItem("Arcs", "arcs")
+            current = normalize_switch_appearance(item["style"].get("switch_appearance"))
+            appearance.setCurrentIndex(0 if current == "arrows" else 1)
+            appearance.currentIndexChanged.connect(
+                lambda _i, wid=item["id"], box=appearance: self._style(
+                    wid, switch_appearance=str(box.currentData() or "arrows"), rebuild=True
+                )
+            )
+            look.addRow("Style", appearance)
+            self._style_color(look, item, "indicator", "Center")
+            self._style_float(look, item, "indicator_size", "Center size", 10, 100)
+            self._style_color(look, item, "fill", "Inactive")
+>>>>>>> Stashed changes
         if types <= {"switch_2way", "switch_3way"}:
             self._orientation_combo(look, item)
         if types <= {"axis_bar", "axis_radio", "axis_fader"}:

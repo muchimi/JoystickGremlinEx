@@ -15,7 +15,7 @@ from typing import Any
 
 from PySide6 import QtCore, QtGui
 
-from .model import is_onscreen_mode, normalize_background_mode
+from .model import is_onscreen_mode, normalize_background_mode, normalize_switch_appearance
 from .shapes import button_uses_shape_path, normalize_shape_kind, shape_path, uses_shape_geometry
 
 
@@ -1826,48 +1826,136 @@ def _switch_fill_colors(style: dict[str, Any], active: bool):
     return qcolor(style.get("fill"), "#1a2230"), qcolor(style.get("border"), "#3a4a62")
 
 
+def _switch_4way_geometry(item: dict[str, Any]) -> dict[str, float]:
+    """Shared layout for arrows/arcs paint and hit-testing."""
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    side = min(rect.width(), rect.height())
+    cx, cy = rect.center().x(), rect.center().y()
+    margin = max(2.0, side * 0.04)
+    outer_r = max(8.0, side / 2.0 - margin)
+    # indicator_size is ~diameter preference for the center button
+    center_r = float(style.get("indicator_size") or 28) * 0.5
+    center_r = max(6.0, min(outer_r * 0.55, center_r))
+    gap = max(2.5, side * 0.035)
+    ring_inner = min(outer_r - gap * 1.5, center_r + gap)
+    ring_inner = max(center_r + gap * 0.75, ring_inner)
+    if ring_inner >= outer_r - 2.0:
+        ring_inner = max(center_r + 1.5, outer_r * 0.55)
+    return {
+        "cx": cx,
+        "cy": cy,
+        "side": side,
+        "outer_r": outer_r,
+        "center_r": center_r,
+        "gap": gap,
+        "ring_inner": ring_inner,
+    }
+
+
+def _cardinal_arrow_path(cx: float, cy: float, slot: str, inner: float, outer: float, half_w: float) -> QtGui.QPainterPath:
+    """Blocky cardinal arrow pointing outward; tip at `outer`, base near `inner`."""
+    tip_len = max(6.0, (outer - inner) * 0.42)
+    body_outer = outer - tip_len
+    body_inner = inner
+    if body_outer <= body_inner + 2.0:
+        body_outer = (inner + outer) * 0.55
+        tip_len = max(4.0, outer - body_outer)
+    tip_half = half_w * 1.55
+    path = QtGui.QPainterPath()
+    if slot == "n":
+        path.moveTo(cx, cy - outer)
+        path.lineTo(cx + tip_half, cy - body_outer)
+        path.lineTo(cx + half_w, cy - body_outer)
+        path.lineTo(cx + half_w, cy - body_inner)
+        path.lineTo(cx - half_w, cy - body_inner)
+        path.lineTo(cx - half_w, cy - body_outer)
+        path.lineTo(cx - tip_half, cy - body_outer)
+    elif slot == "s":
+        path.moveTo(cx, cy + outer)
+        path.lineTo(cx + tip_half, cy + body_outer)
+        path.lineTo(cx + half_w, cy + body_outer)
+        path.lineTo(cx + half_w, cy + body_inner)
+        path.lineTo(cx - half_w, cy + body_inner)
+        path.lineTo(cx - half_w, cy + body_outer)
+        path.lineTo(cx - tip_half, cy + body_outer)
+    elif slot == "e":
+        path.moveTo(cx + outer, cy)
+        path.lineTo(cx + body_outer, cy + tip_half)
+        path.lineTo(cx + body_outer, cy + half_w)
+        path.lineTo(cx + body_inner, cy + half_w)
+        path.lineTo(cx + body_inner, cy - half_w)
+        path.lineTo(cx + body_outer, cy - half_w)
+        path.lineTo(cx + body_outer, cy - tip_half)
+    else:  # w
+        path.moveTo(cx - outer, cy)
+        path.lineTo(cx - body_outer, cy + tip_half)
+        path.lineTo(cx - body_outer, cy + half_w)
+        path.lineTo(cx - body_inner, cy + half_w)
+        path.lineTo(cx - body_inner, cy - half_w)
+        path.lineTo(cx - body_outer, cy - half_w)
+        path.lineTo(cx - body_outer, cy - tip_half)
+    path.closeSubpath()
+    return path
+
+
 def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
     """Physical 4-way hat that reports as five buttons (N/E/S/W/center)."""
     style = item.get("style") or {}
-    rect = widget_rect(item)
+    appearance = normalize_switch_appearance(style.get("switch_appearance"))
     position = str(value or "center")
     if position not in ("n", "e", "s", "w", "center"):
         position = "center"
+    geo = _switch_4way_geometry(item)
+    cx, cy = geo["cx"], geo["cy"]
+    outer_r = geo["outer_r"]
+    center_r = geo["center_r"]
+    ring_inner = geo["ring_inner"]
     painter.save()
     painter.setOpacity(_opacity(style))
-    side = min(rect.width(), rect.height())
-    cx, cy = rect.center().x(), rect.center().y()
-    housing = QtCore.QRectF(cx - side / 2, cy - side / 2, side, side)
-    fill, border = _switch_fill_colors(style, False)
-    painter.setPen(_pen(border, _border_w(style)))
-    painter.setBrush(fill)
-    painter.drawEllipse(housing)
+    painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
 
-    plate = housing.adjusted(side * 0.12, side * 0.12, -side * 0.12, -side * 0.12)
-    painter.setPen(QtCore.Qt.NoPen)
-    plate_fill = qcolor(style.get("track"), "#0b1220")
-    painter.setBrush(plate_fill)
-    painter.drawEllipse(plate)
+    if appearance == "arcs":
+        # Four donut slices with a small angular gap between each.
+        span = 78.0
+        # Qt angles: 0° = east, positive CCW. Centers: N=90, E=0, S=-90, W=180.
+        starts = {"e": -span / 2.0, "n": 90.0 - span / 2.0, "w": 180.0 - span / 2.0, "s": -90.0 - span / 2.0}
+        for slot, start in starts.items():
+            active = slot == position
+            fill, border = _switch_fill_colors(style, active)
+            if not active:
+                fill = qcolor(style.get("fill"), "#6b7580")
+                border = qcolor(style.get("border"), "#2a3038")
+            path = _donut_slice(cx, cy, ring_inner, outer_r, start, span)
+            painter.setPen(_pen(border, max(1.0, _border_w(style) * 0.8)))
+            painter.setBrush(fill)
+            painter.drawPath(path)
+    else:
+        # Arrows mode: four outward arrows + fixed center circle.
+        half_w = max(5.0, (outer_r - ring_inner) * 0.38)
+        for slot in ("n", "e", "s", "w"):
+            active = slot == position
+            fill, border = _switch_fill_colors(style, active)
+            if not active:
+                fill = qcolor(style.get("fill"), "#9aa3ad")
+                border = qcolor(style.get("border"), "#2a3038")
+            path = _cardinal_arrow_path(cx, cy, slot, ring_inner, outer_r, half_w)
+            painter.setPen(_pen(border, max(1.0, _border_w(style) * 0.85)))
+            painter.setBrush(fill)
+            painter.drawPath(path)
 
-    arm = plate.width() * 0.18
-    thickness = plate.width() * 0.28
-    slot_radius = _corner_radius(style, 5.0)
-    offsets = {"n": (0, -1), "e": (1, 0), "s": (0, 1), "w": (-1, 0), "center": (0, 0)}
-    for slot, (ox, oy) in offsets.items():
-        if slot == "center":
-            continue
-        slot_fill, slot_border = _switch_fill_colors(style, slot == position)
-        painter.setPen(_pen(slot_border, max(1.0, _border_w(style) * 0.7)))
-        painter.setBrush(slot_fill if slot == position else qcolor(style.get("crosshair"), "#5a6a84"))
-        sx = cx + ox * arm * 1.15
-        sy = cy + oy * arm * 1.15
-        if ox == 0:
-            slot_rect = QtCore.QRectF(cx - thickness / 2, sy - arm * 0.55, thickness, arm * 1.1)
-        else:
-            slot_rect = QtCore.QRectF(sx - arm * 0.55, cy - thickness / 2, arm * 1.1, thickness)
-        r = min(slot_radius, slot_rect.width() / 2.0, slot_rect.height() / 2.0)
-        painter.drawRoundedRect(slot_rect, r, r)
+    # Center button — always fixed in the middle; size drives ring/arrow inset.
+    center_active = position == "center"
+    if center_active:
+        center_fill, center_border = _switch_fill_colors(style, True)
+    else:
+        center_fill = qcolor(style.get("indicator"), "#c8d0d8")
+        center_border = qcolor(style.get("border"), "#2a3038")
+    painter.setPen(_pen(center_border, max(1.0, _border_w(style))))
+    painter.setBrush(center_fill)
+    painter.drawEllipse(QtCore.QPointF(cx, cy), center_r, center_r)
 
+<<<<<<< Updated upstream
     on = position != "center"
     knob_fill = _switch_fill_colors(style, on)[0]
     if position == "center":
@@ -1880,6 +1968,9 @@ def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setPen(QtCore.Qt.NoPen)
     painter.setBrush(knob_fill)
     painter.drawEllipse(QtCore.QPointF(kx, ky), radius, radius)
+=======
+    housing = QtCore.QRectF(cx - outer_r, cy - outer_r, outer_r * 2, outer_r * 2)
+>>>>>>> Stashed changes
     _draw_axis_labels(painter, item, housing)
     painter.restore()
 
@@ -2260,11 +2351,11 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
     if widget_type in ("label", "panel", "shape", "image", "streamdeck", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch", "input_display"):
         return None
     if widget_type == "switch_4way":
-        cx, cy = rect.center().x(), rect.center().y()
+        geo = _switch_4way_geometry(item)
+        cx, cy = geo["cx"], geo["cy"]
         dx = x - cx
         dy = cy - y
-        dead = min(rect.width(), rect.height()) * 0.22
-        if math.hypot(dx, dy) < dead:
+        if math.hypot(dx, dy) <= geo["center_r"]:
             return "center"
         if abs(dx) >= abs(dy):
             return "e" if dx > 0 else "w"

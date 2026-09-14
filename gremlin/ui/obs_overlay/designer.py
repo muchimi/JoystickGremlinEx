@@ -194,8 +194,8 @@ def _banner_type_help(item: dict) -> list[str]:
         lines.append("Inspector: 4- or 8-position, axis labels. Binding is a hat. Drag on an Interactive overlay if bound to vJoy.")
     elif widget_type == "switch_4way":
         lines.append(
-            "Inspector: bind North, East, South, West, and optional Center as separate buttons. "
-            "For hats that report as five buttons rather than a POV hat. Interactive overlay springs back to center."
+            "Inspector: Style Arrows or Arcs. Center size grows/shrinks the middle button and keeps a gap to the directions. "
+            "Bind North, East, South, West, and optional Center as separate buttons. Interactive overlay springs back to center."
         )
     elif widget_type == "switch_2way":
         lines.append(

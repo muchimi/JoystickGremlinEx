@@ -312,20 +312,21 @@ def default_style(widget_type: str) -> dict[str, Any]:
     elif widget_type == "switch_4way":
         style.update(
             {
-                "fill": "#1a2230",
-                "fill_on": "#ff6b35",
-                "border": "#3a4a62",
-                "border_on": "#ffcc66",
-                "indicator_size": 16.0,
+                "switch_appearance": "arrows",
+                "fill": "#9aa3ad",
+                "fill_on": "#2ecc71",
+                "border": "#2a3038",
+                "border_on": "#1e8f4f",
+                "indicator": "#c8d0d8",
+                "indicator_size": 28.0,
                 "show_label": False,
-                "show_axis_labels": True,
+                "show_axis_labels": False,
                 "axis_label_n": "N",
                 "axis_label_s": "S",
                 "axis_label_e": "E",
                 "axis_label_w": "W",
                 "track": "#0b1220",
-                "crosshair": "#5a6a84",
-                "corner_radius": 5.0,
+                "crosshair": "#6b7580",
             }
         )
     elif widget_type == "switch_2way":
@@ -574,6 +575,13 @@ def switch_rest_position(widget_type: str | None) -> str | None:
 
 def switch_channel(position: str) -> str:
     return f"bindings.{position}"
+
+
+def normalize_switch_appearance(value) -> str:
+    raw = str(value or "").strip().casefold()
+    if raw in ("arcs", "arc"):
+        return "arcs"
+    return "arrows"
 
 
 def switch_binding(item: dict[str, Any] | None, position: str) -> dict[str, Any]:
@@ -1544,6 +1552,8 @@ class OverlayScene(QtCore.QObject):
             item["binding_y"] = normalize_toggle_binding(item.get("binding_y"))
         if widget_type in SWITCH_WIDGET_TYPES:
             item["bindings"] = normalize_switch_bindings(widget_type, raw)
+            if widget_type == "switch_4way":
+                style["switch_appearance"] = normalize_switch_appearance(style.get("switch_appearance"))
         else:
             item["bindings"] = {}
         if widget_type == "shape":
@@ -1763,6 +1773,8 @@ class OverlayScene(QtCore.QObject):
         if widget_type in SWITCH_WIDGET_TYPES:
             previous = saved_bindings if old_kind == "switch" else None
             item["bindings"] = normalize_switch_bindings(widget_type, previous)
+            if widget_type == "switch_4way":
+                new_style["switch_appearance"] = normalize_switch_appearance(new_style.get("switch_appearance"))
             if old_kind == "button":
                 first = next(iter(switch_positions(widget_type)), None)
                 if first:
@@ -2181,6 +2193,10 @@ class OverlayScene(QtCore.QObject):
         for key, value in fields.items():
             if key == "style":
                 item["style"].update(value)
+                if item.get("type") == "switch_4way" and "switch_appearance" in (value or {}):
+                    item["style"]["switch_appearance"] = normalize_switch_appearance(
+                        item["style"].get("switch_appearance")
+                    )
                 _refresh_font_scale_base(item, value)
             elif key in ("binding", "binding_y"):
                 item.setdefault(key, default_binding()).update(value)
