@@ -447,6 +447,10 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
         self._icon_h_align_pressed = "center"
         self._icon_v_align_pressed = "middle"
         self._bg_color_pressed = ""
+        # How the "active" look is chosen: hardware press vs a GEX state.
+        # "press" → released/pressed; "state" → state OFF/ON (same field sets).
+        self._appearance_mode = "press"  # press | state
+        self._appearance_state = ""  # GEX state name when mode == state
         self._step_mode = "all"  # all | advance | latch
         self._step_index = 0
         self._step_wrap = True
@@ -834,6 +838,24 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
     def bg_color_pressed(self, value: str):
         self._bg_color_pressed = value or ""
 
+    @property
+    def appearance_mode(self) -> str:
+        mode = str(self._appearance_mode or "press").strip().casefold()
+        return "state" if mode == "state" else "press"
+
+    @appearance_mode.setter
+    def appearance_mode(self, value: str):
+        mode = str(value or "press").strip().casefold()
+        self._appearance_mode = "state" if mode == "state" else "press"
+
+    @property
+    def appearance_state(self) -> str:
+        return self._appearance_state or ""
+
+    @appearance_state.setter
+    def appearance_state(self, value: str):
+        self._appearance_state = (value or "").strip()
+
     def sync_pressed_style_from_released(self):
         """Copy released style into pressed (used when loading profiles without pressed style)."""
         self._font_family_pressed = self._font_family
@@ -878,6 +900,8 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
             "icon_h_align_pressed": self.icon_h_align_pressed,
             "icon_v_align_pressed": self.icon_v_align_pressed,
             "bg_color_pressed": self.bg_color_pressed,
+            "appearance_mode": self.appearance_mode,
+            "appearance_state": self.appearance_state,
             "step_mode": self.step_mode,
             "step_wrap": self.step_wrap,
             "linked_page": self.linked_page,
@@ -998,6 +1022,8 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
             self._bg_color_pressed = safe_read(node, "bg-color-pressed", str, self._bg_color)
         else:
             self.sync_pressed_style_from_released()
+        self.appearance_mode = safe_read(node, "appearance-mode", str, "press")
+        self.appearance_state = safe_read(node, "appearance-state", str, "")
         self.step_mode = safe_read(node, "step-mode", str, "all")
         self.step_index = safe_read(node, "step-index", int, 0)
         self.step_wrap = safe_read(node, "step-wrap", bool, True)
@@ -1109,6 +1135,10 @@ class StreamDeckInputItem(gremlin.input_item.InputItem):
                 node.set("bg-color-pressed", self._bg_color_pressed)
             else:
                 node.set("bg-color-pressed", "")
+        if self.appearance_mode != "press":
+            node.set("appearance-mode", self.appearance_mode)
+        if self.appearance_state:
+            node.set("appearance-state", self.appearance_state)
         if self.step_mode != "all":
             node.set("step-mode", self.step_mode)
             node.set("step-index", str(self.step_index))
@@ -1412,7 +1442,7 @@ class StreamDeckBridge(QtCore.QObject):
         for live_id in targets:
             if not live_id:
                 continue
-            live_custom, _live_richness = _custom_score(live_id)
+            live_custom, live_richness = _custom_score(live_id)
             # Skip only when this live deck already has real custom names.
             # Generic "Page N" placeholders must still adopt richer orphans.
             if live_custom > 0:
@@ -1987,6 +2017,8 @@ class StreamDeckBridge(QtCore.QObject):
         """Push titles/images for the active GEX bank onto all live plugin slots."""
         self._bump_overlay_gen()
         from gremlin.ui.streamdeck_surface import (
+            appearance_follows_state,
+            appearance_state_is_on,
             compose_pressed_image,
             empty_key_image,
             resolved_image,
@@ -2005,7 +2037,10 @@ class StreamDeckBridge(QtCore.QObject):
             title = ""
             image = ""
             if item is not None:
-                use_pressed = self._slot_is_held(device_id, meta)
+                if appearance_follows_state(item):
+                    use_pressed = appearance_state_is_on(item)
+                else:
+                    use_pressed = self._slot_is_held(device_id, meta)
                 if use_pressed:
                     try:
                         image = compose_pressed_image(item) or ""
@@ -2104,12 +2139,15 @@ class StreamDeckBridge(QtCore.QObject):
             self._bump_overlay_gen()
 
     def _paint_pressed_appearance(self, item, device_id: str, context: str = ""):
-        """Push pressed icon/title/style for one held key (stays until keyUp / idle paint)."""
-        from gremlin.ui.streamdeck_surface import compose_pressed_image, resolved_pressed_title
+        """Push pressed/ON icon/title/style for one key (hold-driven only)."""
+        from gremlin.ui.streamdeck_surface import appearance_follows_state, compose_pressed_image, resolved_pressed_title
 
         if item is not None and getattr(item, "is_linked", False):
             item = self.resolve_linked_source(item)
         if item is None:
+            return
+        # State-driven keys are painted by paint_active_page / StateData.changed.
+        if appearance_follows_state(item):
             return
         ctx = (context or "").strip() or (getattr(item, "context", "") or "")
         if not ctx:
@@ -2714,12 +2752,18 @@ class StreamDeckBridge(QtCore.QObject):
             advance_step = None
 
         # Mark hold + paint pressed BEFORE actions so same-page presses keep pressed look.
+        # State-driven appearance ignores hardware hold (look follows GEX state instead).
+        from gremlin.ui.streamdeck_surface import appearance_follows_state
+
         page_before = self.get_active_page(device_id)
+        follows_state = appearance_follows_state(item)
         if is_pressed:
-            self._set_slot_held(device_id, hold_meta, True)
-            self._paint_pressed_appearance(item, device_id, context=live_context)
+            if not follows_state:
+                self._set_slot_held(device_id, hold_meta, True)
+                self._paint_pressed_appearance(item, device_id, context=live_context)
         else:
-            self._set_slot_held(device_id, hold_meta, False)
+            if not follows_state:
+                self._set_slot_held(device_id, hold_meta, False)
 
         event = gremlin.event_handler.Event(
             InputType.StreamDeck,
@@ -2746,12 +2790,19 @@ class StreamDeckBridge(QtCore.QObject):
                 pass
             page_after = self.get_active_page(device_id)
             if page_after == page_before:
-                # Re-assert pressed look after actions (actions may have scheduled an idle paint).
-                self._paint_pressed_appearance(item, device_id, context=live_context)
+                if follows_state:
+                    try:
+                        self._schedule_paint(device_id)
+                    except Exception:
+                        pass
+                else:
+                    # Re-assert pressed look after actions (actions may have scheduled an idle paint).
+                    self._paint_pressed_appearance(item, device_id, context=live_context)
             else:
                 # Change Page / Next / Previous / Return ran under this press.
                 # Do not stamp the old key art back on top of the new bank.
-                self._set_slot_held(device_id, hold_meta, False)
+                if not follows_state:
+                    self._set_slot_held(device_id, hold_meta, False)
                 try:
                     self.paint_active_page(device_id)
                 except Exception:
@@ -2943,8 +2994,9 @@ class StreamDeckDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
             try:
                 self._share_splitter_sizes = False
                 self._splitter.setChildrenCollapsible(True)
-                self._splitter.setStretchFactor(0, 3)
-                self._splitter.setStretchFactor(1, 2)
+                self._splitter_stretch = (3, 2)
+                self._splitter.setStretchFactor(0, self._splitter_stretch[0])
+                self._splitter.setStretchFactor(1, self._splitter_stretch[1])
                 self._left_panel_widget.setMinimumWidth(0)
                 scroll = getattr(self, "_right_scroll_area", None)
                 if scroll is not None:

@@ -1505,6 +1505,33 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         states_row = QtWidgets.QVBoxLayout()
         states_row.setSpacing(10)
 
+        # Appearance driver: hardware press vs a named GEX state (OFF/ON).
+        driver_host = QtWidgets.QWidget()
+        self._appearance_driver_host = driver_host
+        driver_layout = QtWidgets.QHBoxLayout(driver_host)
+        driver_layout.setContentsMargins(0, 0, 0, 0)
+        driver_layout.setSpacing(8)
+        driver_layout.addWidget(QtWidgets.QLabel("Appearance"))
+        self._appearance_mode_combo = QtWidgets.QComboBox()
+        self._appearance_mode_combo.addItem("Press / Release", "press")
+        self._appearance_mode_combo.addItem("GEX State", "state")
+        self._appearance_mode_combo.setToolTip(
+            "Press / Release follows the physical key hold. "
+            "GEX State uses State OFF / State ON looks from a named state."
+        )
+        self._appearance_mode_combo.currentIndexChanged.connect(self._on_appearance_mode_ui)
+        driver_layout.addWidget(self._appearance_mode_combo)
+        self._appearance_state_label = QtWidgets.QLabel("State")
+        driver_layout.addWidget(self._appearance_state_label)
+        self._appearance_state_combo = QtWidgets.QComboBox()
+        self._appearance_state_combo.setEditable(True)
+        self._appearance_state_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
+        self._appearance_state_combo.setMinimumWidth(120)
+        self._appearance_state_combo.setToolTip("GEX state that drives State ON / State OFF appearance")
+        self._appearance_state_combo.currentTextChanged.connect(self._on_appearance_state_ui)
+        driver_layout.addWidget(self._appearance_state_combo, 1)
+        states_row.addWidget(driver_host)
+
         def _wire_icon_bg_row(
             layout: QtWidgets.QHBoxLayout,
             *,
@@ -2108,7 +2135,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         """Appearance editors under the deck.
 
         - ``hidden``: nothing (dial rotate / dial press mappings)
-        - ``button``: Released + Pressed columns
+        - ``button``: Released + Pressed columns (or State OFF / ON)
         - ``lcd``: single LCD column only (touch strip is not pressable)
         - ``look``: icon + background only (other-plugin hardware keys)
         - ``linked``: read-only banner pointing at the source page
@@ -2127,16 +2154,13 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         multi_banner = getattr(self, "_multi_banner", None)
         if multi_banner is not None and Shiboken.isValid(multi_banner):
             multi_banner.setVisible(mode == "multi")
+        driver = getattr(self, "_appearance_driver_host", None)
+        if driver is not None and Shiboken.isValid(driver):
+            driver.setVisible(mode == "button")
         released = getattr(self, "_released_box", None)
         pressed = getattr(self, "_pressed_box", None)
         if released is not None and Shiboken.isValid(released):
             released.setVisible(mode in ("button", "lcd", "look"))
-            if mode == "lcd":
-                released.setTitle("LCD")
-            elif mode == "look":
-                released.setTitle("Icon / background")
-            else:
-                released.setTitle("Released")
         if pressed is not None and Shiboken.isValid(pressed):
             pressed.setVisible(mode == "button")
         extras = getattr(self, "_released_extras", None)
@@ -2145,21 +2169,15 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         pressed_extras = getattr(self, "_pressed_extras", None)
         if pressed_extras is not None and Shiboken.isValid(pressed_extras):
             pressed_extras.setVisible(mode == "button")
-        title = getattr(self, "_title_edit", None)
-        if title is not None and Shiboken.isValid(title):
-            title.setPlaceholderText(
-                "LCD title — up to 3 lines"
-                if mode == "lcd"
-                else "Released title — up to 3 lines"
-            )
         preview_pressed = getattr(self, "_preview_pressed_btn", None)
         if preview_pressed is not None and Shiboken.isValid(preview_pressed):
-            preview_pressed.setVisible(mode not in ("look", "linked", "multi"))
+            preview_pressed.setVisible(mode not in ("look", "linked", "multi", "lcd"))
         if mode == "look" and getattr(self, "_preview_pressed", False):
             self._preview_pressed = False
             preview_released = getattr(self, "_preview_released_btn", None)
             if preview_released is not None and Shiboken.isValid(preview_released):
                 preview_released.setChecked(True)
+        self._refresh_appearance_driver_labels(panel_mode=mode)
 
     def _dial_base_id(self, button_id: str) -> int | None:
         """Parse dial column from '3', '3:inc', or '3:dec'."""
@@ -2397,6 +2415,8 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                 "icon_h_align_pressed": "center",
                 "icon_v_align_pressed": "middle",
                 "bg_color_pressed": "",
+                "appearance_mode": "press",
+                "appearance_state": "",
                 "step_mode": "all",
                 "step_wrap": True,
                 "linked_page": 0,
@@ -2757,6 +2777,171 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         self._rebuild_pages()
         self._rebuild_grid()
 
+    def _gex_state_names(self) -> list[str]:
+        try:
+            import gremlin.ui.state_device as state_device
+
+            names = [str(n) for n in (state_device.StateData().getStateNames() or []) if str(n).strip()]
+            names.sort(key=lambda s: s.casefold())
+            return names
+        except Exception:
+            return []
+
+    def _current_appearance_driver(self) -> str:
+        combo = getattr(self, "_appearance_mode_combo", None)
+        if combo is not None and Shiboken.isValid(combo):
+            data = combo.currentData()
+            if data:
+                return "state" if str(data).casefold() == "state" else "press"
+        item = self._selected_item()
+        if item is not None:
+            mode = str(getattr(item, "appearance_mode", "press") or "press").casefold()
+            return "state" if mode == "state" else "press"
+        return "press"
+
+    def _refresh_appearance_driver_labels(self, panel_mode: str | None = None):
+        """Rename Released/Pressed UI to State OFF/ON when appearance follows a GEX state."""
+        if panel_mode is None:
+            released = getattr(self, "_released_box", None)
+            if released is not None and Shiboken.isValid(released) and released.isVisible():
+                # Infer from visibility of pressed column when possible.
+                pressed = getattr(self, "_pressed_box", None)
+                if pressed is not None and Shiboken.isValid(pressed) and pressed.isVisible():
+                    panel_mode = "button"
+                else:
+                    title = released.title() if hasattr(released, "title") else ""
+                    if title == "LCD":
+                        panel_mode = "lcd"
+                    elif title.startswith("Icon"):
+                        panel_mode = "look"
+                    else:
+                        panel_mode = "button"
+            else:
+                panel_mode = "hidden"
+        driver = self._current_appearance_driver() if panel_mode == "button" else "press"
+        use_state = driver == "state" and panel_mode == "button"
+
+        state_label = getattr(self, "_appearance_state_label", None)
+        state_combo = getattr(self, "_appearance_state_combo", None)
+        if state_label is not None and Shiboken.isValid(state_label):
+            state_label.setVisible(use_state)
+        if state_combo is not None and Shiboken.isValid(state_combo):
+            state_combo.setVisible(use_state)
+            state_combo.setEnabled(use_state)
+
+        released = getattr(self, "_released_box", None)
+        pressed = getattr(self, "_pressed_box", None)
+        if released is not None and Shiboken.isValid(released):
+            if panel_mode == "lcd":
+                released.setTitle("LCD")
+            elif panel_mode == "look":
+                released.setTitle("Icon / background")
+            elif use_state:
+                released.setTitle("State OFF")
+            else:
+                released.setTitle("Released")
+        if pressed is not None and Shiboken.isValid(pressed):
+            pressed.setTitle("State ON" if use_state else "Pressed")
+
+        title = getattr(self, "_title_edit", None)
+        if title is not None and Shiboken.isValid(title):
+            if panel_mode == "lcd":
+                title.setPlaceholderText("LCD title — up to 3 lines")
+            elif use_state:
+                title.setPlaceholderText("State OFF title — up to 3 lines")
+            else:
+                title.setPlaceholderText("Released title — up to 3 lines")
+        title_p = getattr(self, "_title_pressed_edit", None)
+        if title_p is not None and Shiboken.isValid(title_p):
+            title_p.setPlaceholderText(
+                "State ON title — up to 3 lines (blank = use State OFF)"
+                if use_state
+                else "Pressed title — up to 3 lines (blank = use released)"
+            )
+
+        preview_rel = getattr(self, "_preview_released_btn", None)
+        preview_prs = getattr(self, "_preview_pressed_btn", None)
+        if preview_rel is not None and Shiboken.isValid(preview_rel):
+            preview_rel.setText("State OFF" if use_state else "Released")
+            preview_rel.setToolTip(
+                "Show State OFF appearance on the grid" if use_state else "Show released (idle) appearance on the grid"
+            )
+            preview_rel.setMinimumWidth(80 if use_state else 72)
+        if preview_prs is not None and Shiboken.isValid(preview_prs):
+            preview_prs.setText("State ON" if use_state else "Pressed")
+            preview_prs.setToolTip(
+                "Show State ON appearance on the grid" if use_state else "Show pressed appearance on the grid"
+            )
+            preview_prs.setMinimumWidth(72 if use_state else 64)
+
+        icon = getattr(self, "_icon_preview", None)
+        if icon is not None and Shiboken.isValid(icon):
+            icon.setToolTip(
+                "State OFF icon — drop image or click to choose"
+                if use_state
+                else "Released (unpressed) icon — drop image or click to choose"
+            )
+        icon_p = getattr(self, "_pressed_preview", None)
+        if icon_p is not None and Shiboken.isValid(icon_p):
+            icon_p.setToolTip(
+                "State ON icon — drop image or click to choose" if use_state else "Pressed icon — drop image or click to choose"
+            )
+        bg = getattr(self, "_bg_swatch", None)
+        if bg is not None and Shiboken.isValid(bg):
+            bg.setToolTip("State OFF background color" if use_state else "Released background color")
+        bg_p = getattr(self, "_bg_swatch_p", None)
+        if bg_p is not None and Shiboken.isValid(bg_p):
+            bg_p.setToolTip("State ON background color" if use_state else "Pressed background color")
+
+    def _populate_appearance_state_combo(self, selected: str = ""):
+        combo = getattr(self, "_appearance_state_combo", None)
+        if combo is None or not Shiboken.isValid(combo):
+            return
+        names = self._gex_state_names()
+        selected = (selected or "").strip()
+        with QtCore.QSignalBlocker(combo):
+            combo.clear()
+            combo.addItem("")
+            for name in names:
+                combo.addItem(name)
+            if selected:
+                idx = combo.findText(selected)
+                if idx < 0:
+                    combo.addItem(selected)
+                    idx = combo.findText(selected)
+                combo.setCurrentIndex(max(0, idx))
+            else:
+                combo.setCurrentIndex(0)
+
+    def _on_appearance_mode_ui(self, *_args):
+        item = self._selected_item()
+        if item is None:
+            self._refresh_appearance_driver_labels(panel_mode="button")
+            return
+        combo = getattr(self, "_appearance_mode_combo", None)
+        mode = "press"
+        if combo is not None and Shiboken.isValid(combo):
+            mode = str(combo.currentData() or "press")
+        item.appearance_mode = mode
+        self._refresh_appearance_driver_labels(panel_mode="button")
+        self._refresh_cell_contents()
+        bridge = self._bridge()
+        if bridge.get_active_page(self._device_id) == self._edit_page:
+            bridge.paint_active_page(self._device_id)
+
+    def _on_appearance_state_ui(self, *_args):
+        item = self._selected_item()
+        if item is None:
+            return
+        combo = getattr(self, "_appearance_state_combo", None)
+        if combo is None or not Shiboken.isValid(combo):
+            return
+        item.appearance_state = (combo.currentText() or "").strip()
+        self._refresh_cell_contents()
+        bridge = self._bridge()
+        if bridge.get_active_page(self._device_id) == self._edit_page:
+            bridge.paint_active_page(self._device_id)
+
     def _load_appearance_fields(self, item):
         blockers = []
         for block in (getattr(self, "_style_rel", None), getattr(self, "_style_prs", None)):
@@ -2765,6 +2950,15 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             for w in block.values():
                 if w is not None and Shiboken.isValid(w):
                     blockers.append(QtCore.QSignalBlocker(w))
+        mode_combo = getattr(self, "_appearance_mode_combo", None)
+        if mode_combo is not None and Shiboken.isValid(mode_combo):
+            mode = str(getattr(item, "appearance_mode", "press") or "press").casefold()
+            if mode != "state":
+                mode = "press"
+            with QtCore.QSignalBlocker(mode_combo):
+                idx = mode_combo.findData(mode)
+                mode_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self._populate_appearance_state_combo(getattr(item, "appearance_state", "") or "")
         if Shiboken.isValid(self._title_edit):
             lines = [
                 item.title or "",
@@ -2826,6 +3020,7 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             pressed=True,
         )
         self._update_color_button_styles()
+        self._refresh_appearance_driver_labels(panel_mode="button")
         del blockers
 
     def _load_style_block(
@@ -2960,6 +3155,12 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
         )
         self._apply_style_block_to_item(item, getattr(self, "_style_rel", None), pressed=False)
         self._apply_style_block_to_item(item, getattr(self, "_style_prs", None), pressed=True)
+        mode_combo = getattr(self, "_appearance_mode_combo", None)
+        if mode_combo is not None and Shiboken.isValid(mode_combo):
+            item.appearance_mode = str(mode_combo.currentData() or "press")
+        state_combo = getattr(self, "_appearance_state_combo", None)
+        if state_combo is not None and Shiboken.isValid(state_combo):
+            item.appearance_state = (state_combo.currentText() or "").strip()
         self._refresh_cell_contents()
         bridge = self._bridge()
         if bridge.get_active_page(self._device_id) == self._edit_page:
@@ -3171,6 +3372,8 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
                     "icon_h_align_pressed": "center",
                     "icon_v_align_pressed": "middle",
                     "bg_color_pressed": "",
+                    "appearance_mode": "press",
+                    "appearance_state": "",
                     "step_mode": "all",
                     "step_wrap": True,
                 }
@@ -3379,6 +3582,8 @@ class StreamDeckDesignerWidget(QtWidgets.QWidget):
             item.icon_v_align = "middle"
             item.shrink_to_fit = True
             item.sync_pressed_style_from_released()
+            item.appearance_mode = "press"
+            item.appearance_state = ""
             item.step_mode = "all"
             item.step_index = 0
             item.linked_page = 0

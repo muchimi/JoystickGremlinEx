@@ -10263,20 +10263,6 @@ class WidgetCacheTracker:
         self._param_map.clear()
 
 
-class QSplitterWidget(QtWidgets.QSplitter):
-    def __init__(self, orientation, parent=None):
-        super().__init__(orientation, parent)
-        self._stretch_factors = {}
-
-    def setStretchFactor(self, index: int, stretch: int):
-        self._stretch_factors[index] = stretch
-        super().setStretchFactor(index, stretch)
-
-    def stretchFactor(self, index: int):
-        if index not in self._stretch_factors:
-            return 0
-        return self._stretch_factors.get(index, 0)
-
 class QSplitTabWidget(QDataWidget):
     """tab content widget split"""
 
@@ -10319,7 +10305,7 @@ class QSplitTabWidget(QDataWidget):
         self._content_widget.resized.connect(self._handle_content_resized)
         self._content_widget.setContentsMargins(0, 0, 0, 0)
 
-        self._splitter = QSplitterWidget(QtCore.Qt.Orientation.Horizontal, self._content_widget)
+        self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, self._content_widget)
         self._splitter.splitterMoved.connect(self._splitter_moved)
         self._splitter.setChildrenCollapsible(False)
         self._last_sizes = None
@@ -10374,8 +10360,9 @@ class QSplitTabWidget(QDataWidget):
 
         self._splitter.addWidget(self._left_panel_widget)
         self._splitter.addWidget(self._right_scroll_area)
-        self._splitter.setStretchFactor(0, 1)
-        self._splitter.setStretchFactor(1, 4)
+        self._splitter_stretch = (1, 4)
+        self._splitter.setStretchFactor(0, self._splitter_stretch[0])
+        self._splitter.setStretchFactor(1, self._splitter_stretch[1])
 
         self.main_layout.addWidget(self._content_widget)
 
@@ -10463,11 +10450,10 @@ class QSplitTabWidget(QDataWidget):
         """Left-biased default from stretch factors (classic tabs ≈ 1:4 / 200px)."""
         if width <= 0:
             return [200, 200]
-        try:
-            s0 = max(1, int(self._splitter.stretchFactor(0)))
-            s1 = max(1, int(self._splitter.stretchFactor(1)))
-        except Exception:
-            s0, s1 = 1, 4
+        # QSplitter has setStretchFactor() but no stretchFactor() getter.
+        s0, s1 = getattr(self, "_splitter_stretch", (1, 4))
+        s0 = max(1, int(s0))
+        s1 = max(1, int(s1))
         left = int(round(width * s0 / (s0 + s1)))
         # Match pre-scroll-area behavior for classic device tabs.
         if s0 <= s1 and width >= 400:
@@ -10523,9 +10509,21 @@ class QSplitTabWidget(QDataWidget):
             return
         self._splitter.setFixedWidth(width)
         self._splitter.setFixedHeight(height)
-        # Always re-apply last/shared/default sizes. With a shrinkable right
-        # scroll pane Qt otherwise lands at ~50/50 on every device tab switch.
-        self._apply_splitter_sizes(width)
+        # Re-apply remembered sizes when Qt's layout drifted (e.g. mid-split on
+        # tab switch). Skip when already correct to avoid paste/rebuild churn.
+        sizes = self._splitter.sizes()
+        need = (
+            not self._last_sizes
+            or len(sizes) < 2
+            or abs(sum(sizes) - width) > 2
+        )
+        if not need and self._last_sizes and len(sizes) >= 2 and sum(self._last_sizes) > 0:
+            # Detect ~50/50 snap after device switch with Ignored right pane.
+            expected = self._resolve_splitter_sizes(width)
+            if abs(sizes[0] - expected[0]) > max(20, width // 20):
+                need = True
+        if need:
+            self._apply_splitter_sizes(width)
 
     @property
     def rightPanelLocked(self) -> bool:

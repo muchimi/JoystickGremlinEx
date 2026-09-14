@@ -214,6 +214,34 @@ def text_lines_for_item(item, pressed: bool = False) -> list[str]:
     return lines[:3]
 
 
+def appearance_mode(item) -> str:
+    """How the active look is chosen: ``press`` (hardware hold) or ``state`` (GEX state)."""
+    mode = str(getattr(item, "appearance_mode", None) or "press").strip().casefold()
+    return "state" if mode == "state" else "press"
+
+
+def appearance_state_name(item) -> str:
+    return str(getattr(item, "appearance_state", None) or "").strip()
+
+
+def appearance_follows_state(item) -> bool:
+    """True when the key's look is driven by a GEX state (even if none selected yet)."""
+    return appearance_mode(item) == "state"
+
+
+def appearance_state_is_on(item) -> bool:
+    """True when the GEX state driving this key's look is currently ON."""
+    name = appearance_state_name(item)
+    if not name:
+        return False
+    try:
+        import gremlin.ui.state_device as state_device
+
+        return bool(state_device.StateData().getValue(name))
+    except Exception:
+        return False
+
+
 def has_pressed_appearance(item) -> bool:
     """True when the key defines a distinct pressed icon, title, and/or style."""
     if not item:
