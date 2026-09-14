@@ -584,7 +584,7 @@ def _switch_position_pressed(binding: dict[str, Any] | None) -> bool:
 
 
 def read_switch_position(item: dict[str, Any] | None) -> str:
-    """Active switch slot, or the spring rest / empty string when none are pressed."""
+    """Active switch slot, or empty string when idle (spring rest is not lit)."""
     widget_type = (item or {}).get("type")
     rest = switch_rest_position(widget_type)
     for position in switch_positions(widget_type):
@@ -596,7 +596,8 @@ def read_switch_position(item: dict[str, Any] | None) -> str:
         center = switch_binding(item, rest)
         if binding_is_configured(center) and _switch_position_pressed(center):
             return rest
-        return rest
+        # Idle / spring rest — no slot is lit (do not treat rest as "active").
+        return ""
     return ""
 
 

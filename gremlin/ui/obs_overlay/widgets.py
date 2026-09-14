@@ -1903,14 +1903,15 @@ def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
     """Physical 4-way hat that reports as five buttons (N/E/S/W/center)."""
     style = item.get("style") or {}
     appearance = normalize_switch_appearance(style.get("switch_appearance"))
-    position = str(value or "center")
+    position = str(value or "")
     if position not in ("n", "e", "s", "w", "center"):
-        position = "center"
+        position = ""
     geo = _switch_4way_geometry(item)
     cx, cy = geo["cx"], geo["cy"]
     outer_r = geo["outer_r"]
     center_r = geo["center_r"]
     ring_inner = geo["ring_inner"]
+    border_w = _border_w(style)
     painter.save()
     painter.setOpacity(_opacity(style))
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
@@ -1923,11 +1924,8 @@ def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
         for slot, start in starts.items():
             active = slot == position
             fill, border = _switch_fill_colors(style, active)
-            if not active:
-                fill = qcolor(style.get("fill"), "#6b7580")
-                border = qcolor(style.get("border"), "#2a3038")
             path = _donut_slice(cx, cy, ring_inner, outer_r, start, span)
-            painter.setPen(_pen(border, max(1.0, _border_w(style) * 0.8)))
+            painter.setPen(_pen(border, border_w * 0.85) if border_w > 0 else QtCore.Qt.NoPen)
             painter.setBrush(fill)
             painter.drawPath(path)
     else:
@@ -1936,22 +1934,20 @@ def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
         for slot in ("n", "e", "s", "w"):
             active = slot == position
             fill, border = _switch_fill_colors(style, active)
-            if not active:
-                fill = qcolor(style.get("fill"), "#9aa3ad")
-                border = qcolor(style.get("border"), "#2a3038")
             path = _cardinal_arrow_path(cx, cy, slot, ring_inner, outer_r, half_w)
-            painter.setPen(_pen(border, max(1.0, _border_w(style) * 0.85)))
+            painter.setPen(_pen(border, border_w * 0.9) if border_w > 0 else QtCore.Qt.NoPen)
             painter.setBrush(fill)
             painter.drawPath(path)
 
-    # Center button — always fixed in the middle; size drives ring/arrow inset.
+    # Center button — fixed in the middle. Lit only when the center binding is pressed
+    # (idle spring-rest no longer reports as "center", so this stays inactive at rest).
     center_active = position == "center"
     if center_active:
         center_fill, center_border = _switch_fill_colors(style, True)
     else:
-        center_fill = qcolor(style.get("indicator"), "#c8d0d8")
-        center_border = qcolor(style.get("border"), "#2a3038")
-    painter.setPen(_pen(center_border, max(1.0, _border_w(style))))
+        center_fill = qcolor(style.get("indicator"), "#2a3548")
+        center_border = qcolor(style.get("border"), "#3a4a62")
+    painter.setPen(_pen(center_border, border_w) if border_w > 0 else QtCore.Qt.NoPen)
     painter.setBrush(center_fill)
     painter.drawEllipse(QtCore.QPointF(cx, cy), center_r, center_r)
 

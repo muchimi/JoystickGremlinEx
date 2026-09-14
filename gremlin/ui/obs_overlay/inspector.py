@@ -1169,6 +1169,9 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style_color(look, item, "fill", "Inactive")
             self._style_color(look, item, "fill_on", "Active")
             self._style_color(look, item, "indicator", "Center")
+            self._style_color(look, item, "border", "Border")
+            self._style_color(look, item, "border_on", "Active border")
+            self._style_float(look, item, "border_width", "Border width", 0, 20)
             self._style_float(look, item, "indicator_size", "Center size", 10, 100)
         elif widget_type in ("switch_2way", "switch_3way"):
             self._orientation_combo(look, item)
@@ -1270,6 +1273,9 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style_color(look, item, "indicator", "Center")
             self._style_float(look, item, "indicator_size", "Center size", 10, 100)
             self._style_color(look, item, "fill", "Inactive")
+            self._style_color(look, item, "border", "Border")
+            self._style_color(look, item, "border_on", "Active border")
+            self._style_float(look, item, "border_width", "Border width", 0, 20)
         if types <= {"switch_2way", "switch_3way"}:
             self._orientation_combo(look, item)
         if types <= {"axis_bar", "axis_radio", "axis_fader"}:

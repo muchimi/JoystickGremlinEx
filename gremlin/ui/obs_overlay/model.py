@@ -313,11 +313,12 @@ def default_style(widget_type: str) -> dict[str, Any]:
         style.update(
             {
                 "switch_appearance": "arrows",
-                "fill": "#9aa3ad",
-                "fill_on": "#2ecc71",
-                "border": "#2a3038",
-                "border_on": "#1e8f4f",
-                "indicator": "#c8d0d8",
+                "fill": "#1a2230",
+                "fill_on": "#ff6b35",
+                "border": "#3a4a62",
+                "border_on": "#ffcc66",
+                "border_width": 2.0,
+                "indicator": "#2a3548",
                 "indicator_size": 28.0,
                 "show_label": False,
                 "show_axis_labels": False,
@@ -326,7 +327,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "axis_label_e": "E",
                 "axis_label_w": "W",
                 "track": "#0b1220",
-                "crosshair": "#6b7580",
+                "crosshair": "#5a6a84",
             }
         )
     elif widget_type == "switch_2way":
