@@ -1165,8 +1165,6 @@ class OverlayInspector(QtWidgets.QWidget):
             self._orientation_combo(look, item)
             self._style_color(look, item, "fill", "Housing")
             self._style_color(look, item, "fill_on", "Active fill")
-            self._style_color(look, item, "indicator", "Handle")
-            self._style_float(look, item, "indicator_size", "Handle size", 6, 48)
         elif widget_type in ("shape", "panel"):
             self._shape_appearance(look, item)
         elif widget_type == "image":
@@ -1248,8 +1246,8 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style_color(look, item, "fill_on", "On fill")
         if types <= {"switch_4way", "switch_2way", "switch_3way"}:
             self._style_color(look, item, "fill_on", "Active fill")
-            self._style_color(look, item, "indicator", "Knob" if types <= {"switch_4way"} else "Handle")
         if types <= {"switch_4way"}:
+            self._style_color(look, item, "indicator", "Knob")
             self._style_color(look, item, "track", "Inner fill")
             self._style_color(look, item, "crosshair", "Direction fill")
             self._style_float(look, item, "corner_radius", "Direction radius", 0, 80)

@@ -1888,21 +1888,8 @@ def _switch_is_vertical(item: dict[str, Any]) -> bool:
     return ((item.get("style") or {}).get("orientation") or "vertical").casefold() != "horizontal"
 
 
-def _toggle_angle_deg(widget_type: str, position: str, vertical: bool) -> float:
-    """Screen-plane rotation; 0° points up. Horizontal widgets subtract 90° (left/right)."""
-    if widget_type == "switch_2way":
-        tilt = 0.0 if position == "a" else (180.0 if position == "b" else 90.0)
-    elif position == "up":
-        tilt = 0.0
-    elif position == "down":
-        tilt = 180.0
-    else:
-        tilt = 90.0
-    return tilt if vertical else tilt - 90.0
-
-
 def paint_switch_toggle(painter: QtGui.QPainter, item: dict[str, Any], value):
-    """2-way latching or 3-way spring-center bat-handle switch."""
+    """2-way latching or 3-way spring-center switch (slot highlight only, no bat handle)."""
     style = item.get("style") or {}
     rect = widget_rect(item)
     widget_type = item.get("type")
@@ -1940,30 +1927,6 @@ def paint_switch_toggle(painter: QtGui.QPainter, item: dict[str, Any], value):
         painter.setBrush(slot_fill)
         painter.drawRoundedRect(slot_rect, 4, 4)
 
-    cx, cy = rect.center().x(), rect.center().y()
-    span = inner.height() if vertical else inner.width()
-    handle_len = span * (0.40 if widget_type == "switch_2way" else 0.36)
-    handle_w = max(8.0, float(style.get("indicator_size") or 10) * 0.85)
-    painter.translate(cx, cy)
-    painter.rotate(_toggle_angle_deg(widget_type, position, vertical))
-    painter.translate(-cx, -cy)
-
-    pivot_r = max(5.0, handle_w * 0.55)
-    painter.setPen(QtCore.Qt.NoPen)
-    painter.setBrush(qcolor(style.get("crosshair"), "#5a6a84"))
-    painter.drawEllipse(QtCore.QPointF(cx, cy), pivot_r, pivot_r)
-
-    on = bool(position) and position != "center"
-    handle_fill, handle_border = _switch_fill_colors(style, on)
-    if position in ("", "center"):
-        handle_fill = qcolor(style.get("indicator"), "#ff5a3c")
-        handle_border = qcolor(style.get("border_on") or style.get("indicator"), "#ffcc66")
-    handle = QtCore.QRectF(cx - handle_w / 2, cy - handle_len, handle_w, handle_len + pivot_r * 0.35)
-    painter.setPen(_pen(handle_border, max(1.2, _border_w(style))))
-    painter.setBrush(handle_fill)
-    painter.drawRoundedRect(handle, handle_w / 2, handle_w / 2)
-    cap = QtCore.QRectF(cx - handle_w * 0.72, cy - handle_len - handle_w * 0.12, handle_w * 1.44, handle_w * 0.85)
-    painter.drawRoundedRect(cap, handle_w * 0.4, handle_w * 0.4)
     painter.restore()
 
     painter.save()

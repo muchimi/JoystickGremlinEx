@@ -199,7 +199,7 @@ def _banner_type_help(item: dict) -> list[str]:
         )
     elif widget_type == "switch_2way":
         lines.append(
-            "Inspector: bind Position 1 and Position 2. Orientation flips the handle. "
+            "Inspector: bind Position 1 and Position 2. Orientation flips vertical/horizontal. "
             "Interactive overlay latches the last side you press."
         )
     elif widget_type == "switch_3way":
