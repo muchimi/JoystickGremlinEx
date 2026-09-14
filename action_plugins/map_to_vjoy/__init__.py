@@ -294,6 +294,8 @@ class MergeWidget(gremlin.ui.ui_common.QDataWidget):
         gremlin.util.assert_ui_thread()
         if not Shiboken.isValid(self) or not Shiboken.isValid(self.merge_selector_device_widget):
             return
+        if gremlin.shared_state.current_profile is None:
+            return
 
         devices = sorted(joystick_handling.axis_input_devices(), key=lambda x: x.name.casefold())
         self._merge_enabled = len(devices) > 0  # assume enabled
