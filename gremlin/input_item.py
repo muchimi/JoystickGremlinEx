@@ -953,8 +953,7 @@ class InputItem(gremlin.base_classes.AbstractInputItem):
 
     @device_guid.setter
     def device_guid(self, value: dinput.GUID | uuid.UUID | str = None):  # noqa: F405
-        if value is None:
-            pass
+        assert value is not None,"value must be provided"
         if gremlin.util.compare_guid(self._device_guid, value):
             device = gremlin.joystick_handling.getDevice(value)
             assert device is not None, f"device not found for device GUID: [{value}]"
@@ -2366,7 +2365,7 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
         self._container_id_widget.setWidget(None)
         self._repeater_container_widget.setWidget(None)
         gremlin.util.clear_layout(self._custom_container_layout)
-        
+
 
         gremlin.util.clear_widget_references(self)
 

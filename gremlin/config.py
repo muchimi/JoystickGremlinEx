@@ -39,14 +39,16 @@ import gremlin.singleton_decorator
 
 syslog = logging.getLogger("system")
 
-#VOICE_INPUT_ENABLED = True
-VOICE_INPUT_ENABLED = False # turn off for production while voice input is being tested
+VOICE_INPUT_ENABLED = False
+
 
 @gremlin.singleton_decorator.SingletonDecorator
 class Configuration(QtCore.QObject):
     """configuration data"""
 
     changed = Signal(str, object)  # fires on some configuration value changes, passes the method to get the value that has changed
+
+    VOICE_INPUT_ENABLED = VOICE_INPUT_ENABLED
 
     def get_config(self) -> str:
         """local config file (version based)"""

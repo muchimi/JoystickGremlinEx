@@ -18,6 +18,7 @@
 from __future__ import annotations  # deprecated with python 3.14+
 
 
+import gc
 import hashlib
 import os
 import html
@@ -53,19 +54,17 @@ from comtypes import CLSCTX_ALL
 
 # avoid the avalanche of warnings from pycaw
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning, module="pycaw")
 from pycaw.pycaw import DEVICE_STATE, AudioUtilities, IAudioEndpointVolume, EDataFlow, IMMEndpoint, IMMDeviceEnumerator  # noqa: E402
-from pycaw.constants import CLSID_MMDeviceEnumerator # noqa: E402
+from pycaw.constants import CLSID_MMDeviceEnumerator  # noqa: E402
+
 
 class PROPERTYKEY(comtypes.Structure):
-    _fields_ = [
-        ("fmtid", GUID),
-        ("pid", comtypes.wintypes.DWORD)
-    ]
+    _fields_ = [("fmtid", GUID), ("pid", comtypes.wintypes.DWORD)]
 
-PKEY_Device_FriendlyName = PROPERTYKEY(
-    GUID("{a45c254e-df1c-4efd-8020-67d146a850e0}"), 14
-)
+
+PKEY_Device_FriendlyName = PROPERTYKEY(GUID("{a45c254e-df1c-4efd-8020-67d146a850e0}"), 14)
 
 
 # usage
@@ -593,9 +592,8 @@ class SpeechRecognizer:
         segments, info = self.model.transcribe(
             audio,
             language="en",
-            # Your own VAD already determined the utterance.
-            vad_filter=False,
-            beam_size=1,
+            vad_filter=True,
+            beam_size=2,
             condition_on_previous_text=False,
         )
         words = []
@@ -664,7 +662,7 @@ class VoiceCommand:
 
     @property
     def hashKey(self) -> str:
-        """ unique hash for the phrase in the command """
+        """unique hash for the phrase in the command"""
         if self.phrase is None:
             return None
         return hash(self.phrase)
@@ -787,7 +785,7 @@ class CommandMatcher:
         return len(self._commands)
 
     def addCommand(self, command: Union[VoiceCommand, str]):
-        """ adds a single command to the matcher - duplicates are ignored
+        """adds a single command to the matcher - duplicates are ignored
 
         :param command: The command to add. Can be a VoiceCommand instance or a string representing the phrase.  If a voice command, callback will be called when a match occurs with the key.
         """
@@ -801,7 +799,7 @@ class CommandMatcher:
         self._update_commands()
 
     def addCommands(self, commands: list[Union[VoiceCommand, str]]):
-        """ adds multiple commands to the matcher - duplicates are ignored """
+        """adds multiple commands to the matcher - duplicates are ignored"""
         for command in commands:
             if isinstance(command, VoiceCommand):
                 vc = command
@@ -1163,6 +1161,9 @@ class Voice:
         self._audio_lock = threading.RLock()  # lock when adding new recognized words
         self._model_size = "small"  # "base" #  possible models: "tiny", "base", "small", "medium", "large-v3"
         self._listening = False  # true if actively listening for voice input
+        self._listen_enabled = False  # true if listening is enabled while monitoring
+        self._listen_lock = threading.RLock()
+
         self._suspend_stack = 0  # > 1 if listening suspended
         self._recognize_stack = 0  # > 1 if recognition is suspended
         self._listen_thread = None  # thread for listening to voice input
@@ -1183,12 +1184,12 @@ class Voice:
         el.profile_stop.connect(self.stop)
 
     def addCommand(self, command: VoiceCommand):
-        """ adds a single command to the matcher - duplicates are ignored """
+        """adds a single command to the matcher - duplicates are ignored"""
         if command is not None:
             self._rolling_matcher.addCommand(command)
 
     def addCommands(self, commands: list):
-        """ adds multiple commands to the matcher - duplicates are ignored """
+        """adds multiple commands to the matcher - duplicates are ignored"""
         self._rolling_matcher.addCommands(commands)
 
     def getCommands(self) -> list:
@@ -1223,6 +1224,16 @@ class Voice:
                 self._recognize_stack = 0
             elif self._recognize_stack > 0:
                 self._recognize_stack -= 1
+
+    def setListen(self, enable: bool):
+        """enable or disable listening while monitoring"""
+        with self._listen_lock:
+            self._listen_enabled = enable
+
+    def listenEnabled(self) -> bool:
+        """returns whether listening is currently enabled"""
+        with self._listen_lock:
+            return self._listen_enabled
 
     def test(self):
 
@@ -1289,36 +1300,97 @@ class Voice:
             self._listen_thread = None
             self.recognizer.stop()
 
+    # def _listen_runner(self, abort_event: threading.Event):
+    #     """internal method run in a separate thread to handle listening"""
+
+    #     syslog.info("Voice listen runner started...")
+
+    #     def callback(indata, frames, time_info, status):
+    #         if status:
+    #             syslog.info(f"Audio: {status}")
+
+    #         with self._listen_lock:
+    #             if not self._listen_enabled:
+    #                 # not listening - ignore incoming audio
+    #                 return
+
+    #         audio = indata[:, 0]
+
+    #         output, info = self.processor.process(audio)
+
+    #         if self._recognize_stack == 0 and self._rolling_matcher.hasCommands():  # speech recognition enabled
+    #             # speech recognition enabled
+    #             speech_started = info["speech_started"]
+    #             speech_ended = info["speech_ended"]
+    #             if output is not None:
+    #                 # syslog.info(f"Audio: SPEECH DETECTED  started: {speech_started}, ended: {speech_ended}")
+    #                 self.recognizer.add_audio(output, speech_started, speech_ended)
+
+    #         # monitor mode
+    #         self.audioMonitor.emit(info)
+
+    #     stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype=np.float32, callback=callback)
+    #     with stream:
+    #         # Keep the stream open until the trigger key is pressed
+    #         while not abort_event.is_set():
+    #             time.sleep(0.01)  # Small sleep to prevent high CPU usage in the loop
+
     def _listen_runner(self, abort_event: threading.Event):
-        """internal method run in a separate thread to handle listening"""
+        """Internal method run in a separate thread to handle listening."""
 
         syslog.info("Voice listen runner started...")
+        audio_queue = queue.Queue(maxsize=64)
 
         def callback(indata, frames, time_info, status):
             if status:
-                syslog.info(f"Audio: {status}")
+                if status.input_overflow:
+                    syslog.warning("Audio input overflow")
+                else:
+                    syslog.info("Audio: %s", status)
 
-            audio = indata[:, 0]
+            try:
+                # Input buffers are reused after the callback returns.
+                audio_queue.put_nowait(indata[:, 0].copy())
+            except queue.Full:
+                # Drop audio rather than blocking the real-time callback.
+                syslog.warning("Audio processing queue full; dropping block")
 
-            output, info = self.processor.process(audio)
+        stream = sd.InputStream(
+            samplerate=SAMPLE_RATE,
+            channels=1,
+            dtype=np.float32,
+            callback=callback,
+            blocksize=0,
+            latency="high",
+        )
 
-            if self._recognize_stack == 0 and self._rolling_matcher.hasCommands():  # speech recognition enabled
-                # speech recognition enabled
-                speech_started = info["speech_started"]
-                speech_ended = info["speech_ended"]
-                if output is not None:
-                    # syslog.info(f"Audio: SPEECH DETECTED  started: {speech_started}, ended: {speech_ended}")
-                    self.recognizer.add_audio(output, speech_started, speech_ended)
-
-            # monitor mode
-            self.audioMonitor.emit(info)
-
-        stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype=np.float32, callback=callback)
         with stream:
-            # Keep the stream open until the trigger key is pressed
             while not abort_event.is_set():
-                time.sleep(0.01)  # Small sleep to prevent high CPU usage in the loop
+                try:
+                    audio = audio_queue.get(timeout=0.1)
+                except queue.Empty:
+                    continue
 
+                with self._listen_lock:
+                    listen_enabled = self._listen_enabled
+
+                if not listen_enabled:
+                    continue
+
+                output, info = self.processor.process(audio)
+
+                if (
+                    self._recognize_stack == 0
+                    and self._rolling_matcher.hasCommands()
+                    and output is not None
+                ):
+                    self.recognizer.add_audio(
+                        output,
+                        info["speech_started"],
+                        info["speech_ended"],
+                    )
+
+                self.audioMonitor.emit(info)
 
     def getVolume(self, target_name: str = None) -> float:
         if gremlin.util.is_ui_thread():
@@ -1326,6 +1398,7 @@ class Voice:
 
         # non UI thread
         value = None
+
         def default_callback(volume: float):
             nonlocal value
             value = volume
@@ -1338,7 +1411,7 @@ class Voice:
         return value
 
     def _get_qmedia_device(self, target_name: str = None):
-        """gets the QMediaDevice for the given device, use None for the default device  """
+        """gets the QMediaDevice for the given device, use None for the default device"""
         gremlin.util.assert_ui_thread()
 
         device = None
@@ -1363,8 +1436,7 @@ class Voice:
             return default_device.description()
         return ""
 
-
-    def _get_volume_ui(self, target_name: str = None, callback : Callable = None) -> float:
+    def _get_volume_ui(self, target_name: str = None, callback: Callable = None) -> float:
         """gets the system volume 0 to 100 for the input device
 
         :param target_name: The name of the target input device (microphone). If None, the default microphone is used.
@@ -1387,72 +1459,76 @@ class Voice:
             callback(percent_volume)
         return percent_volume
 
-
-
-
     def setVolume(self, percent: float, target_name: str = None):
-        """ sets the input device volume level """
-        gremlin.util.InvokeUiMethod(self._set_volume_ui, percent, target_name) # must be on UI thread to avoid COM issues
-
+        """sets the input device volume level"""
+        gremlin.util.InvokeUiMethod(self._set_volume_ui, percent, target_name)  # must be on UI thread to avoid COM issues
 
     def _set_volume_com(self, device_name: str, volume_scalar: float) -> bool:
-        """sets the volume for the specified device using COM interfaces
+        """Set the volume of a matching active input device."""
 
-        :param device_name: The name of the target input device (microphone).
-        :param volume_scalar: The desired volume level as a scalar (0.0 to 1.0).
-        :return: True if the volume was successfully set, False otherwise.
-        """
+        if not 0.0 <= volume_scalar <= 1.0:
+            raise ValueError("volume_scalar must be between 0.0 and 1.0")
+
+        com_initialized = False
 
         try:
-            comtypes.CoInitialize()  # Initialize COM library for this thread
+            comtypes.CoInitialize()
+            com_initialized = True
 
+            def set_volume() -> bool:
+                enumerator = comtypes.CoCreateInstance(
+                    CLSID_MMDeviceEnumerator,
+                    interface=IMMDeviceEnumerator,
+                    clsctx=comtypes.CLSCTX_INPROC_SERVER,
+                )
 
-            # 1. Create the base Windows device enumerator
-            enumerator = comtypes.CoCreateInstance(
-                CLSID_MMDeviceEnumerator,
-                IMMDeviceEnumerator,
-                comtypes.CLSCTX_INPROC_SERVER
-            )
+                collection = enumerator.EnumAudioEndpoints(
+                    EDataFlow.eCapture.value,
+                    DEVICE_STATE.ACTIVE.value,
+                )
 
-            # 2. Get only active CAPTURE (input) devices (1 = eCapture)
-            # This prevents scanning rendering devices or disconnected endpoints
-            collection = enumerator.EnumAudioEndpoints(
-                EDataFlow.eCapture.value,
-                DEVICE_STATE.ACTIVE.value
-            )
+                target_device = None
 
-            count = collection.GetCount()
+                for index in range(collection.GetCount()):
+                    device = collection.Item(index)
+                    wrapped_device = AudioUtilities.CreateDevice(device)
 
-            target_dev = None
+                    if device_name.casefold() in wrapped_device.FriendlyName.casefold():
+                        target_device = device
+                        break
 
+                if target_device is None:
+                    print(f"Device matching {device_name!r} not found.")
+                    return False
 
-            # 3. Loop raw pointers directly (extremely fast)
-            for i in range(count):
-                dev = collection.Item(i)
+                interface = target_device.Activate(
+                    IAudioEndpointVolume._iid_,
+                    comtypes.CLSCTX_ALL,
+                    None,
+                )
+                endpoint_volume = cast(
+                    interface,
+                    POINTER(IAudioEndpointVolume),
+                )
 
-                # Open property store to get the string name
-                wrapped_device = AudioUtilities.CreateDevice(dev)
-                friendly_name = wrapped_device.FriendlyName
+                endpoint_volume.SetMasterVolumeLevelScalar(volume_scalar, None)
+                return True
 
-                if device_name.lower() in friendly_name.lower():
-                    target_dev = dev
-                    break
+            result = set_volume()
 
-            if not target_dev:
-                print(f"Device matching '{device_name}' not found.")
-                return False
+            # Ensure any cyclic wrapper objects are finalized while COM is active.
+            gc.collect()
+            return result
 
-            # 4. Activate volume control interface directly
-            interface = target_dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-
-            volume.SetMasterVolumeLevelScalar(volume_scalar, None)
-            return True
-        except Exception as e:
-            print(f"An error occurred while setting the volume: {e}")
+        except Exception as exc:
+            print(f"An error occurred while setting the volume: {exc}")
             return False
+
         finally:
-            comtypes.CoUninitialize()  # Uninitialize COM library for this thread
+            if com_initialized:
+                # Ensure any cyclic wrapper objects are finalized while COM is active.
+                gc.collect()
+                comtypes.CoUninitialize()
 
     def _set_volume_ui(self, percent: float, target_name: str = None):
         """sets the input device volume level
@@ -1490,4 +1566,3 @@ class Voice:
         #     volume = cast(interface, POINTER(IAudioEndpointVolume))
         #     volume.SetMasterVolumeLevelScalar(level_scalar, None)
         # syslog.info(f"VOICE: Microphone volume set to {percent}%  device: {target_name}")
-

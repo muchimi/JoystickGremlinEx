@@ -320,6 +320,7 @@ class MacroManager(QtCore.QObject):
         self._queue_lock = Lock()
         self._tasks_lock = RLock()
         self._abort_event = threading.Event() # scheduler abort event
+        self._schedule_event = threading.Event()
         self.pool = concurrent.futures.ThreadPoolExecutor()  # supports mutliple concurrent macro threads
         self._macro_flags = {} # map of active macro abort flags by [macro id]->threading.Event
         self._macro_map = {} # map of macro ID to macro
@@ -335,7 +336,6 @@ class MacroManager(QtCore.QObject):
 
         self._is_executing_exclusive = False
         self._is_running = False
-        self._schedule_event = threading.Event()  # used to step through macro executions
 
         self._run_scheduler_thread = None
         self.el.profile_stop.connect(self._profile_stop)
@@ -410,7 +410,7 @@ class MacroManager(QtCore.QObject):
             # reset the wake-up event so the fresh thread starts from a clean
             # state (avoids waiting on a half-torn-down primitive)
             self._abort_event.clear()
-            self._schedule_event = Event()
+            self._schedule_event.clear()
             self._run_scheduler_thread = Thread(target=self._run_scheduler, args=(self._abort_event,))
             self._run_scheduler_thread.name = "Macro scheduler"
             # self._run_scheduler_thread.daemon = True
@@ -853,7 +853,7 @@ class MacroManager(QtCore.QObject):
 
                 self._preprocess_macro(macro)
                 entry = MacroEntry(macro, True, is_local, is_remote, mode, client_list=client_list)
-                abort_flag = threading.Event()
+                abort_flag = threading.Event() # event unique to the worker
                 self._macro_flags[macro.id] = abort_flag
                 self._macro_map[macro.id] = macro
                 with self._tasks_lock:

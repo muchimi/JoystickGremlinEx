@@ -1095,7 +1095,7 @@ class Sound:
             device = sd.query_devices(kind='input')
             if device:
                 return device['name']
-            return None 
+            return None
 
     def getDefaultInputDeviceIndex(self):
         """gets the index of the default input device"""
@@ -1334,7 +1334,7 @@ class Sound:
             with self._tasks_lock:
                 self._active_sounds += 1
             for _ in range(loops):
-                event = threading.Event()
+                event = threading.Event() # specific to the worker thread
                 current_frame = 0
 
                 def callback(outdata, frames, time, status):

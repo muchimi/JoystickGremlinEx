@@ -604,7 +604,7 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
 
 
         self.verbose = gremlin.config.Configuration().verbose_mode_container
-        self.verbose = True
+        # self.verbose = True
 
 
         assert len(self.container.action_sets) == 3, "TempoEx container must have exactly 3 action sets: short, long, and double."
@@ -1088,7 +1088,7 @@ class TempoExContainerFunctor(gremlin.base_profile.AbstractTriggerFunctor):
                 if self.trigger_release:
                     self._long_press(self.event_press, self.value_press, self.event_release, self.value_release, extra_data)
 
-        
+
 
 
     def _timer_long_press_mode_press(self, event, value, extra_data):

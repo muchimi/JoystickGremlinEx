@@ -2331,6 +2331,7 @@ class EventHandler(QtCore.QObject):
         self.midi_callbacks = {}
         self.osc_callbacks = {}
         self.streamdeck_callbacks = {}
+        self.voice_callbacks = {}
         self.state_callbacks = {}
         self._event_lookup = {}
         self.latched_functors = {}
@@ -2579,6 +2580,23 @@ class EventHandler(QtCore.QObject):
             stub = ""
         return f"key device: [{key_device.name}][{key_device.device_id}] type: {InputType(key_event_type).name} data: [{key_data}] latched: [{latched}] {stub}"
 
+    def getMagic(self, event):
+        """ gets the magic entry for an event or input item """
+        input_type = event.event_type
+        match input_type:
+            case InputType.Keyboard:
+                return json.dumps(event.identifier)
+            case InputType.Mouse:
+                key = gremlin.keyboard.Key()
+                key.mouse_button = event.identifier
+                return json.dumps(key.index_tuple())
+            case InputType.KeyboardLatched:
+                return json.dumps(event.identifier)
+            case InputType.State:
+                return event.identifier
+            case _:
+                return event.identifier
+
     def _matching_input_item(self, mode, event):
         """gets the matching input item from the event"""
 
@@ -2587,24 +2605,7 @@ class EventHandler(QtCore.QObject):
 
         device_guid = event.device_guid
         input_type = event.event_type
-        match input_type:
-            case InputType.Keyboard:
-                input_type = InputType.KeyboardLatched
-                magic = json.dumps(event.identifier)
-            case InputType.Mouse:
-                input_type = InputType.KeyboardLatched
-                key = gremlin.keyboard.Key()
-                key.mouse_button = event.identifier
-                magic = json.dumps(key.index_tuple())
-
-            case InputType.KeyboardLatched:
-                magic = json.dumps(event.identifier)
-            case InputType.State:
-                mode = gremlin.shared_state.master_mode # states use master mode
-                magic = event.identifier
-            case _:
-                magic = event.identifier
-
+        magic = self.getMagic(event)
 
         key = event.callbackKey
         # verbose = True
@@ -2612,14 +2613,26 @@ class EventHandler(QtCore.QObject):
         if verbose:
             self._dump_latched_input_map()
 
+        # match on master modes and the mode
+        master_mode = gremlin.shared_state.master_mode
+        modes = [master_mode, mode]
+        profile = gremlin.shared_state.current_profile
+        visited = set()
+
         # check latched inputs (these are not real inputs but registered) - check before normal inputs to give latched inputs priority
         if device_guid in self.latched_input_map:
-            if mode in self.latched_input_map[device_guid]:
-                if key in self.latched_input_map[device_guid][mode]:
-                    if verbose:
-                        key_stub = self._callback_key_stub(key)
-                        syslog.info(f"**** LATCH MATCH INPUT ITEM: magic: [{magic}] key: {key_stub} ")
-                    return self.latched_input_map[device_guid][mode][key]
+            for lookup_mode in modes:
+                while lookup_mode and lookup_mode not in visited:
+                    visited.add(lookup_mode)
+                    if lookup_mode in self.latched_input_map[device_guid]:
+                        if key in self.latched_input_map[device_guid][lookup_mode]:
+                            if verbose:
+                                key_stub = self._callback_key_stub(key)
+                                syslog.info(f"**** LATCH MATCH INPUT ITEM: magic: [{magic}] key: {key_stub} ")
+                            return self.latched_input_map[device_guid][lookup_mode][key]
+                    # ascend to the parent mode, if any
+                    lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None and lookup_mode != master_mode else None
+
 
         if verbose:
             key_stub = self._callback_key_stub(key)
@@ -2632,38 +2645,39 @@ class EventHandler(QtCore.QObject):
             # fall back to parent modes here (mirrors build_event_lookup, which
             # only propagates inheritance into the callbacks maps, not this one).
 
-            lookup_mode = mode
-            profile = gremlin.shared_state.current_profile
-            visited = set()
-            while lookup_mode and lookup_mode not in visited:
-                visited.add(lookup_mode)
-                mode_map = self.input_item_map[device_guid].get(lookup_mode)
-                if mode_map and input_type in mode_map:
-                    if magic in mode_map[input_type]:
-                        if verbose:
-                            syslog.info(f"Match Input: input item : magic: {magic} (mode: {lookup_mode})")
-                        return mode_map[input_type][magic]
-                    # State events: fall back to message_key match (object identity
-                    # can miss after profile reload / clone).
-                    if input_type == InputType.State:
-                        want = getattr(magic, "message_key", None) or getattr(magic, "key", None)
-                        if want:
-                            for mapped_magic, mapped_item in mode_map[input_type].items():
-                                mapped_key = getattr(mapped_magic, "message_key", None) or getattr(
-                                    mapped_item, "message_key", None
-                                ) or getattr(mapped_item, "key", None)
-                                if mapped_key == want:
-                                    if verbose:
-                                        syslog.info(
-                                            f"Match Input: state by key [{want}] (mode: {lookup_mode})"
-                                        )
-                                    return mapped_item
-                    elif verbose:
-                        syslog.info("available magic values for this input are: ")
-                        for m in mode_map[input_type]:
-                            syslog.info(f"\t{m}")
-                # ascend to the parent mode, if any
-                lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None else None
+
+
+            for lookup_mode in modes:
+                visited.clear()
+                while lookup_mode and lookup_mode not in visited:
+                    visited.add(lookup_mode)
+                    mode_map = self.input_item_map[device_guid].get(lookup_mode)
+                    if mode_map and input_type in mode_map:
+                        if magic in mode_map[input_type]:
+                            if verbose:
+                                syslog.info(f"Match Input: input item : magic: {magic} (mode: {lookup_mode})")
+                            return mode_map[input_type][magic]
+                        # State events: fall back to message_key match (object identity
+                        # can miss after profile reload / clone).
+                        if input_type == InputType.State:
+                            want = getattr(magic, "message_key", None) or getattr(magic, "key", None)
+                            if want:
+                                for mapped_magic, mapped_item in mode_map[input_type].items():
+                                    mapped_key = getattr(mapped_magic, "message_key", None) or getattr(
+                                        mapped_item, "message_key", None
+                                    ) or getattr(mapped_item, "key", None)
+                                    if mapped_key == want:
+                                        if verbose:
+                                            syslog.info(
+                                                f"Match Input: state by key [{want}] (mode: {lookup_mode})"
+                                            )
+                                        return mapped_item
+                        elif verbose:
+                            syslog.info("available magic values for this input are: ")
+                            for m in mode_map[input_type]:
+                                syslog.info(f"\t{m}")
+                    # ascend to the parent mode, if any
+                    lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None and lookup_mode != master_mode else None
 
         if verbose:
             syslog.info(f"Match input: **no match**: {input_type} {magic}")
@@ -2720,6 +2734,7 @@ class EventHandler(QtCore.QObject):
         assert isinstance(event, Event) if event is not None else True, "invalid event"
 
         verbose = gremlin.config.Configuration().verbose_mode_exec
+
 
         valid_devices_map = gremlin.joystick_handling.getValidJoystickDevicesMap()  # list of valid joystick devices
         input_item = None
@@ -3418,6 +3433,7 @@ class EventHandler(QtCore.QObject):
         self.osc_callbacks = {}
         self.streamdeck_callbacks = {}
         self.state_callbacks = {}
+        self.voice_callbacks = {}
 
     def execute_event(self, event: Event, skip_execute=False):
         """main execution (runtime) event handler - queues trigger callbacks on event input
@@ -3449,6 +3465,7 @@ class EventHandler(QtCore.QObject):
             # list of callbacks
             m_list = []
             f_list = []
+            v_list = []
 
             input_item: gremlin.input_item.InputItem = None
             callback: Callable = None
@@ -3619,6 +3636,12 @@ class EventHandler(QtCore.QObject):
                                 # get callbacks for that input item
                                 m_list = self._matching_latched_callbacks(event, latch_key)
 
+                            # check voice latching if latching on keyboard
+                            if config.VOICE_INPUT_ENABLED:
+                                v_list = self._matching_voice_callbacks(event, latch_key, input_item)
+                                if v_list:
+                                    m_list.extend(v_list)
+
                             if m_list:
 
                                 # record the press event for the release when
@@ -3726,6 +3749,13 @@ class EventHandler(QtCore.QObject):
 
                 if verbose_detailed and not (m_list or f_list):
                     syslog.info(f"EVENT: [Generic] no matching inputs for {str(event.identifier)} mode: {self.runtime_mode}")
+
+
+            # check for matching voice recognition trigger
+            if config.VOICE_INPUT_ENABLED and not v_list:
+                v_list = self._matching_voice_callbacks(event, None, input_item)
+                if v_list:
+                    m_list.extend(v_list)
 
             if not skip_execute and (m_list or f_list):
                 # self._queue_add(event, m_list, f_list)
@@ -3941,7 +3971,7 @@ class EventHandler(QtCore.QObject):
 
         key = event.callbackKey
         device_guid = event.device_guid
-        key = event.callbackKey
+
 
         # Obtain callbacks matching the event
         callback_list = []
@@ -3981,6 +4011,15 @@ class EventHandler(QtCore.QObject):
 
         return []
 
+    def _matching_voice_callbacks(self, event, latch_key, input_item):
+        # matches input to voice callbacks
+        import gremlin.ui.voice_device
+        vd = gremlin.ui.voice_device.VoiceData()
+        if vd.input_item == input_item:
+            return [vd.execute_callback]
+        return []
+
+
     def _matching_latched_callbacks(self, event, key):
         from gremlin.ui.keyboard_device import KeyboardDeviceTabWidget
         import gremlin.keyboard
@@ -4001,12 +4040,23 @@ class EventHandler(QtCore.QObject):
                 # search callbacks for mode hierarchy
                 keyid_source = key.index_tuple()  # use the scan code for now
                 keyid = gremlin.keyboard.KeyMap.translate(keyid_source)
-                mode = self.runtime_mode
-                if device_guid in self.latched_keyboard_key_map:
-                    if mode in self.latched_keyboard_key_map[device_guid]:
-                        if keyid in self.latched_keyboard_key_map[device_guid][mode]:
-                            # callbacks = self.latched_keyboard_key_map[device_guid][mode][keyid]
-                            callback_list = ec.getCallbacks(self.latched_keyboard_key_map[device_guid], keyid, mode)
+
+                master_mode = gremlin.shared_state.master_mode
+                modes = [master_mode, self.runtime_mode]
+                profile = gremlin.shared_state.current_profile
+                visited = set()
+
+                for lookup_mode in modes:
+                    visited.add(lookup_mode)
+                    while lookup_mode is not None and lookup_mode not in visited:
+
+                        if lookup_mode in self.latched_keyboard_key_map[device_guid]:
+                            if keyid in self.latched_keyboard_key_map[device_guid][lookup_mode]:
+                                # callbacks = self.latched_keyboard_key_map[device_guid][lookup_mode][keyid]
+                                callback_list = ec.getCallbacks(self.latched_keyboard_key_map[device_guid], keyid, lookup_mode)
+                                # ascend to the parent mode, if any
+                        lookup_mode = profile.get_parent_mode(lookup_mode) if profile is not None and lookup_mode != master_mode else None
+
 
         if callback_list:
             # Filter events when the system is paused

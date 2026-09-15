@@ -48,6 +48,11 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 
 # Change log
 
+### (m77T52)
+- Fix: API (Macro): legacy engine threading event rework due to Python 3.14 changes (could cause an internal Python exception) 
+- Fix: API: VJoy keep alive service: threading event rework due to Python 3.14. (could cause an internal Python exception)
+- Fix: API: centralized magic values to ensure consistency across all callback registrations.
+
 ### (m77T51)
 - Fix: OBS Overlay: (experimental) - enhancements, thread safety and various fixes (courtesy Lolo350)
 - Fix: Streamdeck Device: (experimental) - polish + paste/splitter stability.  (courtesy Lolo350)

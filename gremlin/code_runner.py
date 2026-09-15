@@ -21,7 +21,7 @@ import os
 import random
 import string
 import sys
-
+import json
 
 import dinput
 
@@ -421,9 +421,36 @@ class CodeRunner:
                     event = gremlin.event_handler.Event(
                         event_type=InputType.State, device_guid=state_device_guid, identifier=input_item.input_id, extra_data={"input_item": input_item}
                     )
-                    magic = event.identifier
+                    magic = eh.getMagic(event)
                     self.event_handler.registerMappedInput(state_device_guid, master_mode, InputType.State, magic, input_item)
                     self.event_handler.addCallback(state_device_guid, master_mode, event, cb_data.callback, input_item.always_execute)
+
+            # setup callbacks for voice input items if a trigger is identified
+            if config.VOICE_INPUT_ENABLED:
+                vd = gremlin.ui.voice_device.VoiceData()
+                input_item = vd.ptt_input_item
+                if input_item:
+                    # voice device is latched to an input
+                    event = gremlin.event_handler.Event(
+                        event_type=input_item.input_type,
+                        device_guid=input_item.device_guid,
+                        identifier=input_item.input_id,
+                        extra_data={"input_item": input_item}
+                    )
+                    callback = vd.execute_callback # what to call
+                    magic = eh.getMagic(event)
+
+                    self.event_handler.registerMappedInput(input_item.device_guid, master_mode, input_item.input_type, magic, input_item)
+
+
+                    self.event_handler.addCallback(
+                        device_guid = input_item.device_guid,
+                        mode = master_mode,
+                        event = event,
+                        callback = callback,
+                        permanent = input_item.always_execute,
+                        extra_data = event.extra_data
+                    )
 
 
 

@@ -325,13 +325,14 @@ DEFAULT_AUDIO_DEVICE_MARKER = "__default__"
 class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
     """configuration dialog to select the voice input device and set speech recognition options"""
 
-    def __init__(self, mode: VoicePTTMode, input_item, device_name: str, parent=None):
+    def __init__(self, mode: VoicePTTMode, input_item, device_name: str, device_index :int, parent=None):
         super().__init__(self.__class__.__name__, parent=parent)
         self.setWindowTitle("Voice Input Configuration")
         self.setModal(True)
 
         self.main_layout = QtWidgets.QVBoxLayout(self)
         self.setLayout(self.main_layout)
+
 
         self._sound = Sound()
         self._voice = Voice()
@@ -349,7 +350,8 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
 
         self._last_monitored_device = None
         self._monitored_input = None
-        self._default_device_name: str = device_name  # name of default device when in default named entry
+        self._device_name: str = device_name  # name of default device when in default named entry
+        self._device_index: int = device_index
 
         # view meter
         self._view_meter = gremlin.ui.ui_common.QAudioLevelMeter()
@@ -429,10 +431,10 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
 
         # button bar
         self.ok_widget = QtWidgets.QPushButton("Ok")
-        self.ok_widget.clicked.connect(self._execute_cb)
+        self.ok_widget.clicked.connect(self._accept_cb)
 
         self.cancel_widget = QtWidgets.QPushButton("Cancel")
-        self.cancel_widget.clicked.connect(self._close_cb)
+        self.cancel_widget.clicked.connect(self._reject_cb)
 
         widget = gremlin.ui.ui_common.getHContainer([self.ok_widget, self.cancel_widget], left_stretch=True, widget_only=True)
 
@@ -449,6 +451,16 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
     @property
     def input_item(self):
         return self._input_item
+
+    @property
+    def device_name(self) -> str:
+        """ name of the selected audio device """
+        return self._device_name
+
+    @property
+    def device_index(self) -> int:
+        """ index of the selected audio device """
+        return self._device_index
 
     def _get_mode_object(self):
         """gets the master mode object"""
@@ -638,16 +650,16 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         self._add_keyboard_listener_key_ui(self._keyboard_dialog.latched_key)
 
     @QtCore.Slot()
-    def _execute_cb(self):
+    def _accept_cb(self):
         """ok button callback"""
         self.setResult(QtWidgets.QDialog.DialogCode.Accepted)
-        self.close()
+        self.accept()
 
     @QtCore.Slot()
-    def _close_cb(self):
+    def _reject_cb(self):
         """cancel button callback"""
         self.setResult(QtWidgets.QDialog.DialogCode.Rejected)
-        self.close()
+        self.reject()
 
     @QtCore.Slot()
     def _keyboard_clear_cb(self):
@@ -663,6 +675,7 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
     def stop(self):
         """stop the voice device and disconnect the monitored input"""
         if self._started:
+            self._voice.setListen(False)
             self._voice.stop()
             self._voice.audioMonitor.disconnect(self._update_view_meter)
             if self._monitored_input:
@@ -681,6 +694,7 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         if self._started:
             return
         self._voice.pushRecognize()
+        self._voice.setListen(True)
         self._voice.audioMonitor.connect(self._update_view_meter)
         self._voice.start()
         if self._monitored_input:
@@ -711,9 +725,9 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         if index == DEFAULT_AUDIO_DEVICE_INDEX:
             # follow the Windows default output device at playback time
 
-            if not self._default_device_name:
-                self._default_device_name = voice_data.getDefaultAudioDevice()
-            voice_data._audio_device = self._default_device_name
+            if not self._device_name:
+                self._device_name = voice_data.getDefaultAudioDevice()
+            voice_data._audio_device = self._device_name
             return
         self.device_name = voice_data.getAudioDeviceFromIndex(index)
         self._update_ui()
@@ -760,9 +774,9 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
     def _get_target_device(self) -> str:
         index = self._input_selector.currentData()
         if index == DEFAULT_AUDIO_DEVICE_INDEX:
-            if not self._default_device_name:
-                self._default_device_name = self._voice_data.getDefaultAudioDevice()
-            return self._default_device_name
+            if not self._device_name:
+                self._device_name = self._voice_data.getDefaultAudioDevice()
+            return self._device_name
         return self._input_selector.currentText()
 
     def _update_audio_devices(self):
@@ -788,13 +802,15 @@ class VoiceSettingsDialog(gremlin.ui.ui_common.QRememberDialog):
         try:
             if value == DEFAULT_AUDIO_DEVICE_INDEX:
                 # follow the Windows default output device at playback time
-                self._default_device_name = self._voice_data.getDefaultAudioDevice()
-                self._device_name = self._default_device_name
+                self._device_name = self._voice_data.getDefaultAudioDevice()
+                self._device_name = self._device_name
+                self._device_index = DEFAULT_AUDIO_DEVICE_INDEX
                 return
             device_name = self._voice_data.getAudioDeviceFromIndex(value)
 
             if device_name is not None:
                 self._device_name = device_name
+                self._device_index = value
                 return
         finally:
             self._update_ui()
@@ -884,11 +900,14 @@ class VoiceData:
         self._data = {}
         self._id_map = {}
 
-        self._audio_device: str = None  # name of the selected audio device
+        self._device_name: str = None  # name of the selected audio device
+        self._device_index: int = None  # index of the selected audio device
+
         self._sound = Sound()
 
         self._gain = 1.0  # default gain value
         self._ptt_mode: VoicePTTMode = VoicePTTMode.PressToSuspend
+        self._last_event = None
         self._ptt_input_item = None  # input to use/monitor for PTT - can be a KeyboardInputItem, OSCInputItem, JoystickInputItem, etc...
 
         self._voice = Voice()
@@ -923,9 +942,10 @@ class VoiceData:
 
     def getDefaultAudioDevice(self):
         """gets the default input device"""
-        if self._audio_device is None:
-            self._audio_device = self._sound.getDefaultInputDevice()
-        return self._audio_device
+        if self._device_name is None:
+            self._device_name = self._sound.getDefaultInputDevice()
+            self._device_index = self._sound.getDefaultInputDeviceIndex()
+        return self._device_name
 
     def getAudioDevices(self):
         """gets the list of all input devices"""
@@ -937,27 +957,50 @@ class VoiceData:
 
     def getAudioDevice(self) -> str:
         """gets the name of the selected audio device"""
-        if self._audio_device is None or self._audio_device == DEFAULT_AUDIO_DEVICE_MARKER:
+        if self._device_name is None or self._device_name == DEFAULT_AUDIO_DEVICE_MARKER:
             # use the current system default
             return self._sound.getDefaultInputDevice()
-        return self._audio_device
+        return self._device_name
 
     @property
     def device_name(self) -> str:
         """gets the name of the selected audio device"""
-        return self._audio_device
+        return self._device_name
 
     @device_name.setter
     def device_name(self, value: str):
         """sets the name of the selected audio device"""
         self.setAudioDevice(value)
 
-    def getAudioDeviceIndex(self) -> int:
+
+    @property
+    def device_index(self) -> int:
         """gets the index of the selected audio device"""
-        if self._audio_device is None or self._audio_device == DEFAULT_AUDIO_DEVICE_MARKER:
+        return self._device_index
+    @device_index.setter
+    def device_index(self, value: int):
+        """sets the index of the selected audio device"""
+        self.setAudioDeviceIndex(value)
+
+    def setAudioDevice(self, device_name: str, index : int):
+        """ convenience to set both name and index in the same call (no validation) """
+        self._device_name = device_name
+        self._device_index = index
+
+
+    def getAudioDeviceIndex(self, device_name: str | None = None) -> int:
+        """gets the index of the selected audio device"""
+        if device_name is None:
+            device_name = self._device_name
+
+        if device_name is None or device_name == DEFAULT_AUDIO_DEVICE_MARKER:
             # use the current system default
             return DEFAULT_AUDIO_DEVICE_INDEX
-        name = self._audio_device.casefold()
+        name = device_name.casefold()
+        for index, device_name in self._sound.input_device_map.items():
+            # exact match first
+            if device_name.casefold() == name:
+                return index
         for index, device_name in self._sound.input_device_map.items():
             if device_name.casefold().startswith(name):
                 return index
@@ -975,13 +1018,14 @@ class VoiceData:
     def setAudioDeviceIndex(self, device_index: int):
         device_name = self._sound.input_device_map.get(device_index)
         if device_name is not None:
-            self._audio_device = device_name
+            self._device_name = device_name
+        self._device_index = device_index
 
-    def setAudioDevice(self, device_name: str, validate=False):
+    def setAudioDeviceName(self, device_name: str, validate=False):
         if device_name is not None:
             # ensure the device name exists in the current audio stack
             if device_name == DEFAULT_AUDIO_DEVICE_MARKER:
-                self._audio_device = None  # use the default
+                self._device_name = None  # use the default
                 return
             if validate:
                 # validate the device exists in the current system input devices
@@ -989,23 +1033,16 @@ class VoiceData:
                 device_name_found = next((d for d in self._sound.input_device_map.values() if d.description().casefold().startswith(name)), None)
                 if device_name_found is None:
                     syslog.warning(f"Audio device '{device_name}' not found, using default")
-                    self._audio_device = None
+                    self._device_name = None
+                    self._device_index = DEFAULT_AUDIO_DEVICE_INDEX
                     return
-                self._audio_device = device_name
+                self._device_name = device_name
+                self._device_index = self.getAudioDeviceIndex(device_name)
             else:
                 # no validation
-                self._audio_device = device_name
+                self._device_name = device_name
         else:
-            self._audio_device = None
-
-    @property
-    def audio_device(self) -> str:
-        """gets the name of the selected audio device"""
-        return self._audio_device
-
-    @audio_device.setter
-    def audio_device(self, value: str):
-        self.setAudioDevice(value)
+            self._device_name = None
 
     @property
     def gain(self) -> float:
@@ -1046,6 +1083,76 @@ class VoiceData:
     def _reset(self):
         """reset voices"""
         pass
+
+    def _profile_start(self):
+        """occurs on profile start - sets up the monitoring loop for voice commands """
+        # set initial state of voice recognition
+        self._update_listen_mode(False)
+        self._last_event = None
+
+
+    def _update_listen_mode(self, is_pressed : bool):
+        """ updates the listening mode """
+
+        verbose = gremlin.config.Configuration().verbose_mode_voice
+        verbose = True
+        match self._ptt_mode:
+            case VoicePTTMode.PressToListen:
+                # on when pressed, off when released
+                if verbose:
+                    syslog.info(f"Voice PTT: PressToListen - {'enabled' if is_pressed else 'disabled'}")
+                self._voice.setListen(is_pressed)
+
+            case VoicePTTMode.PressToSuspend:
+                # off when pressed, on when released
+                if verbose:
+                    syslog.info(f"Voice PTT: PressToSuspend - {'enabled' if not is_pressed else 'disabled'}")
+                self._voice.setListen(not is_pressed)
+
+            case VoicePTTMode.Toggle:
+                if is_pressed:
+                    # only toggle on trigger
+                    enabled = not self._voice.listenEnabled()
+                    syslog.info(f"Voice PTT: Toggle - {'enabled' if enabled else 'disabled'}")
+                    self._voice.setListen(enabled)
+
+            case VoicePTTMode.AlwaysOn:
+                if is_pressed:
+                    # only change on trigger
+                    if verbose:
+                        syslog.info("Voice PTT: AlwaysOn - enabled")
+                    self._voice.setListen(True)
+
+            case VoicePTTMode.Off:
+                if is_pressed:
+                    # only change on trigger
+                    if verbose:
+                        syslog.info("Voice PTT: Off - disabled")
+                    self._voice.setListen(False)
+
+
+    def _profile_stop(self):
+        """occurs on profile stop - tears down the monitoring loop for voice commands"""
+        pass
+
+
+    def execute_callback(self, event : gremlin.event_handler.Event):
+        """ called when the latched input item is triggered by an event"""
+
+        if self._last_event and self._last_event.is_pressed == event.is_pressed:
+            return
+
+        self._last_event = event
+
+        if event.is_axis:
+            # ignore axis events for push-to-talk
+            return
+        if event.event_type == InputType.JoystickHat:
+            is_pressed = event.value != (0,0)
+        else:
+            is_pressed = event.is_pressed
+
+        self._update_listen_mode(is_pressed)
 
     def _handle_profile_unload(self):
         """occurs on profile unload before a new profile is loaded"""
@@ -1203,15 +1310,17 @@ class VoiceData:
                     root.append(node)
 
         # persist device selection
-        if self._audio_device:
-            root.set("device", self._audio_device)
+        if self._device_name:
+            root.set("device", self._device_name)
         if self._ptt_mode is not None:
             root.set("ptt-mode", VoicePTTMode.to_string(self._ptt_mode))
 
-        if self._ptt_input_item:
-            input_node = self._ptt_input_item.to_xml()
+        input_item = self._ptt_input_item
+        if input_item:
+            input_node = input_item.to_xml()
             if input_node is not None:
                 ptt_node = ElementTree.Element("ptt-input")
+                ptt_node.set("type", InputType.to_string(input_item.input_type))
                 ptt_node.append(input_node)
                 root.append(ptt_node)
 
@@ -1233,7 +1342,7 @@ class VoiceData:
                 self._data[item.key] = item
                 self._id_map[item.id] = item
 
-        self._audio_device = safe_read(root, "device", str, None)
+        self._device_name = safe_read(root, "device", str, None)
         self._ptt_mode = VoicePTTMode.from_string(safe_read(root, "ptt-mode", str, None))
 
         master_mode = gremlin.shared_state.master_mode
@@ -1250,7 +1359,8 @@ class VoiceData:
 
         input_node = root.find("ptt-input")
         if input_node is not None:
-            match self._ptt_input_item.input_type:
+            input_type = InputType.from_string(safe_read(input_node, "type", str, None))
+            match input_type:
                 case InputType.Keyboard | InputType.KeyboardLatched:
                     input_item = KeyboardInputItem(mode_object)
                 case InputType.JoystickButton:
@@ -1589,8 +1699,13 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         input_item = self._voice_data.input_item
         mode = self._voice_data.ptt_mode
         device_name = self._voice_data.device_name
+        device_index = self._voice_data.device_index
 
-        self._config_dialog = VoiceSettingsDialog(mode=mode, input_item=input_item, device_name=device_name, parent=self)
+        self._config_dialog = VoiceSettingsDialog(mode=mode,
+                                                  input_item=input_item,
+                                                  device_name=device_name,
+                                                device_index=device_index,
+                                                parent=self)
         self._config_dialog.accepted.connect(self._handle_configure_accepted)
         self._config_dialog.show()
 
@@ -1600,7 +1715,8 @@ class VoiceDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
         dialog = self._config_dialog
         self._voice_data.input_item = dialog.input_item
         self._voice_data.ptt_mode = dialog.mode
-        self._voice_data.device_name = dialog.device_name
+        self._voice_data.setAudioDevice(dialog.device_name, dialog.device_index)
+
 
     def _test_input_cb(self):
         """callback for the test input button"""
