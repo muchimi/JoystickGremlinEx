@@ -2365,7 +2365,8 @@ class InputItemWidget(gremlin.ui.ui_common.QBoxFrame):
 
         self._container_id_widget.setWidget(None)
         self._repeater_container_widget.setWidget(None)
-        self._custom_container_widget.setWidget(None)
+        gremlin.util.clear_layout(self._custom_container_layout)
+        
 
         gremlin.util.clear_widget_references(self)
 

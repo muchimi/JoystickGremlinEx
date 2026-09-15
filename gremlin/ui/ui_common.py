@@ -16301,6 +16301,8 @@ class AutoHideStackedWidget(QtWidgets.QStackedWidget):
 
     def _updateSize(self) -> None:
         """Update the container constraints from its current content."""
+        if not Shiboken.isValid(self):
+            return
         self._size_update_pending = False
 
         if self._widget is None:

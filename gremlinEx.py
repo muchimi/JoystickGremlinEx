@@ -25,6 +25,7 @@ Main UI of JoystickGremlin.
 from __future__ import annotations  # deprecated with python 3.14+
 
 # ruff: disable[F401]
+import encodings
 import faulthandler
 import ctypes
 import logging
@@ -41,7 +42,6 @@ from threading import Lock
 from typing import Callable
 from collections.abc import Iterator
 import webbrowser
-import encodings
 
 
 import filelock

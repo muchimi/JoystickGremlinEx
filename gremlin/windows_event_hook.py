@@ -282,7 +282,7 @@ def process_keyboard_event(n_code, w_param, l_param):
     return user32.CallNextHookEx(None, n_code, w_param, l_param)
 
 
-_mouse_wheel_timer = {}  # timer for wheel releases = keyed by button ID for each possible button, keyed by wheel button ID
+
 _mouse_wheel_state = {}  # holds the current state (pressed) of the wheel button
 _mouse_wheel_delay = 0.5  # mouse wheel delay in ms
 _mouse_x = None
@@ -301,6 +301,40 @@ def getMousePosition(self):
     """gets the mouse position"""
     global _mouse_x, _mouse_y
     return (_mouse_x, _mouse_y)
+
+
+
+_mouse_wheel_timer = {}  # timer for wheel releases = keyed by button ID for each possible button, keyed by wheel button ID
+_mouse_wheel_generation = {}
+_mouse_wheel_lock = threading.Lock()
+
+
+def _schedule_wheel_release(button_id):
+    global _mouse_wheel_timer
+
+    with _mouse_wheel_lock:
+        generation = _mouse_wheel_generation.get(button_id, 0) + 1
+        _mouse_wheel_generation[button_id] = generation
+
+        timer = threading.Timer(
+            _mouse_wheel_delay,
+            _release_wheel_if_current,
+            args=(button_id, generation),
+        )
+        timer.daemon = True
+        _mouse_wheel_timer[button_id] = timer
+
+    timer.start()
+
+
+def _release_wheel_if_current(button_id, generation):
+    with _mouse_wheel_lock:
+        if _mouse_wheel_generation.get(button_id) != generation:
+            return  # This timer was superseded.
+
+        _mouse_wheel_timer[button_id] = None
+
+    _queue_wheel_release(button_id)
 
 
 @HOOKPROC
@@ -346,15 +380,26 @@ def process_mouse_event(n_code, w_param, l_param):
             is_pressed = w_param == WM_XBUTTONDOWN
             process = True
         elif w_param == WM_MOUSEWHEEL:
-            # vertical mouse wheel
-            delta = msg.mouseData >> 16  # high word
-            # print (f"mouse V received: data {msg.mouseData} (0x{msg.mouseData:X})  flags: {msg.flags} (0x{msg.flags:X}) time: {msg.time} (0x{msg.time:X}) extra: {msg.dwExtraInfo} (0x{msg.dwExtraInfo:X})  delta: {delta} (0x{delta:x})  delta / 120: {delta/120}")
-            if delta == 120:
+            # handle new high resolution mouse wheel - decode as 16 bit
+            delta = ctypes.c_short(msg.mouseData >> 16).value
+            if delta > 0:
                 button_id = gremlin.types.MouseButton.WheelUp
                 release_button_id = gremlin.types.MouseButton.WheelDown
-            elif delta == 65416:  # -120
+            elif delta < 0:
                 button_id = gremlin.types.MouseButton.WheelDown
                 release_button_id = gremlin.types.MouseButton.WheelUp
+
+
+            # # vertical mouse wheel
+            # delta = msg.mouseData >> 16  # high word
+            # # print (f"mouse V received: data {msg.mouseData} (0x{msg.mouseData:X})  flags: {msg.flags} (0x{msg.flags:X}) time: {msg.time} (0x{msg.time:X}) extra: {msg.dwExtraInfo} (0x{msg.dwExtraInfo:X})  delta: {delta} (0x{delta:x})  delta / 120: {delta/120}")
+            # if delta == 120:
+            #     button_id = gremlin.types.MouseButton.WheelUp
+            #     release_button_id = gremlin.types.MouseButton.WheelDown
+            # elif delta == 65416:  # -120
+            #     button_id = gremlin.types.MouseButton.WheelDown
+            #     release_button_id = gremlin.types.MouseButton.WheelUp
+
             is_wheel = True
             for callback in g_mouse_wheel_callbacks:
                 callback(delta, False)
@@ -394,22 +439,27 @@ def process_mouse_event(n_code, w_param, l_param):
                 else:
                     _mouse_wheel_state[button_id] = True  # mark pressed
 
-                if _mouse_wheel_timer[button_id]:
-                    # cancel current timer. Guarded: on Python 3.14 Timer.cancel()
-                    # can raise "cannot notify on un-acquired lock" when called
-                    # from the ctypes mouse-hook callback, which otherwise loops
-                    # forever and stalls event processing (vJoy output included).
-                    try:
-                        _mouse_wheel_timer[button_id].cancel()
-                    except RuntimeError:
-                        pass
+                # if _mouse_wheel_timer[button_id]:
+                #     # cancel current timer. Guarded: on Python 3.14 Timer.cancel()
+                #     # can raise "cannot notify on un-acquired lock" when called
+                #     # from the ctypes mouse-hook callback, which otherwise loops
+                #     # forever and stalls event processing (vJoy output included).
+                #     try:
+                #         _mouse_wheel_timer[button_id].cancel()
 
-                # new timer
+                #     except Exception as e:
+                #         pass
 
-                _mouse_wheel_timer[button_id] = threading.Timer(
-                    _mouse_wheel_delay, lambda: _queue_wheel_release(button_id)
-                )
-                _mouse_wheel_timer[button_id].start()
+
+
+                # # new timer
+
+                # _mouse_wheel_timer[button_id] = threading.Timer(
+                #     _mouse_wheel_delay, lambda: _queue_wheel_release(button_id)
+                # )
+                # _mouse_wheel_timer[button_id].start()
+
+                _schedule_wheel_release(button_id)
 
                 # release the paired wheel button if needed
                 if _mouse_wheel_state[release_button_id]:
