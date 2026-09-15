@@ -1268,6 +1268,15 @@ def registerSpecialDevices():
     device.device_category = DeviceCategory.Special
     registerSpecialDevice(device)
 
+    # overlay designer
+    device = DeviceSummary()
+    device.name = "Overlay"
+    device.device_guid = gremlin.shared_state.overlay_tab_guid
+    device.device_type = DeviceType.Overlay
+    device.device_category = DeviceCategory.Special
+    registerSpecialDevice(device)
+
+    # THESE SHOULD BE LAST
     # plugin
 
     device = DeviceSummary()
@@ -1282,14 +1291,6 @@ def registerSpecialDevices():
     device.name = "Settings"
     device.device_guid = gremlin.shared_state.settings_tab_guid
     device.device_type = DeviceType.Settings
-    device.device_category = DeviceCategory.Config
-    registerConfigDevice(device)
-
-    # overlay designer
-    device = DeviceSummary()
-    device.name = "Overlay"
-    device.device_guid = gremlin.shared_state.overlay_tab_guid
-    device.device_type = DeviceType.Overlay
     device.device_category = DeviceCategory.Config
     registerConfigDevice(device)
 

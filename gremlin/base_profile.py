@@ -4048,6 +4048,9 @@ class Profile:
         else:
             self._profile_fname = None
             self._profile_config_fname = None
+        # Path changed — never reuse a previous profile's in-memory sidecar cache.
+        self._config_data_read = False
+        self._config_data = {}
 
     def get_default_mode(self):
         """gets the default mode for this profile - this is the mode used if the default startup mode is not specified"""
@@ -4839,7 +4842,16 @@ class Profile:
                 try:
                     import gremlin.ui.obs_overlay as obs_overlay
 
-                    obs_overlay.persist_for_profile(self)
+                    obs_overlay.persist_for_profile(self, dest_xml=use_name)
+                except Exception:
+                    pass
+                # Stream Deck page names live in the sidecar JSON, not the XML.
+                # Persist on every save (including Save As) so a new path cannot
+                # drop streamdeck_pages the way overlay-only writes used to.
+                try:
+                    from gremlin.ui.streamdeck_device import StreamDeckBridge
+
+                    StreamDeckBridge()._persist_page_metadata()
                 except Exception:
                     pass
 
