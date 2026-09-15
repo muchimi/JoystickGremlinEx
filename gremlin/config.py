@@ -435,9 +435,9 @@ class Configuration(QtCore.QObject):
         if data:
             self._profile_data = data
 
-        # Save all data
+        # Keep in-memory cache only. Re-saving here used to rewrite the sidecar and
+        # drop keys that other subsystems own (e.g. streamdeck_pages).
         self._last_profile_reload = time.time()
-        self.save_profile()
 
     def save(self, fname: str = None, save_profile: bool = False):
         import gremlin.util
@@ -537,12 +537,30 @@ class Configuration(QtCore.QObject):
             tmp = gremlin.util.getTemporaryFile(".json")
 
             if fname:
+                # Merge with on-disk sidecar. _profile_data often only holds last_input /
+                # selection fields; a blind overwrite previously deleted unrelated keys
+                # such as streamdeck_pages (page names) and wiped them on every tab click.
+                merged = {}
+                if os.path.isfile(fname) and os.path.getsize(fname):
+                    try:
+                        with open(fname, "r", encoding="utf-8") as hdl:
+                            loaded = json.load(hdl)
+                        if isinstance(loaded, dict):
+                            merged = loaded
+                    except Exception as err:
+                        syslog.warning(f"CONFIG: could not merge profile sidecar before save: {err}")
+                if isinstance(self._profile_data, dict):
+                    merged.update(self._profile_data)
+                else:
+                    merged = dict(merged)
+                self._profile_data = merged
+
                 lock1 = filelock.FileLock(f"{tmp}.lock")
                 lock2 = filelock.FileLock(f"{fname}.lock")
                 with lock1:
                     with open(tmp, "w", encoding="utf-8") as hdl:
                         encoder = json.JSONEncoder(sort_keys=True, indent=4)
-                        hdl.write(encoder.encode(self._profile_data))
+                        hdl.write(encoder.encode(merged))
                         hdl.close()
 
                     with lock2:

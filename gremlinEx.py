@@ -29,6 +29,7 @@ import faulthandler
 import ctypes
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -1847,6 +1848,37 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         """Prompts the user for a file to save to profile to."""
         fname, _ = QtWidgets.QFileDialog.getSaveFileName(None, "Save Profile", gremlin.shared_state.data_path, "XML files (*.xml)")
         if fname != "":
+            # Seed the new sidecar from the previous profile companion before the
+            # path switch. Overlay/save used to create a sparse JSON (overlay +
+            # last_input only) and Stream Deck page names were lost on Save As.
+            old_xml = getattr(self.profile, "_profile_fname", None) or self.profile.profile_file
+            old_json = getattr(self.profile, "_profile_config_fname", None)
+            if not old_json and old_xml:
+                old_json = gremlin.util.swap_ext(old_xml, "json")
+            new_xml = gremlin.util.fix_path(fname)
+            new_json = gremlin.util.swap_ext(new_xml, "json")
+            try:
+                if (
+                    old_json
+                    and os.path.isfile(old_json)
+                    and new_json
+                    and os.path.normcase(os.path.abspath(old_json))
+                    != os.path.normcase(os.path.abspath(new_json))
+                    and not os.path.isfile(new_json)
+                ):
+                    shutil.copyfile(old_json, new_json)
+            except Exception as err:
+                syslog.warning(f"SAVE AS: could not seed companion JSON: {err}")
+
+            # Flush Stream Deck page names into the *current* sidecar first so
+            # in-memory renames are not left only in RAM when the path changes.
+            try:
+                from gremlin.ui.streamdeck_device import StreamDeckBridge
+
+                StreamDeckBridge()._persist_page_metadata()
+            except Exception:
+                pass
+
             self.profile.setProfileFile(fname)
             self.profile.save()
             # update the hash so we can detect changes
