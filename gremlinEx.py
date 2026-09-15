@@ -3435,11 +3435,9 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                     self._add_tab(device, TabDeviceType.Overlay)
                                     tab_device_list.append(device)
                                     index += 1
-
                             except Exception as err:
                                 syslog.error(f"DEVICE TABS: Overlay tab failed: {err}")
                                 syslog.error(traceback.format_exc())
-
 
                 elif device in config_devices:
                     # =======================================================
@@ -3494,8 +3492,6 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
                                 self._add_tab(device, TabDeviceType.Plugins)
                                 tab_device_list.append(device)
                                 index += 1
-
-
 
             self._reindex_tabs()
 

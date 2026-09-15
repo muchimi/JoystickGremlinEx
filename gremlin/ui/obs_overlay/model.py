@@ -47,12 +47,21 @@ WIDGET_TYPES = (
     "axis_fader",
     "axis_radial",
     "axis_encoder",
+    "axis_graph",
+    "axis_bars",
     "axis_stick_square",
     "axis_crosshair",
     "axis_stick_circle",
+    "axis_mouse",
     "button",
     "hat",
+    "switch_4way",
+    "switch_2way",
+    "switch_3way",
     "label",
+    "sys_stats",
+    "stopwatch",
+    "input_display",
     "shape",
     "image",
     "streamdeck",
@@ -61,6 +70,11 @@ WIDGET_TYPES = (
 )
 
 PALETTE_TYPES = (
+    "button",
+    "hat",
+    "switch_4way",
+    "switch_2way",
+    "switch_3way",
     "axis_bar",
     "axis_radio",
     "axis_fader",
@@ -69,18 +83,24 @@ PALETTE_TYPES = (
     "axis_stick_square",
     "axis_crosshair",
     "axis_stick_circle",
-    "button",
-    "hat",
+    "axis_mouse",
+    "sys_stats",
+    "stopwatch",
+    "axis_graph",
+    "axis_bars",
     "label",
+    "input_display",
     "shape",
     "image",
     "streamdeck",
 )
 
 PALETTE_GROUPS = (
+    ("Buttons", ("button", "hat", "switch_4way", "switch_2way", "switch_3way")),
     ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder")),
-    ("Double axis", ("axis_stick_square", "axis_crosshair", "axis_stick_circle")),
-    ("Other", ("button", "hat", "label", "shape", "image", "streamdeck")),
+    ("Double axis", ("axis_stick_square", "axis_crosshair", "axis_stick_circle", "axis_mouse")),
+    ("Meters", ("sys_stats", "stopwatch")),
+    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "streamdeck")),
 )
 
 DEFAULT_SIZES = {
@@ -89,13 +109,22 @@ DEFAULT_SIZES = {
     "axis_fader": (40, 180),
     "axis_radial": (150, 150),
     "axis_encoder": (150, 150),
+    "axis_graph": (420, 180),
+    "axis_bars": (220, 180),
     "axis_dial": (150, 150),
     "axis_stick_square": (168, 168),
     "axis_stick_circle": (180, 180),
     "axis_crosshair": (220, 220),
+    "axis_mouse": (180, 180),
     "button": (88, 32),
     "hat": (108, 108),
+    "switch_4way": (120, 120),
+    "switch_2way": (48, 96),
+    "switch_3way": (48, 120),
     "label": (140, 28),
+    "sys_stats": (220, 88),
+    "stopwatch": (180, 180),
+    "input_display": (560, 220),
     "shape": (280, 160),
     "image": (200, 120),
     "streamdeck": (320, 208),
@@ -108,13 +137,22 @@ DEFAULT_LABELS = {
     "axis_fader": "",
     "axis_radial": "",
     "axis_encoder": "",
+    "axis_graph": "",
+    "axis_bars": "",
     "axis_dial": "",
     "axis_stick_square": "",
     "axis_stick_circle": "",
     "axis_crosshair": "",
+    "axis_mouse": "",
     "button": "BTN",
     "hat": "",
+    "switch_4way": "",
+    "switch_2way": "",
+    "switch_3way": "",
     "label": "Label",
+    "sys_stats": "",
+    "stopwatch": "",
+    "input_display": "",
     "shape": "",
     "image": "",
     "streamdeck": "",
@@ -176,6 +214,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
         "invert_display": False,
         "opacity": 1.0,
         "auto_scale_font": False,
+        "show_current_mode": False,
     }
     if widget_type == "axis_bar":
         style.update({"corner_radius": 6.0, "indicator_size": 14.0, "show_label": False, "show_dot_shadow": True})
@@ -195,6 +234,33 @@ def default_style(widget_type: str) -> dict[str, Any]:
         style.update({"indicator_size": 10.0, "show_label": False, "needle_width": 14.0, "radio_steps": 11})
     elif widget_type == "axis_encoder":
         style.update({"show_label": False, "needle_width": 0.0, "radio_steps": 16})
+    elif widget_type == "axis_graph":
+        style.update(
+            {
+                "show_label": False,
+                "show_legend": True,
+                "show_grid": True,
+                "period_s": 8.0,
+                "value_min": -1.0,
+                "value_max": 1.0,
+                "unit": "",
+                "grid_width": 1.0,
+            }
+        )
+    elif widget_type == "axis_bars":
+        style.update(
+            {
+                "show_label": False,
+                "show_legend": True,
+                "show_grid": True,
+                "orientation": "vertical",
+                "range_auto": True,
+                "value_min": 0.0,
+                "value_max": 100.0,
+                "unit": "%",
+                "grid_width": 1.0,
+            }
+        )
     elif widget_type == "axis_stick_square":
         style.update(
             {
@@ -217,6 +283,18 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "ring_count": 3,
             }
         )
+    elif widget_type == "axis_mouse":
+        style.update(
+            {
+                "show_label": False,
+                "show_axis_labels": False,
+                "indicator_size": 28.0,
+                "needle_width": 4.0,
+                "mouse_mode": "vjoy",
+                "mouse_max": 250,
+                "mouse_idle_s": 1.0,
+            }
+        )
     elif widget_type == "button":
         style.update(
             {
@@ -231,6 +309,61 @@ def default_style(widget_type: str) -> dict[str, Any]:
         )
     elif widget_type == "hat":
         style.update({"indicator_size": 12.0, "show_label": False, "show_axis_labels": True, "hat_positions": 4})
+    elif widget_type == "switch_4way":
+        style.update(
+            {
+                "switch_appearance": "arrows",
+                "fill": "#1a2230",
+                "fill_on": "#ff6b35",
+                "border": "#3a4a62",
+                "border_on": "#ffcc66",
+                "border_width": 2.0,
+                "indicator": "#2a3548",
+                "indicator_size": 28.0,
+                "show_label": False,
+                "show_axis_labels": False,
+                "axis_label_n": "N",
+                "axis_label_s": "S",
+                "axis_label_e": "E",
+                "axis_label_w": "W",
+                "track": "#0b1220",
+                "crosshair": "#5a6a84",
+            }
+        )
+    elif widget_type == "switch_2way":
+        style.update(
+            {
+                "fill": "#1a2230",
+                "fill_on": "#ff6b35",
+                "border": "#3a4a62",
+                "border_on": "#ffcc66",
+                "orientation": "vertical",
+                "indicator_size": 10.0,
+                "show_label": False,
+                "show_axis_labels": True,
+                "axis_label_n": "I",
+                "axis_label_s": "O",
+                "axis_label_e": "O",
+                "axis_label_w": "I",
+            }
+        )
+    elif widget_type == "switch_3way":
+        style.update(
+            {
+                "fill": "#1a2230",
+                "fill_on": "#ff6b35",
+                "border": "#3a4a62",
+                "border_on": "#ffcc66",
+                "orientation": "vertical",
+                "indicator_size": 10.0,
+                "show_label": False,
+                "show_axis_labels": True,
+                "axis_label_n": "+",
+                "axis_label_s": "−",
+                "axis_label_e": "−",
+                "axis_label_w": "+",
+            }
+        )
     elif widget_type == "label":
         style.update(
             {
@@ -240,6 +373,61 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "corner_radius": 4.0,
                 "font_size": 13,
                 "show_label": True,
+            }
+        )
+    elif widget_type == "sys_stats":
+        style.update(
+            {
+                "fill": "#121826",
+                "border": "#2c3a52",
+                "border_width": 2.0,
+                "corner_radius": 8.0,
+                "font_size": 22,
+                "show_label": False,
+                "show_caption": True,
+                "stat": "time",
+                "time_format": "24h",
+                "temp_unit": "C",
+                "orientation": "vertical",
+            }
+        )
+    elif widget_type == "stopwatch":
+        style.update(
+            {
+                "fill": "#121826",
+                "border": "#2c3a52",
+                "border_width": 2.0,
+                "corner_radius": 8.0,
+                "font_size": 22,
+                "show_label": False,
+                "stopwatch_face": "digital",
+                "stopwatch_format": "mmss",
+                "needle_hour_color": "#f4efe4",
+                "needle_hour_width": 5.0,
+                "needle_hour_arrow": True,
+                "needle_minute_color": "#f4efe4",
+                "needle_minute_width": 3.5,
+                "needle_minute_arrow": True,
+                "needle_second_color": "#ff5a3c",
+                "needle_second_width": 2.0,
+                "needle_second_arrow": False,
+            }
+        )
+    elif widget_type == "input_display":
+        style.update(
+            {
+                "fill": "#1a1d22",
+                "fill_on": "#4ec8ff",
+                "border": "#e8eef8",
+                "border_on": "#4ec8ff",
+                "border_width": 2.0,
+                "corner_radius": 6.0,
+                "font_size": 11,
+                "show_label": False,
+                "show_keyboard": True,
+                "show_mouse": True,
+                "mouse_graphic": "silhouette",
+                "input_preset": "wasd_mouse",
             }
         )
     elif widget_type in ("shape", "panel"):
@@ -321,20 +509,183 @@ SINGLE_AXIS_TYPES = (
     "axis_encoder",
     "axis_dial",
 )
+SERIES_WIDGET_TYPES = ("axis_graph", "axis_bars")
+NO_BINDING_WIDGET_TYPES = (
+    "label",
+    "panel",
+    "shape",
+    "image",
+    "streamdeck",
+    "axis_mouse",
+    "axis_graph",
+    "axis_bars",
+    "sys_stats",
+    "input_display",
+)
+NO_DEADZONE_WIDGET_TYPES = NO_BINDING_WIDGET_TYPES + (
+    "stopwatch",
+    "switch_4way",
+    "switch_2way",
+    "switch_3way",
+)
+
+SWITCH_WIDGET_TYPES = ("switch_4way", "switch_2way", "switch_3way")
+SWITCH_4WAY_POSITIONS = ("n", "e", "s", "w", "center")
+SWITCH_2WAY_POSITIONS = ("a", "b")
+SWITCH_3WAY_POSITIONS = ("up", "center", "down")
+SWITCH_POSITION_TITLES = {
+    "switch_4way": (("n", "North"), ("e", "East"), ("s", "South"), ("w", "West"), ("center", "Center")),
+    "switch_2way": (("a", "Position 1"), ("b", "Position 2")),
+    "switch_3way": (("up", "Up"), ("center", "Center"), ("down", "Down")),
+}
+_SWITCH_POSITION_ALIASES = {
+    "a": "up",
+    "b": "down",
+    "up": "a",
+    "down": "b",
+    "n": "up",
+    "s": "down",
+}
+
+
+def widget_uses_series(widget_type: str) -> bool:
+    return widget_type in SERIES_WIDGET_TYPES
+
+
+def widget_is_switch(widget_type: str | None) -> bool:
+    return canonical_widget_type(widget_type or "") in SWITCH_WIDGET_TYPES
+
+
+def switch_positions(widget_type: str | None) -> tuple[str, ...]:
+    kind = canonical_widget_type(widget_type or "")
+    if kind == "switch_4way":
+        return SWITCH_4WAY_POSITIONS
+    if kind == "switch_2way":
+        return SWITCH_2WAY_POSITIONS
+    if kind == "switch_3way":
+        return SWITCH_3WAY_POSITIONS
+    return ()
+
+
+def switch_rest_position(widget_type: str | None) -> str | None:
+    kind = canonical_widget_type(widget_type or "")
+    if kind in ("switch_4way", "switch_3way"):
+        return "center"
+    return None
+
+
+def switch_channel(position: str) -> str:
+    return f"bindings.{position}"
+
+
+def normalize_switch_appearance(value) -> str:
+    raw = str(value or "").strip().casefold()
+    if raw in ("arcs", "arc"):
+        return "arcs"
+    return "arrows"
+
+
+def switch_binding(item: dict[str, Any] | None, position: str) -> dict[str, Any]:
+    bindings = (item or {}).get("bindings")
+    if isinstance(bindings, dict) and isinstance(bindings.get(position), dict):
+        return bindings[position]
+    return default_toggle_binding()
+
+
+def default_switch_bindings(widget_type: str | None) -> dict[str, Any]:
+    return {position: default_toggle_binding() for position in switch_positions(widget_type)}
+
+
+def normalize_switch_bindings(widget_type: str | None, raw=None) -> dict[str, Any]:
+    result = default_switch_bindings(widget_type)
+    if isinstance(raw, dict):
+        src = raw.get("bindings") if isinstance(raw.get("bindings"), dict) else raw
+    else:
+        src = {}
+    if not isinstance(src, dict):
+        src = {}
+    for position in result:
+        if position in src:
+            result[position] = normalize_toggle_binding(src.get(position))
+            continue
+        alias = _SWITCH_POSITION_ALIASES.get(position)
+        if alias and alias in src:
+            result[position] = normalize_toggle_binding(src.get(alias))
+    return result
 
 
 def widget_binding_kind(widget_type: str) -> str:
     if widget_type in XY_WIDGET_TYPES:
         return "xy"
-    if widget_type == "button":
+    if widget_type in ("button", "stopwatch"):
         return "button"
+    if widget_type in SWITCH_WIDGET_TYPES:
+        return "switch"
     if widget_type == "hat":
         return "hat"
-    if widget_type in ("label", "panel", "shape", "image", "streamdeck"):
+    if widget_type in NO_BINDING_WIDGET_TYPES:
         return "none"
     if widget_type in SINGLE_AXIS_TYPES or str(widget_type).startswith("axis"):
         return "axis"
     return "none"
+
+
+def serialize_overlay_key(key) -> dict[str, Any]:
+    """JSON-safe keyboard/mouse key for overlay bindings."""
+    try:
+        scan_code = int(getattr(key, "scan_code", 0) or 0)
+    except (TypeError, ValueError):
+        scan_code = 0
+    return {
+        "scan_code": scan_code,
+        "is_extended": bool(getattr(key, "is_extended", False)),
+        "is_mouse": bool(getattr(key, "is_mouse", False) or scan_code >= 0x1000),
+        "name": str(getattr(key, "name", None) or ""),
+    }
+
+
+def deserialize_overlay_key(raw) -> Any:
+    """Rebuild a GEX Key from overlay JSON (or pass a Key through)."""
+    from gremlin.keyboard import Key, key_from_code
+
+    if isinstance(raw, Key):
+        return raw
+    if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+        try:
+            return key_from_code(int(raw[0]), bool(raw[1]))
+        except Exception:
+            return None
+    if not isinstance(raw, dict):
+        return None
+    try:
+        scan_code = int(raw.get("scan_code") or 0)
+    except (TypeError, ValueError):
+        scan_code = 0
+    is_mouse = bool(raw.get("is_mouse") or scan_code >= 0x1000)
+    try:
+        if is_mouse:
+            return Key(scan_code=scan_code, is_mouse=True)
+        return key_from_code(scan_code, bool(raw.get("is_extended")))
+    except Exception:
+        return None
+
+
+def normalize_overlay_keys(raw) -> list[dict[str, Any]]:
+    keys = []
+    seen: set[tuple] = set()
+    for item in raw or []:
+        key = deserialize_overlay_key(item)
+        if key is None:
+            continue
+        try:
+            ident = (int(key.scan_code), bool(key.is_extended), bool(getattr(key, "is_mouse", False)))
+        except Exception:
+            continue
+        if ident in seen:
+            continue
+        seen.add(ident)
+        keys.append(serialize_overlay_key(key))
+    return keys
 
 
 def default_binding(axis_id: int = 1) -> dict[str, Any]:
@@ -346,8 +697,225 @@ def default_binding(axis_id: int = 1) -> dict[str, Any]:
         "input_type": "axis",
         "input_id": int(axis_id),
         "state_name": "",
+        "mode_name": "",
         "invert": False,
+        "keys": [],
     }
+
+
+GRAPH_SERIES_COLORS = (
+    "#e41a1c",
+    "#377eb8",
+    "#4daf4a",
+    "#984ea3",
+    "#ff7f00",
+    "#c9b037",
+    "#9cad1c",
+    "#2cb2f5",
+)
+
+
+def default_graph_series(index: int = 0) -> dict[str, Any]:
+    color = GRAPH_SERIES_COLORS[int(index) % len(GRAPH_SERIES_COLORS)]
+    return {
+        "id": _new_id(),
+        "source": "physical",
+        "device_guid": "",
+        "device_name": "",
+        "vjoy_id": 0,
+        "input_id": 0,
+        "invert": False,
+        "color": color,
+        "label": "",
+        "range_mode": "auto",
+    }
+
+
+def normalize_graph_series(raw) -> list[dict[str, Any]]:
+    series: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw or []):
+        if not isinstance(item, dict):
+            continue
+        entry = default_graph_series(index)
+        entry.update({key: item[key] for key in entry.keys() if key in item})
+        source = str(entry.get("source") or "physical").casefold()
+        entry["source"] = "vjoy" if source == "vjoy" else "physical"
+        entry["device_guid"] = str(entry.get("device_guid") or "")
+        entry["device_name"] = str(entry.get("device_name") or "")
+        entry["label"] = str(entry.get("label") or "")
+        color = str(entry.get("color") or "").strip() or GRAPH_SERIES_COLORS[index % len(GRAPH_SERIES_COLORS)]
+        entry["color"] = color
+        try:
+            entry["vjoy_id"] = int(entry.get("vjoy_id") or 0)
+        except (TypeError, ValueError):
+            entry["vjoy_id"] = 0
+        try:
+            entry["input_id"] = int(entry.get("input_id") or 0)
+        except (TypeError, ValueError):
+            entry["input_id"] = 0
+        entry["invert"] = bool(entry.get("invert"))
+        entry["range_mode"] = normalize_series_range_mode(entry.get("range_mode") or entry.get("centered"))
+        cid = str(entry.get("id") or "")
+        if not cid or cid in seen:
+            entry["id"] = _new_id()
+        seen.add(entry["id"])
+        series.append(entry)
+    return series
+
+
+def default_stat_entry(index: int = 0, stat: str = "time") -> dict[str, Any]:
+    from .sys_stats import normalize_stat
+
+    color = "#f4efe4" if int(index) == 0 else GRAPH_SERIES_COLORS[int(index) % len(GRAPH_SERIES_COLORS)]
+    return {
+        "id": _new_id(),
+        "stat": normalize_stat(stat),
+        "color": color,
+        "label": "",
+        "step": 1,
+        "value": 0,
+        "binding": default_toggle_binding(),
+        "binding_y": default_toggle_binding(),
+        "binding_z": default_toggle_binding(),
+    }
+
+
+def normalize_stat_series(raw, fallback_stat: str = "time") -> list[dict[str, Any]]:
+    from .sys_stats import normalize_stat
+
+    series: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw or []):
+        if not isinstance(item, dict):
+            continue
+        entry = default_stat_entry(index, item.get("stat") or fallback_stat)
+        entry.update({key: item[key] for key in entry.keys() if key in item})
+        entry["stat"] = normalize_stat(entry.get("stat"))
+        entry["label"] = str(entry.get("label") or "")
+        color = str(entry.get("color") or "").strip() or GRAPH_SERIES_COLORS[index % len(GRAPH_SERIES_COLORS)]
+        entry["color"] = color
+        try:
+            entry["step"] = max(1, int(entry.get("step") or 1))
+        except (TypeError, ValueError):
+            entry["step"] = 1
+        try:
+            entry["value"] = int(entry.get("value") or 0)
+        except (TypeError, ValueError):
+            entry["value"] = 0
+        entry["binding"] = normalize_toggle_binding(entry.get("binding"))
+        entry["binding_y"] = normalize_toggle_binding(entry.get("binding_y"))
+        entry["binding_z"] = normalize_toggle_binding(entry.get("binding_z"))
+        cid = str(entry.get("id") or "")
+        if not cid or cid in seen:
+            entry["id"] = _new_id()
+        seen.add(entry["id"])
+        series.append(entry)
+    if not series:
+        series.append(default_stat_entry(0, fallback_stat))
+    return series
+
+
+SERIES_RANGE_MODES = ("auto", "centered", "unipolar")
+_UNIPOLAR_NAME_HINTS = (
+    "throttle",
+    "slider",
+    "brake",
+    "accelerator",
+    "pedal",
+    "collective",
+    "s1",
+    "s2",
+)
+
+
+def normalize_series_range_mode(value) -> str:
+    raw = str(value or "auto").casefold().strip()
+    if raw in ("centered", "bipolar", "yes", "true", "1"):
+        return "centered"
+    if raw in ("unipolar", "no", "false", "0"):
+        return "unipolar"
+    return "auto"
+
+
+def series_is_centered(series: dict[str, Any] | None) -> bool:
+    """True when this axis should plot −100..+100 instead of 0..100."""
+    series = series or {}
+    mode = normalize_series_range_mode(series.get("range_mode") or series.get("centered"))
+    if mode == "centered":
+        return True
+    if mode == "unipolar":
+        return False
+    try:
+        input_id = int(series.get("input_id") or 0)
+    except (TypeError, ValueError):
+        input_id = 0
+    names: list[str] = []
+    try:
+        import gremlin.joystick_handling
+
+        names.append(gremlin.joystick_handling.get_axis_name(input_id) or "")
+        guid = series.get("device_guid")
+        if guid:
+            device = gremlin.joystick_handling.getDevice(guid, show_error=False)
+            getter = getattr(device, "get_axis_name", None) if device is not None else None
+            if callable(getter):
+                names.append(str(getter(input_id) or ""))
+    except Exception:
+        pass
+    blob = " ".join(names).casefold()
+    if any(hint in blob for hint in _UNIPOLAR_NAME_HINTS):
+        return False
+    if input_id in (7, 8):
+        return False
+    return True
+
+
+def axis_display_percent(raw_value: float, centered: bool) -> float:
+    """Map a GEX axis (−1..+1) to percent for bar-graph display."""
+    try:
+        value = max(-1.0, min(1.0, float(raw_value)))
+    except (TypeError, ValueError):
+        value = 0.0
+    if centered:
+        return value * 100.0
+    return (value + 1.0) * 50.0
+
+
+def bars_value_range(item: dict[str, Any] | None) -> tuple[float, float]:
+    """Min/max percent for a bar-graph widget, auto or custom."""
+    style = (item or {}).get("style") or {}
+    auto = bool(style.get("range_auto", True))
+    if auto:
+        series = (item or {}).get("series") or []
+        bipolar = False
+        any_axis = False
+        for entry in series:
+            if not isinstance(entry, dict):
+                continue
+            try:
+                if int(entry.get("input_id") or 0) <= 0:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            any_axis = True
+            if series_is_centered(entry):
+                bipolar = True
+                break
+        if not any_axis:
+            return (0.0, 100.0)
+        return (-100.0, 100.0) if bipolar else (0.0, 100.0)
+    try:
+        lo = float(style.get("value_min") if style.get("value_min") is not None else 0.0)
+    except (TypeError, ValueError):
+        lo = 0.0
+    try:
+        hi = float(style.get("value_max") if style.get("value_max") is not None else 100.0)
+    except (TypeError, ValueError):
+        hi = 100.0
+    if hi <= lo:
+        hi = lo + 0.001
+    return lo, hi
 
 
 def default_toggle_binding() -> dict[str, Any]:
@@ -362,13 +930,89 @@ def normalize_toggle_binding(raw) -> dict[str, Any]:
     if isinstance(raw, dict):
         binding.update(raw)
     kind = str(binding.get("input_type") or "button").casefold()
-    binding["input_type"] = kind if kind in ("axis", "button", "hat", "state") else "button"
+    source = str(binding.get("source") or "").casefold()
+    if source in ("keyboard", "keyboard/mouse", "mouse"):
+        binding["source"] = "keyboard"
+        binding["input_type"] = "keyboard"
+    else:
+        binding["input_type"] = kind if kind in ("axis", "button", "hat", "state", "mode", "keyboard") else "button"
     try:
         binding["input_id"] = int(binding.get("input_id") or 0)
     except (TypeError, ValueError):
         binding["input_id"] = 0
     binding["invert"] = bool(binding.get("invert"))
+    binding["keys"] = normalize_overlay_keys(binding.get("keys"))
     return binding
+
+
+VISIBILITY_KINDS = ("mode", "state", "physical", "vjoy", "keyboard")
+
+
+def default_visibility() -> dict[str, Any]:
+    return {"join": "all", "conditions": []}
+
+
+def normalize_visibility_kind(kind) -> str:
+    value = str(kind or "mode").casefold()
+    if value in ("joystick", "button", "physical"):
+        return "physical"
+    if value in ("keyboard/mouse", "mouse"):
+        return "keyboard"
+    if value in VISIBILITY_KINDS:
+        return value
+    return "mode"
+
+
+def default_visibility_condition(kind: str = "mode") -> dict[str, Any]:
+    return {
+        "id": _new_id(),
+        "kind": normalize_visibility_kind(kind),
+        "when": "on",
+        "mode_name": "",
+        "state_name": "",
+        "device_guid": "",
+        "device_name": "",
+        "vjoy_id": 0,
+        "input_id": 0,
+        "keys": [],
+    }
+
+
+def normalize_visibility(raw) -> dict[str, Any]:
+    vis = default_visibility()
+    if not isinstance(raw, dict):
+        return vis
+    join = str(raw.get("join") or "all").casefold()
+    vis["join"] = "any" if join == "any" else "all"
+    seen: set[str] = set()
+    conditions: list[dict[str, Any]] = []
+    for cond in raw.get("conditions") or []:
+        if not isinstance(cond, dict):
+            continue
+        item = default_visibility_condition(cond.get("kind"))
+        item.update({key: cond[key] for key in item.keys() if key in cond})
+        item["kind"] = normalize_visibility_kind(item.get("kind"))
+        item["when"] = "off" if str(item.get("when") or "on").casefold() == "off" else "on"
+        item["mode_name"] = str(item.get("mode_name") or "")
+        item["state_name"] = str(item.get("state_name") or "")
+        item["device_guid"] = str(item.get("device_guid") or "")
+        item["device_name"] = str(item.get("device_name") or "")
+        try:
+            item["vjoy_id"] = int(item.get("vjoy_id") or 0)
+        except (TypeError, ValueError):
+            item["vjoy_id"] = 0
+        try:
+            item["input_id"] = int(item.get("input_id") or 0)
+        except (TypeError, ValueError):
+            item["input_id"] = 0
+        item["keys"] = normalize_overlay_keys(item.get("keys"))
+        cid = str(item.get("id") or "")
+        if not cid or cid in seen:
+            item["id"] = _new_id()
+        seen.add(item["id"])
+        conditions.append(item)
+    vis["conditions"] = conditions
+    return vis
 
 
 def default_canvas() -> dict[str, Any]:
@@ -448,6 +1092,29 @@ def is_interactive_overlay(canvas: dict[str, Any] | None) -> bool:
     return bool((canvas or {}).get("interactive"))
 
 
+def button_appearance_mode(item: dict[str, Any] | None) -> str:
+    """How an overlay button's lit look is chosen: ``press`` (binding) or ``state``."""
+    style = (item or {}).get("style") if isinstance(item, dict) else None
+    raw = ""
+    if isinstance(style, dict):
+        raw = str(style.get("appearance_mode") or "").strip().casefold()
+    if not raw and isinstance(item, dict):
+        raw = str(item.get("appearance_mode") or "").strip().casefold()
+    return "state" if raw == "state" else "press"
+
+
+def button_appearance_state_name(item: dict[str, Any] | None) -> str:
+    """GEX state name when button appearance follows a state (ON/OFF fills)."""
+    style = (item or {}).get("style") if isinstance(item, dict) else None
+    if isinstance(style, dict):
+        name = str(style.get("appearance_state") or style.get("appearance_state_name") or "").strip()
+        if name:
+            return name
+    if isinstance(item, dict):
+        return str(item.get("appearance_state") or item.get("appearance_state_name") or "").strip()
+    return ""
+
+
 def canonical_widget_type(widget_type: str) -> str:
     if widget_type == "panel":
         return "shape"
@@ -472,12 +1139,32 @@ def new_widget(widget_type: str, x: int = 40, y: int = 40) -> dict[str, Any]:
         "rotation": 0,
         "label": DEFAULT_LABELS.get(widget_type, ""),
         "visible": True,
+        "visibility": default_visibility(),
         "group": "",
         "style": default_style(widget_type),
         "binding": default_binding(1),
         "binding_y": default_binding(2),
+        "bindings": {},
         "points": [],
+        "series": [],
+        "keys": [],
+        "stats": [],
     }
+    if widget_uses_series(widget_type):
+        item["series"] = [default_graph_series(0)]
+    if widget_type == "sys_stats":
+        item["stats"] = [default_stat_entry(0, (item["style"] or {}).get("stat") or "time")]
+    if widget_type == "input_display":
+        from .input_display import DEFAULT_PRESET, default_widget_keys, preset_mouse_graphic
+
+        item["keys"] = default_widget_keys()
+        item["style"]["input_preset"] = DEFAULT_PRESET
+        item["style"]["mouse_graphic"] = preset_mouse_graphic(DEFAULT_PRESET)
+    if widget_type == "stopwatch":
+        item["binding"] = default_toggle_binding()
+        item["binding_y"] = default_toggle_binding()
+    if widget_type in SWITCH_WIDGET_TYPES:
+        item["bindings"] = default_switch_bindings(widget_type)
     if widget_type == "shape":
         from .shapes import default_shape_points, normalize_shape_kind
 
@@ -523,6 +1210,17 @@ def _same_profile_path(left: str | None, right: str | None) -> bool:
         return str(left).casefold() == str(right).casefold()
 
 
+def _overlay_payload_has_content(data: dict[str, Any] | None) -> bool:
+    if not isinstance(data, dict):
+        return False
+    pages = data.get("pages")
+    if isinstance(pages, list):
+        for page in pages:
+            if isinstance(page, dict) and page.get("widgets"):
+                return True
+    return bool(data.get("widgets"))
+
+
 class OverlayScene(QtCore.QObject):
     """Versioned overlay layout: pages of canvas + widgets. canvas/widgets alias the active page."""
 
@@ -542,6 +1240,7 @@ class OverlayScene(QtCore.QObject):
         self._path: str | None = None
         self._profile_key: str | None = None
         self._dirty = False
+        self._save_later_pending = False
         self._sorted_cache: list[dict[str, Any]] | None = None
         self._reset_default_pages(emit=False)
 
@@ -736,6 +1435,13 @@ class OverlayScene(QtCore.QObject):
         page["name"] = label
         self._dirty = True
         self._emit()
+        # Persist immediately: activate/deactivate can reload the profile sidecar
+        # and would otherwise wipe an in-memory-only rename.
+        try:
+            if profile_xml_path():
+                self.save_to_profile()
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: page rename autosave failed: {err}")
         return True
 
     def set_page_visible(self, visible: bool, page_id: str | None = None) -> bool:
@@ -815,18 +1521,58 @@ class OverlayScene(QtCore.QObject):
 
         widget_type = canonical_widget_type(raw.get("type", "button"))
         item = new_widget(widget_type)
-        item.update({k: raw[k] for k in item.keys() if k in raw and k not in ("style", "binding", "binding_y", "points")})
+        item.update(
+            {
+                k: raw[k]
+                for k in item.keys()
+                if k in raw and k not in ("style", "binding", "binding_y", "bindings", "points", "visibility", "series", "keys", "stats")
+            }
+        )
         style = default_style(widget_type)
         style.update(raw.get("style") or {})
         item["style"] = style
+        item["visibility"] = normalize_visibility(raw.get("visibility"))
+        item["series"] = normalize_graph_series(raw.get("series") if widget_uses_series(widget_type) else [])
+        if widget_uses_series(widget_type) and not item["series"]:
+            item["series"] = [default_graph_series(0)]
+        if widget_type == "sys_stats":
+            item["stats"] = normalize_stat_series(raw.get("stats") if "stats" in raw else None, style.get("stat") or "time")
+        else:
+            item["stats"] = []
+        if widget_type == "input_display":
+            from .input_display import DEFAULT_PRESET, default_widget_keys, normalize_input_preset, normalize_mouse_graphic
+
+            item["keys"] = normalize_overlay_keys(raw.get("keys") if "keys" in raw else item.get("keys") or default_widget_keys())
+            style["input_preset"] = normalize_input_preset(style.get("input_preset") or DEFAULT_PRESET)
+            style["mouse_graphic"] = normalize_mouse_graphic(style.get("mouse_graphic"))
+        else:
+            item["keys"] = []
         item["binding"], item["binding_y"] = self._normalize_bindings(widget_type, raw)
+        if widget_type == "stopwatch":
+            item["binding"] = normalize_toggle_binding(item.get("binding"))
+            item["binding_y"] = normalize_toggle_binding(item.get("binding_y"))
+        if widget_type in SWITCH_WIDGET_TYPES:
+            item["bindings"] = normalize_switch_bindings(widget_type, raw)
+            if widget_type == "switch_4way":
+                style["switch_appearance"] = normalize_switch_appearance(style.get("switch_appearance"))
+        else:
+            item["bindings"] = {}
         if widget_type == "shape":
             kind = normalize_shape_kind(style.get("shape_kind"))
             style["shape_kind"] = kind
             raw_points = raw.get("points")
             item["points"] = normalize_shape_points(raw_points, kind) if raw_points else default_shape_points(kind)
+        elif widget_type == "button" and (style.get("shape_kind") or raw.get("points")):
+            if style.get("shape_kind"):
+                style["shape_kind"] = normalize_shape_kind(style.get("shape_kind"))
+            kind = style.get("shape_kind") or "freeform"
+            raw_points = raw.get("points")
+            item["points"] = normalize_shape_points(raw_points, kind) if raw_points else default_shape_points(kind)
         if not item.get("id"):
             item["id"] = _new_id()
+        from .widgets import normalize_rotation
+
+        item["rotation"] = normalize_rotation(item.get("rotation"))
         return item
 
     def _normalize_bindings(self, widget_type: str, raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -848,6 +1594,11 @@ class OverlayScene(QtCore.QObject):
             y["input_type"] = "axis"
             y["input_id"] = int(legacy_y_id or y.get("input_id") or 2)
             y["invert"] = bool(legacy_y_inv)
+        for binding in (x, y):
+            if str(binding.get("source") or "").casefold() in ("keyboard", "keyboard/mouse", "mouse"):
+                binding["source"] = "keyboard"
+                binding["input_type"] = "keyboard"
+            binding["keys"] = normalize_overlay_keys(binding.get("keys"))
         return x, y
 
     def snapshot(self) -> str:
@@ -946,6 +1697,25 @@ class OverlayScene(QtCore.QObject):
             self.selection_changed.emit()
         return True
 
+    def convert_widgets_to(self, items: list[dict[str, Any]], widget_type: str) -> bool:
+        widget_type = canonical_widget_type(widget_type)
+        if widget_type not in WIDGET_TYPES:
+            widget_type = "button"
+        targets = [item for item in items if item and item.get("type") != widget_type]
+        if not targets:
+            return False
+        self.push_undo()
+        self._suspend += 1
+        try:
+            for item in targets:
+                self._convert_widget(item, widget_type)
+        finally:
+            self._suspend = max(0, self._suspend - 1)
+            self._dirty = True
+            self._emit()
+            self.selection_changed.emit()
+        return True
+
     def _convert_widget(self, item: dict[str, Any], widget_type: str):
         old_type = item.get("type") or "button"
         if old_type == widget_type:
@@ -955,10 +1725,24 @@ class OverlayScene(QtCore.QObject):
         new_style.update(old_style)
         old_size = DEFAULT_SIZES.get(old_type)
         new_size = DEFAULT_SIZES.get(widget_type)
-        if old_size and new_size and (int(item.get("w") or 0), int(item.get("h") or 0)) == tuple(int(v) for v in old_size):
+        keep_size = old_type in ("shape", "panel") and widget_type == "button"
+        if old_type == "button" and widget_type in ("shape", "panel"):
+            from .shapes import button_uses_shape_path
+
+            keep_size = button_uses_shape_path(item)
+        if (
+            not keep_size
+            and old_size
+            and new_size
+            and (int(item.get("w") or 0), int(item.get("h") or 0)) == tuple(int(v) for v in old_size)
+        ):
             item["w"], item["h"] = int(new_size[0]), int(new_size[1])
         item["type"] = widget_type
         item["style"] = new_style
+        if widget_uses_series(widget_type):
+            item["series"] = normalize_graph_series(item.get("series"))
+            if not item["series"]:
+                item["series"] = [default_graph_series(0)]
         if widget_type == "shape":
             from .shapes import default_shape_points, normalize_shape_kind
 
@@ -966,8 +1750,38 @@ class OverlayScene(QtCore.QObject):
             new_style["shape_kind"] = kind
             if not item.get("points"):
                 item["points"] = default_shape_points(kind)
+        if old_type in ("shape", "panel") and widget_type == "button":
+            from .shapes import normalize_shape_kind
+
+            kind = normalize_shape_kind(new_style.get("shape_kind"))
+            new_style["shape_kind"] = kind
+            new_style["shape_closed"] = True
+            new_style.setdefault("fill_on", default_style("button").get("fill_on"))
+            new_style.setdefault("border_on", default_style("button").get("border_on"))
+        if widget_type == "input_display":
+            from .input_display import default_widget_keys, normalize_mouse_graphic
+
+            item["keys"] = normalize_overlay_keys(item.get("keys") or default_widget_keys())
+            new_style["mouse_graphic"] = normalize_mouse_graphic(new_style.get("mouse_graphic"))
+            new_style.setdefault("show_keyboard", True)
+            new_style.setdefault("show_mouse", True)
+        if widget_type == "sys_stats":
+            item["stats"] = normalize_stat_series(item.get("stats"), new_style.get("stat") or "time")
         old_kind = widget_binding_kind(old_type)
         new_kind = widget_binding_kind(widget_type)
+        saved_binding = dict(item.get("binding") or {})
+        saved_bindings = item.get("bindings") if isinstance(item.get("bindings"), dict) else None
+        if widget_type in SWITCH_WIDGET_TYPES:
+            previous = saved_bindings if old_kind == "switch" else None
+            item["bindings"] = normalize_switch_bindings(widget_type, previous)
+            if widget_type == "switch_4way":
+                new_style["switch_appearance"] = normalize_switch_appearance(new_style.get("switch_appearance"))
+            if old_kind == "button":
+                first = next(iter(switch_positions(widget_type)), None)
+                if first:
+                    item["bindings"][first] = normalize_toggle_binding(saved_binding)
+        elif old_kind == "switch":
+            item["bindings"] = {}
         if new_kind == "none" or old_kind == new_kind:
             return
         if {old_kind, new_kind} <= {"axis", "xy"}:
@@ -983,6 +1797,9 @@ class OverlayScene(QtCore.QObject):
         item["binding_y"] = default_binding(2)
         if new_kind == "button":
             item["binding"]["input_type"] = "button"
+            if widget_type == "stopwatch":
+                item["binding"] = default_toggle_binding()
+                item["binding_y"] = default_toggle_binding()
         elif new_kind == "hat":
             item["binding"]["input_type"] = "hat"
 
@@ -1158,21 +1975,25 @@ class OverlayScene(QtCore.QObject):
         self.selection_changed.emit()
 
     def hit_test(self, x: float, y: float, page_id: str | None = None) -> dict[str, Any] | None:
+        from .widgets import widget_contains_point
+
         for item in reversed(self.sorted_widgets(page_id)):
             if not item.get("visible", True):
                 continue
-            if item["x"] <= x <= item["x"] + item["w"] and item["y"] <= y <= item["y"] + item["h"]:
+            if widget_contains_point(item, x, y):
                 return item
         return None
 
     def widgets_in_rect(self, x: float, y: float, w: float, h: float) -> list[str]:
+        from .widgets import widget_rotated_bounds
+
         x2, y2 = x + w, y + h
         x, x2 = min(x, x2), max(x, x2)
         y, y2 = min(y, y2), max(y, y2)
         ids = []
         for item in self.widgets:
-            ix, iy, iw, ih = item["x"], item["y"], item["w"], item["h"]
-            if ix + iw >= x and ix <= x2 and iy + ih >= y and iy <= y2:
+            bounds = widget_rotated_bounds(item)
+            if bounds.right() >= x and bounds.left() <= x2 and bounds.bottom() >= y and bounds.top() <= y2:
                 ids.append(item["id"])
         return ids
 
@@ -1373,9 +2194,34 @@ class OverlayScene(QtCore.QObject):
         for key, value in fields.items():
             if key == "style":
                 item["style"].update(value)
+                if item.get("type") == "switch_4way" and "switch_appearance" in (value or {}):
+                    item["style"]["switch_appearance"] = normalize_switch_appearance(
+                        item["style"].get("switch_appearance")
+                    )
                 _refresh_font_scale_base(item, value)
             elif key in ("binding", "binding_y"):
                 item.setdefault(key, default_binding()).update(value)
+            elif key == "bindings" and isinstance(value, dict):
+                current = dict(item.get("bindings") or {})
+                for position, fields in value.items():
+                    entry = normalize_toggle_binding(current.get(position))
+                    if isinstance(fields, dict):
+                        entry.update(fields)
+                        entry = normalize_toggle_binding(entry)
+                    current[position] = entry
+                item["bindings"] = normalize_switch_bindings(item.get("type"), current)
+            elif key == "visibility":
+                item["visibility"] = normalize_visibility(value)
+            elif key == "series":
+                item["series"] = normalize_graph_series(value)
+            elif key == "keys":
+                item["keys"] = normalize_overlay_keys(value)
+            elif key == "stats":
+                item["stats"] = normalize_stat_series(value, (item.get("style") or {}).get("stat") or "time")
+            elif key == "rotation":
+                from .widgets import normalize_rotation
+
+                item["rotation"] = normalize_rotation(value)
             else:
                 item[key] = value
         self._dirty = True
@@ -1431,30 +2277,32 @@ class OverlayScene(QtCore.QObject):
         data = None
         if profile is not None:
             try:
-                cfg = profile._readConfig() or {}
+                # force=True: never trust a stale in-memory cache that predates
+                # a page-rename autosave written by another code path.
+                cfg = profile._readConfig(force=True) or {}
                 candidate = cfg.get(OVERLAY_CONFIG_KEY)
                 if isinstance(candidate, dict):
                     data = candidate
             except Exception as err:
                 syslog.warning(f"OBS OVERLAY: profile overlay read failed: {err}")
-        if data is None and self._path and os.path.isfile(self._path):
-            try:
-                with open(self._path, "r", encoding="utf-8") as handle:
-                    data = json.load(handle)
-                if profile is not None and isinstance(data, dict):
-                    try:
-                        profile._setConfig(OVERLAY_CONFIG_KEY, data)
-                    except Exception:
-                        pass
-            except Exception as err:
-                syslog.error(f"OBS OVERLAY: failed to load sidecar {self._path}: {err}")
-                data = None
+        sidecar = self._read_sidecar(self._path)
+        if _overlay_payload_has_content(sidecar) and not _overlay_payload_has_content(data):
+            data = sidecar
+            if profile is not None and isinstance(data, dict):
+                try:
+                    profile._setConfig(OVERLAY_CONFIG_KEY, data)
+                except Exception:
+                    pass
         if isinstance(data, dict) and (data.get("pages") or data.get("widgets") or data.get("canvas")):
             self.from_dict(data)
             self._dirty = False
             self._undo.clear()
             self._redo.clear()
             return True
+        # No stored layout. If the profile path is temporarily missing but we still
+        # have unsaved edits (e.g. a page rename), keep them instead of wiping.
+        if not path and self._dirty and self.pages:
+            return False
         self._reset_default_pages(emit=True)
         self._dirty = False
         return False
@@ -1477,6 +2325,46 @@ class OverlayScene(QtCore.QObject):
             return self._write_sidecar(path, self.to_dict())
         return self.save_to_profile()
 
+    def save_to_profile(self, profile=None, dest_xml: str | None = None) -> bool:
+        profile = profile or gremlin.shared_state.current_profile
+        path = dest_xml or profile_xml_path(profile)
+        if not path:
+            syslog.warning("OBS OVERLAY: save the GEX profile first so the overlay can be stored with it")
+            return False
+        data = self.to_dict()
+        # Merge into the profile JSON on disk. Avoid profile._setConfig here:
+        # it asserts UI thread and can fail during tab-switch / nested Qt events,
+        # which previously left widgets unsaved.
+        ok = self._persist_files(path, data)
+        if ok:
+            self._profile_key = path
+            self._path = gremlin.util.swap_ext(path, "overlay.json")
+            if profile is not None and getattr(profile, "_config_data_read", False):
+                cfg = getattr(profile, "_config_data", None)
+                if isinstance(cfg, dict):
+                    cfg[OVERLAY_CONFIG_KEY] = copy.deepcopy(data)
+            syslog.info(f"OBS OVERLAY: saved layout {gremlin.util.toUrl(self._path)}")
+        return ok
+
+    def save_later(self):
+        """Persist after the current Qt event finishes. Never call save() from hideEvent."""
+        if not gremlin.util.is_ui_thread():
+            gremlin.util.InvokeUiMethod(self.save_later)
+            return
+        if self._save_later_pending:
+            return
+        self._save_later_pending = True
+        QtCore.QTimer.singleShot(0, self._save_later_run)
+
+    def _save_later_run(self):
+        self._save_later_pending = False
+        if not self._dirty:
+            return
+        try:
+            self.save_to_profile()
+        except Exception:
+            pass
+
     def save_owned(self) -> bool:
         """Persist this scene to the profile it was loaded from, even after a switch."""
         if not self._profile_key:
@@ -1485,28 +2373,6 @@ class OverlayScene(QtCore.QObject):
         if current and _same_profile_path(current, self._profile_key):
             return self.save_to_profile()
         return self._persist_files(self._profile_key, self.to_dict())
-
-    def save_to_profile(self, profile=None) -> bool:
-        profile = profile or gremlin.shared_state.current_profile
-        path = profile_xml_path(profile)
-        if not path:
-            syslog.warning("OBS OVERLAY: save the GEX profile first so the overlay can be stored with it")
-            return False
-        data = self.to_dict()
-        wrote_config = False
-        if profile is not None:
-            try:
-                profile._setConfig(OVERLAY_CONFIG_KEY, data)
-                wrote_config = True
-            except Exception as err:
-                syslog.error(f"OBS OVERLAY: failed to store overlay in profile config: {err}")
-        sidecar_ok = self._write_sidecar(overlay_path_for_profile(profile) or gremlin.util.swap_ext(path, "overlay.json"), data)
-        if wrote_config or sidecar_ok:
-            self._profile_key = path
-            self._path = overlay_path_for_profile(profile)
-            self._dirty = False
-            return True
-        return False
 
     def _write_sidecar(self, path: str, data: dict[str, Any]) -> bool:
         try:
@@ -1519,6 +2385,17 @@ class OverlayScene(QtCore.QObject):
         except Exception as err:
             syslog.error(f"OBS OVERLAY: failed to save layout {path}: {err}")
             return False
+
+    def _read_sidecar(self, path: str | None) -> dict[str, Any] | None:
+        if not path or not os.path.isfile(path):
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            return data if isinstance(data, dict) else None
+        except Exception as err:
+            syslog.warning(f"OBS OVERLAY: failed to load sidecar {path}: {err}")
+            return None
 
     def _persist_files(self, profile_xml: str, data: dict[str, Any]) -> bool:
         config_path = gremlin.util.swap_ext(profile_xml, "json")

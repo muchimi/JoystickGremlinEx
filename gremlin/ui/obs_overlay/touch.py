@@ -15,11 +15,13 @@ import logging
 from typing import Any
 
 from PySide6 import QtCore
+from shiboken6 import Shiboken
 
 from .bindings import (
     binding_for_axis,
     binding_source,
     read_widget_value,
+    toggle_mode,
     toggle_state,
     vjoy_binding_writable,
     widget_accepts_touch,
@@ -27,8 +29,9 @@ from .bindings import (
     write_axis,
     write_button,
     write_hat,
+    write_switch_position,
 )
-from .model import is_interactive_overlay
+from .model import is_interactive_overlay, switch_rest_position, widget_is_switch
 from .widgets import value_from_point, widget_dirty_rect
 
 syslog = logging.getLogger("system")
@@ -71,10 +74,18 @@ class OverlayTouchHandler:
         grab = {"item_id": item["id"], "type": widget_type, "held": False}
         if widget_type == "button":
             binding = item.get("binding") or {}
+            from .model import button_appearance_mode
+
+            appearance_follows_press = button_appearance_mode(item) == "press"
             if binding_source(binding) == "state":
                 if toggle_state(binding) is None:
                     return False
                 grab["kind"] = "state"
+                self._poke(item, read_widget_value(item))
+            elif binding_source(binding) == "mode":
+                if toggle_mode(binding) is None:
+                    return False
+                grab["kind"] = "mode"
                 self._poke(item, read_widget_value(item))
             else:
                 invert = bool(binding.get("invert"))
@@ -84,7 +95,17 @@ class OverlayTouchHandler:
                 grab["kind"] = "button"
                 grab["held"] = True
                 grab["up_value"] = invert
-                self._poke(item, True)
+                # State-driven look must not flash with the finger press.
+                self._poke(item, True if appearance_follows_press else read_widget_value(item))
+        elif widget_is_switch(widget_type):
+            mapped = value_from_point(item, scene_pos.x(), scene_pos.y())
+            position = mapped if isinstance(mapped, str) else (switch_rest_position(widget_type) or "")
+            if not write_switch_position(item, position or None):
+                return False
+            grab["kind"] = "switch"
+            grab["spring"] = widget_type in ("switch_4way", "switch_3way")
+            grab["position"] = position
+            self._poke(item, position)
         else:
             grab["kind"] = "value"
             grab["spring"] = widget_type in SPRING_TYPES
@@ -94,10 +115,22 @@ class OverlayTouchHandler:
 
     def move(self, pointer_id, scene_pos: QtCore.QPointF) -> bool:
         grab = self._grabs.get(pointer_id)
-        if not grab or grab.get("kind") != "value":
+        if not grab:
             return False
         item = self.view.scene.widget_by_id(grab["item_id"], self.view.page_id)
         if not item:
+            return False
+        if grab.get("kind") == "switch":
+            mapped = value_from_point(item, scene_pos.x(), scene_pos.y())
+            position = mapped if isinstance(mapped, str) else (switch_rest_position(item.get("type")) or "")
+            if position == grab.get("position"):
+                return True
+            if not write_switch_position(item, position or None):
+                return False
+            grab["position"] = position
+            self._poke(item, position)
+            return True
+        if grab.get("kind") != "value":
             return False
         self._apply_value(item, scene_pos)
         return True
@@ -112,7 +145,16 @@ class OverlayTouchHandler:
                 return True
             if grab.get("kind") == "button" and grab.get("held"):
                 write_button(item.get("binding"), bool(grab.get("up_value")))
-                self._poke(item, False)
+                from .model import button_appearance_mode
+
+                if button_appearance_mode(item) == "press":
+                    self._poke(item, False)
+                else:
+                    self._poke(item, read_widget_value(item))
+            elif grab.get("kind") == "switch":
+                rest = switch_rest_position(item.get("type")) if grab.get("spring") else grab.get("position")
+                write_switch_position(item, rest or None)
+                self._poke(item, rest or "")
             elif grab.get("kind") == "value" and grab.get("spring"):
                 self._spring(item)
             return True
@@ -161,11 +203,14 @@ class OverlayTouchHandler:
             self._poke(item, (0.0, 0.0))
 
     def _poke(self, item: dict[str, Any], value):
-        bus = getattr(self.view, "bus", None)
+        view = self.view
+        if view is None or not Shiboken.isValid(view):
+            return
+        bus = getattr(view, "bus", None)
         if bus is not None:
             bus.poke(item.get("id"), value, lock=True)
         else:
-            self.view.update(widget_dirty_rect(item).toRect())
+            view.update(widget_dirty_rect(item).toRect())
 
     def _unlock(self, widget_id: str | None):
         bus = getattr(self.view, "bus", None)

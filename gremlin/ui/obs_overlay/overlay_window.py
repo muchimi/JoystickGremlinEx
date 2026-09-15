@@ -17,10 +17,25 @@ import math
 from PySide6 import QtCore, QtGui, QtWidgets
 from shiboken6 import Shiboken
 
-from .bindings import OverlayValueBus, widget_accepts_touch
+from .bindings import OverlayValueBus, widget_accepts_touch, widget_conditions_match
 from .model import DEFAULT_GUIDE_COLOR, OVERLAY_WINDOW_TITLE, OverlayScene, is_interactive_overlay, is_onscreen_mode, normalize_background_mode, overlay_window_title
+from .qt_guard import alive
 from .touch import OverlayTouchHandler
-from .widgets import chroma_fill_color, live_window_is_layered, paint_background, paint_widget, qcolor, widget_dirty_rect, widget_rect
+from .widgets import (
+    chroma_fill_color,
+    live_window_is_layered,
+    paint_background,
+    paint_widget,
+    qcolor,
+    widget_contains_point,
+    widget_dirty_rect,
+    widget_local_to_scene,
+    widget_rect,
+    widget_rotated_bounds,
+    apply_widget_rotation,
+)
+
+ROTATE_HANDLE = 8
 
 syslog = logging.getLogger("system")
 
@@ -47,7 +62,7 @@ def touchable_item_at(scene: OverlayScene, x: float, y: float, page_id: str | No
             iw, ih = float(item["w"]), float(item["h"])
         except (TypeError, ValueError, KeyError):
             continue
-        if ix <= x <= ix + iw and iy <= y <= iy + ih and widget_accepts_touch(item):
+        if widget_contains_point(item, x, y) and widget_accepts_touch(item):
             return item
     return None
 
@@ -117,7 +132,10 @@ def _extend_frame_into_client(widget: QtWidgets.QWidget):
         return
     try:
         import ctypes
+        from shiboken6 import Shiboken
 
+        if widget is None or not Shiboken.isValid(widget):
+            return
         hwnd = int(widget.winId())
         if not hwnd:
             return
@@ -256,6 +274,11 @@ class OverlayView(QtWidgets.QWidget):
         self.scene.changed.connect(self._on_scene_changed)
         self._scene_connected = True
         self._bus_connected = False
+        self._scene_queued = False
+        self.destroyed.connect(self._on_view_destroyed)
+
+    def _on_view_destroyed(self, *_args):
+        self.detach_from_scene()
 
     @property
     def page_id(self) -> str | None:
@@ -355,6 +378,9 @@ class OverlayView(QtWidgets.QWidget):
     def attach_bus(self):
         if not Shiboken.isValid(self):
             return
+        if QtCore.QThread.currentThread() is not self.thread():
+            QtCore.QTimer.singleShot(0, self, self.attach_bus)
+            return
         self.bus.set_widgets(self.page_widgets)
         if not self._bus_connected:
             self.bus.attach(self.page_widgets)
@@ -392,6 +418,13 @@ class OverlayView(QtWidgets.QWidget):
     def _on_scene_changed(self):
         if not Shiboken.isValid(self):
             return
+        if QtCore.QThread.currentThread() is not self.thread():
+            if self._scene_queued:
+                return
+            self._scene_queued = True
+            QtCore.QTimer.singleShot(0, self, self._on_scene_changed)
+            return
+        self._scene_queued = False
         self.bus.set_widgets(self.page_widgets)
         self._grid_pm = None
         self._sync_paint_mode()
@@ -399,7 +432,7 @@ class OverlayView(QtWidgets.QWidget):
         self.update()
 
     def _sync_paint_mode(self):
-        if not Shiboken.isValid(self):
+        if not alive(self):
             return
         layered = live_window_is_layered(self.page_canvas, designer=self.interactive)
         opaque = not layered
@@ -411,6 +444,8 @@ class OverlayView(QtWidgets.QWidget):
             self.setAttribute(QtCore.Qt.WA_TranslucentBackground, layered)
 
     def _apply_size(self):
+        if not alive(self):
+            return
         content = self._content_rect()
         old_origin = QtCore.QPoint(self._scene_origin)
         origin = content.topLeft()
@@ -428,14 +463,16 @@ class OverlayView(QtWidgets.QWidget):
         parent = self.parent()
         while parent is not None and not isinstance(parent, QtWidgets.QScrollArea):
             parent = parent.parent()
-        if not isinstance(parent, QtWidgets.QScrollArea):
+        if not isinstance(parent, QtWidgets.QScrollArea) or not alive(parent):
             return
         if abs(dx) >= 1:
             bar = parent.horizontalScrollBar()
-            bar.setValue(bar.value() + int(round(dx)))
+            if alive(bar):
+                bar.setValue(bar.value() + int(round(dx)))
         if abs(dy) >= 1:
             bar = parent.verticalScrollBar()
-            bar.setValue(bar.value() + int(round(dy)))
+            if alive(bar):
+                bar.setValue(bar.value() + int(round(dy)))
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
@@ -467,9 +504,12 @@ class OverlayView(QtWidgets.QWidget):
                 for item in self.scene.sorted_widgets(self._page_id):
                     if not widget_accepts_touch(item):
                         continue
-                    hit = widget_rect(item)
+                    hit = widget_rotated_bounds(item)
                     if hit.intersects(QtCore.QRectF(scene_clip)):
-                        painter.fillRect(hit, QtGui.QColor(0, 0, 0, 1))
+                        painter.save()
+                        apply_widget_rotation(painter, item)
+                        painter.fillRect(widget_rect(item), QtGui.QColor(0, 0, 0, 1))
+                        painter.restore()
             painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
             if not is_onscreen_mode(self.page_canvas):
                 paint_background(painter, self.page_canvas, canvas_rect, preview=False, fallback_chroma=False)
@@ -487,8 +527,19 @@ class OverlayView(QtWidgets.QWidget):
             dirty = widget_dirty_rect(item)
             if not dirty.intersects(scene_clip):
                 continue
+            if not item.get("visible", True):
+                continue
+            conditions_ok = widget_conditions_match(item)
+            if not self.interactive and not conditions_ok:
+                continue
             value = self.bus.value_for(item)
-            paint_widget(painter, item, value)
+            if self.interactive and not conditions_ok:
+                painter.save()
+                painter.setOpacity(0.32)
+                paint_widget(painter, item, value)
+                painter.restore()
+            else:
+                paint_widget(painter, item, value)
         if self.interactive:
             self._paint_guides(painter)
             self._paint_selection(painter)
@@ -581,12 +632,7 @@ class OverlayView(QtWidgets.QWidget):
             item = self.scene.widget_by_id(widget_id, self._page_id)
             if not item:
                 continue
-            rect = QtCore.QRectF(
-                float(item.get("x") or 0),
-                float(item.get("y") or 0),
-                max(1.0, float(item.get("w") or 1)),
-                max(1.0, float(item.get("h") or 1)),
-            )
+            rect = widget_rotated_bounds(item)
             bounds = rect if not found else bounds.united(rect)
             found = True
         return bounds if found else None
@@ -594,19 +640,24 @@ class OverlayView(QtWidgets.QWidget):
     def _paint_selection(self, painter: QtGui.QPainter):
         painter.save()
         multi = len(self.scene.selected_ids) > 1
+        hs = 4.0 / max(self._zoom, 0.25)
         for widget_id in self.scene.selected_ids:
             item = self.scene.widget_by_id(widget_id, self._page_id)
             if not item:
                 continue
-            rect = QtCore.QRectF(item["x"], item["y"], item["w"], item["h"])
+            rect = widget_rect(item)
+            painter.save()
+            apply_widget_rotation(painter, item)
             painter.setPen(QtGui.QPen(QtGui.QColor("#7ec8ff"), 1.5))
             painter.setBrush(QtCore.Qt.NoBrush)
             painter.drawRect(rect.adjusted(-1, -1, 1, 1))
+            painter.restore()
             if not multi and widget_id == (self.scene.selected_ids[-1] if self.scene.selected_ids else None):
                 painter.setBrush(QtGui.QColor("#7ec8ff"))
-                hs = 4.0 / max(self._zoom, 0.25)
+                painter.setPen(QtGui.QPen(QtGui.QColor("#7ec8ff"), 1))
                 for hx, hy in self.handle_points(item):
                     painter.drawRect(QtCore.QRectF(hx - hs, hy - hs, hs * 2, hs * 2))
+                self._paint_rotation_handle(painter, item, hs)
         if multi:
             bounds = self._selected_bounds()
             if bounds is not None:
@@ -615,15 +666,28 @@ class OverlayView(QtWidgets.QWidget):
                 painter.drawRect(bounds.adjusted(-2, -2, 2, 2))
                 painter.setPen(QtGui.QPen(QtGui.QColor("#7ec8ff"), 1))
                 painter.setBrush(QtGui.QColor("#7ec8ff"))
-                hs = 4.0 / max(self._zoom, 0.25)
                 dummy = {"x": bounds.x(), "y": bounds.y(), "w": bounds.width(), "h": bounds.height()}
                 for hx, hy in self.handle_points(dummy):
                     painter.drawRect(QtCore.QRectF(hx - hs, hy - hs, hs * 2, hs * 2))
+                self._paint_rotation_handle(painter, dummy, hs)
         painter.restore()
 
+    def _paint_rotation_handle(self, painter: QtGui.QPainter, item: dict, hs: float):
+        top = self._top_center_point(item)
+        handle = self.rotation_handle_point(item)
+        painter.setPen(QtGui.QPen(QtGui.QColor("#7ec8ff"), 1.2))
+        painter.drawLine(top, handle)
+        painter.setBrush(QtGui.QColor("#7ec8ff"))
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.drawEllipse(handle, hs * 1.15, hs * 1.15)
+
+    def _top_center_point(self, item: dict) -> QtCore.QPointF:
+        rect = widget_rect(item)
+        return widget_local_to_scene(item, rect.center().x(), rect.top())
+
     def handle_points(self, item: dict):
-        x, y, w, h = item["x"], item["y"], item["w"], item["h"]
-        return [
+        x, y, w, h = float(item["x"]), float(item["y"]), float(item["w"]), float(item["h"])
+        local = [
             (x, y),
             (x + w / 2, y),
             (x + w, y),
@@ -633,6 +697,12 @@ class OverlayView(QtWidgets.QWidget):
             (x, y + h),
             (x, y + h / 2),
         ]
+        return [(widget_local_to_scene(item, px, py).x(), widget_local_to_scene(item, px, py).y()) for px, py in local]
+
+    def rotation_handle_point(self, item: dict) -> QtCore.QPointF:
+        rect = widget_rect(item)
+        offset = 18.0 / max(self._zoom, 0.25)
+        return widget_local_to_scene(item, rect.center().x(), rect.top() - offset)
 
     def handle_at(self, pos: QtCore.QPointF) -> tuple[str | None, int]:
         if not self.scene.selected_ids:
@@ -649,6 +719,9 @@ class OverlayView(QtWidgets.QWidget):
                 return None, -1
             target_id = item["id"]
         tol = 6.0 / max(self._zoom, 0.25)
+        rotate = self.rotation_handle_point(item)
+        if abs(pos.x() - rotate.x()) <= tol * 1.35 and abs(pos.y() - rotate.y()) <= tol * 1.35:
+            return target_id, ROTATE_HANDLE
         for index, (hx, hy) in enumerate(self.handle_points(item)):
             if abs(pos.x() - hx) <= tol and abs(pos.y() - hy) <= tol:
                 return target_id, index
@@ -763,6 +836,10 @@ class OverlayWindow(QtWidgets.QWidget):
         self._apply_window_flags()
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
+        self.destroyed.connect(self._on_window_destroyed)
+
+    def _on_window_destroyed(self, *_args):
+        self.detach_from_scene()
 
     @property
     def page_canvas(self) -> dict:
@@ -906,6 +983,9 @@ class OverlayWindow(QtWidgets.QWidget):
     def _on_scene_changed(self):
         if not Shiboken.isValid(self):
             return
+        if QtCore.QThread.currentThread() is not self.thread():
+            QtCore.QTimer.singleShot(0, self, self._on_scene_changed)
+            return
         sig = self._chrome_signature()
         if sig == self._chrome_sig:
             return
@@ -936,6 +1016,9 @@ class OverlayWindow(QtWidgets.QWidget):
                 self.setAttribute(QtCore.Qt.WA_AcceptTouchEvents, interactive)
                 flags_changed = int(self.windowFlags()) != int(flags)
                 if flags_changed:
+                    # Never change flags while visible — Windows HWND UAF risk.
+                    if visible:
+                        self.hide()
                     self.setWindowFlags(flags)
                     self._sync_page_title()
                 self.drag_bar.setVisible(False)
@@ -966,6 +1049,8 @@ class OverlayWindow(QtWidgets.QWidget):
                         _transparent_palette(self.view)
                 flags_changed = int(self.windowFlags()) != int(flags)
                 if flags_changed:
+                    if visible:
+                        self.hide()
                     self.setWindowFlags(flags)
                     self._sync_page_title()
                 show_bar = bool(self.page_canvas.get("show_drag_bar", True)) or layered
@@ -978,16 +1063,19 @@ class OverlayWindow(QtWidgets.QWidget):
                     self.view._apply_size()
                 self.adjustSize()
                 self._restore_or_center()
-            if visible and flags_changed:
+            if visible and flags_changed and Shiboken.isValid(self):
                 self.show()
-            self._apply_click_through(onscreen and not interactive)
-            if live_window_is_layered(self.page_canvas) and (visible or self.isVisible()):
+            if Shiboken.isValid(self):
+                self._apply_click_through(onscreen and not interactive)
+            if live_window_is_layered(self.page_canvas) and Shiboken.isValid(self) and (visible or self.isVisible()):
                 _extend_frame_into_client(self)
         finally:
             self._applying_flags = False
 
     def _apply_click_through(self, enabled: bool):
         if sys.platform != "win32":
+            return
+        if not Shiboken.isValid(self):
             return
         try:
             import ctypes

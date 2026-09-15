@@ -4840,7 +4840,7 @@ class Profile:
                 try:
                     import gremlin.ui.obs_overlay as obs_overlay
 
-                    obs_overlay.persist_for_profile(self)
+                    obs_overlay.persist_for_profile(self, dest_xml=use_name)
                 except Exception:
                     pass
                 # Stream Deck page names live in the sidecar JSON, not the XML.
