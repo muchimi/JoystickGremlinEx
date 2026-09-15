@@ -53,6 +53,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: Streamdeck Device: (experimental) - polish + paste/splitter stability.  (courtesy Lolo350)
 - Fix: UI : various fixes.
 - Fix: API: refactor low level mouse wheel release handling to avoid Python 3.14 threading library issues with timers due to the use of internal events in Python that could cause internal lock issues.
+- Change: API: use of high resolution mouse wheel events (support for high resolution devices).
 
 ### (m77T50)
 - New: OBS Overlay: (experimental) Module courtesy Lolo350. This module allows to design and show an overlay module for OBS with chroma-key support suitable for streaming or showing inputs real-time. Many thanks to Lolo350 for including this feature in GEX.
