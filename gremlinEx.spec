@@ -102,6 +102,7 @@ a = Analysis(
         "faster_whisper",
         "pycaw",
         "pycountry",
+        "nodegraphQT",
         "gremlin.ui.obs_overlay",
         "gremlin.ui.obs_overlay.bindings",
         "gremlin.ui.obs_overlay.designer",

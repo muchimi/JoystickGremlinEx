@@ -52,6 +52,7 @@ The test versions are available here: https://github.com/muchimi/JoystickGremlin
 - Fix: API (Macro): legacy engine threading event rework due to Python 3.14 changes (could cause an internal Python exception) 
 - Fix: API: VJoy keep alive service: threading event rework due to Python 3.14. (could cause an internal Python exception)
 - Fix: API: centralized magic values to ensure consistency across all callback registrations.
+- Change: Added new dependencies for upcoming modules.
 
 ### (m77T51)
 - Fix: OBS Overlay: (experimental) - enhancements, thread safety and various fixes (courtesy Lolo350)
