@@ -57,7 +57,44 @@ from gremlin.types import VjoyAction
 syslog = logging.getLogger("system")
 
 
+def _open_remote_vjoy(device_id):
+    """Acquire a vJoy device for remote output (opens on demand if needed).
+
+    Returns (vjoy_id, vjoy_device) or (None, None).
+
+    Membership checks against VJoyProxy.vjoy_devices fail after profile stop
+    (reset) or on receive-only clients that never wrote locally — silently
+    dropping remote button/axis/hat commands. Always resolve and open via
+    VJoyProxy.__getitem__ instead.
+    """
+    vid = device_id
+    if not isinstance(vid, int):
+        try:
+            vid = int(vid)
+        except (TypeError, ValueError):
+            vid = gremlin.joystick_handling.vjoy_id_from_guid(vid, None)
+            if vid is None:
+                syslog.warning(f"REMOTE: cannot resolve vJoy device id [{device_id}]")
+                return None, None
+    try:
+        vid = int(vid)
+    except (TypeError, ValueError):
+        syslog.warning(f"REMOTE: invalid vJoy device id [{device_id}]")
+        return None, None
+    if vid < 1 or vid > 16:
+        syslog.warning(f"REMOTE: vJoy device id out of range [{vid}]")
+        return None, None
+    try:
+        return vid, gremlin.joystick_handling.VJoyProxy()[vid]
+    except Exception as err:
+        syslog.warning(f"REMOTE: cannot open vJoy [{vid}]: {err}")
+        return None, None
+
+
 class GremlinServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
     def handle_timeout(self):
         import gremlin.event_handler
 
@@ -66,6 +103,13 @@ class GremlinServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
         return super().handle_timeout()
 
     def handle_error(self, request, client_address):
+        import sys
+        import traceback
+
+        err = sys.exc_info()[1]
+        if err is not None:
+            syslog.error(f"RPC: socket handler error from {client_address}: {err}")
+            syslog.debug("".join(traceback.format_exception(*sys.exc_info())))
         el = gremlin.event_handler.EventListener()
         el.remote_control_socket_error.emit()  # fire the event to indicate we had a timeout
         # return super().handle_error(request, client_address)
@@ -88,7 +132,16 @@ class GremlinSocketHandler(socketserver.BaseRequestHandler):
             # unpack error
             return
 
-        remote_client.handle(data)
+        host_ip = ""
+        try:
+            host_ip = str(self.client_address[0] or "")
+        except Exception:
+            host_ip = ""
+        try:
+            remote_client.handle(data, peer_ip=host_ip)
+        except Exception as err:
+            syslog.error(f"RPC: handle failed from {host_ip}: {err}")
+            raise
 
 
 class RPCGremlin:
@@ -130,8 +183,8 @@ class RPCGremlin:
             self._running = True
             while self._keep_running:
                 time.sleep(1)
-        except Exception:
-            pass
+        except Exception as err:
+            syslog.error(f"RPC: listener failed: {err}")
 
         self._server.shutdown()
         self._server.server_close()
@@ -153,13 +206,12 @@ class RPCGremlin:
             return
 
         config = gremlin.config.Configuration()
-        if not config.enable_remote_control:
-            syslog.info("Remote control disabled - Gremlin listener not started")
+        if not config.remoteEnabled():
+            syslog.info("Remote control/broadcast disabled - Gremlin listener not started")
             return
 
-        # register the devices we will need
-        vjoyid_list = [dev.vjoy_id for dev in gremlin.joystick_handling.joystick_devices() if dev.is_virtual]
-        for key in vjoyid_list:
+        # Pre-acquire connected vJoy devices for remote receive (also opens on demand later)
+        for key in gremlin.joystick_handling.vjoy_id_list(connected=True):
             try:
                 _device = gremlin.joystick_handling.VJoyProxy()[key]
                 syslog.info(f"Remote proxy VJOY [{key}] ok")
@@ -201,15 +253,34 @@ class RemoteServer(QtCore.QObject):
 
     def start(self):
         """start listening"""
-        if self._started:
+        if self._started and self._rpc is not None and self._rpc.running:
             return
         config = gremlin.config.Configuration()
-        self._enabled = config.enable_remote_control
-        if self._enabled:
-            self._rpc = RPCGremlin()
-            self._rpc.start()
+        # Masters need the listener too (identify replies / peer discovery).
+        # Clients need it to receive commands. Either remote flag is enough.
+        self._enabled = bool(config.remoteEnabled())
+        if not self._enabled:
+            syslog.info("Gremlin RPC server not started (remote control/broadcast disabled in Options)")
+            return
+        # Allow retry if a prior start claimed success but the listener never came up.
+        if self._rpc is not None and not self._rpc.running:
+            try:
+                self._rpc.stop()
+            except Exception:
+                pass
+            self._rpc = None
+            self._started = False
+        if self._started:
+            return
+        self._rpc = RPCGremlin()
+        self._rpc.start()
+        if self._rpc.running:
             syslog.info("Gremlin RPC server started...")
             self._started = True
+        else:
+            syslog.error("Gremlin RPC server failed to start listener")
+            self._started = False
+            self._rpc = None
 
     def stop(self):
         """stop listening"""
@@ -326,6 +397,8 @@ class RemoteClient:
         """creates a multicast client send socket on profile start"""
         if not self._started:
             if self.remote_control.remoteEnabled():
+                # Always bring the UDP listener up before sending identify.
+                remote_server.start()
                 if self.ensure_socket():
                     el = gremlin.event_handler.EventListener()
                     el.heartbeat.connect(self._alive_ticker)
@@ -372,21 +445,31 @@ class RemoteClient:
                 config = gremlin.config.Configuration()
                 broadcast_host = config.broadcast_host_ip
                 if broadcast_host == "127.0.0.1":
-                    if broadcast_host == "127.0.0.1":
-                        broadcast_host = gremlin.util.getHostIp()[0]
-                        syslog.warning(
-                            f"RPC: broadcast host is not configured (using localhost). Using [{broadcast_host}].  This may not be correct if you have multiple IP addresses."
-                        )
+                    broadcast_host = gremlin.util.getHostIp()[0]
+                    syslog.warning(
+                        f"RPC: broadcast host is not configured (using localhost). Using [{broadcast_host}].  This may not be correct if you have multiple IP addresses."
+                    )
 
-                bind_all = config.broadcast_bind_all_ips
                 port = config.server_port
                 self._address = (RPCGremlin.MULTICAST_GROUP, port)
                 self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 ttl = struct.pack("b", RPCGremlin.MULTICAST_TTL)
                 self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-                if bind_all and broadcast_host:
-                    self._sock.bind((broadcast_host, port))
-                    syslog.info(f"Gremlin RPC client started... IP: {broadcast_host} port: {port}")
+                # Never bind the *send* socket to server_port — that collides with the
+                # UDP listener and produces RPC socket errors / missed identify replies.
+                # Optionally pin the outbound multicast interface instead.
+                bind_all = config.broadcast_bind_all_ips
+                if (not bind_all) and broadcast_host and broadcast_host not in ("0.0.0.0", ""):
+                    try:
+                        self._sock.setsockopt(
+                            socket.IPPROTO_IP,
+                            socket.IP_MULTICAST_IF,
+                            socket.inet_aton(broadcast_host),
+                        )
+                        syslog.info(f"Gremlin RPC client started... iface {broadcast_host} port: {port}")
+                    except OSError as err:
+                        syslog.warning(f"RPC: could not set multicast iface {broadcast_host}: {err}")
+                        syslog.info(f"Gremlin RPC client started... ALL IP - port: {port}")
                 else:
                     syslog.info(f"Gremlin RPC client started... ALL IP - port: {port}")
             return self._sock is not None
@@ -400,7 +483,7 @@ class RemoteClient:
         enabled = gremlin.config.Configuration().remoteEnabled()
         if enabled:
             client = ClientData()
-            data = self.getDatablock("register_client", client.toPayload())
+            data = self.getDatablock("register_client", data=client.toPayload())
             self.send(data)  # send to all
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
@@ -410,7 +493,7 @@ class RemoteClient:
         enabled = gremlin.config.Configuration().remoteEnabled()
         if enabled:
             client = ClientData()
-            data = self.getDatablock("unregister_client", client.toPayload())
+            data = self.getDatablock("unregister_client", data=client.toPayload())
             self.send(data)  # send to all
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
@@ -502,8 +585,8 @@ class RemoteClient:
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 syslog.info(f"REMOTE OUTPUT: VJoyId: {device_id} hat: {hat_id} direction: {direction}")
-            payload = AxisData.create(device_id, hat_id, direction, action="value").toPayload()
-            data = self.getDatablock("hat", key=AxisData.key, data=payload)
+            payload = HatData.create(device_id, hat_id, direction, action="value").toPayload()
+            data = self.getDatablock("hat", key=HatData.key, data=payload)
             self._dispatch(data, client_list)
 
     def send_key(
@@ -711,29 +794,39 @@ class RemoteClient:
     def id(self):
         return self._id
 
-    def send(self, data=None, client_id: int = 0):
-        """sends data to the socket"""
-        if data:
-            data["sender_id"] = self.clientId
-            data["sender_name"] = self.clientName
-            data["to"] = client_id if client_id is not None else 0
+    def send(self, data=None, client_id: int = 0) -> bool:
+        """sends data to the socket. Returns True if a datagram was sent."""
+        if not data:
+            return False
+        data["sender_id"] = self.clientId
+        data["sender_name"] = self.clientName
+        data["to"] = client_id if client_id is not None else 0
 
-            # ensure started
-            remote_server.start()
+        # ensure listener is up when remote is enabled
+        remote_server.start()
 
-            verbose = gremlin.config.Configuration().verbose_mode_remote_extra
-            if verbose:
-                syslog.info(f"RPC:  send data {data}")
+        verbose = gremlin.config.Configuration().verbose_mode_remote_extra
+        if verbose:
+            syslog.info(f"RPC:  send data {data}")
 
-            # encode the data
+        # encode the data
+        try:
             raw_data = msgpack.packb(data)
-            if self._sock:
-                self._sock.sendto(raw_data, self._address)
-            else:
-                # retry connection
-                self.ensure_socket()
-                if self._sock:
-                    self._sock.sendto(raw_data, self._address)
+        except Exception as err:
+            syslog.error(f"RPC: msgpack failed: {err}")
+            return False
+
+        if not self._sock:
+            self.ensure_socket()
+        if not self._sock:
+            syslog.warning("RPC: send aborted — no outbound socket")
+            return False
+        try:
+            self._sock.sendto(raw_data, self._address)
+            return True
+        except OSError as err:
+            syslog.error(f"RPC: sendto failed: {err}")
+            return False
 
     def sendRequest(self, callback, payload: dict = None, client_id: str = None):
         """sends a packet request to clients expecting a response
@@ -780,8 +873,11 @@ class RemoteClient:
         syslog.info("RPC: send identify request")
         self.sendRequest(callback=callback, payload=payload)
 
-    def handle(self, data: dict):
-        """handles received data"""
+    def handle(self, data: dict, peer_ip: str = ""):
+        """handles received data
+
+        :param peer_ip: UDP source address when known (used for video return connect-back)
+        """
 
         sender = data["sender_id"]
         action = data["action"]
@@ -982,21 +1078,41 @@ class RemoteClient:
 
             case "identify":
                 # received a request to self identify to the network
-                data = self.getDatablock("identify_client", ClientData().toPayload())
-                self.send(data)  # send to all
+                try:
+                    data = self.getDatablock("identify_client", data=ClientData().toPayload())
+                    ok = self.send(data)  # send to all
+                    if not ok:
+                        syslog.warning("RPC: identify reply send failed (no socket?)")
+                    else:
+                        syslog.info("RPC: identify reply sent")
+                except Exception as err:
+                    syslog.error(f"RPC: identify reply failed: {err}")
 
             case "identify_client":
                 # request to register the specified client as a result of a prior "identify" request
-                payload = data["data"]
+                # Older T50L2R builds accidentally put the payload in "key" instead of "data".
+                payload = data.get("data")
+                if not isinstance(payload, dict):
+                    payload = data.get("key")
+                if not isinstance(payload, dict):
+                    syslog.warning(f"RPC: identify_client missing payload from {peer_ip}: keys={list(data.keys())}")
+                    return
                 cd = ClientData.fromPayload(payload)
-                if verbose:
-                    syslog.info(f"RPC: identity received: {str(cd)}")
+                if peer_ip and not getattr(cd, "host_ip", ""):
+                    cd.host_ip = peer_ip
+                syslog.info(
+                    f"RPC: identity received: {cd} version=[{cd.client_version}] ip=[{cd.host_ip}]"
+                )
 
                 self.remote_control.registerClient(cd)
 
             case "unregister_client":
                 # request to unregister the specified client
-                payload = data["data"]
+                payload = data.get("data")
+                if not isinstance(payload, dict):
+                    payload = data.get("key")
+                if not isinstance(payload, dict):
+                    return
                 cd = ClientData.fromPayload(payload)
                 if verbose:
                     syslog.info(f"RPC: disconnect received: {str(cd)}")
@@ -1054,7 +1170,7 @@ class RemoteClient:
                     vigem.update()
 
             case "button" | "axis" | "hat" | "relative_axis" | "toggle":
-                # joystick button
+                # joystick button / axis / hat — open vJoy on demand (do not require prior local claim)
 
                 relative_value = 0.0
                 payload = data["data"]
@@ -1064,73 +1180,59 @@ class RemoteClient:
                         device = packet.device_id
                         target = packet.button_id
                         value = packet.is_pressed
-                    case "axis" | "relative_Axis":
+                    case "axis" | "relative_axis" | "relative_Axis":
                         packet = AxisData().fromPayload(payload)
                         device = packet.device_id
                         target = packet.axis_id
                         value = packet.value
                         relative_value = packet.relative_value
                     case "hat":
-                        packet = HatData().fromPayload(payload)
-                        device = packet.device_id
-                        target = packet.hat_id
-                        value = packet.direction
+                        # Accept HatData; also tolerate legacy AxisData payloads (wrong key) from older masters
+                        try:
+                            packet = HatData().fromPayload(payload)
+                            device = packet.device_id
+                            target = packet.hat_id
+                            value = packet.direction
+                        except AssertionError:
+                            packet = AxisData().fromPayload(payload)
+                            device = packet.device_id
+                            target = packet.axis_id
+                            value = packet.value
 
-                # device = data["device"]
-                # target = data["target"]
-                # value = data["value"]
-                # if "relative_value" in data:
-                #     relative_value = data["relative_value"]
-                # else:
-                #     relative_value = 0.0
+                vid, vjoy = _open_remote_vjoy(device)
+                if vjoy is None:
+                    return
 
-                proxy = gremlin.joystick_handling.VJoyProxy()
-                if device in proxy.vjoy_devices:
-                    # valid device
-                    vjoy = proxy[device]
-
-                    match action:
-                        case "button":
-                            # emit button change
-
+                match action:
+                    case "button":
+                        if verbose:
+                            syslog.info(f"REMOTE: button vjoy {vid} input id: {target} pressed: {value}")
+                        if target > 0 and target <= vjoy.button_count:
+                            vjoy.button(target).is_pressed = value
+                    case "toggle":
+                        if verbose:
+                            syslog.info(f"REMOTE: button toggle vjoy {vid} input id: {target}")
+                        if target > 0 and target <= vjoy.button_count:
+                            vjoy.button(target).is_pressed = not vjoy.button(target).is_pressed
+                    case "axis" | "relative_axis" | "relative_Axis":
+                        if value is None:
+                            value = vjoy.axis(target).value
+                        if relative_value:
+                            value = gremlin.util.clamp(value + relative_value)
                             if verbose:
-                                syslog.info(f"REMOTE: button vjoy {device} input id: {target} pressed: {value}")
-                            if target > 0 and target < vjoy.button_count:
-                                proxy[device].button(target).is_pressed = value
-                        case "toggle":
-                            # emit toggle
+                                syslog.info(f"REMOTE: relative axis vjoy {vid} input id: {target} relative value: {relative_value:0.3f}")
+                        if target > 0 and target <= vjoy.axis_count:
                             if verbose:
-                                syslog.info(f"REMOTE: button toggle vjoy {device} input id: {target}")
-                            if target > 0 and target < vjoy.button_count:
-                                proxy[device].button(target).is_pressed = not proxy[device].button(target).is_pressed
-                        case "axis":
-                            if value is None:
-                                # relative mode = get the current value
-                                value = proxy[device].axis(target).value
-                            if relative_value:
-                                # apply the relative value
-                                value = gremlin.util.clamp(value + relative_value)
-                                if verbose:
-                                    syslog.info(f"REMOTE: relative axis vjoy {device} input id: {target} relative value: {relative_value:0.3f}")
-                            if target > 0 and target <= vjoy.axis_count:
-                                if verbose:
-                                    syslog.info(f"REMOTE: axis vjoy {device} input id: {target} {value:0.3f}")
-                                proxy[device].axis(target).value = value
-                        case "hat":
-                            if target > 0 and target <= vjoy.hat_count:
-                                if verbose:
-                                    syslog.info(f"REMOTE: hat vjoy {device} input id: {target} direction: {value}")
-                                proxy[device].hat(target).direction = value
-                        case "relative_axis":
-                            if target > 0 and target <= vjoy.axis_count:
-                                new_value = gremlin.util.clamp(proxy[device].axis(target).value + value)
-                                if verbose:
-                                    syslog.info(
-                                        f"REMOTE: relative axis vjoy {device} input id: {target} relative value: {value:0.3f} new value: {new_value:0.3f}"
-                                    )
-                                proxy[device].axis(target).value = new_value
-                        case _:
-                            syslog.error(f"REMOTE: unknown action code received [{action}]")
+                                stub = f"{value:0.3f}" if value is not None else "None"
+                                syslog.info(f"REMOTE: axis vjoy {vid} input id: {target} {stub}")
+                            vjoy.axis(target).value = value
+                    case "hat":
+                        if target > 0 and target <= vjoy.hat_count:
+                            if verbose:
+                                syslog.info(f"REMOTE: hat vjoy {vid} input id: {target} direction: {value}")
+                            vjoy.hat(target).direction = value
+                    case _:
+                        syslog.error(f"REMOTE: unknown action code received [{action}]")
 
             case "pause":
                 # pause client
@@ -1430,6 +1532,17 @@ class ClientData:
         self.custom_name = remote_client.customName if auto else None  # custom name of the client (optional)
         self.client_version = gremlin.shared_state.application_version if auto else None  # version of the client (optional)
         self.client_timestamp = gremlin.shared_state.application_start_time if auto else None  # start time of the client (optional)
+        self.host_ip = ""  # filled by receiver from UDP peer address
+        self.video_enabled = False
+        self.video_port = 0
+        if auto:
+            try:
+                cfg = gremlin.config.Configuration()
+                self.video_enabled = bool(cfg.enable_remote_control and cfg.remote_video_enabled)
+                self.video_port = int(cfg.remote_video_port) if self.video_enabled else 0
+            except Exception:
+                self.video_enabled = False
+                self.video_port = 0
 
     def getClientName(self):
         """gets the client name custom or system"""
@@ -1460,6 +1573,9 @@ class ClientData:
             "client_custom": self.custom_name,
             "client_version": self.client_version,
             "client_timestamp": self.client_timestamp,
+            "video_enabled": bool(self.video_enabled),
+            "video_port": int(self.video_port or 0),
+            "host_ip": str(self.host_ip or ""),
         }
 
     @staticmethod
@@ -1471,6 +1587,12 @@ class ClientData:
         cd.custom_name = data["client_custom"]
         cd.client_version = data["client_version"]
         cd.client_timestamp = data["client_timestamp"]
+        cd.video_enabled = bool(data.get("video_enabled", False))
+        try:
+            cd.video_port = int(data.get("video_port") or 0)
+        except (TypeError, ValueError):
+            cd.video_port = 0
+        cd.host_ip = str(data.get("host_ip") or "")
         return cd
 
     @property
@@ -1481,11 +1603,25 @@ class ClientData:
         return None
 
     def __hash__(self):
-        return hash((self.client_id, self.client_name, self.custom_name, self.client_version))
+        return hash((self.client_id, self.client_name, self.custom_name, self.client_version, self.video_enabled, self.video_port, self.host_ip))
+
+    def __eq__(self, other):
+        if not isinstance(other, ClientData):
+            return NotImplemented
+        return (
+            self.client_id == other.client_id
+            and self.client_name == other.client_name
+            and self.custom_name == other.custom_name
+            and self.client_version == other.client_version
+            and bool(self.video_enabled) == bool(other.video_enabled)
+            and int(self.video_port or 0) == int(other.video_port or 0)
+            and str(self.host_ip or "") == str(other.host_ip or "")
+        )
 
     def __str__(self):
         stub = f"({self.custom_name})" if self.custom_name else ""
-        return f"client: {stub}[{self.client_name}]/[{self.client_id}]"
+        video = f" video:{self.video_port}" if self.video_enabled else ""
+        return f"client: {stub}[{self.client_name}]/[{self.client_id}]{video}"
 
 
 @gremlin.singleton_decorator.SingletonDecorator
@@ -1600,12 +1736,10 @@ class RemoteControl:
             # fire an update event
 
         if changed:
-            el = gremlin.event_handler.EventListener()
             verbose = gremlin.config.Configuration().verbose_mode_remote
             if verbose:
                 syslog.info(f"RPC: new/updated client registered: {data}")
-
-            el.remote_control_client_change.emit()
+            self._emit_client_change()
 
     def unregisterClient(self, client_id: str):
         """unregisters a client"""
@@ -1616,8 +1750,19 @@ class RemoteControl:
                 syslog.info(f"RPC: new client unregistered: {data}")
             del self._clients[client_id]
 
-        el = gremlin.event_handler.EventListener()
-        el.remote_control_client_change.emit()
+        self._emit_client_change()
+
+    def _emit_client_change(self):
+        """Notify UI of client list changes on the UI thread (UDP handlers are not)."""
+        def _do():
+            el = gremlin.event_handler.EventListener()
+            el.remote_control_client_change.emit()
+
+        # is_ui_thread() is True when QApplication is not up yet (import-time init)
+        if gremlin.util.is_ui_thread():
+            _do()
+        else:
+            gremlin.util.InvokeUiMethod(_do)
 
     def _update(self, value):
         is_local = self._is_local
@@ -2023,13 +2168,17 @@ class RemoteConfig:
                         client.client_version,
                         client.custom_name,
                     )
-                    client.discovered = True
+                    if client.client_id in self._clients:
+                        self._clients[client.client_id].discovered = True
                     changed = True
                 else:
                     c1: RemoteClientData = self._clients[client_id]
                     # record changes
                     if c1.custom_name != client.custom_name:
                         c1.custom_name = client.custom_name
+                        changed = True
+                    if getattr(client, "client_version", None) and c1.client_version != client.client_version:
+                        c1.client_version = client.client_version
                         changed = True
 
             client: RemoteClientData

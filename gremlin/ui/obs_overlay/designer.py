@@ -95,6 +95,8 @@ WIDGET_TITLES = {
     "input_display": "Keyboard / Mouse",
     "shape": "Shape",
     "image": "Image",
+    "application": "Application",
+    "remote_view": "Remote View",
     "streamdeck": "Stream Deck",
 }
 
@@ -161,7 +163,13 @@ def _banner_type_help(item: dict) -> list[str]:
         lines.append(
             "Inspector: browse to a PNG, WebP, GIF, JPEG, or BMP, or Paste a screenshot from the clipboard "
             "(Windows Snipping Tool / Win+Shift+S). Ctrl+V on the canvas does the same. Formats with alpha keep transparency. "
-            "Keep aspect ratio is on by default."
+            "Keep aspect ratio is on by default. Right-click: Turn into button (image as off background, no label) "
+            "or Turn into paddle (image rotates around its center)."
+        )
+    elif widget_type == "application":
+        lines.append(
+            "Inspector: pick a running window to show inside this widget. Refresh the list if the app was started later. "
+            "Keep aspect ratio fits the capture; off stretches it. This widget has no joystick binding."
         )
     elif widget_type == "streamdeck":
         lines.append("Inspector: pick the deck (or First connected), follow the GEX page or set a page, Show bezel, Fit to device. No joystick binding.")
@@ -632,6 +640,8 @@ class DesignerCanvas(OverlayView):
         delete_point = None
         turn_button = None
         turn_shape = None
+        turn_image_button = None
+        turn_image_paddle = None
         save_custom = None
         item = self.scene.primary_selection()
         if uses_editable_points(item):
@@ -646,6 +656,11 @@ class DesignerCanvas(OverlayView):
             if button_uses_shape_path(item):
                 turn_shape = menu.addAction("Turn into shape")
             save_custom = menu.addAction("Save as custom shape…")
+        images = [w for w in self.scene.selected_widgets() if (w.get("type") or "") == "image"]
+        if images:
+            menu.addSeparator()
+            turn_image_button = menu.addAction("Turn into button")
+            turn_image_paddle = menu.addAction("Turn into paddle")
         chosen = menu.exec(event.globalPos())
         if chosen is paste_image:
             self.paste_clipboard_image(pos)
@@ -676,6 +691,10 @@ class DesignerCanvas(OverlayView):
         elif chosen is turn_shape:
             buttons = [w for w in self.scene.selected_widgets() if button_uses_shape_path(w)]
             self.scene.convert_widgets_to(buttons, "shape")
+        elif chosen is turn_image_button:
+            self.scene.convert_widgets_to(images, "button")
+        elif chosen is turn_image_paddle:
+            self.scene.convert_widgets_to(images, "axis_paddle")
         elif chosen is save_custom:
             self._save_custom_shape(item)
 

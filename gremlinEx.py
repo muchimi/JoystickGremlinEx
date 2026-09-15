@@ -43,6 +43,12 @@ from typing import Callable
 from collections.abc import Iterator
 import webbrowser
 
+# Remote-video helper process: take this path before UI / gremlinEx circular imports.
+if __name__ == "__main__" and "--remote-video-worker" in sys.argv:
+    from gremlin.remote_video import worker_main
+
+    raise SystemExit(worker_main(sys.argv))
+
 
 import filelock
 
@@ -161,7 +167,11 @@ from logging.handlers import RotatingFileHandler
 # Figure out the location of the code / executable and change the working
 # directory accordingly
 install_path = os.path.normcase(os.path.dirname(os.path.abspath(sys.argv[0])))
-os.chdir(install_path)
+if os.path.isdir(install_path):
+    try:
+        os.chdir(install_path)
+    except OSError:
+        pass
 
 syslog = logging.getLogger("system")
 
@@ -486,6 +496,12 @@ class GremlinUi(gremlin.ui.ui_common.QRememberMainWindow):
         # cleanup on shutdown
         if os.path.isfile(self._comparative_file):
             os.unlink(self._comparative_file)
+        try:
+            from gremlin.remote_video import RemoteVideoPublisher
+
+            RemoteVideoPublisher().stop()
+        except Exception:
+            pass
 
     def handle_tab_selected(self, device_guid):
         """persists the last selected device for the profile"""

@@ -65,6 +65,8 @@ WIDGET_TYPES = (
     "input_display",
     "shape",
     "image",
+    "application",
+    "remote_view",
     "streamdeck",
     "panel",  # legacy alias of shape
     "axis_dial",  # legacy alias of axis_radial
@@ -94,6 +96,8 @@ PALETTE_TYPES = (
     "input_display",
     "shape",
     "image",
+    "application",
+    "remote_view",
     "streamdeck",
 )
 
@@ -102,7 +106,7 @@ PALETTE_GROUPS = (
     ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder", "axis_paddle")),
     ("Double axis", ("axis_stick_square", "axis_crosshair", "axis_stick_circle", "axis_mouse")),
     ("Meters", ("sys_stats", "stopwatch")),
-    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "streamdeck")),
+    ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "application", "remote_view", "streamdeck")),
 )
 
 DEFAULT_SIZES = {
@@ -130,6 +134,8 @@ DEFAULT_SIZES = {
     "input_display": (560, 220),
     "shape": (280, 160),
     "image": (200, 120),
+    "application": (480, 270),
+    "remote_view": (480, 270),
     "streamdeck": (320, 208),
     "panel": (280, 160),
 }
@@ -159,6 +165,8 @@ DEFAULT_LABELS = {
     "input_display": "",
     "shape": "",
     "image": "",
+    "application": "",
+    "remote_view": "Remote",
     "streamdeck": "",
     "panel": "",
 }
@@ -250,6 +258,7 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "paddle_start_deg": 0.0,
                 "paddle_end_deg": 70.0,
                 "paddle_direction": "cw",
+                "paddle_image": "",
             }
         )
     elif widget_type == "axis_graph":
@@ -323,6 +332,12 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "font_size": 10,
                 "shape": "rounded",
                 "corner_radius": 5.0,
+                "appearance_mode": "press",
+                "appearance_state": "",
+                "appearance_state_id": "",
+                "image_path": "",
+                "image_path_on": "",
+                "image_keep_aspect": True,
             }
         )
     elif widget_type == "hat":
@@ -478,6 +493,33 @@ def default_style(widget_type: str) -> dict[str, Any]:
                 "image_keep_aspect": True,
             }
         )
+    elif widget_type == "application":
+        style.update(
+            {
+                "fill": "#0a0c10",
+                "border": "#2c3a52",
+                "border_width": 2.0,
+                "corner_radius": 6.0,
+                "opacity": 1.0,
+                "show_label": False,
+                "window_title": "",
+                "window_exe": "",
+                "image_keep_aspect": True,
+            }
+        )
+    elif widget_type == "remote_view":
+        style.update(
+            {
+                "fill": "#0a0c10",
+                "border": "#2c3a52",
+                "border_width": 2.0,
+                "corner_radius": 6.0,
+                "opacity": 1.0,
+                "show_label": False,
+                "remote_client_id": 0,
+                "image_keep_aspect": True,
+            }
+        )
     elif widget_type == "streamdeck":
         style.update(
             {
@@ -540,6 +582,8 @@ NO_BINDING_WIDGET_TYPES = (
     "panel",
     "shape",
     "image",
+    "application",
+    "remote_view",
     "streamdeck",
     "axis_mouse",
     "axis_graph",
@@ -757,7 +801,9 @@ def default_binding(axis_id: int = 1) -> dict[str, Any]:
         "input_type": "axis",
         "input_id": int(axis_id),
         "state_name": "",
+        "state_id": "",
         "mode_name": "",
+        "mode_id": "",
         "invert": False,
         "keys": [],
     }
@@ -1029,7 +1075,9 @@ def default_visibility_condition(kind: str = "mode") -> dict[str, Any]:
         "kind": normalize_visibility_kind(kind),
         "when": "on",
         "mode_name": "",
+        "mode_id": "",
         "state_name": "",
+        "state_id": "",
         "device_guid": "",
         "device_name": "",
         "vjoy_id": 0,
@@ -1054,7 +1102,9 @@ def normalize_visibility(raw) -> dict[str, Any]:
         item["kind"] = normalize_visibility_kind(item.get("kind"))
         item["when"] = "off" if str(item.get("when") or "on").casefold() == "off" else "on"
         item["mode_name"] = str(item.get("mode_name") or "")
+        item["mode_id"] = str(item.get("mode_id") or "")
         item["state_name"] = str(item.get("state_name") or "")
+        item["state_id"] = str(item.get("state_id") or "")
         item["device_guid"] = str(item.get("device_guid") or "")
         item["device_name"] = str(item.get("device_name") or "")
         try:
@@ -1166,13 +1216,26 @@ def button_appearance_mode(item: dict[str, Any] | None) -> str:
 def button_appearance_state_name(item: dict[str, Any] | None) -> str:
     """GEX state name when button appearance follows a state (ON/OFF fills)."""
     style = (item or {}).get("style") if isinstance(item, dict) else None
-    if isinstance(style, dict):
-        name = str(style.get("appearance_state") or style.get("appearance_state_name") or "").strip()
-        if name:
-            return name
-    if isinstance(item, dict):
-        return str(item.get("appearance_state") or item.get("appearance_state_name") or "").strip()
-    return ""
+    holder = style if isinstance(style, dict) else (item if isinstance(item, dict) else None)
+    if not isinstance(holder, dict):
+        return ""
+    sid = str(holder.get("appearance_state_id") or "").strip()
+    name = str(holder.get("appearance_state") or holder.get("appearance_state_name") or "").strip()
+    if sid or name:
+        try:
+            from gremlin.ui import state_device
+
+            sd = state_device.StateData()
+            state = sd.getStateById(sid) if sid else None
+            if state is None and name:
+                state = sd.getState(name)
+            if state is not None:
+                holder["appearance_state"] = state.key
+                holder["appearance_state_id"] = str(state.id)
+                return state.key
+        except Exception:
+            pass
+    return name
 
 
 def canonical_widget_type(widget_type: str) -> str:
@@ -1302,7 +1365,54 @@ class OverlayScene(QtCore.QObject):
         self._dirty = False
         self._save_later_pending = False
         self._sorted_cache: list[dict[str, Any]] | None = None
+        self._identity_hooks = False
         self._reset_default_pages(emit=False)
+        self._bind_identity_hooks()
+
+    def _bind_identity_hooks(self):
+        """Keep overlay state/mode names in sync with JG Ex unique IDs."""
+        if self._identity_hooks:
+            return
+        try:
+            from gremlin.ui import state_device
+
+            sd = state_device.StateData()
+            sd.key_changed.connect(self._on_identity_changed)
+            sd.crud.connect(self._on_identity_changed)
+        except Exception:
+            pass
+        try:
+            import gremlin.event_handler
+
+            el = gremlin.event_handler.EventListener()
+            el.mode_name_changed.connect(self._on_identity_changed)
+        except Exception:
+            pass
+        self._identity_hooks = True
+
+    def _on_identity_changed(self, *args):
+        if getattr(gremlin.shared_state, "profile_loading", False):
+            return
+        # Must rewrite cached names while StateData still has the old key
+        # (update_key deletes it after this signal returns).
+        if gremlin.util.is_ui_thread():
+            self.sync_identity_refs(emit=False)
+            return
+        gremlin.util.InvokeUiMethod(self._on_identity_changed_ui)
+
+    def _on_identity_changed_ui(self):
+        self.sync_identity_refs(emit=False)
+
+    def sync_identity_refs(self, emit: bool = False) -> bool:
+        """Rewrite cached state/mode names from unique IDs. Returns True if anything changed."""
+        from .bindings import sync_scene_identity_refs
+
+        changed = sync_scene_identity_refs(self)
+        if changed:
+            self._dirty = True
+            if emit:
+                self._emit()
+        return changed
 
     def _reset_default_pages(self, emit: bool = True):
         page = default_page("Overlay")
@@ -1648,7 +1758,7 @@ class OverlayScene(QtCore.QObject):
             y.pop("input_id_y", None)
             y.pop("invert_y", None)
         elif widget_type in XY_WIDGET_TYPES:
-            for key in ("source", "device_guid", "device_name", "vjoy_id", "state_name"):
+            for key in ("source", "device_guid", "device_name", "vjoy_id", "state_name", "state_id", "mode_name", "mode_id"):
                 if x.get(key) not in (None, ""):
                     y[key] = x.get(key)
             y["input_type"] = "axis"
@@ -1790,6 +1900,8 @@ class OverlayScene(QtCore.QObject):
             from .shapes import button_uses_shape_path
 
             keep_size = button_uses_shape_path(item)
+        if old_type == "image" and widget_type in ("button", "axis_paddle"):
+            keep_size = True
         if (
             not keep_size
             and old_size
@@ -1799,6 +1911,18 @@ class OverlayScene(QtCore.QObject):
             item["w"], item["h"] = int(new_size[0]), int(new_size[1])
         item["type"] = widget_type
         item["style"] = new_style
+        if old_type == "image" and widget_type == "button":
+            new_style["show_label"] = False
+            new_style["image_path"] = str(old_style.get("image_path") or "")
+            new_style.setdefault("image_keep_aspect", True)
+            item["label"] = ""
+        elif old_type == "image" and widget_type == "axis_paddle":
+            new_style["show_label"] = False
+            new_style["paddle_image"] = str(old_style.get("image_path") or "")
+            paddle_defaults = default_style("axis_paddle")
+            new_style["fill"] = paddle_defaults.get("fill")
+            new_style["fill_on"] = paddle_defaults.get("fill_on")
+            item["label"] = ""
         if widget_uses_series(widget_type):
             item["series"] = normalize_graph_series(item.get("series"))
             if not item["series"]:
@@ -2355,6 +2479,7 @@ class OverlayScene(QtCore.QObject):
                     pass
         if isinstance(data, dict) and (data.get("pages") or data.get("widgets") or data.get("canvas")):
             self.from_dict(data)
+            self.sync_identity_refs(emit=False)
             self._dirty = False
             self._undo.clear()
             self._redo.clear()

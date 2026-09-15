@@ -1563,17 +1563,19 @@ class AbstractCallbackModel(AbstractModel):
         if not self._can_sort():
             # nothing to do
             return
-        items = self._filtered_item_map.keys()  # iterable
+        items = list(self._filtered_item_map.keys())
+        if not items:
+            return
         indices = self._sort_callback(items)
         if indices is None:
             # callback returning nothing means no sort - skip
             return
+        # Materialize generators before validation / zip (do not consume twice).
+        indices = list(indices)
+        if not indices:
+            return
         if __debug__:
-            # check the data
-            if not indices:
-                return  # no data = nothing to do
-            unique = set(indices)  # ensure unique
-            # ensure unduplicated
+            unique = set(indices)
             count = len(self._filtered_item_map)
 
             if len(unique) != count:
@@ -1594,6 +1596,55 @@ class AbstractCallbackModel(AbstractModel):
             self._filtered_item_map[item] = index
         if emit:
             self._fireChanged()
+
+    def sort(self, callback=None, emit=True):
+        """Sort filtered items.
+
+        Device tabs call ``model.sort(self._sort_callback)`` where the callback is
+        ``callback(items: list) -> list`` of sorted items (sorted in place ok).
+
+        Without a callback, uses the model's configured sort via :meth:`applySort`.
+        """
+        if callback is None:
+            self.applySort(emit=emit)
+            return
+
+        items = list(self._filtered_index_map.values())
+        if not items:
+            items = list(self._index_map.values())
+        if not items:
+            return
+
+        sorted_items = callback(list(items))
+        if sorted_items is None:
+            return
+        sorted_items = list(sorted_items)
+        if not sorted_items:
+            return
+
+        self.pushSuspend()
+        try:
+            self._filtered_index_map = TriggerDict()
+            self._filtered_item_map = TriggerDict()
+            self._filtered_index_map.addCallback(self._handle_data_changed)
+            for index, item in enumerate(sorted_items):
+                self._filtered_index_map[index] = item
+                self._filtered_item_map[item] = index
+
+            # Keep the unfiltered maps in the same visible order when they match 1:1.
+            if len(self._index_map) == len(sorted_items):
+                self._index_map = TriggerDict()
+                self._item_map = TriggerDict()
+                self._index_map.addCallback(self._handle_data_changed)
+                for index, item in enumerate(sorted_items):
+                    self._index_map[index] = item
+                    self._item_map[item] = index
+        finally:
+            self.popSuspend()
+
+        if emit:
+            self._fireChanged()
+            self._notify_changed(data=self, operation="sort")
 
     def setFilteredEnabled(self, value: bool, emit=True):
         """enables or disables the filter - has no effect is no filtering is setup"""

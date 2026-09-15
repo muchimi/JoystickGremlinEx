@@ -3292,16 +3292,17 @@ class InputItemListModel(AbstractCallbackModel):
         else:
             super().clear(emit=emit)
 
-    def _handle_sort(self, items) -> tuple:
-        """returns a sort list for the items if a custom handler was not provided"""
-        # sort by input sortkey
-        if self._can_sort:
-            data = [(item, item.sortKey) for item in items]
-            data.sort(key=lambda x: x[1])
-            # sequence the list
-            indices = (data.index(x) for x in data)
-            return indices
-        return None  # unchanged
+    def _handle_sort(self, items) -> list:
+        """returns new indices for items ordered by sortKey (for applySort)."""
+        items = list(items)
+        if not items:
+            return []
+        # ordered[new_pos] = old_pos
+        ordered = sorted(range(len(items)), key=lambda i: items[i].sortKey)
+        indices = [0] * len(items)
+        for new_pos, old_pos in enumerate(ordered):
+            indices[old_pos] = new_pos
+        return indices
 
     @property
     def display_name(self) -> str:

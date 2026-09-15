@@ -3775,13 +3775,16 @@ class Profile:
 
         node.name = new_mode
 
-        # mode device objects
+        # mode device objects — ProfileModeNode.id is unchanged; only the name moves
         mode: ProfileModeNode
         for device in self.devices.values():
             for mode in device.modes.values():
                 if mode.name == old_mode:
                     # if verbose: syslog.info(f"PROFILE: rename [{old_mode}] to [{new_mode}]")
                     mode.name = new_mode
+
+        el = gremlin.event_handler.EventListener()
+        el.mode_name_changed.emit(old_mode, new_mode)
 
         return True
 

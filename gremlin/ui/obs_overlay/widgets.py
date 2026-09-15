@@ -426,6 +426,44 @@ def _widget_image_pixmap(path: str) -> QtGui.QPixmap:
     return pixmap
 
 
+def _fitted_pixmap_rect(pixmap: QtGui.QPixmap, rect: QtCore.QRectF, keep_aspect: bool) -> tuple[QtCore.QRectF, QtGui.QPixmap]:
+    mode = QtCore.Qt.KeepAspectRatio if keep_aspect else QtCore.Qt.IgnoreAspectRatio
+    scaled = pixmap.scaled(rect.size().toSize(), mode, QtCore.Qt.SmoothTransformation)
+    return QtCore.QRectF(
+        rect.center().x() - scaled.width() / 2.0,
+        rect.center().y() - scaled.height() / 2.0,
+        scaled.width(),
+        scaled.height(),
+    ), scaled
+
+
+def _draw_fitted_pixmap(painter: QtGui.QPainter, pixmap: QtGui.QPixmap, rect: QtCore.QRectF, keep_aspect: bool):
+    if pixmap.isNull():
+        return
+    painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
+    target, scaled = _fitted_pixmap_rect(pixmap, rect, keep_aspect)
+    painter.drawPixmap(target.toRect(), scaled)
+
+
+def _button_outline_path(item: dict[str, Any], rect: QtCore.QRectF) -> QtGui.QPainterPath:
+    if button_uses_shape_path(item):
+        return shape_path(item)
+    style = item.get("style") or {}
+    path = QtGui.QPainterPath()
+    shape = (style.get("shape") or "rounded").casefold()
+    radius = float(style.get("corner_radius") or 6)
+    if shape == "circle":
+        side = min(rect.width(), rect.height())
+        path.addEllipse(QtCore.QRectF(rect.center().x() - side / 2, rect.center().y() - side / 2, side, side))
+    elif shape == "pill":
+        return _rounded(rect, rect.height() / 2)
+    elif shape == "rect":
+        path.addRect(rect)
+    else:
+        return _rounded(rect, radius)
+    return path
+
+
 def paint_image(painter: QtGui.QPainter, item: dict[str, Any], value):
     style = item.get("style") or {}
     rect = widget_rect(item)
@@ -449,21 +487,111 @@ def paint_image(painter: QtGui.QPainter, item: dict[str, Any], value):
         painter.restore()
         return
     keep_aspect = bool(style.get("image_keep_aspect", True))
-    mode = QtCore.Qt.KeepAspectRatio if keep_aspect else QtCore.Qt.IgnoreAspectRatio
-    painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
-    scaled = pixmap.scaled(rect.size().toSize(), mode, QtCore.Qt.SmoothTransformation)
-    target = QtCore.QRectF(
-        rect.center().x() - scaled.width() / 2.0,
-        rect.center().y() - scaled.height() / 2.0,
-        scaled.width(),
-        scaled.height(),
-    )
-    painter.drawPixmap(target.toRect(), scaled)
+    _draw_fitted_pixmap(painter, pixmap, rect, keep_aspect)
     if border_w > 0:
         painter.setBrush(QtCore.Qt.NoBrush)
         painter.setPen(_pen(style.get("border"), border_w))
         painter.drawRect(rect)
     _draw_label(painter, item, rect)
+    painter.restore()
+
+
+def paint_remote_view(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """Live remote client screen/app feed (master Overlay)."""
+    from gremlin.remote_video import RemoteVideoHub
+
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    try:
+        radius = max(0.0, float(style.get("corner_radius") or 0))
+    except (TypeError, ValueError):
+        radius = 0.0
+    border_w = _border_w(style)
+    painter.setPen(_pen(style.get("border"), border_w))
+    painter.setBrush(qcolor(style.get("fill"), "#0a0c10"))
+    if radius > 0.05:
+        painter.drawRoundedRect(rect, radius, radius)
+    else:
+        painter.drawRect(rect)
+
+    try:
+        client_id = int(style.get("remote_client_id") or 0)
+    except (TypeError, ValueError):
+        client_id = 0
+    hub = RemoteVideoHub()
+    pixmap = hub.pixmap(client_id) if client_id else None
+    if pixmap is not None and not pixmap.isNull():
+        keep = bool(style.get("image_keep_aspect", True))
+        mode = QtCore.Qt.KeepAspectRatio if keep else QtCore.Qt.IgnoreAspectRatio
+        scaled = pixmap.scaled(rect.size().toSize(), mode, QtCore.Qt.FastTransformation)
+        target = QtCore.QRectF(
+            rect.center().x() - scaled.width() / 2.0,
+            rect.center().y() - scaled.height() / 2.0,
+            scaled.width(),
+            scaled.height(),
+        )
+        clip = QtGui.QPainterPath()
+        if radius > 0.05:
+            clip.addRoundedRect(rect, radius, radius)
+        else:
+            clip.addRect(rect)
+        painter.setClipPath(clip)
+        painter.drawPixmap(target.toRect(), scaled)
+        painter.setClipping(False)
+    else:
+        painter.setPen(qcolor(style.get("font_color"), "#8899aa"))
+        msg = hub.feed_status(client_id)
+        painter.drawText(rect, int(QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap), msg)
+    # Don't stack the widget title over the status / live picture.
+    if pixmap is not None and not pixmap.isNull():
+        _draw_label(painter, item, rect)
+    elif not client_id:
+        _draw_label(painter, item, rect)
+    painter.restore()
+
+
+def paint_application(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """Live capture of a local running application window."""
+    from .app_view import ApplicationViewTracker
+
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    try:
+        radius = max(0.0, float(style.get("corner_radius") or 0))
+    except (TypeError, ValueError):
+        radius = 0.0
+    border_w = _border_w(style)
+    painter.setPen(_pen(style.get("border"), border_w))
+    painter.setBrush(qcolor(style.get("fill"), "#0a0c10"))
+    if radius > 0.05:
+        painter.drawRoundedRect(rect, radius, radius)
+    else:
+        painter.drawRect(rect)
+
+    tracker = ApplicationViewTracker()
+    tracker.sample(item)
+    pixmap = tracker.pixmap(item)
+    if pixmap is not None and not pixmap.isNull():
+        keep = bool(style.get("image_keep_aspect", True))
+        clip = QtGui.QPainterPath()
+        if radius > 0.05:
+            clip.addRoundedRect(rect, radius, radius)
+        else:
+            clip.addRect(rect)
+        painter.setClipPath(clip)
+        _draw_fitted_pixmap(painter, pixmap, rect, keep)
+        painter.setClipping(False)
+        _draw_label(painter, item, rect)
+    else:
+        painter.setPen(qcolor(style.get("font_color"), "#8899aa"))
+        msg = tracker.status(item) or "Select a running application"
+        painter.drawText(rect, int(QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap), msg)
+        if not (style.get("window_title") or style.get("window_exe")):
+            _draw_label(painter, item, rect)
     painter.restore()
 
 
@@ -745,26 +873,29 @@ def paint_button(painter: QtGui.QPainter, item: dict[str, Any], value):
     on = _pressed(value)
     fill = style.get("fill_on") if on else style.get("fill")
     border = style.get("border_on") if on else style.get("border")
+    off_pm = _widget_image_pixmap(str(style.get("image_path") or ""))
+    on_pm = _widget_image_pixmap(str(style.get("image_path_on") or ""))
+    if on and not on_pm.isNull():
+        image = on_pm
+    elif (not on) and not off_pm.isNull():
+        image = off_pm
+    else:
+        image = QtGui.QPixmap()
+    outline = _button_outline_path(item, rect)
     painter.save()
     painter.setOpacity(_opacity(style))
     painter.setPen(_pen(border, _border_w(style)))
     painter.setBrush(qcolor(fill, "#3a1518"))
-    if button_uses_shape_path(item):
-        painter.drawPath(shape_path(item))
-        _draw_label(painter, item, rect)
+    painter.drawPath(outline)
+    if not image.isNull():
+        painter.save()
+        painter.setClipPath(outline)
+        _draw_fitted_pixmap(painter, image, rect, bool(style.get("image_keep_aspect", True)))
         painter.restore()
-        return
-    shape = (style.get("shape") or "rounded").casefold()
-    radius = float(style.get("corner_radius") or 6)
-    if shape == "circle":
-        side = min(rect.width(), rect.height())
-        painter.drawEllipse(QtCore.QRectF(rect.center().x() - side / 2, rect.center().y() - side / 2, side, side))
-    elif shape == "pill":
-        painter.drawPath(_rounded(rect, rect.height() / 2))
-    elif shape == "rect":
-        painter.drawRect(rect)
-    else:
-        painter.drawPath(_rounded(rect, radius))
+        if _border_w(style) > 0:
+            painter.setBrush(QtCore.Qt.NoBrush)
+            painter.setPen(_pen(border, _border_w(style)))
+            painter.drawPath(outline)
     _draw_label(painter, item, rect)
     painter.restore()
 
@@ -2512,6 +2643,8 @@ _PAINTERS = {
     "shape": paint_shape,
     "panel": paint_shape,
     "image": paint_image,
+    "application": paint_application,
+    "remote_view": paint_remote_view,
     "streamdeck": paint_streamdeck,
 }
 
@@ -2547,7 +2680,7 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
     local = scene_to_widget_local(item, x, y)
     x, y = local.x(), local.y()
     rect = widget_rect(item)
-    if widget_type in ("label", "panel", "shape", "image", "streamdeck", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch", "input_display"):
+    if widget_type in ("label", "panel", "shape", "image", "application", "remote_view", "streamdeck", "button", "axis_mouse", "axis_graph", "axis_bars", "sys_stats", "stopwatch", "input_display"):
         return None
     if widget_type == "switch_4way":
         geo = _switch_4way_geometry(item)

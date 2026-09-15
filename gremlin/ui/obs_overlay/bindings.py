@@ -74,6 +74,237 @@ def profile_mode_choices() -> list[tuple[str, str]]:
         return [("Default", "Default")]
 
 
+def overlay_id_str(value) -> str:
+    return str(value).strip() if value is not None else ""
+
+
+def overlay_ids_equal(left, right) -> bool:
+    a = overlay_id_str(left)
+    b = overlay_id_str(right)
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    na = a.replace("-", "").replace("{", "").replace("}", "").casefold()
+    nb = b.replace("-", "").replace("{", "").replace("}", "").casefold()
+    return bool(na) and na == nb
+
+
+def find_overlay_state(state_id=None, state_name=None):
+    """Resolve a GEX state by unique ID, then by name. Returns the StateInputItem or None."""
+    try:
+        from gremlin.ui import state_device
+
+        sd = state_device.StateData()
+    except Exception:
+        return None
+    sid = overlay_id_str(state_id)
+    if sid:
+        state = sd.getStateById(sid)
+        if state is not None:
+            return state
+    name = str(state_name or "").strip()
+    if name:
+        return sd.getState(name)
+    return None
+
+
+def resolve_overlay_state(data: dict[str, Any] | None, name_key: str = "state_name", id_key: str = "state_id"):
+    """Look up a state from a binding/condition dict and rewrite cached name/id in place."""
+    if not isinstance(data, dict):
+        return None
+    state = find_overlay_state(data.get(id_key), data.get(name_key))
+    if state is None:
+        return None
+    data[id_key] = overlay_id_str(state.id)
+    data[name_key] = state.key
+    return state
+
+
+def _iter_profile_modes():
+    profile = gremlin.shared_state.current_profile
+    if profile is None:
+        return
+    devices = getattr(profile, "devices", None) or {}
+    for device in devices.values():
+        modes = getattr(device, "modes", None) or {}
+        for mode in modes.values():
+            yield mode
+
+
+def overlay_mode_id_for_name(mode_name: str) -> str:
+    name = str(mode_name or "").strip()
+    if not name:
+        return ""
+    for mode in _iter_profile_modes():
+        if str(getattr(mode, "name", "") or "") == name:
+            return overlay_id_str(getattr(mode, "id", ""))
+    return ""
+
+
+def resolve_overlay_mode(mode_id=None, mode_name=None) -> tuple[str, str]:
+    """Return (mode_id, current_name) using ProfileModeNode.id, then name fallback."""
+    mid = overlay_id_str(mode_id)
+    if mid:
+        for mode in _iter_profile_modes():
+            if overlay_ids_equal(getattr(mode, "id", ""), mid):
+                return mid, str(getattr(mode, "name", "") or "")
+    name = str(mode_name or "").strip()
+    if name:
+        found = overlay_mode_id_for_name(name)
+        return found, name
+    return "", ""
+
+
+def sync_overlay_mode_fields(data: dict[str, Any] | None, name_key: str = "mode_name", id_key: str = "mode_id") -> bool:
+    if not isinstance(data, dict):
+        return False
+    if not data.get(id_key) and not data.get(name_key):
+        return False
+    mid, name = resolve_overlay_mode(data.get(id_key), data.get(name_key))
+    changed = False
+    if mid and data.get(id_key) != mid:
+        data[id_key] = mid
+        changed = True
+    if name and data.get(name_key) != name:
+        data[name_key] = name
+        changed = True
+    return changed
+
+
+def sync_overlay_state_fields(
+    data: dict[str, Any] | None,
+    name_key: str = "state_name",
+    id_key: str = "state_id",
+) -> bool:
+    if not isinstance(data, dict):
+        return False
+    if not data.get(id_key) and not data.get(name_key):
+        return False
+    before_id, before_name = data.get(id_key), data.get(name_key)
+    state = resolve_overlay_state(data, name_key, id_key)
+    if state is None:
+        return False
+    return data.get(id_key) != before_id or data.get(name_key) != before_name
+
+
+def _iter_identity_dicts(item: dict[str, Any]):
+    for key in ("binding", "binding_y"):
+        value = item.get(key)
+        if isinstance(value, dict):
+            yield value
+    bindings = item.get("bindings")
+    if isinstance(bindings, dict):
+        for value in bindings.values():
+            if isinstance(value, dict):
+                yield value
+    vis = item.get("visibility")
+    if isinstance(vis, dict):
+        for cond in vis.get("conditions") or []:
+            if isinstance(cond, dict):
+                yield cond
+    style = item.get("style")
+    if isinstance(style, dict):
+        yield style
+    for series in item.get("series") or []:
+        if isinstance(series, dict):
+            yield series
+    for stat in item.get("stats") or []:
+        if not isinstance(stat, dict):
+            continue
+        for key in ("binding", "binding_y", "binding_z"):
+            value = stat.get(key)
+            if isinstance(value, dict):
+                yield value
+
+
+def sync_identity_dict(data: dict[str, Any] | None) -> bool:
+    if not isinstance(data, dict):
+        return False
+    changed = sync_overlay_state_fields(data)
+    changed = sync_overlay_mode_fields(data) or changed
+    if "appearance_state" in data or "appearance_state_id" in data:
+        changed = sync_overlay_state_fields(data, "appearance_state", "appearance_state_id") or changed
+    return changed
+
+
+def sync_scene_identity_refs(scene) -> bool:
+    """Walk overlay pages and rewrite cached names from unique IDs."""
+    changed = False
+    pages = getattr(scene, "pages", None) or []
+    for page in pages:
+        canvas = page.get("canvas") if isinstance(page, dict) else None
+        if isinstance(canvas, dict):
+            toggle = canvas.get("toggle_binding")
+            if isinstance(toggle, dict):
+                changed = sync_identity_dict(toggle) or changed
+        widgets = page.get("widgets") if isinstance(page, dict) else None
+        for item in widgets or []:
+            if not isinstance(item, dict):
+                continue
+            for data in _iter_identity_dicts(item):
+                changed = sync_identity_dict(data) or changed
+    return changed
+
+
+def populate_overlay_state_combo(combo, state_id=None, state_name=None):
+    """Fill a combo with current GEX states; select by unique ID with name fallback."""
+    combo.setEditable(False)
+    combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
+    combo.clear()
+    combo.addItem("", "")
+    resolved = find_overlay_state(state_id, state_name)
+    selected_id = overlay_id_str(resolved.id) if resolved is not None else overlay_id_str(state_id)
+    index = 0
+    try:
+        from gremlin.ui import state_device
+
+        states = list(state_device.StateData().getStates().values())
+    except Exception:
+        states = []
+    for state in states:
+        sid = overlay_id_str(state.id)
+        combo.addItem(state.key, sid)
+        if selected_id and overlay_ids_equal(sid, selected_id):
+            index = combo.count() - 1
+    if index == 0 and (selected_id or overlay_id_str(state_name)):
+        label = (resolved.key if resolved is not None else overlay_id_str(state_name)) or selected_id
+        combo.addItem(f"{label} (missing)", selected_id)
+        index = combo.count() - 1
+    combo.setCurrentIndex(index)
+
+
+def populate_overlay_mode_combo(combo, mode_id=None, mode_name=None):
+    """Fill a combo with profile modes; select by ProfileModeNode ID with name fallback."""
+    combo.clear()
+    combo.addItem("", "")
+    _mid, name = resolve_overlay_mode(mode_id, mode_name)
+    index = 0
+    for display, stored in profile_mode_choices():
+        combo.addItem(display, stored)
+        if name and stored == name:
+            index = combo.count() - 1
+    if index == 0 and name:
+        combo.addItem(f"{name} (missing)", name)
+        index = combo.count() - 1
+    combo.setCurrentIndex(index)
+
+
+def overlay_state_combo_fields(combo) -> dict[str, str]:
+    sid = overlay_id_str(combo.currentData())
+    name = combo.currentText().replace(" (missing)", "").strip() if sid else ""
+    return {"state_id": sid, "state_name": name, "input_type": "state"}
+
+
+def overlay_mode_combo_fields(combo) -> dict[str, str]:
+    name = overlay_id_str(combo.currentData())
+    return {
+        "mode_name": name,
+        "mode_id": overlay_mode_id_for_name(name) if name else "",
+        "input_type": "mode",
+    }
+
+
 def _set_profile_mode(mode_name: str) -> bool:
     name = str(mode_name or "").strip()
     if not name:
@@ -171,16 +402,19 @@ def read_button(binding: dict[str, Any]) -> bool:
     source = (binding.get("source") or "physical").casefold()
     if source == "state":
         try:
-            from gremlin.ui import state_device
-
-            name = binding.get("state_name") or ""
-            value = state_device.StateData().getValue(name)
-            return bool(value)
+            state = resolve_overlay_state(binding)
+            if state is None:
+                return False
+            return bool(state.value)
         except Exception as err:
-            _warn_once(f"state:{binding.get('state_name')}", f"OBS OVERLAY: state read failed: {err}")
+            _warn_once(f"state:{binding.get('state_id') or binding.get('state_name')}", f"OBS OVERLAY: state read failed: {err}")
             return False
     if source == "mode":
-        name = str(binding.get("mode_name") or "").strip()
+        _mid, name = resolve_overlay_mode(binding.get("mode_id"), binding.get("mode_name"))
+        if name:
+            binding["mode_name"] = name
+            if _mid:
+                binding["mode_id"] = _mid
         return bool(name) and current_profile_mode() == name
     if source in ("keyboard", "keyboard/mouse", "mouse"):
         return read_keyboard(binding)
@@ -297,6 +531,9 @@ def binding_for_axis(item: dict[str, Any], axis: str = "x") -> dict[str, Any]:
         or y_bind.get("vjoy_id")
         or y_bind.get("input_id")
         or y_bind.get("state_name")
+        or y_bind.get("state_id")
+        or y_bind.get("mode_name")
+        or y_bind.get("mode_id")
     ):
         return dict(y_bind)
     if x_bind.get("input_id_y"):
@@ -329,9 +566,9 @@ def binding_is_configured(binding: dict[str, Any] | None) -> bool:
     source = (binding.get("source") or "physical").casefold()
     kind = (binding.get("input_type") or "").casefold()
     if source == "mode" or kind == "mode":
-        return bool(str(binding.get("mode_name") or "").strip())
+        return bool(str(binding.get("mode_id") or binding.get("mode_name") or "").strip())
     if source == "state" or kind == "state":
-        return bool(str(binding.get("state_name") or "").strip())
+        return bool(str(binding.get("state_id") or binding.get("state_name") or "").strip())
     if source in ("keyboard", "keyboard/mouse", "mouse") or kind == "keyboard":
         return bool(binding.get("keys"))
     try:
@@ -410,9 +647,19 @@ def visibility_binding(condition: dict[str, Any] | None) -> dict[str, Any]:
     cond = condition or {}
     kind = str(cond.get("kind") or "mode").casefold()
     if kind == "mode":
-        return {"source": "mode", "mode_name": str(cond.get("mode_name") or ""), "input_type": "mode"}
+        return {
+            "source": "mode",
+            "mode_name": str(cond.get("mode_name") or ""),
+            "mode_id": str(cond.get("mode_id") or ""),
+            "input_type": "mode",
+        }
     if kind == "state":
-        return {"source": "state", "state_name": str(cond.get("state_name") or ""), "input_type": "state"}
+        return {
+            "source": "state",
+            "state_name": str(cond.get("state_name") or ""),
+            "state_id": str(cond.get("state_id") or ""),
+            "input_type": "state",
+        }
     if kind == "keyboard":
         return {"source": "keyboard", "input_type": "keyboard", "keys": list(cond.get("keys") or [])}
     if kind == "vjoy":
@@ -518,18 +765,22 @@ def write_button(binding: dict[str, Any] | None, pressed: bool) -> bool:
     source = binding_source(binding)
     if source == "state":
         try:
+            state = resolve_overlay_state(binding)
+            if state is None:
+                return False
             from gremlin.ui import state_device
 
-            name = str(binding.get("state_name") or "").strip()
-            if not name:
-                return False
-            state_device.StateData().setValue(name, bool(pressed), emit=True, force=True)
+            state_device.StateData().setValue(state.key, bool(pressed), emit=True, force=True)
             return True
         except Exception as err:
-            _warn_once(f"write-state:{binding.get('state_name')}", f"OBS OVERLAY: state write failed: {err}")
+            _warn_once(f"write-state:{binding.get('state_id') or binding.get('state_name')}", f"OBS OVERLAY: state write failed: {err}")
             return False
     if source == "mode":
-        name = str(binding.get("mode_name") or "").strip()
+        _mid, name = resolve_overlay_mode(binding.get("mode_id"), binding.get("mode_name"))
+        if name:
+            binding["mode_name"] = name
+            if _mid:
+                binding["mode_id"] = _mid
         if not name:
             return False
         if pressed:
@@ -726,8 +977,20 @@ def read_widget_value(item: dict[str, Any]):
         if widget_type == "label" and (item.get("style") or {}).get("show_current_mode"):
             return current_profile_mode()
         return None
+    if widget_type == "application":
+        from .app_view import ApplicationViewTracker
+
+        return ApplicationViewTracker().sample(item)
     if widget_type == "streamdeck":
         return _streamdeck_overlay_value(item)
+    if widget_type == "remote_view":
+        from gremlin.remote_video import RemoteVideoHub
+
+        try:
+            client_id = int((item.get("style") or {}).get("remote_client_id") or 0)
+        except (TypeError, ValueError):
+            client_id = 0
+        return RemoteVideoHub().generation(client_id) if client_id else 0
     if widget_type == "axis_mouse":
         from .mouse_track import MouseOverlayTracker
 
@@ -935,6 +1198,8 @@ class OverlayValueBus(QtCore.QObject):
         stopwatch_ids = set()
         input_display_ids = set()
         manual_ids = set()
+        remote_ids = set()
+        application_ids = set()
         for item in self._scene_widgets:
             widget_id = item.get("id")
             widget_type = item.get("type")
@@ -954,6 +1219,15 @@ class OverlayValueBus(QtCore.QObject):
                     sid = str((entry or {}).get("id") or "")
                     if sid:
                         manual_ids.add(f"{widget_id}:{sid}")
+            if widget_type == "application" and widget_id:
+                application_ids.add(widget_id)
+            if widget_type == "remote_view":
+                try:
+                    cid = int((item.get("style") or {}).get("remote_client_id") or 0)
+                except (TypeError, ValueError):
+                    cid = 0
+                if cid:
+                    remote_ids.add(cid)
             if widget_id in self._locked:
                 continue
             value = read_widget_value(item)
@@ -967,12 +1241,16 @@ class OverlayValueBus(QtCore.QObject):
         from .stopwatch_track import StopwatchOverlayTracker
         from .input_display import KeyboardMouseTracker
         from .sys_stats import ManualCounterTracker
+        from .app_view import ApplicationViewTracker
+        from gremlin.remote_video import RemoteVideoHub
 
         MouseOverlayTracker().retain(mouse_ids)
         GraphOverlayTracker().retain(graph_keys)
         StopwatchOverlayTracker().retain(stopwatch_ids)
         KeyboardMouseTracker().retain(input_display_ids)
         ManualCounterTracker().retain(manual_ids)
+        ApplicationViewTracker().retain(application_ids)
+        RemoteVideoHub().retain(remote_ids)
         if ManualCounterTracker().take_persist_dirty():
             try:
                 from gremlin.ui.obs_overlay import OverlayManager
