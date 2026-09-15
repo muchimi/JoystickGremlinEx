@@ -17533,3 +17533,5 @@ class QDataRepeaterWidget(QtWidgets.QWidget):
 
     def value(self) -> float:
         return self._value
+
+

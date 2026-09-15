@@ -189,6 +189,8 @@ class ProfileDeviceNode:
             return self._device.device_id
         return str(self.device_guid)
 
+    
+
     def getModeNode(self, mode: str, system: bool = None, autocreate=False):
         """gets the mode object for the given mode
         :param mode: the mode name (case sensitive)

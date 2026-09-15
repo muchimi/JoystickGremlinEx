@@ -1403,47 +1403,56 @@ class Voice:
         :return: True if the volume was successfully set, False otherwise.
         """
 
-        # 1. Create the base Windows device enumerator
-        enumerator = comtypes.CoCreateInstance(
-            CLSID_MMDeviceEnumerator,
-            IMMDeviceEnumerator,
-            comtypes.CLSCTX_INPROC_SERVER
-        )
-
-        # 2. Get only active CAPTURE (input) devices (1 = eCapture)
-        # This prevents scanning rendering devices or disconnected endpoints
-        collection = enumerator.EnumAudioEndpoints(
-            EDataFlow.eCapture.value,
-            DEVICE_STATE.ACTIVE.value
-        )
-
-        count = collection.GetCount()
-
-        target_dev = None
+        try:
+            comtypes.CoInitialize()  # Initialize COM library for this thread
 
 
-        # 3. Loop raw pointers directly (extremely fast)
-        for i in range(count):
-            dev = collection.Item(i)
+            # 1. Create the base Windows device enumerator
+            enumerator = comtypes.CoCreateInstance(
+                CLSID_MMDeviceEnumerator,
+                IMMDeviceEnumerator,
+                comtypes.CLSCTX_INPROC_SERVER
+            )
 
-            # Open property store to get the string name
-            wrapped_device = AudioUtilities.CreateDevice(dev)
-            friendly_name = wrapped_device.FriendlyName
+            # 2. Get only active CAPTURE (input) devices (1 = eCapture)
+            # This prevents scanning rendering devices or disconnected endpoints
+            collection = enumerator.EnumAudioEndpoints(
+                EDataFlow.eCapture.value,
+                DEVICE_STATE.ACTIVE.value
+            )
 
-            if device_name.lower() in friendly_name.lower():
-                target_dev = dev
-                break
+            count = collection.GetCount()
 
-        if not target_dev:
-            print(f"Device matching '{device_name}' not found.")
+            target_dev = None
+
+
+            # 3. Loop raw pointers directly (extremely fast)
+            for i in range(count):
+                dev = collection.Item(i)
+
+                # Open property store to get the string name
+                wrapped_device = AudioUtilities.CreateDevice(dev)
+                friendly_name = wrapped_device.FriendlyName
+
+                if device_name.lower() in friendly_name.lower():
+                    target_dev = dev
+                    break
+
+            if not target_dev:
+                print(f"Device matching '{device_name}' not found.")
+                return False
+
+            # 4. Activate volume control interface directly
+            interface = target_dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+            volume = cast(interface, POINTER(IAudioEndpointVolume))
+
+            volume.SetMasterVolumeLevelScalar(volume_scalar, None)
+            return True
+        except Exception as e:
+            print(f"An error occurred while setting the volume: {e}")
             return False
-
-        # 4. Activate volume control interface directly
-        interface = target_dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        volume = cast(interface, POINTER(IAudioEndpointVolume))
-
-        volume.SetMasterVolumeLevelScalar(volume_scalar, None)
-        return True
+        finally:
+            comtypes.CoUninitialize()  # Uninitialize COM library for this thread
 
     def _set_volume_ui(self, percent: float, target_name: str = None):
         """sets the input device volume level
@@ -1454,40 +1463,31 @@ class Voice:
         """
         percent = max(0, min(100, percent))  # Clamp the value between 0 and 100
 
-        # 1. Initialize COM apartment for THIS thread
-        CoInitialize()
+        if target_name is None:
+            target_name = self.getDefaultDeviceName()
+        target_name = target_name.casefold()
+        level_scalar = percent / 100
 
-        try:
-            if target_name is None:
-                target_name = self.getDefaultDeviceName()
-            target_name = target_name.casefold()
-            level_scalar = percent / 100
+        syslog.info(f"VOICE: Setting microphone volume to {percent}% for target device: {target_name}")
 
-            syslog.info(f"VOICE: Setting microphone volume to {percent}% for target device: {target_name}")
+        self._set_volume_com(target_name, level_scalar)
 
-            self._set_volume_com(target_name, level_scalar)
+        # microphone = None
+        # devices = AudioUtilities.GetAllDevices()
+        # for device in devices:
+        #     if device.id.startswith("{0.0.1.00000000}"):  # input device
+        #         # if not is_input_device(device):
+        #         #     continue
+        #         name = device.FriendlyName
+        #         if not name:
+        #             continue
+        #         if target_name in name.casefold():
+        #             microphone = device
+        #             break
 
-            # microphone = None
-            # devices = AudioUtilities.GetAllDevices()
-            # for device in devices:
-            #     if device.id.startswith("{0.0.1.00000000}"):  # input device
-            #         # if not is_input_device(device):
-            #         #     continue
-            #         name = device.FriendlyName
-            #         if not name:
-            #             continue
-            #         if target_name in name.casefold():
-            #             microphone = device
-            #             break
+        # if microphone is not None:
+        #     interface = microphone._dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+        #     volume = cast(interface, POINTER(IAudioEndpointVolume))
+        #     volume.SetMasterVolumeLevelScalar(level_scalar, None)
+        # syslog.info(f"VOICE: Microphone volume set to {percent}%  device: {target_name}")
 
-            # if microphone is not None:
-            #     interface = microphone._dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            #     volume = cast(interface, POINTER(IAudioEndpointVolume))
-            #     volume.SetMasterVolumeLevelScalar(level_scalar, None)
-            # syslog.info(f"VOICE: Microphone volume set to {percent}%  device: {target_name}")
-
-        except Exception as e:
-            syslog.error(f"VOICE: An error occurred setting the microphone volume: {e}")
-        finally:
-            # 2. Always uninitialize to prevent memory leaking
-            CoUninitialize()

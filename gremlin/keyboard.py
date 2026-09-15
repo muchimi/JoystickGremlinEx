@@ -581,12 +581,15 @@ def key_from_mousebutton(button_id):
     return None
 
 
-def key_from_list(keys: list[Key]):
+def key_from_list(keys: list[Key] | Key):
     """converts a list of keys to a latched key sequence"""
     if not keys:
         return None
     primary_key = None
     key: Key
+    if isinstance(keys, Key):
+        return keys # single key
+
     for key in keys:
         if not primary_key:
             primary_key = key.duplicate()

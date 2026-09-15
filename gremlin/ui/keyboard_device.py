@@ -799,6 +799,99 @@ class KeyboardInputItemWidget(gremlin.input_item.InputItemWidget):
         )
 
 
+
+class QKeyListWidget(QtWidgets.QWidget):
+    """ a widget that displays latched keyboard keys from a key """
+
+    def __init__(self, values: list[gremlin.keyboard.Key] | gremlin.keyboard.Key = None, parent=None):
+        super().__init__(parent)
+        self._values = None
+        self.main_layout = QtWidgets.QHBoxLayout(self)
+        self.setLayout(self.main_layout)
+
+        if values:
+            self.setValues(values)
+
+    def clear(self):
+        gremlin.util.InvokeUiMethod(self._clear_ui)
+
+    def _clear_ui(self):
+        """ removes contents from the key list widget """
+        self._values = None
+        gremlin.util.clear_layout(self.main_layout)
+
+    def setKeys(self, values: list[gremlin.keyboard.Key] | gremlin.keyboard.Key):
+        """ sets the keys in the widget (list of key objects or single key)"""
+        self.setValues(values)
+
+    def setValues(self, values: list[gremlin.keyboard.Key] | gremlin.keyboard.Key):
+        """ sets the keys in the widget (list of key objects or single key)"""
+        if values:
+            if isinstance(values, gremlin.keyboard.Key):
+                values = [values]
+        self._values = values
+        self._update_key_list()
+
+    @property
+    def values(self):
+        """ returns the current list of key objects or single key """
+        return self._values
+
+    @values.setter
+    def values(self, new_values: list[gremlin.keyboard.Key] | gremlin.keyboard.Key):
+        self.setValues(new_values)
+
+    def _update_key_list(self):
+        gremlin.util.InvokeUiMethod(self._update_key_list_ui)
+
+    def _update_key_list_ui(self):
+        if self._values is None:
+            return
+        import gremlin.ui.virtual_keyboard
+        gremlin.util.clear_layout(self.main_layout)
+        widgets = []
+        if self._values is not None:
+            # order the keys
+            values = gremlin.keyboard.sort_keys(self._values)
+
+
+            if len(values) < 8:
+                key: gremlin.keyboard.Key
+                for key in values:
+                    # check for blank keys
+                    if not key.name:
+                        continue
+
+                    widget = gremlin.ui.virtual_keyboard.QKeyWidget()
+                    icon = KeyMap.icon(key)
+                    name = KeyMap.get_name(key)
+                    tooltip = KeyMap.get_description(key, True)
+                    if icon:
+                        widget.setIcon(icon)
+                    if name:
+                        widget.setText(name)
+                    if tooltip:
+                        widget.setToolTip(tooltip)
+                    widget.keySize = 2
+                    widget.autoSize = True
+                    widget.setFixedHeight(28)
+
+                    widget.setReadOnly(True)
+                    widgets.append(widget)
+
+            else:
+                # output as text that can wrap
+                keys = "".join(key.name + " " for key in values)
+                lbl = QtWidgets.QLabel(keys)
+                lbl.setWordWrap(True)
+                widgets = [lbl]
+
+        if widgets:
+            for widget in widgets:
+                self.main_layout.addWidget(widget)
+        else:
+            self.main_layout.addWidget(QtWidgets.QLabel("No keys assigned."))
+
 class KeyboardDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     """Widget used to configure keyboard inputs"""
 
