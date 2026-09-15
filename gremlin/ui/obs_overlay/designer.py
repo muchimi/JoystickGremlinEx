@@ -77,6 +77,7 @@ WIDGET_TITLES = {
     "axis_fader": "Fader",
     "axis_radial": "Radial",
     "axis_encoder": "Encoder",
+    "axis_paddle": "Paddle",
     "axis_stick_square": "X/Y",
     "axis_crosshair": "Radar",
     "axis_stick_circle": "Circular",
@@ -199,8 +200,9 @@ def _banner_type_help(item: dict) -> list[str]:
         )
     elif widget_type == "switch_2way":
         lines.append(
-            "Inspector: bind Position 1 and Position 2. Orientation flips vertical/horizontal. "
-            "Interactive overlay latches the last side you press."
+            "Inspector: Style Arrows/Arcs (like 4-way, North+South only) or Bars. "
+            "Orientation flips N/S vs W/E. Bind Position 1, Center, and Position 2. "
+            "Interactive overlay latches the last side (or center) you press."
         )
     elif widget_type == "switch_3way":
         lines.append(
@@ -211,6 +213,12 @@ def _banner_type_help(item: dict) -> list[str]:
         lines.append("Inspector: Axis X and Axis Y are independent (mix devices). Dot, grid, and crosshair options. Drag on an Interactive overlay if bound to vJoy.")
     elif widget_type in ("axis_bar", "axis_radio", "axis_fader"):
         lines.append("Inspector: Orientation, binding (Listen…). Drag on an Interactive overlay if bound to vJoy.")
+    elif widget_type == "axis_paddle":
+        lines.append(
+            "Inspector: Start/End angles (0° = tip up), CW or CCW travel, Off/On fills. "
+            "Optional Custom image (PNG) replaces the built-in silhouette — pivot is the image center. "
+            "Axis at start shows Off; moving toward end rotates and uses On fill. Drag on an Interactive overlay if bound to vJoy."
+        )
     elif widget_type in ("axis_radial", "axis_encoder", "axis_dial"):
         lines.append("Inspector: ticks/arc, binding (Listen…). Drag on an Interactive overlay if bound to vJoy.")
     elif widget_type:
@@ -384,7 +392,14 @@ class DesignerCanvas(OverlayView):
         self._shape_vertex = None
         self._shape_handle = None
 
+    def _runtime_locked(self) -> bool:
+        """True while a profile is running — designer must not edit or show live input."""
+        return bool(gremlin.shared_state.is_running)
+
     def mousePressEvent(self, event: QtGui.QMouseEvent):
+        if self._runtime_locked():
+            event.accept()
+            return
         if event.button() != QtCore.Qt.LeftButton:
             return
         self.setFocus()
@@ -471,6 +486,9 @@ class DesignerCanvas(OverlayView):
         self.update()
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent):
+        if self._runtime_locked():
+            event.accept()
+            return
         pos = self.map_to_scene(event.position())
         if self._mode == "move":
             dx = pos.x() - self._last.x()
@@ -503,6 +521,10 @@ class DesignerCanvas(OverlayView):
                 self.setCursor(QtCore.Qt.ArrowCursor)
 
     def mouseReleaseEvent(self, event: QtGui.QMouseEvent):
+        if self._runtime_locked():
+            self._mode = None
+            event.accept()
+            return
         if self._mode == "rubber":
             ids = self.scene.widgets_in_rect(
                 self._rubber.x(), self._rubber.y(), self._rubber.width(), self._rubber.height()
@@ -523,6 +545,17 @@ class DesignerCanvas(OverlayView):
     def keyPressEvent(self, event: QtGui.QKeyEvent):
         key = event.key()
         mods = event.modifiers()
+        # Zoom shortcuts stay available while a profile is running (view-only).
+        if self._runtime_locked():
+            if (key in (QtCore.Qt.Key_Plus, QtCore.Qt.Key_Equal)) and mods & QtCore.Qt.ControlModifier:
+                self._zoom_at(self.zoom * 1.1)
+            elif key == QtCore.Qt.Key_Minus and mods & QtCore.Qt.ControlModifier:
+                self._zoom_at(self.zoom / 1.1)
+            elif key == QtCore.Qt.Key_0 and mods & QtCore.Qt.ControlModifier:
+                self._zoom_at(1.0)
+            else:
+                event.accept()
+            return
         step = 8 if self.scene.canvas.get("snap_to_grid") else 1
         if mods & QtCore.Qt.ShiftModifier:
             step *= 4
@@ -568,6 +601,9 @@ class DesignerCanvas(OverlayView):
             super().keyPressEvent(event)
 
     def contextMenuEvent(self, event: QtGui.QContextMenuEvent):
+        if self._runtime_locked():
+            event.accept()
+            return
         pos = self.map_to_scene(event.pos())
         hit = self.scene.hit_test(pos.x(), pos.y())
         if hit and hit["id"] not in self.scene.selected_ids:
@@ -877,6 +913,9 @@ class DesignerCanvas(OverlayView):
         self.scene.update_guide(guide["id"], position=max(0.0, min(1.0, value)))
 
     def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent):
+        if self._runtime_locked():
+            event.accept()
+            return
         if event.button() != QtCore.Qt.LeftButton:
             return
         pos = self.map_to_scene(event.position())
@@ -1072,6 +1111,9 @@ class DesignerCanvas(OverlayView):
         return self._place_image(path, image, scene_pos, hit)
 
     def dragEnterEvent(self, event: QtGui.QDragEnterEvent):
+        if self._runtime_locked():
+            event.ignore()
+            return
         mime = event.mimeData()
         if local_image_path_from_mime(mime) or qimage_from_mime(mime) is not None:
             event.acceptProposedAction()
@@ -1079,9 +1121,15 @@ class DesignerCanvas(OverlayView):
         event.ignore()
 
     def dragMoveEvent(self, event: QtGui.QDragMoveEvent):
+        if self._runtime_locked():
+            event.ignore()
+            return
         self.dragEnterEvent(event)
 
     def dropEvent(self, event: QtGui.QDropEvent):
+        if self._runtime_locked():
+            event.ignore()
+            return
         mime = event.mimeData()
         scene_pos = self.map_to_scene(event.position())
         hit = self.scene.hit_test(scene_pos.x(), scene_pos.y())
@@ -1149,11 +1197,14 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         self._title.setStyleSheet("font-weight: bold;")
         root.addWidget(self._title)
         self.refresh_profile_title()
-        root.addWidget(self._toolbar())
-        root.addWidget(self._page_bar())
+        self._toolbar_bar = self._toolbar()
+        root.addWidget(self._toolbar_bar)
+        self._page_bar_widget = self._page_bar()
+        root.addWidget(self._page_bar_widget)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
-        splitter.addWidget(self._palette())
+        self._palette_panel = self._palette()
+        splitter.addWidget(self._palette_panel)
         self.canvas = DesignerCanvas(scene)
         scroll = QtWidgets.QScrollArea()
         self._canvas_scroll = scroll
@@ -1201,10 +1252,13 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             el = gremlin.event_handler.EventListener()
             el.profile_loaded.connect(self.refresh_profile_title)
             el.profile_unloaded.connect(self.refresh_profile_title)
+            el.profile_start.connect(self._on_profile_runtime_changed)
+            el.profile_stop.connect(self._on_profile_runtime_changed)
             self._profile_hooks = True
         except Exception:
             self._profile_hooks = False
         self.destroyed.connect(self._cleanup_ui)
+        self._apply_runtime_lock()
 
     def _focus_wants_text_paste(self) -> bool:
         widget = QtWidgets.QApplication.focusWidget()
@@ -1217,6 +1271,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         return False
 
     def _paste_shortcut(self):
+        if gremlin.shared_state.is_running and not self._focus_wants_text_paste():
+            return
         clip = QtWidgets.QApplication.clipboard()
         mime = clip.mimeData() if clip is not None else None
         has_text = bool(mime is not None and mime.hasText() and str(mime.text() or "").strip())
@@ -1259,6 +1315,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
                 el = gremlin.event_handler.EventListener()
                 el.profile_loaded.disconnect(self.refresh_profile_title)
                 el.profile_unloaded.disconnect(self.refresh_profile_title)
+                el.profile_start.disconnect(self._on_profile_runtime_changed)
+                el.profile_stop.disconnect(self._on_profile_runtime_changed)
             except Exception:
                 pass
             self._profile_hooks = False
@@ -1346,13 +1404,17 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         export = QtWidgets.QPushButton("Export overlay...")
         export.setToolTip("Copy this overlay to a JSON file you choose. The profile still keeps its own overlay.")
         export.clicked.connect(self._export_overlay)
+        self._export_btn = export
         import_btn = QtWidgets.QPushButton("Import overlay...")
         import_btn.setToolTip("Replace this profile’s overlay with a JSON file.")
         import_btn.clicked.connect(self._import_overlay)
+        self._import_btn = import_btn
         undo = QtWidgets.QPushButton("Undo")
         undo.clicked.connect(self.scene.undo)
+        self._undo_btn = undo
         redo = QtWidgets.QPushButton("Redo")
         redo.clicked.connect(self.scene.redo)
+        self._redo_btn = redo
         for widget in (self._overlay_button, self._interactive_box, self._hints_box, export, import_btn, undo, redo):
             layout.addWidget(widget)
         layout.addStretch()
@@ -1417,6 +1479,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             return
         if not gremlin.util.is_ui_thread():
             on_ui(self, self._refresh_action_banner)
+            return
+        if gremlin.shared_state.is_running:
             return
         banner = getattr(self, "_action_banner", None)
         if banner is None or not alive(banner):
@@ -1579,6 +1643,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         return scroll
 
     def _add_widget(self, widget_type: str):
+        if gremlin.shared_state.is_running:
+            return
         if self.scene.convert_selected(widget_type):
             self.canvas.setFocus()
             return
@@ -1621,6 +1687,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         return max(0, min(canvas_w - width, x)), max(0, min(canvas_h - height, y))
 
     def _apply_template(self, title: str, factory):
+        if gremlin.shared_state.is_running:
+            return
         items = factory()
         if not items:
             if title.lower().startswith("blank"):
@@ -1688,6 +1756,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         QtWidgets.QToolTip.showText(QtGui.QCursor.pos(), f"Saved {path}", self)
 
     def _set_interactive(self, checked: bool):
+        if gremlin.shared_state.is_running:
+            return
         if bool(self.scene.canvas.get("interactive")) == bool(checked):
             return
         self.scene.canvas["interactive"] = bool(checked)
@@ -1754,6 +1824,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         return os.path.join(folder, f"{stem}.overlay.json")
 
     def _export_overlay(self):
+        if gremlin.shared_state.is_running:
+            return
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
             self,
             "Export overlay",
@@ -1771,6 +1843,8 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
             QtWidgets.QMessageBox.warning(self, "OBS Overlay", f"Could not export overlay to:\n{path}")
 
     def _import_overlay(self):
+        if gremlin.shared_state.is_running:
+            return
         start = self._overlay_file_start()
         directory = os.path.dirname(start) if start else ""
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -1785,7 +1859,11 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
 
     def showEvent(self, event):
         if hasattr(self, "canvas") and Shiboken.isValid(self.canvas):
-            self.canvas.attach_bus()
+            if gremlin.shared_state.is_running:
+                self.canvas.detach_bus()
+            else:
+                self.canvas.attach_bus()
+        self._apply_runtime_lock()
         self._refresh_overlay_button()
         super().showEvent(event)
 
@@ -1795,6 +1873,57 @@ class OverlayDesignerWidget(QtWidgets.QWidget):
         if self.scene.dirty:
             self.scene.save_later()
         super().hideEvent(event)
+
+    def _on_profile_runtime_changed(self):
+        if not alive(self):
+            return
+        if not gremlin.util.is_ui_thread():
+            on_ui(self, self._on_profile_runtime_changed)
+            return
+        self._apply_runtime_lock()
+
+    def _apply_runtime_lock(self):
+        """While a profile runs: no live input preview and no designer edits."""
+        if not alive(self):
+            return
+        locked = bool(gremlin.shared_state.is_running)
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None and alive(canvas):
+            if locked:
+                canvas.detach_bus()
+                canvas.update()
+            elif self.isVisible():
+                canvas.attach_bus()
+                canvas.update()
+        for attr in ("_palette_panel", "inspector", "_page_bar_widget"):
+            widget = getattr(self, attr, None)
+            if widget is not None and alive(widget):
+                widget.setEnabled(not locked)
+        # Keep Show overlay / Hints / Zoom usable; lock edit actions.
+        for attr in (
+            "_interactive_box",
+            "_export_btn",
+            "_import_btn",
+            "_undo_btn",
+            "_redo_btn",
+        ):
+            widget = getattr(self, attr, None)
+            if widget is not None and alive(widget):
+                widget.setEnabled(not locked)
+        banner = getattr(self, "_action_banner", None)
+        if locked:
+            if banner is not None and alive(banner):
+                banner.set_content(
+                    "Overlay locked",
+                    "The profile is running. The Overlay tab is view-only: widgets stay idle (off), "
+                    "and editing is disabled until the profile stops. Use <b>Show overlay</b> for the live window.",
+                )
+                banner.setVisible(True)
+        else:
+            self._refresh_action_banner()
+            box = getattr(self, "_hints_box", None)
+            if box is not None and alive(box) and banner is not None and alive(banner):
+                banner.setVisible(bool(box.isChecked()))
 
 
 OverlayDesignerDialog = OverlayDesignerWidget

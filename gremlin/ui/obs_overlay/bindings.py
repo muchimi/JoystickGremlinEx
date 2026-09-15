@@ -973,6 +973,15 @@ class OverlayValueBus(QtCore.QObject):
         StopwatchOverlayTracker().retain(stopwatch_ids)
         KeyboardMouseTracker().retain(input_display_ids)
         ManualCounterTracker().retain(manual_ids)
+        if ManualCounterTracker().take_persist_dirty():
+            try:
+                from gremlin.ui.obs_overlay import OverlayManager
+
+                scene = OverlayManager().scene
+                scene._dirty = True
+                scene.save_later()
+            except Exception:
+                pass
         if self._emit_all:
             self._emit_all = False
             self.values_changed.emit([])

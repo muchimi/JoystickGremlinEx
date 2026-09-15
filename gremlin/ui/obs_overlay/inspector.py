@@ -46,6 +46,7 @@ from .model import (
     normalize_background_mode,
     normalize_graph_series,
     normalize_overlay_keys,
+    normalize_paddle_direction,
     normalize_series_range_mode,
     normalize_stat_series,
     normalize_switch_appearance,
@@ -1126,6 +1127,59 @@ class OverlayInspector(QtWidgets.QWidget):
             ticks.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, radio_steps=int(v)))
             look.addRow("Steps", ticks)
             self._style_bool(look, item, "invert_display", "Invert")
+        elif widget_type == "axis_paddle":
+            start = QtWidgets.QDoubleSpinBox()
+            start.setRange(-360.0, 360.0)
+            start.setDecimals(1)
+            start.setSuffix("°")
+            start.setValue(float(item["style"].get("paddle_start_deg") or 0.0))
+            start.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, paddle_start_deg=float(v)))
+            look.addRow("Start angle", start)
+            end = QtWidgets.QDoubleSpinBox()
+            end.setRange(-360.0, 360.0)
+            end.setDecimals(1)
+            end.setSuffix("°")
+            end.setValue(float(item["style"].get("paddle_end_deg") or 70.0))
+            end.valueChanged.connect(lambda v, wid=item["id"]: self._style(wid, paddle_end_deg=float(v)))
+            look.addRow("End angle", end)
+            direction = QtWidgets.QComboBox()
+            direction.addItem("Clockwise", "cw")
+            direction.addItem("Counter-clockwise", "ccw")
+            cur_dir = normalize_paddle_direction(item["style"].get("paddle_direction"))
+            direction.setCurrentIndex(0 if cur_dir == "cw" else 1)
+            direction.currentIndexChanged.connect(
+                lambda _i, wid=item["id"], box=direction: self._style(
+                    wid, paddle_direction=box.currentData()
+                )
+            )
+            look.addRow("Rotation", direction)
+            self._style_color(look, item, "fill", "Off fill")
+            self._style_color(look, item, "fill_on", "On fill")
+            self._style_color(look, item, "indicator", "Pivot")
+            self._style_float(look, item, "indicator_size", "Pivot size", 4, 80)
+            path_row = QtWidgets.QWidget()
+            path_layout = QtWidgets.QHBoxLayout(path_row)
+            path_layout.setContentsMargins(0, 0, 0, 0)
+            path_edit = QtWidgets.QLineEdit(item["style"].get("paddle_image") or "")
+            path_edit.setPlaceholderText("Optional — replaces built-in art (pivot = image center)")
+            browse = QtWidgets.QPushButton("...")
+            browse.setFixedWidth(28)
+            browse.setToolTip(
+                "Choose a custom paddle image. PNG with transparency works best. "
+                "Pivot is the center of the image. Clear uses the built-in silhouette from your reference."
+            )
+            browse.clicked.connect(lambda _=False, wid=item["id"]: self._browse_paddle_image(wid))
+            clear = QtWidgets.QPushButton("Clear")
+            clear.setToolTip("Use the built-in vector paddle.")
+            clear.clicked.connect(lambda _=False, wid=item["id"]: self._style(wid, paddle_image="", rebuild=True))
+            path_edit.editingFinished.connect(
+                lambda wid=item["id"], w=path_edit: self._style(wid, paddle_image=w.text().strip())
+            )
+            path_layout.addWidget(path_edit)
+            path_layout.addWidget(browse)
+            path_layout.addWidget(clear)
+            look.addRow("Custom image", path_row)
+            self._style_bool(look, item, "invert_display", "Invert")
         elif widget_type in ("axis_stick_square", "axis_stick_circle", "axis_crosshair", "hat"):
             self._style_color(look, item, "fill", "Fill")
             self._style_color(look, item, "indicator", "Dot")
@@ -1155,25 +1209,10 @@ class OverlayInspector(QtWidgets.QWidget):
                 self._grid_appearance(look, item)
                 self._crosshair_appearance(look, item)
         elif widget_type == "switch_4way":
-            appearance = QtWidgets.QComboBox()
-            appearance.addItem("Arrows", "arrows")
-            appearance.addItem("Arcs", "arcs")
-            current = normalize_switch_appearance(item["style"].get("switch_appearance"))
-            appearance.setCurrentIndex(0 if current == "arrows" else 1)
-            appearance.currentIndexChanged.connect(
-                lambda _i, wid=item["id"], box=appearance: self._style(
-                    wid, switch_appearance=str(box.currentData() or "arrows"), rebuild=True
-                )
-            )
-            look.addRow("Style", appearance)
-            self._style_color(look, item, "fill", "Inactive")
-            self._style_color(look, item, "fill_on", "Active")
-            self._style_color(look, item, "indicator", "Center")
-            self._style_color(look, item, "border", "Border")
-            self._style_color(look, item, "border_on", "Active border")
-            self._style_float(look, item, "border_width", "Border width", 0, 20)
-            self._style_float(look, item, "indicator_size", "Center size", 10, 100)
-        elif widget_type in ("switch_2way", "switch_3way"):
+            self._switch_cardinal_appearance(look, item, include_orientation=False)
+        elif widget_type == "switch_2way":
+            self._switch_cardinal_appearance(look, item, include_orientation=True)
+        elif widget_type == "switch_3way":
             self._orientation_combo(look, item)
             self._style_color(look, item, "fill", "Housing")
             self._style_color(look, item, "fill_on", "Active fill")
@@ -1258,25 +1297,11 @@ class OverlayInspector(QtWidgets.QWidget):
             self._style_color(look, item, "fill_on", "On fill")
         if types <= {"switch_4way", "switch_2way", "switch_3way"}:
             self._style_color(look, item, "fill_on", "Active fill")
-        if types <= {"switch_4way"}:
-            appearance = QtWidgets.QComboBox()
-            appearance.addItem("Arrows", "arrows")
-            appearance.addItem("Arcs", "arcs")
-            current = normalize_switch_appearance(item["style"].get("switch_appearance"))
-            appearance.setCurrentIndex(0 if current == "arrows" else 1)
-            appearance.currentIndexChanged.connect(
-                lambda _i, wid=item["id"], box=appearance: self._style(
-                    wid, switch_appearance=str(box.currentData() or "arrows"), rebuild=True
-                )
+        if types <= {"switch_4way", "switch_2way"}:
+            self._switch_cardinal_appearance(
+                look, item, include_orientation=("switch_2way" in types)
             )
-            look.addRow("Style", appearance)
-            self._style_color(look, item, "indicator", "Center")
-            self._style_float(look, item, "indicator_size", "Center size", 10, 100)
-            self._style_color(look, item, "fill", "Inactive")
-            self._style_color(look, item, "border", "Border")
-            self._style_color(look, item, "border_on", "Active border")
-            self._style_float(look, item, "border_width", "Border width", 0, 20)
-        if types <= {"switch_2way", "switch_3way"}:
+        elif types <= {"switch_3way"}:
             self._orientation_combo(look, item)
         if types <= {"axis_bar", "axis_radio", "axis_fader"}:
             self._orientation_combo(look, item)
@@ -1295,6 +1320,7 @@ class OverlayInspector(QtWidgets.QWidget):
             "axis_fader",
             "axis_radial",
             "axis_encoder",
+            "axis_paddle",
             "axis_dial",
         }
         if types <= invert_types:
@@ -1728,6 +1754,33 @@ class OverlayInspector(QtWidgets.QWidget):
         orient.setCurrentText(item["style"].get("orientation") or default)
         orient.currentTextChanged.connect(lambda v, wid=item["id"]: self._set_orientation(wid, v))
         form.addRow("Orientation", orient)
+
+    def _switch_cardinal_appearance(self, form, item, include_orientation: bool = False):
+        appearance = QtWidgets.QComboBox()
+        appearance.addItem("Arrows", "arrows")
+        appearance.addItem("Arcs", "arcs")
+        if item.get("type") == "switch_2way" or include_orientation:
+            appearance.addItem("Bars", "bars")
+        current = normalize_switch_appearance(item["style"].get("switch_appearance"))
+        index = {"arrows": 0, "arcs": 1, "bars": 2}.get(current, 0)
+        if index >= appearance.count():
+            index = 0
+        appearance.setCurrentIndex(index)
+        appearance.currentIndexChanged.connect(
+            lambda _i, wid=item["id"], box=appearance: self._style(
+                wid, switch_appearance=str(box.currentData() or "arrows"), rebuild=True
+            )
+        )
+        form.addRow("Style", appearance)
+        if include_orientation:
+            self._orientation_combo(form, item)
+        self._style_color(form, item, "fill", "Inactive")
+        self._style_color(form, item, "fill_on", "Active")
+        self._style_color(form, item, "indicator", "Center")
+        self._style_color(form, item, "border", "Border")
+        self._style_color(form, item, "border_on", "Active border")
+        self._style_float(form, item, "border_width", "Border width", 0, 20)
+        self._style_float(form, item, "indicator_size", "Center size", 10, 100)
 
     def _set_orientation(self, widget_id: str, orientation: str):
         if self._building:
@@ -2942,6 +2995,23 @@ class OverlayInspector(QtWidgets.QWidget):
         self._fit_item_to_image(item, fname)
         self.scene._dirty = True
         self.scene._emit()
+
+    def _browse_paddle_image(self, widget_id: str):
+        if self._building:
+            return
+        item = self.scene.widget_by_id(widget_id)
+        if not item:
+            return
+        start = (item.get("style") or {}).get("paddle_image") or ""
+        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Paddle silhouette",
+            start,
+            "Images (*.png *.webp *.gif *.jpg *.jpeg *.bmp)",
+        )
+        if not fname:
+            return
+        self._style(widget_id, paddle_image=fname, rebuild=True)
         self.rebuild()
 
     def _paste_image(self, widget_id: str):
@@ -3112,7 +3182,7 @@ class OverlayInspector(QtWidgets.QWidget):
         if widget_is_switch(widget_type):
             hints = {
                 "switch_4way": "Each direction is a separate button. Center is optional (some hats press it at rest).",
-                "switch_2way": "Two positions. On an Interactive overlay the last side you press stays latched.",
+                "switch_2way": "Position 1, Center, and Position 2. Center is optional. Interactive overlay latches the last press.",
                 "switch_3way": "Spring-loaded center: an Interactive overlay returns to center when you lift.",
             }
             rows = list(SWITCH_POSITION_TITLES.get(widget_type) or ())

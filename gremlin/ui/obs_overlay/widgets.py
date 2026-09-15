@@ -15,7 +15,15 @@ from typing import Any
 
 from PySide6 import QtCore, QtGui
 
-from .model import is_onscreen_mode, normalize_background_mode, normalize_switch_appearance
+from .model import (
+    is_onscreen_mode,
+    normalize_background_mode,
+    normalize_paddle_direction,
+    normalize_switch_appearance,
+    switch_2way_cardinal_slots,
+    switch_2way_cardinal_to_value,
+    switch_2way_value_to_cardinal,
+)
 from .shapes import button_uses_shape_path, normalize_shape_kind, shape_path, uses_shape_geometry
 
 
@@ -1145,6 +1153,200 @@ def paint_axis_encoder(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.restore()
 
 
+def _paddle_deg(value, fallback: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(fallback)
+
+
+def _paddle_axis_t(value, style: dict) -> float:
+    """Map axis [-1, 1] to travel 0..1 (start→end)."""
+    axis = _deadzone(_axis(value), style)
+    if style.get("invert_display"):
+        axis = -axis
+    return max(0.0, min(1.0, (axis + 1.0) / 2.0))
+
+
+def _paddle_angle_at(start_deg: float, end_deg: float, t: float, direction: str) -> float:
+    """Clockwise-positive degrees from tip-up (0°). Interpolate start→end along CW or CCW."""
+    start = start_deg % 360.0
+    end = end_deg % 360.0
+    t = max(0.0, min(1.0, float(t)))
+    if normalize_paddle_direction(direction) == "ccw":
+        span = (start - end) % 360.0
+        return (start - span * t) % 360.0
+    span = (end - start) % 360.0
+    return (start + span * t) % 360.0
+
+
+def _paddle_progress_along_arc(angle_deg: float, start_deg: float, end_deg: float, direction: str) -> float:
+    """How far along the configured arc [0,1] a clock angle sits (clamped)."""
+    start = start_deg % 360.0
+    end = end_deg % 360.0
+    ang = angle_deg % 360.0
+    if normalize_paddle_direction(direction) == "ccw":
+        span = (start - end) % 360.0
+        if span < 1e-6:
+            return 0.0
+        along = (start - ang) % 360.0
+    else:
+        span = (end - start) % 360.0
+        if span < 1e-6:
+            return 0.0
+        along = (ang - start) % 360.0
+    if along > span:
+        # Snap to nearer endpoint
+        return 0.0 if along - span > (360.0 - along) else 1.0
+    return along / span
+
+
+_PADDLE_ASSET = os.path.join(os.path.dirname(__file__), "assets", "paddle.png")
+_PADDLE_PM_CACHE: dict[str, QtGui.QPixmap] = {}
+_PADDLE_TINT_CACHE: dict[tuple, QtGui.QPixmap] = {}
+
+
+def _paddle_body_path(length: float) -> QtGui.QPainterPath:
+    """Fallback vector paddle if the bundled asset is missing."""
+    L = max(28.0, float(length))
+    hub_r = L * 0.26
+
+    arm = QtGui.QPainterPath()
+    arm.moveTo(QtCore.QPointF(-hub_r * 0.35, -hub_r * 0.78))
+    arm.cubicTo(
+        QtCore.QPointF(-L * 0.18, -L * 0.42),
+        QtCore.QPointF(-L * 0.12, -L * 0.72),
+        QtCore.QPointF(L * 0.02, -L * 0.93),
+    )
+    arm.cubicTo(
+        QtCore.QPointF(L * 0.08, -L * 1.00),
+        QtCore.QPointF(L * 0.18, -L * 0.99),
+        QtCore.QPointF(L * 0.22, -L * 0.92),
+    )
+    tip = QtCore.QPointF(L * 0.22, -L * 0.92)
+    c1 = QtCore.QPointF(L * 0.48, -L * 0.70)
+    c2 = QtCore.QPointF(L * 0.46, -L * 0.22)
+    end = QtCore.QPointF(hub_r * 0.72, -hub_r * 0.55)
+    serrations = 10
+    prev = tip
+    for i in range(1, serrations + 1):
+        u = i / serrations
+        u1 = 1.0 - u
+        pt = QtCore.QPointF(
+            u1**3 * tip.x() + 3 * u1**2 * u * c1.x() + 3 * u1 * u**2 * c2.x() + u**3 * end.x(),
+            u1**3 * tip.y() + 3 * u1**2 * u * c1.y() + 3 * u1 * u**2 * c2.y() + u**3 * end.y(),
+        )
+        if 0 < i < serrations and i % 2 == 1 and u < 0.85:
+            dx = pt.x() - prev.x()
+            dy = pt.y() - prev.y()
+            mag = math.hypot(dx, dy) or 1.0
+            nx, ny = dy / mag, -dx / mag
+            depth = L * (0.034 if u < 0.55 else 0.022)
+            pt = QtCore.QPointF(pt.x() + nx * depth, pt.y() + ny * depth)
+        arm.lineTo(pt)
+        prev = pt
+    arm.lineTo(QtCore.QPointF(hub_r * 0.15, -hub_r * 0.85))
+    arm.closeSubpath()
+    hub = QtGui.QPainterPath()
+    hub.addEllipse(QtCore.QPointF(0.0, 0.0), hub_r, hub_r)
+    return hub.united(arm)
+
+
+def _paddle_pixmap(style: dict) -> QtGui.QPixmap | None:
+    raw = str(style.get("paddle_image") or "").strip()
+    path = raw if raw and os.path.isfile(raw) else (_PADDLE_ASSET if os.path.isfile(_PADDLE_ASSET) else "")
+    if not path:
+        return None
+    cached = _PADDLE_PM_CACHE.get(path)
+    if cached is not None and not cached.isNull():
+        return cached
+    pm = QtGui.QPixmap(path)
+    if pm.isNull():
+        return None
+    _PADDLE_PM_CACHE[path] = pm
+    return pm
+
+
+def _tint_paddle_pixmap(pm: QtGui.QPixmap, body: QtGui.QColor, size: int) -> QtGui.QPixmap:
+    """Scale + colorize a white/alpha paddle silhouette (cached)."""
+    key = (id(pm), body.rgba(), int(size))
+    hit = _PADDLE_TINT_CACHE.get(key)
+    if hit is not None and not hit.isNull():
+        return hit
+    scaled = pm.scaled(int(size), int(size), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+    out = QtGui.QPixmap(scaled.size())
+    out.fill(QtCore.Qt.transparent)
+    painter = QtGui.QPainter(out)
+    painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
+    painter.drawPixmap(0, 0, scaled)
+    painter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceIn)
+    painter.fillRect(out.rect(), body)
+    painter.end()
+    if len(_PADDLE_TINT_CACHE) > 64:
+        _PADDLE_TINT_CACHE.clear()
+    _PADDLE_TINT_CACHE[key] = out
+    return out
+
+
+def paint_axis_paddle(painter: QtGui.QPainter, item: dict[str, Any], value):
+    """Single-axis paddle: rotates from start° to end° (CW or CCW); off at start, on when moved."""
+    style = item.get("style") or {}
+    rect = widget_rect(item)
+    t = _paddle_axis_t(value, style)
+    start_deg = _paddle_deg(style.get("paddle_start_deg"), 0.0)
+    end_deg = _paddle_deg(style.get("paddle_end_deg"), 70.0)
+    direction = normalize_paddle_direction(style.get("paddle_direction"))
+    angle = _paddle_angle_at(start_deg, end_deg, t, direction)
+    is_on = t > 0.02
+
+    painter.save()
+    painter.setOpacity(_opacity(style))
+    side = min(rect.width(), rect.height())
+    cx, cy = rect.center().x(), rect.center().y()
+    length = side * 0.44
+
+    body = qcolor(style.get("fill_on") if is_on else style.get("fill"), "#6a6f78" if not is_on else "#c4c8d0")
+    pin = qcolor(style.get("indicator"), "#2a2e36")
+    border_w = max(0.0, _border_w(style))
+    source = _paddle_pixmap(style)
+    user_image = bool(str(style.get("paddle_image") or "").strip())
+
+    painter.save()
+    painter.translate(cx, cy)
+    # 0° = tip up; positive degrees rotate clockwise (matches QPainter).
+    painter.rotate(angle)
+
+    if source is not None:
+        target = max(16, int(side * 0.95))
+        if user_image:
+            pm = source.scaled(target, target, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+        else:
+            pm = _tint_paddle_pixmap(source, body, target)
+        painter.drawPixmap(int(-pm.width() / 2), int(-pm.height() / 2), pm)
+        if not user_image:
+            pin_r = max(2.0, side * 0.028)
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(pin)
+            painter.drawEllipse(QtCore.QPointF(0, 0), pin_r, pin_r)
+    else:
+        path = _paddle_body_path(length)
+        painter.setPen(_pen(style.get("border"), border_w if border_w > 0 else 1.4))
+        painter.setBrush(body)
+        painter.drawPath(path)
+        hub_r = length * 0.26
+        pin_r = max(2.0, hub_r * 0.28)
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.setPen(_pen(style.get("border"), max(1.0, border_w * 0.85)))
+        painter.drawEllipse(QtCore.QPointF(0, 0), pin_r * 1.65, pin_r * 1.65)
+        painter.setBrush(pin)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.drawEllipse(QtCore.QPointF(0, 0), pin_r, pin_r)
+    painter.restore()
+
+    _draw_label(painter, item, rect)
+    painter.restore()
+
+
 def paint_axis_dial(painter: QtGui.QPainter, item: dict[str, Any], value):
     paint_axis_radial(painter, item, value)
 
@@ -1901,11 +2103,22 @@ def _cardinal_arrow_path(cx: float, cy: float, slot: str, inner: float, outer: f
 
 def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
     """Physical 4-way hat that reports as five buttons (N/E/S/W/center)."""
-    style = item.get("style") or {}
-    appearance = normalize_switch_appearance(style.get("switch_appearance"))
     position = str(value or "")
     if position not in ("n", "e", "s", "w", "center"):
         position = ""
+    _paint_switch_cardinal(painter, item, position, ("n", "e", "s", "w"), show_center=True)
+
+
+def _paint_switch_cardinal(
+    painter: QtGui.QPainter,
+    item: dict[str, Any],
+    position: str,
+    slots: tuple[str, ...],
+    show_center: bool = True,
+):
+    """Shared arrows/arcs paint for 4-way and 2-way (subset of cardinals)."""
+    style = item.get("style") or {}
+    appearance = normalize_switch_appearance(style.get("switch_appearance"))
     geo = _switch_4way_geometry(item)
     cx, cy = geo["cx"], geo["cy"]
     outer_r = geo["outer_r"]
@@ -1917,21 +2130,19 @@ def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
 
     if appearance == "arcs":
-        # Four donut slices with a small angular gap between each.
-        span = 78.0
-        # Qt angles: 0° = east, positive CCW. Centers: N=90, E=0, S=-90, W=180.
+        # Wider slices when only two directions so the ring still reads clearly.
+        span = 78.0 if len(slots) >= 4 else 140.0
         starts = {"e": -span / 2.0, "n": 90.0 - span / 2.0, "w": 180.0 - span / 2.0, "s": -90.0 - span / 2.0}
-        for slot, start in starts.items():
+        for slot in slots:
             active = slot == position
             fill, border = _switch_fill_colors(style, active)
-            path = _donut_slice(cx, cy, ring_inner, outer_r, start, span)
+            path = _donut_slice(cx, cy, ring_inner, outer_r, starts[slot], span)
             painter.setPen(_pen(border, border_w * 0.85) if border_w > 0 else QtCore.Qt.NoPen)
             painter.setBrush(fill)
             painter.drawPath(path)
     else:
-        # Arrows mode: four outward arrows + fixed center circle.
         half_w = max(5.0, (outer_r - ring_inner) * 0.38)
-        for slot in ("n", "e", "s", "w"):
+        for slot in slots:
             active = slot == position
             fill, border = _switch_fill_colors(style, active)
             path = _cardinal_arrow_path(cx, cy, slot, ring_inner, outer_r, half_w)
@@ -1939,17 +2150,16 @@ def paint_switch_4way(painter: QtGui.QPainter, item: dict[str, Any], value):
             painter.setBrush(fill)
             painter.drawPath(path)
 
-    # Center button — fixed in the middle. Lit only when the center binding is pressed
-    # (idle spring-rest no longer reports as "center", so this stays inactive at rest).
-    center_active = position == "center"
-    if center_active:
-        center_fill, center_border = _switch_fill_colors(style, True)
-    else:
-        center_fill = qcolor(style.get("indicator"), "#2a3548")
-        center_border = qcolor(style.get("border"), "#3a4a62")
-    painter.setPen(_pen(center_border, border_w) if border_w > 0 else QtCore.Qt.NoPen)
-    painter.setBrush(center_fill)
-    painter.drawEllipse(QtCore.QPointF(cx, cy), center_r, center_r)
+    if show_center:
+        center_active = position == "center"
+        if center_active:
+            center_fill, center_border = _switch_fill_colors(style, True)
+        else:
+            center_fill = qcolor(style.get("indicator"), "#2a3548")
+            center_border = qcolor(style.get("border"), "#3a4a62")
+        painter.setPen(_pen(center_border, border_w) if border_w > 0 else QtCore.Qt.NoPen)
+        painter.setBrush(center_fill)
+        painter.drawEllipse(QtCore.QPointF(cx, cy), center_r, center_r)
 
     housing = QtCore.QRectF(cx - outer_r, cy - outer_r, outer_r * 2, outer_r * 2)
     _draw_axis_labels(painter, item, housing)
@@ -1963,14 +2173,21 @@ def _switch_is_vertical(item: dict[str, Any]) -> bool:
 def paint_switch_toggle(painter: QtGui.QPainter, item: dict[str, Any], value):
     """2-way latching or 3-way spring-center switch (slot highlight only, no bat handle)."""
     style = item.get("style") or {}
-    rect = widget_rect(item)
     widget_type = item.get("type")
+    if widget_type == "switch_2way" and normalize_switch_appearance(style.get("switch_appearance")) != "bars":
+        slots = switch_2way_cardinal_slots(item)
+        raw = str(value or "")
+        cardinal = "center" if raw == "center" else switch_2way_value_to_cardinal(item, raw)
+        _paint_switch_cardinal(painter, item, cardinal, slots, show_center=True)
+        return
+
+    rect = widget_rect(item)
     position = str(value or "")
     vertical = _switch_is_vertical(item)
     painter.save()
     painter.setOpacity(_opacity(style))
     fill, border = _switch_fill_colors(style, False)
-    painter.setPen(_pen(border, _border_w(style)))
+    painter.setPen(_pen(border, _border_w(style)) if _border_w(style) > 0 else QtCore.Qt.NoPen)
     painter.setBrush(fill)
     radius = _corner_radius(style, 10.0)
     painter.drawPath(_rounded(rect, radius))
@@ -1983,7 +2200,7 @@ def paint_switch_toggle(painter: QtGui.QPainter, item: dict[str, Any], value):
     painter.setBrush(qcolor(style.get("track") or "#0b1220"))
     painter.drawPath(_rounded(inner, max(4.0, radius * 0.45)))
 
-    slots = ("a", "b") if widget_type == "switch_2way" else ("up", "center", "down")
+    slots = ("a", "center", "b") if widget_type == "switch_2way" else ("up", "center", "down")
     count = len(slots)
     for index, slot in enumerate(slots):
         if vertical:
@@ -2275,6 +2492,7 @@ _PAINTERS = {
     "axis_fader": paint_axis_fader,
     "axis_radial": paint_axis_radial,
     "axis_encoder": paint_axis_encoder,
+    "axis_paddle": paint_axis_paddle,
     "axis_dial": paint_axis_radial,
     "axis_stick_square": paint_axis_stick_square,
     "axis_stick_circle": paint_axis_stick_circle,
@@ -2341,12 +2559,30 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
         if abs(dx) >= abs(dy):
             return "e" if dx > 0 else "w"
         return "n" if dy > 0 else "s"
-    if widget_type in ("switch_2way", "switch_3way"):
+    if widget_type == "switch_2way":
+        style_app = normalize_switch_appearance((style.get("switch_appearance") or "arrows"))
+        if style_app != "bars":
+            geo = _switch_4way_geometry(item)
+            cx, cy = geo["cx"], geo["cy"]
+            dx = x - cx
+            dy = cy - y
+            if math.hypot(dx, dy) <= geo["center_r"]:
+                return "center"
+            first, second = switch_2way_cardinal_slots(item)
+            if first in ("n", "s"):
+                cardinal = "n" if dy > 0 else "s"
+            else:
+                cardinal = "e" if dx > 0 else "w"
+            return switch_2way_cardinal_to_value(item, cardinal) or None
         vertical = (style.get("orientation") or "vertical").casefold() != "horizontal"
-        if widget_type == "switch_2way":
-            if vertical:
-                return "a" if y < rect.center().y() else "b"
-            return "a" if x < rect.center().x() else "b"
+        t = (y - rect.y()) / max(1.0, rect.height()) if vertical else (x - rect.x()) / max(1.0, rect.width())
+        if t < 1.0 / 3.0:
+            return "a"
+        if t > 2.0 / 3.0:
+            return "b"
+        return "center"
+    if widget_type == "switch_3way":
+        vertical = (style.get("orientation") or "vertical").casefold() != "horizontal"
         t = (y - rect.y()) / max(1.0, rect.height()) if vertical else (x - rect.x()) / max(1.0, rect.width())
         if t < 1.0 / 3.0:
             return "up"
@@ -2413,6 +2649,16 @@ def value_from_point(item: dict[str, Any], x: float, y: float):
         idx = int(cw / span) % ticks
         axis = _clamp(-1.0 + 2.0 * idx / (ticks - 1))
         return _undo_invert_display(item, axis)
+    if widget_type == "axis_paddle":
+        cx, cy = rect.center().x(), rect.center().y()
+        # Clock degrees: 0 = up, positive clockwise (matches paint).
+        math_ang = _math_angle_deg(x, y, cx, cy)
+        clock_ang = (90.0 - math_ang) % 360.0
+        start_deg = _paddle_deg(style.get("paddle_start_deg"), 0.0)
+        end_deg = _paddle_deg(style.get("paddle_end_deg"), 70.0)
+        direction = normalize_paddle_direction(style.get("paddle_direction"))
+        t = _paddle_progress_along_arc(clock_ang, start_deg, end_deg, direction)
+        return _undo_invert_display(item, _clamp(t * 2.0 - 1.0))
     if widget_type in ("axis_radial", "axis_dial"):
         cx, cy = rect.center().x(), rect.center().y()
         ang = _math_angle_deg(x, y, cx, cy)

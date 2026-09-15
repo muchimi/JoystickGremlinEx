@@ -47,6 +47,7 @@ WIDGET_TYPES = (
     "axis_fader",
     "axis_radial",
     "axis_encoder",
+    "axis_paddle",
     "axis_graph",
     "axis_bars",
     "axis_stick_square",
@@ -80,6 +81,7 @@ PALETTE_TYPES = (
     "axis_fader",
     "axis_radial",
     "axis_encoder",
+    "axis_paddle",
     "axis_stick_square",
     "axis_crosshair",
     "axis_stick_circle",
@@ -97,7 +99,7 @@ PALETTE_TYPES = (
 
 PALETTE_GROUPS = (
     ("Buttons", ("button", "hat", "switch_4way", "switch_2way", "switch_3way")),
-    ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder")),
+    ("Single axis", ("axis_bar", "axis_radio", "axis_fader", "axis_radial", "axis_encoder", "axis_paddle")),
     ("Double axis", ("axis_stick_square", "axis_crosshair", "axis_stick_circle", "axis_mouse")),
     ("Meters", ("sys_stats", "stopwatch")),
     ("Other", ("axis_graph", "axis_bars", "label", "input_display", "shape", "image", "streamdeck")),
@@ -109,6 +111,7 @@ DEFAULT_SIZES = {
     "axis_fader": (40, 180),
     "axis_radial": (150, 150),
     "axis_encoder": (150, 150),
+    "axis_paddle": (160, 160),
     "axis_graph": (420, 180),
     "axis_bars": (220, 180),
     "axis_dial": (150, 150),
@@ -119,7 +122,7 @@ DEFAULT_SIZES = {
     "button": (88, 32),
     "hat": (108, 108),
     "switch_4way": (120, 120),
-    "switch_2way": (48, 96),
+    "switch_2way": (100, 100),
     "switch_3way": (48, 120),
     "label": (140, 28),
     "sys_stats": (220, 88),
@@ -137,6 +140,7 @@ DEFAULT_LABELS = {
     "axis_fader": "",
     "axis_radial": "",
     "axis_encoder": "",
+    "axis_paddle": "",
     "axis_graph": "",
     "axis_bars": "",
     "axis_dial": "",
@@ -234,6 +238,20 @@ def default_style(widget_type: str) -> dict[str, Any]:
         style.update({"indicator_size": 10.0, "show_label": False, "needle_width": 14.0, "radio_steps": 11})
     elif widget_type == "axis_encoder":
         style.update({"show_label": False, "needle_width": 0.0, "radio_steps": 16})
+    elif widget_type == "axis_paddle":
+        style.update(
+            {
+                "show_label": False,
+                "fill": "#6a6f78",
+                "fill_on": "#c4c8d0",
+                "border": "#1a1d22",
+                "indicator": "#2a2e36",
+                "indicator_size": 18.0,
+                "paddle_start_deg": 0.0,
+                "paddle_end_deg": 70.0,
+                "paddle_direction": "cw",
+            }
+        )
     elif widget_type == "axis_graph":
         style.update(
             {
@@ -333,18 +351,23 @@ def default_style(widget_type: str) -> dict[str, Any]:
     elif widget_type == "switch_2way":
         style.update(
             {
+                "switch_appearance": "arrows",
                 "fill": "#1a2230",
                 "fill_on": "#ff6b35",
                 "border": "#3a4a62",
                 "border_on": "#ffcc66",
+                "border_width": 2.0,
+                "indicator": "#2a3548",
+                "indicator_size": 28.0,
                 "orientation": "vertical",
-                "indicator_size": 10.0,
                 "show_label": False,
-                "show_axis_labels": True,
-                "axis_label_n": "I",
-                "axis_label_s": "O",
-                "axis_label_e": "O",
-                "axis_label_w": "I",
+                "show_axis_labels": False,
+                "axis_label_n": "N",
+                "axis_label_s": "S",
+                "axis_label_e": "E",
+                "axis_label_w": "W",
+                "track": "#0b1220",
+                "crosshair": "#5a6a84",
             }
         )
     elif widget_type == "switch_3way":
@@ -498,6 +521,7 @@ NO_CORNER_RADIUS_TYPES = (
     "axis_radial",
     "axis_dial",
     "axis_encoder",
+    "axis_paddle",
     "axis_crosshair",
     "axis_stick_circle",
 )
@@ -507,6 +531,7 @@ SINGLE_AXIS_TYPES = (
     "axis_fader",
     "axis_radial",
     "axis_encoder",
+    "axis_paddle",
     "axis_dial",
 )
 SERIES_WIDGET_TYPES = ("axis_graph", "axis_bars")
@@ -531,11 +556,11 @@ NO_DEADZONE_WIDGET_TYPES = NO_BINDING_WIDGET_TYPES + (
 
 SWITCH_WIDGET_TYPES = ("switch_4way", "switch_2way", "switch_3way")
 SWITCH_4WAY_POSITIONS = ("n", "e", "s", "w", "center")
-SWITCH_2WAY_POSITIONS = ("a", "b")
+SWITCH_2WAY_POSITIONS = ("a", "center", "b")
 SWITCH_3WAY_POSITIONS = ("up", "center", "down")
 SWITCH_POSITION_TITLES = {
     "switch_4way": (("n", "North"), ("e", "East"), ("s", "South"), ("w", "West"), ("center", "Center")),
-    "switch_2way": (("a", "Position 1"), ("b", "Position 2")),
+    "switch_2way": (("a", "North / Position 1"), ("center", "Center"), ("b", "South / Position 2")),
     "switch_3way": (("up", "Up"), ("center", "Center"), ("down", "Down")),
 }
 _SWITCH_POSITION_ALIASES = {
@@ -569,7 +594,7 @@ def switch_positions(widget_type: str | None) -> tuple[str, ...]:
 
 def switch_rest_position(widget_type: str | None) -> str | None:
     kind = canonical_widget_type(widget_type or "")
-    if kind in ("switch_4way", "switch_3way"):
+    if kind in ("switch_4way", "switch_3way", "switch_2way"):
         return "center"
     return None
 
@@ -582,7 +607,42 @@ def normalize_switch_appearance(value) -> str:
     raw = str(value or "").strip().casefold()
     if raw in ("arcs", "arc"):
         return "arcs"
+    if raw in ("bars", "bar", "slots", "slot", "toggle"):
+        return "bars"
     return "arrows"
+
+
+def normalize_paddle_direction(value) -> str:
+    raw = str(value or "").strip().casefold()
+    if raw in ("ccw", "counterclockwise", "counter-clockwise", "anticlockwise"):
+        return "ccw"
+    return "cw"
+
+
+def switch_2way_cardinal_slots(item: dict[str, Any] | None) -> tuple[str, str]:
+    """Visual cardinal slots for a 2-way: vertical N/S, horizontal W/E."""
+    vertical = ((item or {}).get("style") or {}).get("orientation") or "vertical"
+    if str(vertical).casefold() == "horizontal":
+        return ("w", "e")
+    return ("n", "s")
+
+
+def switch_2way_value_to_cardinal(item: dict[str, Any] | None, value: str) -> str:
+    first, second = switch_2way_cardinal_slots(item)
+    if value == "a":
+        return first
+    if value == "b":
+        return second
+    return ""
+
+
+def switch_2way_cardinal_to_value(item: dict[str, Any] | None, cardinal: str) -> str:
+    first, second = switch_2way_cardinal_slots(item)
+    if cardinal == first:
+        return "a"
+    if cardinal == second:
+        return "b"
+    return ""
 
 
 def switch_binding(item: dict[str, Any] | None, position: str) -> dict[str, Any]:
@@ -1553,7 +1613,7 @@ class OverlayScene(QtCore.QObject):
             item["binding_y"] = normalize_toggle_binding(item.get("binding_y"))
         if widget_type in SWITCH_WIDGET_TYPES:
             item["bindings"] = normalize_switch_bindings(widget_type, raw)
-            if widget_type == "switch_4way":
+            if widget_type in ("switch_4way", "switch_2way"):
                 style["switch_appearance"] = normalize_switch_appearance(style.get("switch_appearance"))
         else:
             item["bindings"] = {}
@@ -1774,7 +1834,7 @@ class OverlayScene(QtCore.QObject):
         if widget_type in SWITCH_WIDGET_TYPES:
             previous = saved_bindings if old_kind == "switch" else None
             item["bindings"] = normalize_switch_bindings(widget_type, previous)
-            if widget_type == "switch_4way":
+            if widget_type in ("switch_4way", "switch_2way"):
                 new_style["switch_appearance"] = normalize_switch_appearance(new_style.get("switch_appearance"))
             if old_kind == "button":
                 first = next(iter(switch_positions(widget_type)), None)
@@ -2194,7 +2254,7 @@ class OverlayScene(QtCore.QObject):
         for key, value in fields.items():
             if key == "style":
                 item["style"].update(value)
-                if item.get("type") == "switch_4way" and "switch_appearance" in (value or {}):
+                if item.get("type") in ("switch_4way", "switch_2way") and "switch_appearance" in (value or {}):
                     item["style"]["switch_appearance"] = normalize_switch_appearance(
                         item["style"].get("switch_appearance")
                     )

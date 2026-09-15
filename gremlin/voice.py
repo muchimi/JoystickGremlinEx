@@ -35,7 +35,10 @@ from collections import deque
 import queue
 import sounddevice as sd
 import numpy as np
-from faster_whisper import WhisperModel
+try:
+    from faster_whisper import WhisperModel
+except ImportError:
+    WhisperModel = None  # optional; VOICE_INPUT_ENABLED requires this package
 from PySide6.QtMultimedia import QAudioInput, QMediaDevices, QAudioOutput
 import threading
 import logging
@@ -43,7 +46,11 @@ import os
 import numpy as np
 import time
 import concurrent.futures
-from rapidfuzz import process, fuzz
+try:
+    from rapidfuzz import process, fuzz
+except ImportError:
+    process = None
+    fuzz = None
 from psygnal import Signal
 
 import sounddevice as sd
@@ -470,6 +477,10 @@ class SpeechRecognizer:
         self.sample_rate = sample_rate
         self.callback = callback
 
+        if WhisperModel is None:
+            raise RuntimeError(
+                "faster_whisper is not installed — cannot start speech recognition"
+            )
         self.model = WhisperModel(
             model_size,
             device=device,
