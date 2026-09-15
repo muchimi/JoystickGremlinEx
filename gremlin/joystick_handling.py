@@ -1276,6 +1276,14 @@ def registerSpecialDevices():
     device.device_category = DeviceCategory.Special
     registerSpecialDevice(device)
 
+    # AFCS visual axis-flow designer
+    device = DeviceSummary()
+    device.name = "AFCS"
+    device.device_guid = gremlin.shared_state.afcs_tab_guid
+    device.device_type = DeviceType.Afcs
+    device.device_category = DeviceCategory.Special
+    registerSpecialDevice(device)
+
     # THESE SHOULD BE LAST
     # plugin
 

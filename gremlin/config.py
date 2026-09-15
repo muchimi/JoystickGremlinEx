@@ -2009,6 +2009,17 @@ class Configuration(QtCore.QObject):
             self.changed.emit("show_input_axis", value)
 
     @property
+    def afcs_show_live_while_running(self):
+        """Show AFCS designer live meters while a profile is active."""
+        return bool(self._get_data("afcs_show_live_while_running", False))
+
+    @afcs_show_live_while_running.setter
+    def afcs_show_live_while_running(self, value):
+        current = self.afcs_show_live_while_running
+        if current != bool(value):
+            self._set_data("afcs_show_live_while_running", bool(value))
+
+    @property
     def input_viewer_disables_repeaters(self):
         return self._get_data("input_viewer_disables_repeaters", False)
 
@@ -2356,7 +2367,7 @@ class Configuration(QtCore.QObject):
             case DeviceType.ModeControl:
                 save_input_id = input_id
                 input_type = InputType.ModeControl
-            case DeviceType.Settings | DeviceType.Plugins | DeviceType.Overlay:
+            case DeviceType.Settings | DeviceType.Plugins | DeviceType.Overlay | DeviceType.Afcs:
                 input_type = InputType.NotSet
                 input_id = None
                 save_input_id = None

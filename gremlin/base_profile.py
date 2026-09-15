@@ -3424,6 +3424,8 @@ class Profile:
             return len(plugins) > 0
         elif device_guid == gremlin.shared_state.overlay_tab_guid:
             return True
+        elif device_guid == gremlin.shared_state.afcs_tab_guid:
+            return True
         elif device_guid == gremlin.shared_state.keyboard_tab_guid:
             look_for_containers = False
 
@@ -4846,6 +4848,12 @@ class Profile:
                     import gremlin.ui.obs_overlay as obs_overlay
 
                     obs_overlay.persist_for_profile(self, dest_xml=use_name)
+                except Exception:
+                    pass
+                try:
+                    import gremlin.ui.afcs as afcs
+
+                    afcs.persist_for_profile(self, dest_xml=use_name)
                 except Exception:
                     pass
                 # Stream Deck page names live in the sidecar JSON, not the XML.

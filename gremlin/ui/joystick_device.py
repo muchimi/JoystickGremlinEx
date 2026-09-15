@@ -27,6 +27,7 @@ from dinput import DeviceSummary
 import gremlin.config
 import gremlin.ui.ui_common
 import gremlin.base_profile
+import gremlin.curve_handler
 import gremlin.event_handler
 import gremlin.joystick_handling
 import gremlin.shared_state
@@ -1148,8 +1149,6 @@ class JoystickDeviceTabWidget(gremlin.input_item.BaseDeviceTabWidget):
     def _edit_curve_item_ui(self, index: int, input_item: InputItem):
         """edit curve request"""
         gremlin.util.assert_ui_thread()
-        import gremlin.curve_handler
-        import gremlin.event_handler
 
         global _active_curve_dialog
 
